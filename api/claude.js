@@ -1,12 +1,14 @@
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
+import { isAppAuthed } from '../lib/appAuth.js'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, anthropic-version, anthropic-beta')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, x-app-key, anthropic-version, anthropic-beta')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).send('Method not allowed')
+  if (!isAppAuthed(req)) return res.status(401).json({ error: { message: 'Unauthorized — enter the team password' } })
 
   const rl = rateLimit(clientIp(req.headers))
   if (!rl.ok) {

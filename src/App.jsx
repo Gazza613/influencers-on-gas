@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider, useTheme } from './context/theme'
 import { StoreProvider } from './store'
 import { silentRefreshHFToken } from './utils/higgsfieldAuth'
+import AppGate from './components/AppGate'
 import Nav from './components/Nav'
 import Landing from './pages/Landing'
 import Influencers from './pages/Influencers'
@@ -62,6 +63,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+    <AppGate>
     <StoreProvider>
     <BrowserRouter>
       <Nav />
@@ -79,6 +81,7 @@ export default function App() {
       <Analytics />
     </BrowserRouter>
     </StoreProvider>
+    </AppGate>
     </ThemeProvider>
   )
 }

@@ -1,4 +1,5 @@
 import { getValidHFAccessToken } from '../lib/hfToken.js'
+import { isAppAuthed } from '../lib/appAuth.js'
 
 export const config = { runtime: 'edge' }
 
@@ -15,6 +16,9 @@ export default async function handler(req) {
     'Access-Control-Allow-Credentials': 'true',
   }
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
+  if (!isAppAuthed(req)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
 
   try {
     const accessToken = await getValidHFAccessToken()
