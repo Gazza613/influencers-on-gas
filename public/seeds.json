@@ -1,0 +1,2037 @@
+{
+  "exportedAt": "2026-05-26T11:42:48.866Z",
+  "influencer_ids": [
+    "camila-template",
+    "kayla-template",
+    "mpe00fxqdypgtihqft",
+    "mpm5hc0xi4d78ry3qr",
+    "mpm8eqj77o69r06igss",
+    "mpma2ne5wzlwy87k7n",
+    "mpmd4rw1nhdryivbpxh",
+    "marcus-template"
+  ],
+  "influencers": {
+    "camila-template": {
+      "id": "camila-template",
+      "name": "Camila",
+      "gender": "Female",
+      "type": "Influencer",
+      "createdAt": 1715000001000,
+      "mainImage": "/camila/main.jpg",
+      "characterSheetImage": "/camila/sheet.jpg",
+      "closeUpImage1": "/camila/closeup1.png",
+      "closeUpImage2": "/camila/closeup2.png",
+      "prompt": "Candid iPhone photo of @image1, wearing the complete outfit from @image2, reproducing all clothing, headwear, and accessories exactly. Match skin texture and facial detail from @image3 and @image4. Mid-action \u2014 mid-laugh, mid-sip, mid-step, or mid-reach \u2014 body fully committed to the action, expression caught at the apex. Eyes can be on lens (late-arrival) or completely off-axis. Hands engaged with the action, not posed. Expression: direct and serious \u2014 neutral mouth at rest, steady gaze into the lens, no smile. Composed and self-assured. Eyes directed off-axis \u2014 looking to the side or slightly above the camera, as if unaware of being photographed. A small front window table, street traffic soft and blurred outside the glass, a half-drunk flat white on the table beside her. Soft morning window light from one side, cool and directional. Eye-level, 24mm, handheld. 9:16, chest-up framing. Deep focus, no bokeh, photorealistic. No other people in frame.",
+      "age": "22",
+      "backstory": "Camilla got into fitness relatively young, but after realizing she wasn't passionate in personal training clients in the gym, she switched careers to teaching yoga classes.",
+      "introExtrovert": 70,
+      "niche": "Fashion",
+      "nicheCustom": "",
+      "audience": "",
+      "hobbies": "",
+      "clothingStyle": "Streetwear",
+      "dreamBrands": "",
+      "voice": "",
+      "contentPillars": [],
+      "palette": [
+        "#D97706",
+        "#FDE68A",
+        "#B45309",
+        "#92400E"
+      ],
+      "videoUrls": [],
+      "scripts": [],
+      "homeImages": [],
+      "brandDealImages": [],
+      "wardrobeSlots": [
+        {
+          "id": "camila-wardrobe-sporty",
+          "name": "sporty fit",
+          "image": "/camila/wardrobe/sporty_fit.png"
+        },
+        {
+          "id": "camila-wardrobe-yoga",
+          "name": "yoga fit",
+          "image": "/camila/wardrobe/yoga_fit.png"
+        }
+      ],
+      "physicalDesc": "Latina, medium-length wavy brunette hair with side-swept bangs, brown eyes, olive skin tone, slim athletic build",
+      "generationHistory": [
+        {
+          "id": "camila-video-4",
+          "type": "video",
+          "label": "Video",
+          "url": "/camila/videos/v4.mp4",
+          "date": 1748208318000
+        },
+        {
+          "id": "camila-video-1",
+          "type": "video",
+          "label": "Video",
+          "url": "/camila/videos/v1.mp4",
+          "date": 1748177579000
+        },
+        {
+          "id": "camila-video-2",
+          "type": "video",
+          "label": "Video",
+          "url": "/camila/videos/v2.mp4",
+          "date": 1748213180000
+        },
+        {
+          "id": "camila-video-3",
+          "type": "video",
+          "label": "Video",
+          "url": "/camila/videos/v3.mp4",
+          "date": 1748216854000
+        },
+        {
+          "id": "camila-photo-1",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p1.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-2",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p2.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-3",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p3.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-4",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p4.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-5",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p5.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-6",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p6.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-7",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p7.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-8",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p8.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-9",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p9.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-10",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p10.png",
+          "date": 1748131200000
+        },
+        {
+          "id": "camila-photo-11",
+          "type": "image",
+          "label": "Photo",
+          "url": "/camila/photos/p11.png",
+          "date": 1748131200000
+        }
+      ],
+      "tag": "Yoga teacher",
+      "brandDeals": [
+        {
+          "id": "camila-deal-swatch",
+          "brand": "swatch",
+          "category": "fashion",
+          "image": "/camila/brand_deals/swatch_original.png",
+          "images": [
+            "/camila/brand_deals/swatch_original.png"
+          ],
+          "characterSheet": "/camila/brand_deals/swatch_sheet.png"
+        }
+      ]
+    },
+    "kayla-template": {
+      "id": "kayla-template",
+      "name": "Kayla",
+      "gender": "Female",
+      "type": "Influencer",
+      "createdAt": 1715000000000,
+      "mainImage": "/kayla/main.jpg",
+      "characterSheetImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260522_064535_dbb9b214-c7de-4354-bd18-b3afab70ddb7.png",
+      "closeUpImage1": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260518_142431_ac935634-8bf4-4628-8d6b-403582cbb8b5.png",
+      "closeUpImage2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260518_142431_3a9b6311-81e8-473e-ad85-5b5d70c0aaeb.png",
+      "prompt": "Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output \u2014 unedited. The subject is unaware this will be published \u2014 a personal photo, not intended for any shoot.\n\nScene: rooftop at golden hour, city below, warm haze, soft indoor afternoon window. Empty of other people. If the location is an interior, it shows real signs of habitation \u2014 not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it \u2014 no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.\n\nSubject: Female, 18 year old, white, long wavy blonde hair, blue eyes, medium skin tone, athletic build. open, present energy \u2014 moves through the world with ease, comfortable being seen. The feeling of wanna be influencer \u2014 real person, real life, not a model on a shoot. Natural micro-asymmetries in the face \u2014 this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead \u2014 and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.\n\nPose: body in soft 3/4 angle to camera, shoulders relaxed and slightly dropped. pair of clean sunglasses held loosely in one hand at the side held in both hands at chest height, elbows soft. Eyes meeting the lens with a quiet small expression \u2014 a half-smile just forming, not fully committed. Posing but acting like she isn't. pair of clean sunglasses held loosely in one hand at the side held in one hand \u2014 no visible brand logo.\n\nWardrobe & details: Oversized faded graphic tee, neckline slightly wide, tucked at the front into high-waist straight-leg denim with subtle knee distress; chunky platform boot, zip detail at ankle; a worn leather cuff \u2014 no logos visible. Visibly intentional \u2014 pulling the look together on purpose, naturally.\nPalette: washed-out neutrals \u2014 faded black, washed grey, dirty white, faded indigo denim.\n\nLighting: afternoon daylight coming through a large window to camera-left \u2014 the near cheek lit and warm, falling off across the shadow side. Warm overhead room lighting fills the shadows gently. Window light and ambient room fill present at the same time. Natural, found, not arranged. The subject's face is the brightest element in the frame. This is natural found light \u2014 not a lighting setup.\n\nCamera & capture: iPhone 16 Pro 24mm main lens f/1.78, held at arm's length or by a nearby friend, automatic exposure, natural sensor noise in shadow areas, slight lens barrel distortion at edges, 9:16 vertical, chest-up framing, face at the upper-third line, subject fills the center of the frame.\n\nSkin (rendered as concrete photographic facts, not category words):\n\u2014 Visible individual pores across her T-zone, nose, and cheeks; pores on the lit side cast tiny directional micro-shadows from the key light\n\u2014 soft thermal indoor flush at the cheeks from the heated space, gentle warmth settling across the face\n\u2014 a small healing blemish on the left jaw, slightly pinker than surrounding skin\n\u2014 Left brow sits marginally higher than the right; one nostril slightly narrower; cupid's bow peaks uneven \u2014 natural asymmetry throughout\n\u2014 Subtle digital sensor noise in the shadow areas consistent with iPhone auto-ISO\n\nUse case: iPhone feed shot \u2014 soft pose, eyes at lens\n\nConstraints: no people in the background. No visible brand logos on any item. Subject fills 60\u201370% of the 9:16 frame \u2014 tight crop, not a wide environmental shot. No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin \u2014 zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. No phone screen, no social media UI, no app overlay, no notification bar, no status bar, no interface elements of any kind visible anywhere in the image. This is a raw photograph \u2014 no digital overlays, no framing devices, no UI chrome. ",
+      "age": "18",
+      "backstory": "wanna be influencer",
+      "introExtrovert": 19,
+      "niche": "Fashion",
+      "nicheCustom": "",
+      "audience": "",
+      "hobbies": "",
+      "clothingStyle": "Streetwear",
+      "dreamBrands": "",
+      "voice": "",
+      "contentPillars": [],
+      "palette": [
+        "#F9A8D4",
+        "#FBCFE8",
+        "#E879F9",
+        "#BE185D"
+      ],
+      "videoUrls": [],
+      "scripts": [],
+      "homeImages": [],
+      "brandDealImages": [],
+      "wardrobeSlots": [
+        {
+          "id": "mpb98ypkiaylqgblx8",
+          "name": "Streetwear",
+          "image": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260518_133728_523ce265-a2ac-4066-9685-de43b241189f.png"
+        },
+        {
+          "id": "mpbacds75blebyq5hn4",
+          "name": "Custom Look",
+          "image": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260518_141134_c7db0d19-1843-4579-bac4-6b24829f5db3.png"
+        }
+      ],
+      "physicalDesc": "white, long wavy blonde hair, blue eyes, medium skin tone, athletic build",
+      "brandDeals": [
+        {
+          "id": "mpazmlrxwu4itej5hai",
+          "brand": "Brand 1",
+          "category": "",
+          "image": "/kayla/brand_deals/deal1.jpeg",
+          "characterSheet": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260519_065610_af03e9a4-ede7-4ddc-b367-98906395d610.png"
+        },
+        {
+          "id": "mpca9t9j25aftmvx83y",
+          "brand": "Nike",
+          "category": "shoes",
+          "image": "/kayla/brand_deals/deal2.jpeg",
+          "characterSheet": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260519_070018_66056983-0890-43ed-9637-d466e3a4f0c6.png"
+        },
+        {
+          "id": "mpcadn8gkhy78k87a3s",
+          "brand": "hermez",
+          "category": "cap",
+          "image": "/kayla/brand_deals/deal3.jpeg",
+          "characterSheet": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260519_070317_6bf1636f-26aa-4892-b728-52c0224134ac.png"
+        },
+        {
+          "id": "mpe04jipkn3b6dzgh4",
+          "brand": "prime",
+          "category": "drink",
+          "image": null,
+          "characterSheet": null,
+          "images": []
+        }
+      ],
+      "homeSlots": [
+        {
+          "id": "mpazmt82fz03vbglchi",
+          "name": "Room 1",
+          "image": null
+        },
+        {
+          "id": "mpb5fbl9saospbyb7f",
+          "name": "Room 2",
+          "image": null
+        }
+      ],
+      "generationHistory": [
+        {
+          "id": "kayla-video-1",
+          "type": "video",
+          "label": "Video",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260518_041646_b7fade5c-6e6b-460a-80c8-3d672acac275.mp4",
+          "date": 1779077806000
+        },
+        {
+          "id": "mpmc96l59zk9abuaauj",
+          "type": "video",
+          "label": "Video 1",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_074553_49ce6882-884d-483d-956a-8856908d807b.mp4",
+          "date": 1779782008217,
+          "settings": {
+            "dialogue": "ok you guys know how brutal i am with my reviews. I'm not the biggest, biggest fan of the hermez bags lineup... but this cap... it has this ultra soft material and I'm just in love with it",
+            "environment": "dubai luxury mall",
+            "envKey": "",
+            "camera": "Handheld",
+            "vibe": "Luxury",
+            "voicePreset": "f-21-american-bright",
+            "voiceCustom": "",
+            "additionalNotes": "",
+            "duration": 15,
+            "aspect": "9:16",
+            "outputs": 2,
+            "shotMode": "oner",
+            "productRef1": "",
+            "productRef2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260519_070317_6bf1636f-26aa-4892-b728-52c0224134ac.png",
+            "productRef3": null,
+            "productWorn": false
+          }
+        },
+        {
+          "id": "mpmc96l5ujzv9lctqf",
+          "type": "video",
+          "label": "Video 2",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_074556_e9ec2d7c-d79e-4573-8054-2e79ee605751.mp4",
+          "date": 1779782008217,
+          "settings": {
+            "dialogue": "ok you guys know how brutal i am with my reviews. I'm not the biggest, biggest fan of the hermez bags lineup... but this cap... it has this ultra soft material and I'm just in love with it",
+            "environment": "dubai luxury mall",
+            "envKey": "",
+            "camera": "Handheld",
+            "vibe": "Luxury",
+            "voicePreset": "f-21-american-bright",
+            "voiceCustom": "",
+            "additionalNotes": "",
+            "duration": 15,
+            "aspect": "9:16",
+            "outputs": 2,
+            "shotMode": "oner",
+            "productRef1": "",
+            "productRef2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260519_070317_6bf1636f-26aa-4892-b728-52c0224134ac.png",
+            "productRef3": null,
+            "productWorn": false
+          }
+        },
+        {
+          "id": "mpgk5zhv6jdcarnmgde",
+          "type": "image",
+          "label": "Character Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260522_064535_dbb9b214-c7de-4354-bd18-b3afab70ddb7.png",
+          "date": 1779432498929
+        }
+      ],
+      "tag": "Rich girl"
+    },
+    "mpe00fxqdypgtihqft": {
+      "id": "mpe00fxqdypgtihqft",
+      "name": "Brad",
+      "gender": "Male",
+      "age": "21",
+      "type": "Influencer",
+      "createdAt": 1779277715630,
+      "niche": "Lifestyle, Fitness",
+      "niches": [
+        "Lifestyle",
+        "Fitness"
+      ],
+      "nicheCustom": "",
+      "backstory": "coffee lover",
+      "introExtrovert": 50,
+      "physicalDesc": "middle eastern, long straight brunette hair, light grey eyes, fair skin tone, average build",
+      "vibeWords": [
+        "Minimalist"
+      ],
+      "mainImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260520_114723_07b1f65e-fdda-4fd8-b945-2c38350ab2c5.png",
+      "characterSheetImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260520_114855_88f6d914-dc6e-484e-a324-674fb77f376f.png",
+      "closeUpImage1": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260521_044441_2d54c6be-c950-4edb-a641-d427b7b174ea.png",
+      "closeUpImage2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260521_044514_de20b956-91e3-41ea-930e-acb72e14fdac.png",
+      "audience": "",
+      "clothingStyle": "Minimalist",
+      "hobbies": "",
+      "location": "",
+      "palette": [
+        "#93C5FD",
+        "#BFDBFE",
+        "#3B82F6",
+        "#3462df"
+      ],
+      "voice": "",
+      "dreamBrands": "",
+      "contentPillars": [],
+      "videoUrls": [],
+      "scripts": [],
+      "homeImages": [],
+      "wardrobeSlots": [
+        {
+          "id": "mpe00fxrtm7b4tceaqo",
+          "name": "Wardrobe 1",
+          "image": null
+        },
+        {
+          "id": "mpe00fxrnjefppbo4pe",
+          "name": "Wardrobe 2",
+          "image": null
+        },
+        {
+          "id": "mpe00fxrztd4fhvgdj",
+          "name": "Wardrobe 3",
+          "image": null
+        }
+      ],
+      "brandDealImages": [],
+      "prompt": "Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output \u2014 unedited. The subject is unaware this will be published \u2014 a personal photo, not intended for any shoot.\n\nScene: minimal open-plan office, floor-to-ceiling window, cool diffused cloud daylight, industrial ceiling soft behind, soft indoor afternoon window. Empty of other people. If the location is an interior, it shows real signs of habitation \u2014 not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it \u2014 no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.\n\nSubject: Male, 21 year old, middle eastern, long straight brunette hair, light grey eyes, fair skin tone, average build. natural, unhurried energy \u2014 comfortable in the moment. The feeling of jwpfjwpfjewfopwjop \u2014 real person, real life, not a model on a shoot. Natural micro-asymmetries in the face \u2014 this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead \u2014 and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.\n\nPose: standing upright with the body turned slightly toward the camera, balanced and straight, shoulders relaxed \u2014 simple and still, not leaning forward, not posed thin notebook held loosely under one arm held in one hand \u2014 no visible brand logo.\n\nWardrobe & details: Relaxed-fit linen shirt, collar open, slightly untucked; straight-leg denim; clean canvas slip-on; no accessories \u2014 no logos visible. Casually considered \u2014 looks good without looking like effort.\n\nLighting: afternoon daylight coming through a large window to camera-left \u2014 the near cheek lit and warm, falling off across the shadow side. Warm overhead room lighting fills the shadows gently. Window light and ambient room fill present at the same time. Natural, found, not arranged. The subject's face is the brightest element in the frame. This is natural found light \u2014 not a lighting setup.\n\nCamera & capture: iPhone 16 Pro 24mm main lens f/1.78, held at arm's length or by a nearby friend, automatic exposure, natural sensor noise in shadow areas, slight lens barrel distortion at edges, 9:16 vertical, chest-up framing, face at the upper-third line, subject fills the center of the frame.\n\nSkin (rendered as concrete photographic facts, not category words):\n\u2014 Visible individual pores across his T-zone, nose, and cheeks; pores on the lit side cast tiny directional micro-shadows from the key light\n\u2014 soft thermal indoor flush at the cheeks from the heated space, gentle warmth settling across the face\n\u2014 a small healing blemish on the left jaw, slightly pinker than surrounding skin\n\u2014 Left brow sits marginally higher than the right; one nostril slightly narrower; cupid's bow peaks uneven \u2014 natural asymmetry throughout\n\u2014 Subtle digital sensor noise in the shadow areas consistent with iPhone auto-ISO\n\nUse case: iPhone candid \u2014 mid-moment, eyes at the lens\n\nConstraints: no people in the background. No visible brand logos on any item. Subject fills 60\u201370% of the 9:16 frame \u2014 tight crop, not a wide environmental shot. No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin \u2014 zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. No phone screen, no social media UI, no app overlay, no notification bar, no status bar, no interface elements of any kind visible anywhere in the image. This is a raw photograph \u2014 no digital overlays, no framing devices, no UI chrome. ",
+      "generationHistory": [
+        {
+          "id": "brad-video-restore-1",
+          "type": "video",
+          "label": "Video",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_110221_3922b091-289c-4ad4-8d40-a57b7e82f9cc.mp4",
+          "date": 1748261341000
+        },
+        {
+          "id": "mpmjeewmemkhdkq77d",
+          "type": "video",
+          "label": "Video 1",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_110226_18f0bbec-749d-4ceb-a745-0edf2473521e.mp4",
+          "date": 1779794009590
+        },
+        {
+          "id": "mpmjeewmgxvhpiykefh",
+          "type": "video",
+          "label": "Video 2",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_110221_3922b091-289c-4ad4-8d40-a57b7e82f9cc.mp4",
+          "date": 1779794009590
+        }
+      ],
+      "brandDeals": [
+        {
+          "id": "mpf8e3bolon9rb3vcw",
+          "brand": "nike",
+          "category": "shoes",
+          "image": "/brad/brand_deals/deal1.jpeg",
+          "characterSheet": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260521_083119_25fb2d09-057a-40f9-b489-b02bd30967c3.png"
+        }
+      ],
+      "tag": "Coffee lover"
+    },
+    "mpm5hc0xi4d78ry3qr": {
+      "id": "mpm5hc0xi4d78ry3qr",
+      "name": "Olivia",
+      "gender": "Female",
+      "age": "23",
+      "type": "Influencer",
+      "createdAt": 1779770631201,
+      "niche": "Lifestyle",
+      "niches": [
+        "Lifestyle"
+      ],
+      "nicheCustom": "",
+      "backstory": "Olivia loves to travel around the world. Her favorite place is Greece because she is obsessed with the food there",
+      "introExtrovert": 72,
+      "physicalDesc": "white, long coily dyed hair, blue eyes, light skin tone, curvy build",
+      "vibeWords": [],
+      "mainImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_044115_c4b31da8-0ba4-4649-9e8a-5663333a849c.png",
+      "prompt": "Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output \u2014 unedited. The subject is unaware this will be published \u2014 a personal photo, not intended for any shoot.\n\nScene: urban park path, greenery on both sides, natural soft mid-morning light through the trees, golden hour late afternoon. Empty of other people. If the location is an interior, it shows real signs of habitation \u2014 not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it \u2014 no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.\n\nSubject: Female, 23 year old, white, long coily dyed hair, blue eyes, light skin tone, curvy build. open, present energy \u2014 moves through the world with ease, comfortable being seen \u2014 the face of someone living their life, not a model on a shoot. Natural micro-asymmetries in the face \u2014 this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead \u2014 and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.\n\nPose: mid-action \u2014 caught at the apex of a genuine mid-laugh or bright spontaneous expression, body and shoulders caught in motion, one hand mid-gesture near the chest. Eyes looking directly toward the lens \u2014 spontaneous, unguarded eye contact full of real energy. Not posed, not looking away \u2014 the camera caught them in a real moment while they were already looking at it. hands in a natural mid-gesture, nothing held.\n\nWardrobe & details: Lightweight crochet cover-up worn over a simple ribbed bralette, hem hitting mid-thigh; flat woven sandal; layered cord and natural-material necklaces \u2014 no logos visible. Visibly intentional \u2014 pulling the look together on purpose, naturally.\n\nLighting: late afternoon sun hitting from behind-right \u2014 warm golden light rimming the hair and the lit cheek, open sky filling the shadow side in cooler bluish tones. Both temperatures visible on the face at the same time. The kind of accidental perfect light you get outside around 5pm. The subject's face is the brightest element in the frame. This is natural found light \u2014 not a lighting setup.\n\nCamera & capture: iPhone 16 Pro 24mm main lens f/1.78, held at arm's length or by a nearby friend, automatic exposure, natural sensor noise in shadow areas, slight lens barrel distortion at edges, 9:16 vertical, chest-up framing, face at the upper-third line, subject fills the center of the frame.\n\nSkin (rendered as concrete photographic facts, not category words):\n\u2014 Visible individual pores across her T-zone, nose, and cheeks; pores on the lit side cast tiny directional micro-shadows from the key light\n\u2014 warm golden flush across the forehead and cheekbone tops \u2014 more visible on fair skin, the lit side noticeably warm\n\u2014 a faint old thin scar below the right jawline \u2014 barely there, photographically real\n\u2014 Left brow sits marginally higher than the right; one nostril slightly narrower; cupid's bow peaks uneven \u2014 natural asymmetry throughout\n\u2014 Subtle digital sensor noise in the shadow areas consistent with iPhone auto-ISO\n\nUse case: iPhone candid \u2014 mid-moment, eyes at the lens\n\nConstraints: no people in the background. No visible brand logos on any item. Subject fills 60\u201370% of the 9:16 frame \u2014 tight crop, not a wide environmental shot. No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin \u2014 zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. No phone screen, no social media UI, no app overlay, no notification bar, no status bar, no interface elements of any kind visible anywhere in the image. This is a raw photograph \u2014 no digital overlays, no framing devices, no UI chrome. ",
+      "characterSheetImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_044413_98ecd6f2-4dbc-434e-a617-1e4eb0868439.png",
+      "closeUpImage1": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_044415_7acd1fd0-589e-4749-85d1-ed5d498b7850.png",
+      "closeUpImage2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_044415_b48b3a31-0ed9-4f3d-8544-338deba70d57.png",
+      "audience": "",
+      "clothingStyle": "",
+      "hobbies": "",
+      "location": "",
+      "palette": [],
+      "voice": "",
+      "dreamBrands": "",
+      "contentPillars": [],
+      "videoUrls": [],
+      "scripts": [],
+      "homeImages": [],
+      "wardrobeSlots": [
+        {
+          "id": "mpm5hc0x5cf09cbx6fd",
+          "name": "Wardrobe 1",
+          "image": null
+        },
+        {
+          "id": "mpm5hc0xmjialk6pje8",
+          "name": "Wardrobe 2",
+          "image": null
+        },
+        {
+          "id": "mpm5hc0xv19ilyrhcp",
+          "name": "Wardrobe 3",
+          "image": null
+        },
+        {
+          "id": "mpm6ckaf65v36wsx905",
+          "name": "Hiking Attire",
+          "image": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_050442_95d2b336-8b8c-414e-a92a-d04dacb072ea.png"
+        }
+      ],
+      "brandDealImages": [],
+      "tag": "Travel Vlogger",
+      "generationHistory": [
+        {
+          "id": "mpm7a26pq5ofm2wndwg",
+          "type": "video",
+          "label": "Video",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_051712_afc1530f-5c21-4696-85f8-c97637dcf8eb.mp4",
+          "date": 1779773651089
+        },
+        {
+          "id": "mpm7403uimedto8cd9b",
+          "type": "video",
+          "label": "Video 2",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_051702_7e50bb4a-fd2d-4134-b241-bc5eb005a584.mp4",
+          "date": 1779773368458,
+          "settings": {
+            "dialogue": "so you guys already know how much I adore hiking. We're hiking in greece in this beautiful weather and hydration is my utmost pirioty. This is my Hydro Flask and it's been a lifesaver in long, hot hikes like these",
+            "environment": "in a hiking trail in greece in early morning",
+            "envKey": "",
+            "camera": "Handheld",
+            "vibe": "Natural",
+            "voicePreset": "f-british-playful",
+            "voiceCustom": "",
+            "additionalNotes": "",
+            "duration": 15,
+            "aspect": "9:16",
+            "outputs": 3,
+            "shotMode": "oner",
+            "productRef1": "",
+            "productRef2": null,
+            "productRef3": null,
+            "productWorn": false
+          }
+        },
+        {
+          "id": "mpm7403uru7whnzyj0a",
+          "type": "video",
+          "label": "Video 3",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_051654_05881755-7a66-4a16-8af9-cf2c1ada73be.mp4",
+          "date": 1779773368458,
+          "settings": {
+            "dialogue": "so you guys already know how much I adore hiking. We're hiking in greece in this beautiful weather and hydration is my utmost pirioty. This is my Hydro Flask and it's been a lifesaver in long, hot hikes like these",
+            "environment": "in a hiking trail in greece in early morning",
+            "envKey": "",
+            "camera": "Handheld",
+            "vibe": "Natural",
+            "voicePreset": "f-british-playful",
+            "voiceCustom": "",
+            "additionalNotes": "",
+            "duration": 15,
+            "aspect": "9:16",
+            "outputs": 3,
+            "shotMode": "oner",
+            "productRef1": "",
+            "productRef2": null,
+            "productRef3": null,
+            "productWorn": false
+          }
+        },
+        {
+          "id": "mpm5lo2f308wnkcxz2u",
+          "type": "image",
+          "label": "Close Up",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_044415_7acd1fd0-589e-4749-85d1-ed5d498b7850.png",
+          "date": 1779770833431
+        },
+        {
+          "id": "mpm5li4hmchdo9brj8g",
+          "type": "image",
+          "label": "Feature Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_044415_b48b3a31-0ed9-4f3d-8544-338deba70d57.png",
+          "date": 1779770825729
+        },
+        {
+          "id": "mpm5lbqbmh2y9kbkn8m",
+          "type": "image",
+          "label": "Character Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_044413_98ecd6f2-4dbc-434e-a617-1e4eb0868439.png",
+          "date": 1779770817442
+        }
+      ]
+    },
+    "mpm8eqj77o69r06igss": {
+      "id": "mpm8eqj77o69r06igss",
+      "name": "Derek",
+      "gender": "Male",
+      "age": "19",
+      "type": "Influencer",
+      "createdAt": 1779775548884,
+      "niche": "Lifestyle, Fitness",
+      "niches": [
+        "Lifestyle",
+        "Fitness"
+      ],
+      "nicheCustom": "",
+      "backstory": "Lifestyle guru",
+      "introExtrovert": 100,
+      "physicalDesc": "white, long straight silver hair, blue eyes, light skin tone, muscular build",
+      "vibeWords": [
+        "Sporty"
+      ],
+      "mainImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_060255_b38cf82f-03d1-4ce7-b593-99bb4226c6c4.png",
+      "prompt": "Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output \u2014 unedited. The subject is unaware this will be published \u2014 a personal photo, not intended for any shoot.\n\nScene: clean battlestation visible behind, RGB soft-glow as background, one window at 90\u00b0 as key light, golden hour late afternoon. Empty of other people. If the location is an interior, it shows real signs of habitation \u2014 not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it \u2014 no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.\n\nSubject: Male, 19 year old, white, long straight silver hair, blue eyes, light skin tone, muscular build. open, present energy \u2014 moves through the world with ease, comfortable being seen. The feeling of a fitness enthusiast and a personal trainer \u2014 real person, real life, not a model on a shoot. Natural micro-asymmetries in the face \u2014 this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead \u2014 and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.\n\nPose: body in soft 3/4 angle to camera, shoulders relaxed and slightly dropped. phone held loosely at the side, screen off held in both hands at chest height, elbows soft. Eyes meeting the lens with a quiet small expression \u2014 a half-smile just forming, not fully committed. Posing but acting like she isn't. phone held loosely at the side, screen off held in one hand \u2014 no visible brand logo.\n\nWardrobe & details: Fitted performance tee, slightly damp at the collar; tapered training shorts with small side-slit; clean training shoe, toe box faintly scuffed \u2014 no logos visible. Fully committed \u2014 every piece deliberate, confident in the choices.\nPalette: clean athletic colors \u2014 sage green, lavender, warm rust, classic black-and-white, or a pastel matching set.\n\nLighting: late afternoon sun hitting from behind-right \u2014 warm golden light rimming the hair and the lit cheek, open sky filling the shadow side in cooler bluish tones. Both temperatures visible on the face at the same time. The kind of accidental perfect light you get outside around 5pm. The subject's face is the brightest element in the frame. This is natural found light \u2014 not a lighting setup.\n\nCamera & capture: iPhone 16 Pro 24mm main lens f/1.78, held at arm's length or by a nearby friend, automatic exposure, natural sensor noise in shadow areas, slight lens barrel distortion at edges, 9:16 vertical, chest-up framing, face at the upper-third line, subject fills the center of the frame.\n\nSkin (rendered as concrete photographic facts, not category words):\n\u2014 Visible individual pores across his T-zone, nose, and cheeks; pores on the lit side cast tiny directional micro-shadows from the key light\n\u2014 warm golden flush across the forehead and cheekbone tops \u2014 more visible on fair skin, the lit side noticeably warm\n\u2014 faint asymmetric sun pigmentation near the right temple\n\u2014 Left brow sits marginally higher than the right; one nostril slightly narrower; cupid's bow peaks uneven \u2014 natural asymmetry throughout\n\u2014 Subtle digital sensor noise in the shadow areas consistent with iPhone auto-ISO\n\nUse case: iPhone feed shot \u2014 soft pose, eyes at lens\n\nConstraints: no people in the background. No visible brand logos on any item. Subject fills 60\u201370% of the 9:16 frame \u2014 tight crop, not a wide environmental shot. No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin \u2014 zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. No phone screen, no social media UI, no app overlay, no notification bar, no status bar, no interface elements of any kind visible anywhere in the image. This is a raw photograph \u2014 no digital overlays, no framing devices, no UI chrome. ",
+      "characterSheetImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_060607_a85e8420-b69e-4e58-9846-b5be2029a5b0.png",
+      "closeUpImage1": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_060607_ba34eacd-77b5-48ce-ac27-e27211247b87.png",
+      "closeUpImage2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_063812_ad780af4-0082-4fa9-8a07-634ba5abd305.png",
+      "audience": "",
+      "clothingStyle": "Sporty",
+      "hobbies": "",
+      "location": "",
+      "palette": [],
+      "voice": "",
+      "dreamBrands": "",
+      "contentPillars": [],
+      "videoUrls": [],
+      "scripts": [],
+      "homeImages": [],
+      "wardrobeSlots": [
+        {
+          "id": "mpm8eqj86edc537v8qc",
+          "name": "Wardrobe 1",
+          "image": null
+        },
+        {
+          "id": "mpm8eqj8exl9av1gcxw",
+          "name": "Wardrobe 2",
+          "image": null
+        },
+        {
+          "id": "mpm8eqj8k1194aph5z",
+          "name": "Wardrobe 3",
+          "image": null
+        }
+      ],
+      "brandDealImages": [],
+      "tag": "Lifestyle guru",
+      "generationHistory": [
+        {
+          "id": "derek-video-restore-1",
+          "type": "video",
+          "label": "Video",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_113121_248608f1-9f0f-4759-b338-3173ce804261.mp4",
+          "date": 1748259081000
+        },
+        {
+          "id": "mpm9o89kn8cpi6kj0yq",
+          "type": "image",
+          "label": "Feature Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_063812_ad780af4-0082-4fa9-8a07-634ba5abd305.png",
+          "date": 1779777671384
+        },
+        {
+          "id": "mpm9lk6wkfldax2bunk",
+          "type": "image",
+          "label": "Feature Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_063551_4d4a0095-1d96-4738-8d3e-a9efb7137fa5.png",
+          "date": 1779777546872
+        },
+        {
+          "id": "mpm8iuebzwd9z9lr9f",
+          "type": "image",
+          "label": "Close Up",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_060607_ba34eacd-77b5-48ce-ac27-e27211247b87.png",
+          "date": 1779775740514
+        },
+        {
+          "id": "mpm8ii0814qfqx8r4wd",
+          "type": "image",
+          "label": "Character Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_060607_a85e8420-b69e-4e58-9846-b5be2029a5b0.png",
+          "date": 1779775724455
+        }
+      ]
+    },
+    "mpma2ne5wzlwy87k7n": {
+      "id": "mpma2ne5wzlwy87k7n",
+      "name": "Joshua",
+      "gender": "Male",
+      "age": "19",
+      "type": "Influencer",
+      "createdAt": 1779778344173,
+      "niche": "Lifestyle, Fitness",
+      "niches": [
+        "Lifestyle",
+        "Fitness"
+      ],
+      "nicheCustom": "",
+      "backstory": "personal trainer and fitness enthusiast",
+      "introExtrovert": 100,
+      "physicalDesc": "south asian, long wavy silver hair, dark eyes, light skin tone, muscular build",
+      "vibeWords": [
+        "Sporty"
+      ],
+      "mainImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_064948_0849775e-caab-4e73-96c3-a869c2f4e8d5.png",
+      "prompt": "Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output \u2014 unedited. The subject is unaware this will be published \u2014 a personal photo, not intended for any shoot.\n\nScene: minimalist vanity corner, large mirror catching daylight from a nearby window, bright sunny mid-morning. Empty of other people. If the location is an interior, it shows real signs of habitation \u2014 not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it \u2014 no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.\n\nSubject: Male, 19 year old, south asian, long wavy silver hair, dark eyes, light skin tone, muscular build. open, present energy \u2014 moves through the world with ease, comfortable being seen. The feeling of personal trainer and fitness enthusiast \u2014 real person, real life, not a model on a shoot. Natural micro-asymmetries in the face \u2014 this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead \u2014 and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.\n\nPose: body in soft 3/4 angle to camera, shoulders relaxed and slightly dropped. one hand gently touching the side of the jaw, fingers loose and natural. Eyes meeting the lens with a quiet small expression \u2014 a half-smile just forming, not fully committed. Posing but acting like she isn't. hands in a natural mid-gesture, nothing held.\n\nWardrobe & details: Oversized washed hoodie, hem hitting mid-thigh; fitted training short; clean minimalist training shoe \u2014 no logos visible. Fully committed \u2014 every piece deliberate, confident in the choices.\nPalette: clean athletic colors \u2014 sage green, lavender, warm rust, classic black-and-white, or a pastel matching set.\n\nLighting: direct mid-morning sun from the front-left \u2014 hard, honest daylight with a clear nose shadow and a bright lit side. The shadow side filled by open blue sky. Exactly the kind of full-sun look an iPhone captures with auto exposure outdoors. The subject's face is the brightest element in the frame. This is natural found light \u2014 not a lighting setup.\n\nCamera & capture: iPhone 16 Pro 24mm main lens f/1.78, held at arm's length or by a nearby friend, automatic exposure, natural sensor noise in shadow areas, slight lens barrel distortion at edges, 9:16 vertical, chest-up framing, face at the upper-third line, subject fills the center of the frame.\n\nSkin (rendered as concrete photographic facts, not category words):\n\u2014 Visible individual pores across his T-zone, nose, and cheeks; pores on the lit side cast tiny directional micro-shadows from the key light\n\u2014 slight sun-warmth flush on the forehead and nose bridge, micro-fine sweat at the temples catching the hard light\n\u2014 a small healing blemish on the left jaw, slightly pinker than surrounding skin\n\u2014 Left brow sits marginally higher than the right; one nostril slightly narrower; cupid's bow peaks uneven \u2014 natural asymmetry throughout\n\u2014 Subtle digital sensor noise in the shadow areas consistent with iPhone auto-ISO\n\nUse case: iPhone feed shot \u2014 soft pose, eyes at lens\n\nConstraints: no people in the background. No visible brand logos on any item. Subject fills 60\u201370% of the 9:16 frame \u2014 tight crop, not a wide environmental shot. No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin \u2014 zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. No phone screen, no social media UI, no app overlay, no notification bar, no status bar, no interface elements of any kind visible anywhere in the image. This is a raw photograph \u2014 no digital overlays, no framing devices, no UI chrome. ",
+      "characterSheetImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_065234_b5b968e0-49e7-4563-803e-d40ff11a526c.png",
+      "closeUpImage1": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_065233_e787e746-7d4c-4a3d-91cd-e42791b67566.png",
+      "closeUpImage2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_065233_3f5b3f3f-efff-4b65-8081-c0e056c30176.png",
+      "audience": "",
+      "clothingStyle": "Sporty",
+      "hobbies": "",
+      "location": "",
+      "palette": [],
+      "voice": "",
+      "dreamBrands": "",
+      "contentPillars": [],
+      "videoUrls": [],
+      "scripts": [],
+      "homeImages": [],
+      "wardrobeSlots": [
+        {
+          "id": "mpma2ne56v3dvhj8s8w",
+          "name": "Wardrobe 1",
+          "image": null
+        },
+        {
+          "id": "mpma2ne5z1sabmulpg",
+          "name": "Wardrobe 2",
+          "image": null
+        },
+        {
+          "id": "mpma2ne5f8u54u0sklp",
+          "name": "Wardrobe 3",
+          "image": null
+        }
+      ],
+      "brandDealImages": [],
+      "generationHistory": [
+        {
+          "id": "mpmbn64yxn3rlajrgfq",
+          "type": "video",
+          "label": "Video",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_072814_b58b7152-ac38-487e-a903-ac96cd16b96e.mp4",
+          "date": 1779780981202,
+          "settings": {
+            "dialogue": "alright summer is coming and if you want to get your fitness level up, then I'm your man. I've coached over 200 people and you can view all the crazy transformations in my page here. So if you struggle to get in shape, I'll help you with personalized diet plans and programs.",
+            "environment": "in the gym",
+            "envKey": "Gym",
+            "camera": "Handheld",
+            "vibe": "",
+            "voicePreset": "",
+            "voiceCustom": "confident ",
+            "additionalNotes": "",
+            "duration": 15,
+            "aspect": "9:16",
+            "outputs": 1,
+            "shotMode": "oner",
+            "productRef1": null,
+            "productRef2": null,
+            "productRef3": null,
+            "productWorn": false
+          }
+        },
+        {
+          "id": "mpma7lj5pbhp25hugzg",
+          "type": "image",
+          "label": "Character Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_065234_b5b968e0-49e7-4563-803e-d40ff11a526c.png",
+          "date": 1779778575041
+        },
+        {
+          "id": "mpma7emmo4xrl9vmul7",
+          "type": "image",
+          "label": "Close Up",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_065233_e787e746-7d4c-4a3d-91cd-e42791b67566.png",
+          "date": 1779778566094
+        },
+        {
+          "id": "mpma74k9wu5mmk1k8y",
+          "type": "image",
+          "label": "Feature Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_065233_3f5b3f3f-efff-4b65-8081-c0e056c30176.png",
+          "date": 1779778553048
+        }
+      ],
+      "tag": "Personal Trainer"
+    },
+    "mpmd4rw1nhdryivbpxh": {
+      "id": "mpmd4rw1nhdryivbpxh",
+      "name": "Jake",
+      "gender": "Male",
+      "type": "Influencer",
+      "createdAt": 1779783482161,
+      "mainImage": "/jake/main.jpeg",
+      "characterSheetImage": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_081836_ad3275af-e0ae-4a1c-8396-3abad4d8cd8e.png",
+      "closeUpImage1": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_081836_a09f69ca-abd2-43d9-87f7-9c15c281dbc3.png",
+      "closeUpImage2": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_081836_6eae392a-9896-4fd6-9628-579262d1dbfd.png",
+      "prompt": "Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output \u2014 unedited. The subject is unaware this will be published \u2014 a personal photo, not intended for any shoot.\n\nScene: modern space, neon accent soft in background, late evening one-window key, bright sunny mid-morning. Empty of other people. If the location is an interior, it shows real signs of habitation \u2014 not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it \u2014 no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.\n\nSubject: Male, 21 year old, south asian, short straight black hair, brown eyes, light skin tone, slim build. quiet, inward energy \u2014 someone with a rich internal world, not performing for the camera. The feeling of tech youtuber and wears glasses \u2014 real person, real life, not a model on a shoot. Natural micro-asymmetries in the face \u2014 this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead \u2014 and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.\n\nPose: body facing directly toward camera, weight shifted onto one leg for a subtle hip tilt \u2014 relaxed, not stiff. arms relaxed at the sides or one hand resting loosely near the hip, fingers natural. Eyes meeting the lens directly with a quiet, present expression \u2014 not forced, not a performance. The \"comfortable in front of the camera\" framing. Face fully visible and front-lit. hands in a natural mid-gesture, nothing held.\n\nWardrobe & details: Soft quarter-zip merino sweater; slim straight chino; clean low-profile sneaker; a simple stainless steel watch \u2014 no logos visible. Worn without deliberateness \u2014 clothes exist, not styled.\nPalette: monochrome and minimal \u2014 all-black, deep charcoal, dark navy, all-grey. No bright or warm tones.\n\nLighting: direct mid-morning sun from the front-left \u2014 hard, honest daylight with a clear nose shadow and a bright lit side. The shadow side filled by open blue sky. Exactly the kind of full-sun look an iPhone captures with auto exposure outdoors. The subject's face is the brightest element in the frame. This is natural found light \u2014 not a lighting setup.\n\nCamera & capture: iPhone 16 Pro 24mm main lens f/1.78, held at arm's length or by a nearby friend, automatic exposure, natural sensor noise in shadow areas, slight lens barrel distortion at edges, 9:16 vertical, chest-up framing, face at the upper-third line, subject fills the center of the frame.\n\nSkin (rendered as concrete photographic facts, not category words):\n\u2014 Visible individual pores across his T-zone, nose, and cheeks; pores on the lit side cast tiny directional micro-shadows from the key light\n\u2014 slight sun-warmth flush on the forehead and nose bridge, micro-fine sweat at the temples catching the hard light\n\u2014 two freckles placed asymmetrically across the nose and left cheek\n\u2014 Left brow sits marginally higher than the right; one nostril slightly narrower; cupid's bow peaks uneven \u2014 natural asymmetry throughout\n\u2014 Subtle digital sensor noise in the shadow areas consistent with iPhone auto-ISO\n\nUse case: iPhone portrait \u2014 direct, relaxed, facing camera\n\nConstraints: no people in the background. No visible brand logos on any item. Subject fills 60\u201370% of the 9:16 frame \u2014 tight crop, not a wide environmental shot. No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin \u2014 zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. No phone screen, no social media UI, no app overlay, no notification bar, no status bar, no interface elements of any kind visible anywhere in the image. This is a raw photograph \u2014 no digital overlays, no framing devices, no UI chrome.",
+      "age": "21",
+      "backstory": "loves tech and gadgets. Have a youtube channel about it",
+      "introExtrovert": 50,
+      "niche": "Tech",
+      "nicheCustom": "",
+      "audience": "",
+      "hobbies": "",
+      "clothingStyle": "",
+      "dreamBrands": "",
+      "voice": "",
+      "contentPillars": [],
+      "palette": [],
+      "videoUrls": [],
+      "scripts": [],
+      "homeImages": [],
+      "brandDealImages": [],
+      "wardrobeSlots": [
+        {
+          "id": "mpmd4rw2c5dx8r1ypb",
+          "name": "Wardrobe 1",
+          "image": null
+        },
+        {
+          "id": "mpmd4rw2nwujq0gg22b",
+          "name": "Wardrobe 2",
+          "image": null
+        },
+        {
+          "id": "mpmd4rw2c7lyeeq6e8p",
+          "name": "Wardrobe 3",
+          "image": null
+        }
+      ],
+      "generationHistory": [
+        {
+          "id": "mpmkfmzuoc9j3ucy9l",
+          "type": "video",
+          "label": "Video 1",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_111735_1e5bbe14-995f-4304-bad0-e8ba2a51f83a.mp4",
+          "date": 1779795746346
+        },
+        {
+          "id": "mpmkfmzuaifnyjf5nh5",
+          "type": "video",
+          "label": "Video 2",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_111721_ca05995a-6d72-49cf-8101-3a08a84d1b6b.mp4",
+          "date": 1779795746346
+        },
+        {
+          "id": "mpmji5v4oi2vyh22u1b",
+          "type": "video",
+          "label": "Video 1",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_110826_e32740e7-f663-4f8a-b68a-52cbc0fd3ca8.mp4",
+          "date": 1779794184496,
+          "settings": {
+            "dialogue": "okay this garmin watch is crazy. it has up to 18 hours of battery life, it has Gen 5 optical HR sensor which is the best in the market, and it has the Brightest AMOLED display Garmin has ever made",
+            "environment": "",
+            "envKey": "",
+            "camera": "Talking Head",
+            "vibe": "Tutorial",
+            "voicePreset": "",
+            "voiceCustom": "20 year old tech indian man doing a review",
+            "additionalNotes": "",
+            "duration": 14,
+            "aspect": "9:16",
+            "outputs": 2,
+            "shotMode": "oner",
+            "productRef1": null,
+            "productRef2": null,
+            "productRef3": null,
+            "productWorn": false
+          }
+        },
+        {
+          "id": "mpmji5v47phbijgzjms",
+          "type": "video",
+          "label": "Video 2",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_110828_a4c94f06-8a9d-4195-9708-429bc49b1998.mp4",
+          "date": 1779794184496,
+          "settings": {
+            "dialogue": "okay this garmin watch is crazy. it has up to 18 hours of battery life, it has Gen 5 optical HR sensor which is the best in the market, and it has the Brightest AMOLED display Garmin has ever made",
+            "environment": "",
+            "envKey": "",
+            "camera": "Talking Head",
+            "vibe": "Tutorial",
+            "voicePreset": "",
+            "voiceCustom": "20 year old tech indian man doing a review",
+            "additionalNotes": "",
+            "duration": 14,
+            "aspect": "9:16",
+            "outputs": 2,
+            "shotMode": "oner",
+            "productRef1": null,
+            "productRef2": null,
+            "productRef3": null,
+            "productWorn": false
+          }
+        },
+        {
+          "id": "mpmda9d9qeq994fg41c",
+          "type": "image",
+          "label": "Close Up",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_081836_a09f69ca-abd2-43d9-87f7-9c15c281dbc3.png",
+          "date": 1779783738093
+        },
+        {
+          "id": "mpmd9t8s8cxzrqfu8o3",
+          "type": "image",
+          "label": "Feature Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_081836_6eae392a-9896-4fd6-9628-579262d1dbfd.png",
+          "date": 1779783717196
+        },
+        {
+          "id": "mpmd9t7stcr0mc9ahi",
+          "type": "image",
+          "label": "Character Sheet",
+          "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_081836_ad3275af-e0ae-4a1c-8396-3abad4d8cd8e.png",
+          "date": 1779783717160
+        }
+      ],
+      "tag": "Tech & lifestyle"
+    },
+    "marcus-template": {
+      "id": "marcus-template",
+      "name": "Marcus",
+      "gender": "Male",
+      "type": "Influencer",
+      "createdAt": 1715000002000,
+      "mainImage": "/marcus/main.png",
+      "characterSheetImage": "/marcus/sheet.png",
+      "closeUpImage1": "/marcus/closeup1.png",
+      "closeUpImage2": "/marcus/closeup2.png",
+      "prompt": "",
+      "age": "22",
+      "backstory": "loves tech since he was young",
+      "introExtrovert": 60,
+      "niche": "Tech",
+      "nicheCustom": "",
+      "audience": "",
+      "hobbies": "",
+      "clothingStyle": "Streetwear",
+      "dreamBrands": "",
+      "voice": "",
+      "contentPillars": [],
+      "palette": [
+        "#6366F1",
+        "#A5B4FC",
+        "#4F46E5",
+        "#1E1B4B"
+      ],
+      "videoUrls": [
+        "/marcus/video1.mp4"
+      ],
+      "scripts": [],
+      "homeImages": [],
+      "brandDealImages": [],
+      "wardrobeSlots": [],
+      "physicalDesc": "Latino, short black hair, brown eyes, olive skin tone, average build",
+      "generationHistory": [
+        {
+          "id": "marcus-video-1",
+          "type": "video",
+          "label": "Video",
+          "url": "/marcus/video1.mp4",
+          "date": 1748248415000
+        }
+      ],
+      "tag": "Pro Gamer"
+    }
+  },
+  "photo_studio_history": [
+    {
+      "histId": "1779792526301-7eby9",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_104600_88ffe6a1-2993-4dc5-9826-97c375e8348b.png",
+      "batchId": "1779792354167-ovlwb",
+      "influencerId": "mpmd4rw1nhdryivbpxh",
+      "influencerName": "Jake",
+      "location": "bedroom",
+      "timeOfDay": "night",
+      "pose": "holding the product and giving a thumbs up",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779792526301,
+      "settings": {
+        "location": "bedroom",
+        "timeOfDay": "night",
+        "pose": "holding the product and giving a thumbs up",
+        "stance": "sitting",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779791644805-ejl6m",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_103049_1ee89239-ae9e-44c0-84eb-1f30c70c225c.png",
+      "batchId": "resume-1779791644024",
+      "influencerId": "mpm8eqj77o69r06igss",
+      "influencerName": "Derek",
+      "location": "busy gym",
+      "timeOfDay": "morning",
+      "pose": "crossed-arms",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779791644805,
+      "settings": {
+        "location": "busy gym",
+        "timeOfDay": "morning",
+        "pose": "crossed-arms",
+        "stance": "standing",
+        "expression": "smiling",
+        "gaze": "looking-away",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779791644805-ixf49",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_103048_463b0d1d-bc74-4dea-9907-2999ae37882b.png",
+      "batchId": "resume-1779791644024",
+      "influencerId": "mpm8eqj77o69r06igss",
+      "influencerName": "Derek",
+      "location": "busy gym",
+      "timeOfDay": "morning",
+      "pose": "crossed-arms",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779791644805,
+      "settings": {
+        "location": "busy gym",
+        "timeOfDay": "morning",
+        "pose": "crossed-arms",
+        "stance": "standing",
+        "expression": "smiling",
+        "gaze": "looking-away",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779791528019-l6qn6",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102924_69e09731-2c27-4055-bd4c-797256fc0bbd.png",
+      "batchId": "1779791363567-z630j",
+      "influencerId": "marcus-template",
+      "influencerName": "Marcus",
+      "location": "park",
+      "timeOfDay": "morning",
+      "pose": "hands in pocket and smiling awkwardly at the frame",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779791528019,
+      "settings": {
+        "location": "park",
+        "timeOfDay": "morning",
+        "pose": "hands in pocket and smiling awkwardly at the frame",
+        "stance": "standing",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779791514281-vgyux",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102926_bd132c70-d89f-498c-bdb3-28244a0f4318.png",
+      "batchId": "1779791363567-z630j",
+      "influencerId": "marcus-template",
+      "influencerName": "Marcus",
+      "location": "park",
+      "timeOfDay": "morning",
+      "pose": "hands in pocket and smiling awkwardly at the frame",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779791514281,
+      "settings": {
+        "location": "park",
+        "timeOfDay": "morning",
+        "pose": "hands in pocket and smiling awkwardly at the frame",
+        "stance": "standing",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779791326266-7srcv",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102602_6500908f-7a27-49db-a3ba-e48f6dcb0cd5.png",
+      "batchId": "1779791159452-zcaan",
+      "influencerId": "mpm5hc0xi4d78ry3qr",
+      "influencerName": "Olivia",
+      "location": "in a tokyo alley",
+      "timeOfDay": "morning",
+      "pose": "candid",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779791326266,
+      "settings": {
+        "location": "in a tokyo alley",
+        "timeOfDay": "morning",
+        "pose": "candid",
+        "stance": "standing",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "Casual",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779790756934-ct6ex",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_101617_44657ad6-7268-4458-9f93-0df7caea2409.png",
+      "batchId": "1779790572882-3zuo6",
+      "influencerId": "mpm5hc0xi4d78ry3qr",
+      "influencerName": "Olivia",
+      "location": "in a hiking trail",
+      "timeOfDay": "morning",
+      "pose": "mid-turn",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779790756934,
+      "settings": {
+        "location": "in a hiking trail",
+        "timeOfDay": "morning",
+        "pose": "mid-turn",
+        "stance": "standing",
+        "expression": "laughing",
+        "gaze": "at-camera",
+        "outfitPreset": "mpm6ckaf65v36wsx905",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779790748886-ufy2g",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_101614_3b6cb1b4-b109-45fd-8620-211aebe04f82.png",
+      "batchId": "1779790572882-3zuo6",
+      "influencerId": "mpm5hc0xi4d78ry3qr",
+      "influencerName": "Olivia",
+      "location": "in a hiking trail",
+      "timeOfDay": "morning",
+      "pose": "mid-turn",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779790748886,
+      "settings": {
+        "location": "in a hiking trail",
+        "timeOfDay": "morning",
+        "pose": "mid-turn",
+        "stance": "standing",
+        "expression": "laughing",
+        "gaze": "at-camera",
+        "outfitPreset": "mpm6ckaf65v36wsx905",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 2
+      }
+    },
+    {
+      "histId": "1779789774908-4xbtf",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_095916_93262d91-e4ab-4c59-8858-d88f49dd6f83.png",
+      "batchId": "1779789552659-lhahv",
+      "influencerId": "marcus-template",
+      "influencerName": "Marcus",
+      "location": "bedroom",
+      "timeOfDay": "night",
+      "pose": "sitting infront of his desk with his keyboard and mouse, giving a cheeky thumbs up",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779789774908,
+      "settings": {
+        "location": "bedroom",
+        "timeOfDay": "night",
+        "pose": "sitting infront of his desk with his keyboard and mouse, giving a cheeky thumbs up",
+        "stance": "sitting",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779789766882-avh5e",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_095915_40736a73-78ec-497f-bf6f-e124e72a8038.png",
+      "batchId": "1779789552659-lhahv",
+      "influencerId": "marcus-template",
+      "influencerName": "Marcus",
+      "location": "bedroom",
+      "timeOfDay": "night",
+      "pose": "sitting infront of his desk with his keyboard and mouse, giving a cheeky thumbs up",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779789766882,
+      "settings": {
+        "location": "bedroom",
+        "timeOfDay": "night",
+        "pose": "sitting infront of his desk with his keyboard and mouse, giving a cheeky thumbs up",
+        "stance": "sitting",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779789745885-74u4z",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_095913_d7f99e0b-87e6-4178-aada-8cb263088ef9.png",
+      "batchId": "1779789552659-lhahv",
+      "influencerId": "marcus-template",
+      "influencerName": "Marcus",
+      "location": "bedroom",
+      "timeOfDay": "night",
+      "pose": "sitting infront of his desk with his keyboard and mouse, giving a cheeky thumbs up",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779789745885,
+      "settings": {
+        "location": "bedroom",
+        "timeOfDay": "night",
+        "pose": "sitting infront of his desk with his keyboard and mouse, giving a cheeky thumbs up",
+        "stance": "sitting",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779726829753-hvz7d",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_162957_a60cf291-8b07-4675-a35c-cb16cfaaccdb.png",
+      "batchId": "resume-1779726783622",
+      "influencerId": "mpdvj953buyeu0n2ddm",
+      "influencerName": "Camila",
+      "location": "bathroom",
+      "timeOfDay": "night",
+      "pose": "facing-away",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779726829753,
+      "settings": {
+        "location": "bathroom",
+        "timeOfDay": "night",
+        "pose": "facing-away",
+        "stance": "standing",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "Smart Casual",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779726828730-9vzxm",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_162955_be836c50-d927-4c86-917f-abc9a191d88c.png",
+      "batchId": "resume-1779726724054",
+      "influencerId": "mpdvj953buyeu0n2ddm",
+      "influencerName": "Camila",
+      "location": "coffee-shop",
+      "timeOfDay": "afternoon",
+      "pose": "front",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779726828730,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "afternoon",
+        "pose": "front",
+        "stance": "standing",
+        "expression": "natural",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 1
+      }
+    },
+    {
+      "histId": "1779726828730-i92nu",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_162959_d74d03f3-44b3-4717-8fab-927a2d3475cb.png",
+      "batchId": "resume-1779726724054",
+      "influencerId": "mpdvj953buyeu0n2ddm",
+      "influencerName": "Camila",
+      "location": "coffee-shop",
+      "timeOfDay": "afternoon",
+      "pose": "front",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779726828730,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "afternoon",
+        "pose": "front",
+        "stance": "standing",
+        "expression": "natural",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "4k",
+        "outputCount": 1
+      }
+    },
+    {
+      "histId": "1779720828403-b8g77",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_145111_aafe70cd-3eee-480f-977d-a2e8f949a381.png",
+      "batchId": "1779720627198-qekj4",
+      "influencerId": "mpe00fxqdypgtihqft",
+      "influencerName": "Brad",
+      "location": "rooftop",
+      "timeOfDay": "night",
+      "pose": "facing-away",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779720828403,
+      "settings": {
+        "location": "rooftop",
+        "timeOfDay": "night",
+        "pose": "facing-away",
+        "stance": "standing",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "Smart Casual",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779720827979-q4zd7",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_145109_98e982f5-03e8-4997-8a96-462b5155b338.png",
+      "batchId": "1779720627198-qekj4",
+      "influencerId": "mpe00fxqdypgtihqft",
+      "influencerName": "Brad",
+      "location": "rooftop",
+      "timeOfDay": "night",
+      "pose": "facing-away",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779720827979,
+      "settings": {
+        "location": "rooftop",
+        "timeOfDay": "night",
+        "pose": "facing-away",
+        "stance": "standing",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "Smart Casual",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779720765481-ogdia",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_145029_d2eb5ae3-1918-4f53-957b-da76359d02da.png",
+      "batchId": "1779720627198-qekj4",
+      "influencerId": "mpe00fxqdypgtihqft",
+      "influencerName": "Brad",
+      "location": "rooftop",
+      "timeOfDay": "night",
+      "pose": "facing-away",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779720765481,
+      "settings": {
+        "location": "rooftop",
+        "timeOfDay": "night",
+        "pose": "facing-away",
+        "stance": "standing",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "Smart Casual",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779720497288-7gcxp",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_144518_8231e26f-b143-421c-8b5b-661e1bade3c6.png",
+      "batchId": "resume-1779720479808",
+      "influencerId": "kayla-template",
+      "influencerName": "Kayla",
+      "location": "rooftop",
+      "timeOfDay": "night",
+      "pose": "facing-away",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779720497288,
+      "settings": {
+        "location": "rooftop",
+        "timeOfDay": "night",
+        "pose": "facing-away",
+        "stance": "standing",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "Smart Casual",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "holding a latte ",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779720497288-h8rxw",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_144516_8816e5c3-90c8-4a6b-9cf2-1527e63bb90e.png",
+      "batchId": "resume-1779720479808",
+      "influencerId": "kayla-template",
+      "influencerName": "Kayla",
+      "location": "rooftop",
+      "timeOfDay": "night",
+      "pose": "facing-away",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779720497288,
+      "settings": {
+        "location": "rooftop",
+        "timeOfDay": "night",
+        "pose": "facing-away",
+        "stance": "standing",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "Smart Casual",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "holding a latte ",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779719898540-u8mq0",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_143516_cc7f259b-6940-4f21-9724-68aa2f903db1.png",
+      "batchId": "1779719711665-75fq7",
+      "influencerId": "mpe00fxqdypgtihqft",
+      "influencerName": "Brad",
+      "location": "coffee-shop",
+      "timeOfDay": "night",
+      "pose": "hands-pockets",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779719898540,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "night",
+        "pose": "hands-pockets",
+        "stance": "sitting",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "holding a latte ",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779719877565-aynch",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_143515_4d631fda-5690-473d-9e7f-682a87d6dea9.png",
+      "batchId": "1779719711665-75fq7",
+      "influencerId": "mpe00fxqdypgtihqft",
+      "influencerName": "Brad",
+      "location": "coffee-shop",
+      "timeOfDay": "night",
+      "pose": "hands-pockets",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779719877565,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "night",
+        "pose": "hands-pockets",
+        "stance": "sitting",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "holding a latte ",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779719858605-g480e",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_143513_ef1243c7-121f-45da-b283-4864a57842bf.png",
+      "batchId": "1779719711665-75fq7",
+      "influencerId": "mpe00fxqdypgtihqft",
+      "influencerName": "Brad",
+      "location": "coffee-shop",
+      "timeOfDay": "night",
+      "pose": "hands-pockets",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779719858605,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "night",
+        "pose": "hands-pockets",
+        "stance": "sitting",
+        "expression": "serious",
+        "gaze": "looking-away",
+        "outfitPreset": "current",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "holding a latte ",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779719090070-ymqd9",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_142142_b92721fb-cb92-4286-b06a-6a17d473f9a9.png",
+      "batchId": "1779718897166-nf4vj",
+      "influencerId": "kayla-template",
+      "influencerName": "Kayla",
+      "location": "mall",
+      "timeOfDay": "morning",
+      "pose": "mid-turn",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779719090070,
+      "settings": {
+        "location": "mall",
+        "timeOfDay": "morning",
+        "pose": "mid-turn",
+        "stance": "standing",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "nice tailored dress",
+        "hairstyleText": "sleek high ponytail",
+        "propText": "carrying designer shopping bags",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779719089262-1msub",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_142139_2fc1ebb4-53b4-4eeb-bee6-60301973112b.png",
+      "batchId": "1779718897166-nf4vj",
+      "influencerId": "kayla-template",
+      "influencerName": "Kayla",
+      "location": "mall",
+      "timeOfDay": "morning",
+      "pose": "mid-turn",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779719089262,
+      "settings": {
+        "location": "mall",
+        "timeOfDay": "morning",
+        "pose": "mid-turn",
+        "stance": "standing",
+        "expression": "smiling",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "nice tailored dress",
+        "hairstyleText": "sleek high ponytail",
+        "propText": "carrying designer shopping bags",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779718793762-l9rt9",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_141720_e23ae2b1-70c8-4aff-be6d-cf106d329329.png",
+      "batchId": "1779718631607-2kt62",
+      "influencerId": "kayla-template",
+      "influencerName": "Kayla",
+      "location": "coffee-shop",
+      "timeOfDay": "morning",
+      "pose": "cute-posed",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779718793762,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "morning",
+        "pose": "cute-posed",
+        "stance": "sitting",
+        "expression": "natural",
+        "gaze": "looking-away",
+        "outfitPreset": "Chic",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779718793413-9odh2",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_141719_c88583e4-30ec-4712-9c0b-2ef5ea98a4df.png",
+      "batchId": "1779718631607-2kt62",
+      "influencerId": "kayla-template",
+      "influencerName": "Kayla",
+      "location": "coffee-shop",
+      "timeOfDay": "morning",
+      "pose": "cute-posed",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779718793413,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "morning",
+        "pose": "cute-posed",
+        "stance": "sitting",
+        "expression": "natural",
+        "gaze": "looking-away",
+        "outfitPreset": "Chic",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779718774121-3buwr",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_141722_fb607b94-5861-460a-9952-90ddcc51cfcc.png",
+      "batchId": "1779718631607-2kt62",
+      "influencerId": "kayla-template",
+      "influencerName": "Kayla",
+      "location": "coffee-shop",
+      "timeOfDay": "morning",
+      "pose": "cute-posed",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779718774121,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "morning",
+        "pose": "cute-posed",
+        "stance": "sitting",
+        "expression": "natural",
+        "gaze": "looking-away",
+        "outfitPreset": "Chic",
+        "wardrobeText": "",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779714912293-85vlb",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_131045_b31424b0-d838-4415-9dc3-4a889b74a3a2.png",
+      "batchId": "resume-1779714687520",
+      "influencerId": "mpdvj953buyeu0n2ddm",
+      "influencerName": "Camila",
+      "location": "coffee-shop",
+      "timeOfDay": "morning",
+      "pose": "walking",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779714912293,
+      "settings": {
+        "location": "coffee-shop",
+        "timeOfDay": "morning",
+        "pose": "walking",
+        "stance": "standing",
+        "expression": "serious",
+        "gaze": "at-camera",
+        "outfitPreset": "current",
+        "wardrobeText": "loose high ponytail",
+        "hairstyleText": "",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779714377835-5tf7t",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_130201_cc1d478e-21da-4088-8738-1e519aa89ea9.png",
+      "batchId": "resume-1779714134835",
+      "influencerId": "mpdvj953buyeu0n2ddm",
+      "influencerName": "Camila",
+      "location": "restaurant",
+      "timeOfDay": "night",
+      "pose": "lean",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779714377835,
+      "settings": {
+        "location": "restaurant",
+        "timeOfDay": "night",
+        "pose": "lean",
+        "stance": "sitting",
+        "expression": "natural",
+        "gaze": "looking-away",
+        "outfitPreset": "Party",
+        "wardrobeText": "",
+        "hairstyleText": "sleek ponytail",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779711832726-e4ccm",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_122116_cd7dc214-4c6f-4adb-8af9-d57909e86c2b.png",
+      "batchId": "1779711667601-jrzhk",
+      "influencerId": "mpdvj953buyeu0n2ddm",
+      "influencerName": "Camila",
+      "location": "restaurant",
+      "timeOfDay": "night",
+      "pose": "lean",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779711832726,
+      "settings": {
+        "location": "restaurant",
+        "timeOfDay": "night",
+        "pose": "lean",
+        "stance": "sitting",
+        "expression": "natural",
+        "gaze": "looking-away",
+        "outfitPreset": "Party",
+        "wardrobeText": "",
+        "hairstyleText": "sleek ponytail",
+        "propText": "",
+        "aspectRatio": "9:16",
+        "resolution": "2k",
+        "outputCount": 3
+      }
+    },
+    {
+      "histId": "1779705380352-2d5mf",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260525_103400_0bd5c1cf-ded5-4e44-91e3-d25c05823361.png",
+      "batchId": "1779705224000-mite5",
+      "influencerId": "mpdvj953buyeu0n2ddm",
+      "influencerName": "Camila",
+      "location": "gym",
+      "timeOfDay": "morning",
+      "pose": "candid",
+      "vibe": "candid",
+      "aspectRatio": "9:16",
+      "createdAt": 1779705380352
+    },
+    {
+      "influencerId": "mpmd4rw1nhdryivbpxh",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_104559_392be9b8-96f3-4c5a-b0d6-2050d45d9deb.png",
+      "createdAt": 1748263559000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpmd4rw1nhdryivbpxh",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102734_6ad497c6-bbc4-4c97-970c-6fb5173409da.png",
+      "createdAt": 1748261254000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpmd4rw1nhdryivbpxh",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102733_4b1aeb26-ba4e-4e1b-a76d-357d9cbe26a4.png",
+      "createdAt": 1748261253000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpmd4rw1nhdryivbpxh",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102234_76e09a86-e6a2-423d-9d41-f45724eda8fa.png",
+      "createdAt": 1748261154000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpmd4rw1nhdryivbpxh",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102231_0daa99dd-e291-47f6-b78d-eb816d171ac8.png",
+      "createdAt": 1748261151000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpm8eqj77o69r06igss",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102443_3a420032-8203-4f6c-8c7f-6d1171adc2db.png",
+      "createdAt": 1748261083000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpm8eqj77o69r06igss",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_102441_f96f7c7b-4cc1-4e0f-bd75-3088038c69f8.png",
+      "createdAt": 1748261081000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpm8eqj77o69r06igss",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_101736_ca48db77-53e6-4335-8a6e-e12d616ea8e7.png",
+      "createdAt": 1748257056000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpm8eqj77o69r06igss",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_101732_8a3965d0-53ed-4c6a-9a5f-11888817a5ae.png",
+      "createdAt": 1748257052000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpma2ne5wzlwy87k7n",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_101653_cff2e1b2-5dd8-4a79-bafa-7d727c0bca4d.png",
+      "createdAt": 1748256613000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "mpma2ne5wzlwy87k7n",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_101651_39cb19bb-94df-4f47-b5cf-c71d4ac6e478.png",
+      "createdAt": 1748256611000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p1.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p2.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p3.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p4.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p5.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p6.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p7.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p8.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p9.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p10.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p11.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p12.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    },
+    {
+      "influencerId": "camila-template",
+      "url": "/camila/photos/p13.png",
+      "createdAt": 1748131200000,
+      "location": "",
+      "timeOfDay": "",
+      "aspectRatio": "9:16",
+      "settings": null
+    }
+  ],
+  "brand_deals": [
+    {
+      "id": "mpan5nonfy3trqamf4a",
+      "brand": "prime",
+      "category": "drink",
+      "image": "/prime/product.jpg",
+      "createdAt": 1779074725415,
+      "characterSheet": "/prime/sheet.png"
+    }
+  ],
+  "inspiration_boards": [
+    {
+      "id": "seed-board-streetwear",
+      "name": "Streetwear",
+      "images": [
+        "/inspiration/streetwear/1.jpg",
+        "/inspiration/streetwear/2.jpg",
+        "/inspiration/streetwear/3.jpg",
+        "/inspiration/streetwear/4.jpg",
+        "/inspiration/streetwear/5.jpg",
+        "/inspiration/streetwear/6.jpg"
+      ],
+      "createdAt": 1748257200000
+    }
+  ]
+}

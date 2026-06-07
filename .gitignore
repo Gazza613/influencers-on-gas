@@ -1,0 +1,17 @@
+node_modules
+dist
+.DS_Store
+*.local
+.claude/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
+# Logs
+*.log
+npm-debug.log*
