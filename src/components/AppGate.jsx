@@ -8,6 +8,16 @@ import { useState, useEffect } from 'react'
 const MONO = "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace"
 const ORANGE = '#f96203'
 
+// Clipped-text gradient with a slow shimmer — echoes the landing-page headline.
+const gradText = (bg) => ({
+  backgroundImage: bg,
+  backgroundSize: '200% auto',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+  animation: 'gas-shimmer 6s linear infinite',
+})
+
 export default function AppGate({ children }) {
   const [status, setStatus] = useState('checking') // checking | locked | open
   const [pw, setPw] = useState('')
@@ -57,17 +67,19 @@ export default function AppGate({ children }) {
           <style>{`@keyframes gatespin { to { transform: rotate(360deg) } }`}</style>
         </div>
       ) : (
-        <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', width: 'min(380px, 92vw)' }}>
+        <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', width: 'min(460px, 92vw)' }}>
+          <style>{`@keyframes gas-shimmer { to { background-position: 200% center } }`}</style>
           {/* Logo with glow */}
-          <img src="/gas-logo.png" alt="GAS" style={{ width: 96, height: 96, borderRadius: '50%', filter: 'drop-shadow(0 0 34px rgba(249,98,3,0.65))' }} />
+          <img src="/gas-logo.png" alt="GAS" style={{ width: 100, height: 100, borderRadius: '50%', filter: 'drop-shadow(0 0 36px rgba(249,98,3,0.65))' }} />
 
-          {/* Title */}
-          <div style={{ marginTop: 22, fontFamily: MONO, fontWeight: 700, fontSize: 26, letterSpacing: '6px', color: '#fff', textTransform: 'uppercase' }}>
-            INFLUENCERS <span style={{ color: ORANGE }}>ON</span> GAS
+          {/* Title — dual-tone gradient (matches the landing headline), one line */}
+          <div style={{ marginTop: 24, fontFamily: MONO, fontWeight: 800, fontSize: 'clamp(17px, 4.6vw, 27px)', letterSpacing: 'clamp(2px, 0.8vw, 5px)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            <span style={gradText('linear-gradient(135deg,#EC4899 0%,#A855F7 50%,#60A5FA 100%)')}>Influencers&nbsp;on&nbsp;</span>
+            <span style={gradText('linear-gradient(135deg,#FFB020 0%,#FF6A00 45%,#FF2D55 100%)')}>GAS</span>
           </div>
           {/* Tagline */}
-          <div style={{ marginTop: 8, fontFamily: MONO, fontWeight: 500, fontSize: 12.5, letterSpacing: '5px', color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase' }}>
-            INFLUENCE THAT MATTERS
+          <div style={{ marginTop: 10, fontFamily: MONO, fontWeight: 500, fontSize: 'clamp(10px, 2.6vw, 12.5px)', letterSpacing: 'clamp(2px, 1.2vw, 5px)', color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            Influence That Matters
           </div>
 
           {/* Card */}
@@ -112,7 +124,7 @@ const screenStyle = {
   background: '#070e16', zIndex: 9999, overflow: 'hidden', padding: 24,
 }
 const cardStyle = {
-  marginTop: 32, width: '100%', padding: '30px 28px', borderRadius: 18,
+  marginTop: 34, width: '100%', maxWidth: 380, alignSelf: 'center', padding: '30px 28px', borderRadius: 18,
   background: 'rgba(255,255,255,0.025)',
   border: '1px solid rgba(249,98,3,0.30)',
   boxShadow: '0 0 0 1px rgba(249,98,3,0.05), 0 18px 60px rgba(0,0,0,0.55), 0 0 50px rgba(249,98,3,0.08)',
