@@ -14,16 +14,11 @@ function Section({ title, children }) {
   )
 }
 
-const CLAUDE_KEY = 'claude_api_key'
-
 export default function Settings() {
   const location = useLocation()
   const { theme, toggle } = useTheme()
   const [hfConnected, setHfConnected] = useState(isHFConnected)
   const [hfLoading, setHfLoading] = useState(false)
-  const [claudeKey, setClaudeKey] = useState(() => localStorage.getItem(CLAUDE_KEY) || '')
-  const [claudeInput, setClaudeInput] = useState('')
-  const [showClaudeInput, setShowClaudeInput] = useState(false)
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     if (params.get('connected') === '1') {
@@ -123,66 +118,14 @@ export default function Settings() {
         </Section>
 
         <Section title="Claude AI">
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
-            Add your Anthropic API key to let Claude analyze the image just before generating your product character sheet.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#34C759' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#34C759' }}>Claude enabled</span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 12, lineHeight: 1.6 }}>
+            Claude is managed centrally for your team — no API key needed. It analyzes product
+            images and writes smarter prompts automatically.
           </p>
-          {claudeKey ? (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#34C759' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#34C759' }}>Claude connected</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>···{claudeKey.slice(-4)}</span>
-                </div>
-                <button
-                  onClick={() => { localStorage.removeItem(CLAUDE_KEY); setClaudeKey(''); setClaudeInput(''); setShowClaudeInput(false) }}
-                  style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, color: '#FF3B30', background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.18)', fontWeight: 500 }}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ) : showClaudeInput ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                autoFocus
-                type="password"
-                value={claudeInput}
-                onChange={e => setClaudeInput(e.target.value)}
-                placeholder="sk-ant-..."
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && claudeInput.trim()) {
-                    const k = claudeInput.trim()
-                    localStorage.setItem(CLAUDE_KEY, k)
-                    setClaudeKey(k)
-                    setClaudeInput('')
-                    setShowClaudeInput(false)
-                  }
-                }}
-                style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg)', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'monospace' }}
-              />
-              <button
-                onClick={() => {
-                  const k = claudeInput.trim()
-                  if (!k) return
-                  localStorage.setItem(CLAUDE_KEY, k)
-                  setClaudeKey(k)
-                  setClaudeInput('')
-                  setShowClaudeInput(false)
-                }}
-                style={{ padding: '10px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, background: '#1D1D1F', color: '#fff', border: 'none', cursor: 'pointer' }}
-              >
-                Save
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowClaudeInput(true)}
-              style={{ padding: '10px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, background: '#1D1D1F', color: '#fff', border: 'none', cursor: 'pointer' }}
-            >
-              Add API Key
-            </button>
-          )}
         </Section>
       </div>
     </div>

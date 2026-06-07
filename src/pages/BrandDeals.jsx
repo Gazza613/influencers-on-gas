@@ -321,13 +321,12 @@ export default function BrandDeals() {
     try {
       // Step 1 — Claude studies the image and writes the full Higgsfield prompt
       let imagePrompt = null
-      const claudeKey = localStorage.getItem('claude_api_key')
-      console.log('[BrandDeals] claudeKey found:', !!claudeKey, '| deal.image exists:', !!deal.image)
-      if (claudeKey && deal.image) {
+      console.log('[BrandDeals] deal.image exists:', !!deal.image)
+      if (deal.image) {
         try {
           setGenProgress(p => ({ ...p, [deal.id]: 5 }))
           console.log('[BrandDeals] Calling Claude...')
-          imagePrompt = await buildCharSheetPromptWithClaude(deal.image, deal.brand, deal.category, claudeKey)
+          imagePrompt = await buildCharSheetPromptWithClaude(deal.image, deal.brand, deal.category)
           console.log('[BrandDeals] Claude returned prompt:', imagePrompt?.slice(0, 120))
         } catch (e) {
           console.error('[BrandDeals] Claude failed:', e.message)

@@ -1,5 +1,3 @@
-const CLAUDE_KEY = 'claude_api_key'
-
 const SYSTEM = `You are a visual prompt assistant for an AI influencer image generator.
 Given a character's backstory and physical description, extract two things:
 
@@ -11,8 +9,6 @@ Respond with a JSON object only — no explanation, no markdown:
 {"styleSignal":"tag1, tag2","sceneNiche":"lifestyle"}`
 
 export async function analyzeBackstory(backstory, physicalDesc) {
-  const apiKey = localStorage.getItem(CLAUDE_KEY)
-  if (!apiKey) { console.log('[Claude] no API key in localStorage — skipping backstory analysis'); return null }
   if (!backstory?.trim()) { console.log('[Claude] no backstory — skipping'); return null }
 
   console.log('[Claude] analyzing backstory...')
@@ -23,7 +19,6 @@ export async function analyzeBackstory(backstory, physicalDesc) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',

@@ -2444,13 +2444,12 @@ function BrandDealSection({ deals=[], onChange }) {
     setGenProgress(p=>({...p,[deal.id]:0}))
 
     let imagePrompt = null
-    const claudeKey = localStorage.getItem('claude_api_key')
     const allImages = deal.images?.length ? deal.images : (deal.image ? [deal.image] : [])
-    if (claudeKey && allImages.length) {
+    if (allImages.length) {
       setClaudeStatus(s=>({...s,[deal.id]:'analyzing'}))
       try {
         setGenProgress(p=>({...p,[deal.id]:5}))
-        imagePrompt = await buildCharSheetPromptWithClaude(allImages, deal.brand, deal.category, claudeKey)
+        imagePrompt = await buildCharSheetPromptWithClaude(allImages, deal.brand, deal.category)
         setClaudeStatus(s=>({...s,[deal.id]:'done'}))
         setTimeout(()=>setClaudeStatus(s=>({...s,[deal.id]:null})),3000)
       } catch(e) {

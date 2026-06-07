@@ -14,8 +14,11 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: { message: 'Too many requests — slow down a moment and try again.' } })
   }
 
-  const apiKey = req.headers['x-api-key']
-  if (!apiKey) return res.status(400).json({ error: { message: 'Missing x-api-key header' } })
+  // Agency mode: the API key is held centrally as a Vercel env var so the team
+  // never needs to supply one. Falls back to a browser-supplied header if the
+  // env var isn't set (legacy per-user behavior).
+  const apiKey = process.env.ANTHROPIC_API_KEY || req.headers['x-api-key']
+  if (!apiKey) return res.status(400).json({ error: { message: 'Server is missing ANTHROPIC_API_KEY' } })
 
   try {
     const upstreamHeaders = {

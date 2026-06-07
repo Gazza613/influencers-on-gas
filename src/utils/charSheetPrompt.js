@@ -36,13 +36,13 @@ export async function buildCharSheetPromptWithClaude(images, brand, category, ap
   })
 
   const imageCount = imageBlocks.length
+  // The key is held centrally on the server (ANTHROPIC_API_KEY); only forward a
+  // browser key if one was explicitly passed (legacy per-user behavior).
+  const headers = { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' }
+  if (apiKey) headers['x-api-key'] = apiKey
   const res = await fetch('/api/claude', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+    headers,
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 2000,
