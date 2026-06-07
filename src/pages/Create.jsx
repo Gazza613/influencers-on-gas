@@ -29,10 +29,10 @@ const VIBE_OPTIONS = [
 const STEPS = ['Basics', 'References', 'Story', 'Look', 'Generate']
 
 const MODELS = [
-  { id: 'soul_2',            name: 'Higgsfield Soul', tag: 'Influencer-Native',   tagColor: '#EC4899', provider: 'higgsfield',              desc: 'Native model for fashion and UGC.',          maxRefs: 1 },
-  { id: 'gpt_image_2',       name: 'GPT Image 2',     tag: 'Max Quality',         tagColor: '#10B981', provider: 'openai',                  desc: 'Highest quality output, maximum realism.',   maxRefs: 2 },
-  { id: 'nano_banana_2',     name: 'Nano Banana Pro', tag: 'Sharpest Detail',     tagColor: '#8B5CF6', provider: 'banana', version: 'Pro', desc: 'Maximum detail and portrait precision.',     maxRefs: 2 },
-  { id: 'nano_banana_flash', name: 'Nano Banana 2',   tag: 'Fastest',             tagColor: '#0EA5E9', provider: 'banana', version: '2',   desc: 'Rapid results, still premium quality.',      maxRefs: 2 },
+  { id: 'soul_2',            name: 'Higgsfield Soul', tag: 'Influencer-Native',   tagColor: '#EC4899', provider: 'higgsfield',              desc: 'Best for fresh UGC looks (no reference)',    maxRefs: 1 },
+  { id: 'gpt_image_2',       name: 'GPT Image 2',     tag: 'Max Quality',         tagColor: '#10B981', provider: 'openai',                  desc: 'Best for realistic hero shots',             maxRefs: 2 },
+  { id: 'nano_banana_2',     name: 'Nano Banana Pro', tag: 'Sharpest Detail',     tagColor: '#8B5CF6', provider: 'banana', version: 'Pro', desc: 'Best for faces & fine detail',              maxRefs: 2 },
+  { id: 'nano_banana_flash', name: 'Nano Banana 2',   tag: 'Fastest',             tagColor: '#0EA5E9', provider: 'banana', version: '2',   desc: 'Best for fast, cheaper drafts',             maxRefs: 2 },
 ]
 const MODEL_PREF_KEY = 'aiis_model_pref'
 
@@ -1378,7 +1378,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
                     <div style={{ fontSize: 12, fontWeight: 700, color: blocked ? '#FF3B30' : on ? '#8B5CF6' : L.text, marginBottom: 4, lineHeight: 1.2 }}>{m.name}</div>
                     {blocked
                       ? <div style={{ fontSize: 10.5, color: '#FF3B30', fontWeight: 600, lineHeight: 1.3 }}>Not compatible with references</div>
-                      : <div style={{ fontSize: 10.5, color: L.textFaint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.desc}</div>
+                      : <div style={{ fontSize: 10.5, color: L.textFaint, lineHeight: 1.3 }}>{m.desc}</div>
                     }
                   </div>
                 </button>
