@@ -44,24 +44,16 @@ export default function Nav() {
 
       {/* Logo */}
       <NavLink to="/" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-        <span style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: dark ? 'rgba(255,255,255,0.10)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-          border: dark ? '1px solid rgba(255,255,255,0.12)' : 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: dark ? 'none' : '0 2px 8px rgba(139,92,246,0.35)',
-          transition: 'background 0.5s',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <circle cx="7" cy="5" r="3" fill="white" opacity="0.95"/>
-            <path d="M1 13c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.95"/>
-          </svg>
-        </span>
+        <img
+          src="/gas-logo.png"
+          alt="GAS"
+          style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', display: 'block' }}
+        />
         <span className="nav-brand-label" style={{
           fontWeight: 700, fontSize: 15, letterSpacing: '-0.4px',
           color: dark ? 'rgba(255,255,255,0.90)' : 'var(--text-primary)',
           transition: 'color 0.5s',
-        }}>Influencer Studio</span>
+        }}>Influencers on GAS</span>
       </NavLink>
 
       {/* Nav links */}

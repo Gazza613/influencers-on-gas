@@ -170,20 +170,23 @@ export default function Landing() {
       {/* ── Center content ── */}
       <div style={{ maxWidth: 680, position: 'relative', zIndex: 2 }}>
 
-        {/* Badge */}
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.52)',
-          padding: '6px 16px 6px 12px', borderRadius: 20,
-          fontSize: 13, fontWeight: 600, letterSpacing: '0.3px',
-          marginBottom: 44, border: '1px solid rgba(255,255,255,0.09)',
-          backdropFilter: 'blur(8px)',
-        }}>
-          <span style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', width:10, height:10 }}>
-            <span style={{ position:'absolute', width:10, height:10, borderRadius:'50%', background:'#34C759', opacity:0.35, animation:'ping 1.8s ease-out infinite' }}/>
-            <span style={{ width:7, height:7, borderRadius:'50%', background:'#34C759', flexShrink:0 }}/>
-          </span>
-          Made by Dan Kieft
+        {/* GAS logo + tagline */}
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom: 40 }}>
+          <img
+            src="/gas-logo.png"
+            alt="GAS"
+            style={{ width: 92, height: 92, marginBottom: 18, borderRadius: '50%', filter:'drop-shadow(0 8px 28px rgba(255,90,30,0.55))' }}
+          />
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.62)',
+            padding: '6px 16px', borderRadius: 20,
+            fontSize: 13, fontWeight: 700, letterSpacing: '0.6px',
+            border: '1px solid rgba(255,255,255,0.09)',
+            backdropFilter: 'blur(8px)', textTransform: 'uppercase',
+          }}>
+            Influencers on GAS
+          </div>
         </div>
 
         <h1 style={{ fontSize:'clamp(62px,10vw,104px)', fontWeight:800, letterSpacing:'-3.5px', lineHeight:1.0, color:'#fff', marginBottom:2 }}>
