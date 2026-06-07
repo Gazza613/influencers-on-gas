@@ -1,93 +1,35 @@
 ====================================================
-  AI INFLUENCER STUDIO — SETUP GUIDE
+  INFLUENCERS ON GAS — TEAM ACCESS GUIDE
 ====================================================
 
-Follow these steps in order. No tech experience needed.
-Just type exactly what you see in the boxes.
+The app is live and hosted. Your team does NOT need to install
+anything or log into Higgsfield or Claude — it's all set up
+centrally on the GAS account.
 
 
-STEP 1 — DOWNLOAD THE PROJECT
+HOW TO USE IT
 --------------------------------------------------
-1. Go to: https://github.com/DaanKieft/ai-influencer
-2. Click the green "Code" button
-3. Click "Download ZIP"
-4. Find the downloaded ZIP (usually in your Downloads folder)
-   and double-click it to unzip
-5. Move the unzipped folder somewhere easy, like your Desktop
+1. Open Chrome and go to:
 
+      https://creative-on-gas.vercel.app
 
-STEP 2 — INSTALL ANTIGRAVITY
---------------------------------------------------
-1. Search "Antigravity" on Google, or go to: https://antigravity.dev
-2. Download it and install it like any normal app
+2. Enter the team password when prompted.
+   (Ask Gary for the password if you don't have it yet.)
 
-(That's the only thing you install. Everything else is inside it.)
-
-
-STEP 3 — OPEN THE PROJECT
---------------------------------------------------
-1. Open Antigravity
-2. Click: File → Open Folder
-3. Pick the unzipped project folder from Step 1
-
-
-STEP 4 — ADD CLAUDE (your helper)
---------------------------------------------------
-1. Click the Extensions icon in the left sidebar
-   (it looks like four little squares)
-2. Search for "Claude Code"
-3. Click Install
-4. Sign in with your Anthropic account when it asks
-
-
-STEP 5 — START IT
---------------------------------------------------
-1. Open the terminal: Menu → Terminal → New Terminal
-2. Type this and press Enter:
-
-      claude
-
-3. When Claude is ready, just tell it:
-
-      install everything and start the app
-
-   Claude does the rest. When it's running, it will show a web
-   address that looks like:
-
-      http://localhost:5173
-
-   The number at the end may be different on your computer —
-   just use whatever address Claude shows. Open your browser
-   and go to that address.
-
-Done! The app loads with everything ready.
-
-
-STEP 6 — CONNECT HIGGSFIELD (for images & videos)
---------------------------------------------------
-1. In the app, click the gear icon (top right) → Settings
-2. Click "Connect Higgsfield"
-3. Log in with your Higgsfield account
-4. Done — it uses your own Higgsfield credits
-
-
-USING IT LATER
---------------------------------------------------
-To start the app again:
-   Open Antigravity → open the terminal → type  claude
-   → tell it "start the app"  →  open the web address it shows
-
-To stop the app:
-   Click the terminal and press Ctrl+C
-
-Keep Antigravity open while using the app — the terminal
-inside it is what runs the app.
+3. That's it — start creating influencers, photos, and videos.
+   Image and video generation run on the GAS account automatically.
 
 
 GOOD TO KNOW
 --------------------------------------------------
-- You only install Antigravity. It already includes everything else.
-- Stuck on anything? Just ask Claude in the terminal. That's what
-  it's there for — type your question and press Enter.
-- All your data is saved in your browser. Clearing your browser
-  data will reset everything.
+- One password gets you in. You won't log into anything else.
+- Your work (influencers, brand deals, boards) is saved in your
+  browser on your device.
+- Clearing your browser data resets what you see on that device.
+- Access requests / questions:  grow@gasmarketing.co.za
+
+
+FOR DEVELOPERS
+--------------------------------------------------
+Code:      https://github.com/Gazza613/creative-on-gas
+Local dev: npm install  ->  npm run dev   (http://localhost:5173)

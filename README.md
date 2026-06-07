@@ -1,45 +1,32 @@
-# AI Influencer Studio
+# Influencers on GAS
 
-A local-first web app for building, managing, and generating AI influencers.
-React + Vite frontend, Higgsfield for image & video generation, your own
-Higgsfield account, your data lives in your browser.
-
----
-
-## Setup (no tech experience needed)
-
-You only install one thing — **Antigravity**. Everything else lives inside
-it. Just follow these steps in order.
-
-1. **Download the project.** Go to the
-   [GitHub page](https://github.com/DaanKieft/ai-influencer), click the green
-   **Code** button → **Download ZIP**, then unzip it onto your Desktop.
-2. **Install Antigravity.** Search "Antigravity" on Google (or go to
-   [antigravity.dev](https://antigravity.dev)) and install it like any app.
-3. **Open the project.** In Antigravity, click **File → Open Folder** and pick
-   the unzipped folder.
-4. **Add Claude.** Click the **Extensions** icon in the left sidebar, search
-   **Claude Code**, click **Install**, and sign in with your Anthropic account.
-5. **Start it.** Open **Terminal → New Terminal**, type `claude`, press Enter,
-   then tell Claude: *"install everything and start the app."*
-6. **Open it.** When Claude says it's running, it will show a web address
-   (something like `http://localhost:5173` — the number may differ on your
-   computer). Open that address in Chrome.
-7. **Connect Higgsfield.** In the app: **Settings → Connect Higgsfield** (uses
-   your own Higgsfield credits).
-
-That's it. Stuck on anything? Just ask Claude in the terminal — that's what
-it's there for. To change something, tell it: *"change the homepage
-headline,"* *"add a new vibe option,"* etc.
+An internal GAS Marketing web app for building, managing, and generating AI
+influencers. React + Vite frontend, Higgsfield for image & video generation,
+Claude for prompt assistance. Deployed on Vercel behind a shared team password.
 
 ---
 
-## Updating
+## Running it locally (developers)
 
-In the terminal, type `claude` and tell it: *"get the latest version."*
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # production build
+npm run preview  # preview the production build
+```
 
-Your saved data (influencers, brand deals, inspiration boards) stays in your
-browser and survives updates.
+Get the code from the GitHub repo:
+[github.com/Gazza613/creative-on-gas](https://github.com/Gazza613/creative-on-gas).
+
+---
+
+## How access works
+
+- The live site is gated by a single shared **team password**
+  (`APP_ACCESS_PASSWORD`). The team enters it once.
+- **Higgsfield** (images/video) and **Claude** (prompt assistance) are
+  centralized server-side — the team never logs into either. Credentials live
+  in Vercel environment variables; the Higgsfield token rotates via Vercel KV.
 
 ---
 
@@ -48,22 +35,19 @@ browser and survives updates.
 ```
 src/
   pages/           Routes: Landing, Influencers, Inspiration, BrandDeals, Create, Settings
-  components/      Reusable UI: Nav, ImageGrid, MasonryGrid, Lightbox
+  components/      Reusable UI: Nav, ImageGrid, MasonryGrid, Lightbox, AppGate
   context/         React contexts (theme)
   utils/           Higgsfield API, OAuth, prompt builders, image helpers
   store.jsx        localStorage-backed React contexts
-api/               Vercel serverless functions (proxies + image proxy)
-docs/              Prompt engineering reference docs
+api/               Vercel serverless functions (Claude + Higgsfield proxies, auth)
+lib/               Server helpers (token store, rate limit, app auth)
 ```
 
 ---
 
-## Deployment (optional)
-   
-The repo is Vercel-ready. Connect the GitHub repo at vercel.com → it
-auto-detects Vite + the `api/` folder and deploys in ~60 seconds. End
-users still bring their own Higgsfield account.
+## Deployment
 
----
-
-Made by Dan Kieft.
+The repo is Vercel-ready. Connecting the GitHub repo at vercel.com auto-detects
+Vite + the `api/` folder. Required environment variables: `ANTHROPIC_API_KEY`,
+`HF_CLIENT_ID`, `HF_REFRESH_TOKEN`, `APP_ACCESS_PASSWORD`, plus the Upstash KV
+vars (`KV_REST_API_URL`, `KV_REST_API_TOKEN`).
