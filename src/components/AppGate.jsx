@@ -43,7 +43,7 @@ export default function AppGate({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw }),
       })
-      if (res.ok) setStatus('open')
+      if (res.ok) window.location.reload() // reload so the shared library loads with the new session
       else setError('Incorrect password. Please try again.')
     } catch {
       setError('Something went wrong. Please try again.')

@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/theme'
 import { StoreProvider } from './store'
 import { silentRefreshHFToken } from './utils/higgsfieldAuth'
 import AppGate from './components/AppGate'
+import SyncWatcher from './components/SyncWatcher'
 import Nav from './components/Nav'
 import Landing from './pages/Landing'
 import Influencers from './pages/Influencers'
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <SyncWatcher />
       <Analytics />
     </BrowserRouter>
     </StoreProvider>
