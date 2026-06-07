@@ -53,7 +53,11 @@ export default function Nav() {
           fontWeight: 700, fontSize: 15, letterSpacing: '-0.4px',
           color: dark ? 'rgba(255,255,255,0.90)' : 'var(--text-primary)',
           transition: 'color 0.5s',
-        }}>Influencers on GAS</span>
+        }}>Influencers on <span style={{
+          fontWeight: 900,
+          background: 'linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        }}>GAS</span></span>
       </NavLink>
 
       {/* Nav links */}

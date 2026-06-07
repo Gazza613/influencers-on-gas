@@ -51,8 +51,11 @@ export default function AppGate({ children }) {
   return (
     <div style={screenStyle}>
       <form onSubmit={submit} style={cardStyle}>
-        <img src="/gas-logo.png" alt="GAS" style={{ width: 64, height: 64, marginBottom: 16, borderRadius: '50%' }} />
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.5px' }}>Influencers on GAS</h1>
+        <img src="/gas-logo.png" alt="GAS" style={{ width: 77, height: 77, marginBottom: 18, borderRadius: '50%' }} />
+        <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
+          <span style={{ background: 'linear-gradient(135deg,#EC4899 0%,#A855F7 50%,#60A5FA 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Influencers on </span>
+          <span style={{ fontWeight: 900, background: 'linear-gradient(135deg,#FFB020 0%,#FF6A00 45%,#FF2D55 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GAS</span>
+        </h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', margin: '8px 0 24px' }}>Enter the team password to continue.</p>
         <input
           autoFocus

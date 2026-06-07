@@ -170,22 +170,26 @@ export default function Landing() {
       {/* ── Center content ── */}
       <div style={{ maxWidth: 680, position: 'relative', zIndex: 2 }}>
 
-        {/* GAS logo + tagline */}
+        {/* GAS logo + dual-tone tagline */}
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom: 40 }}>
           <img
             src="/gas-logo.png"
             alt="GAS"
-            style={{ width: 92, height: 92, marginBottom: 18, borderRadius: '50%', filter:'drop-shadow(0 8px 28px rgba(255,90,30,0.55))' }}
+            style={{ width: 110, height: 110, marginBottom: 22, borderRadius: '50%', filter:'drop-shadow(0 10px 32px rgba(255,90,30,0.55))' }}
           />
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.62)',
-            padding: '6px 16px', borderRadius: 20,
-            fontSize: 13, fontWeight: 700, letterSpacing: '0.6px',
-            border: '1px solid rgba(255,255,255,0.09)',
-            backdropFilter: 'blur(8px)', textTransform: 'uppercase',
+            display: 'inline-flex', alignItems: 'baseline', gap: '0.32em',
+            fontSize: 'clamp(22px, 3.2vw, 30px)', fontWeight: 800, letterSpacing: '-0.6px',
           }}>
-            Influencers on GAS
+            <span style={{
+              background: 'linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>Influencers on</span>
+            <span style={{
+              fontWeight: 900,
+              background: 'linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>GAS</span>
           </div>
         </div>
 
