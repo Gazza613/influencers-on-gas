@@ -1,6 +1,12 @@
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
+import { getValidHFAccessToken } from '../lib/hfToken.js'
 
 export const config = { runtime: 'edge' }
+
+// Paths that act on the owner's Higgsfield account and need the centralized token.
+function needsAuth(path) {
+  return path.startsWith('/mcp') || path.startsWith('/v1/')
+}
 
 // Only forward requests to known Higgsfield MCP paths
 const ALLOWED_PATH_PREFIXES = [
@@ -55,6 +61,20 @@ export default async function handler(req) {
   for (const [k, v] of req.headers.entries()) {
     if (k === 'host') continue
     forward.set(k, v)
+  }
+
+  // Agency mode: inject the owner's centralized Higgsfield token server-side so
+  // the team never has to authenticate. Overrides any client-supplied header.
+  if (needsAuth(path)) {
+    try {
+      const accessToken = await getValidHFAccessToken()
+      forward.set('authorization', `Bearer ${accessToken}`)
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: `Higgsfield is not available: ${e.message}` }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
   }
 
   const upstream = await fetch(target, {

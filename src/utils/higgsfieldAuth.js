@@ -150,7 +150,9 @@ export async function handleOAuthCallback(code, state) {
 }
 
 export function getHFToken() { return localStorage.getItem('hf_access_token') }
-export function isHFConnected() { return !!getHFToken() }
+// Agency mode: Higgsfield is authorized centrally on the server, so the app is
+// always "connected" from the team's perspective — no per-user OAuth needed.
+export function isHFConnected() { return true }
 export function disconnectHF() {
   ['hf_access_token', 'hf_refresh_token', 'hf_token_expires_at', 'hf_verifier', 'hf_state']
     .forEach(k => localStorage.removeItem(k))

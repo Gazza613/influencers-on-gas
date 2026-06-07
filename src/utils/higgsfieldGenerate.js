@@ -1,5 +1,3 @@
-import { getHFToken, refreshHFToken } from './higgsfieldAuth'
-
 const MCP_URL = '/api/hf/mcp'
 const PENDING_KEY = 'hf_pending_gens'
 
@@ -92,10 +90,20 @@ export async function resumeVideoJob(jobIds, count, onProgress, onPartialResults
   return pollVideoJobs(jobIds, count, onProgress, onPartialResults, isCancelled)
 }
 
+// Fetch the centralized Higgsfield access token from the server (behind Vercel
+// Password Protection) for the rare direct-call fallback below.
+async function fetchCentralHFToken() {
+  const res = await fetch('/api/hf-token')
+  if (!res.ok) throw new Error('Could not get Higgsfield token for direct call')
+  const d = await res.json()
+  if (!d.access_token) throw new Error('No Higgsfield token available')
+  return d.access_token
+}
+
 // Direct-to-Higgsfield call — bypasses the Vercel proxy so Higgsfield sees the browser's real
 // IP instead of a Vercel datacenter IP. Used as fallback when the proxy call is IP-blocked.
 async function mcpPostDirect(body) {
-  const token = getHFToken()
+  const token = await fetchCentralHFToken()
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json, text/event-stream',
@@ -129,11 +137,11 @@ async function mcpPostDirect(body) {
 }
 
 async function mcpPost(body, isRetry = false) {
-  const token = getHFToken()
+  // The proxy injects the centralized Higgsfield token server-side, so the
+  // browser no longer sends an Authorization header.
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json, text/event-stream',
-    'Authorization': `Bearer ${token}`,
   }
   if (_sessionId) headers['Mcp-Session-Id'] = _sessionId
 
@@ -151,14 +159,7 @@ async function mcpPost(body, isRetry = false) {
 
   if (res.status === 401) {
     clearTimeout(timeout)
-    if (isRetry) throw new Error('Higgsfield session expired — please reconnect in Settings')
-    try {
-      await refreshHFToken()
-      _sessionId = null // force new session with fresh token
-      return mcpPost(body, true)
-    } catch {
-      throw new Error('Higgsfield session expired — please reconnect in Settings')
-    }
+    throw new Error('Higgsfield authorization failed — the central token may need re-seeding by your admin.')
   }
   if (!res.ok) {
     clearTimeout(timeout)
