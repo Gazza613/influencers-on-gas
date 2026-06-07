@@ -62,22 +62,17 @@ export async function startHiggsfieldOAuth() {
   window.location.href = await buildAuthUrl()
 }
 
-// Opens ONE popup. First-time users: popup starts on higgsfield.ai (sets referral cookie),
-// then auto-navigates to OAuth in the same popup window. No extra tabs ever.
+// Opens ONE popup that goes straight to the Higgsfield OAuth screen. No extra tabs ever.
 export async function startHiggsfieldOAuthPopup() {
   const w = 520, h = 660
   const left = Math.round(window.screenX + (window.outerWidth - w) / 2)
   const top = Math.round(window.screenY + (window.outerHeight - h) / 2)
 
-  const referralDone = localStorage.getItem('hf_referral_fired')
-
   // CRITICAL: open the popup synchronously, inside the click gesture, BEFORE any
   // await. buildAuthUrl() makes network calls; if we await it first, the browser
-  // no longer treats window.open as user-initiated and blocks the popup.
-  // First-time users land on the referral page (sets cookie); returning users get
-  // a blank popup we immediately redirect once the auth URL is ready.
-  const startUrl = referralDone ? 'about:blank' : 'https://higgsfield.ai/?fpr=dankieft&fp_sid=tool'
-  const popup = window.open(startUrl, 'hf_oauth', `width=${w},height=${h},left=${left},top=${top}`)
+  // no longer treats window.open as user-initiated and blocks the popup. We open a
+  // blank popup now and redirect it to OAuth once the auth URL is ready.
+  const popup = window.open('about:blank', 'hf_oauth', `width=${w},height=${h},left=${left},top=${top}`)
   if (!popup) throw new Error('Popup blocked — please allow popups for this site and try again')
 
   // Now do the async work — the popup is already open and won't be blocked.
@@ -89,22 +84,13 @@ export async function startHiggsfieldOAuthPopup() {
     throw e
   }
 
-  if (referralDone) {
-    // Returning user: send the blank popup straight to OAuth.
-    try { popup.location.href = authUrl } catch (_) {}
-  } else {
-    // First-timer: give the referral page ~2.5 s to set its cookie, then go to OAuth.
-    setTimeout(() => { try { popup.location.href = authUrl } catch (_) {} }, 2500)
-  }
+  // Send the blank popup straight to OAuth.
+  try { popup.location.href = authUrl } catch (_) {}
 
   return new Promise((resolve, reject) => {
     function onMessage(e) {
       if (e.origin !== window.location.origin) return
-      if (e.data?.type === 'hf_auth_success') {
-        // Only mark referral as fired after OAuth actually succeeds
-        if (!referralDone) localStorage.setItem('hf_referral_fired', '1')
-        cleanup(); resolve()
-      }
+      if (e.data?.type === 'hf_auth_success') { cleanup(); resolve() }
       else if (e.data?.type === 'hf_auth_error') { cleanup(); reject(new Error(e.data.error)) }
     }
     const poll = setInterval(() => { if (popup.closed) { cleanup(); reject(new Error('cancelled')) } }, 600)
@@ -211,12 +197,4 @@ export async function silentRefreshHFToken() {
   if (!needsRefresh()) return
   if (!localStorage.getItem('hf_refresh_token')) return
   try { await refreshHFToken() } catch (_) { /* surfaces on next API call */ }
-}
-
-// Fire the referral link once per device so affiliate tracking is captured.
-// Must be called from a user-interaction handler (click) to avoid popup blockers.
-export function fireReferralOnce() {
-  if (localStorage.getItem('hf_referral_fired')) return
-  window.open('https://higgsfield.ai/?fpr=dankieft&fp_sid=tool', '_blank', 'noopener,noreferrer')
-  localStorage.setItem('hf_referral_fired', '1')
 }
