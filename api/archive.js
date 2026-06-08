@@ -15,12 +15,23 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!isAppAuthed(req)) return res.status(401).json({ error: 'Unauthorized' })
 
+  // Diagnostic: { debug: true } lists which BLOB-related env var names exist
+  // (names only, never values) so we can confirm the token name after connecting.
+  if (req.body?.debug) {
+    return res.status(200).json({ blobVars: Object.keys(process.env).filter(k => k.includes('BLOB')) })
+  }
+
   const url = req.body?.url
   if (!url || typeof url !== 'string' || !url.startsWith('http')) {
     return res.status(200).json({ url: url || null })
   }
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN
+  // The connected Blob store may expose the token under a prefixed name
+  // (e.g. UGC_ON_GAS_BLOB_READ_WRITE_TOKEN), so find any *BLOB_READ_WRITE_TOKEN.
+  const tokenKey = process.env.BLOB_READ_WRITE_TOKEN
+    ? 'BLOB_READ_WRITE_TOKEN'
+    : Object.keys(process.env).find(k => k.endsWith('BLOB_READ_WRITE_TOKEN'))
+  const token = tokenKey ? process.env[tokenKey] : null
   // Archiving off (store not connected) or it's already ours → pass through.
   if (!token || url.includes('.blob.vercel-storage.com')) {
     return res.status(200).json({ url })
