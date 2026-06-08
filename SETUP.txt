@@ -11,7 +11,7 @@ HOW TO USE IT
 --------------------------------------------------
 1. Open Chrome and go to:
 
-      https://creative-on-gas.vercel.app
+      https://influencers-on-gas.vercel.app
 
 2. Enter the team password when prompted.
    (Ask Gary for the password if you don't have it yet.)
