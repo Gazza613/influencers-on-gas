@@ -15,6 +15,13 @@ import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/c
 import PhotoStudioPanel from './PhotoStudio'
 import WardrobeDrawer from '../components/WardrobeDrawer'
 
+// Video models offered in the Video Studio. Only models verified to work with
+// this app's generation parameters belong here. (Kling/Veo need different
+// per-model settings — they'll be added once that's implemented + tested.)
+const VIDEO_MODELS = [
+  { id: 'seedance_2_0', label: 'Seedance 2.0', note: 'High quality · best identity match' },
+]
+
 function useMobile() {
   const [m, setM] = useState(() => window.innerWidth < 768)
   useEffect(() => {
@@ -3796,7 +3803,7 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
   const [outputs, setOutputs] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').outputs ?? 1 } catch { return 1 } })
   const [resolution, setResolution] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').resolution ?? '1080p' } catch { return '1080p' } })
   const [shotMode, setShotMode] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').shotMode ?? 'oner' } catch { return 'oner' } })
-  const [videoModel, setVideoModel] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').model ?? 'seedance_2_0' } catch { return 'seedance_2_0' } })
+  const [videoModel, setVideoModel] = useState(() => { try { const s = JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').model; return VIDEO_MODELS.find(m => m.id === s) ? s : 'seedance_2_0' } catch { return 'seedance_2_0' } })
   const [saved, setSaved] = useState(false)
   const [saveModal, setSaveModal] = useState(null)
   const [generating, setGenerating] = useState(false)
@@ -3843,12 +3850,6 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
   const restoringRef = useRef(false)
 
   const CS_DEFAULTS = { vibe: '', duration: 15, aspect: '9:16', outputs: 1, resolution: '1080p', shotMode: 'oner', camera: 'Handheld', envKey: '', envCustom: '', voicePreset: '', voiceCustom: '', model: 'seedance_2_0' }
-  const VIDEO_MODELS = [
-    { id: 'seedance_2_0', label: 'Seedance 2.0', note: 'Best quality & identity — most expensive' },
-    { id: 'kling3_0',     label: 'Kling 3.0',    note: 'Cheaper · strong all-rounder' },
-    { id: 'kling2_6',     label: 'Kling 2.6',    note: 'Cheaper · cinematic motion' },
-    { id: 'veo3_1',       label: 'Veo 3.1',      note: 'Cheaper · realistic (1 reference)' },
-  ]
   function loadCsSettings(id) { try { return JSON.parse(localStorage.getItem(`cs_settings_${id}`) || '{}') } catch { return {} } }
 
   useEffect(() => {
@@ -3862,7 +3863,7 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
     setOutputs(s.outputs      ?? CS_DEFAULTS.outputs)
     setResolution(s.resolution ?? CS_DEFAULTS.resolution)
     setShotMode(s.shotMode    ?? CS_DEFAULTS.shotMode)
-    setVideoModel(s.model     ?? CS_DEFAULTS.model)
+    setVideoModel(VIDEO_MODELS.find(m => m.id === s.model) ? s.model : CS_DEFAULTS.model)
     setCamera(s.camera        ?? CS_DEFAULTS.camera)
     const ek = s.envKey ?? CS_DEFAULTS.envKey
     setEnvKey(ek)
