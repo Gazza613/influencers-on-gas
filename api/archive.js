@@ -25,16 +25,7 @@ export default async function handler(req, res) {
     }
     return [null, null]
   }
-  const [tokenKey, token] = findBlobToken()
-
-  // Diagnostic: { debug: true } reports which env var holds the blob token
-  // (name only, never the value) so we can confirm it's detected.
-  if (req.body?.debug) {
-    return res.status(200).json({
-      tokenVar: tokenKey,
-      blobVars: Object.keys(process.env).filter(k => k.includes('BLOB') || k.includes('READ_WRITE')),
-    })
-  }
+  const [, token] = findBlobToken()
 
   const url = req.body?.url
   if (!url || typeof url !== 'string' || !url.startsWith('http')) {
