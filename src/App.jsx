@@ -6,6 +6,7 @@ import { StoreProvider } from './store'
 import { silentRefreshHFToken } from './utils/higgsfieldAuth'
 import AppGate from './components/AppGate'
 import SyncWatcher from './components/SyncWatcher'
+import IdleLogout from './components/IdleLogout'
 import Nav from './components/Nav'
 import Landing from './pages/Landing'
 import Influencers from './pages/Influencers'
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <SyncWatcher />
+      <IdleLogout />
       <Analytics />
     </BrowserRouter>
     </StoreProvider>
