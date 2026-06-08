@@ -3796,6 +3796,7 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
   const [outputs, setOutputs] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').outputs ?? 1 } catch { return 1 } })
   const [resolution, setResolution] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').resolution ?? '1080p' } catch { return '1080p' } })
   const [shotMode, setShotMode] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').shotMode ?? 'oner' } catch { return 'oner' } })
+  const [videoModel, setVideoModel] = useState(() => { try { return JSON.parse(localStorage.getItem(`cs_settings_${influencer.id}`) || '{}').model ?? 'seedance_2_0' } catch { return 'seedance_2_0' } })
   const [saved, setSaved] = useState(false)
   const [saveModal, setSaveModal] = useState(null)
   const [generating, setGenerating] = useState(false)
@@ -3841,7 +3842,13 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
   const [confirmVidClear, setConfirmVidClear] = useState(null)
   const restoringRef = useRef(false)
 
-  const CS_DEFAULTS = { vibe: '', duration: 15, aspect: '9:16', outputs: 1, resolution: '1080p', shotMode: 'oner', camera: 'Handheld', envKey: '', envCustom: '', voicePreset: '', voiceCustom: '' }
+  const CS_DEFAULTS = { vibe: '', duration: 15, aspect: '9:16', outputs: 1, resolution: '1080p', shotMode: 'oner', camera: 'Handheld', envKey: '', envCustom: '', voicePreset: '', voiceCustom: '', model: 'seedance_2_0' }
+  const VIDEO_MODELS = [
+    { id: 'seedance_2_0', label: 'Seedance 2.0', note: 'Best quality & identity — most expensive' },
+    { id: 'kling3_0',     label: 'Kling 3.0',    note: 'Cheaper · strong all-rounder' },
+    { id: 'kling2_6',     label: 'Kling 2.6',    note: 'Cheaper · cinematic motion' },
+    { id: 'veo3_1',       label: 'Veo 3.1',      note: 'Cheaper · realistic (1 reference)' },
+  ]
   function loadCsSettings(id) { try { return JSON.parse(localStorage.getItem(`cs_settings_${id}`) || '{}') } catch { return {} } }
 
   useEffect(() => {
@@ -3855,6 +3862,7 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
     setOutputs(s.outputs      ?? CS_DEFAULTS.outputs)
     setResolution(s.resolution ?? CS_DEFAULTS.resolution)
     setShotMode(s.shotMode    ?? CS_DEFAULTS.shotMode)
+    setVideoModel(s.model     ?? CS_DEFAULTS.model)
     setCamera(s.camera        ?? CS_DEFAULTS.camera)
     const ek = s.envKey ?? CS_DEFAULTS.envKey
     setEnvKey(ek)
@@ -3900,7 +3908,6 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
   const [selectedHomeId, setSelectedHomeId] = useState(() => { try { return localStorage.getItem(`hf_home_id_${influencer.id}`) || '' } catch { return '' } })
   const homeSlots = (influencer.homeSlots || []).filter(s => s.image)
   const selectedHome = homeSlots.find(s => s.id === selectedHomeId) || null
-  const videoModel = 'seedance_2_0'
 
   // Reset wardrobe drawer state when the active influencer changes
   useEffect(() => {
@@ -4029,9 +4036,9 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
   useEffect(() => {
     if (restoringRef.current) return
     try {
-      localStorage.setItem(`cs_settings_${influencer.id}`, JSON.stringify({ vibe, duration, aspect, outputs, resolution, shotMode, camera, envKey, envCustom: CS_ENV_PRESETS[envKey] ? '' : environment, voicePreset, voiceCustom, dialogue, videoTimeOfDay, productWorn }))
+      localStorage.setItem(`cs_settings_${influencer.id}`, JSON.stringify({ vibe, duration, aspect, outputs, resolution, shotMode, camera, envKey, envCustom: CS_ENV_PRESETS[envKey] ? '' : environment, voicePreset, voiceCustom, dialogue, videoTimeOfDay, productWorn, model: videoModel }))
     } catch {}
-  }, [influencer.id, vibe, duration, aspect, outputs, resolution, shotMode, camera, envKey, environment, voicePreset, voiceCustom, dialogue, videoTimeOfDay, productWorn])
+  }, [influencer.id, vibe, duration, aspect, outputs, resolution, shotMode, camera, envKey, environment, voicePreset, voiceCustom, dialogue, videoTimeOfDay, productWorn, videoModel])
 
   // Persist last prompt per influencer
   useEffect(() => {
@@ -5236,6 +5243,24 @@ ${shotsWithBeats.join('\n\n')}`
               </div>
             </div>
 
+            <div>
+              <div style={{fontSize:11,fontWeight:600,color:'var(--text-tertiary)',marginBottom:8}}>Video Model</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {VIDEO_MODELS.map(m => (
+                  <button key={m.id} onClick={()=>setVideoModel(m.id)} title={m.note} style={{
+                    padding:'7px 12px',borderRadius:9,fontSize:11,fontWeight:600,
+                    background: videoModel===m.id ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
+                    color: videoModel===m.id ? '#8B5CF6' : 'var(--text-secondary)',
+                    border: videoModel===m.id ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                    transition:'all 0.15s',whiteSpace:'nowrap',cursor:'pointer',
+                  }}>{m.label}</button>
+                ))}
+              </div>
+              <div style={{fontSize:10,color:'var(--text-tertiary)',marginTop:6,lineHeight:1.4}}>
+                {VIDEO_MODELS.find(m=>m.id===videoModel)?.note}
+              </div>
+            </div>
+
           </div>
         </Sec>
 
@@ -5278,7 +5303,7 @@ ${shotsWithBeats.join('\n\n')}`
                     <span style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>
                       {genProgress < 10 ? 'Connecting...'
                         : genProgress < 28 ? 'Uploading references...'
-                        : genProgress < 35 ? 'Submitting to Seedance...'
+                        : genProgress < 35 ? `Submitting to ${VIDEO_MODELS.find(m=>m.id===videoModel)?.label || 'model'}...`
                         : genProgress >= 95 ? 'Almost there...'
                         : lockedOutputs > 1 && genResults.length > 0
                           ? `Rendering · ${genResults.length}/${lockedOutputs} ready`
