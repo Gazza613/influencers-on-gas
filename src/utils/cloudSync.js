@@ -26,6 +26,25 @@ export function isSharedKey(k) {
   )
 }
 
+// Array-valued shared keys are merged by a unique field (not overwritten) so an
+// item created on one device isn't lost when another device's copy syncs.
+const INF_PREFIX = 'hf_influencer_'
+const COLLECTION_KEYS = { photo_studio_history: 'url', brand_deals: 'id', inspiration_boards: 'id' }
+
+function safeParse(raw, fallback) { try { return raw == null ? fallback : JSON.parse(raw) } catch { return fallback } }
+
+function mergeById(cloudArr, localArr, idField) {
+  const seen = new Set()
+  const out = []
+  for (const item of [...(Array.isArray(cloudArr) ? cloudArr : []), ...(Array.isArray(localArr) ? localArr : [])]) {
+    const key = item && item[idField] != null ? item[idField] : JSON.stringify(item)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(item)
+  }
+  return out
+}
+
 let suppress = false // true while we apply remote data, so it isn't echoed back
 
 // ---- push (local → cloud) -------------------------------------------------
@@ -122,35 +141,60 @@ export async function pullWorkspaceIntoLocalStorage() {
     return { authed: true, migrated: true, changed: false }
   }
 
-  const localOnly = {}
+  const localOnly = {}  // local-only keys (e.g. created offline) to push up
+  const pushBack = {}   // values we merged/rebuilt and need to send back to the cloud
   suppress = true
   try {
-    for (const k of cloudKeys) {
-      try { localStorage.setItem(k, data[k]) } catch (e) { console.warn('[sync] write failed', k, e) }
-    }
     const cloudSet = new Set(cloudKeys)
     const synced = getSynced()
-    for (const k of Object.keys(localStorage)) {
-      if (!isSharedKey(k) || cloudSet.has(k)) continue
-      if (synced.has(k)) {
-        // Was on the server before, now gone → a real delete by a teammate.
-        try { localStorage.removeItem(k) } catch {}
+
+    // Apply each cloud key. Array collections are MERGED (so local-only items
+    // survive); the influencer index is rebuilt afterwards; everything else is
+    // overwritten with the cloud value.
+    for (const k of cloudKeys) {
+      if (k === 'influencer_ids') continue
+      if (COLLECTION_KEYS[k]) {
+        const merged = mergeById(safeParse(data[k], []), safeParse(localStorage.getItem(k), []), COLLECTION_KEYS[k])
+        const raw = JSON.stringify(merged)
+        localStorage.setItem(k, raw)
+        if (raw !== data[k]) pushBack[k] = raw
       } else {
-        // Never made it to the server (e.g. created offline) → keep it and push it.
-        const v = localStorage.getItem(k)
-        if (v != null) localOnly[k] = v
+        try { localStorage.setItem(k, data[k]) } catch (e) { console.warn('[sync] write failed', k, e) }
       }
     }
+
+    // Local shared keys the cloud doesn't have: delete only if they were synced
+    // before (a real teammate delete); otherwise keep + push (don't lose data).
+    for (const k of Object.keys(localStorage)) {
+      if (!isSharedKey(k) || cloudSet.has(k) || k === 'influencer_ids') continue
+      if (synced.has(k)) { try { localStorage.removeItem(k) } catch {} }
+      else { const v = localStorage.getItem(k); if (v != null) localOnly[k] = v }
+    }
+
+    // Rebuild the influencer index = cloud ids + every influencer that actually
+    // exists locally. This recovers any influencer whose id fell out of the
+    // shared index (e.g. SAMI) while its data is still present.
+    const ids = [...(Array.isArray(safeParse(data['influencer_ids'], [])) ? safeParse(data['influencer_ids'], []) : [])]
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(INF_PREFIX)) continue
+      const id = key.slice(INF_PREFIX.length)
+      if (id && !ids.includes(id)) ids.push(id)
+    }
+    const idsRaw = JSON.stringify(ids)
+    localStorage.setItem('influencer_ids', idsRaw)
+    if (idsRaw !== data['influencer_ids']) pushBack['influencer_ids'] = idsRaw
   } finally { suppress = false }
 
   localStorage.setItem(VERSION_KEY, String(version))
-  setSynced(new Set([...cloudKeys, ...Object.keys(localOnly)]))
-  if (Object.keys(localOnly).length) {
-    try { await pushInChunks(localOnly, []) } catch (e) { console.warn('[sync] local-only push failed', e) }
+  const toPush = { ...localOnly, ...pushBack }
+  setSynced(new Set([...cloudKeys, ...Object.keys(toPush)]))
+  if (Object.keys(toPush).length) {
+    try { await pushInChunks(toPush, []) } catch (e) { console.warn('[sync] reconcile push failed', e) }
   }
-  // "changed" = the cloud had a different version than what we last applied, so
-  // the local data we just wrote is genuinely new (callers may reload to show it).
-  return { authed: true, version, changed: Number(version) !== localVersion }
+  // changed = cloud differed from what we last applied, OR we recovered/merged
+  // local data the cloud was missing — either way the UI should reflect it.
+  const changed = Number(version) !== localVersion || Object.keys(toPush).length > 0
+  return { authed: true, version, changed }
 }
 
 // Background sync used at startup: never blocks render. Pulls the shared library
