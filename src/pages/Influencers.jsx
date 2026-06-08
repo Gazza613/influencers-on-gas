@@ -15,11 +15,14 @@ import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/c
 import PhotoStudioPanel from './PhotoStudio'
 import WardrobeDrawer from '../components/WardrobeDrawer'
 
-// Video models offered in the Video Studio. Only models verified to work with
-// this app's generation parameters belong here. (Kling/Veo need different
-// per-model settings — they'll be added once that's implemented + tested.)
+// Video models offered in the Video Studio. Seedance 2.0 is the verified one;
+// the others are in testing — they now send model-specific parameters, and on
+// failure the error reports the job status so we can refine each one.
 const VIDEO_MODELS = [
-  { id: 'seedance_2_0', label: 'Seedance 2.0', note: 'High quality · best identity match' },
+  { id: 'seedance_2_0', label: 'Seedance 2.0', note: '✓ Verified · best quality & identity' },
+  { id: 'kling3_0',     label: 'Kling 3.0',    note: '🧪 Testing · cheaper (5–10s, 1 reference)' },
+  { id: 'kling2_6',     label: 'Kling 2.6',    note: '🧪 Testing · cheaper cinematic (5–10s)' },
+  { id: 'veo3_1',       label: 'Veo 3.1',      note: '🧪 Testing · cheaper realistic (8s, 1 reference)' },
 ]
 
 function useMobile() {

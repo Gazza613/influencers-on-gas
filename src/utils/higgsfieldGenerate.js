@@ -352,6 +352,7 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
   const urls = []
   const shareUrls = []
   const softRetries = new Map() // jobId → count of rounds seen as soft-terminal with no URL
+  const lastStatus = new Map() // jobId → last status seen (for diagnosing model issues)
 
   for (let round = 0; round < 270; round++) { // 270 × 2s = 9 minutes max
     if (isCancelled?.()) throw new Error('CANCELLED')
@@ -373,6 +374,7 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
         const shareUrl = resultsObj?.shareUrl || resultsObj?.share_url || item?.shareUrl || item?.share_url
           || extractShareUrls(result)[0] || null
         const status = (item?.status || data?.status || '').toLowerCase()
+        lastStatus.set(jobId, status || 'unknown')
 
         if (url) {
           pending.delete(jobId)
@@ -414,7 +416,8 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
     return { urls: urls.slice(0, total), shareUrls: shareUrls.slice(0, total) }
   }
   if (pending.size === 0) throw new Error('Video generation failed — all jobs ended without output')
-  throw new Error('Video generation timed out — check Higgsfield dashboard')
+  const stuck = [...pending].map(j => `${j.slice(0, 8)}:${lastStatus.get(j) || '?'}`).join(', ')
+  throw new Error(`Video timed out — jobs still pending [${stuck}]. This model may not support the current settings (check the console for details).`)
 }
 
 // Shared upload pipeline for any media kind. Caches by fingerprint so the same
@@ -479,6 +482,44 @@ const uploadAudioFile = dataUrl => uploadMedia(dataUrl, {
   prefix: 'audio',
 })
 
+// Each Higgsfield video model accepts a different parameter shape. Seedance is
+// the verified one; the others are best-effort for testing and get refined as we
+// see real responses. Over-specifying params (mode/resolution a model doesn't
+// know, too-long durations, multiple refs) makes a model silently stall — so for
+// the non-Seedance models we send a minimal, safe shape and a single reference.
+function buildVideoParams(model, { prompt, aspectRatio, duration, resolution, medias }) {
+  const p = { model, prompt, aspect_ratio: aspectRatio }
+  const oneRef = (medias || [])
+    .filter(m => m.role === 'image' || m.role === 'start_image')
+    .slice(0, 1)
+    .map(m => ({ ...m, role: 'start_image' }))
+
+  switch (model) {
+    case 'seedance_2_0':
+    case 'seedance_2_0_fast':
+      p.duration = duration
+      p.resolution = resolution
+      p.mode = 'std'
+      if (medias?.length) p.medias = medias
+      return p
+    case 'kling3_0':
+    case 'kling2_6':
+      // Kling clips are 5s or 10s; it takes a single start frame.
+      p.duration = duration >= 8 ? 10 : 5
+      if (oneRef.length) p.medias = oneRef
+      return p
+    case 'veo3_1':
+      // Veo: ~8s, single reference, constrained formats.
+      p.duration = 8
+      if (oneRef.length) p.medias = oneRef
+      return p
+    default:
+      p.duration = duration
+      if (medias?.length) p.medias = medias
+      return p
+  }
+}
+
 export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8, count = 1, referenceImages = [], audioRef = null, startFrameUrl = null, model = 'seedance_2_0', resolution = '1080p', onProgress, onPartialResults, isCancelled, pendingKey = null }) {
   await initSession()
   onProgress?.(5)
@@ -517,15 +558,8 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
     }
   }
 
-  const params = {
-    model,
-    prompt,
-    aspect_ratio: aspectRatio,
-    duration,
-    resolution,
-    mode: 'std',
-  }
-  if (medias.length) params.medias = medias
+  const params = buildVideoParams(model, { prompt, aspectRatio, duration, resolution, medias })
+  console.log('[HF-VID] model:', model, '| params:', JSON.stringify({ ...params, prompt: params.prompt?.slice(0, 40) + '…', medias: params.medias?.length }))
   onProgress?.(25)
 
   // Higgsfield video API generates 1 per call — fire N sequential requests for count > 1
