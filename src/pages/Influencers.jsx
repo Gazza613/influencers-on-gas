@@ -5274,8 +5274,11 @@ ${shotsWithBeats.join('\n\n')}`
           fontSize:13,color:'#FF3B30',lineHeight:1.5,
         }}>
           <strong>Generation failed:</strong> {genError}
-          {/session|expired|reconnect|timed out|copyrighted|protected likeness/i.test(genError) && (
-            <span style={{marginLeft:8,fontWeight:600}}>→ Go to Settings and reconnect Higgsfield.</span>
+          {/timed out|still processing/i.test(genError) && (
+            <span style={{marginLeft:8,fontWeight:600}}>→ The clip may still be rendering on Higgsfield — wait a moment and check your videos, or try a shorter clip / the Seedance 2.0 model.</span>
+          )}
+          {/authorization|re-seed/i.test(genError) && (
+            <span style={{marginLeft:8,fontWeight:600}}>→ Higgsfield authorization issue — your admin may need to re-seed the token.</span>
           )}
         </div>
       )}
