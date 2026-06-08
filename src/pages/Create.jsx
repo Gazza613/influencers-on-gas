@@ -446,19 +446,27 @@ function Step3({ data, set }) {
     <div>
       <div style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: L.text, marginBottom: 8, lineHeight: 1.1 }}>Who are they?</h2>
-        <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>Their story, vibe, what makes them different.</p>
+        <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>Their story shapes how they look, dress, and where they're shown — the more real detail, the better the result.</p>
       </div>
 
       <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card, marginBottom: 16 }}>
-        <Lbl optional>Backstory</Lbl>
+        <Lbl>Backstory</Lbl>
+        <p style={{ fontSize: 13, color: L.textSub, lineHeight: 1.5, margin: '0 0 12px' }}>
+          Cover their <strong>job or main focus</strong>, <strong>daily life</strong>, <strong>personality</strong>, <strong>interests</strong>, and the kinds of <strong>places</strong> they'd be. This drives their wardrobe, scenes, and overall vibe.
+        </p>
         <textarea
           className={inputCls}
           value={data.backstory}
           onChange={e => set('backstory', e.target.value)}
-          placeholder="Their background, what drives them, what makes them unique…"
-          rows={5}
+          placeholder="e.g. 24-year-old fitness coach in Cape Town. Trains clients at sunrise on the beach, lives in clean minimalist athleticwear, posts workout tips and healthy recipes. Calm, disciplined and warm — motivates people without shouting."
+          rows={6}
           style={{ ...taStyle, background: L.surfaceAlt, marginBottom: 0 }}
         />
+        <div style={{ fontSize: 11.5, fontWeight: 500, marginTop: 8, color: data.backstory.trim().length >= 20 ? '#34C759' : L.textFaint }}>
+          {data.backstory.trim().length >= 20
+            ? '✓ Great — this gives the AI plenty to work with'
+            : 'Required — add at least a sentence or two to continue'}
+        </div>
       </div>
 
       <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card }}>
@@ -1577,7 +1585,11 @@ export default function Create() {
     }))
   }
 
-  function canAdvance() { return step === 1 ? (!!data.name.trim() && !!data.gender) : true }
+  function canAdvance() {
+    if (step === 1) return !!data.name.trim() && !!data.gender
+    if (step === 3) return data.backstory.trim().length >= 20 // backstory is material to the output — require real detail
+    return true
+  }
 
   function handleContinue() {
     if (step === 1 && data.age !== '' && Number(data.age) < 18) {
