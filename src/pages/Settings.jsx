@@ -105,6 +105,22 @@ export default function Settings() {
             images and writes smarter prompts automatically.
           </p>
         </Section>
+
+        <Section title="Session">
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.6 }}>
+            You're signed in with the team password. Logging out clears it on this device, so the
+            password will be required again next time.
+          </p>
+          <button
+            onClick={async () => {
+              try { await fetch('/api/logout', { method: 'POST' }) } catch {}
+              window.location.reload()
+            }}
+            style={{ padding: '10px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, color: '#FF3B30', background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)', cursor: 'pointer' }}
+          >
+            Log out
+          </button>
+        </Section>
       </div>
     </div>
   )
