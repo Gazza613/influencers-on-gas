@@ -29,7 +29,6 @@ const VIBE_OPTIONS = [
 const STEPS = ['Basics', 'References', 'Story', 'Look', 'Generate']
 
 const MODELS = [
-  { id: 'soul_2',            name: 'Higgsfield Soul', tag: 'Influencer-Native',   tagColor: '#EC4899', provider: 'higgsfield',              desc: 'Best for fresh UGC looks (no reference)',    maxRefs: 1 },
   { id: 'gpt_image_2',       name: 'GPT Image 2',     tag: 'Max Quality',         tagColor: '#10B981', provider: 'openai',                  desc: 'Best for realistic hero shots',             maxRefs: 2 },
   { id: 'seedream_v4_5',     name: 'Seedream 4.5',    tag: 'Free on Ultra',       tagColor: '#34C759', provider: 'bytedance',              desc: 'High realism — free on the Ultra plan',     maxRefs: 2 },
   { id: 'nano_banana_2',     name: 'Nano Banana Pro', tag: 'Sharpest Detail',     tagColor: '#8B5CF6', provider: 'banana', version: 'Pro', desc: 'Best for faces & fine detail',              maxRefs: 2 },
@@ -1254,14 +1253,6 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
   }
   const gc = gColor(data.gender)
   const hasRef = !!(data.faceRef || data.styleRef)
-
-  useEffect(() => {
-    if (hasRef && model === 'soul_2') {
-      setModel('gpt_image_2')
-    } else if (!hasRef && userModelRef.current === 'soul_2' && model !== 'soul_2') {
-      setModel('soul_2')
-    }
-  }, [hasRef]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generate() {
     setPhase('generating'); setGenError(null); setVariations([]); setSelected(null); setGenProgress(5); setLightboxUrl(null)
