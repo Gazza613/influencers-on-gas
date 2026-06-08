@@ -7,6 +7,27 @@ const hflog = (...a) => { if (HF_DEBUG) console.log('[HF]', ...a) }
 
 let _sessionId = null
 
+// Copy a generated media URL into the team's own Vercel Blob (when archiving is
+// enabled server-side). Falls back to the original URL on any failure so it can
+// never break a real generation result.
+async function archiveUrl(url) {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) return url
+  try {
+    const res = await fetch('/api/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+    if (!res.ok) return url
+    const d = await res.json()
+    return d?.url || url
+  } catch { return url }
+}
+async function archiveUrls(urls) {
+  if (!Array.isArray(urls)) return urls
+  return Promise.all(urls.map(archiveUrl))
+}
+
 // Persistent media cache — survives page reloads so reference images are never re-uploaded
 const MEDIA_CACHE_KEY = 'hf_media_cache'
 const _mediaCache = (() => {
@@ -617,7 +638,7 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
   }
 
   const directUrls = results.flatMap(r => extractVideoUrls(r))
-  if (directUrls.length >= count) { onProgress?.(100); return { urls: directUrls.slice(0, count), shareUrls: [] } }
+  if (directUrls.length >= count) { onProgress?.(100); return { urls: await archiveUrls(directUrls.slice(0, count)), shareUrls: [] } }
 
   const jobIds = results.flatMap(r => extractJobIds(r)).filter(Boolean)
   console.log('[HF-VID] job IDs:', jobIds)
@@ -628,7 +649,7 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
     const result = await pollVideoJobs(jobIds, count, onProgress, onPartialResults, isCancelled)
     onProgress?.(100)
     if (pendingKey) clearPendingVideo(pendingKey)
-    return result
+    return { ...result, urls: await archiveUrls(result.urls) }
   } catch (e) {
     // Only clear the pending entry if this wasn't a navigation-triggered cancel.
     // A cancel from unmount leaves the entry in localStorage so the resume effect
@@ -872,7 +893,7 @@ export async function generateThreeImages({ prompts, aspectRatio = '9:16', model
   }
 
   onProgress?.(100)
-  return urls.slice(0, prompts.length)
+  return await archiveUrls(urls.slice(0, prompts.length))
 }
 
 // Single image generation — uploads base64 ref images properly before generating
@@ -931,7 +952,7 @@ export async function generateSingleImage({ prompt, aspectRatio = '16:9', resolu
   try {
     const urls = await pollAllJobs(jobIds, 1, onProgress, 16, isCancelled)
     onProgress?.(100)
-    return urls[0] ?? null
+    return await archiveUrl(urls[0] ?? null)
   } finally {
     if (pendingKey) clearPendingGen(pendingKey.influencerId, pendingKey.slot)
   }
@@ -982,7 +1003,7 @@ export async function generateNImages({ prompt, count = 1, aspectRatio = '9:16',
 
   // Handle any direct URLs (rare but possible)
   const directUrls = jobResults.flatMap(r => extractImageUrls(r))
-  directUrls.slice(0, count).forEach(url => onResult?.(url))
+  for (const url of directUrls.slice(0, count)) onResult?.(await archiveUrl(url))
   if (directUrls.length >= count) { onProgress?.(100); return }
 
   const jobIds = [...new Set(jobResults.flatMap(r => extractJobIds(r)))].filter(Boolean)
@@ -1009,7 +1030,7 @@ export async function generateNImages({ prompt, count = 1, aspectRatio = '9:16',
           pending.delete(jobId)
           if (deliveredCount < count) {
             deliveredCount++
-            onResult?.(url)
+            onResult?.(await archiveUrl(url))
             onProgress?.(Math.min(22 + (deliveredCount / count) * 73, 95))
           }
         } else if (IMAGE_TERMINAL.has(status)) {
