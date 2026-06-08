@@ -15,23 +15,31 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!isAppAuthed(req)) return res.status(401).json({ error: 'Unauthorized' })
 
-  // Diagnostic: { debug: true } lists which BLOB-related env var names exist
-  // (names only, never values) so we can confirm the token name after connecting.
+  // Find the Vercel Blob read-write token by its VALUE signature
+  // (vercel_blob_rw_...), so it works no matter what the env var is named
+  // (the store may prefix it, e.g. INFLUENCERS_MEDIA_READ_WRITE_TOKEN).
+  const findBlobToken = () => {
+    if (process.env.BLOB_READ_WRITE_TOKEN) return ['BLOB_READ_WRITE_TOKEN', process.env.BLOB_READ_WRITE_TOKEN]
+    for (const [k, v] of Object.entries(process.env)) {
+      if (typeof v === 'string' && v.startsWith('vercel_blob_rw_')) return [k, v]
+    }
+    return [null, null]
+  }
+  const [tokenKey, token] = findBlobToken()
+
+  // Diagnostic: { debug: true } reports which env var holds the blob token
+  // (name only, never the value) so we can confirm it's detected.
   if (req.body?.debug) {
-    return res.status(200).json({ blobVars: Object.keys(process.env).filter(k => k.includes('BLOB')) })
+    return res.status(200).json({
+      tokenVar: tokenKey,
+      blobVars: Object.keys(process.env).filter(k => k.includes('BLOB') || k.includes('READ_WRITE')),
+    })
   }
 
   const url = req.body?.url
   if (!url || typeof url !== 'string' || !url.startsWith('http')) {
     return res.status(200).json({ url: url || null })
   }
-
-  // The connected Blob store may expose the token under a prefixed name
-  // (e.g. UGC_ON_GAS_BLOB_READ_WRITE_TOKEN), so find any *BLOB_READ_WRITE_TOKEN.
-  const tokenKey = process.env.BLOB_READ_WRITE_TOKEN
-    ? 'BLOB_READ_WRITE_TOKEN'
-    : Object.keys(process.env).find(k => k.endsWith('BLOB_READ_WRITE_TOKEN'))
-  const token = tokenKey ? process.env[tokenKey] : null
   // Archiving off (store not connected) or it's already ours → pass through.
   if (!token || url.includes('.blob.vercel-storage.com')) {
     return res.status(200).json({ url })
