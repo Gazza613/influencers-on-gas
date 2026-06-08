@@ -106,11 +106,12 @@ async function migrateLocalToCloud() {
 
 // Returns { authed, migrated?, version? }. Writes cloud data into localStorage.
 export async function pullWorkspaceIntoLocalStorage() {
+  const localVersion = Number(localStorage.getItem(VERSION_KEY) || 0)
   let res
   try { res = await fetch(API, { headers: { Accept: 'application/json' } }) }
-  catch { return { authed: true, offline: true } } // network blip → keep local copy
-  if (res.status === 401) return { authed: false }
-  if (!res.ok) return { authed: true, error: true }
+  catch { return { authed: true, offline: true, changed: false } } // network blip → keep local copy
+  if (res.status === 401) return { authed: false, changed: false }
+  if (!res.ok) return { authed: true, error: true, changed: false }
 
   const { data, version } = await res.json()
   const cloudKeys = Object.keys(data || {})
@@ -118,7 +119,7 @@ export async function pullWorkspaceIntoLocalStorage() {
   if (cloudKeys.length === 0) {
     // Cloud is empty → seed it from this device's current library (one-time).
     await migrateLocalToCloud()
-    return { authed: true, migrated: true }
+    return { authed: true, migrated: true, changed: false }
   }
 
   const localOnly = {}
@@ -147,7 +148,18 @@ export async function pullWorkspaceIntoLocalStorage() {
   if (Object.keys(localOnly).length) {
     try { await pushInChunks(localOnly, []) } catch (e) { console.warn('[sync] local-only push failed', e) }
   }
-  return { authed: true, version }
+  // "changed" = the cloud had a different version than what we last applied, so
+  // the local data we just wrote is genuinely new (callers may reload to show it).
+  return { authed: true, version, changed: Number(version) !== localVersion }
+}
+
+// Background sync used at startup: never blocks render. Pulls the shared library
+// and reloads only if it actually changed the local data.
+export async function backgroundSync() {
+  try {
+    const res = await pullWorkspaceIntoLocalStorage()
+    if (res && res.changed) window.location.reload()
+  } catch (e) { console.warn('[sync] background sync failed', e) }
 }
 
 // Cheap check: has the shared library changed on the server since our last sync?

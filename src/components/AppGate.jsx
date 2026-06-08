@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { pullWorkspaceIntoLocalStorage } from '../utils/cloudSync'
 
 // Shared-password gate, styled to match the "Media on GAS" login.
 // Shows a password screen until the team password is accepted; the server sets
@@ -43,8 +44,13 @@ export default function AppGate({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw }),
       })
-      if (res.ok) window.location.reload() // reload so the shared library loads with the new session
-      else setError('Incorrect password. Please try again.')
+      if (res.ok) {
+        // Now authed — load the shared library, then reload once to render with it.
+        try { await pullWorkspaceIntoLocalStorage() } catch {}
+        window.location.reload()
+      } else {
+        setError('Incorrect password. Please try again.')
+      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
