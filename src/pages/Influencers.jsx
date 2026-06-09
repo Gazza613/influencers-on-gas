@@ -19,10 +19,10 @@ import WardrobeDrawer from '../components/WardrobeDrawer'
 // the others are in testing — they now send model-specific parameters, and on
 // failure the error reports the job status so we can refine each one.
 const VIDEO_MODELS = [
-  { id: 'seedance_2_0', label: 'Seedance 2.0', note: '✓ Verified · best quality & identity' },
-  { id: 'kling3_0',     label: 'Kling 3.0',    note: '🧪 Testing · cheaper (5–10s, 1 reference)' },
-  { id: 'kling2_6',     label: 'Kling 2.6',    note: '🧪 Testing · cheaper cinematic (5–10s)' },
-  { id: 'veo3_1',       label: 'Veo 3.1',      note: '🧪 Testing · cheaper realistic (8s, 1 reference)' },
+  { id: 'seedance_2_0', label: 'Seedance 2.0', note: '✓ Verified · best quality + uses your uploaded audio (lipsync)' },
+  { id: 'kling3_0',     label: 'Kling 3.0',    note: '🧪 Testing · cheaper (5–10s, 1 ref) · no uploaded audio' },
+  { id: 'kling2_6',     label: 'Kling 2.6',    note: '🧪 Testing · cheaper cinematic (5–10s) · no uploaded audio' },
+  { id: 'veo3_1',       label: 'Veo 3.1',      note: '🧪 Testing · cheaper (8s, 1 ref) · no uploaded audio' },
 ]
 
 function useMobile() {
@@ -5263,6 +5263,11 @@ ${shotsWithBeats.join('\n\n')}`
               <div style={{fontSize:10,color:'var(--text-tertiary)',marginTop:6,lineHeight:1.4}}>
                 {VIDEO_MODELS.find(m=>m.id===videoModel)?.note}
               </div>
+              {audioDataUrl && videoModel !== 'seedance_2_0' && (
+                <div style={{fontSize:10.5,color:'#FF9F0A',marginTop:6,fontWeight:600,lineHeight:1.4}}>
+                  ⚠️ Your uploaded audio is only used by Seedance 2.0 — this model will ignore it.
+                </div>
+              )}
             </div>
 
           </div>
