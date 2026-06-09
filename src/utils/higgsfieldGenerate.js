@@ -312,6 +312,32 @@ export async function discoverHiggsfieldCredits() {
   return { tools, results }
 }
 
+// Live account snapshot, parsed for the dashboard headline:
+// { credits:Number, plan:String, transactions:[{name,credits,action,at}], raw }
+export async function getHiggsfieldAccount() {
+  await initSession()
+  let balRaw = null, txRaw = null
+  try { balRaw = unwrapMCP(await callTool('balance', {})) } catch (e) { balRaw = { error: e.message } }
+  try { txRaw = unwrapMCP(await callTool('transactions', {})) } catch (e) { txRaw = { error: e.message } }
+
+  const balText = typeof balRaw === 'string' ? balRaw : JSON.stringify(balRaw ?? '')
+  const credits = (() => {
+    const m = balText.match(/Credits?["\s:]*([\d.,]+)/i)
+    return m ? Number(m[1].replace(/,/g, '')) : null
+  })()
+  const plan = (() => {
+    const m = balText.match(/Plan["\s:]*([A-Za-z0-9_ -]+?)(?:["|,}]|$)/i)
+    return m ? m[1].trim() : null
+  })()
+
+  const txText = typeof txRaw === 'string' ? txRaw : JSON.stringify(txRaw ?? '')
+  const transactions = [...txText.matchAll(/^\s*([^,\n]+?),\s*(-?\d+(?:\.\d+)?),\s*(\w+),\s*"?(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)"?/gm)]
+    .map(m => ({ name: m[1].trim(), credits: Number(m[2]), action: m[3], at: m[4] }))
+
+  console.log('[HF][CREDITS] account:', { credits, plan, txCount: transactions.length })
+  return { credits, plan, transactions, raw: { balance: balRaw, transactions: txRaw } }
+}
+
 function extractJobIds(result) {
   const data = unwrapMCP(result)
 

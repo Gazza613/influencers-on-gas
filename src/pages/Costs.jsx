@@ -1,12 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
-import { discoverHiggsfieldCredits } from '../utils/higgsfieldGenerate'
+import { discoverHiggsfieldCredits, getHiggsfieldAccount } from '../utils/higgsfieldGenerate'
 
-// Plan-true cost dashboard. Visible to any signed-in team member.
-// Headline is the real bill (fixed Ultra plan), with a credit-budget ring driven
-// by credit-consuming models (Veo). Unlimited models show as "Included · $0".
+// Cost dashboard. Visible to any signed-in team member. Leads with the LIVE
+// Higgsfield credit balance + deduction ledger (ground truth from Higgsfield),
+// then shows our own per-model / per-user usage tracking as estimates.
 
 const fmtUsd = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum = (n) => (Number(n) || 0).toLocaleString('en-US')
+const fmtNum2 = (n) => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })
+const fmtTime = (iso) => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+const lowColor = (c) => c == null ? 'var(--text-primary)' : c < 60 ? '#FF3B30' : c < 200 ? '#FF9500' : 'var(--text-primary)'
+const creditsLabel = (c) => c == null ? '' : c < 60 ? 'critically low' : c < 200 ? 'running low' : 'healthy'
 
 function lastMonths(count) {
   const out = []
@@ -46,10 +50,18 @@ export default function Costs() {
   const [error, setError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [probe, setProbe] = useState(null) // null | 'loading' | {…} | {error}
+  const [live, setLive] = useState('loading') // 'loading' | {credits,plan,transactions} | {error}
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => (r.ok ? r.json() : null)).then(d => setIsAdmin(d?.user?.role === 'super_admin')).catch(() => {})
   }, [])
+
+  async function loadLive() {
+    setLive('loading')
+    try { setLive(await getHiggsfieldAccount()) }
+    catch (e) { setLive({ error: e.message || 'Could not reach Higgsfield' }) }
+  }
+  useEffect(() => { loadLive() }, [])
 
   async function runProbe() {
     setProbe('loading')
@@ -77,10 +89,10 @@ export default function Costs() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.6px', margin: 0 }}>Costs</h1>
-            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6, maxWidth: 580, lineHeight: 1.55 }}>
-              Your team runs on one <strong>Higgsfield {data?.plan?.name || 'Ultra'}</strong> account — a fixed monthly
-              cost where <strong>images are unlimited</strong>, while <strong>video models draw down</strong> the
-              monthly credit budget. Video is the spend to watch.
+            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6, maxWidth: 600, lineHeight: 1.55 }}>
+              Your team shares one Higgsfield account. The <strong>live balance and deduction ledger</strong> below come
+              straight from Higgsfield; the per-model and per-member breakdowns are <strong>estimates</strong> from our own
+              usage tracking.
             </p>
           </div>
           <select value={month} onChange={e => setMonth(e.target.value)} style={selectStyle}>
@@ -93,52 +105,67 @@ export default function Costs() {
 
         {data && (
           <>
-            {/* Top row: bill + budget ring + month activity */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 16 }}>
-              {/* Bill */}
-              <div style={{ ...cardStyle, padding: 22, background: 'linear-gradient(135deg, rgba(236,72,153,0.10), rgba(139,92,246,0.10))' }}>
-                <div style={labelStyle}>This month's bill</div>
-                <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-1.5px', marginTop: 6, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                  {fmtUsd(data.billUsd)}
+            {/* LIVE balance + deduction ledger — straight from Higgsfield */}
+            <div style={{ ...cardStyle, marginBottom: 16, background: 'linear-gradient(135deg, rgba(236,72,153,0.07), rgba(139,92,246,0.07))' }}>
+              <div style={{ ...cardHeadStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>● Live Higgsfield balance</span>
+                <button onClick={loadLive} disabled={live === 'loading'} style={ghostRefresh}>{live === 'loading' ? 'Refreshing…' : '↻ Refresh'}</button>
+              </div>
+              <div style={{ padding: 22, display: 'grid', gridTemplateColumns: 'minmax(220px, 300px) 1fr', gap: 24, alignItems: 'start' }}>
+                {/* Balance */}
+                <div>
+                  {live === 'loading' && <div style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>Reading live balance…</div>}
+                  {live?.error && <div style={{ color: '#FF3B30', fontSize: 13, lineHeight: 1.5 }}>Couldn't read live balance: {live.error}</div>}
+                  {live && live !== 'loading' && !live.error && (
+                    <>
+                      <div style={labelStyle}>Credits remaining{live.plan ? ` · ${live.plan} plan` : ''}</div>
+                      <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-2px', marginTop: 6, color: lowColor(live.credits) }}>
+                        {live.credits == null ? '—' : fmtNum2(live.credits)}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 4 }}>
+                        ≈ {fmtUsd((live.credits || 0) * (data?.plan?.creditUsd || 0.045))} to replace · {creditsLabel(live.credits)}
+                      </div>
+                      {live.credits != null && live.credits < 200 && (
+                        <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.3)', fontSize: 12.5, color: '#FF3B30', lineHeight: 1.5 }}>
+                          <strong>Low balance.</strong> The shared account is nearly out — generations will start failing for the whole team.{' '}
+                          <a href="https://higgsfield.ai/mcp-credits?show_modal=auto_refill&source=mcp" target="_blank" rel="noreferrer" style={{ color: '#FF3B30', fontWeight: 700 }}>Top up / auto-refill →</a>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 8, lineHeight: 1.5 }}>
-                  {fmtUsd(data.plan.monthlyUsd)} fixed plan
-                  {data.estOverageUsd > 0
-                    ? <> + <span style={{ color: '#FF9500', fontWeight: 700 }}>{fmtUsd(data.estOverageUsd)} credit overage</span></>
-                    : <> · <span style={{ color: '#34C759', fontWeight: 700 }}>within budget</span></>}
+                {/* Recent deductions ledger */}
+                <div>
+                  <div style={labelStyle}>Recent deductions (live ledger)</div>
+                  <div style={{ marginTop: 8 }}>
+                    {(!live || live === 'loading' || live.error || !live.transactions?.length) && <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>—</div>}
+                    {live?.transactions?.slice(0, 8).map((t, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderTop: i ? '1px solid var(--border-subtle)' : 'none' }}>
+                        <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
+                        <span style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmtTime(t.at)}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: t.credits < 0 ? '#FF9500' : '#34C759', minWidth: 52, textAlign: 'right' }}>{t.credits > 0 ? '+' : ''}{fmtNum2(t.credits)}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Credit budget ring */}
-              <div style={{ ...cardStyle, padding: 22, display: 'flex', alignItems: 'center', gap: 18 }}>
-                <Ring used={data.creditsUsed} budget={data.creditsBudget} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={labelStyle}>Credit budget</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginTop: 6 }}>
-                    {fmtNum(data.creditsUsed)}<span style={{ fontSize: 14, color: 'var(--text-tertiary)', fontWeight: 600 }}> / {fmtNum(data.creditsBudget)}</span>
-                  </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
-                    {data.creditsUsed <= data.creditsBudget
-                      ? <>{fmtNum(data.creditsBudget - data.creditsUsed)} credits left</>
-                      : <span style={{ color: '#FF3B30', fontWeight: 700 }}>{fmtNum(data.overageCredits)} over</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Activity */}
-              <div style={{ ...cardStyle, padding: 22 }}>
-                <div style={labelStyle}>Generations this month</div>
-                <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-1.5px', marginTop: 6, color: 'var(--text-primary)' }}>{fmtNum(data.totals.generations)}</div>
-                <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
-                  <div><span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(data.totals.images)}</span> <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>images</span></div>
-                  <div><span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(data.totals.videos)}</span> <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>videos</span></div>
-                </div>
+            {/* Activity (our tracking) */}
+            <div style={{ ...cardStyle, padding: 22, marginBottom: 16 }}>
+              <div style={labelStyle}>Generations tracked this month (in-app)</div>
+              <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-1.2px', marginTop: 6, color: 'var(--text-primary)' }}>{fmtNum(data.totals.generations)}</div>
+              <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                <div><span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(data.totals.images)}</span> <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>images</span></div>
+                <div><span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(data.totals.videos)}</span> <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>videos</span></div>
               </div>
             </div>
 
             {/* Per-model breakdown */}
             <div style={{ ...cardStyle, padding: 0, marginBottom: 16 }}>
-              <div style={cardHeadStyle}>By model — what's included vs what costs credits</div>
+              <div style={cardHeadStyle}>Estimated usage by model</div>
               <div style={{ padding: '8px 0' }}>
                 {data.models.length === 0 && <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No generations yet this month.</div>}
                 {data.models.map(m => (
@@ -165,7 +192,7 @@ export default function Costs() {
 
             {/* Per-user */}
             <div style={{ ...cardStyle, padding: 0 }}>
-              <div style={cardHeadStyle}>By team member</div>
+              <div style={cardHeadStyle}>Estimated usage by team member</div>
               <div style={{ padding: '8px 0' }}>
                 {data.users.length === 0 && <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No team activity yet this month.</div>}
                 {data.users.map(u => (
@@ -217,8 +244,9 @@ export default function Costs() {
             )}
 
             <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 16, lineHeight: 1.6 }}>
-              Credit costs are estimates from Higgsfield's published per-model rates ({fmtUsd(data.plan.creditUsd)}/credit on the {data.plan.name} plan).
-              Unlimited models are included in the fixed plan at no marginal cost. A weekly watcher flags when Higgsfield changes pricing so these stay accurate.
+              The live balance and ledger are pulled directly from Higgsfield. The per-model and per-member figures are
+              estimates from in-app tracking at ~{fmtUsd(data.plan.creditUsd)}/credit (the real top-up rate) — Higgsfield
+              bills the shared account as a whole, so it can't attribute spend per person; that's what our tracking adds.
             </div>
           </>
         )}
@@ -233,4 +261,5 @@ const labelStyle = { fontSize: 11.5, fontWeight: 700, color: 'var(--text-tertiar
 const badgeIncluded = { fontSize: 11, fontWeight: 800, color: '#34C759', background: 'rgba(52,199,89,0.12)', padding: '5px 10px', borderRadius: 8, whiteSpace: 'nowrap' }
 const selectStyle = { padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }
 const probeBtn = { padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 13.5, fontWeight: 700, fontFamily: 'inherit' }
+const ghostRefresh = { padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }
 const preStyle = { marginTop: 8, padding: '12px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 320, overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }
