@@ -10,6 +10,7 @@ export default function TeamPanel() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
+  const [history, setHistory] = useState({}) // email -> 'loading' | array
 
   const loadUsers = useCallback(async () => {
     try {
@@ -56,6 +57,16 @@ export default function TeamPanel() {
     } catch {}
   }
 
+  async function toggleHistory(userEmail) {
+    if (history[userEmail]) { setHistory(h => { const n = { ...h }; delete n[userEmail]; return n }); return }
+    setHistory(h => ({ ...h, [userEmail]: 'loading' }))
+    try {
+      const r = await fetch(`/api/admin/users?history=${encodeURIComponent(userEmail)}`)
+      const d = r.ok ? await r.json() : { history: [] }
+      setHistory(h => ({ ...h, [userEmail]: d.history || [] }))
+    } catch { setHistory(h => ({ ...h, [userEmail]: [] })) }
+  }
+
   return (
     <div style={card}>
       <div style={cardHead}><div style={cardTitle}>Team · Users</div></div>
@@ -71,16 +82,38 @@ export default function TeamPanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {users.map(u => (
             <div key={u.email} style={row}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {u.email}{u.role === 'super_admin' && <span style={badge}>admin</span>}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {u.email}{u.role === 'super_admin' && <span style={badge}>admin</span>}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>
+                    {u.lastLogin ? `Last sign-in ${new Date(u.lastLogin).toLocaleString()}` : 'Never signed in'}
+                  </div>
+                  {u.usage && (
+                    <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 3 }}>
+                      {u.usage.images} images · {u.usage.videos} videos · {u.usage.claudeCalls} Claude · <strong>~${u.usage.estUsd}</strong> est.
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>
-                  {u.lastLogin ? `Last sign-in ${new Date(u.lastLogin).toLocaleString()}` : 'Never signed in'}
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => toggleHistory(u.email)} style={ghostBtn}>{history[u.email] ? 'Hide' : 'History'}</button>
+                  {u.email !== me.email && <button onClick={() => remove(u.email)} style={removeBtn}>Remove</button>}
                 </div>
               </div>
-              {u.email !== me.email && (
-                <button onClick={() => remove(u.email)} style={removeBtn}>Remove</button>
+              {history[u.email] && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {history[u.email] === 'loading'
+                    ? <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</div>
+                    : history[u.email].length === 0
+                      ? <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No sign-ins recorded yet.</div>
+                      : history[u.email].map((h, i) => (
+                          <div key={i} style={{ fontSize: 11.5, color: 'var(--text-tertiary)', display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                            <span>{new Date(h.ts).toLocaleString()}</span>
+                            <span style={{ fontFamily: 'monospace' }}>{h.ip}</span>
+                          </div>
+                        ))}
+                </div>
               )}
             </div>
           ))}
@@ -100,6 +133,7 @@ const cardHead = { padding: '16px 24px', borderBottom: '1px solid var(--border-s
 const cardTitle = { fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }
 const inp = { flex: '1 1 160px', minWidth: 0, padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, fontFamily: 'inherit', outline: 'none' }
 const btn = { padding: '10px 18px', borderRadius: 9, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 14, fontWeight: 700 }
-const row = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)' }
+const row = { display: 'flex', flexDirection: 'column', padding: '10px 12px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)' }
+const ghostBtn = { padding: '6px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }
 const badge = { marginLeft: 8, fontSize: 9, fontWeight: 800, color: '#8B5CF6', background: 'rgba(139,92,246,0.12)', padding: '2px 7px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }
 const removeBtn = { padding: '6px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: '#FF3B30', background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)', cursor: 'pointer', flexShrink: 0 }

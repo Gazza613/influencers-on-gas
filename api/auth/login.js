@@ -1,4 +1,4 @@
-import { checkPassword, createSession, sessionCookie, isAllowedEmail, maybeBootstrapSuperAdmin, EMAIL_DOMAIN } from '../../lib/auth.js'
+import { checkPassword, createSession, sessionCookie, isAllowedEmail, maybeBootstrapSuperAdmin, recordLogin, EMAIL_DOMAIN } from '../../lib/auth.js'
 import { rateLimit, clientIp } from '../../lib/rateLimit.js'
 import { tooManyAuthFails, recordAuthFail, clearAuthFails } from '../../lib/authLimit.js'
 
@@ -44,6 +44,7 @@ export default async function handler(req) {
   }
 
   await clearAuthFails(ip)
+  await recordLogin(user.email, ip)
   const token = await createSession(user.email, user.role)
   return new Response(JSON.stringify({ ok: true, user: { email: user.email, role: user.role } }), {
     status: 200,

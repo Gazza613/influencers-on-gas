@@ -1,4 +1,5 @@
-import { listUsers, createUser, deleteUser, getSession } from '../../lib/auth.js'
+import { listUsers, createUser, deleteUser, getSession, getLoginHistory } from '../../lib/auth.js'
+import { getUsageFor } from '../../lib/usage.js'
 
 export const config = { runtime: 'edge' }
 
@@ -21,7 +22,14 @@ export default async function handler(req) {
 
   try {
     if (req.method === 'GET') {
-      return new Response(JSON.stringify({ users: await listUsers() }), { status: 200, headers: cors })
+      const histEmail = new URL(req.url).searchParams.get('history')
+      if (histEmail) {
+        return new Response(JSON.stringify({ history: await getLoginHistory(histEmail) }), { status: 200, headers: cors })
+      }
+      const users = await listUsers()
+      const usage = await getUsageFor(users.map(u => u.email))
+      const withUsage = users.map(u => ({ ...u, usage: usage[u.email.toLowerCase().trim()] || null }))
+      return new Response(JSON.stringify({ users: withUsage }), { status: 200, headers: cors })
     }
 
     if (req.method === 'POST') {

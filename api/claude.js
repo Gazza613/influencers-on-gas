@@ -1,5 +1,6 @@
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
-import { isAuthed } from '../lib/auth.js'
+import { getSession } from '../lib/auth.js'
+import { recordUsage } from '../lib/usage.js'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -8,7 +9,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).send('Method not allowed')
-  if (!(await isAuthed(req))) return res.status(401).json({ error: { message: 'Unauthorized — please sign in' } })
+  const session = await getSession(req)
+  if (!session) return res.status(401).json({ error: { message: 'Unauthorized — please sign in' } })
 
   const rl = rateLimit(clientIp(req.headers))
   if (!rl.ok) {
@@ -36,6 +38,12 @@ export default async function handler(req, res) {
       body: JSON.stringify(req.body),
     })
     const data = await upstream.json()
+    // Track Claude usage for this user (calls + tokens).
+    if (upstream.ok && data?.usage) {
+      const tokens = (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0)
+      recordUsage(session.email, 'claude:calls', 1)
+      if (tokens) recordUsage(session.email, 'claude:tokens', tokens)
+    }
     return res.status(upstream.status).json(data)
   } catch (e) {
     return res.status(500).json({ error: { message: e.message } })

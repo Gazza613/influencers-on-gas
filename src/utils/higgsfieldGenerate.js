@@ -28,6 +28,19 @@ async function archiveUrls(urls) {
   return Promise.all(urls.map(archiveUrl))
 }
 
+// Report a completed generation to the per-user usage tracker (fire-and-forget).
+function reportUsage(kind, model, count) {
+  if (!count) return
+  try {
+    fetch('/api/usage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, model: model || 'unknown', count }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {}
+}
+
 // Persistent media cache — survives page reloads so reference images are never re-uploaded
 const MEDIA_CACHE_KEY = 'hf_media_cache'
 const _mediaCache = (() => {
@@ -582,7 +595,7 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
   }
 
   const directUrls = results.flatMap(r => extractVideoUrls(r))
-  if (directUrls.length >= count) { onProgress?.(100); return { urls: await archiveUrls(directUrls.slice(0, count)), shareUrls: [] } }
+  if (directUrls.length >= count) { onProgress?.(100); reportUsage('video', model, count); return { urls: await archiveUrls(directUrls.slice(0, count)), shareUrls: [] } }
 
   const jobIds = results.flatMap(r => extractJobIds(r)).filter(Boolean)
   console.log('[HF-VID] job IDs:', jobIds)
@@ -593,6 +606,7 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
     const result = await pollVideoJobs(jobIds, count, onProgress, onPartialResults, isCancelled)
     onProgress?.(100)
     if (pendingKey) clearPendingVideo(pendingKey)
+    reportUsage('video', model, result.urls?.length || 0)
     return { ...result, urls: await archiveUrls(result.urls) }
   } catch (e) {
     // Only clear the pending entry if this wasn't a navigation-triggered cancel.
@@ -837,6 +851,7 @@ export async function generateThreeImages({ prompts, aspectRatio = '9:16', model
   }
 
   onProgress?.(100)
+  reportUsage('image', model, Math.min(urls.length, prompts.length))
   return await archiveUrls(urls.slice(0, prompts.length))
 }
 
@@ -896,6 +911,7 @@ export async function generateSingleImage({ prompt, aspectRatio = '16:9', resolu
   try {
     const urls = await pollAllJobs(jobIds, 1, onProgress, 16, isCancelled)
     onProgress?.(100)
+    if (urls[0]) reportUsage('image', 'gpt_image_2', 1)
     return await archiveUrl(urls[0] ?? null)
   } finally {
     if (pendingKey) clearPendingGen(pendingKey.influencerId, pendingKey.slot)
@@ -947,7 +963,7 @@ export async function generateNImages({ prompt, count = 1, aspectRatio = '9:16',
 
   // Handle any direct URLs (rare but possible)
   const directUrls = jobResults.flatMap(r => extractImageUrls(r))
-  for (const url of directUrls.slice(0, count)) onResult?.(await archiveUrl(url))
+  for (const url of directUrls.slice(0, count)) { reportUsage('image', 'gpt_image_2', 1); onResult?.(await archiveUrl(url)) }
   if (directUrls.length >= count) { onProgress?.(100); return }
 
   const jobIds = [...new Set(jobResults.flatMap(r => extractJobIds(r)))].filter(Boolean)
@@ -974,6 +990,7 @@ export async function generateNImages({ prompt, count = 1, aspectRatio = '9:16',
           pending.delete(jobId)
           if (deliveredCount < count) {
             deliveredCount++
+            reportUsage('image', 'gpt_image_2', 1)
             onResult?.(await archiveUrl(url))
             onProgress?.(Math.min(22 + (deliveredCount / count) * 73, 95))
           }
