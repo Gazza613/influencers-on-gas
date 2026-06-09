@@ -197,21 +197,19 @@ export default function Costs() {
                   {probe && probe !== 'loading' && (
                     <div style={{ marginTop: 16 }}>
                       {probe.error && <div style={{ color: '#FF3B30', fontSize: 13 }}>{probe.error}</div>}
-                      {probe.account && (
-                        <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(52,199,89,0.10)', border: '1px solid rgba(52,199,89,0.25)', marginBottom: 12 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: '#34C759', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Live account data — tool “{probe.account.tool}”</div>
-                          <pre style={preStyle}>{JSON.stringify(probe.account.result, null, 2)}</pre>
+                      {probe.results && Object.entries(probe.results).map(([tool, result]) => (
+                        <div key={tool} style={{ padding: '14px 16px', borderRadius: 12, background: result?.error ? 'rgba(255,59,48,0.08)' : 'rgba(52,199,89,0.10)', border: `1px solid ${result?.error ? 'rgba(255,59,48,0.25)' : 'rgba(52,199,89,0.25)'}`, marginBottom: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: result?.error ? '#FF3B30' : '#34C759', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{tool.replace(/_/g, ' ')}</div>
+                          <pre style={preStyle}>{typeof result === 'string' ? result : JSON.stringify(result, null, 2)}</pre>
                         </div>
-                      )}
+                      ))}
                       {probe.tools && (
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                            {probe.tools.length} Higgsfield tools{probe.candidates?.length ? ` · credit/account candidates: ${probe.candidates.join(', ')}` : ' · no obvious credit/account tool'}
-                          </div>
-                          <pre style={preStyle}>{probe.tools.map(t => `• ${t.name}${t.description ? ' — ' + t.description : ''}`).join('\n')}</pre>
-                        </div>
+                        <details style={{ marginTop: 4 }}>
+                          <summary style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}>{probe.tools.length} Higgsfield tools available</summary>
+                          <pre style={preStyle}>{probe.tools.map(t => `• ${t.name}${t.description ? ' — ' + t.description.slice(0, 120) : ''}`).join('\n')}</pre>
+                        </details>
                       )}
-                      <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 8 }}>Full output is also in the browser console under <strong>[HF][CREDITS]</strong>. Paste it to me and I'll wire the real balance in.</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 8 }}>Full output is also in the browser console under <strong>[HF][CREDITS]</strong>.</div>
                     </div>
                   )}
                 </div>

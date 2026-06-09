@@ -285,29 +285,31 @@ function unwrapMCP(result) {
 // the account's credit balance. Returns { tools, candidates, account }. Used by
 // the Costs dashboard's "Check live Higgsfield credits" button to get ground
 // truth (does video really deduct credits, and what's the real balance?).
+// Known read-only account/credit tools (confirmed via tools/list), in the order
+// we want to show them. We deliberately do NOT auto-call generate_*/upscale/etc.
+const HF_READ_TOOLS = ['balance', 'show_plans_and_credits', 'transactions']
+
 export async function discoverHiggsfieldCredits() {
   await initSession()
   const listRes = await mcpPost({ jsonrpc: '2.0', id: Date.now(), method: 'tools/list', params: {} })
   const rawTools = listRes?.result?.tools || listRes?.tools || []
   const tools = rawTools.map(t => ({ name: t.name, description: t.description || '' }))
+  const names = new Set(tools.map(t => t.name))
 
-  const re = /credit|balance|account|billing|subscription|wallet|quota|\bme\b|profile|plan/i
-  const candidates = tools.filter(t => re.test(`${t.name} ${t.description}`))
-
-  let account = null
-  for (const c of candidates) {
+  const results = {}
+  for (const name of HF_READ_TOOLS) {
+    if (!names.has(name)) continue
     try {
-      const r = await callTool(c.name, {})
-      const data = unwrapMCP(r)
-      console.log(`[HF][CREDITS] tool ${c.name} =>`, JSON.stringify(data)?.slice(0, 600))
-      account = { tool: c.name, result: data }
-      break
+      const data = unwrapMCP(await callTool(name, {}))
+      results[name] = data
+      console.log(`[HF][CREDITS] ${name} =>`, JSON.stringify(data)?.slice(0, 1000))
     } catch (e) {
-      console.log(`[HF][CREDITS] tool ${c.name} failed:`, e.message)
+      results[name] = { error: e.message }
+      console.log(`[HF][CREDITS] ${name} failed:`, e.message)
     }
   }
-  console.log('[HF][CREDITS] available tools:', tools.map(t => t.name).join(', '))
-  return { tools, candidates: candidates.map(c => c.name), account }
+  console.log('[HF][CREDITS] all tools:', tools.map(t => t.name).join(', '))
+  return { tools, results }
 }
 
 function extractJobIds(result) {
