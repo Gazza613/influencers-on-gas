@@ -582,6 +582,19 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
 
   console.log('[HF-VID] generate_video raw[0]:', JSON.stringify(unwrapMCP(results[0]))?.slice(0, 600))
 
+  // Ground-truth credit check: scan Higgsfield's own response for any
+  // cost/credit/balance fields so we can SEE whether this model deducts credits
+  // (rather than relying on published-rate estimates). Logged for every video.
+  try {
+    const fullRaw = JSON.stringify(unwrapMCP(results[0]) ?? {})
+    const hits = [...fullRaw.matchAll(/"([^"]*(?:credit|cost|charge|balance|price|quota|billing)[^"]*)"\s*:\s*("?[^",{}\[\]]+"?)/gi)]
+    if (hits.length) {
+      console.log('[HF-VID][CREDITS] Higgsfield reported cost fields:', hits.map(h => `${h[1]}=${h[2]}`).join(' · '))
+    } else {
+      console.log('[HF-VID][CREDITS] No cost/credit field in the response — check your Higgsfield credit balance before/after to confirm deduction.')
+    }
+  } catch {}
+
   // Check for hard error responses before treating response UUIDs as job IDs
   for (const res of results) {
     const raw = JSON.stringify(unwrapMCP(res) ?? '')
