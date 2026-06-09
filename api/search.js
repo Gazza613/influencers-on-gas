@@ -1,9 +1,11 @@
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
+import { isAppAuthed } from '../lib/appAuth.js'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   if (req.method === 'OPTIONS') return res.status(200).end()
+  if (!isAppAuthed(req)) return res.status(401).json({ error: 'Unauthorized', items: [] })
 
   const rl = rateLimit(clientIp(req.headers))
   if (!rl.ok) {

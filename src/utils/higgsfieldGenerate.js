@@ -111,52 +111,6 @@ export async function resumeVideoJob(jobIds, count, onProgress, onPartialResults
   return pollVideoJobs(jobIds, count, onProgress, onPartialResults, isCancelled)
 }
 
-// Fetch the centralized Higgsfield access token from the server (behind Vercel
-// Password Protection) for the rare direct-call fallback below.
-async function fetchCentralHFToken() {
-  const res = await fetch('/api/hf-token')
-  if (!res.ok) throw new Error('Could not get Higgsfield token for direct call')
-  const d = await res.json()
-  if (!d.access_token) throw new Error('No Higgsfield token available')
-  return d.access_token
-}
-
-// Direct-to-Higgsfield call — bypasses the Vercel proxy so Higgsfield sees the browser's real
-// IP instead of a Vercel datacenter IP. Used as fallback when the proxy call is IP-blocked.
-async function mcpPostDirect(body) {
-  const token = await fetchCentralHFToken()
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json, text/event-stream',
-    'Authorization': `Bearer ${token}`,
-  }
-  if (_sessionId) headers['Mcp-Session-Id'] = _sessionId
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30000)
-  try {
-    const res = await fetch('https://mcp.higgsfield.ai/mcp', {
-      method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal,
-    })
-    clearTimeout(timeout)
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '')
-      throw new Error(`Higgsfield direct error ${res.status}: ${errText}`)
-    }
-    const sid = res.headers.get('Mcp-Session-Id')
-    if (sid) _sessionId = sid
-    const ct = res.headers.get('content-type') || ''
-    if (ct.includes('text/event-stream')) return await parseSSEStream(res, controller.signal)
-    const rawText = await res.text()
-    if (rawText.trimStart().startsWith('data:')) return parseSSEText(rawText)
-    try { return JSON.parse(rawText) } catch { return rawText }
-  } catch (e) {
-    clearTimeout(timeout)
-    if (e.name === 'AbortError') throw new Error('Higgsfield direct call timed out')
-    throw e
-  }
-}
-
 async function mcpPost(body, isRetry = false) {
   // The proxy injects the centralized Higgsfield token server-side, so the
   // browser no longer sends an Authorization header.
@@ -603,25 +557,10 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
       return m ? m[1] : null
     })()
     if (presetNoticeId) {
-      // Decline the preset — generate literally with the original model (seedance).
-      // The proxy IP gets blocked by Higgsfield on this path, so fall back to a direct
-      // browser call (user's real IP) if the proxy attempt returns "IP detected".
+      // Decline the preset — generate literally with the original model.
       console.log('[HF-VID] preset notice — declining, retrying literally:', presetNoticeId)
       const declineParams = { ...params, declined_preset_id: presetNoticeId }
       res = await callTool('generate_video', { params: declineParams })
-
-      const proxyRaw = JSON.stringify(unwrapMCP(res) ?? '')
-      if (proxyRaw.toLowerCase().includes('ip detected')) {
-        console.log('[HF-VID] proxy IP blocked — retrying via direct browser call')
-        try {
-          const directBody = { jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: 'generate_video', arguments: { params: declineParams } } }
-          const directRaw = await mcpPostDirect(directBody)
-          res = directRaw?.result ?? directRaw
-        } catch (corsErr) {
-          console.warn('[HF-VID] direct call failed:', corsErr.message)
-          // Keep the IP-detected result — the error check below will surface it clearly
-        }
-      }
     }
     results.push(res)
   }
