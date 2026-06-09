@@ -524,16 +524,21 @@ function buildVideoParams(model, { prompt, aspectRatio, duration, resolution, me
       if (medias?.length) p.medias = medias
       return p
     case 'kling3_0':
-    case 'kling2_6':
-      // Kling clips are 5s or 10s; it takes a single start frame.
+    case 'kling2_6': {
+      // Kling clips are 5s or 10s; single start frame. Audio is passed through
+      // for testing (Higgsfield may use, ignore, or reject it on this model).
       p.duration = duration >= 8 ? 10 : 5
-      if (oneRef.length) p.medias = oneRef
+      const m = [...oneRef, ...(medias || []).filter(x => x.role === 'audio')]
+      if (m.length) p.medias = m
       return p
-    case 'veo3_1':
-      // Veo: ~8s, single reference, constrained formats.
+    }
+    case 'veo3_1': {
+      // Veo: ~8s, single reference. Audio passed through for testing too.
       p.duration = 8
-      if (oneRef.length) p.medias = oneRef
+      const m = [...oneRef, ...(medias || []).filter(x => x.role === 'audio')]
+      if (m.length) p.medias = m
       return p
+    }
     default:
       p.duration = duration
       if (medias?.length) p.medias = medias

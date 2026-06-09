@@ -20,9 +20,9 @@ import WardrobeDrawer from '../components/WardrobeDrawer'
 // failure the error reports the job status so we can refine each one.
 const VIDEO_MODELS = [
   { id: 'seedance_2_0', label: 'Seedance 2.0', note: '✓ Verified · best quality + uses your uploaded audio (lipsync)' },
-  { id: 'kling3_0',     label: 'Kling 3.0',    note: '🧪 Testing · cheaper (5–10s, 1 ref) · no uploaded audio' },
-  { id: 'kling2_6',     label: 'Kling 2.6',    note: '🧪 Testing · cheaper cinematic (5–10s) · no uploaded audio' },
-  { id: 'veo3_1',       label: 'Veo 3.1',      note: '🧪 Testing · cheaper (8s, 1 ref) · no uploaded audio' },
+  { id: 'kling3_0',     label: 'Kling 3.0',    note: '🧪 Testing · cheaper (5–10s, 1 ref) · audio experimental' },
+  { id: 'kling2_6',     label: 'Kling 2.6',    note: '🧪 Testing · cheaper cinematic (5–10s) · audio experimental' },
+  { id: 'veo3_1',       label: 'Veo 3.1',      note: '🧪 Testing · cheaper (8s, 1 ref) · audio experimental' },
 ]
 
 function useMobile() {
@@ -5265,7 +5265,7 @@ ${shotsWithBeats.join('\n\n')}`
               </div>
               {audioDataUrl && videoModel !== 'seedance_2_0' && (
                 <div style={{fontSize:10.5,color:'#FF9F0A',marginTop:6,fontWeight:600,lineHeight:1.4}}>
-                  ⚠️ Your uploaded audio is only used by Seedance 2.0 — this model will ignore it.
+                  ⚠️ Audio lipsync is only verified on Seedance 2.0 — on this model it's experimental and may be ignored.
                 </div>
               )}
             </div>
