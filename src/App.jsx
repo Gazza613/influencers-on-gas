@@ -13,6 +13,7 @@ import Influencers from './pages/Influencers'
 import Inspiration from './pages/Inspiration'
 import BrandDeals from './pages/BrandDeals'
 import Create from './pages/Create'
+import Costs from './pages/Costs'
 import Settings from './pages/Settings'
 import AuthCallback from './pages/AuthCallback'
 
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/inspiration" element={<Inspiration />} />
         <Route path="/brand-deals" element={<BrandDeals />} />
         <Route path="/create" element={<Create />} />
+        <Route path="/costs" element={<Costs />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Navigate to="/" replace />} />
