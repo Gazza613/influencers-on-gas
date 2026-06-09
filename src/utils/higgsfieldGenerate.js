@@ -29,13 +29,14 @@ async function archiveUrls(urls) {
 }
 
 // Report a completed generation to the per-user usage tracker (fire-and-forget).
-function reportUsage(kind, model, count) {
+// duration (seconds) lets the server cost video by clip length.
+function reportUsage(kind, model, count, duration) {
   if (!count) return
   try {
     fetch('/api/usage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, model: model || 'unknown', count }),
+      body: JSON.stringify({ kind, model: model || 'unknown', count, duration }),
       keepalive: true,
     }).catch(() => {})
   } catch {}
@@ -595,7 +596,7 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
   }
 
   const directUrls = results.flatMap(r => extractVideoUrls(r))
-  if (directUrls.length >= count) { onProgress?.(100); reportUsage('video', model, count); return { urls: await archiveUrls(directUrls.slice(0, count)), shareUrls: [] } }
+  if (directUrls.length >= count) { onProgress?.(100); reportUsage('video', model, count, duration); return { urls: await archiveUrls(directUrls.slice(0, count)), shareUrls: [] } }
 
   const jobIds = results.flatMap(r => extractJobIds(r)).filter(Boolean)
   console.log('[HF-VID] job IDs:', jobIds)
@@ -606,7 +607,7 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
     const result = await pollVideoJobs(jobIds, count, onProgress, onPartialResults, isCancelled)
     onProgress?.(100)
     if (pendingKey) clearPendingVideo(pendingKey)
-    reportUsage('video', model, result.urls?.length || 0)
+    reportUsage('video', model, result.urls?.length || 0, duration)
     return { ...result, urls: await archiveUrls(result.urls) }
   } catch (e) {
     // Only clear the pending entry if this wasn't a navigation-triggered cancel.

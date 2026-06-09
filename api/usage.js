@@ -1,10 +1,10 @@
 import { getSession } from '../lib/auth.js'
-import { recordUsage } from '../lib/usage.js'
+import { recordGeneration } from '../lib/usage.js'
 
 export const config = { runtime: 'edge' }
 
 // Records a generation event for the signed-in user.
-// POST { kind: 'image' | 'video', model, count }
+// POST { kind: 'image' | 'video', model, count, duration }
 export default async function handler(req) {
   const cors = {
     'Access-Control-Allow-Origin': req.headers.get('origin') || '*',
@@ -20,10 +20,15 @@ export default async function handler(req) {
   if (!s) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors })
 
   try {
-    const { kind, model, count } = (await req.json().catch(() => ({})))
+    const { kind, model, count, duration } = (await req.json().catch(() => ({})))
     if (kind && model) {
-      const prefix = kind === 'video' ? 'vid' : 'img'
-      await recordUsage(s.email, `${prefix}:${String(model).slice(0, 40)}`, Math.min(20, Math.max(1, Number(count) || 1)))
+      await recordGeneration({
+        email: s.email,
+        kind,
+        model,
+        count: Math.min(20, Math.max(1, Number(count) || 1)),
+        duration: Number(duration) || undefined,
+      })
     }
   } catch {}
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers: cors })
