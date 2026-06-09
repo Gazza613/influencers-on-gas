@@ -36,6 +36,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ url })
   }
 
+  // Anti-SSRF: only ever fetch from trusted media hosts. Anything else (internal
+  // IPs, metadata endpoints, arbitrary sites) is passed through, never fetched.
+  const ALLOWED_MEDIA_HOSTS = ['cloudfront.net', 'higgsfield.ai', 'blob.core.windows.net']
+  let host = ''
+  try { const u = new URL(url); if (u.protocol === 'https:') host = u.hostname } catch {}
+  const allowed = host && ALLOWED_MEDIA_HOSTS.some(h => host === h || host.endsWith('.' + h))
+  if (!allowed) return res.status(200).json({ url })
+
   try {
     const src = await fetch(url)
     if (!src.ok || !src.body) return res.status(200).json({ url })
