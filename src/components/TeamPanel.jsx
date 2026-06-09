@@ -90,11 +90,14 @@ export default function TeamPanel() {
                   <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>
                     {u.lastLogin ? `Last sign-in ${new Date(u.lastLogin).toLocaleString()}` : 'Never signed in'}
                   </div>
-                  {u.usage && (
-                    <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 3 }}>
-                      {u.usage.images} images · {u.usage.videos} videos · {u.usage.claudeCalls} Claude · <strong>~${u.usage.estUsd}</strong> est.
-                    </div>
-                  )}
+                  {(() => {
+                    const us = u.usage || { images: 0, videos: 0, claudeCalls: 0, estUsd: 0 }
+                    return (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 3 }}>
+                        {us.images} images · {us.videos} videos · {us.claudeCalls} Claude · <strong>~${us.estUsd}</strong> est.
+                      </div>
+                    )
+                  })()}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button onClick={() => toggleHistory(u.email)} style={ghostBtn}>{history[u.email] ? 'Hide' : 'History'}</button>
