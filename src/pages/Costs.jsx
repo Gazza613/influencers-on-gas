@@ -64,10 +64,10 @@ export default function Costs() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.6px', margin: 0 }}>Costs</h1>
-            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6, maxWidth: 560, lineHeight: 1.55 }}>
+            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6, maxWidth: 580, lineHeight: 1.55 }}>
               Your team runs on one <strong>Higgsfield {data?.plan?.name || 'Ultra'}</strong> account — a fixed monthly
-              cost with most models unlimited. The only variable spend is credit-consuming models drawing down the
-              monthly credit budget.
+              cost where <strong>images are unlimited</strong>, while <strong>video models draw down</strong> the
+              monthly credit budget. Video is the spend to watch.
             </p>
           </div>
           <select value={month} onChange={e => setMonth(e.target.value)} style={selectStyle}>
