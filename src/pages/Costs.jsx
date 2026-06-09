@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { discoverHiggsfieldCredits } from '../utils/higgsfieldGenerate'
 
 // Plan-true cost dashboard. Visible to any signed-in team member.
 // Headline is the real bill (fixed Ultra plan), with a credit-budget ring driven
@@ -43,6 +44,18 @@ export default function Costs() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [probe, setProbe] = useState(null) // null | 'loading' | {…} | {error}
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => (r.ok ? r.json() : null)).then(d => setIsAdmin(d?.user?.role === 'super_admin')).catch(() => {})
+  }, [])
+
+  async function runProbe() {
+    setProbe('loading')
+    try { setProbe(await discoverHiggsfieldCredits()) }
+    catch (e) { setProbe({ error: e.message || 'Probe failed' }) }
+  }
 
   useEffect(() => {
     let alive = true
@@ -168,6 +181,43 @@ export default function Costs() {
               </div>
             </div>
 
+            {/* Ground-truth probe (super admin only) */}
+            {isAdmin && (
+              <div style={{ ...cardStyle, marginTop: 16 }}>
+                <div style={cardHeadStyle}>Verify against Higgsfield (live)</div>
+                <div style={{ padding: '18px 22px' }}>
+                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px', lineHeight: 1.55, maxWidth: 620 }}>
+                    The numbers above are estimates from published per-model rates. This asks Higgsfield's own API what tools
+                    it exposes and whether it reports a live credit balance — ground truth for whether video really deducts credits.
+                  </p>
+                  <button onClick={runProbe} disabled={probe === 'loading'} style={probeBtn}>
+                    {probe === 'loading' ? 'Checking…' : 'Check live Higgsfield credits'}
+                  </button>
+
+                  {probe && probe !== 'loading' && (
+                    <div style={{ marginTop: 16 }}>
+                      {probe.error && <div style={{ color: '#FF3B30', fontSize: 13 }}>{probe.error}</div>}
+                      {probe.account && (
+                        <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(52,199,89,0.10)', border: '1px solid rgba(52,199,89,0.25)', marginBottom: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#34C759', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Live account data — tool “{probe.account.tool}”</div>
+                          <pre style={preStyle}>{JSON.stringify(probe.account.result, null, 2)}</pre>
+                        </div>
+                      )}
+                      {probe.tools && (
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                            {probe.tools.length} Higgsfield tools{probe.candidates?.length ? ` · credit/account candidates: ${probe.candidates.join(', ')}` : ' · no obvious credit/account tool'}
+                          </div>
+                          <pre style={preStyle}>{probe.tools.map(t => `• ${t.name}${t.description ? ' — ' + t.description : ''}`).join('\n')}</pre>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 8 }}>Full output is also in the browser console under <strong>[HF][CREDITS]</strong>. Paste it to me and I'll wire the real balance in.</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 16, lineHeight: 1.6 }}>
               Credit costs are estimates from Higgsfield's published per-model rates ({fmtUsd(data.plan.creditUsd)}/credit on the {data.plan.name} plan).
               Unlimited models are included in the fixed plan at no marginal cost. A weekly watcher flags when Higgsfield changes pricing so these stay accurate.
@@ -184,3 +234,5 @@ const cardHeadStyle = { padding: '16px 22px', borderBottom: '1px solid var(--bor
 const labelStyle = { fontSize: 11.5, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.6px' }
 const badgeIncluded = { fontSize: 11, fontWeight: 800, color: '#34C759', background: 'rgba(52,199,89,0.12)', padding: '5px 10px', borderRadius: 8, whiteSpace: 'nowrap' }
 const selectStyle = { padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }
+const probeBtn = { padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 13.5, fontWeight: 700, fontFamily: 'inherit' }
+const preStyle = { marginTop: 8, padding: '12px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 320, overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }

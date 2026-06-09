@@ -281,6 +281,35 @@ function unwrapMCP(result) {
   return result
 }
 
+// Diagnostic: enumerate the Higgsfield MCP tools and probe for any that report
+// the account's credit balance. Returns { tools, candidates, account }. Used by
+// the Costs dashboard's "Check live Higgsfield credits" button to get ground
+// truth (does video really deduct credits, and what's the real balance?).
+export async function discoverHiggsfieldCredits() {
+  await initSession()
+  const listRes = await mcpPost({ jsonrpc: '2.0', id: Date.now(), method: 'tools/list', params: {} })
+  const rawTools = listRes?.result?.tools || listRes?.tools || []
+  const tools = rawTools.map(t => ({ name: t.name, description: t.description || '' }))
+
+  const re = /credit|balance|account|billing|subscription|wallet|quota|\bme\b|profile|plan/i
+  const candidates = tools.filter(t => re.test(`${t.name} ${t.description}`))
+
+  let account = null
+  for (const c of candidates) {
+    try {
+      const r = await callTool(c.name, {})
+      const data = unwrapMCP(r)
+      console.log(`[HF][CREDITS] tool ${c.name} =>`, JSON.stringify(data)?.slice(0, 600))
+      account = { tool: c.name, result: data }
+      break
+    } catch (e) {
+      console.log(`[HF][CREDITS] tool ${c.name} failed:`, e.message)
+    }
+  }
+  console.log('[HF][CREDITS] available tools:', tools.map(t => t.name).join(', '))
+  return { tools, candidates: candidates.map(c => c.name), account }
+}
+
 function extractJobIds(result) {
   const data = unwrapMCP(result)
 
