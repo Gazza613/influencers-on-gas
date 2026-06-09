@@ -45,9 +45,9 @@ export default function AppGate({ children }) {
         body: JSON.stringify({ password: pw }),
       })
       if (res.ok) {
-        // Now authed — load the shared library, then reload once to render with it.
+        // Now authed — load the shared library, then land on the home page.
         try { await pullWorkspaceIntoLocalStorage() } catch {}
-        window.location.reload()
+        window.location.href = '/'
       } else {
         setError('Incorrect password. Please try again.')
       }
