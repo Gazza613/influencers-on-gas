@@ -1,5 +1,5 @@
 import { getWorkspace, getVersion, applyChanges } from '../lib/workspace.js'
-import { isAppAuthed } from '../lib/appAuth.js'
+import { isAuthed } from '../lib/auth.js'
 
 export const config = { runtime: 'edge' }
 
@@ -17,7 +17,7 @@ export default async function handler(req) {
     'Cache-Control': 'no-store',
   }
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
-  if (!isAppAuthed(req)) {
+  if (!(await isAuthed(req))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors })
   }
 

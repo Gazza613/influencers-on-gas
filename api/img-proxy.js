@@ -23,10 +23,10 @@ function safeFilename(name) {
 }
 
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
-import { isAppAuthed } from '../lib/appAuth.js'
+import { isAuthed } from '../lib/auth.js'
 
 export default async function handler(req, res) {
-  if (!isAppAuthed(req)) { res.status(401).send('Unauthorized'); return }
+  if (!(await isAuthed(req))) { res.status(401).send('Unauthorized'); return }
   const rl = rateLimit(clientIp(req.headers))
   if (!rl.ok) {
     res.setHeader('Retry-After', String(rl.retryAfter))

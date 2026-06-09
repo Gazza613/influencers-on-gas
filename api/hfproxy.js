@@ -1,6 +1,6 @@
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
 import { getValidHFAccessToken } from '../lib/hfToken.js'
-import { isAppAuthed } from '../lib/appAuth.js'
+import { isAuthed } from '../lib/auth.js'
 
 export const config = { runtime: 'edge' }
 
@@ -49,8 +49,8 @@ export default async function handler(req) {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
 
-  if (!isAppAuthed(req)) {
-    return new Response('Unauthorized — enter the team password', { status: 401, headers: corsHeaders })
+  if (!(await isAuthed(req))) {
+    return new Response('Unauthorized — please sign in', { status: 401, headers: corsHeaders })
   }
 
   const rl = rateLimit(clientIp(req.headers))

@@ -20,7 +20,7 @@ export default function IdleLogout() {
       if (loggingOut) return
       loggingOut = true
       try { await flushNow() } catch {}                              // save any pending work
-      try { await fetch('/api/logout', { method: 'POST' }) } catch {} // clear the cookie
+      try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {} // end the session
       window.location.reload()                                       // → password screen
     }
 

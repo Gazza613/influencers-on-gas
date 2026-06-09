@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { startHiggsfieldOAuthPopup, disconnectHF, isHFConnected } from '../utils/higgsfieldAuth'
 import { useTheme } from '../context/theme'
+import TeamPanel from '../components/TeamPanel'
 
 function Section({ title, children }) {
   return (
@@ -48,6 +49,9 @@ export default function Settings() {
     <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: 'var(--bg)' }}>
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '32px 24px' }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 28 }}>Settings</h1>
+
+        <TeamPanel />
+
 
         <Section title="Appearance">
           <div style={{ display: 'flex', gap: 10 }}>
@@ -113,7 +117,7 @@ export default function Settings() {
           </p>
           <button
             onClick={async () => {
-              try { await fetch('/api/logout', { method: 'POST' }) } catch {}
+              try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {}
               window.location.reload()
             }}
             style={{ padding: '10px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, color: '#FF3B30', background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.2)', cursor: 'pointer' }}

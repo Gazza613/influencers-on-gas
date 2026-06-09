@@ -21,13 +21,14 @@ const gradText = (bg) => ({
 
 export default function AppGate({ children }) {
   const [status, setStatus] = useState('checking') // checking | locked | open
+  const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/auth-check')
+    fetch('/api/auth/me')
       .then(r => { if (!cancelled) setStatus(r.ok ? 'open' : 'locked') })
       .catch(() => { if (!cancelled) setStatus('locked') })
     return () => { cancelled = true }
@@ -35,21 +36,22 @@ export default function AppGate({ children }) {
 
   async function submit(e) {
     e.preventDefault()
-    if (!pw.trim() || submitting) return
+    if (!email.trim() || !pw || submitting) return
     setSubmitting(true)
     setError('')
     try {
-      const res = await fetch('/api/auth-check', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw }),
+        body: JSON.stringify({ email: email.trim(), password: pw }),
       })
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        // Now authed — load the shared library, then land on the home page.
+        // Signed in — load the shared library, then land on the home page.
         try { await pullWorkspaceIntoLocalStorage() } catch {}
         window.location.href = '/'
       } else {
-        setError('Incorrect password. Please try again.')
+        setError(data.error || 'Sign-in failed. Please try again.')
       }
     } catch {
       setError('Something went wrong. Please try again.')
@@ -96,11 +98,20 @@ export default function AppGate({ children }) {
 
             <input
               autoFocus
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="Your work email"
+              autoComplete="username"
+              style={inputStyle}
+            />
+            <input
               type="password"
               value={pw}
               onChange={e => setPw(e.target.value)}
               placeholder="Your password"
-              style={inputStyle}
+              autoComplete="current-password"
+              style={{ ...inputStyle, marginTop: 10 }}
             />
             {error && <div style={{ color: '#FF6B6B', fontSize: 12, fontFamily: MONO, marginTop: 12 }}>{error}</div>}
 

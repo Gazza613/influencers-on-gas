@@ -1,5 +1,5 @@
 import { put } from '@vercel/blob'
-import { isAppAuthed } from '../lib/appAuth.js'
+import { isAuthed } from '../lib/auth.js'
 
 // Node runtime (not edge) — @vercel/blob's put() is fully supported here.
 // Copies a generated media URL into the team's own Vercel Blob store so the
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (!isAppAuthed(req)) return res.status(401).json({ error: 'Unauthorized' })
+  if (!(await isAuthed(req))) return res.status(401).json({ error: 'Unauthorized' })
 
   // Find the Vercel Blob read-write token by its VALUE signature
   // (vercel_blob_rw_...), so it works no matter what the env var is named
