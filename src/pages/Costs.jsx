@@ -10,6 +10,7 @@ import { discoverHiggsfieldCredits, getHiggsfieldAccount } from '../utils/higgsf
 const fmtUsd = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum = (n) => (Number(n) || 0).toLocaleString('en-US')
 const fmtTime = (iso) => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+const fmtDay = (d) => { try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) } catch { return d } }
 const lowColor = (c) => c == null ? 'var(--text-primary)' : c < 600 ? '#FF3B30' : c < 2000 ? '#FF9500' : 'var(--text-primary)'
 const creditsLabel = (c) => c == null ? '' : c < 600 ? 'critically low' : c < 2000 ? 'running low' : 'healthy'
 
@@ -51,6 +52,7 @@ export default function Costs() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [probe, setProbe] = useState(null)
   const [live, setLive] = useState('loading')
+  const [chartMode, setChartMode] = useState('daily') // 'daily' | 'monthly' | 'todate'
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => (r.ok ? r.json() : null)).then(d => setIsAdmin(d?.user?.role === 'super_admin')).catch(() => {})
@@ -90,6 +92,12 @@ export default function Costs() {
   const videos = data?.models?.filter(m => m.kind === 'video') || []
   const maxVideoCredits = Math.max(1, ...videos.map(m => m.credits))
   const maxImageCount = Math.max(1, ...images.map(m => m.count))
+
+  const chartSeries = !data ? [] : chartMode === 'daily'
+    ? (data.daily || []).map(d => ({ label: fmtDay(d.date), images: d.images, videos: d.videos }))
+    : chartMode === 'monthly'
+      ? (data.cycleSeries || []).map(c => ({ label: c.label, images: c.images, videos: c.videos }))
+      : [{ label: 'To date', images: data.toDate?.images || 0, videos: data.toDate?.videos || 0 }]
 
   return (
     <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -203,6 +211,28 @@ export default function Costs() {
               </div>
             </div>
 
+            {/* Volume over time — images vs videos */}
+            <div style={{ ...cardStyle, padding: 0, marginBottom: 16 }}>
+              <div style={{ ...cardHeadStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <span>Volume — images vs videos</span>
+                <div style={{ display: 'flex', gap: 2, background: 'var(--bg-tertiary)', padding: 3, borderRadius: 9 }}>
+                  {[['daily', 'Daily'], ['monthly', 'Monthly'], ['todate', 'To date']].map(([k, l]) => (
+                    <button key={k} onClick={() => setChartMode(k)} style={{
+                      padding: '5px 13px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                      fontFamily: 'inherit', textTransform: 'none', letterSpacing: 0,
+                      background: chartMode === k ? 'var(--surface)' : 'transparent',
+                      color: chartMode === k ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                      boxShadow: chartMode === k ? 'var(--shadow-sm)' : 'none',
+                    }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: '20px 22px' }}>
+                <VolumeChart series={chartSeries} />
+                {chartMode === 'monthly' && chartSeries.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 12 }}>Each bar is one billing cycle (11th → 10th).</div>}
+              </div>
+            </div>
+
             {/* By model — grouped */}
             <div style={{ ...cardStyle, padding: 0, marginBottom: 16 }}>
               <div style={cardHeadStyle}>Usage by model</div>
@@ -287,6 +317,48 @@ export default function Costs() {
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function Legend({ color, label }) {
+  return <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: color }} />{label}</div>
+}
+
+function Bar({ value, max, H, color }) {
+  const h = value > 0 ? Math.max(3, Math.round((value / max) * H)) : 0
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: H }}>
+      {value > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 3 }}>{value}</div>}
+      <div style={{ width: 20, height: h, borderRadius: '5px 5px 0 0', background: color }} />
+    </div>
+  )
+}
+
+function VolumeChart({ series }) {
+  if (!series.length || series.every(s => !s.images && !s.videos)) {
+    return <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No activity to chart yet.</div>
+  }
+  const max = Math.max(1, ...series.flatMap(s => [s.images, s.videos]))
+  const H = 150
+  const few = series.length <= 8
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 18, marginBottom: 16, paddingLeft: 2 }}>
+        <Legend color="#34C759" label="Images" />
+        <Legend color="#FF9500" label="Videos" />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: few ? 24 : 16, overflowX: 'auto', paddingBottom: 4 }}>
+        {series.map((s, i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 48, flex: few ? 1 : '0 0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: H }}>
+              <Bar value={s.images} max={max} H={H} color="linear-gradient(180deg,#34C759,#30D158)" />
+              <Bar value={s.videos} max={max} H={H} color="linear-gradient(180deg,#FFB340,#FF9500)" />
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', marginTop: 8, whiteSpace: 'nowrap', maxWidth: 76, overflow: 'hidden', textOverflow: 'ellipsis' }} title={s.label}>{s.label}</div>
+          </div>
+        ))}
       </div>
     </div>
   )
