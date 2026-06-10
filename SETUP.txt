@@ -31,5 +31,5 @@ GOOD TO KNOW
 
 FOR DEVELOPERS
 --------------------------------------------------
-Code:      https://github.com/Gazza613/creative-on-gas
+Code:      https://github.com/Gazza613/influencers-on-gas
 Local dev: npm install  ->  npm run dev   (http://localhost:5173)

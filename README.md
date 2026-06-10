@@ -16,7 +16,7 @@ npm run preview  # preview the production build
 ```
 
 Get the code from the GitHub repo:
-[github.com/Gazza613/creative-on-gas](https://github.com/Gazza613/creative-on-gas).
+[github.com/Gazza613/influencers-on-gas](https://github.com/Gazza613/influencers-on-gas).
 
 ---
 
