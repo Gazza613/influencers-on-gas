@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { flushNow } from '../utils/cloudSync'
+import { IDLE_MS, markActivity, clearActivity } from '../utils/idle'
 
 // Auto-logout after inactivity, with a 1-minute warning. Work is saved
 // continuously (localStorage + cloud sync) and we flush any pending sync right
 // before logging out, so nothing is lost. Only mounted while signed in.
-const IDLE_MS = 15 * 60 * 1000        // total inactivity before logout
-const WARN_MS = 14 * 60 * 1000        // show the warning 1 minute before
+// Last-activity is persisted (utils/idle) so the window is also enforced across
+// reloads — see AppGate.
+const WARN_MS = IDLE_MS - 60 * 1000   // show the warning 1 minute before
 const COUNTDOWN_S = Math.round((IDLE_MS - WARN_MS) / 1000)
 
 export default function IdleLogout() {
@@ -20,6 +22,7 @@ export default function IdleLogout() {
       if (loggingOut) return
       loggingOut = true
       try { await flushNow() } catch {}                              // save any pending work
+      clearActivity()                                                // so the reload re-gates
       try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {} // end the session
       window.location.reload()                                       // → password screen
     }
@@ -39,6 +42,7 @@ export default function IdleLogout() {
       const now = Date.now()
       if (!force && now - lastReset < 2000) return // throttle — activity fires constantly
       lastReset = now
+      markActivity()                               // persist so reloads honor the idle window
       clearAll()
       setWarning(false)
       warnTimer = setTimeout(startWarning, WARN_MS)

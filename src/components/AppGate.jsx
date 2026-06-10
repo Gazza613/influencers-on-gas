@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { pullWorkspaceIntoLocalStorage } from '../utils/cloudSync'
+import { isIdleExpired, markActivity, clearActivity } from '../utils/idle'
 
 // Shared-password gate, styled to match the "Media on GAS" login.
 // Shows a password screen until the team password is accepted; the server sets
@@ -28,15 +29,24 @@ export default function AppGate({ children }) {
 
   useEffect(() => {
     let cancelled = false
-    // Gate on the SERVER's confirmation, never a bare 2xx. A cached page, an SPA
-    // HTML fallback, or any proxy returning 200 must NOT open the app — only a
-    // valid session ({ authed: true } from /api/auth/me) does. no-store so a hard
-    // refresh always re-checks against the server.
+    // Enforce the inactivity window ACROSS reloads: if the last recorded activity
+    // is older than the idle window, end the session and show login — so a hard
+    // refresh after being idle lands on the login screen.
+    if (isIdleExpired()) {
+      clearActivity()
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {})
+      setStatus('locked')
+      return () => { cancelled = true }
+    }
+    // Otherwise gate on the SERVER's confirmation, never a bare 2xx. A cached page,
+    // an SPA HTML fallback, or any proxy returning 200 must NOT open the app — only
+    // a valid session ({ authed: true }) does. no-store so the refresh re-checks.
     fetch('/api/auth/me', { headers: { Accept: 'application/json' }, cache: 'no-store', credentials: 'same-origin' })
       .then(async r => {
         if (cancelled) return
         let authed = false
         try { authed = r.ok && (await r.json())?.authed === true } catch { authed = false }
+        if (authed) markActivity() // (re)start the idle clock for this load
         setStatus(authed ? 'open' : 'locked')
       })
       .catch(() => { if (!cancelled) setStatus('locked') })
@@ -56,7 +66,8 @@ export default function AppGate({ children }) {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        // Signed in — load the shared library, then land on the home page.
+        // Signed in — start the idle clock, load the shared library, then land home.
+        markActivity()
         try { await pullWorkspaceIntoLocalStorage() } catch {}
         window.location.href = '/'
       } else {
