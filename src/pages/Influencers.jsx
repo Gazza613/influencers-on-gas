@@ -1,55 +1,24 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useInfluencers, useBrandDeals, generateId } from '../store'
-import ImageGrid from '../components/ImageGrid'
-import MasonryGrid from '../components/MasonryGrid'
+import { useInfluencers, generateId } from '../store'
 import Lightbox from '../components/Lightbox'
-import { compressImage, downloadImage } from '../utils/imageUtils'
-import { generateSingleImage, generateThreeImages, generateVideo, initSession, pollAllJobs, getPendingGens, clearPendingGen, getPendingVideo, clearPendingVideo, resumeVideoJob } from '../utils/higgsfieldGenerate'
-import { buildThreeVariationPrompts } from '../utils/systemPrompt'
-import { gColor, pLabel } from '../utils/influencerUtils'
+import { gColor } from '../utils/influencerUtils'
 import { useTheme } from '../context/theme'
-import { isHFConnected } from '../utils/higgsfieldAuth'
-import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/charSheetPrompt'
 import PhotoStudioPanel from './PhotoStudio'
-import WardrobeDrawer from '../components/WardrobeDrawer'
-import {
-  VIDEO_MODELS, SD, NICHES_F, NICHES_M, NICHES_ALL, SHEET_RATIOS, GM, DEFAULT_PALETTES,
-  SCRIPT_STATUSES, SCRIPT_STATUS_STYLE, WARDROBE_STYLES_F, WARDROBE_STYLES_M,
-  HAIR_PRESETS_F, HAIR_PRESETS_M, GEN_DURATION_MS, CS_ENVIRONMENTS, CS_ENV_PRESETS,
-  AMBIENT_SOUND, CS_CAMERAS, CS_VIBES, VOICE_PRESETS, VIDEO_TEMPLATES, DIALOGUE_STARTERS,
-  CAMERA_META, VIBE_META, VIDEO_MAX_WORDS, PHOTO_STUDIO_HISTORY_KEY,
-} from './influencers/constants'
-import {
-  useMobile, getNiches, audiencePh, pColor, accent, accentText, completeness,
-  ytId, domain, inferAmbientSound, fmtElapsed, getGlobalMuted, useGlobalMuted,
-} from './influencers/helpers'
-import {
-  buildFeatureSheetPrompt, buildCloseUpPrompt, buildCharacterSheetPrompt,
-  buildWardrobePrompt, parseAdditionalNotes, annotateDialogue,
-} from './influencers/prompts'
-import {
-  saveGenParams, getGenParams, getCreationParams,
-  saveWardrobePending, getWardrobePending, clearWardrobePending,
-} from './influencers/storage'
-import {
-  Ring, CtxMenu, GenLoadingOverlay, FL, FI, FTA, GenderButtons, ColorPalette,
-  InfoCell, BareInput, Sec, Tabs, CSStepHeader, CSChips,
-} from './influencers/components/common'
+import { SD } from './influencers/constants'
+import { accent, completeness, useMobile } from './influencers/helpers'
+import { buildFeatureSheetPrompt } from './influencers/prompts'
+import { Ring, CtxMenu, Sec, Tabs } from './influencers/components/common'
 import { HeroBanner, CharacterSheetSlot, CloseUpSlot, MainImageSlot } from './influencers/components/ImageSlots'
-import { SaveScriptModal, ScriptsSection } from './influencers/components/Scripts'
+import { ScriptsSection } from './influencers/components/Scripts'
 import { DescriptionForm } from './influencers/components/Description'
 import { WardrobeGenerator } from './influencers/components/Wardrobe'
-import { WorldDropCard, WorldDropSection } from './influencers/components/WorldDrops'
+import { WorldDropSection } from './influencers/components/WorldDrops'
 import { HomeSection } from './influencers/components/Home'
-import { BrandDealCard, NewBrandModal, ImportBrandDealsModal, BrandDealSection } from './influencers/components/BrandDeals'
+import { BrandDealSection } from './influencers/components/BrandDeals'
 import { NewModal } from './influencers/components/Modals'
-import { MediaLightbox, HistoryCard, VideoStripThumb } from './influencers/components/Media'
 import { HistoryTab } from './influencers/components/History'
 import { ContentStudio } from './influencers/ContentStudio'
-
-
 
 // ─────────────────────────────────────────────
 // Main export

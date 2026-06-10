@@ -30,7 +30,8 @@ account (OAuth, PKCE).
 | `src/utils/higgsfieldGenerate.js` | MCP-style image/video generation, polling, media uploads |
 | `src/utils/systemPrompt.js` | Prompt templates — poses, wardrobe library, vibe palettes, Soul vs GPT Image 2 variants |
 | `src/pages/Create.jsx` | Multi-step influencer creation wizard |
-| `src/pages/Influencers.jsx` | Influencer profile + Content Studio + Video Studio (very large — known structural debt) |
+| `src/pages/Influencers.jsx` | Page shell only (~640 lines): sidebar, influencer resolution, tab routing, CRUD. Renders the pieces below. |
+| `src/pages/influencers/` | Extracted internals: `constants.js`, `helpers.js`, `prompts.js`, `storage.js`, `ContentStudio.jsx` (Content/Video Studio), and `components/*` (HeroBanner, image slots, Scripts, Wardrobe, BrandDeals, Media/History, common leaf comps, …) |
 | `api/hf/[...path].js` | Edge function that proxies all Higgsfield MCP traffic and forwards SSE streams |
 | `api/claude.js` | Anthropic API proxy — caller supplies their own `x-api-key` |
 
@@ -52,9 +53,13 @@ account (OAuth, PKCE).
 - Don't trust the comment in `modelBaseParams` saying resolution and
   quality conflict for `gpt_image_2` — they don't, the working code
   intentionally passes both.
-- Don't refactor `Influencers.jsx` casually. It's 4,700+ lines and the
-  state is tangled; any split needs its own dedicated session with
-  in-browser verification of every flow.
+- The old 6,400-line `Influencers.jsx` was split into `src/pages/influencers/`
+  by pure mechanical extraction (one component/module per file, props-only,
+  no state untangling). Keep that boundary: shared data → `constants.js`,
+  pure fns/hooks → `helpers.js`, prompt strings → `prompts.js`, localStorage →
+  `storage.js`, leaf UI → `components/common.jsx`. `ContentStudio.jsx` is still
+  ~2,150 lines and internally tangled — refactoring *its* state needs a
+  dedicated session with in-browser verification of every generate flow.
 
 ## Dev workflow
 
