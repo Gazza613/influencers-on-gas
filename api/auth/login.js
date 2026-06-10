@@ -1,17 +1,12 @@
 import { checkPassword, createSession, sessionCookie, isAllowedEmail, maybeBootstrapSuperAdmin, recordLogin, EMAIL_DOMAIN } from '../../lib/auth.js'
 import { rateLimit, clientIp } from '../../lib/rateLimit.js'
 import { tooManyAuthFails, recordAuthFail, clearAuthFails } from '../../lib/authLimit.js'
+import { corsHeaders } from '../../lib/cors.js'
 
 export const config = { runtime: 'edge' }
 
 export default async function handler(req) {
-  const cors = {
-    'Access-Control-Allow-Origin': req.headers.get('origin') || '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type',
-    'Access-Control-Allow-Credentials': 'true',
-    'Content-Type': 'application/json',
-  }
+  const cors = corsHeaders(req, { methods: 'POST, OPTIONS' })
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: cors })
 

@@ -1,18 +1,13 @@
 import { getSession } from '../lib/auth.js'
 import { recordGeneration } from '../lib/usage.js'
+import { corsHeaders } from '../lib/cors.js'
 
 export const config = { runtime: 'edge' }
 
 // Records a generation event for the signed-in user.
 // POST { kind: 'image' | 'video', model, count, duration }
 export default async function handler(req) {
-  const cors = {
-    'Access-Control-Allow-Origin': req.headers.get('origin') || '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type',
-    'Access-Control-Allow-Credentials': 'true',
-    'Content-Type': 'application/json',
-  }
+  const cors = corsHeaders(req, { methods: 'POST, OPTIONS' })
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: cors })
 

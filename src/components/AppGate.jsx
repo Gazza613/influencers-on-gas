@@ -28,8 +28,17 @@ export default function AppGate({ children }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/auth/me')
-      .then(r => { if (!cancelled) setStatus(r.ok ? 'open' : 'locked') })
+    // Gate on the SERVER's confirmation, never a bare 2xx. A cached page, an SPA
+    // HTML fallback, or any proxy returning 200 must NOT open the app — only a
+    // valid session ({ authed: true } from /api/auth/me) does. no-store so a hard
+    // refresh always re-checks against the server.
+    fetch('/api/auth/me', { headers: { Accept: 'application/json' }, cache: 'no-store', credentials: 'same-origin' })
+      .then(async r => {
+        if (cancelled) return
+        let authed = false
+        try { authed = r.ok && (await r.json())?.authed === true } catch { authed = false }
+        setStatus(authed ? 'open' : 'locked')
+      })
       .catch(() => { if (!cancelled) setStatus('locked') })
     return () => { cancelled = true }
   }, [])

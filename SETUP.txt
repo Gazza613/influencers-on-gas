@@ -32,4 +32,5 @@ GOOD TO KNOW
 FOR DEVELOPERS
 --------------------------------------------------
 Code:      https://github.com/Gazza613/influencers-on-gas
-Local dev: npm install  ->  npm run dev   (http://localhost:5173)
+Live app:  https://influencers.gasmarketing.co.za  (hosted on Vercel)
+Local dev: npm install  ->  npm run dev   (development only)

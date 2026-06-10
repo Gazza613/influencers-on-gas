@@ -18,3 +18,4 @@ npm-debug.log*
 
 # Ephemeral output from the pricing watcher (created on the CI runner only)
 pricing-change-body.md
+.env*

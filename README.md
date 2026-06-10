@@ -2,7 +2,10 @@
 
 An internal GAS Marketing web app for building, managing, and generating AI
 influencers. React + Vite frontend, Higgsfield for image & video generation,
-Claude for prompt assistance. Deployed on Vercel behind a shared team password.
+Claude for prompt assistance. The production app lives in the cloud — hosted on
+**Vercel** at <https://influencers.gasmarketing.co.za>, behind a shared team
+password. Nothing runs or is stored on localhost; the dev server is for local
+development only.
 
 ---
 
@@ -10,7 +13,7 @@ Claude for prompt assistance. Deployed on Vercel behind a shared team password.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # local dev server (development only)
 npm run build    # production build
 npm run preview  # preview the production build
 ```

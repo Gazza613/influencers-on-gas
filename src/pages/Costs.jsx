@@ -251,7 +251,7 @@ export default function Costs() {
 
             {/* By team member — allocated cost */}
             <div style={{ ...cardStyle, padding: 0 }}>
-              <div style={cardHeadStyle}>Cost by team member</div>
+              <div style={cardHeadStyle}>Usage by team member</div>
               <div style={{ padding: '8px 0' }}>
                 {data.users.length === 0 && <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No team activity yet this cycle.</div>}
                 {data.users.map(u => (

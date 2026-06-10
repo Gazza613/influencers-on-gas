@@ -1,18 +1,12 @@
 import { listUsers, createUser, deleteUser, getSession, getLoginHistory } from '../../lib/auth.js'
 import { getUsageFor } from '../../lib/usage.js'
+import { corsHeaders } from '../../lib/cors.js'
 
 export const config = { runtime: 'edge' }
 
 // Super-admin only. GET = list users · POST = invite (create) · DELETE = remove.
 export default async function handler(req) {
-  const cors = {
-    'Access-Control-Allow-Origin': req.headers.get('origin') || '*',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type',
-    'Access-Control-Allow-Credentials': 'true',
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-store',
-  }
+  const cors = { ...corsHeaders(req, { methods: 'GET, POST, DELETE, OPTIONS' }), 'Cache-Control': 'no-store' }
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
 
   const session = await getSession(req)

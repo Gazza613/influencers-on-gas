@@ -1,6 +1,7 @@
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
 import { getValidHFAccessToken } from '../lib/hfToken.js'
 import { isAuthed } from '../lib/auth.js'
+import { corsHeaders as buildCors } from '../lib/cors.js'
 
 export const config = { runtime: 'edge' }
 
@@ -37,14 +38,11 @@ export default async function handler(req) {
 
   const target = `https://mcp.higgsfield.ai${path}${search}`
 
-  // CORS preflight
-  const origin = req.headers.get('origin') || '*'
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, content-type, accept, mcp-session-id',
-    'Access-Control-Allow-Credentials': 'true',
-  }
+  // CORS preflight — origin allow-listed (same-origin app is unaffected).
+  // Drop the helper's default Content-Type: this is a passthrough proxy and must
+  // not impose a content type on streamed (SSE) upstream responses.
+  const corsHeaders = buildCors(req, { methods: 'GET, POST, PUT, DELETE, OPTIONS', headers: 'authorization, content-type, accept, mcp-session-id' })
+  delete corsHeaders['Content-Type']
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }

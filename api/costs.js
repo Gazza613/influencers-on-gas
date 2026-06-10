@@ -1,5 +1,6 @@
 import { getSession, listUsers } from '../lib/auth.js'
 import { getCostsReport } from '../lib/usage.js'
+import { corsHeaders } from '../lib/cors.js'
 
 export const config = { runtime: 'edge' }
 
@@ -7,14 +8,7 @@ export const config = { runtime: 'edge' }
 // member can view it. GET ?cycle=YYYY-MM-DD (billing-cycle start, the 11th;
 // defaults to the current cycle).
 export default async function handler(req) {
-  const cors = {
-    'Access-Control-Allow-Origin': req.headers.get('origin') || '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type',
-    'Access-Control-Allow-Credentials': 'true',
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-store',
-  }
+  const cors = { ...corsHeaders(req, { methods: 'GET, OPTIONS' }), 'Cache-Control': 'no-store' }
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
 
   const session = await getSession(req)

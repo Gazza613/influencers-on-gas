@@ -32,7 +32,7 @@ account (OAuth, PKCE).
 | `src/pages/Create.jsx` | Multi-step influencer creation wizard |
 | `src/pages/Influencers.jsx` | Page shell only (~640 lines): sidebar, influencer resolution, tab routing, CRUD. Renders the pieces below. |
 | `src/pages/influencers/` | Extracted internals: `constants.js`, `helpers.js`, `prompts.js`, `storage.js`, `ContentStudio.jsx` (Content/Video Studio), and `components/*` (HeroBanner, image slots, Scripts, Wardrobe, BrandDeals, Media/History, common leaf comps, …) |
-| `api/hf/[...path].js` | Edge function that proxies all Higgsfield MCP traffic and forwards SSE streams |
+| `api/hfproxy.js` | Authed edge function that proxies all Higgsfield MCP traffic (injects the shared owner token server-side) and forwards SSE streams. `vercel.json` rewrites `/api/hf/*` → here. |
 | `api/claude.js` | Anthropic API proxy — caller supplies their own `x-api-key` |
 
 ## Conventions

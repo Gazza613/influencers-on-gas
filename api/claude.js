@@ -1,9 +1,19 @@
 import { rateLimit, clientIp } from '../lib/rateLimit.js'
 import { getSession } from '../lib/auth.js'
 import { recordUsage } from '../lib/usage.js'
+import { ALLOWED_ORIGINS } from '../lib/cors.js'
+
+// Cap on the shared agency Anthropic key so a single request can't run away.
+const MAX_OUTPUT_TOKENS = 8192
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  // Origin allow-list (same-origin app is unaffected). Echo only trusted origins.
+  const origin = req.headers.origin || ''
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+    res.setHeader('Vary', 'Origin')
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, x-app-key, anthropic-version, anthropic-beta')
 
@@ -24,6 +34,18 @@ export default async function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY || req.headers['x-api-key']
   if (!apiKey) return res.status(400).json({ error: { message: 'Server is missing ANTHROPIC_API_KEY' } })
 
+  // Validate + clamp the caller's body so the shared key can't be abused with an
+  // arbitrary provider/model or an unbounded token request.
+  let body = req.body
+  if (typeof body === 'string') { try { body = JSON.parse(body) } catch { body = {} } }
+  if (!body || typeof body !== 'object') body = {}
+  if (typeof body.model === 'string' && !body.model.startsWith('claude-')) {
+    return res.status(400).json({ error: { message: 'Unsupported model' } })
+  }
+  if (!(typeof body.max_tokens === 'number') || body.max_tokens > MAX_OUTPUT_TOKENS) {
+    body.max_tokens = Math.min(Number(body.max_tokens) || MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS)
+  }
+
   try {
     const upstreamHeaders = {
       'x-api-key': apiKey,
@@ -35,7 +57,7 @@ export default async function handler(req, res) {
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: upstreamHeaders,
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(body),
     })
     const data = await upstream.json()
     // Track Claude usage for this user (calls + tokens).
