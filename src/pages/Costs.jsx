@@ -1,56 +1,57 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { discoverHiggsfieldCredits, getHiggsfieldAccount } from '../utils/higgsfieldGenerate'
 
 // Cost dashboard. Visible to any signed-in team member. Leads with the LIVE
-// Higgsfield credit balance + deduction ledger (ground truth from Higgsfield),
-// then shows our own per-model / per-user usage tracking as estimates.
+// Higgsfield credit balance (ground truth from the shared Ultra account), then
+// shows our own per-model / per-member cost intelligence: images are unlimited
+// ($0 marginal) on Ultra, videos draw credits, and the fixed $310/mo is blended
+// across the team so every member carries a real cost.
 
 const fmtUsd = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum = (n) => (Number(n) || 0).toLocaleString('en-US')
 const fmtNum2 = (n) => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })
 const fmtTime = (iso) => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
-const lowColor = (c) => c == null ? 'var(--text-primary)' : c < 60 ? '#FF3B30' : c < 200 ? '#FF9500' : 'var(--text-primary)'
-const creditsLabel = (c) => c == null ? '' : c < 60 ? 'critically low' : c < 200 ? 'running low' : 'healthy'
+const lowColor = (c) => c == null ? 'var(--text-primary)' : c < 600 ? '#FF3B30' : c < 2000 ? '#FF9500' : 'var(--text-primary)'
+const creditsLabel = (c) => c == null ? '' : c < 600 ? 'critically low' : c < 2000 ? 'running low' : 'healthy'
 
-function lastMonths(count) {
-  const out = []
-  const now = new Date()
-  for (let i = 0; i < count; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    out.push({ value: ym, label: d.toLocaleString('en-US', { month: 'long', year: 'numeric' }) })
-  }
-  return out
-}
-
-function Ring({ used, budget }) {
-  const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0
+// Donut showing % of the credit budget remaining.
+function Ring({ pct, centerTop, centerBottom }) {
+  const p = Math.max(0, Math.min(100, pct))
   const r = 76, c = 2 * Math.PI * r
-  const color = pct >= 90 ? '#FF3B30' : pct >= 70 ? '#FF9500' : '#34C759'
+  const color = p <= 10 ? '#FF3B30' : p <= 30 ? '#FF9500' : '#34C759'
   return (
     <div style={{ position: 'relative', width: 184, height: 184, flexShrink: 0 }}>
       <svg width="184" height="184" style={{ transform: 'rotate(-90deg)' }}>
         <circle cx="92" cy="92" r={r} fill="none" stroke="var(--border-subtle)" strokeWidth="14" />
         <circle cx="92" cy="92" r={r} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={c - (pct / 100) * c} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+          strokeDasharray={c} strokeDashoffset={c - (p / 100) * c} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', color: 'var(--text-primary)' }}>{Math.round(pct)}%</div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>of monthly credits</div>
+        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', color: 'var(--text-primary)' }}>{centerTop}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2, textAlign: 'center', lineHeight: 1.3, padding: '0 18px' }}>{centerBottom}</div>
       </div>
     </div>
   )
 }
 
+function StatTile({ label, value, sub, accent }) {
+  return (
+    <div style={{ flex: 1, minWidth: 150, padding: '16px 18px', borderRadius: 14, background: 'var(--bg)', border: '1px solid var(--border-subtle)' }}>
+      <div style={labelStyle}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.8px', marginTop: 6, color: accent || 'var(--text-primary)' }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 3 }}>{sub}</div>}
+    </div>
+  )
+}
+
 export default function Costs() {
-  const months = useMemo(() => lastMonths(6), [])
-  const [month, setMonth] = useState(months[0].value)
+  const [cycleKey, setCycleKey] = useState(null) // null → current cycle
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [probe, setProbe] = useState(null) // null | 'loading' | {…} | {error}
-  const [live, setLive] = useState('loading') // 'loading' | {credits,plan,transactions} | {error}
+  const [probe, setProbe] = useState(null)
+  const [live, setLive] = useState('loading')
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => (r.ok ? r.json() : null)).then(d => setIsAdmin(d?.user?.role === 'super_admin')).catch(() => {})
@@ -72,14 +73,24 @@ export default function Costs() {
   useEffect(() => {
     let alive = true
     setLoading(true); setError('')
-    fetch(`/api/costs?month=${month}`)
+    fetch(`/api/costs${cycleKey ? `?cycle=${cycleKey}` : ''}`)
       .then(r => (r.ok ? r.json() : Promise.reject(new Error('Could not load costs'))))
       .then(d => { if (alive) { setData(d); setLoading(false) } })
       .catch(e => { if (alive) { setError(e.message); setLoading(false) } })
     return () => { alive = false }
-  }, [month])
+  }, [cycleKey])
 
-  const maxModelCount = Math.max(1, ...(data?.models || []).map(m => m.count))
+  const budget = data?.creditsBudget || 9000
+  const creditUsd = data?.plan?.creditUsd || 0.045
+  // Prefer the live remaining balance; fall back to budget − our tracked usage.
+  const liveCredits = (live && live !== 'loading' && !live.error) ? live.credits : null
+  const remaining = liveCredits != null ? liveCredits : (data ? Math.max(0, budget - data.creditsUsed) : null)
+  const pctRemaining = remaining != null ? (remaining / budget) * 100 : 0
+
+  const images = data?.models?.filter(m => m.kind === 'image') || []
+  const videos = data?.models?.filter(m => m.kind === 'video') || []
+  const maxVideoCredits = Math.max(1, ...videos.map(m => m.credits))
+  const maxImageCount = Math.max(1, ...images.map(m => m.count))
 
   return (
     <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -89,15 +100,17 @@ export default function Costs() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.6px', margin: 0 }}>Costs</h1>
-            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6, maxWidth: 600, lineHeight: 1.55 }}>
-              Your team shares one Higgsfield account. The <strong>live balance and deduction ledger</strong> below come
-              straight from Higgsfield; the per-model and per-member breakdowns are <strong>estimates</strong> from our own
-              usage tracking.
+            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 6, maxWidth: 640, lineHeight: 1.55 }}>
+              One shared <strong>Higgsfield Ultra</strong> account — <strong>$310/mo for 9,000 credits</strong>, reloading on the 11th.
+              Images are <strong>included (unlimited)</strong>; videos spend credits. The fee is blended across the team so every
+              member and client job shows a real cost.
             </p>
           </div>
-          <select value={month} onChange={e => setMonth(e.target.value)} style={selectStyle}>
-            {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
+          {data?.cycles && (
+            <select value={cycleKey || data.cycle.key} onChange={e => setCycleKey(e.target.value)} style={selectStyle}>
+              {data.cycles.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+          )}
         </div>
 
         {error && <div style={{ ...cardStyle, padding: 20, color: '#FF3B30' }}>{error}</div>}
@@ -105,41 +118,48 @@ export default function Costs() {
 
         {data && (
           <>
-            {/* LIVE balance + deduction ledger — straight from Higgsfield */}
+            {/* HERO — live balance ring + cycle facts + deduction ledger */}
             <div style={{ ...cardStyle, marginBottom: 16, background: 'linear-gradient(135deg, rgba(236,72,153,0.07), rgba(139,92,246,0.07))' }}>
               <div style={{ ...cardHeadStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>● Live Higgsfield balance</span>
+                <span>● Live Higgsfield balance · {data.plan.name} plan</span>
                 <button onClick={loadLive} disabled={live === 'loading'} style={ghostRefresh}>{live === 'loading' ? 'Refreshing…' : '↻ Refresh'}</button>
               </div>
-              <div style={{ padding: 22, display: 'grid', gridTemplateColumns: 'minmax(220px, 300px) 1fr', gap: 24, alignItems: 'start' }}>
-                {/* Balance */}
-                <div>
-                  {live === 'loading' && <div style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>Reading live balance…</div>}
-                  {live?.error && <div style={{ color: '#FF3B30', fontSize: 13, lineHeight: 1.5 }}>Couldn't read live balance: {live.error}</div>}
-                  {live && live !== 'loading' && !live.error && (
-                    <>
-                      <div style={labelStyle}>Credits remaining{live.plan ? ` · ${live.plan} plan` : ''}</div>
-                      <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-2px', marginTop: 6, color: lowColor(live.credits) }}>
-                        {live.credits == null ? '—' : fmtNum2(live.credits)}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 4 }}>
-                        ≈ {fmtUsd((live.credits || 0) * (data?.plan?.creditUsd || 0.045))} to replace · {creditsLabel(live.credits)}
-                      </div>
-                      {live.credits != null && live.credits < 200 && (
-                        <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.3)', fontSize: 12.5, color: '#FF3B30', lineHeight: 1.5 }}>
-                          <strong>Low balance.</strong> The shared account is nearly out — generations will start failing for the whole team.{' '}
-                          <a href="https://higgsfield.ai/mcp-credits?show_modal=auto_refill&source=mcp" target="_blank" rel="noreferrer" style={{ color: '#FF3B30', fontWeight: 700 }}>Top up / auto-refill →</a>
+              <div style={{ padding: 22, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 28, alignItems: 'center' }}>
+                {/* Ring + live number */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                  <Ring
+                    pct={pctRemaining}
+                    centerTop={`${Math.round(pctRemaining)}%`}
+                    centerBottom="credits left"
+                  />
+                  <div>
+                    {live === 'loading' && <div style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>Reading live balance…</div>}
+                    {live?.error && <div style={{ color: '#FF3B30', fontSize: 13, lineHeight: 1.5, maxWidth: 240 }}>Couldn't read live balance: {live.error}</div>}
+                    {(liveCredits != null || (live && live !== 'loading' && !live.error)) && (
+                      <>
+                        <div style={labelStyle}>Credits remaining</div>
+                        <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-2px', marginTop: 4, color: lowColor(remaining) }}>
+                          {remaining == null ? '—' : fmtNum2(remaining)}
                         </div>
-                      )}
-                    </>
-                  )}
+                        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+                          of {fmtNum(budget)} · {creditsLabel(remaining)}
+                        </div>
+                        {remaining != null && remaining < 2000 && (
+                          <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.3)', fontSize: 12.5, color: '#FF3B30', lineHeight: 1.5, maxWidth: 280 }}>
+                            <strong>Low balance.</strong> Video generations will start failing for the whole team.{' '}
+                            <a href="https://higgsfield.ai/mcp-credits?show_modal=auto_refill&source=mcp" target="_blank" rel="noreferrer" style={{ color: '#FF3B30', fontWeight: 700 }}>Top up →</a>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
                 {/* Recent deductions ledger */}
                 <div>
                   <div style={labelStyle}>Recent deductions (live ledger)</div>
                   <div style={{ marginTop: 8 }}>
                     {(!live || live === 'loading' || live.error || !live.transactions?.length) && <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>—</div>}
-                    {live?.transactions?.slice(0, 8).map((t, i) => (
+                    {live?.transactions?.slice(0, 7).map((t, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderTop: i ? '1px solid var(--border-subtle)' : 'none' }}>
                         <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
                         <span style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexShrink: 0 }}>
@@ -153,55 +173,73 @@ export default function Costs() {
               </div>
             </div>
 
-            {/* Activity (our tracking) */}
-            <div style={{ ...cardStyle, padding: 22, marginBottom: 16 }}>
-              <div style={labelStyle}>Generations tracked this month (in-app)</div>
-              <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-1.2px', marginTop: 6, color: 'var(--text-primary)' }}>{fmtNum(data.totals.generations)}</div>
-              <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-                <div><span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(data.totals.images)}</span> <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>images</span></div>
-                <div><span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(data.totals.videos)}</span> <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>videos</span></div>
+            {/* Cycle facts */}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+              <StatTile label="Billing cycle" value={data.cycle.label} sub={`Reloads in ${data.cycle.daysToReset} day${data.cycle.daysToReset === 1 ? '' : 's'} (the 11th)`} />
+              <StatTile label="Credits used (tracked)" value={fmtNum(data.creditsUsed)} sub={`of ${fmtNum(budget)} · ${Math.round((data.creditsUsed / budget) * 100)}% of budget`} accent={data.overageCredits > 0 ? '#FF3B30' : 'var(--text-primary)'} />
+              <StatTile label="Cycle spend" value={fmtUsd(data.cycleSpendUsd)} sub={data.overageCredits > 0 ? `$${data.plan.baseUsd} base + ${fmtUsd(data.estOverageUsd)} overage` : `$${data.plan.baseUsd} base · no overage`} accent={data.overageCredits > 0 ? '#FF9500' : 'var(--text-primary)'} />
+            </div>
+
+            {/* Images vs Videos — materially different costs */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 16 }}>
+              {/* Images */}
+              <div style={{ ...cardStyle, padding: 20, borderLeft: '3px solid #34C759' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={labelStyle}>🖼 Images</div>
+                  <span style={badgeIncluded}>Included · $0</span>
+                </div>
+                <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-1.2px', marginTop: 8, color: 'var(--text-primary)' }}>{fmtNum(data.totals.images)}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 3 }}>generated this cycle · unlimited on Ultra, zero marginal cost</div>
+              </div>
+              {/* Videos */}
+              <div style={{ ...cardStyle, padding: 20, borderLeft: '3px solid #FF9500' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={labelStyle}>🎬 Videos</div>
+                  <span style={{ ...badgeIncluded, color: '#FF9500', background: 'rgba(255,149,0,0.12)' }}>Credit cost</span>
+                </div>
+                <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-1.2px', marginTop: 8, color: 'var(--text-primary)' }}>{fmtNum(data.totals.videos)}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 3 }}>
+                  {fmtNum(data.totals.videoCredits)} credits burned · {fmtUsd(data.totals.videoCredits * creditUsd)} credit value
+                </div>
               </div>
             </div>
 
-            {/* Per-model breakdown */}
+            {/* By model — grouped */}
             <div style={{ ...cardStyle, padding: 0, marginBottom: 16 }}>
-              <div style={cardHeadStyle}>Estimated usage by model</div>
+              <div style={cardHeadStyle}>Usage by model</div>
               <div style={{ padding: '8px 0' }}>
-                {data.models.length === 0 && <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No generations yet this month.</div>}
-                {data.models.map(m => (
-                  <div key={m.model} style={{ padding: '12px 22px', display: 'grid', gridTemplateColumns: '160px 1fr 130px', alignItems: 'center', gap: 14 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>{m.kind}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, height: 8, borderRadius: 6, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
-                        <div style={{ width: `${(m.count / maxModelCount) * 100}%`, height: '100%', borderRadius: 6, background: m.unlimited ? 'linear-gradient(90deg,#34C759,#30D158)' : 'linear-gradient(90deg,#FF9500,#FF3B30)' }} />
-                      </div>
-                      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', minWidth: 56, textAlign: 'right' }}>{fmtNum(m.count)} gen</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      {m.unlimited
-                        ? <span style={badgeIncluded}>Included · $0</span>
-                        : <div><div style={{ fontSize: 13.5, fontWeight: 700, color: '#FF9500' }}>{fmtUsd(m.estUsd)}</div><div style={{ fontSize: 10.5, color: 'var(--text-tertiary)' }}>{fmtNum(m.credits)} credits</div></div>}
-                    </div>
-                  </div>
+                {data.models.length === 0 && <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No generations yet this cycle.</div>}
+                {videos.length > 0 && <div style={groupHead}>Videos — credit cost</div>}
+                {videos.map(m => (
+                  <ModelRow key={m.model} m={m} pct={(m.credits / maxVideoCredits) * 100} right={<><div style={{ fontSize: 13.5, fontWeight: 700, color: '#FF9500' }}>{fmtUsd(m.estUsd)}</div><div style={{ fontSize: 10.5, color: 'var(--text-tertiary)' }}>{fmtNum(m.credits)} cr · {fmtNum(m.count)} gen</div></>} barColor="linear-gradient(90deg,#FF9500,#FF3B30)" />
+                ))}
+                {images.length > 0 && <div style={groupHead}>Images — included</div>}
+                {images.map(m => (
+                  <ModelRow key={m.model} m={m} pct={(m.count / maxImageCount) * 100} right={<span style={badgeIncluded}>$0 · {fmtNum(m.count)} gen</span>} barColor="linear-gradient(90deg,#34C759,#30D158)" />
                 ))}
               </div>
             </div>
 
-            {/* Per-user */}
+            {/* By team member — allocated cost */}
             <div style={{ ...cardStyle, padding: 0 }}>
-              <div style={cardHeadStyle}>Estimated usage by team member</div>
+              <div style={cardHeadStyle}>Cost by team member</div>
               <div style={{ padding: '8px 0' }}>
-                {data.users.length === 0 && <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No team activity yet this month.</div>}
+                {data.users.length === 0 && <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No team activity yet this cycle.</div>}
                 {data.users.map(u => (
-                  <div key={u.email} style={{ padding: '12px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: '1px solid var(--border-subtle)' }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0 }}>
-                      <div style={{ textAlign: 'right' }}><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(u.generations)}</div><div style={{ fontSize: 10.5, color: 'var(--text-tertiary)' }}>gens</div></div>
-                      <div style={{ textAlign: 'right' }}><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtNum(u.credits)}</div><div style={{ fontSize: 10.5, color: 'var(--text-tertiary)' }}>credits</div></div>
-                      <div style={{ textAlign: 'right', minWidth: 64 }}><div style={{ fontSize: 14, fontWeight: 800, color: u.credits > 0 ? '#FF9500' : '#34C759' }}>{fmtUsd(u.estUsd)}</div><div style={{ fontSize: 10.5, color: 'var(--text-tertiary)' }}>credit cost</div></div>
+                  <div key={u.email} style={{ padding: '14px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: '1px solid var(--border-subtle)' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>{fmtNum(u.images)} images · {fmtNum(u.videos)} videos · {fmtNum(u.credits)} credits</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexShrink: 0 }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', fontWeight: 600 }}>{fmtUsd(u.creditValueUsd)}</div>
+                        <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)' }}>video value</div>
+                      </div>
+                      <div style={{ textAlign: 'right', minWidth: 72 }}>
+                        <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>{fmtUsd(u.allocatedUsd)}</div>
+                        <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)' }}>allocated cost</div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -220,7 +258,6 @@ export default function Costs() {
                   <button onClick={runProbe} disabled={probe === 'loading'} style={probeBtn}>
                     {probe === 'loading' ? 'Checking…' : 'Check live Higgsfield credits'}
                   </button>
-
                   {probe && probe !== 'loading' && (
                     <div style={{ marginTop: 16 }}>
                       {probe.error && <div style={{ color: '#FF3B30', fontSize: 13 }}>{probe.error}</div>}
@@ -244,9 +281,10 @@ export default function Costs() {
             )}
 
             <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 16, lineHeight: 1.6 }}>
-              The live balance and ledger are pulled directly from Higgsfield. The per-model and per-member figures are
-              estimates from in-app tracking at ~{fmtUsd(data.plan.creditUsd)}/credit (the real top-up rate) — Higgsfield
-              bills the shared account as a whole, so it can't attribute spend per person; that's what our tracking adds.
+              The live balance and ledger come straight from Higgsfield. <strong>Allocated cost</strong> spreads the {fmtUsd(data.plan.baseUsd)} fixed
+              fee (plus any overage at {fmtUsd(creditUsd)}/credit) across the team by usage — videos weigh by credits, images by a small flat
+              share — so each member's allocated cost sums to the real {fmtUsd(data.cycleSpendUsd)} cycle bill. <strong>Video value</strong> is the
+              raw credit cost of their videos. Figures shift slightly as more work lands in the cycle.
             </div>
           </>
         )}
@@ -255,8 +293,26 @@ export default function Costs() {
   )
 }
 
+function ModelRow({ m, pct, right, barColor }) {
+  return (
+    <div style={{ padding: '12px 22px', display: 'grid', gridTemplateColumns: '160px 1fr 140px', alignItems: 'center', gap: 14 }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>{m.kind}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, height: 8, borderRadius: 6, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
+          <div style={{ width: `${Math.max(2, pct)}%`, height: '100%', borderRadius: 6, background: barColor }} />
+        </div>
+      </div>
+      <div style={{ textAlign: 'right' }}>{right}</div>
+    </div>
+  )
+}
+
 const cardStyle = { background: 'var(--surface)', borderRadius: 18, border: '1px solid var(--border-subtle)', overflow: 'hidden' }
 const cardHeadStyle = { padding: '16px 22px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }
+const groupHead = { padding: '10px 22px 4px', fontSize: 11, fontWeight: 800, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.6px' }
 const labelStyle = { fontSize: 11.5, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.6px' }
 const badgeIncluded = { fontSize: 11, fontWeight: 800, color: '#34C759', background: 'rgba(52,199,89,0.12)', padding: '5px 10px', borderRadius: 8, whiteSpace: 'nowrap' }
 const selectStyle = { padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }
