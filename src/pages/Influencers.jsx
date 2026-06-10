@@ -14,159 +14,26 @@ import { isHFConnected } from '../utils/higgsfieldAuth'
 import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/charSheetPrompt'
 import PhotoStudioPanel from './PhotoStudio'
 import WardrobeDrawer from '../components/WardrobeDrawer'
+import {
+  VIDEO_MODELS, SD, NICHES_F, NICHES_M, NICHES_ALL, SHEET_RATIOS, GM, DEFAULT_PALETTES,
+  SCRIPT_STATUSES, SCRIPT_STATUS_STYLE, WARDROBE_STYLES_F, WARDROBE_STYLES_M,
+  HAIR_PRESETS_F, HAIR_PRESETS_M, GEN_DURATION_MS, CS_ENVIRONMENTS, CS_ENV_PRESETS,
+  AMBIENT_SOUND, CS_CAMERAS, CS_VIBES, VOICE_PRESETS, VIDEO_TEMPLATES, DIALOGUE_STARTERS,
+  CAMERA_META, VIBE_META, VIDEO_MAX_WORDS, PHOTO_STUDIO_HISTORY_KEY,
+} from './influencers/constants'
+import {
+  useMobile, getNiches, audiencePh, pColor, accent, accentText, completeness,
+  ytId, domain, inferAmbientSound, fmtElapsed, getGlobalMuted, useGlobalMuted,
+} from './influencers/helpers'
+import {
+  buildFeatureSheetPrompt, buildCloseUpPrompt, buildCharacterSheetPrompt,
+  buildWardrobePrompt, parseAdditionalNotes, annotateDialogue,
+} from './influencers/prompts'
+import {
+  saveGenParams, getGenParams, getCreationParams,
+  saveWardrobePending, getWardrobePending, clearWardrobePending,
+} from './influencers/storage'
 
-// Video models offered in the Video Studio. Seedance 2.0 is the verified one;
-// the others are in testing — they now send model-specific parameters, and on
-// failure the error reports the job status so we can refine each one.
-const VIDEO_MODELS = [
-  { id: 'seedance_2_0', label: 'Seedance 2.0', note: '✓ Verified · best quality + uses your uploaded audio (lipsync)' },
-  { id: 'kling3_0',     label: 'Kling 3.0',    note: '🧪 Testing · cheaper (5–10s, 1 ref) · audio experimental' },
-  { id: 'kling2_6',     label: 'Kling 2.6',    note: '🧪 Testing · cheaper cinematic (5–10s) · audio experimental' },
-  { id: 'veo3_1',       label: 'Veo 3.1',      note: '🧪 Testing · cheaper (8s, 1 ref) · audio experimental' },
-]
-
-function useMobile() {
-  const [m, setM] = useState(() => window.innerWidth < 768)
-  useEffect(() => {
-    const h = () => setM(window.innerWidth < 768)
-    window.addEventListener('resize', h)
-    return () => window.removeEventListener('resize', h)
-  }, [])
-  return m
-}
-
-// ─────────────────────────────────────────────
-// Dark sidebar palette
-const SD = {
-  bg:      '#0d0d14',
-  border:  'rgba(255,255,255,0.07)',
-  text:    '#F4F4F5',
-  dim:     'rgba(255,255,255,0.38)',
-  active:  'rgba(255,255,255,0.1)',
-  hover:   'rgba(255,255,255,0.055)',
-  ring:    'rgba(255,255,255,0.12)',
-}
-
-// ─────────────────────────────────────────────
-// Niche lists
-const NICHES_F   = ['Fashion','Beauty','Lifestyle','Wellness','Fitness','Travel','Food & Dining','Home & Decor','Parenting','Entertainment','Other']
-const NICHES_M   = ['Fitness','Gaming','Tech','Sports','Finance','Cars & Motors','Travel','Outdoor & Adventure','Food & Dining','Entertainment','Other']
-const NICHES_ALL = ['Fashion','Fitness','Lifestyle','Beauty','Tech','Gaming','Travel','Food & Dining','Finance','Entertainment','Wellness','Sports','Other']
-
-const SHEET_RATIOS = [
-  { id: '16:9', label: '16:9', sub: 'Recommended', rec: true  },
-  { id: '4:3',  label: '4:3',  sub: 'Compact',     rec: false },
-  { id: '3:2',  label: '3:2',  sub: 'Balanced',    rec: false },
-]
-
-function buildFeatureSheetPrompt(inf) {
-  const phys = inf.physicalDesc ? `The subject: ${inf.physicalDesc}. ` : ''
-  return `Beauty model feature reference sheet. ${phys}Pure white background throughout. Clinical reference card layout — like a casting or makeup artist reference sheet printed on white paper. Bold black uppercase sans-serif labels above each panel. Clear white gutters between every panel and white margins around the outside.
-
-Layout — 4 rows stacked top to bottom:
-Row 1 (full width): one wide panel labelled "EYE" — extreme macro close-up centered tightly on both irises. The irises fill the majority of the frame. Shows exact iris color, pattern, and detail. Lashes visible at edges but irises are the dominant subject.
-Row 2 (full width): one wide panel labelled "BROW" — close-up from hairline to mid-nose showing exact brow shape, arch, thickness, hair direction, forehead skin.
-Row 3 (two equal side-by-side panels):
-  Left — labelled "LIP": close-up from nose base to chin showing exact lip shape, cupid's bow, natural lip color.
-  Right — labelled "SKIN TEXTURE": macro close-up of cheek skin showing pores, freckles, natural skin detail, zero retouching.
-Row 4 (two equal side-by-side panels):
-  Left — labelled "HAIR TEXTURE": close-up of hair strands showing exact color, shine, texture, wave or curl pattern.
-  Right — labelled "HANDS": close-up of hand showing nail shape, length, nail color or nail art, knuckle skin detail.
-
-Replicate the reference person's exact features in every panel: precise skin tone, freckle placement, hair color, lip shape, brow arch. Zero beauty retouching — raw photographic detail. White space clearly visible between all panels.
-
-Photorealistic RAW photograph quality, ultra-sharp macro detail in each panel. Shot on Hasselblad 100mm macro lens.`
-}
-
-function buildCloseUpPrompt(inf) {
-  const phys = inf.physicalDesc ? `The subject: ${inf.physicalDesc}. ` : ''
-  return `Professional studio headshot. Subject facing directly forward, eyes looking straight into the camera lens. Framed from shoulders up — head, neck, and upper chest visible. Clean seamless pure white backdrop, soft gradient toward very light grey at edges, no texture, no cast shadows on background.
-
-${phys}Soft diffused studio lighting: two large softboxes at 45-degree angles producing soft, even, shadow-free illumination across the face. Subtle catchlights visible in both eyes. No harsh under-nose or chin shadows. Skin tone reproduced accurately — natural pore texture, subtle imperfections visible, zero retouching.
-
-Replicate every physical detail from the reference image exactly: facial bone structure, unique facial features and natural asymmetries, precise skin tone, freckles, moles, iris color and detail, eyebrow shape, lip shape, hair color, texture and natural fall. The subject must be unmistakably the same individual.
-
-Subject standing straight, head completely level, facing dead-on into the camera — no tilt, no turn, no pose. Eyes looking directly into the lens. Neutral expression, mouth relaxed and closed. No modelling, no attitude, no special pose whatsoever. Identical to a casting reference or identity card photo.
-
-Shot on Phase One IQ4 150MP, 85mm portrait lens, f/2.8, studio strobe. Photorealistic, ultra-sharp facial detail, RAW photograph quality. Studio identity reference portrait.`
-}
-
-function buildCharacterSheetPrompt(inf) {
-  const phys = inf.physicalDesc ? `The character: ${inf.physicalDesc}. ` : ''
-  const style = inf.clothingStyle ? `Outfit: ${inf.clothingStyle}. ` : ''
-  return `Professional full-body character turnaround sheet. Pure white background, no background elements whatsoever. Soft neutral studio lighting, perfectly flat and even across all four panels — no shadows, no color cast, no vignette.
-
-${phys}${style}
-
-Single row of four equally sized full-body shots from head to toe, each with a small label in clean sans-serif capitals printed above the figure:
-Panel 1 — "FRONT VIEW": character facing directly forward, arms relaxed at sides, feet together.
-Panel 2 — "SIDE VIEW": character in perfect left profile, arms at sides.
-Panel 3 — "BACK VIEW": character facing directly away, arms relaxed.
-Panel 4 — "THREE-QUARTER VIEW": character at 45-degree angle facing forward-right.
-
-Replicate every single physical detail identically across all four panels: exact facial structure and bone structure, unique facial features and natural asymmetries, precise skin tone, real pore texture, natural blemishes, freckles, moles, birthmarks, natural moisture and skin sheen, realistic catchlights in the eyes, exact iris color and detail, exact hair color and texture and styling. Zero beauty retouching — raw skin imperfections must be visible. Same outfit, same proportions, same scale in every panel.
-
-Shot on Hasselblad X2D 100C, photorealistic, ultra-sharp micro detail, RAW photograph quality. Character design sheet, model sheet, orthographic turnaround reference.`
-}
-
-// ─────────────────────────────────────────────
-// Generation param storage — so Regenerate replays the exact same prompt + ratio
-const GP_KEY = 'hf_gen_params'
-function saveGenParams(influencerId, slot, params) {
-  const d = JSON.parse(localStorage.getItem(GP_KEY) || '{}')
-  d[`${influencerId}::${slot}`] = params
-  localStorage.setItem(GP_KEY, JSON.stringify(d))
-}
-function getGenParams(influencerId, slot) {
-  const d = JSON.parse(localStorage.getItem(GP_KEY) || '{}')
-  return d[`${influencerId}::${slot}`] || null
-}
-
-// Creation params — stores faceRef/styleRef/model/etc. saved when influencer was first created
-const CREATION_PARAMS_KEY = 'hf_creation_params'
-function getCreationParams(influencerId) {
-  const d = JSON.parse(localStorage.getItem(CREATION_PARAMS_KEY) || '{}')
-  return d[influencerId] || null
-}
-
-// ─────────────────────────────────────────────
-// Helpers
-function getNiches(g)  { return g==='Female'?NICHES_F:g==='Male'?NICHES_M:NICHES_ALL }
-function audiencePh(g,n) {
-  const nl = n && n!=='Other' ? n.toLowerCase() : null
-  if (g==='Female') return `e.g. a woman, 18–34, interested in ${nl||'fashion & beauty'}`
-  if (g==='Male')   return `e.g. a man, 20–35, interested in ${nl||'fitness & gaming'}`
-  return `e.g. adults, 18–30, interested in ${nl||'lifestyle & entertainment'}`
-}
-function pColor(v) {
-  const l=(a,b,t)=>Math.round(a+(b-a)*t)
-  if(v<=50){const t=v/50;return`rgb(${l(251,249,t)},${l(191,115,t)},${l(36,22,t)})`}
-  const t=(v-50)/50;return`rgb(${l(249,239,t)},${l(115,68,t)},${l(22,68,t)})`
-}
-// Profile accent: use first palette color or fall back to gender color
-function accent(inf) { return inf?.palette?.[0] || gColor(inf?.gender) }
-
-// Light-or-dark text on accent bg
-function accentText(hex) {
-  if (!hex || hex.length < 7) return '#fff'
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16)
-  return (0.299*r+0.587*g+0.114*b) < 145 ? '#fff' : '#1D1D1F'
-}
-
-function completeness(inf) {
-  const c = [
-    inf.age?.toString().trim(),
-    inf.niche,
-    inf.location?.trim(),
-    inf.backstory?.trim(),
-    inf.audience?.trim(),
-    inf.physicalDesc?.trim(),
-    inf.hobbies?.trim(),
-    inf.clothingStyle?.trim(),
-    inf.dreamBrands?.trim(),
-  ]
-  return Math.round(c.filter(Boolean).length / c.length * 100)
-}
 
 // ─────────────────────────────────────────────
 // Completeness ring
@@ -931,10 +798,6 @@ function FTA({ value, onChange, placeholder, rows=3 }) {
 
 // ─────────────────────────────────────────────
 // Gender buttons
-const GM = {
-  Female: {icon:'♀',color:'#EC4899',bg:'rgba(236,72,153,0.08)',border:'#EC4899'},
-  Male:   {icon:'♂',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',border:'#3B82F6'},
-}
 function GenderButtons({ value, onChange }) {
   return (
     <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -959,10 +822,6 @@ function GenderButtons({ value, onChange }) {
 
 // ─────────────────────────────────────────────
 // Color palette
-const DEFAULT_PALETTES = {
-  Female:['#F9A8D4','#FBCFE8','#E879F9','#BE185D'],
-  Male:['#93C5FD','#BFDBFE','#3B82F6','#1E3A8A'],
-}
 function ColorPalette({ palette=[], onChange, gender }) {
   const defs = DEFAULT_PALETTES[gender]||['#E5E7EB','#D1D5DB','#9CA3AF','#6B7280']
   const cols = palette.length===4?palette:defs
@@ -984,20 +843,9 @@ function ColorPalette({ palette=[], onChange, gender }) {
 
 // ─────────────────────────────────────────────
 // Video URL helpers (used in scripts)
-function ytId(u){ return u?.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=)([\w-]+)/)?.[1]??null }
-function domain(u){ try{return new URL(u).hostname.replace('www.','')}catch{return'link'} }
 
 // ─────────────────────────────────────────────
 // Scripts section
-const SCRIPT_STATUSES = ['Unposted','Posted']
-const SCRIPT_STATUS_STYLE = {
-  Unposted: {bg:'rgba(174,174,178,0.15)',color:'#6E6E73'},
-  Posted:   {bg:'rgba(52,199,89,0.12)',  color:'#34C759'},
-  // legacy
-  Planned:  {bg:'rgba(174,174,178,0.15)',color:'#6E6E73'},
-  Shooting: {bg:'rgba(249,115,22,0.12)', color:'#F97316'},
-  Done:     {bg:'rgba(52,199,89,0.12)',  color:'#34C759'},
-}
 
 function SaveScriptModal({ onSave, onClose }) {
   const [title, setTitle] = useState('')
@@ -1607,76 +1455,6 @@ function DescriptionForm({ influencer, onUpdate }) {
 // ─────────────────────────────────────────────
 // Wardrobe generator
 
-const WARDROBE_STYLES_F = [
-  { id: 'old_money',    label: 'Old Money',    icon: '🏛', outfit: 'ivory cashmere turtleneck, tailored wide-leg cream trousers, tan leather loafers, minimal gold jewelry',                                   hair: 'sleek low chignon' },
-  { id: 'clean_girl',   label: 'Clean Girl',   icon: '🫧', outfit: 'fitted white ribbed tank top, straight-leg light-wash jeans, simple gold hoops, clean white sneakers',                                    hair: 'slicked-back low bun' },
-  { id: 'streetwear',   label: 'Streetwear',   icon: '🧢', outfit: 'oversized washed graphic hoodie, baggy wide-leg cargo pants, chunky platform sneakers',                                                   hair: 'messy space buns' },
-  { id: 'glam',         label: 'Glam',         icon: '✨', outfit: 'strapless sequin bodycon mini dress, strappy barely-there heels, small diamond studs',                                                    hair: 'bouncy blowout with voluminous waves' },
-  { id: 'cottagecore',  label: 'Cottagecore',  icon: '🌸', outfit: 'white floral prairie dress with puffed sleeves, brown Mary Jane flats, wicker bag',                                                       hair: 'loose romantic braids with small dried flowers' },
-  { id: 'y2k',          label: 'Y2K',          icon: '💿', outfit: 'pink butterfly-print crop top, ultra low-rise denim mini skirt, chunky platform sneakers, tinted micro sunglasses',                       hair: 'half-up pigtails with butterfly clips' },
-  { id: 'editorial',    label: 'Editorial',    icon: '🖤', outfit: 'oversized sharp black structured blazer worn as a dress belted at waist, knee-high patent leather boots',                                  hair: 'sleek straight blowout' },
-  { id: 'bohemian',     label: 'Bohemian',     icon: '🌿', outfit: 'cream linen wide-sleeve blouse, rust-toned flowy maxi skirt, leather flat sandals, layered gold necklaces, stacked bracelets',            hair: 'loose undone beachy waves' },
-  { id: 'sporty',       label: 'Sporty',       icon: '⚡', outfit: 'fitted cropped sports bra, high-waist seamless flare leggings, clean white training sneakers',                                             hair: 'sleek high ponytail' },
-  { id: 'dark_moody',   label: 'Dark & Moody', icon: '🌙', outfit: 'sheer black long-sleeve fitted top, black leather midi skirt, black pointed ankle boots, silver rings',                                    hair: 'sleek center-part straight hair' },
-  { id: 'coastal',      label: 'Coastal',      icon: '🌊', outfit: 'white linen button-down shirt loosely tied at waist, wide-leg cream linen trousers, tan leather flat sandals',                            hair: 'loose natural waves, sun-kissed' },
-  { id: 'preppy',       label: 'Preppy',       icon: '🎓', outfit: 'fitted navy polo shirt, plaid pleated mini skirt, white knee-high socks, brown penny loafers',                                            hair: 'low twin braids with ribbon ties' },
-]
-
-const WARDROBE_STYLES_M = [
-  { id: 'old_money',    label: 'Old Money',    icon: '🏛', outfit: 'navy single-breasted blazer, crisp white oxford shirt, tailored beige chinos, tan leather loafers — no tie',                             hair: 'classic side-parted, neat and polished' },
-  { id: 'streetwear',  label: 'Streetwear',   icon: '🧢', outfit: 'oversized washed black graphic tee, baggy distressed denim jeans, clean white low-top sneakers',                                          hair: 'low skin fade, loose top' },
-  { id: 'tech_bro',    label: 'Tech Bro',     icon: '💻', outfit: 'heather grey quarter-zip fleece pullover, dark slim-fit chinos, minimalist clean white sneakers',                                          hair: 'neat, slightly tousled' },
-  { id: 'preppy',      label: 'Preppy',       icon: '🎓', outfit: 'pink Oxford button-down polo shirt, flat-front khaki chinos, brown penny loafers, leather belt',                                           hair: 'classic side part, well-groomed' },
-  { id: 'sporty',      label: 'Sporty',       icon: '⚡', outfit: 'fitted performance athletic training top, tapered jogger pants, premium running sneakers',                                                  hair: 'fresh skin fade, clean edges' },
-  { id: 'business',    label: 'Business',     icon: '👔', outfit: 'slate blue slim-fit button-down shirt, dark tailored slim trousers, brown leather oxford shoes',                                           hair: 'neat, professional, combed' },
-  { id: 'coastal',     label: 'Coastal',      icon: '🌊', outfit: 'relaxed linen white shirt slightly unbuttoned at collar, navy linen shorts, tan boat shoes, no socks',                                    hair: 'natural, lightly wind-tousled' },
-  { id: 'editorial',   label: 'Editorial',    icon: '🖤', outfit: 'oversized black structured wool coat, slim black ribbed turtleneck, straight-leg black trousers, black leather Chelsea boots',              hair: 'slicked back, very sleek' },
-  { id: 'dark_moody',  label: 'Dark & Moody', icon: '🌙', outfit: 'washed black denim jacket over black band tee, black slim-fit jeans, black creeper boots, silver chain necklace',                         hair: 'undone, messy, slightly overgrown' },
-  { id: 'bohemian',    label: 'Bohemian',     icon: '🌿', outfit: 'loose cream linen shirt open at chest, wide-leg natural linen trousers, leather sandals, stacked wooden and silver bracelets',             hair: 'loose natural curls or waves' },
-  { id: 'y2k',         label: 'Y2K',          icon: '💿', outfit: 'baggy vintage colour-block windbreaker, wide-leg track pants, chunky dad sneakers, fitted cap',                                            hair: 'buzz cut or tight cornrows' },
-  { id: 'party',       label: 'Party Night',  icon: '🪩', outfit: 'black satin shirt open two buttons, slim-fit black tailored trousers, sleek black loafers, silver watch',                                  hair: 'slicked back, polished' },
-]
-
-const HAIR_PRESETS_F = ['Sleek bun', 'High ponytail', 'Beach waves', 'Blowout', 'Space buns', 'Braids', 'Half-up', 'Curtain bangs', 'Slicked back', 'Natural curls', 'Pixie cut', 'Bob']
-const HAIR_PRESETS_M = ['Low fade', 'Side part', 'Buzz cut', 'Slicked back', 'Textured crop', 'Tousled', 'Undercut', 'Man bun', 'Cornrows', 'Afro', 'Shaved sides', 'French crop']
-
-function buildWardrobePrompt(influencer, { outfit, hair, customText }) {
-  const phys = influencer.physicalDesc ? `The subject: ${influencer.physicalDesc}. ` : ''
-  const identity = `IDENTITY LOCK — replicate exactly from reference: facial bone structure, face shape, jaw, nose bridge and tip, lip shape, eye shape and color, eyebrow arch and thickness, skin tone, skin texture and pores, all freckles, moles, marks, scars, natural asymmetries. Zero facial drift — this must be unmistakably the same person.`
-  const layout = `Output must be the exact same 4-panel character turnaround sheet as the reference image. Single row of four equally sized full-body panels with these labels in clean sans-serif capitals above each: "FRONT VIEW" | "SIDE VIEW" | "BACK VIEW" | "THREE-QUARTER VIEW". Keep identical body poses, stance, arm positions, proportions, and panel layout from the reference. Do NOT change poses, labels, panel structure, background (pure white seamless), or lighting.`
-
-  const changeParts = [
-    outfit && `outfit — ${outfit}`,
-    hair && `hairstyle — ${hair}`,
-    customText?.trim() || '',
-  ].filter(Boolean)
-  const changes = `Change only: ${changeParts.join('; ') || 'casual stylish outfit, natural hairstyle'}.`
-
-  return `Professional full-body character turnaround sheet. ${phys}Pure white seamless background throughout. Soft neutral studio lighting, perfectly flat and even across all four panels — no shadows, no color cast.
-
-${layout}
-
-${identity}
-
-${changes}
-
-Photorealistic RAW photograph quality, ultra-sharp micro detail. Shot on Hasselblad X2D 100C.`
-}
-
-function saveWardrobePending(influencerId, data) {
-  try { localStorage.setItem(`hf_wardrobe_pending_${influencerId}`, JSON.stringify({ ...data, startedAt: Date.now() })) } catch {}
-}
-function getWardrobePending(influencerId) {
-  try {
-    const d = JSON.parse(localStorage.getItem(`hf_wardrobe_pending_${influencerId}`) || 'null')
-    if (!d) return null
-    if (Date.now() - d.startedAt > 15 * 60 * 1000) { clearWardrobePending(influencerId); return null }
-    return d
-  } catch { return null }
-}
-function clearWardrobePending(influencerId) {
-  try { localStorage.removeItem(`hf_wardrobe_pending_${influencerId}`) } catch {}
-}
 
 function WardrobeGenerator({ influencer, onAdd }) {
   const [top, setTop] = useState('')
@@ -2098,7 +1876,6 @@ function HomeSection({ slots=[], onChange }) {
 
 // ─────────────────────────────────────────────
 // Brand deal card — WorldDropCard style with brand + category fields
-const GEN_DURATION_MS = 150000 // ~2m30s estimated total
 
 function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit, onCommitEdit, onCancelEdit, onImageChange, onDelete, onCategoryChange, onLightbox, generating, progress, claudeStatus, onGenerate }) {
   const fileRef = useRef()
@@ -2606,143 +2383,6 @@ function Tabs({ active, onChange, ac }) {
 
 // ─────────────────────────────────────────────
 // Content Studio helpers
-const CS_ENVIRONMENTS = [
-  { key: 'Bedroom',     label: 'In a bedroom' },
-  { key: 'Bathroom',    label: 'In a bathroom' },
-  { key: 'Kitchen',     label: 'In the kitchen' },
-  { key: 'Coffee Shop', label: 'Coffee shop' },
-  { key: 'Mall / Store',label: 'At the mall' },
-  { key: 'Street',      label: 'On the street' },
-  { key: 'Gym',         label: 'At the gym' },
-  { key: 'Studio',      label: 'In a studio' },
-]
-const CS_ENV_PRESETS = {
-  'Bedroom':     'in the bedroom',
-  'Bathroom':    'in the bathroom',
-  'Kitchen':     'in the kitchen',
-  'Coffee Shop': 'in a coffee shop',
-  'Mall / Store':'in a mall or store',
-  'Street':      'on the street outside',
-  'Gym':         'in the gym',
-  'Studio':      'in a studio',
-}
-const AMBIENT_SOUND = {
-  'Bedroom':     'Quiet room tone — soft, near-silent background.',
-  'Bathroom':    'Subtle bathroom reverb — clean, minimal background.',
-  'Kitchen':     'Light kitchen ambience — faint appliance hum, natural room tone.',
-  'Coffee Shop': 'Ambient coffee shop — low chatter, espresso machine, soft background bustle.',
-  'Mall / Store':'Ambient mall — light crowd murmur, distant music.',
-  'Street':      'Outdoor city ambience — light traffic, natural wind, distant urban activity.',
-  'Gym':         'Ambient gym — distant weights, low activity, faint background music.',
-  'Studio':      'Clean studio silence — minimal room tone, no background noise.',
-}
-function inferAmbientSound(envKey, environment) {
-  if (envKey && AMBIENT_SOUND[envKey]) return AMBIENT_SOUND[envKey]
-  const e = (environment || envKey || '').toLowerCase()
-  if (/restaurant|dining|bistro|brasserie|diner/.test(e)) return 'Ambient restaurant — low dining chatter, cutlery, warm bustle.'
-  if (/beach|ocean|sea|shore|surf/.test(e)) return 'Ambient beach — waves, light breeze, distant seagulls.'
-  if (/park|garden|nature|forest|woods/.test(e)) return 'Outdoor ambience — birds, light breeze, natural sounds.'
-  if (/office|work|corporate|coworking/.test(e)) return 'Quiet office ambience — distant keyboard, low HVAC hum.'
-  if (/car|vehicle|driving|road/.test(e)) return 'Ambient car interior — engine hum, road noise.'
-  if (/bar|club|lounge|nightclub/.test(e)) return 'Ambient nightlife — low crowd murmur, distant music, gentle bass.'
-  if (/pool|spa|resort|hotel/.test(e)) return 'Ambient resort — light water, gentle breeze, relaxed atmosphere.'
-  if (/market|bazaar|store|shop/.test(e)) return 'Ambient market — light crowd, distant chatter.'
-  if (/rooftop|terrace|balcony/.test(e)) return 'Outdoor rooftop ambience — light wind, distant city sounds.'
-  if (/airport|station|transit/.test(e)) return 'Ambient transit sounds — light crowd, distant announcements.'
-  return 'Natural ambient sound — location-appropriate background audio.'
-}
-
-const CS_CAMERAS = [
-  'Handheld','Tripod','Talking Head',
-]
-const CS_VIBES = [
-  'Natural','Energetic','Luxury','Playful','Tutorial','Dramatic','Cozy','Confident',
-]
-
-const VOICE_PRESETS = {
-  female: [
-    { id: 'f-21-american-bright',  label: '21-year-old American',   sub: 'Bright · fast · TikTok-native',     voice: '21-year-old American woman accent, bright and energetic, fast-paced and upbeat.' },
-    { id: 'f-28-american-warm',    label: '28-year-old American',   sub: 'Warm · confident · grounded',       voice: '28-year-old American woman accent, warm and confident, clear and grounded.' },
-    { id: 'f-35-american-calm',    label: '35-year-old American',   sub: 'Calm · measured · trustworthy',     voice: '35-year-old American woman accent, calm and measured, slow and soothing.' },
-    { id: 'f-british-polished',    label: 'British — polished',     sub: 'Refined · elegant · clear',         voice: 'Polished British woman accent, refined and elegant, clear and measured.' },
-    { id: 'f-british-playful',     label: 'British — playful',      sub: 'Bright · warm · charming',          voice: 'Playful British woman accent, bright and warm, light and charming.' },
-    { id: 'f-deep-japanese',       label: 'Japanese — soft',        sub: 'Soft · gentle · precise',           voice: 'Soft Japanese woman accent, gentle and precise, calm and measured.' },
-  ],
-  male: [
-    { id: 'm-22-american-energy',  label: '22-year-old American',   sub: 'Energetic · direct · natural',      voice: '22-year-old American man accent, energetic and direct, upbeat and natural.' },
-    { id: 'm-30-american-deep',    label: '30-year-old American',   sub: 'Deep · confident · authoritative',  voice: '30-year-old American man accent, deep and confident, authoritative and measured.' },
-    { id: 'm-38-american-warm',    label: '38-year-old American',   sub: 'Warm · relaxed · approachable',     voice: '38-year-old American man accent, warm and relaxed, approachable and conversational.' },
-    { id: 'm-british-sharp',       label: 'British — sharp',        sub: 'Refined · precise · authoritative', voice: 'Sharp British man accent, refined and precise, clear and authoritative.' },
-    { id: 'm-british-story',       label: 'British — storyteller',  sub: 'Warm · engaging · unhurried',       voice: 'Warm British man storytelling accent, engaging and unhurried, naturally charismatic.' },
-  ],
-}
-
-const VIDEO_TEMPLATES = [
-  {
-    id: 'talking-head',
-    label: 'Talking Head',
-    icon: '🎤',
-    sub: 'Direct to camera, personal & engaging',
-    dialogue: "I need to tell you about something that completely changed my routine.",
-    envKey: 'Bedroom', environment: '',
-    camera: 'Handheld', vibe: 'Natural', duration: 8, shotMode: 'oner',
-  },
-  {
-    id: 'product-review',
-    label: 'Product Review',
-    icon: '⭐',
-    sub: 'Hold, show, and talk about a product',
-    dialogue: "Okay so I've been using this for two weeks and here's my honest take.",
-    envKey: 'Studio', environment: '',
-    camera: 'Close-up', vibe: 'Tutorial', duration: 12, shotMode: 'oner',
-  },
-  {
-    id: 'grwm',
-    label: 'GRWM',
-    icon: '✨',
-    sub: 'Get Ready With Me — casual beauty content',
-    dialogue: "Get ready with me for tonight — I have a whole thing planned.",
-    envKey: 'Bathroom', environment: '',
-    camera: 'Handheld', vibe: 'Playful', duration: 10, shotMode: 'oner',
-  },
-  {
-    id: 'brand-collab',
-    label: 'Brand Collab',
-    icon: '🤝',
-    sub: 'Polished partnership announcement',
-    dialogue: "I partnered with a brand that actually aligns with how I live.",
-    envKey: 'Street', environment: '',
-    camera: 'Slow push-in', vibe: 'Confident', duration: 12, shotMode: 'oner',
-  },
-]
-
-const DIALOGUE_STARTERS = [
-  "I need to tell you about something—",
-  "Okay so I've been obsessed with this—",
-  "This is my honest review:",
-  "Can we talk about this for a second?",
-  "I wasn't going to post this but—",
-  "Three things I noticed after one week:",
-]
-
-const CAMERA_META = {
-  'Handheld':     { label: 'Handheld' },
-  'Tripod':       { label: 'Tripod' },
-  'Talking Head': { label: 'Talking Head' },
-  'Wide':         { label: 'Wide' },
-  'Overhead':     { label: 'Overhead' },
-}
-
-const VIBE_META = {
-  'Natural':   'Real and unfiltered — like talking to a friend.',
-  'Energetic': 'Fast, forward, high energy the whole way through.',
-  'Luxury':    'Slow and deliberate — every word carries weight.',
-  'Playful':   'Light and bouncy — makes people smile.',
-  'Tutorial':  'Clear and confident — step-by-step, no fluff.',
-  'Dramatic':  'Quiet at first, builds to a strong landing.',
-  'Cozy':      'Soft and intimate — like a one-on-one chat.',
-  'Confident': 'Grounded and sure — zero doubt, pure presence.',
-}
 
 function CSStepHeader({ n, title, sub }) {
   return (
@@ -2831,268 +2471,8 @@ function CSProductSlot({ value, onChange, dragOver, setDragOver, fileRef, label 
 
 // ─────────────────────────────────────────────
 // Parse additional notes into action beats (injected into ACTION block) and direction notes (DIRECTION section)
-function parseAdditionalNotes(notes, durationSecs) {
-  if (!notes.trim()) return { actionBeats: [], directionNotes: '' }
 
-  const sentences = notes.trim()
-    .split(/(?<=[.!?])\s+|[\n]+/)
-    .map(s => s.trim())
-    .filter(Boolean)
 
-  const actionBeats = []
-  const directionLines = []
-
-  const ACTION_VERBS = /\b(pick|picks up|hold|holds|turn|turns|spin|spins|lean|leans|look|looks at|walk|walks|sit|sits|stand|stands|laugh|laughs|smile|smiles|nod|nods|wave|waves|point|points|reach|reaches|touch|touches|grab|grabs|show|shows|open|opens|close|closes|tilt|tilts|adjust|adjusts|pull|pulls|lift|lifts|flip|flips|drop|drops|step|steps|crouch|crouches|glance|glances|wink|winks|pause|pauses|freeze|freezes|stop|stops)\b/i
-
-  for (const s of sentences) {
-    const isActionBeat = ACTION_VERBS.test(s) || /\b(she|he|they)\s+\w+/i.test(s) || /\bpause\b/i.test(s)
-
-    if (isActionBeat) {
-      // Determine position as a fraction 0–1 of the video/dialogue
-      let fraction = 0.5 // default: middle of dialogue
-      let ts = `0:${String(Math.round(durationSecs * 0.5)).padStart(2, '0')}`
-
-      if (/\bat (the )?start\b|from the start|at the beginning|^first\b/i.test(s)) {
-        fraction = 0; ts = '0:01'
-      } else if (/\bat (the )?end\b|last|final|before (it )?cuts/i.test(s)) {
-        fraction = 1; ts = `0:${String(Math.max(durationSecs - 2, 1)).padStart(2, '0')}`
-      } else {
-        const m = s.match(/at\s+(\d+)\s*s(?:ec(?:ond)?s?)?/i)
-        if (m) {
-          const sec = parseInt(m[1])
-          fraction = Math.min(sec / durationSecs, 1)
-          ts = `0:${String(sec).padStart(2, '0')}`
-        }
-      }
-
-      let text = s
-        .replace(/at (the )?(start|end|beginning)\b[,]?/gi, '')
-        .replace(/from the start\b[,]?/gi, '')
-        .replace(/at \d+\s*s(ec(ond)?s?)?\b[,]?/gi, '')
-        .replace(/^(make sure|ensure|have her|have him|i want|please|note[:]?)\s+/i, '')
-        .trim()
-        .replace(/[.!?]+$/, '')
-
-      if (!/^(she|he|they)\b/i.test(text)) text = `She ${text.charAt(0).toLowerCase()}${text.slice(1)}`
-      text = text.charAt(0).toUpperCase() + text.slice(1)
-
-      actionBeats.push({ text, timestamp: ts, fraction, fired: false })
-    } else {
-      directionLines.push(s.replace(/[.!?]+$/, '').trim())
-    }
-  }
-
-  // Sort beats by fraction so they fire in chronological order
-  actionBeats.sort((a, b) => a.fraction - b.fraction)
-
-  return { actionBeats, directionNotes: directionLines.join('. ').trim() }
-}
-
-// ─────────────────────────────────────────────
-// Dialogue annotation — reads the raw script and wraps it with performance notation
-// following the MD guide: emotion before line, [beat]/[breath] pauses, product tilts,
-// micro-expressions (max 2), CTA lands like a friend's tip not a pitch.
-// productTag = the @image_N string for the product (e.g. '@image_5'), or null
-// isHandheld = true when the subject is self-filming while walking
-function annotateDialogue(rawText, productTag, durationSecs, isHandheld = false, wearMode = false, actionBeats = [], she = 'she', her = 'her', his = 'her') { // his = possessive ('her'/'his')
-  if (!rawText.trim()) return ''
-
-  // Split into clauses:
-  // 1. On sentence endings (.  !  ?) followed by a space
-  // 2. Then on comma-pivot breaks: ", but " / ", however " / ", though " / ", yet "
-  const sentences = rawText.trim()
-    .split(/(?<=[.!?])\s+/)
-    .flatMap(s => s.split(/,\s+(?=(?:but|however|though|yet)\s)/i))
-    .map(s => s.trim())
-    .filter(Boolean)
-
-  let microLeft = durationSecs <= 6 ? 1 : 2
-  const useMicro = expr => { if (!microLeft) return ''; microLeft--; return expr }
-
-  const prod = productTag || null
-  const out = []
-
-  // Worn-mode: rotate through natural interaction gestures so every 2nd sentence
-  // has a physical beat with the product — keeps it visible without feeling staged.
-  // All gestures are body-position-agnostic so they work for any wearable
-  // (cap, bracelet, necklace, shirt, shoes, earrings, sunglasses, etc.)
-  const She = she.charAt(0).toUpperCase() + she.slice(1)
-  const Her = her.charAt(0).toUpperCase() + her.slice(1)
-  const WORN_GESTURES = prod ? [
-    `${She} touches ${prod} briefly — natural, not staged.`,
-    `${Her} hand goes to ${prod} for a beat, then back to natural position.`,
-    `${She} glances toward ${prod}, then back to lens — draws attention to it without words.`,
-    `${She} adjusts ${prod} slightly — natural reflex, eyes stay on camera.`,
-    `${She} angles ${his} body so ${prod} is clearly visible, then settles back.`,
-  ] : []
-  let wornGestureIdx = 0
-  let wornGestureCounter = 0
-  let wornGesturesUsed = 0
-  const wornGestureMax = durationSecs <= 6 ? 1 : 2
-  function maybeWornGesture() {
-    if (!wearMode || !prod) return null
-    if (wornGesturesUsed >= wornGestureMax) return null
-    wornGestureCounter++
-    if (wornGestureCounter % 3 !== 0) return null
-    const g = WORN_GESTURES[wornGestureIdx % WORN_GESTURES.length]
-    wornGestureIdx++
-    wornGesturesUsed++
-    return g
-  }
-
-  // Opening body state — already in pose, product worn or in hand as applicable
-  if (isHandheld) {
-    out.push(prod
-      ? wearMode
-        ? `@image_1 is self-filming — arm extended toward camera, ${prod} worn. ${she.charAt(0).toUpperCase()+she.slice(1)} is already walking. Camera bobs with ${his} steps from 0:00. One breath before ${she} speaks.`
-        : `@image_1 is self-filming — arm extended toward camera, ${prod} in the other hand. ${she.charAt(0).toUpperCase()+she.slice(1)} is already walking. Camera bobs with ${his} steps from 0:00. One breath before ${she} speaks.`
-      : `@image_1 is self-filming — arm extended toward camera, already walking. Camera bobs with ${his} steps from 0:00. One breath before ${she} speaks.`
-    )
-  } else {
-    out.push(prod
-      ? wearMode
-        ? `@image_1 faces camera, ${prod} worn from 0:00. ${she.charAt(0).toUpperCase()+she.slice(1)} touches or adjusts ${prod} once early — natural reflex that draws attention to it. One breath before ${she} starts.`
-        : `@image_1 faces camera, ${prod} in hand from 0:00. One breath before ${she} starts.`
-      : `@image_1 faces camera. Eyes on lens. One breath.`
-    )
-  }
-
-  // Fire "at start" beats before the first sentence
-  for (const beat of actionBeats) {
-    if (!beat.fired && beat.fraction === 0) {
-      beat.fired = true
-      out.push(`At ${beat.timestamp} — ${beat.text}.`)
-    }
-  }
-
-  sentences.forEach((raw, i) => {
-    const s = raw.trim()
-    const l = s.toLowerCase()
-    const isLast = i === sentences.length - 1
-    const hasPivot = /^(but|however|though|yet)\s/i.test(l)
-    const hasActually = /\bactually\b/.test(l)
-    const hasEllipsis = s.includes('...')
-    const endsExclaim = s.endsWith('!')
-    const isCTA = isLast && /^(so if|if you|grab|go get|buy|check out|order|pick up|get yours)\b/i.test(l)
-    const isNegative = /\b(not a fan|taste like|tastes like|99%|don'?t like|dislike|awful|terrible|cough syrup|worst|gross)\b/.test(l)
-
-    // CTA — always last, lands light
-    if (isCTA) {
-      out.push(`"${s}" Lands easy — like a tip from a friend, not a pitch.`)
-      return
-    }
-
-    // Pivot + ellipsis
-    if (hasPivot && hasEllipsis) {
-      wornGestureCounter++
-      if (prod) out.push(wearMode ? `She touches ${prod} and angles so it's clearly visible to camera.` : `She tilts ${prod} toward camera.`)
-      out.push(endsExclaim ? `"${s}" Energy up — genuine.` : `"${s}" [beat.]`)
-      return
-    }
-
-    // Pure pivot ("but...", "however...", "actually...") without ellipsis
-    if (hasPivot || (hasActually && !isNegative)) {
-      wornGestureCounter++ // keep counter in sync
-      if (prod) out.push(wearMode ? `She touches ${prod}, angles so it's visible. "${s}" [beat.]` : `She tilts ${prod} toward camera. "${s}" [beat.]`)
-      else out.push(`She leans forward slightly. "${s}" [beat.]`)
-      return
-    }
-
-    // Mid-sentence ellipsis without pivot: "this thing is... incredible"
-    if (hasEllipsis) {
-      const [before, after] = s.split(/\.\.\./)
-      const g = maybeWornGesture()
-      if (g) out.push(g)
-      out.push(`"${before.trim()}..."`)
-      out.push(`[micro-pause.]`)
-      const afterTrimmed = after?.trim()
-      if (afterTrimmed) out.push(/[!]$/.test(afterTrimmed) ? `"${afterTrimmed}" Energy up — genuine.` : `"${afterTrimmed}" [beat.]`)
-      return
-    }
-
-    // First line — hook opener
-    if (i === 0) {
-      const m = useMicro(` Corners of ${his} mouth pull back — genuine, not performed.`)
-      out.push(`"${s}" [beat.]${m}`)
-      return
-    }
-
-    // Negative / dismissal line — slight honest reaction
-    if (isNegative) {
-      const m = useMicro(' Slight face — honest, not dramatic.')
-      const g = maybeWornGesture()
-      if (g) out.push(g)
-      out.push(`"${s}"${m} [beat.]`)
-      return
-    }
-
-    // Exclamation — energy up, genuine
-    if (endsExclaim) {
-      const g = maybeWornGesture()
-      if (g) out.push(g)
-      out.push(`"${s}" Energy up — genuine, not performed.`)
-      return
-    }
-
-    // Default — statement with conversational beat
-    const g = maybeWornGesture()
-    if (g) out.push(g)
-    out.push(`"${s}" [beat.]`)
-
-    // Inject any action beats that fall at or before this sentence's position
-    if (actionBeats.length) {
-      const sentenceFraction = (i + 1) / sentences.length
-      for (const beat of actionBeats) {
-        if (!beat.fired && beat.fraction <= sentenceFraction) {
-          beat.fired = true
-          out.push(`At ${beat.timestamp} — ${beat.text}.`)
-        }
-      }
-    }
-  })
-
-  // Fire any remaining beats (e.g. atEnd beats or no-dialogue case)
-  for (const beat of actionBeats) {
-    if (!beat.fired) {
-      beat.fired = true
-      out.push(`At ${beat.timestamp} — ${beat.text}.`)
-    }
-  }
-
-  // Conversation ends naturally — no [beat.] hanging after the last spoken word
-  if (out.length && out[out.length - 1].endsWith('[beat.]')) {
-    out[out.length - 1] = out[out.length - 1].slice(0, -7).trimEnd()
-  }
-
-  return out.join(' ')
-}
-
-function fmtElapsed(e) {
-  if (e < 60) return `${e}s`
-  return `${Math.floor(e / 60)}:${String(e % 60).padStart(2, '0')}`
-}
-
-const VIDEO_MAX_WORDS = {4:14,5:17,6:21,7:24,8:28,9:32,10:35,11:38,12:42,13:45,14:48,15:52}
-
-// ─────────────────────────────────────────────
-// Content Studio
-// ─────────────────────────────────────────────
-// Global video mute state — persists across hover sessions
-function getGlobalMuted() { try { return localStorage.getItem('hf_vid_muted') !== 'false' } catch { return true } }
-function saveGlobalMuted(v) {
-  try { localStorage.setItem('hf_vid_muted', v ? 'true' : 'false') } catch {}
-  window.dispatchEvent(new CustomEvent('hf-muted', { detail: v }))
-}
-function useGlobalMuted() {
-  const [muted, setMuted] = useState(getGlobalMuted)
-  useEffect(() => {
-    const handler = (e) => setMuted(e.detail)
-    window.addEventListener('hf-muted', handler)
-    return () => window.removeEventListener('hf-muted', handler)
-  }, [])
-  function toggle() { const next = !muted; setMuted(next); saveGlobalMuted(next) }
-  return [muted, toggle]
-}
 
 // Wardrobe card with hover popup — matches PhotoStudio OutfitCard exactly
 function WardrobeChipWithHover({ slot, active, onClick }) {
@@ -3418,7 +2798,6 @@ function HistoryCard({ entry, onDelete, onDownload, isSelected, onSelect, showSe
   )
 }
 
-const PHOTO_STUDIO_HISTORY_KEY = 'photo_studio_history'
 
 function HistoryTab({ influencer, onUpdate, onReuseSettings }) {
   const [segment, setSegment] = useState('photos')
