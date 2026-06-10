@@ -9,7 +9,6 @@ import { discoverHiggsfieldCredits, getHiggsfieldAccount } from '../utils/higgsf
 
 const fmtUsd = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum = (n) => (Number(n) || 0).toLocaleString('en-US')
-const fmtNum2 = (n) => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })
 const fmtTime = (iso) => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
 const lowColor = (c) => c == null ? 'var(--text-primary)' : c < 600 ? '#FF3B30' : c < 2000 ? '#FF9500' : 'var(--text-primary)'
 const creditsLabel = (c) => c == null ? '' : c < 600 ? 'critically low' : c < 2000 ? 'running low' : 'healthy'
@@ -139,7 +138,7 @@ export default function Costs() {
                       <>
                         <div style={labelStyle}>Credits remaining</div>
                         <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-2px', marginTop: 4, color: lowColor(remaining) }}>
-                          {remaining == null ? '—' : fmtNum2(remaining)}
+                          {remaining == null ? '—' : fmtNum(Math.round(remaining))}
                         </div>
                         <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
                           of {fmtNum(budget)} · {creditsLabel(remaining)}
@@ -164,7 +163,7 @@ export default function Costs() {
                         <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
                         <span style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexShrink: 0 }}>
                           <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmtTime(t.at)}</span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: t.credits < 0 ? '#FF9500' : '#34C759', minWidth: 52, textAlign: 'right' }}>{t.credits > 0 ? '+' : ''}{fmtNum2(t.credits)}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: t.credits < 0 ? '#FF9500' : '#34C759', minWidth: 52, textAlign: 'right' }}>{t.credits > 0 ? '+' : ''}{fmtNum(Math.round(t.credits))}</span>
                         </span>
                       </div>
                     ))}
