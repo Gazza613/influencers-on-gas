@@ -1,0 +1,193 @@
+-- GAS Studio — Neon Postgres schema (Phase 1).
+-- Source of truth for the relational + RAG data model. Compiled from the pivot
+-- specs: architecture.md, brains.md, cost-controls.md, compliance.md,
+-- production-pipeline.md. Apply once Neon is provisioned (see scripts/migrate).
+--
+-- Principles: client_id is the tenancy/brain key on everything that holds a
+-- client's data; prices live in rate_card (never in code); embeddings are
+-- vector(1024) to match Voyage voyage-3.5.
+
+create extension if not exists vector;
+
+-- ── People ───────────────────────────────────────────────────────────────────
+create table if not exists users (
+  id          uuid primary key default gen_random_uuid(),
+  email       text unique not null,
+  name        text,
+  role        text not null default 'producer',  -- 'super_admin' | 'admin' | 'producer'
+  display_currency text default 'ZAR',
+  show_both   boolean default true,
+  created_at  timestamptz not null default now()
+);
+
+-- ── Clients (a.k.a. "brains") ─────────────────────────────────────────────────
+create table if not exists clients (
+  id                 uuid primary key default gen_random_uuid(),
+  name               text not null,
+  slug               text unique not null,
+  status             text not null default 'active',
+  brand              jsonb default '{}'::jsonb,          -- logo_url, colors, fonts, lower_third
+  sonic_identity     jsonb default '{}'::jsonb,          -- music style descriptor / finetune id
+  voice_id           text,                               -- ElevenLabs
+  heygen_avatar_id   text,                               -- HeyGen
+  higgsfield_soul_id text,                               -- Higgsfield Soul 2.0
+  default_currency   text default 'ZAR',
+  created_at         timestamptz not null default now()
+);
+
+create table if not exists client_profiles (
+  id                  uuid primary key default gen_random_uuid(),
+  client_id           uuid not null references clients(id) on delete cascade,
+  version             int not null default 1,
+  positioning         text,
+  audience            jsonb default '{}'::jsonb,
+  banned_words        text[] default '{}',
+  tone_rules          text,
+  proof_points        jsonb default '[]'::jsonb,
+  outcome_definitions text,
+  exemplars           jsonb default '[]'::jsonb,
+  is_live             boolean not null default false,    -- human-approved before use
+  created_at          timestamptz not null default now()
+);
+create index if not exists idx_client_profiles_client on client_profiles(client_id);
+
+-- ── Knowledge / RAG ───────────────────────────────────────────────────────────
+create table if not exists knowledge_sources (
+  id             uuid primary key default gen_random_uuid(),
+  client_id      uuid not null references clients(id) on delete cascade,
+  type           text not null,                          -- 'website' | 'gsheet'
+  uri            text not null,                          -- url, or Google Sheet id
+  status         text not null default 'pending',        -- pending | indexed | failed
+  last_synced_at timestamptz
+);
+create index if not exists idx_knowledge_sources_client on knowledge_sources(client_id);
+
+create table if not exists knowledge_chunks (
+  id         uuid primary key default gen_random_uuid(),
+  client_id  uuid not null references clients(id) on delete cascade,
+  source_id  uuid references knowledge_sources(id) on delete cascade,
+  content    text not null,
+  embedding  vector(1024),                               -- Voyage voyage-3.5
+  metadata   jsonb default '{}'::jsonb,                  -- { title, url, tags[] }
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_knowledge_chunks_client on knowledge_chunks(client_id);
+create index if not exists idx_knowledge_chunks_embedding
+  on knowledge_chunks using hnsw (embedding vector_cosine_ops);
+
+-- ── Productions (the video runs) ──────────────────────────────────────────────
+create table if not exists productions (
+  id              uuid primary key default gen_random_uuid(),
+  client_id       uuid not null references clients(id) on delete cascade,
+  created_by      uuid references users(id),
+  title           text,
+  brief           jsonb default '{}'::jsonb,             -- topic, segment, toggles, tier, voice mode, aspect_ratio
+  plan            jsonb default '{}'::jsonb,             -- script, scenes, captions, popups, audio_map
+  duration_target int not null default 45,               -- 15 | 30 | 45 | 60
+  status          text not null default 'draft',
+  -- draft | estimating | awaiting_approval | rendering_draft | draft_ready
+  -- | awaiting_final_approval | rendering_final | qa_review | complete | failed | cancelled
+  estimate_cents  int,
+  actual_cents    int,
+  fx_rate_snapshot numeric,
+  display_currency text,
+  draft_video_url text,
+  final_video_url text,
+  created_at      timestamptz not null default now()
+);
+create index if not exists idx_productions_client on productions(client_id);
+
+create table if not exists production_steps (
+  id            uuid primary key default gen_random_uuid(),
+  production_id uuid not null references productions(id) on delete cascade,
+  stage         text not null,   -- tts|music|ambient|aroll|broll|assemble_draft|assemble_final|script|...
+  provider      text,
+  model         text,
+  units         numeric,
+  cost_cents    int,
+  output_ref    text,
+  status        text not null default 'pending',
+  started_at    timestamptz,
+  finished_at   timestamptz
+);
+create index if not exists idx_production_steps_prod on production_steps(production_id);
+
+-- ── Cost controls ─────────────────────────────────────────────────────────────
+-- Prices live HERE, never in code. Versioned via effective_from.
+create table if not exists rate_card (
+  id                  uuid primary key default gen_random_uuid(),
+  provider            text not null,
+  model               text,
+  unit                text not null,   -- char | second | clip | render_minute | minute | token | image
+  resolution          text,
+  price_cents_per_unit numeric not null,
+  effective_from      timestamptz not null default now(),
+  active              boolean not null default true
+);
+
+create table if not exists budgets (
+  id          uuid primary key default gen_random_uuid(),
+  scope       text not null,           -- 'user' | 'client' | 'team'
+  scope_id    text,
+  period      text not null default 'monthly',
+  limit_cents int not null,
+  spent_cents int not null default 0,
+  hard_gate   boolean not null default true,
+  currency    text default 'ZAR',
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists fx_rates (
+  base       text not null,
+  quote      text not null,
+  rate       numeric not null,
+  fetched_at timestamptz not null default now(),
+  primary key (base, quote, fetched_at)
+);
+
+-- ── Learning loop (Iteration 2 — schema seams now) ────────────────────────────
+create table if not exists published_assets (
+  id            uuid primary key default gen_random_uuid(),
+  production_id uuid references productions(id) on delete set null,
+  client_id     uuid not null references clients(id) on delete cascade,
+  platform      text,                  -- facebook | tiktok | x | linkedin
+  url           text,
+  segment       text,
+  posted_at     timestamptz
+);
+create index if not exists idx_published_assets_client on published_assets(client_id);
+
+create table if not exists performance_metrics (
+  id          uuid primary key default gen_random_uuid(),
+  asset_id    uuid not null references published_assets(id) on delete cascade,
+  platform    text,
+  metric      text,                    -- retention | ctr | engagement | conversions
+  value       numeric,
+  captured_at timestamptz not null default now()
+);
+
+-- ── Compliance: consent (POPIA / GDPR) ────────────────────────────────────────
+create table if not exists consent_texts (
+  id             uuid primary key default gen_random_uuid(),
+  version        int not null,
+  body           text not null,
+  effective_from timestamptz not null default now(),
+  active         boolean not null default true
+);
+
+create table if not exists consents (
+  id              uuid primary key default gen_random_uuid(),
+  client_id       uuid references clients(id) on delete set null,
+  influencer_ref  text,
+  subject_name    text not null,
+  subject_email   text,
+  data_type       text not null,        -- 'image' | 'voice'
+  scope           text not null,
+  lawful_basis    text not null default 'consent',
+  consent_text_id uuid not null references consent_texts(id),
+  granted_by      uuid not null references users(id),
+  granted_at      timestamptz not null default now(),  -- date + time + tz (audit requirement)
+  status          text not null default 'active',      -- 'active' | 'withdrawn'
+  withdrawn_at    timestamptz
+);
+create index if not exists idx_consents_client on consents(client_id);

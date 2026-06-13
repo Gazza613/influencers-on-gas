@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* GAS Studio — "control room" design tokens.
+   Dark, instrument-panel aesthetic; numeric/data uses the mono font. */
+@theme {
+  --color-surface-0: #07090d; /* app background (deepest) */
+  --color-surface-1: #0d1117; /* panels / rails */
+  --color-surface-2: #141b24; /* raised cards */
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+  --color-ink: #e6e8eb;       /* primary text */
+  --color-ink-dim: rgba(230, 232, 235, 0.55);
+  --color-ink-faint: rgba(230, 232, 235, 0.32);
+  --color-accent: #f96203;    /* GAS orange */
+  --color-active: #ffb020;    /* in-progress / warm */
+  --color-ready: #34c759;     /* ready / ok */
+  --color-alert: #ff453a;     /* blocked / error */
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html, body {
+  height: 100%;
+}
+body {
+  background: var(--color-surface-0);
+  color: var(--color-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* numeric "instrument readout" data */
+.tabular {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}

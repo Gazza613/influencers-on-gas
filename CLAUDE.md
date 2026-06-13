@@ -1,74 +1,67 @@
-# Project context for Claude Code
+# Project context for Claude Code — GAS Studio
 
-This file gives a new Claude Code session enough context to be useful
-immediately. Read this first before making changes.
+Read this first. **This repo was re-platformed (June 2026)** from a React+Vite SPA
+into a **Next.js agency video-production studio** ("GAS Studio"). The old SPA is
+preserved on the `archive/vite-spa` branch + `v1-vite-spa` tag — salvage IP from
+there, don't resurrect it.
 
-## What this app is
+## What this app is (the pivot)
 
-A React+Vite single-page app for designing and generating AI influencers.
-Local-first: every user's data lives in their own browser localStorage.
-Image and video generation happens through the user's own Higgsfield
-account (OAuth, PKCE).
+GAS Marketing's internal tool to turn a brief into a publish-ready **45-second**
+(configurable 15/30/45/60s) AI-influencer video, via a **producer co-pilot** +
+per-client **"brain" (RAG)** through a durable, **cost-gated** pipeline. Built for
+GAS's own team first (Iteration 1); multi-tenant + the performance-learning loop
+are Iteration 2.
 
-## Tech stack
+**The full spec + locked decisions live in [`docs/pivot/`](docs/pivot/) — read
+`docs/pivot/SYNTHESIS.md` first**, then the 10 topic PDFs (`CLAUDE.pdf` is the
+master brief).
 
-- **React 18** + **Vite 5** + **React Router 6**
-- **No build-time API keys** — Higgsfield is OAuthed per-user; the optional
-  Claude features call through a serverless proxy that expects an
-  `x-api-key` header from the browser.
-- **Vercel** is the intended host: `api/*.js` are Vercel serverless
-  functions, and `vite.config.js` mirrors them as local dev proxies so
-  the dev server behaves the same as production.
+## Stack (locked — see SYNTHESIS.md)
 
-## Key files to know
+- **Next.js 16** (App Router, TypeScript, Tailwind v4) on **Vercel**
+- **Neon Postgres + pgvector** (`@neondatabase/serverless`; never `@vercel/kv`/`@vercel/postgres`)
+- **Auth.js v5** (`auth.ts` / `auth.config.ts` / `proxy.ts`) — v1 is a single super-admin (Gary) from env; moves to the `users` table in Phase 1b
+- **Inngest** (durable pipeline — not yet added), **Vercel Blob** (storage)
+- Vendors (GAS-funded, GAS's own accounts): **Anthropic** (Sonnet 4.6 default / Opus 4.8 premium / Haiku 4.5 ingestion), **ElevenLabs** (TTS/Music/SFX/Scribe), **HeyGen** (a-roll), **Higgsfield** (Soul/Seedance b-roll), **Magnific** (skin realism), **Shotstack** (assembly), **Voyage** `voyage-3.5` embeddings (1024-dim), **Firecrawl** (crawl)
 
-| Path | What it does |
+## Key files (current — Phase 1 foundation)
+
+| Path | What |
 |---|---|
-| `src/App.jsx` | Routes + `<ThemeProvider>` + `<StoreProvider>` |
-| `src/store.jsx` | localStorage-backed contexts (`useInfluencers`, etc.) and the `Kayla` seed |
-| `src/utils/higgsfieldAuth.js` | OAuth PKCE flow against `mcp.higgsfield.ai` |
-| `src/utils/higgsfieldGenerate.js` | MCP-style image/video generation, polling, media uploads |
-| `src/utils/systemPrompt.js` | Prompt templates — poses, wardrobe library, vibe palettes, Soul vs GPT Image 2 variants |
-| `src/pages/Create.jsx` | Multi-step influencer creation wizard |
-| `src/pages/Influencers.jsx` | Page shell only (~640 lines): sidebar, influencer resolution, tab routing, CRUD. Renders the pieces below. |
-| `src/pages/influencers/` | Extracted internals: `constants.js`, `helpers.js`, `prompts.js`, `storage.js`, `ContentStudio.jsx` (Content/Video Studio), and `components/*` (HeroBanner, image slots, Scripts, Wardrobe, BrandDeals, Media/History, common leaf comps, …) |
-| `api/hfproxy.js` | Authed edge function that proxies all Higgsfield MCP traffic (injects the shared owner token server-side) and forwards SSE streams. `vercel.json` rewrites `/api/hf/*` → here. |
-| `api/claude.js` | Anthropic API proxy — caller supplies their own `x-api-key` |
+| `app/layout.tsx`, `app/globals.css` | Root layout + "control-room" design tokens (Tailwind v4 `@theme`) |
+| `app/page.tsx` | The GAS Studio shell (5-region skeleton: topbar, stage spine, workspace, co-pilot, build spine) |
+| `app/login/page.tsx` | GAS-branded sign-in |
+| `auth.ts` / `auth.config.ts` / `proxy.ts` | Auth.js v5 gate (super-admin only for v1) |
+| `lib/db.ts` | Lazy Neon client |
+| `db/schema.sql` | Full Postgres schema (users, clients/brains, client_profiles, knowledge_*, productions, production_steps, rate_card, budgets, consents, …) |
+| `scripts/migrate.mjs` | Applies `db/schema.sql` to Neon (`npm run db:migrate`) |
+| `.env.example` | All required env vars |
 
 ## Conventions
 
-- Inline styles with CSS variables (`var(--bg)`, `var(--text-primary)`).
-  Theme tokens are set on `<html data-theme="dark|light">` from
-  `src/context/theme.jsx`.
-- IDs use `generateId()` from `store.jsx` (`Date.now() + random`).
-- Higgsfield models supported: `soul_2`, `gpt_image_2`, `nano_banana_2`,
-  `nano_banana_flash`, `seedance_2_0`. Soul has its own simplified
-  pose set (`POSES_SOUL`) because it struggles with detailed spatial pose
-  instructions.
-
-## Things not to do
-
-- **Never kill the Vite dev server** (port 5173). The owner wants it
-  running at all times.
-- Don't trust the comment in `modelBaseParams` saying resolution and
-  quality conflict for `gpt_image_2` — they don't, the working code
-  intentionally passes both.
-- The old 6,400-line `Influencers.jsx` was split into `src/pages/influencers/`
-  by pure mechanical extraction (one component/module per file, props-only,
-  no state untangling). Keep that boundary: shared data → `constants.js`,
-  pure fns/hooks → `helpers.js`, prompt strings → `prompts.js`, localStorage →
-  `storage.js`, leaf UI → `components/common.jsx`. `ContentStudio.jsx` is still
-  ~2,150 lines and internally tangled — refactoring *its* state needs a
-  dedicated session with in-browser verification of every generate flow.
+- TypeScript everywhere; Tailwind utility classes with the design tokens
+  (`bg-surface-1`, `text-ink-dim`, `text-accent`, `.tabular` for numeric data).
+- `client_id` is the tenancy/brain key — it must thread through every table,
+  query, and RAG retrieval. A brain can never read another brain's data
+  (ships only after the isolation regression test passes).
+- **Prices live in the `rate_card` table, never in code.**
+- Cost control = **dials, never a quality cap**; nothing calls a paid API before
+  passing the budget gate.
 
 ## Dev workflow
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npm run dev          # local dev server (development only)
 npm run build        # production build
-npm run preview      # preview the production build locally
+npm run db:migrate   # apply db/schema.sql to Neon (needs DATABASE_URL)
 ```
 
-To diagnose Higgsfield issues, flip `HF_DEBUG = true` at the top of
-`src/utils/higgsfieldGenerate.js` for verbose request/response logs.
+## Working preferences
+
+- **Cloud-first**: commit + push to GitHub (`influencers-on-gas`) and deploy on
+  Vercel; verify on the live deploy, not localhost.
+- Keep the **influencer builder** concept (it moves to Setup → Influencers and
+  gains Soul training + ElevenLabs voice + consent + "Build Me" twin).
+- Build strictly in the phase order from `docs/pivot/CLAUDE.pdf` / `SYNTHESIS.md`.
