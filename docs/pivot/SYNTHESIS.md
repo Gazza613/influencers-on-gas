@@ -15,9 +15,11 @@ roadmap we build from.
 
 ## Decisions locked (2026-06-13)
 
-1. **Approach = GREENFIELD.** Fresh Next.js app; do **not** port the Vite SPA.
-   Keep the current app live at `influencers.gasmarketing.co.za` until cutover.
-   Salvage specific IP (see below). Owner is not precious about the current build.
+1. **Approach = GREENFIELD, cut over from the start.** Fresh Next.js app that
+   **replaces** the Vite SPA in place (same repo, Vercel project, domain). No
+   parallel-live period — the current app is retired immediately. **Archive it first**
+   to a git branch/tag (`archive/vite-spa`) so salvage IP stays recoverable. Owner is
+   not precious about the current build; team is invited only after it's built + tested.
 2. **Tenancy = per-tenant architecture, GAS-only for v1.** Build the `client_id`
    isolation seam everywhere now; only GAS connects credentials in v1; multi-tenant
    onboarding is Iteration 2.
@@ -36,6 +38,12 @@ roadmap we build from.
      (overrides the `vector(1536)` in `architecture.pdf`, which assumed OpenAI).
    - **Web crawler:** **Firecrawl** (LLM-ready extraction).
    - **STT / uploaded-voice alignment:** **ElevenLabs Scribe** (single audio vendor).
+6. **Video duration = configurable: 15 / 30 / 45 / 60 s** (brief selector; default 45s).
+   The narrative spine timings, script length, scene count, and cost estimate all scale
+   to the chosen duration.
+7. **Roles = single super_admin for v1.** Gary Berman (`gary@gasmarketing.co.za`) is the
+   only user/super_admin while building + testing. Team invites (and the admin/producer
+   split, budgets-per-member, etc.) come after v1 is built and tested.
 
 ---
 
@@ -62,9 +70,11 @@ roadmap we build from.
 
 ## Migration plan (greenfield + salvage)
 
-- **Fresh Next.js app.** Repo/branch structure to confirm at kickoff (recommend: new
-  repo *or* a `v2` branch + a separate Vercel project on a preview domain; cut the
-  custom domain over once v1 of the pipeline is solid). Current app stays live meanwhile.
+- **Fresh Next.js app, cut over from the start.** Before scaffolding: tag/branch the
+  current Vite app as `archive/vite-spa` and push it (salvage reference). Then build the
+  Next.js app on `main` in the same repo + Vercel project + domain — it replaces the Vite
+  app directly (no parallel preview-then-cutover). Only Gary uses the site during the
+  build, so an in-progress production deploy is acceptable.
 - **Salvage list** (port + adapt, don't depend on the SPA):
   - `src/utils/higgsfieldGenerate.js` → server-side Higgsfield service (b-roll/Soul).
   - Prompt IP: hyper-realism master prompt, `annotateDialogue`, poses/wardrobe/vibe
@@ -111,10 +121,10 @@ roadmap we build from.
   watermarks, and platform/advertising (TikTok/IG/ASA) rules are **explicitly OUT of scope
   for now** (owner, 2026-06-13). Can be added later if needed.
 
-## Still open (owner input)
-- **Repo/branch structure** + when to cut the live domain over to the new app.
-- **Duration:** 45s is treated as fixed everywhere — confirm fixed vs configurable.
-- **Roles:** confirm admin vs producer split (admins set budgets/edit rate card).
+## Open items
+All planning decisions are now locked (see Decisions 1–7 above). Remaining choices are
+build-time details (e.g. exact rate-card seed values, Drive/Sheet service-account setup)
+handled as each phase is built.
 
 ## Non-negotiable principles (from the specs)
 - "Cost control is **dials, never a quality cap**." Prices live in `rate_card`, **never in code**.
