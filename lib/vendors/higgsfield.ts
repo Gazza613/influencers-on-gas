@@ -147,37 +147,30 @@ async function createElement(call: Caller, jobId: string | null, url: string, na
   return null;
 }
 
-// Generate a CONSISTENT identity set: one hero face, then same-person variations
-// locked to it via a face Element. Returns the element_id (for reuse) + frames
-// (hero first). Falls back to plain prompting if the Element can't be created.
-export async function generateIdentitySet(opts: {
-  prompt: string;
-  variations: string[];
-  name?: string;
-  model?: string;
-  aspectRatio?: string;
-}): Promise<{ elementId: string | null; heroUrl: string; frames: { url: string; hero?: boolean }[] }> {
-  const { prompt, variations, name = "identity", model = "gpt_image_2", aspectRatio = "9:16" } = opts;
-  const { call } = await openSession();
-  const base: AnyObj = model === "gpt_image_2"
+function baseParams(model: string, aspectRatio: string): AnyObj {
+  return model === "gpt_image_2"
     ? { model, aspect_ratio: aspectRatio, count: 1, quality: "high" }
     : { model, aspect_ratio: aspectRatio, count: 1, quality: "2k" };
+}
 
-  const hero = await generateOneJob(call, base, prompt);
-  if (!hero.url) throw new Error("Higgsfield hero generation failed");
+// Generate ONE hero face. Returns { jobId, url } (url may be null on failure).
+export async function generateHero(prompt: string, model = "gpt_image_2", aspectRatio = "9:16"): Promise<{ jobId: string | null; url: string | null }> {
+  const { call } = await openSession();
+  return generateOneJob(call, baseParams(model, aspectRatio), prompt);
+}
 
-  let elementId: string | null = null;
-  try { elementId = await createElement(call, hero.jobId, hero.url, name); } catch { /* degrade */ }
+// Create a reusable face Element from a hero frame → element_id (or null).
+export async function createFaceElement(jobId: string | null, url: string, name: string): Promise<string | null> {
+  const { call } = await openSession();
+  try { return await createElement(call, jobId, url, name); } catch { return null; }
+}
 
-  const frames: { url: string; hero?: boolean }[] = [{ url: hero.url, hero: true }];
-  for (const v of variations) {
-    const vp = elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`;
-    try {
-      const f = await generateOneJob(call, base, vp);
-      if (f.url && !frames.some((x) => x.url === f.url)) frames.push({ url: f.url });
-    } catch { /* skip this variation */ }
-  }
-  return { elementId, heroUrl: hero.url, frames };
+// Generate one same-person variation, locked to the Element if present (else plain).
+export async function generateVariation(elementId: string | null, basePrompt: string, variation: string, model = "gpt_image_2", aspectRatio = "9:16"): Promise<string | null> {
+  const { call } = await openSession();
+  const prompt = elementId ? `<<<${elementId}>>> ${variation}` : `${basePrompt}. ${variation}`;
+  const { url } = await generateOneJob(call, baseParams(model, aspectRatio), prompt);
+  return url;
 }
 
 // Train a reusable Soul identity from 5–20 reference images. Returns the soul_id

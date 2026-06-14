@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
-import { generateIdentitySet, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
+import { generateHero, createFaceElement, generateVariation, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 
 // Same-person variations (angles + expressions). Each is locked to the hero face via
 // the Element, so all frames are ONE consistent identity — required for a faithful Soul.
@@ -35,17 +35,30 @@ export const generateReferences = inngest.createFunction(
     );
 
     try {
-      const set = await step.run("generate-frames", () =>
-        generateIdentitySet({ prompt, variations: IDENTITY_VARIATIONS, name: `${inf.name}-${influencerId.slice(0, 8)}`, model: "gpt_image_2", aspectRatio: "9:16" }),
+      // 1. Hero face (its own step — one generation, safely within the function limit).
+      const hero = await step.run("hero", () => generateHero(prompt, "gpt_image_2", "9:16"));
+      if (!hero.url) throw new Error("hero generation failed");
+
+      // 2. Face Element from the hero → locks every variation to this identity.
+      const elementId = await step.run("element", () =>
+        createFaceElement(hero.jobId, hero.url as string, `${inf.name}-${influencerId.slice(0, 8)}`),
       );
+
+      // 3. Same-person variations — each its own durable step.
+      const frames: { url: string; hero?: boolean }[] = [{ url: hero.url, hero: true }];
+      for (let i = 0; i < IDENTITY_VARIATIONS.length; i++) {
+        const url = await step.run(`variation-${i}`, () => generateVariation(elementId, prompt, IDENTITY_VARIATIONS[i], "gpt_image_2", "9:16"));
+        if (url && !frames.some((f) => f.url === url)) frames.push({ url });
+      }
+
       await step.run("save-frames", () =>
         updateInfluencer(influencerId, {
-          look_refs: set.frames,
+          look_refs: frames,
           status: "frames_ready",
-          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, element_id: set.elementId, hero_url: set.heroUrl },
+          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, element_id: elementId, hero_url: hero.url },
         }),
       );
-      return { ok: true, frames: set.frames.length, element: !!set.elementId };
+      return { ok: true, frames: frames.length, element: !!elementId };
     } catch (e) {
       await step.run("mark-failed", () =>
         updateInfluencer(influencerId, {
