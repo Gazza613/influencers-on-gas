@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
-import { generateHero, createFaceElement, generateVariation, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 
 const CANDIDATE_COUNT = 6;
 
@@ -47,16 +47,10 @@ export const generateCandidates = inngest.createFunction(
     await step.run("save-prompt", () => updateInfluencer(influencerId, { persona }));
 
     try {
-      // Higgsfield generates serially per account, so we generate one look per durable
-      // step and persist it immediately — the UI shows looks appear one-by-one.
-      const candidates: { url: string }[] = [];
-      for (let i = 0; i < CANDIDATE_COUNT; i++) {
-        const hero = await step.run(`cast-${i}`, () => generateHero(prompt, "gpt_image_2", "9:16"));
-        if (hero.url && !candidates.some((c) => c.url === hero.url)) {
-          candidates.push({ url: hero.url });
-          await step.run(`save-cast-${i}`, () => updateInfluencer(influencerId, { persona: { ...persona, candidates: [...candidates] } }));
-        }
-      }
+      // gpt_image_2 is ~150s PER IMAGE, so generating all 6 CONCURRENTLY collapses casting
+      // to ~one image's wall-clock (~2.5 min) instead of 6× (~15 min).
+      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), "gpt_image_2", "9:16"));
+      const candidates = [...new Set(urls.filter((u): u is string => !!u))].map((url) => ({ url }));
       if (!candidates.length) throw new Error("no candidate looks generated");
       await step.run("save-candidates", () =>
         updateInfluencer(influencerId, { status: "cast_ready", persona: { ...persona, candidates } }),
@@ -104,14 +98,11 @@ export const buildIdentity = inngest.createFunction(
         updateInfluencer(influencerId, { look_refs: [...frames], persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected } }),
       );
 
-      // One coverage frame per durable step, persisted as it lands (UI fills frame-by-frame).
-      for (let i = 0; i < coverage.length; i++) {
-        const url = await step.run(`variation-${i}`, () => generateVariation(elementId, prompt, coverage[i], "gpt_image_2", "9:16"));
-        if (url && !frames.some((f) => f.url === url)) {
-          frames.push({ url });
-          await step.run(`save-${i}`, () => updateInfluencer(influencerId, { look_refs: [...frames] }));
-        }
-      }
+      // All coverage frames generate CONCURRENTLY, each locked to the chosen face (~one
+      // image's wall-clock instead of 8×).
+      const vPrompts = coverage.map((v) => (elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`));
+      const urls = await step.run("variations", () => generateBatch(vPrompts, "gpt_image_2", "9:16"));
+      for (const url of urls) if (url && !frames.some((f) => f.url === url)) frames.push({ url });
 
       await step.run("save-frames", () =>
         updateInfluencer(influencerId, {
