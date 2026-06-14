@@ -8,11 +8,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   const key = process.env.INNGEST_SIGNING_KEY || "";
+  const ek = process.env.INNGEST_EVENT_KEY || "";
   const sha = (s: string) => (s ? createHash("sha256").update(s).digest("hex").slice(0, 12) : null);
   return NextResponse.json({
-    set: !!key,
-    length: key.length,
-    sha12: sha(key),
-    event_key_set: !!process.env.INNGEST_EVENT_KEY,
+    vercel_env: process.env.VERCEL_ENV || null,
+    signing_set: !!key,
+    signing_length: key.length,
+    signing_sha12: sha(key),
+    event_length: ek.length,
+    event_sha12: sha(ek),
   });
 }
