@@ -37,6 +37,9 @@ export default async function StudioPage() {
           <div className="tabular text-xs text-ink-dim">
             cost <span className="text-ink">$0.00</span> <span className="text-ink-faint">▮▮▯</span>
           </div>
+          <Link href="/setup/influencers" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">
+            Influencers
+          </Link>
           <Link href="/setup/connect" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">
             Setup
           </Link>

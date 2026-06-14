@@ -81,19 +81,22 @@ export default function InfluencersManager({ initial }: { initial: Influencer[] 
           </div>
         )}
         {list.map((inf) => (
-          <div key={inf.id} className="flex items-center justify-between rounded-xl border border-line bg-surface-1 p-4">
-            <Link href={`/setup/influencers/${inf.id}`} className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{inf.name}</span>
-                <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-ink-faint">
-                  {inf.mode === "twin" ? "twin" : "synthetic"}
-                </span>
+          <div key={inf.id} className="flex items-center justify-between rounded-xl border border-line bg-surface-1 p-4 transition hover:border-line-strong">
+            <Link href={`/setup/influencers/${inf.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3 pr-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{inf.name}</span>
+                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-ink-faint">
+                    {inf.mode === "twin" ? "twin" : "synthetic"}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-3 text-[11px] text-ink-faint">
+                  <span>{inf.higgsfield_soul_id ? "Soul ✓" : "Soul —"}</span>
+                  <span>{inf.voice_id ? "Voice ✓" : "Voice —"}</span>
+                  <span className="text-active">{inf.status}</span>
+                </div>
               </div>
-              <div className="mt-1 flex items-center gap-3 text-[11px] text-ink-faint">
-                <span>{inf.higgsfield_soul_id ? "Soul ✓" : "Soul —"}</span>
-                <span>{inf.voice_id ? "Voice ✓" : "Voice —"}</span>
-                <span className="text-active">{inf.status}</span>
-              </div>
+              <span className="whitespace-nowrap text-xs font-semibold text-accent">Open →</span>
             </Link>
             <button onClick={() => remove(inf.id)} className="text-xs text-ink-faint hover:text-alert">Delete</button>
           </div>
