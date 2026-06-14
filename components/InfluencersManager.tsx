@@ -91,7 +91,7 @@ export default function InfluencersManager({ initial }: { initial: Influencer[] 
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-[11px] text-ink-faint">
-                  <span>{inf.higgsfield_soul_id ? "Soul ✓" : "Soul —"}</span>
+                  <span>{inf.higgsfield_soul_id ? "Identity ✓" : "Identity —"}</span>
                   <span>{inf.voice_id ? "Voice ✓" : "Voice —"}</span>
                   <span className="text-active">{inf.status}</span>
                 </div>
@@ -107,8 +107,8 @@ export default function InfluencersManager({ initial }: { initial: Influencer[] 
       {modal === "synthetic" && (
         <Modal title="Build an Influencer" onClose={() => setModal(null)}>
           <p className="text-xs text-ink-dim">
-            A synthetic, reusable identity. Soul training, voice, and reference frames are
-            generated in the next step once your tools are connected.
+            A synthetic, reusable identity. Identity training, voice, and reference frames
+            are generated in the next step.
           </p>
           <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Ava" autoFocus />
           <div className="grid grid-cols-2 gap-2">

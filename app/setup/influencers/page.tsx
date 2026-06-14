@@ -10,8 +10,7 @@ export default async function InfluencersPage() {
       <h1 className="text-xl font-bold">Influencers</h1>
       <p className="mt-2 max-w-2xl text-sm text-ink-dim">
         Reusable identities — built once, used across every video. Each one is a
-        Higgsfield Soul (consistent face) + an ElevenLabs voice + look references,
-        engineered to read as a real human.
+        consistent face + a voice + look references, engineered to read as a real human.
       </p>
       <InfluencersManager initial={influencers} />
     </div>

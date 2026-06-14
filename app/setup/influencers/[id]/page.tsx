@@ -28,9 +28,9 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
 
       {/* Identity status */}
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <StatusCard label="Soul (Higgsfield)" ok={!!inf.higgsfield_soul_id} pending="Not trained" />
+        <StatusCard label="Identity" ok={!!inf.higgsfield_soul_id} pending="Not trained" />
         <VoicePicker influencerId={inf.id} voiceId={inf.voice_id} />
-        {inf.mode === "twin" && <StatusCard label="Avatar (HeyGen)" ok={!!inf.heygen_avatar_id} pending="Not created" />}
+        {inf.mode === "twin" && <StatusCard label="Presenter" ok={!!inf.heygen_avatar_id} pending="Not created" />}
         {inf.mode === "twin" && <StatusCard label="Consent" ok={!!inf.consent_id} pending="Missing" />}
       </div>
 
@@ -51,11 +51,10 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
 
       {/* Generation (Phase 3b) */}
       <div className="mt-6 rounded-xl border border-active/40 bg-active/5 p-5">
-        <div className="text-sm font-semibold text-active">Generation wires up next (Phase 3b)</div>
+        <div className="text-sm font-semibold text-active">Generation wires up next</div>
         <p className="mt-1 text-xs text-ink-dim">
-          Reference-frame generation, Soul 2.0 training, the Magnific realism pass, and voice
-          binding activate once the vendor tools are connected. The hyper-realism prompt
-          library is applied automatically.
+          Reference-frame generation, identity training, the realism pass, and presenter
+          creation activate next. The hyper-realism look is applied automatically.
         </p>
       </div>
     </div>

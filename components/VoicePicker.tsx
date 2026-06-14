@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-type Voice = { voice_id: string; name: string; labels: Record<string, string> };
+type Voice = { voice_id: string; name: string; labels: Record<string, string>; preview_url: string | null };
 
 export default function VoicePicker({ influencerId, voiceId }: { influencerId: string; voiceId: string | null }) {
   const [current, setCurrent] = useState(voiceId);
@@ -10,6 +10,8 @@ export default function VoicePicker({ influencerId, voiceId }: { influencerId: s
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [playing, setPlaying] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   async function load() {
     setErr("");
@@ -33,36 +35,60 @@ export default function VoicePicker({ influencerId, voiceId }: { influencerId: s
     });
     setBusy(false);
     setCurrent(id);
-    setOpen(false);
+  }
+
+  function preview(v: Voice) {
+    if (audioRef.current) audioRef.current.pause();
+    if (playing === v.voice_id) { setPlaying(null); return; }
+    if (!v.preview_url) return;
+    const a = new Audio(v.preview_url);
+    audioRef.current = a;
+    setPlaying(v.voice_id);
+    a.onended = () => setPlaying(null);
+    a.play().catch(() => setPlaying(null));
   }
 
   const currentName = voices?.find((v) => v.voice_id === current)?.name;
+  const labelLine = (v: Voice) =>
+    [v.labels?.accent, v.labels?.age, v.labels?.gender, v.labels?.use_case].filter(Boolean).join(" · ");
 
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-4">
-      <div className="text-[11px] text-ink-dim">Voice (ElevenLabs)</div>
+      <div className="text-[11px] text-ink-dim">Voice</div>
       <div className={`mt-1 text-sm font-semibold ${current ? "text-ready" : "text-ink-faint"}`}>
         {current ? `Ready ✓${currentName ? " — " + currentName : ""}` : "Not assigned"}
       </div>
       {!open && (
         <button onClick={load} disabled={busy} className="mt-2 rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:text-ink">
-          {busy ? "Loading…" : current ? "Change voice" : "Assign voice"}
+          {busy ? "Loading…" : current ? "Change voice" : "Choose a voice"}
         </button>
       )}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
       {open && voices && (
-        <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-line">
-          {voices.length === 0 && <div className="p-2 text-xs text-ink-faint">No voices on the account.</div>}
+        <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-line">
+          {voices.length === 0 && <div className="p-3 text-xs text-ink-faint">No voices available.</div>}
           {voices.map((v) => (
-            <button
-              key={v.voice_id}
-              onClick={() => pick(v.voice_id)}
-              disabled={busy}
-              className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-surface-2 ${current === v.voice_id ? "text-ready" : "text-ink"}`}
-            >
-              <span>{v.name}</span>
-              {current === v.voice_id && <span>✓</span>}
-            </button>
+            <div key={v.voice_id} className={`flex items-center gap-2 border-b border-line/50 px-3 py-2 last:border-0 ${current === v.voice_id ? "bg-surface-2" : ""}`}>
+              <button
+                onClick={() => preview(v)}
+                disabled={!v.preview_url}
+                title={v.preview_url ? "Preview" : "No preview available"}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line text-[11px] hover:border-line-strong disabled:opacity-30"
+              >
+                {playing === v.voice_id ? "❚❚" : "▶"}
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-semibold text-ink">{v.name}</div>
+                {labelLine(v) && <div className="truncate text-[10px] capitalize text-ink-faint">{labelLine(v)}</div>}
+              </div>
+              <button
+                onClick={() => pick(v.voice_id)}
+                disabled={busy}
+                className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${current === v.voice_id ? "text-ready" : "bg-accent text-white"}`}
+              >
+                {current === v.voice_id ? "Selected ✓" : "Select"}
+              </button>
+            </div>
           ))}
         </div>
       )}
