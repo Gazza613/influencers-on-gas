@@ -12,9 +12,10 @@ export default async function ConnectPage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="text-xl font-bold">Connect Tools</h1>
       <p className="mt-2 max-w-2xl text-sm text-ink-dim">
-        GAS connects its vendor accounts here. Keys are <strong>encrypted at rest</strong> and
-        never leave the server. The produce flow unlocks once the required tools are connected.
-        Keys already set in the environment show as “connected”.
+        Connect your vendor accounts here. Keys are <strong>encrypted at rest</strong> and never
+        leave the server. You can <strong>revoke any connection instantly</strong> with Disconnect —
+        use it immediately if a key is ever leaked or compromised. The produce flow unlocks once
+        the required tools are connected.
       </p>
       <ConnectTools initial={connections} canEdit={session?.user?.role === "super_admin"} />
     </div>
