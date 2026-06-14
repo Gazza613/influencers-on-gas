@@ -173,6 +173,25 @@ export async function generateVariation(elementId: string | null, basePrompt: st
   return url;
 }
 
+// Generate many prompts CONCURRENTLY in one session: launch every job up front, then
+// poll them all in parallel. Wall-clock ≈ a single image, not the sum. Returns URLs
+// aligned to `prompts` (null where a job failed). Used for fast casting + coverage sets.
+export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16"): Promise<(string | null)[]> {
+  const { call } = await openSession();
+  const base = baseParams(model, aspectRatio);
+  const launched = await Promise.all(prompts.map(async (p) => {
+    try {
+      const r = await call("generate_image", { params: { ...base, prompt: p } });
+      return { jobId: extractJobIds(r)[0] ?? null, url: extractImageUrls(r)[0] ?? null };
+    } catch { return { jobId: null, url: null }; }
+  }));
+  return Promise.all(launched.map(async (l) => {
+    if (l.url) return l.url;
+    if (l.jobId) return pollJob(call, l.jobId).catch(() => null);
+    return null;
+  }));
+}
+
 // Train a reusable Soul identity from 5–20 reference images. Returns the soul_id
 // (training runs ~10 min server-side; poll soulStatus). show_characters action=train.
 export async function trainSoul(opts: { name: string; images: string[]; type?: string }): Promise<string> {

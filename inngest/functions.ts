@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
-import { generateHero, createFaceElement, generateVariation, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 
 const CANDIDATE_COUNT = 6;
 
@@ -37,14 +37,9 @@ export const generateCandidates = inngest.createFunction(
     await step.run("save-prompt", () => updateInfluencer(influencerId, { persona }));
 
     try {
-      const candidates: { url: string }[] = [];
-      for (let i = 0; i < CANDIDATE_COUNT; i++) {
-        const hero = await step.run(`cast-${i}`, () => generateHero(prompt, "gpt_image_2", "9:16"));
-        if (hero.url && !candidates.some((c) => c.url === hero.url)) {
-          candidates.push({ url: hero.url });
-          await step.run(`save-cast-${i}`, () => updateInfluencer(influencerId, { persona: { ...persona, candidates: [...candidates] } }));
-        }
-      }
+      // All 6 candidate looks generate CONCURRENTLY (~one image's wall-clock, not 6×).
+      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), "gpt_image_2", "9:16"));
+      const candidates = [...new Set(urls.filter((u): u is string => !!u))].map((url) => ({ url }));
       if (!candidates.length) throw new Error("no candidate looks generated");
       await step.run("save-candidates", () =>
         updateInfluencer(influencerId, { status: "cast_ready", persona: { ...persona, candidates } }),
@@ -91,13 +86,10 @@ export const buildIdentity = inngest.createFunction(
         updateInfluencer(influencerId, { look_refs: [...frames], persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected } }),
       );
 
-      for (let i = 0; i < IDENTITY_VARIATIONS.length; i++) {
-        const url = await step.run(`variation-${i}`, () => generateVariation(elementId, prompt, IDENTITY_VARIATIONS[i], "gpt_image_2", "9:16"));
-        if (url && !frames.some((f) => f.url === url)) {
-          frames.push({ url });
-          await step.run(`save-${i}`, () => updateInfluencer(influencerId, { look_refs: [...frames] }));
-        }
-      }
+      // All coverage frames generate CONCURRENTLY, each locked to the chosen face.
+      const vPrompts = IDENTITY_VARIATIONS.map((v) => (elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`));
+      const urls = await step.run("variations", () => generateBatch(vPrompts, "gpt_image_2", "9:16"));
+      for (const url of urls) if (url && !frames.some((f) => f.url === url)) frames.push({ url });
 
       await step.run("save-frames", () =>
         updateInfluencer(influencerId, {
