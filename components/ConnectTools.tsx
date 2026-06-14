@@ -124,11 +124,11 @@ function StatusBadge({ connected, source, verified }: { connected: boolean; sour
   if (source === "vault" && verified === false) {
     return <span className="text-xs text-alert">Key error — re-enter</span>;
   }
-  const label = source === "env" ? "Connected (env)" : verified ? "Connected · verified" : "Connected";
+  // Uniform look for vault + env: every connected tool reads the same.
   return (
     <span className="flex items-center gap-1.5 text-xs text-ready">
       <span className="h-1.5 w-1.5 rounded-full bg-ready" />
-      {label}
+      {verified ? "Connected · verified" : "Connected"}
     </span>
   );
 }

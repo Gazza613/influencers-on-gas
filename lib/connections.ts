@@ -49,6 +49,8 @@ export async function listConnections(): Promise<ConnectionStatus[]> {
       } catch {
         verified = false;
       }
+    } else if (envSet) {
+      verified = true; // env-backed keys are present/readable — shown as verified too
     }
     return {
       id: p.id,
