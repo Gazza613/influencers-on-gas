@@ -191,3 +191,17 @@ create table if not exists consents (
   withdrawn_at    timestamptz
 );
 create index if not exists idx_consents_client on consents(client_id);
+
+-- ── Connect Tools: per-tenant credential vault ────────────────────────────────
+-- v1 has one tenant ('gas'); tenant column is the multi-tenant seam (Iteration 2).
+-- Secrets are AES-256-GCM encrypted at rest (lib/crypto). Never returned to the client.
+create table if not exists connections (
+  id               uuid primary key default gen_random_uuid(),
+  tenant           text not null default 'gas',
+  provider         text not null,   -- anthropic | voyage | firecrawl | elevenlabs | heygen | higgsfield | magnific | shotstack
+  secret_encrypted text,
+  status           text not null default 'connected',
+  metadata         jsonb default '{}'::jsonb,
+  updated_at       timestamptz not null default now(),
+  unique (tenant, provider)
+);

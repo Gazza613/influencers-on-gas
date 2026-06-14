@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { auth } from "@/auth";
 import SignOutButton from "@/components/SignOutButton";
+import { listConnections } from "@/lib/connections";
 
 // Produce-flow stages (ux-flow.md). Skeleton for Phase 1 — wired up in later phases.
 const STAGES = [
@@ -17,6 +19,8 @@ const STAGES = [
 export default async function StudioPage() {
   const session = await auth();
   const email = session?.user?.email ?? "";
+  const conns = await listConnections();
+  const missingRequired = conns.filter((c) => c.required && !c.connected).map((c) => c.label);
 
   return (
     <div className="flex h-dvh flex-col bg-surface-0 text-ink">
@@ -33,6 +37,9 @@ export default async function StudioPage() {
           <div className="tabular text-xs text-ink-dim">
             cost <span className="text-ink">$0.00</span> <span className="text-ink-faint">▮▮▯</span>
           </div>
+          <Link href="/setup/connect" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">
+            Setup
+          </Link>
           <span className="hidden text-xs text-ink-dim sm:inline">{email}</span>
           <SignOutButton />
         </div>
@@ -61,16 +68,27 @@ export default async function StudioPage() {
         {/* Center — stage workspace */}
         <main className="min-h-0 overflow-y-auto p-8">
           <div className="mx-auto max-w-2xl">
-            <h1 className="text-xl font-bold">Foundation is live 🎬</h1>
+            <h1 className="text-xl font-bold">GAS Studio</h1>
             <p className="mt-2 text-sm text-ink-dim">
-              GAS Studio v2 — the agency video-production rebuild. This is the Phase 1
-              shell (Next.js + Auth.js gate). Next up: Neon schema, Connect Tools, the
-              client brains, and the producer co-pilot.
+              The agency video-production rebuild. Connect your tools, then add client
+              brains and influencers to start producing.
             </p>
-            <div className="mt-6 rounded-xl border border-line bg-surface-1 p-5 text-sm text-ink-dim">
-              No client brain connected yet. Brains, influencers, and the produce
-              pipeline arrive in the next phases.
-            </div>
+            {missingRequired.length > 0 ? (
+              <div className="mt-6 rounded-xl border border-active/40 bg-active/5 p-5">
+                <div className="text-sm font-semibold text-active">
+                  Connect required tools to start producing
+                </div>
+                <p className="mt-1 text-xs text-ink-dim">Still needed: {missingRequired.join(", ")}.</p>
+                <Link href="/setup/connect" className="mt-3 inline-block rounded-md bg-accent px-3 py-1.5 text-xs font-bold text-white">
+                  Go to Connect Tools →
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-xl border border-ready/30 bg-ready/5 p-5 text-sm text-ink-dim">
+                ✓ All required tools connected. Client brains, influencers, and the
+                produce pipeline arrive in the next phases.
+              </div>
+            )}
           </div>
         </main>
 

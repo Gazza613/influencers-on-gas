@@ -9,7 +9,8 @@ export default auth;
 
 export const config = {
   matcher: [
-    // Everything except auth API, the login page, Next internals, and static assets.
-    "/((?!api/auth|login|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|json)$).*)",
+    // Gate page routes. API routes self-gate (return JSON 401/403) so they aren't
+    // redirected to /login. Excludes Next internals + static assets too.
+    "/((?!api|login|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|json)$).*)",
   ],
 };
