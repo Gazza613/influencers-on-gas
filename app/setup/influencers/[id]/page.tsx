@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getInfluencer } from "@/lib/influencers";
+import VoicePicker from "@/components/VoicePicker";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
       {/* Identity status */}
       <div className="mt-6 grid grid-cols-3 gap-3">
         <StatusCard label="Soul (Higgsfield)" ok={!!inf.higgsfield_soul_id} pending="Not trained" />
-        <StatusCard label="Voice (ElevenLabs)" ok={!!inf.voice_id} pending="Not assigned" />
+        <VoicePicker influencerId={inf.id} voiceId={inf.voice_id} />
         {inf.mode === "twin" && <StatusCard label="Avatar (HeyGen)" ok={!!inf.heygen_avatar_id} pending="Not created" />}
         {inf.mode === "twin" && <StatusCard label="Consent" ok={!!inf.consent_id} pending="Missing" />}
       </div>

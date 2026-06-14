@@ -44,6 +44,20 @@ export async function createInfluencer(input: {
   return rows[0].id;
 }
 
+export async function updateInfluencer(
+  id: string,
+  fields: { voice_id?: string | null; status?: string },
+): Promise<void> {
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let i = 1;
+  if (fields.voice_id !== undefined) { sets.push(`voice_id = $${i++}`); vals.push(fields.voice_id); }
+  if (fields.status !== undefined) { sets.push(`status = $${i++}`); vals.push(fields.status); }
+  if (!sets.length) return;
+  vals.push(id);
+  await db().query(`update influencers set ${sets.join(", ")} where id = $${i}`, vals);
+}
+
 export async function deleteInfluencer(id: string): Promise<void> {
   await db().query("delete from influencers where id = $1", [id]);
 }
