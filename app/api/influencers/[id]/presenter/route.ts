@@ -12,7 +12,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const inf = await getInfluencer(id);
   const refs = (inf?.look_refs as { url: string; hero?: boolean }[]) || [];
   const hero = (inf?.persona as { hero_url?: string })?.hero_url || refs.find((r) => r.hero)?.url || refs[0]?.url;
-  if (!hero) return NextResponse.json({ error: "Build the identity first — there's no face to make a presenter from." }, { status: 400 });
+  if (!hero) return NextResponse.json({ error: "Build the identity first. There's no face to make a presenter from yet." }, { status: 400 });
 
   try {
     await inngest.send({ name: "influencer/create.presenter", data: { influencerId: id } });

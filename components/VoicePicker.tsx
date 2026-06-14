@@ -56,7 +56,7 @@ export default function VoicePicker({ influencerId, voiceId }: { influencerId: s
     <div className="rounded-xl border border-line bg-surface-1 p-4">
       <div className="text-[11px] text-ink-dim">Voice</div>
       <div className={`mt-1 text-sm font-semibold ${current ? "text-ready" : "text-ink-faint"}`}>
-        {current ? `Ready ✓${currentName ? " — " + currentName : ""}` : "Not assigned"}
+        {current ? `Ready ✓${currentName ? " · " + currentName : ""}` : "Not assigned"}
       </div>
       {!open && (
         <button onClick={load} disabled={busy} className="mt-2 rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:text-ink">

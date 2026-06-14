@@ -30,8 +30,8 @@ export default async function StudioPage() {
           <span className="font-extrabold tracking-tight">
             GAS<span className="text-accent">·</span>Studio
           </span>
-          <Selector label="Brain" value="— none —" />
-          <Selector label="Influencer" value="— none —" />
+          <Selector label="Brain" value="none" />
+          <Selector label="Influencer" value="none" />
         </div>
         <div className="flex items-center gap-4">
           <div className="tabular text-xs text-ink-dim">

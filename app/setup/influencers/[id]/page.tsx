@@ -52,6 +52,12 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
                 : "Hero frame. Train the identity below to lock this face across every video."}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Humaniser module (flex) */}
+      {faceUrl && (
+        <div className="mt-4">
           <RealismBoost influencerId={inf.id} realismUrl={(persona as Record<string, string>).hero_realism_url ?? null} hasHero={!!faceUrl} />
         </div>
       )}

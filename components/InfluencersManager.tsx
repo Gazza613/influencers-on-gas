@@ -77,7 +77,7 @@ export default function InfluencersManager({ initial }: { initial: Influencer[] 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {list.length === 0 && (
           <div className="col-span-full rounded-xl border border-line bg-surface-1 p-6 text-sm text-ink-dim">
-            No influencers yet. Build one — it&apos;s reused across every video.
+            No influencers yet. Build one, it&apos;s reused across every video.
           </div>
         )}
         {list.map((inf) => (
@@ -91,8 +91,8 @@ export default function InfluencersManager({ initial }: { initial: Influencer[] 
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-[11px] text-ink-faint">
-                  <span>{inf.higgsfield_soul_id ? "Identity ✓" : "Identity —"}</span>
-                  <span>{inf.voice_id ? "Voice ✓" : "Voice —"}</span>
+                  <span>{inf.higgsfield_soul_id ? "Identity ✓" : "Identity ·"}</span>
+                  <span>{inf.voice_id ? "Voice ✓" : "Voice ·"}</span>
                   <span className="text-active">{inf.status}</span>
                 </div>
               </div>
@@ -125,7 +125,7 @@ export default function InfluencersManager({ initial }: { initial: Influencer[] 
 
       {/* Build Me (twin) — name then consent gate */}
       {modal === "twin" && !consentFor && (
-        <Modal title="Build Me — digital twin" onClose={() => setModal(null)}>
+        <Modal title="Build Me: digital twin" onClose={() => setModal(null)}>
           <p className="text-xs text-ink-dim">
             Your own likeness, from photos + voice. We&apos;ll capture consent before any
             upload (POPIA / GDPR).

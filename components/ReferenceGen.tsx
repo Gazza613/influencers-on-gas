@@ -26,7 +26,7 @@ const TRAIN_QUIPS = [
   "Memorising the smile…",
   "Building a face the camera will never forget…",
   "Locking the identity in for good…",
-  "This one takes about 10 minutes — worth the wait…",
+  "This one takes about 10 minutes, well worth it…",
 ];
 
 export default function ReferenceGen({
@@ -141,9 +141,9 @@ export default function ReferenceGen({
       {/* Step hint */}
       <p className="mt-1 text-[11px] text-ink-faint">
         {trained && !training ? "Identity locked." :
-         hasSet ? "Photoshoot — pick the best 5+ frames (face shots train the identity best), then train." :
-         showChoose ? "Casting — choose your model. We’ll then run the photoshoot on that face." :
-         "Casting — generate a set of looks, choose your model, then run the photoshoot & train."}
+         hasSet ? "Photoshoot: pick your strongest 5+ frames (the face shots train the sharpest identity), then lock it in." :
+         showChoose ? "Casting: choose your model. We then run a full photoshoot on that exact face." :
+         "Casting: we generate a set of distinct, photoreal looks for you to choose your model from."}
       </p>
 
       {/* Actions */}
@@ -185,14 +185,14 @@ export default function ReferenceGen({
             ) : <div className="h-full w-1/4 animate-pulse rounded-full bg-accent" />}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            {training ? "Training runs in the background — you can leave this page." :
-             building ? "Photoshoot in progress — angles, close-ups & your scene. Frames appear as they’re ready." :
-             "Casting looks — they appear as they’re ready."}
+            {training ? "Locking the identity. This runs in the background, you can carry on elsewhere." :
+             building ? "Photoshoot in progress: angles, close-ups and your scene. Frames appear as they are ready." :
+             "Casting your influencer. Fresh looks appear as they land."}
           </p>
         </div>
       )}
 
-      {trained && !training && <p className="mt-3 text-xs text-ready">✓ Identity trained — the chosen face is now locked across every video.</p>}
+      {trained && !training && <p className="mt-3 text-xs text-ready">✓ Identity locked. This exact face now carries across every video.</p>}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
 
       {/* Casting board — choose one */}
@@ -218,7 +218,7 @@ export default function ReferenceGen({
       {/* Identity set — select frames for training */}
       {hasSet && (
         <>
-          {!trained && <p className="mt-4 text-[11px] text-ink-faint">All frames are the same chosen person. Tap to deselect any odd ones, then train on 5–20.</p>}
+          {!trained && <p className="mt-4 text-[11px] text-ink-faint">Every frame is the same chosen person. Tap to deselect any odd ones, then train on 5 to 20.</p>}
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {frames.map((f, i) => {
               const sel = selected.has(f.url);

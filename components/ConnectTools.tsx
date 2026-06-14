@@ -122,7 +122,7 @@ function StatusBadge({ connected, source, verified }: { connected: boolean; sour
     return <span className="text-xs text-ink-faint">Not connected</span>;
   }
   if (source === "vault" && verified === false) {
-    return <span className="text-xs text-alert">Key error — re-enter</span>;
+    return <span className="text-xs text-alert">Key error, re-enter</span>;
   }
   // Uniform look for vault + env: every connected tool reads the same.
   return (
