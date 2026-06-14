@@ -177,18 +177,18 @@ export async function generateVariation(elementId: string | null, basePrompt: st
 // poll them all in parallel. Wall-clock ≈ a single image, not the sum. Returns URLs
 // aligned to `prompts` (null where a job failed). Used for fast casting + coverage sets.
 export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16"): Promise<(string | null)[]> {
-  const { call } = await openSession();
   const base = baseParams(model, aspectRatio);
-  const launched = await Promise.all(prompts.map(async (p) => {
+  // Each prompt gets its OWN MCP session so generations run truly in parallel
+  // (a shared session serializes requests). Wall-clock ≈ one image, not the sum.
+  return Promise.all(prompts.map(async (p) => {
     try {
+      const { call } = await openSession();
       const r = await call("generate_image", { params: { ...base, prompt: p } });
-      return { jobId: extractJobIds(r)[0] ?? null, url: extractImageUrls(r)[0] ?? null };
-    } catch { return { jobId: null, url: null }; }
-  }));
-  return Promise.all(launched.map(async (l) => {
-    if (l.url) return l.url;
-    if (l.jobId) return pollJob(call, l.jobId).catch(() => null);
-    return null;
+      let url = extractImageUrls(r)[0] ?? null;
+      const jobId = extractJobIds(r)[0] ?? null;
+      if (!url && jobId) url = await pollJob(call, jobId);
+      return url;
+    } catch { return null; }
   }));
 }
 
