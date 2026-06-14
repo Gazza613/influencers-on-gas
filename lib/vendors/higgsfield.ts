@@ -184,7 +184,7 @@ export async function generateBatch(prompts: string[], model = "gpt_image_2", as
     try {
       const { call } = await openSession();
       const r = await call("generate_image", { params: { ...base, prompt: p } });
-      let url = extractImageUrls(r)[0] ?? null;
+      let url: string | null = extractImageUrls(r)[0] ?? null;
       const jobId = extractJobIds(r)[0] ?? null;
       if (!url && jobId) url = await pollJob(call, jobId);
       return url;
