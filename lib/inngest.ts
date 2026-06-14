@@ -9,4 +9,5 @@ import { Inngest } from "inngest";
 export const inngest = new Inngest({
   id: "gas-studio",
   ...(process.env.INNGEST_PROD_EVENT_KEY ? { eventKey: process.env.INNGEST_PROD_EVENT_KEY } : {}),
+  ...(process.env.INNGEST_PROD_SIGNING_KEY ? { signingKey: process.env.INNGEST_PROD_SIGNING_KEY } : {}),
 });
