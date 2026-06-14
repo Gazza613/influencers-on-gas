@@ -57,6 +57,7 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
           status={inf.status}
           identityPrompt={(persona as Record<string, string>).identity_prompt ?? null}
           lookRefs={Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string }[]) : []}
+          soulId={inf.higgsfield_soul_id}
         />
       </div>
     </div>

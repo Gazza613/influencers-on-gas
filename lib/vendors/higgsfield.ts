@@ -78,6 +78,49 @@ async function rawPost(token: string, sessionId: string | null, body: AnyObj): P
   return { parsed, sid };
 }
 
+// Open an MCP session and return a bound tool-caller.
+async function openSession() {
+  const token = await getValidHFAccessToken();
+  const init = await rawPost(token, null, {
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, clientInfo: { name: "GAS Studio", version: "1.0" } },
+  });
+  const sid = init.sid;
+  const call = async (name: string, args: AnyObj): Promise<AnyObj> => {
+    const { parsed } = await rawPost(token, sid, { jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name, arguments: args } });
+    return (parsed?.result ?? parsed) as AnyObj;
+  };
+  return { call };
+}
+
+// Train a reusable Soul identity from 5–20 reference images. Returns the soul_id
+// (training runs ~10 min server-side; poll soulStatus). show_characters action=train.
+export async function trainSoul(opts: { name: string; images: string[]; type?: string }): Promise<string> {
+  const { name, images, type = "soul_2" } = opts;
+  const { call } = await openSession();
+  const res = await call("show_characters", { action: "train", type, name, images });
+  const data = unwrapMCP(res);
+  const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+  const m =
+    str.match(/"soul_id"\s*:\s*"([^"]+)"/) ||
+    str.match(/"(?:character_id|id)"\s*:\s*"([0-9a-f-]{8,})"/i) ||
+    str.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (!m) throw new Error("No soul_id in train response: " + str.slice(0, 220));
+  return m[1] || m[0];
+}
+
+// Poll a Soul's training status → 'ready' | 'training' | 'failed'.
+export async function soulStatus(soulId: string): Promise<string> {
+  const { call } = await openSession();
+  const data = unwrapMCP(await call("show_characters", { action: "status", soul_id: soulId }));
+  const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+  const m = str.match(/"(?:status|state)"\s*:\s*"(ready|training|failed)"/i);
+  if (m) return m[1].toLowerCase();
+  if (/\bfailed\b/i.test(str)) return "failed";
+  if (/\bready\b/i.test(str)) return "ready";
+  return "training";
+}
+
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
 export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
   const token = await getValidHFAccessToken();
