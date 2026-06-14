@@ -1,6 +1,6 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
-import { generateReferences, trainSoulJob } from "@/inngest/functions";
+import { generateCandidates, buildIdentity, trainSoulJob } from "@/inngest/functions";
 
 // Image generation + polling can run up to a few minutes.
 export const maxDuration = 300;
@@ -11,6 +11,6 @@ export const maxDuration = 300;
 // to invoke a Vercel-protected *.vercel.app deployment URL.
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [generateReferences, trainSoulJob],
+  functions: [generateCandidates, buildIdentity, trainSoulJob],
   serveOrigin: "https://influencers.gasmarketing.co.za",
 });

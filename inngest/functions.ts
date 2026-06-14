@@ -3,24 +3,27 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
 import { generateHero, createFaceElement, generateVariation, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 
-// Same-person variations (angles + expressions). Each is locked to the hero face via
-// the Element, so all frames are ONE consistent identity — required for a faithful Soul.
-// Wardrobe + setting are held constant (only angle/expression/light vary).
+const CANDIDATE_COUNT = 6;
+
+// Stage 2 — same-person coverage shot from the CHOSEN look: angles, expressions, and
+// the close-up face/skin/lips detail Soul training wants. Each is locked to the chosen
+// face via the Element, so every frame is ONE consistent identity. Wardrobe/setting held.
 const IDENTITY_VARIATIONS = [
   "the same exact person, three-quarter left angle, soft natural daylight, calm neutral expression, identical face, wardrobe and setting, photorealistic portrait",
   "the same exact person, three-quarter right angle, warm indoor lighting, subtle genuine smile, identical face, wardrobe and setting, photorealistic portrait",
   "the same exact person, near-profile side view, gentle side lighting, relaxed expression, identical face, wardrobe and setting, photorealistic portrait",
+  "the same exact person, tight beauty close-up of the face, sharp catchlight in the eyes, natural skin texture with visible pores and fine detail, identical features, photorealistic",
+  "the same exact person, close-up on the lower face and lips, soft natural light, realistic skin and lip detail, identical features, photorealistic",
   "the same exact person, straight-on at eye level, looking directly into the lens, warm authentic smile, identical face, wardrobe and setting, photorealistic portrait",
-  "the same exact person, slight low angle, soft golden-hour light, composed confident expression, identical face, wardrobe and setting, photorealistic portrait",
 ];
 
-// Build the hyper-realism prompt + generate ONE hero face, then 5 same-person
-// variations locked to it via a face Element (6 consistent frames; need 5+ for Soul).
-// Images are unlimited on Ultra, so retries are free.
-export const generateReferences = inngest.createFunction(
+// STAGE 1 — Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the
+// producer can choose the face. Each is an independent generation (different person),
+// persisted as it lands for a live progress board. Images are free on Ultra.
+export const generateCandidates = inngest.createFunction(
   {
     id: "generate-references",
-    name: "Generate influencer reference frames",
+    name: "Generate casting looks",
     retries: 1,
     triggers: [{ event: "influencer/generate.references" }],
   },
@@ -30,29 +33,64 @@ export const generateReferences = inngest.createFunction(
     if (!inf) return { skipped: "influencer not found" };
 
     const { prompt, negative } = buildIdentityPrompt(inf.persona);
-    await step.run("save-prompt", () =>
-      updateInfluencer(influencerId, { persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative } }),
-    );
+    const persona = { ...inf.persona, identity_prompt: prompt, identity_negative: negative, candidates_expected: CANDIDATE_COUNT };
+    await step.run("save-prompt", () => updateInfluencer(influencerId, { persona }));
 
     try {
-      // 1. Hero face (its own step — one generation, safely within the function limit).
-      const hero = await step.run("hero", () => generateHero(prompt, "gpt_image_2", "9:16"));
-      if (!hero.url) throw new Error("hero generation failed");
-      // Persist the hero immediately so the UI shows the first frame + a real progress bar.
+      const candidates: { url: string }[] = [];
+      for (let i = 0; i < CANDIDATE_COUNT; i++) {
+        const hero = await step.run(`cast-${i}`, () => generateHero(prompt, "gpt_image_2", "9:16"));
+        if (hero.url && !candidates.some((c) => c.url === hero.url)) {
+          candidates.push({ url: hero.url });
+          await step.run(`save-cast-${i}`, () => updateInfluencer(influencerId, { persona: { ...persona, candidates: [...candidates] } }));
+        }
+      }
+      if (!candidates.length) throw new Error("no candidate looks generated");
+      await step.run("save-candidates", () =>
+        updateInfluencer(influencerId, { status: "cast_ready", persona: { ...persona, candidates } }),
+      );
+      return { ok: true, candidates: candidates.length };
+    } catch (e) {
+      await step.run("mark-failed", () =>
+        updateInfluencer(influencerId, { status: "gen_failed", persona: { ...persona, gen_error: String((e as Error)?.message || e).slice(0, 300) } }),
+      );
+      throw e;
+    }
+  },
+);
+
+// STAGE 2 — Build the identity set from the chosen look. Lock the chosen face as an
+// Element, then shoot the multi-angle/close-up coverage. Frames persist as they land.
+export const buildIdentity = inngest.createFunction(
+  {
+    id: "build-identity",
+    name: "Build identity set from chosen look",
+    retries: 1,
+    triggers: [{ event: "influencer/build.identity" }],
+  },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const chosenUrl = String(event.data.chosenUrl || "");
+    const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "influencer not found" };
+    if (!chosenUrl) {
+      await step.run("no-choice", () => updateInfluencer(influencerId, { status: "cast_ready" }));
+      return { error: "no chosen look" };
+    }
+
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const prompt = (persona.identity_prompt as string) || buildIdentityPrompt(inf.persona).prompt;
+    const expected = IDENTITY_VARIATIONS.length + 1;
+
+    try {
+      // Lock the chosen face as a reusable Element (import the URL → media reference).
+      const elementId = await step.run("element", () => createFaceElement(null, chosenUrl, `${inf.name}-${influencerId.slice(0, 8)}`));
+
+      const frames: { url: string; hero?: boolean }[] = [{ url: chosenUrl, hero: true }];
       await step.run("save-hero", () =>
-        updateInfluencer(influencerId, {
-          look_refs: [{ url: hero.url, hero: true }],
-          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, hero_url: hero.url, frames_expected: IDENTITY_VARIATIONS.length + 1 },
-        }),
+        updateInfluencer(influencerId, { look_refs: [...frames], persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected } }),
       );
 
-      // 2. Face Element from the hero → locks every variation to this identity.
-      const elementId = await step.run("element", () =>
-        createFaceElement(hero.jobId, hero.url as string, `${inf.name}-${influencerId.slice(0, 8)}`),
-      );
-
-      // 3. Same-person variations — each its own durable step, persisted as it lands.
-      const frames: { url: string; hero?: boolean }[] = [{ url: hero.url, hero: true }];
       for (let i = 0; i < IDENTITY_VARIATIONS.length; i++) {
         const url = await step.run(`variation-${i}`, () => generateVariation(elementId, prompt, IDENTITY_VARIATIONS[i], "gpt_image_2", "9:16"));
         if (url && !frames.some((f) => f.url === url)) {
@@ -65,23 +103,20 @@ export const generateReferences = inngest.createFunction(
         updateInfluencer(influencerId, {
           look_refs: frames,
           status: "frames_ready",
-          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, element_id: elementId, hero_url: hero.url, frames_expected: IDENTITY_VARIATIONS.length + 1 },
+          persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected },
         }),
       );
       return { ok: true, frames: frames.length, element: !!elementId };
     } catch (e) {
       await step.run("mark-failed", () =>
-        updateInfluencer(influencerId, {
-          status: "gen_failed",
-          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, gen_error: String((e as Error)?.message || e).slice(0, 300) },
-        }),
+        updateInfluencer(influencerId, { status: "gen_failed", persona: { ...persona, gen_error: String((e as Error)?.message || e).slice(0, 300) } }),
       );
       throw e;
     }
   },
 );
 
-// Train a reusable Soul from selected reference frames (~10 min). Uses step.sleep so
+// STAGE 3 — Train a reusable Soul from selected frames (~10 min). Uses step.sleep so
 // the function is durably suspended between status polls (survives function timeouts).
 export const trainSoulJob = inngest.createFunction(
   { id: "train-soul", retries: 0, triggers: [{ event: "influencer/train.soul" }] },

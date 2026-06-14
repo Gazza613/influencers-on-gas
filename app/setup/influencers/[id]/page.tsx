@@ -17,7 +17,11 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
     .filter(([, v]) => v);
 
   const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]) : [];
-  const faceUrl = persona.hero_url || refs.find((r) => r.hero)?.url || refs[0]?.url || null;
+  const candidates = Array.isArray((inf.persona as { candidates?: { url: string }[] })?.candidates)
+    ? ((inf.persona as { candidates?: { url: string }[] }).candidates as { url: string }[])
+    : [];
+  // The "face" is the chosen look (only once a set is being built/trained).
+  const faceUrl = refs.find((r) => r.hero)?.url || (refs.length ? refs[0]?.url : null) || persona.hero_url || null;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -78,7 +82,8 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
           influencerId={inf.id}
           status={inf.status}
           identityPrompt={(persona as Record<string, string>).identity_prompt ?? null}
-          lookRefs={Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string }[]) : []}
+          candidates={candidates}
+          lookRefs={refs}
           soulId={inf.higgsfield_soul_id}
         />
       </div>
