@@ -81,7 +81,7 @@ export default function ConnectTools({
                   {editing === c.id ? "Cancel" : c.connected ? "Update" : "Connect"}
                 </button>
               )}
-              {canEdit && c.source === "vault" && (
+              {canEdit && c.connected && (
                 <button
                   onClick={() => disconnect(c.id)}
                   className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-alert/80 hover:text-alert"

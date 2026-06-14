@@ -40,7 +40,9 @@ export async function listConnections(): Promise<ConnectionStatus[]> {
   return PROVIDERS.map((p) => {
     const row = byProvider.get(p.id);
     const envSet = p.env.some((e) => !!process.env[e]);
-    const hasSecret = !!row?.secret_encrypted;
+    const disconnected = row?.status === "disconnected"; // tombstone suppresses vault + env
+    const hasSecret = !disconnected && !!row?.secret_encrypted;
+    const connected = !disconnected && (hasSecret || envSet);
     let verified: boolean | null = null;
     if (hasSecret) {
       try {
@@ -49,7 +51,7 @@ export async function listConnections(): Promise<ConnectionStatus[]> {
       } catch {
         verified = false;
       }
-    } else if (envSet) {
+    } else if (connected && envSet) {
       verified = true; // env-backed keys are present/readable — shown as verified too
     }
     return {
@@ -57,8 +59,8 @@ export async function listConnections(): Promise<ConnectionStatus[]> {
       label: p.label,
       role: p.role,
       required: p.required,
-      connected: hasSecret || envSet,
-      source: hasSecret ? "vault" : envSet ? "env" : null,
+      connected,
+      source: !connected ? null : hasSecret ? "vault" : "env",
       verified,
       updatedAt: row?.updated_at ?? null,
     };
@@ -76,16 +78,26 @@ export async function saveConnection(provider: ProviderId, secret: string): Prom
   );
 }
 
+// Disconnect = a tombstone row that suppresses BOTH any vault secret and the env
+// fallback, so env-backed tools can be disconnected too. Reconnecting (saveConnection)
+// clears it.
 export async function deleteConnection(provider: ProviderId): Promise<void> {
-  await db().query("delete from connections where tenant=$1 and provider=$2", [TENANT, provider]);
+  await db().query(
+    `insert into connections (tenant, provider, secret_encrypted, status, updated_at)
+     values ($1, $2, null, 'disconnected', now())
+     on conflict (tenant, provider)
+     do update set secret_encrypted = null, status = 'disconnected', updated_at = now()`,
+    [TENANT, provider],
+  );
 }
 
-// Server-side secret resolver for the pipeline: vault first, then env fallback.
+// Server-side secret resolver for the pipeline: tombstone wins, then vault, then env.
 export async function getSecret(provider: ProviderId): Promise<string | null> {
   const rows = (await db().query(
-    "select secret_encrypted from connections where tenant=$1 and provider=$2",
+    "select secret_encrypted, status from connections where tenant=$1 and provider=$2",
     [TENANT, provider],
-  )) as { secret_encrypted: string | null }[];
+  )) as { secret_encrypted: string | null; status: string }[];
+  if (rows[0]?.status === "disconnected") return null;
   if (rows[0]?.secret_encrypted) {
     try {
       return decryptSecret(rows[0].secret_encrypted);
