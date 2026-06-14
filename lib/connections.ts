@@ -27,25 +27,37 @@ export type ConnectionStatus = {
   required: boolean;
   connected: boolean;
   source: "vault" | "env" | null;
+  verified: boolean | null; // vault secret decrypts? (null for env/none)
   updatedAt: string | null;
 };
 
 export async function listConnections(): Promise<ConnectionStatus[]> {
   const rows = (await db().query(
-    "select provider, status, updated_at, (secret_encrypted is not null) as has_secret from connections where tenant=$1",
+    "select provider, status, updated_at, secret_encrypted from connections where tenant=$1",
     [TENANT],
-  )) as { provider: string; status: string; updated_at: string; has_secret: boolean }[];
+  )) as { provider: string; status: string; updated_at: string; secret_encrypted: string | null }[];
   const byProvider = new Map(rows.map((r) => [r.provider, r]));
   return PROVIDERS.map((p) => {
     const row = byProvider.get(p.id);
     const envSet = p.env.some((e) => !!process.env[e]);
+    const hasSecret = !!row?.secret_encrypted;
+    let verified: boolean | null = null;
+    if (hasSecret) {
+      try {
+        decryptSecret(row!.secret_encrypted!);
+        verified = true;
+      } catch {
+        verified = false;
+      }
+    }
     return {
       id: p.id,
       label: p.label,
       role: p.role,
       required: p.required,
-      connected: !!row?.has_secret || envSet,
-      source: row?.has_secret ? "vault" : envSet ? "env" : null,
+      connected: hasSecret || envSet,
+      source: hasSecret ? "vault" : envSet ? "env" : null,
+      verified,
       updatedAt: row?.updated_at ?? null,
     };
   });

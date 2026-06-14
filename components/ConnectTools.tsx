@@ -69,7 +69,7 @@ export default function ConnectTools({
             </div>
 
             <div className="flex shrink-0 items-center gap-3">
-              <StatusBadge connected={c.connected} source={c.source} />
+              <StatusBadge connected={c.connected} source={c.source} verified={c.verified} />
               {canEdit && (
                 <button
                   onClick={() => {
@@ -117,14 +117,18 @@ export default function ConnectTools({
   );
 }
 
-function StatusBadge({ connected, source }: { connected: boolean; source: string | null }) {
+function StatusBadge({ connected, source, verified }: { connected: boolean; source: string | null; verified: boolean | null }) {
   if (!connected) {
     return <span className="text-xs text-ink-faint">Not connected</span>;
   }
+  if (source === "vault" && verified === false) {
+    return <span className="text-xs text-alert">Key error — re-enter</span>;
+  }
+  const label = source === "env" ? "Connected (env)" : verified ? "Connected · verified" : "Connected";
   return (
     <span className="flex items-center gap-1.5 text-xs text-ready">
       <span className="h-1.5 w-1.5 rounded-full bg-ready" />
-      Connected{source === "env" ? " (env)" : ""}
+      {label}
     </span>
   );
 }
