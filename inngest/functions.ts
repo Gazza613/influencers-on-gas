@@ -1,7 +1,22 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
-import { generateImages } from "@/lib/vendors/higgsfield";
+import { generateImages, listTools } from "@/lib/vendors/higgsfield";
+
+// Throwaway discovery: logs Higgsfield's MCP tools + schemas to the Vercel logs so
+// we can find the Soul-training tool. (Remove after 3b-2b-ii.)
+export const discoverTools = inngest.createFunction(
+  { id: "hf-discover-tools", triggers: [{ event: "hf/discover.tools" }] },
+  async ({ step }) => {
+    const tools = await step.run("list-tools", () => listTools());
+    for (const t of tools) {
+      const hit = /soul|train|character|avatar|identity|finetune|custom|model|set|lora/i.test(t.name);
+      console.log(`[HFTOOLS]${hit ? "★" : " "} ${t.name} :: ${(t.description || "").slice(0, 80)}`);
+      if (hit) console.log(`[HFTOOLS-SCHEMA] ${t.name} ${JSON.stringify(t.inputSchema || {}).slice(0, 900)}`);
+    }
+    return { count: tools.length };
+  },
+);
 
 // Durable identity-generation job: build the hyper-realism prompt, then generate
 // real reference frames via Higgsfield. (Images are unlimited on the Ultra plan,

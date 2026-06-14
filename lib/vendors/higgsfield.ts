@@ -78,6 +78,19 @@ async function rawPost(token: string, sessionId: string | null, body: AnyObj): P
   return { parsed, sid };
 }
 
+// Enumerate the Higgsfield MCP tools + their input schemas (discovery).
+export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
+  const token = await getValidHFAccessToken();
+  const init = await rawPost(token, null, {
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, clientInfo: { name: "GAS Studio", version: "1.0" } },
+  });
+  const { parsed } = await rawPost(token, init.sid, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
+  const res = (parsed?.result ?? parsed) as AnyObj;
+  const tools = ((res?.tools as AnyObj[]) || []) as AnyObj[];
+  return tools.map((t) => ({ name: String(t.name), description: t.description as string, inputSchema: t.inputSchema ?? t.input_schema }));
+}
+
 // Generate `count` reference frames from one identity prompt. Returns image URLs.
 export async function generateImages(opts: { prompt: string; count?: number; model?: string; aspectRatio?: string }): Promise<string[]> {
   const { prompt, count = 4, model = "gpt_image_2", aspectRatio = "9:16" } = opts;
