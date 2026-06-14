@@ -205,3 +205,32 @@ create table if not exists connections (
   updated_at       timestamptz not null default now(),
   unique (tenant, provider)
 );
+
+-- ── Influencers (reusable identities; built once, reused across productions) ──
+-- Optionally scoped to a client/brain (nullable in v1). Soul/voice/avatar IDs are
+-- populated by the generation steps in Phase 3b once vendor tools are connected.
+create table if not exists influencers (
+  id                 uuid primary key default gen_random_uuid(),
+  client_id          uuid references clients(id) on delete set null,
+  name               text not null,
+  mode               text not null default 'synthetic',  -- 'synthetic' | 'twin'
+  status             text not null default 'draft',       -- 'draft' | 'ready'
+  persona            jsonb default '{}'::jsonb,            -- age_range, gender, vibe, niche, audience, wardrobe, setting, backstory
+  higgsfield_soul_id text,
+  voice_id           text,        -- ElevenLabs
+  heygen_avatar_id   text,        -- HeyGen (twin a-roll)
+  look_refs          jsonb default '[]'::jsonb,            -- chosen reference frames [{url}]
+  locked_seed        bigint,
+  consent_id         uuid references consents(id) on delete set null,
+  created_by         uuid references users(id),
+  created_at         timestamptz not null default now()
+);
+create index if not exists idx_influencers_client on influencers(client_id);
+
+-- Seed the canonical consent wording (v1) once. POPIA/GDPR — see compliance.md.
+insert into consent_texts (version, body)
+select 1, 'I confirm I have the right to use this person''s image / voice. '
+       || 'I consent to creating an AI likeness / voice clone from this material. '
+       || 'I understand the purpose: producing marketing video content. '
+       || 'I understand consent can be withdrawn and the data deleted at any time.'
+where not exists (select 1 from consent_texts where version = 1);

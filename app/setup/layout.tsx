@@ -21,12 +21,12 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
       <div className="grid min-h-0 flex-1 grid-cols-[200px_1fr]">
         <nav className="flex flex-col gap-1 border-r border-line bg-surface-1 p-3">
           <p className="tabular mb-2 px-2 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Setup</p>
-          <Link href="/setup/connect" className="rounded-md bg-surface-2 px-2.5 py-2 text-[13px] text-ink">
+          <Link href="/setup/connect" className="rounded-md px-2.5 py-2 text-[13px] text-ink-dim hover:bg-surface-2 hover:text-ink">
             Connect Tools
           </Link>
-          <div className="flex items-center justify-between rounded-md px-2.5 py-2 text-[13px] text-ink-faint">
-            Influencers <span className="tabular text-[9px] uppercase tracking-wide">Phase 3</span>
-          </div>
+          <Link href="/setup/influencers" className="rounded-md px-2.5 py-2 text-[13px] text-ink-dim hover:bg-surface-2 hover:text-ink">
+            Influencers
+          </Link>
           <div className="flex items-center justify-between rounded-md px-2.5 py-2 text-[13px] text-ink-faint">
             Brains <span className="tabular text-[9px] uppercase tracking-wide">Phase 4</span>
           </div>
