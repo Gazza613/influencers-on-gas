@@ -192,6 +192,14 @@ export async function generateBatch(prompts: string[], model = "gpt_image_2", as
   }));
 }
 
+// Preflight the credit cost of a model WITHOUT generating (get_cost:true). Returns the
+// raw unwrapped response so we can read whatever cost field Higgsfield provides.
+export async function previewImageCost(model: string, prompt = "portrait of a woman, photorealistic", aspectRatio = "9:16"): Promise<unknown> {
+  const { call } = await openSession();
+  const base = baseParams(model, aspectRatio);
+  return unwrapMCP(await call("generate_image", { params: { ...base, prompt, get_cost: true } }));
+}
+
 // Train a reusable Soul identity from 5–20 reference images. Returns the soul_id
 // (training runs ~10 min server-side; poll soulStatus). show_characters action=train.
 export async function trainSoul(opts: { name: string; images: string[]; type?: string }): Promise<string> {
