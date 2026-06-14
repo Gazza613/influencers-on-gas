@@ -1,8 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Ref = { url: string; hero?: boolean };
+
+const EXPECTED_FRAMES = 6;
+
+const GEN_QUIPS = [
+  "Warming up the studio lights…",
+  "Casting your influencer…",
+  "Finding their best angle…",
+  "Dialling in the lighting…",
+  "Coaching the perfect smile…",
+  "Steaming the wardrobe…",
+  "Touching up for the camera…",
+  "Locking in the look…",
+  "Almost ready for the close-up…",
+];
+const TRAIN_QUIPS = [
+  "Teaching every angle of this face…",
+  "Memorising the smile…",
+  "Building a face the camera will never forget…",
+  "Locking the identity in for good…",
+  "This one takes about 10 minutes — worth the wait…",
+];
 
 export default function ReferenceGen({
   influencerId,
@@ -24,11 +45,27 @@ export default function ReferenceGen({
   const [trained, setTrained] = useState(!!soulId);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [quip, setQuip] = useState(0);
 
   const TERMINAL = ["frames_ready", "ready", "gen_failed", "soul_failed"];
+  const generating = busy && st !== "training";
+  const training = st === "training";
+  const activeQuips = training ? TRAIN_QUIPS : GEN_QUIPS;
+
+  // Rotate the engaging copy while a job is running.
+  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (busy || training) {
+      tick.current = setInterval(() => setQuip((q) => (q + 1) % activeQuips.length), 3500);
+      return () => { if (tick.current) clearInterval(tick.current); };
+    }
+    setQuip(0);
+  }, [busy, training, activeQuips.length]);
 
   async function poll(tries = 0): Promise<void> {
-    if (tries > 80) { setBusy(false); return; }
+    // ~13 min ceiling: covers Inngest's startup delay + the ~3 min 6-frame set
+    // (training keeps its own state via higgsfield_soul_id even past this).
+    if (tries > 150) { setBusy(false); return; }
     await new Promise((r) => setTimeout(r, 5000));
     const r = await fetch(`/api/influencers/${influencerId}`, { cache: "no-store" });
     if (r.ok) {
@@ -68,7 +105,7 @@ export default function ReferenceGen({
   }
 
   const toggle = (url: string) => setSelected((s) => { const n = new Set(s); n.has(url) ? n.delete(url) : n.add(url); return n; });
-  const training = st === "training";
+  const pct = Math.min(100, Math.round((frames.length / EXPECTED_FRAMES) * 100));
 
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-5">
@@ -89,7 +126,28 @@ export default function ReferenceGen({
         )}
       </div>
 
-      {trained && <p className="mt-2 text-xs text-ready">✓ Identity trained — the face below is now locked across every video.</p>}
+      {(generating || training) && (
+        <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-ink">{activeQuips[quip]}</span>
+            {generating && <span className="tabular text-ink-faint">{frames.length}/{EXPECTED_FRAMES} frames</span>}
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-1">
+            {training ? (
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
+            ) : frames.length > 0 ? (
+              <div className="h-full rounded-full bg-accent transition-all duration-700" style={{ width: `${pct}%` }} />
+            ) : (
+              <div className="h-full w-1/4 animate-pulse rounded-full bg-accent" />
+            )}
+          </div>
+          <p className="mt-2 text-[11px] text-ink-faint">
+            {training ? "Training the identity — this runs in the background, you can leave this page." : "Generating a consistent set — frames appear as they're ready."}
+          </p>
+        </div>
+      )}
+
+      {trained && !training && <p className="mt-2 text-xs text-ready">✓ Identity trained — the face below is now locked across every video.</p>}
       {frames.length > 0 && !trained && <p className="mt-2 text-[11px] text-ink-faint">All frames are the same person (hero + variations). Tap to deselect any odd ones, then train on 5–20.</p>}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
 

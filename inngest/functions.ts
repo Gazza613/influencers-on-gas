@@ -38,24 +38,34 @@ export const generateReferences = inngest.createFunction(
       // 1. Hero face (its own step — one generation, safely within the function limit).
       const hero = await step.run("hero", () => generateHero(prompt, "gpt_image_2", "9:16"));
       if (!hero.url) throw new Error("hero generation failed");
+      // Persist the hero immediately so the UI shows the first frame + a real progress bar.
+      await step.run("save-hero", () =>
+        updateInfluencer(influencerId, {
+          look_refs: [{ url: hero.url, hero: true }],
+          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, hero_url: hero.url, frames_expected: IDENTITY_VARIATIONS.length + 1 },
+        }),
+      );
 
       // 2. Face Element from the hero → locks every variation to this identity.
       const elementId = await step.run("element", () =>
         createFaceElement(hero.jobId, hero.url as string, `${inf.name}-${influencerId.slice(0, 8)}`),
       );
 
-      // 3. Same-person variations — each its own durable step.
+      // 3. Same-person variations — each its own durable step, persisted as it lands.
       const frames: { url: string; hero?: boolean }[] = [{ url: hero.url, hero: true }];
       for (let i = 0; i < IDENTITY_VARIATIONS.length; i++) {
         const url = await step.run(`variation-${i}`, () => generateVariation(elementId, prompt, IDENTITY_VARIATIONS[i], "gpt_image_2", "9:16"));
-        if (url && !frames.some((f) => f.url === url)) frames.push({ url });
+        if (url && !frames.some((f) => f.url === url)) {
+          frames.push({ url });
+          await step.run(`save-${i}`, () => updateInfluencer(influencerId, { look_refs: [...frames] }));
+        }
       }
 
       await step.run("save-frames", () =>
         updateInfluencer(influencerId, {
           look_refs: frames,
           status: "frames_ready",
-          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, element_id: elementId, hero_url: hero.url },
+          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, element_id: elementId, hero_url: hero.url, frames_expected: IDENTITY_VARIATIONS.length + 1 },
         }),
       );
       return { ok: true, frames: frames.length, element: !!elementId };
