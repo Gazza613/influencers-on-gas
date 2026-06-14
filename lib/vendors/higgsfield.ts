@@ -93,6 +93,93 @@ async function openSession() {
   return { call };
 }
 
+type Caller = (name: string, args: AnyObj) => Promise<AnyObj>;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+// Poll one generation job until it yields an image URL (or terminal/no-url).
+async function pollJob(call: Caller, jobId: string, rounds = 60): Promise<string | null> {
+  for (let round = 0; round < rounds; round++) {
+    if (round) await sleep(3000);
+    try {
+      const data = unwrapMCP(await call("job_status", { jobId })) as AnyObj;
+      const item = (Array.isArray(data?.results) ? (data.results as AnyObj[])[0] : data) as AnyObj;
+      const ro = (item?.results as AnyObj) || {};
+      const url = (ro.rawUrl || ro.minUrl || item?.result_url || item?.url || extractImageUrls(data)[0]) as string | undefined;
+      const status = String(item?.status || data?.status || "").toLowerCase();
+      if (url) return url;
+      if (TERMINAL.has(status)) return null;
+    } catch { /* transient — retry */ }
+  }
+  return null;
+}
+
+// Launch one generate_image and resolve to { jobId, url }.
+async function generateOneJob(call: Caller, base: AnyObj, prompt: string): Promise<{ jobId: string | null; url: string | null }> {
+  const r = await call("generate_image", { params: { ...base, prompt } });
+  const jobId = extractJobIds(r)[0] ?? null;
+  let url: string | null = extractImageUrls(r)[0] ?? null;
+  if (!url && jobId) url = await pollJob(call, jobId);
+  return { jobId, url };
+}
+
+// Import an HTTPS media URL into Higgsfield storage → media_id.
+async function importMedia(call: Caller, url: string): Promise<string | null> {
+  const data = unwrapMCP(await call("media_import_url", { url, type: "image" }));
+  const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+  const m = str.match(/"media_id"\s*:\s*"([^"]+)"/) || str.match(/"id"\s*:\s*"([0-9a-f-]{8,})"/i) || str.match(UUID_RE);
+  return m ? m[1] || m[0] : null;
+}
+
+// Create a reusable face Element from a hero frame → element_id (used as <<<id>>>
+// in later prompts to lock the same identity). Tries image_job, falls back to import.
+async function createElement(call: Caller, jobId: string | null, url: string, name: string): Promise<string | null> {
+  const tryCreate = async (medias: AnyObj[]): Promise<string | null> => {
+    const data = unwrapMCP(await call("show_reference_elements", { action: "create", category: "auto", name, medias }));
+    const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+    const m = str.match(/"element_id"\s*:\s*"([0-9a-f-]{8,})"/i) || str.match(/"id"\s*:\s*"([0-9a-f-]{8,})"/i) || str.match(UUID_RE);
+    return m ? m[1] || m[0] : null;
+  };
+  if (jobId) { try { const id = await tryCreate([{ type: "image_job", id: jobId }]); if (id) return id; } catch { /* fall through */ } }
+  const mediaId = await importMedia(call, url).catch(() => null);
+  if (mediaId) { try { return await tryCreate([{ type: "media_input", id: mediaId, url }]); } catch { /* give up */ } }
+  return null;
+}
+
+// Generate a CONSISTENT identity set: one hero face, then same-person variations
+// locked to it via a face Element. Returns the element_id (for reuse) + frames
+// (hero first). Falls back to plain prompting if the Element can't be created.
+export async function generateIdentitySet(opts: {
+  prompt: string;
+  variations: string[];
+  name?: string;
+  model?: string;
+  aspectRatio?: string;
+}): Promise<{ elementId: string | null; heroUrl: string; frames: { url: string; hero?: boolean }[] }> {
+  const { prompt, variations, name = "identity", model = "gpt_image_2", aspectRatio = "9:16" } = opts;
+  const { call } = await openSession();
+  const base: AnyObj = model === "gpt_image_2"
+    ? { model, aspect_ratio: aspectRatio, count: 1, quality: "high" }
+    : { model, aspect_ratio: aspectRatio, count: 1, quality: "2k" };
+
+  const hero = await generateOneJob(call, base, prompt);
+  if (!hero.url) throw new Error("Higgsfield hero generation failed");
+
+  let elementId: string | null = null;
+  try { elementId = await createElement(call, hero.jobId, hero.url, name); } catch { /* degrade */ }
+
+  const frames: { url: string; hero?: boolean }[] = [{ url: hero.url, hero: true }];
+  for (const v of variations) {
+    const vp = elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`;
+    try {
+      const f = await generateOneJob(call, base, vp);
+      if (f.url && !frames.some((x) => x.url === f.url)) frames.push({ url: f.url });
+    } catch { /* skip this variation */ }
+  }
+  return { elementId, heroUrl: hero.url, frames };
+}
+
 // Train a reusable Soul identity from 5–20 reference images. Returns the soul_id
 // (training runs ~10 min server-side; poll soulStatus). show_characters action=train.
 export async function trainSoul(opts: { name: string; images: string[]; type?: string }): Promise<string> {

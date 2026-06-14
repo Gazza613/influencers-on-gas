@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type Ref = { url: string };
+type Ref = { url: string; hero?: boolean };
 
 export default function ReferenceGen({
   influencerId,
@@ -89,8 +89,8 @@ export default function ReferenceGen({
         )}
       </div>
 
-      {trained && <p className="mt-2 text-xs text-ready">✓ Identity trained — this face is now locked across every video.</p>}
-      {frames.length > 0 && !trained && <p className="mt-2 text-[11px] text-ink-faint">Tap frames to select the best (5–20) for training.</p>}
+      {trained && <p className="mt-2 text-xs text-ready">✓ Identity trained — the face below is now locked across every video.</p>}
+      {frames.length > 0 && !trained && <p className="mt-2 text-[11px] text-ink-faint">All frames are the same person (hero + variations). Tap to deselect any odd ones, then train on 5–20.</p>}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
 
       {frames.length > 0 && (
@@ -106,6 +106,9 @@ export default function ReferenceGen({
                   <span className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${sel ? "bg-accent text-white" : "bg-black/50 text-ink-faint"}`}>
                     {sel ? "✓" : ""}
                   </span>
+                )}
+                {f.hero && (
+                  <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Face</span>
                 )}
               </button>
             );

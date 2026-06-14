@@ -1,10 +1,22 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
-import { generateImages, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
+import { generateIdentitySet, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 
-// Build the hyper-realism prompt + generate 6 real reference frames (need 5+ for
-// Soul training). Images are unlimited on Ultra, so retries are free.
+// Same-person variations (angles + expressions). Each is locked to the hero face via
+// the Element, so all frames are ONE consistent identity — required for a faithful Soul.
+// Wardrobe + setting are held constant (only angle/expression/light vary).
+const IDENTITY_VARIATIONS = [
+  "the same exact person, three-quarter left angle, soft natural daylight, calm neutral expression, identical face, wardrobe and setting, photorealistic portrait",
+  "the same exact person, three-quarter right angle, warm indoor lighting, subtle genuine smile, identical face, wardrobe and setting, photorealistic portrait",
+  "the same exact person, near-profile side view, gentle side lighting, relaxed expression, identical face, wardrobe and setting, photorealistic portrait",
+  "the same exact person, straight-on at eye level, looking directly into the lens, warm authentic smile, identical face, wardrobe and setting, photorealistic portrait",
+  "the same exact person, slight low angle, soft golden-hour light, composed confident expression, identical face, wardrobe and setting, photorealistic portrait",
+];
+
+// Build the hyper-realism prompt + generate ONE hero face, then 5 same-person
+// variations locked to it via a face Element (6 consistent frames; need 5+ for Soul).
+// Images are unlimited on Ultra, so retries are free.
 export const generateReferences = inngest.createFunction(
   {
     id: "generate-references",
@@ -23,13 +35,17 @@ export const generateReferences = inngest.createFunction(
     );
 
     try {
-      const urls = await step.run("generate-frames", () =>
-        generateImages({ prompt, count: 6, model: "gpt_image_2", aspectRatio: "9:16" }),
+      const set = await step.run("generate-frames", () =>
+        generateIdentitySet({ prompt, variations: IDENTITY_VARIATIONS, name: `${inf.name}-${influencerId.slice(0, 8)}`, model: "gpt_image_2", aspectRatio: "9:16" }),
       );
       await step.run("save-frames", () =>
-        updateInfluencer(influencerId, { look_refs: urls.map((url) => ({ url })), status: "frames_ready" }),
+        updateInfluencer(influencerId, {
+          look_refs: set.frames,
+          status: "frames_ready",
+          persona: { ...inf.persona, identity_prompt: prompt, identity_negative: negative, element_id: set.elementId, hero_url: set.heroUrl },
+        }),
       );
-      return { ok: true, frames: urls.length };
+      return { ok: true, frames: set.frames.length, element: !!set.elementId };
     } catch (e) {
       await step.run("mark-failed", () =>
         updateInfluencer(influencerId, {

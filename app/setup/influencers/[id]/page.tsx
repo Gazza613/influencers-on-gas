@@ -16,16 +16,38 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
     .map((k) => [k, persona[k]] as const)
     .filter(([, v]) => v);
 
+  const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]) : [];
+  const faceUrl = persona.hero_url || refs.find((r) => r.hero)?.url || refs[0]?.url || null;
+
   return (
     <div className="mx-auto max-w-3xl">
       <Link href="/setup/influencers" className="text-xs text-ink-dim hover:text-ink">← Influencers</Link>
       <div className="mt-2 flex items-center gap-3">
+        {faceUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={faceUrl} alt={inf.name} className="h-14 w-14 rounded-full border border-line object-cover" />
+        )}
         <h1 className="text-xl font-bold">{inf.name}</h1>
         <span className="tabular rounded bg-surface-2 px-2 py-0.5 text-[10px] uppercase tracking-wide text-ink-faint">
           {inf.mode === "twin" ? "digital twin" : "synthetic"}
         </span>
         <span className="text-xs text-active">{inf.status}</span>
       </div>
+
+      {faceUrl && (
+        <div className="mt-5 flex items-center gap-4 rounded-xl border border-line bg-surface-1 p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={faceUrl} alt={`${inf.name} face`} className="h-28 w-28 rounded-lg border border-line object-cover" />
+          <div>
+            <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">The face</div>
+            <div className="mt-1 text-sm text-ink">
+              {inf.higgsfield_soul_id
+                ? "This is the locked identity used in every video."
+                : "Hero frame. Train the identity below to lock this face across every video."}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Identity status */}
       <div className="mt-6 grid grid-cols-3 gap-3">
