@@ -46,13 +46,16 @@ export async function createInfluencer(input: {
 
 export async function updateInfluencer(
   id: string,
-  fields: { voice_id?: string | null; status?: string },
+  fields: { voice_id?: string | null; status?: string; persona?: Record<string, unknown>; higgsfield_soul_id?: string | null; look_refs?: unknown[] },
 ): Promise<void> {
   const sets: string[] = [];
   const vals: unknown[] = [];
   let i = 1;
   if (fields.voice_id !== undefined) { sets.push(`voice_id = $${i++}`); vals.push(fields.voice_id); }
   if (fields.status !== undefined) { sets.push(`status = $${i++}`); vals.push(fields.status); }
+  if (fields.persona !== undefined) { sets.push(`persona = $${i++}`); vals.push(JSON.stringify(fields.persona)); }
+  if (fields.higgsfield_soul_id !== undefined) { sets.push(`higgsfield_soul_id = $${i++}`); vals.push(fields.higgsfield_soul_id); }
+  if (fields.look_refs !== undefined) { sets.push(`look_refs = $${i++}`); vals.push(JSON.stringify(fields.look_refs)); }
   if (!sets.length) return;
   vals.push(id);
   await db().query(`update influencers set ${sets.join(", ")} where id = $${i}`, vals);

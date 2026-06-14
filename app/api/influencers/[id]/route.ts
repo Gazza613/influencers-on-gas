@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { deleteInfluencer, updateInfluencer } from "@/lib/influencers";
+import { deleteInfluencer, updateInfluencer, getInfluencer } from "@/lib/influencers";
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const influencer = await getInfluencer(id);
+  if (!influencer) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ influencer });
+}
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

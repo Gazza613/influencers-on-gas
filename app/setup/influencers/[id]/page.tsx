@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getInfluencer } from "@/lib/influencers";
 import VoicePicker from "@/components/VoicePicker";
+import ReferenceGen from "@/components/ReferenceGen";
 
 export const dynamic = "force-dynamic";
 
@@ -49,13 +50,13 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
         </div>
       )}
 
-      {/* Generation (Phase 3b) */}
-      <div className="mt-6 rounded-xl border border-active/40 bg-active/5 p-5">
-        <div className="text-sm font-semibold text-active">Generation wires up next</div>
-        <p className="mt-1 text-xs text-ink-dim">
-          Reference-frame generation, identity training, the realism pass, and presenter
-          creation activate next. The hyper-realism look is applied automatically.
-        </p>
+      {/* Identity generation (Inngest durable job) */}
+      <div className="mt-6">
+        <ReferenceGen
+          influencerId={inf.id}
+          status={inf.status}
+          identityPrompt={(persona as Record<string, string>).identity_prompt ?? null}
+        />
       </div>
     </div>
   );
