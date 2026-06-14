@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getInfluencer } from "@/lib/influencers";
 import VoicePicker from "@/components/VoicePicker";
 import ReferenceGen from "@/components/ReferenceGen";
+import PresenterCard from "@/components/PresenterCard";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
       <div className="mt-6 grid grid-cols-3 gap-3">
         <StatusCard label="Identity" ok={!!inf.higgsfield_soul_id} pending="Not trained" />
         <VoicePicker influencerId={inf.id} voiceId={inf.voice_id} />
-        {inf.mode === "twin" && <StatusCard label="Presenter" ok={!!inf.heygen_avatar_id} pending="Not created" />}
+        <PresenterCard influencerId={inf.id} avatarId={inf.heygen_avatar_id} hasHero={!!faceUrl} />
         {inf.mode === "twin" && <StatusCard label="Consent" ok={!!inf.consent_id} pending="Missing" />}
       </div>
 

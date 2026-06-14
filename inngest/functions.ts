@@ -2,6 +2,7 @@ import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
+import { createTalkingPhoto } from "@/lib/vendors/heygen";
 
 const CANDIDATE_COUNT = 6;
 
@@ -119,6 +120,33 @@ export const buildIdentity = inngest.createFunction(
     } catch (e) {
       await step.run("mark-failed", () =>
         updateInfluencer(influencerId, { status: "gen_failed", persona: { ...persona, gen_error: String((e as Error)?.message || e).slice(0, 300) } }),
+      );
+      throw e;
+    }
+  },
+);
+
+// PRESENTER — turn the chosen hero into a HeyGen Talking Photo (the talking a-roll
+// avatar). Fast; stored as heygen_avatar_id for the produce pipeline to drive later.
+export const createPresenter = inngest.createFunction(
+  { id: "create-presenter", retries: 1, triggers: [{ event: "influencer/create.presenter" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "influencer not found" };
+    const refs = (inf.look_refs as { url: string; hero?: boolean }[]) || [];
+    const hero = (inf.persona as { hero_url?: string })?.hero_url || refs.find((r) => r.hero)?.url || refs[0]?.url;
+    if (!hero) return { error: "no hero image yet" };
+
+    try {
+      const talkingPhotoId = await step.run("talking-photo", () => createTalkingPhoto(hero));
+      await step.run("save", () =>
+        updateInfluencer(influencerId, { heygen_avatar_id: talkingPhotoId, persona: { ...inf.persona, presenter_error: null } }),
+      );
+      return { ok: true, talkingPhotoId };
+    } catch (e) {
+      await step.run("fail", () =>
+        updateInfluencer(influencerId, { persona: { ...inf.persona, presenter_error: String((e as Error)?.message || e).slice(0, 300) } }),
       );
       throw e;
     }
