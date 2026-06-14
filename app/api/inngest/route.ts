@@ -9,5 +9,5 @@ import { generateReferences } from "@/inngest/functions";
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [generateReferences],
-  serveHost: "https://influencers.gasmarketing.co.za",
+  serveOrigin: "https://influencers.gasmarketing.co.za",
 });
