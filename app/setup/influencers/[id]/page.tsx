@@ -4,6 +4,7 @@ import { getInfluencer } from "@/lib/influencers";
 import VoicePicker from "@/components/VoicePicker";
 import ReferenceGen from "@/components/ReferenceGen";
 import PresenterCard from "@/components/PresenterCard";
+import RealismBoost from "@/components/RealismBoost";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +41,10 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
       </div>
 
       {faceUrl && (
-        <div className="mt-5 flex items-center gap-4 rounded-xl border border-line bg-surface-1 p-4">
+        <div className="mt-5 flex flex-wrap items-center gap-4 rounded-xl border border-line bg-surface-1 p-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={faceUrl} alt={`${inf.name} face`} className="h-28 w-28 rounded-lg border border-line object-cover" />
-          <div>
+          <div className="min-w-[180px] flex-1">
             <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">The face</div>
             <div className="mt-1 text-sm text-ink">
               {inf.higgsfield_soul_id
@@ -51,6 +52,7 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
                 : "Hero frame. Train the identity below to lock this face across every video."}
             </div>
           </div>
+          <RealismBoost influencerId={inf.id} realismUrl={(persona as Record<string, string>).hero_realism_url ?? null} hasHero={!!faceUrl} />
         </div>
       )}
 

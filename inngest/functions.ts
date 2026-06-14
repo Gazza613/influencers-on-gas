@@ -3,6 +3,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
+import { enhanceImage } from "@/lib/vendors/magnific";
 
 const CANDIDATE_COUNT = 6;
 
@@ -147,6 +148,33 @@ export const createPresenter = inngest.createFunction(
     } catch (e) {
       await step.run("fail", () =>
         updateInfluencer(influencerId, { persona: { ...inf.persona, presenter_error: String((e as Error)?.message || e).slice(0, 300) } }),
+      );
+      throw e;
+    }
+  },
+);
+
+// REALISM — run the hero through Magnific for skin realism. Stores the enhanced URL
+// as persona.hero_realism_url (kept alongside the original).
+export const enhanceRealism = inngest.createFunction(
+  { id: "enhance-realism", retries: 1, triggers: [{ event: "influencer/enhance.realism" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "influencer not found" };
+    const refs = (inf.look_refs as { url: string; hero?: boolean }[]) || [];
+    const hero = (inf.persona as { hero_url?: string })?.hero_url || refs.find((r) => r.hero)?.url || refs[0]?.url;
+    if (!hero) return { error: "no hero image yet" };
+
+    try {
+      const enhanced = await step.run("enhance", () => enhanceImage(hero));
+      await step.run("save", () =>
+        updateInfluencer(influencerId, { persona: { ...inf.persona, hero_realism_url: enhanced, realism_error: null } }),
+      );
+      return { ok: true, enhanced };
+    } catch (e) {
+      await step.run("fail", () =>
+        updateInfluencer(influencerId, { persona: { ...inf.persona, realism_error: String((e as Error)?.message || e).slice(0, 300) } }),
       );
       throw e;
     }

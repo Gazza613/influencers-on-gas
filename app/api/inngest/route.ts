@@ -1,6 +1,6 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
-import { generateCandidates, buildIdentity, createPresenter, trainSoulJob } from "@/inngest/functions";
+import { generateCandidates, buildIdentity, createPresenter, enhanceRealism, trainSoulJob } from "@/inngest/functions";
 
 // Image generation + polling can run up to a few minutes.
 export const maxDuration = 300;
@@ -13,7 +13,7 @@ export const maxDuration = 300;
 // build-time INNGEST_SIGNING_KEY points at the wrong Inngest environment.
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [generateCandidates, buildIdentity, createPresenter, trainSoulJob],
+  functions: [generateCandidates, buildIdentity, createPresenter, enhanceRealism, trainSoulJob],
   serveOrigin: "https://influencers.gasmarketing.co.za",
   ...(process.env.INNGEST_PROD_SIGNING_KEY ? { signingKey: process.env.INNGEST_PROD_SIGNING_KEY } : {}),
 });
