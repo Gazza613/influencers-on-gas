@@ -78,7 +78,7 @@ export default function ConnectTools({
                   }}
                   className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink"
                 >
-                  {editing === c.id ? "Cancel" : c.source === "vault" ? "Update" : "Connect"}
+                  {editing === c.id ? "Cancel" : c.connected ? "Update" : "Connect"}
                 </button>
               )}
               {canEdit && c.source === "vault" && (
