@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type Ref = { url: string; hero?: boolean };
 
 const CAST_TOTAL = 6; // candidate looks to choose from
-const SET_TOTAL = 7; // chosen hero + 6 coverage frames
+const SET_TOTAL = 9; // chosen hero + 6 face-coverage + 2 scene shots
 
 const CAST_QUIPS = [
   "Casting your influencer…",
@@ -18,8 +18,8 @@ const BUILD_QUIPS = [
   "Locking in the chosen face…",
   "Shooting every angle…",
   "Getting the close-up skin detail…",
+  "On location for the scene shots…",
   "Dialling in the lighting…",
-  "Building the coverage set…",
 ];
 const TRAIN_QUIPS = [
   "Teaching every angle of this face…",
@@ -134,29 +134,29 @@ export default function ReferenceGen({
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-5">
       <div className="flex items-center justify-between">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Identity</div>
+        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">{hasSet ? "Photoshoot" : "Casting"}</div>
         <span className={`text-xs ${st === "ready" || st === "frames_ready" || st === "cast_ready" ? "text-ready" : st.includes("failed") ? "text-alert" : "text-active"}`}>{st}</span>
       </div>
 
       {/* Step hint */}
       <p className="mt-1 text-[11px] text-ink-faint">
         {trained && !training ? "Identity locked." :
-         hasSet ? "Step 2 of 2 — pick the best 5+ frames, then train the identity." :
-         showChoose ? "Step 1 of 2 — choose the face. We’ll then shoot a full set of it for training." :
-         "Generate a set of looks, choose your favourite, then we build & train that face."}
+         hasSet ? "Photoshoot — pick the best 5+ frames (face shots train the identity best), then train." :
+         showChoose ? "Casting — choose your model. We’ll then run the photoshoot on that face." :
+         "Casting — generate a set of looks, choose your model, then run the photoshoot & train."}
       </p>
 
       {/* Actions */}
       <div className="mt-3 flex flex-wrap gap-2">
         {!hasSet && (
           <button onClick={cast} disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
-            {casting ? "Casting…" : candidates.length ? "Re-generate looks" : "Generate looks"}
+            {casting ? "Casting…" : candidates.length ? "Re-cast looks" : "Generate looks"}
           </button>
         )}
         {showChoose && (
           <button onClick={build} disabled={busy || !chosen}
             className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink hover:border-line-strong disabled:opacity-50">
-            {chosen ? "Build identity set from this look →" : "Pick a look to continue"}
+            {chosen ? "Start photoshoot with this model →" : "Pick a model to continue"}
           </button>
         )}
         {hasSet && !trained && (
@@ -186,8 +186,8 @@ export default function ReferenceGen({
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
             {training ? "Training runs in the background — you can leave this page." :
-             building ? "Shooting your influencer from every angle — frames appear as they’re ready." :
-             "Generating looks — they appear as they’re ready."}
+             building ? "Photoshoot in progress — angles, close-ups & your scene. Frames appear as they’re ready." :
+             "Casting looks — they appear as they’re ready."}
           </p>
         </div>
       )}

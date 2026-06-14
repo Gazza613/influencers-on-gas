@@ -5,17 +5,27 @@ import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/v
 
 const CANDIDATE_COUNT = 6;
 
-// Stage 2 — same-person coverage shot from the CHOSEN look: angles, expressions, and
-// the close-up face/skin/lips detail Soul training wants. Each is locked to the chosen
-// face via the Element, so every frame is ONE consistent identity. Wardrobe/setting held.
-const IDENTITY_VARIATIONS = [
-  "the same exact person, three-quarter left angle, soft natural daylight, calm neutral expression, identical face, wardrobe and setting, photorealistic portrait",
-  "the same exact person, three-quarter right angle, warm indoor lighting, subtle genuine smile, identical face, wardrobe and setting, photorealistic portrait",
-  "the same exact person, near-profile side view, gentle side lighting, relaxed expression, identical face, wardrobe and setting, photorealistic portrait",
+// Stage 2 (Photoshoot) — same-person coverage from the CHOSEN look. FACE_COVERAGE is the
+// angle/expression/close-up set that trains a faithful identity; sceneShots() places the
+// same face in the brief's required location. Each is locked to the chosen face via the
+// Element, so every frame is ONE consistent identity.
+const FACE_COVERAGE = [
+  "the same exact person, three-quarter left angle, soft natural daylight, calm neutral expression, identical face and wardrobe, photorealistic portrait",
+  "the same exact person, three-quarter right angle, warm indoor lighting, subtle genuine smile, identical face and wardrobe, photorealistic portrait",
+  "the same exact person, near-profile side view, gentle side lighting, relaxed expression, identical face and wardrobe, photorealistic portrait",
   "the same exact person, tight beauty close-up of the face, sharp catchlight in the eyes, natural skin texture with visible pores and fine detail, identical features, photorealistic",
   "the same exact person, close-up on the lower face and lips, soft natural light, realistic skin and lip detail, identical features, photorealistic",
-  "the same exact person, straight-on at eye level, looking directly into the lens, warm authentic smile, identical face, wardrobe and setting, photorealistic portrait",
+  "the same exact person, straight-on at eye level, looking directly into the lens, warm authentic smile, identical face and wardrobe, photorealistic portrait",
 ];
+
+// 2 shots of the same person in the brief's location (the money shots you'll actually use).
+function sceneShots(setting?: string): string[] {
+  const loc = (setting || "").trim() || "a clean editorial studio backdrop";
+  return [
+    `the same exact person in ${loc}, natural medium shot with full scene context, face clearly visible and identical, photorealistic editorial photo`,
+    `the same exact person in ${loc}, candid wider lifestyle shot, environment in frame, identical face, photorealistic`,
+  ];
+}
 
 // STAGE 1 — Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the
 // producer can choose the face. Each is an independent generation (different person),
@@ -75,7 +85,8 @@ export const buildIdentity = inngest.createFunction(
 
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const prompt = (persona.identity_prompt as string) || buildIdentityPrompt(inf.persona).prompt;
-    const expected = IDENTITY_VARIATIONS.length + 1;
+    const coverage = [...FACE_COVERAGE, ...sceneShots(persona.setting as string | undefined)];
+    const expected = coverage.length + 1;
 
     try {
       // Lock the chosen face as a reusable Element (import the URL → media reference).
@@ -87,7 +98,7 @@ export const buildIdentity = inngest.createFunction(
       );
 
       // All coverage frames generate CONCURRENTLY, each locked to the chosen face.
-      const vPrompts = IDENTITY_VARIATIONS.map((v) => (elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`));
+      const vPrompts = coverage.map((v) => (elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`));
       const urls = await step.run("variations", () => generateBatch(vPrompts, "gpt_image_2", "9:16"));
       for (const url of urls) if (url && !frames.some((f) => f.url === url)) frames.push({ url });
 
