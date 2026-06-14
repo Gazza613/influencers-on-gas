@@ -2,18 +2,21 @@ import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt } from "@/lib/realism";
 import { generateImages, listTools } from "@/lib/vendors/higgsfield";
+import { db } from "@/lib/db";
 
-// Throwaway discovery: logs Higgsfield's MCP tools + schemas to the Vercel logs so
-// we can find the Soul-training tool. (Remove after 3b-2b-ii.)
+// Throwaway discovery: persists Higgsfield's MCP tool list + schemas to a _diag row
+// so we can read it via a DB query (logs are flaky). Remove after 3b-2b-ii.
 export const discoverTools = inngest.createFunction(
   { id: "hf-discover-tools", triggers: [{ event: "hf/discover.tools" }] },
   async ({ step }) => {
     const tools = await step.run("list-tools", () => listTools());
-    for (const t of tools) {
-      const hit = /soul|train|character|avatar|identity|finetune|custom|model|set|lora/i.test(t.name);
-      console.log(`[HFTOOLS]${hit ? "★" : " "} ${t.name} :: ${(t.description || "").slice(0, 80)}`);
-      if (hit) console.log(`[HFTOOLS-SCHEMA] ${t.name} ${JSON.stringify(t.inputSchema || {}).slice(0, 900)}`);
-    }
+    await step.run("persist", async () => {
+      await db().query("create table if not exists _diag (k text primary key, data jsonb, at timestamptz default now())");
+      await db().query(
+        "insert into _diag (k, data, at) values ('hf_tools', $1, now()) on conflict (k) do update set data = excluded.data, at = now()",
+        [JSON.stringify(tools)],
+      );
+    });
     return { count: tools.length };
   },
 );
