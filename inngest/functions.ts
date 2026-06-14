@@ -5,6 +5,10 @@ import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/v
 
 const CANDIDATE_COUNT = 6;
 
+// Nano Banana Pro: 1 credit/image (vs gpt_image_2's 4), far faster, and supports the
+// <<<element>>> identity lock we need for consistent photoshoot frames.
+const IMAGE_MODEL = "nano_banana_2";
+
 // Stage 2 (Photoshoot) — same-person coverage from the CHOSEN look. FACE_COVERAGE is the
 // angle/expression/close-up set that trains a faithful identity; sceneShots() places the
 // same face in the brief's required location. Each is locked to the chosen face via the
@@ -49,7 +53,7 @@ export const generateCandidates = inngest.createFunction(
     try {
       // gpt_image_2 is ~150s PER IMAGE, so generating all 6 CONCURRENTLY collapses casting
       // to ~one image's wall-clock (~2.5 min) instead of 6× (~15 min).
-      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), "gpt_image_2", "9:16"));
+      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16"));
       const candidates = [...new Set(urls.filter((u): u is string => !!u))].map((url) => ({ url }));
       if (!candidates.length) throw new Error("no candidate looks generated");
       await step.run("save-candidates", () =>
@@ -101,7 +105,7 @@ export const buildIdentity = inngest.createFunction(
       // All coverage frames generate CONCURRENTLY, each locked to the chosen face (~one
       // image's wall-clock instead of 8×).
       const vPrompts = coverage.map((v) => (elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`));
-      const urls = await step.run("variations", () => generateBatch(vPrompts, "gpt_image_2", "9:16"));
+      const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
       for (const url of urls) if (url && !frames.some((f) => f.url === url)) frames.push({ url });
 
       await step.run("save-frames", () =>
