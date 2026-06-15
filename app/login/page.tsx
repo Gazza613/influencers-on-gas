@@ -39,7 +39,7 @@ export default function LoginPage() {
       <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center">
         <Image src="/gas-logo.png" alt="GAS" width={88} height={88}
           className="rounded-full" style={{ filter: "drop-shadow(0 0 34px rgba(249,98,3,0.6))" }} priority />
-        <h1 className="mt-6 text-2xl font-extrabold tracking-tight">GAS Studio</h1>
+        <h1 className="mt-6 text-2xl font-extrabold tracking-tight">Influencers <span className="text-accent">on</span> GAS</h1>
         <p className="tabular mt-1 text-[11px] uppercase tracking-[0.35em] text-ink-faint">
           Influence that matters
         </p>

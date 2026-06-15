@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import SignOutButton from "@/components/SignOutButton";
+import StudioSelectors from "@/components/StudioSelectors";
 import { listConnections } from "@/lib/connections";
 
 // Produce-flow stages (ux-flow.md). Skeleton for Phase 1 — wired up in later phases.
@@ -27,11 +28,12 @@ export default async function StudioPage() {
       {/* ── Top bar: wordmark · brain + influencer selectors · live cost readout */}
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface-1 px-4 py-2.5">
         <div className="flex items-center gap-4">
-          <span className="font-extrabold tracking-tight">
-            GAS<span className="text-accent">·</span>Studio
+          <span className="flex items-center gap-2 font-extrabold tracking-tight">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/gas-logo.png" alt="GAS" className="h-7 w-7 rounded-full" />
+            <span>Influencers <span className="text-accent">on</span> GAS</span>
           </span>
-          <Selector label="Brain" value="none" />
-          <Selector label="Influencer" value="none" />
+          <StudioSelectors />
         </div>
         <div className="flex items-center gap-4">
           <div className="tabular text-xs text-ink-dim">
@@ -71,9 +73,9 @@ export default async function StudioPage() {
         {/* Center — stage workspace */}
         <main className="min-h-0 overflow-y-auto p-8">
           <div className="mx-auto max-w-2xl">
-            <h1 className="text-xl font-bold">GAS Studio</h1>
+            <h1 className="text-xl font-bold">Influencers on GAS</h1>
             <p className="mt-2 text-sm text-ink-dim">
-              The agency video-production rebuild. Connect your tools, then add client
+              The agency video-production studio. Connect your tools, then add client
               brains and influencers to start producing.
             </p>
             {missingRequired.length > 0 ? (
@@ -119,15 +121,5 @@ export default async function StudioPage() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function Selector({ label, value }: { label: string; value: string }) {
-  return (
-    <button className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-xs text-ink-dim">
-      <span className="text-ink-faint">{label}</span>
-      <span className="text-ink">{value}</span>
-      <span className="text-ink-faint">▾</span>
-    </button>
   );
 }
