@@ -5,6 +5,7 @@ import VoicePicker from "@/components/VoicePicker";
 import ReferenceGen from "@/components/ReferenceGen";
 import PresenterCard from "@/components/PresenterCard";
 import RealismBoost from "@/components/RealismBoost";
+import BibleEditor from "@/components/BibleEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,15 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
         <VoicePicker influencerId={inf.id} voiceId={inf.voice_id} />
         <PresenterCard influencerId={inf.id} avatarId={inf.heygen_avatar_id} hasHero={!!faceUrl} />
         {inf.mode === "twin" && <StatusCard label="Consent" ok={!!inf.consent_id} pending="Missing" />}
+      </div>
+
+      {/* Character Bible (AI-authored blueprint) */}
+      <div className="mt-6">
+        <BibleEditor
+          influencerId={inf.id}
+          initialBrief={(persona as Record<string, string>).brief ?? null}
+          initialBible={(persona as { bible?: Record<string, unknown> }).bible ?? null}
+        />
       </div>
 
       {/* Persona */}

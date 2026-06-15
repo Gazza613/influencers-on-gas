@@ -12,15 +12,39 @@ export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin";
 
+// Compose a rich subject line from a Character Bible when present (far more specific
+// than the simple persona fields), else fall back to the basic persona controls.
+function subjectFromBible(b: Record<string, unknown>): string {
+  const id = (b.identity ?? {}) as Record<string, string>;
+  const face = (b.face ?? {}) as Record<string, string>;
+  const wardrobe = (b.wardrobe ?? {}) as { garments?: { item: string; fabric: string }[]; footwear?: string };
+  const garments = (wardrobe.garments ?? []).map((g) => `${g.item} (${g.fabric})`).join(", ");
+  const parts = [
+    [id.age, id.build, id.ethnicity_design].filter(Boolean).join(", "),
+    id.profession,
+    face.structure, face.skin, face.eyes, face.hair, face.distinct_features,
+    garments && `wearing ${garments}`,
+    wardrobe.footwear,
+  ].map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean);
+  return parts.join(", ");
+}
+
 // Compose a persona spec with the always-on realism core into a generation prompt.
 export function buildIdentityPrompt(persona: Record<string, unknown> = {}) {
-  const order = ["gender", "age_range", "vibe", "wardrobe", "setting"];
-  const bits = order
-    .map((k) => persona[k])
-    .map((x) => (typeof x === "string" ? x.trim() : ""))
-    .filter(Boolean);
-  const subject = bits.length ? bits.join(", ") + ". " : "";
-  return { prompt: `${subject}${REALISM_POSITIVE}.`, negative: REALISM_NEGATIVE };
+  const bible = persona.bible as Record<string, unknown> | undefined;
+  let subject = "";
+  if (bible && typeof bible === "object") {
+    subject = subjectFromBible(bible);
+  } else {
+    const order = ["gender", "age_range", "vibe", "wardrobe", "setting"];
+    subject = order
+      .map((k) => persona[k])
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter(Boolean)
+      .join(", ");
+  }
+  const subjectStr = subject ? subject + ". " : "";
+  return { prompt: `${subjectStr}${REALISM_POSITIVE}.`, negative: REALISM_NEGATIVE };
 }
 
 // Self-check before accepting a generated frame (influencer-builder.md).
