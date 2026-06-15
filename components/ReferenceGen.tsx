@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Lightbox from "@/components/Lightbox";
+import Uploader from "@/components/Uploader";
 
 type Ref = { url: string; hero?: boolean };
 
@@ -61,6 +62,8 @@ export default function ReferenceGen({
   const [err, setErr] = useState("");
   const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
+  const [locationRef, setLocationRef] = useState<string | null>(null);
+  const [clothingRef, setClothingRef] = useState<string | null>(null);
 
   const casting = st === "casting";
   const building = st === "generating";
@@ -116,7 +119,7 @@ export default function ReferenceGen({
     if (!src || busy) return;
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/build`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chosenUrl: src }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chosenUrl: src, locationRef, clothingRef }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not build the identity set"); setBusy(false); return; }
     setSt("generating"); setFrames([{ url: src, hero: true }]); poll();
@@ -156,6 +159,18 @@ export default function ReferenceGen({
          showChoose ? "Casting: choose your model. We then run a full photoshoot on that exact face." :
          "Casting: we generate a set of distinct, photoreal looks for you to choose your model from."}
       </p>
+
+      {/* Photoshoot options: optional location + clothing references to steer scenes/wardrobe */}
+      {!hasSet && (referenceUrl || chosen) && (
+        <div className="mt-3 rounded-lg border border-line bg-surface-2 p-3">
+          <div className="tabular mb-2 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Photoshoot options (optional)</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Uploader kind="location" label="Location shot" current={locationRef} onUploaded={setLocationRef} />
+            <Uploader kind="clothing" label="Clothing style" current={clothingRef} onUploaded={setClothingRef} />
+          </div>
+          <p className="mt-2 text-[11px] text-ink-faint">Upload a location and/or an outfit to steer the scene shots and wardrobe. Leave blank to use the brief.</p>
+        </div>
+      )}
 
       {/* Reference-photo flow (twin / "use my reference") — casting skipped */}
       {!hasSet && referenceUrl && (

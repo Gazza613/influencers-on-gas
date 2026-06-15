@@ -86,6 +86,8 @@ export const buildIdentity = inngest.createFunction(
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const chosenUrl = String(event.data.chosenUrl || "");
+    const locationRef = (event.data.locationRef as string) || "";
+    const clothingRef = (event.data.clothingRef as string) || "";
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "influencer not found" };
     if (!chosenUrl) {
@@ -95,21 +97,28 @@ export const buildIdentity = inngest.createFunction(
 
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const prompt = (persona.identity_prompt as string) || buildIdentityPrompt(inf.persona).prompt;
-    const coverage = [...FACE_COVERAGE, ...sceneShots(persona.setting as string | undefined)];
-    const expected = coverage.length + 1;
+    const faceCoverage = [...FACE_COVERAGE];
+    const sceneCoverage = sceneShots(persona.setting as string | undefined);
+    const expected = faceCoverage.length + sceneCoverage.length + 1;
 
     try {
       // Lock the chosen face as a reusable Element (import the URL → media reference).
       const elementId = await step.run("element", () => createFaceElement(null, chosenUrl, `${inf.name}-${influencerId.slice(0, 8)}`));
+      // Optional uploaded references → their own Elements (steer wardrobe + location).
+      const clothEl = clothingRef ? await step.run("cloth-element", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
+      const locEl = locationRef ? await step.run("loc-element", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
 
       const frames: { url: string; hero?: boolean }[] = [{ url: chosenUrl, hero: true }];
       await step.run("save-hero", () =>
         updateInfluencer(influencerId, { look_refs: [...frames], persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected } }),
       );
 
-      // All coverage frames generate CONCURRENTLY, each locked to the chosen face (~one
-      // image's wall-clock instead of 8×).
-      const vPrompts = coverage.map((v) => (elementId ? `<<<${elementId}>>> ${v}` : `${prompt}. ${v}`));
+      // Compose prompts: face element always; clothing element on face-coverage; location
+      // element on scene shots. Each <<<id>>> placeholder injects that reference image.
+      const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
+      const facePrompts = faceCoverage.map((v) => `${tag(elementId)}${tag(clothEl)}${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${v}`);
+      const scenePrompts = sceneCoverage.map((v) => `${tag(elementId)}${tag(locEl)}${locEl ? "in the same location as the location reference, " : ""}${v}`);
+      const vPrompts = elementId ? [...facePrompts, ...scenePrompts] : [...faceCoverage, ...sceneCoverage].map((v) => `${prompt}. ${v}`);
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
       for (const url of urls) if (url && !frames.some((f) => f.url === url)) frames.push({ url });
 

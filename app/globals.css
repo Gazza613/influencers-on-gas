@@ -9,8 +9,8 @@
   --color-line: rgba(255, 255, 255, 0.08);
   --color-line-strong: rgba(255, 255, 255, 0.14);
   --color-ink: #e6e8eb;       /* primary text */
-  --color-ink-dim: rgba(230, 232, 235, 0.55);
-  --color-ink-faint: rgba(230, 232, 235, 0.32);
+  --color-ink-dim: rgba(230, 232, 235, 0.68);
+  --color-ink-faint: rgba(230, 232, 235, 0.5);
   --color-accent: #f96203;    /* GAS orange */
   --color-active: #ffb020;    /* in-progress / warm */
   --color-ready: #34c759;     /* ready / ok */

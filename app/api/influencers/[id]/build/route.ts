@@ -22,9 +22,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Pick a look, or upload a reference photo first." }, { status: 400 });
   }
 
+  const locationRef = typeof body.locationRef === "string" ? body.locationRef : "";
+  const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
+
   await updateInfluencer(id, { status: "generating" });
   try {
-    await inngest.send({ name: "influencer/build.identity", data: { influencerId: id, chosenUrl } });
+    await inngest.send({ name: "influencer/build.identity", data: { influencerId: id, chosenUrl, locationRef, clothingRef } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
