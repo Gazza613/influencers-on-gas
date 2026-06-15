@@ -248,8 +248,20 @@ export const trainSoulJob = inngest.createFunction(
       await step.sleep(`wait-${i}`, "30s");
       const status = await step.run(`status-${i}`, () => soulStatus(soulId));
       if (status === "ready") {
-        await step.run("mark-ready", () => updateInfluencer(influencerId, { status: "ready" }));
-        return { ready: true, soulId };
+        // Lock Down step 2: run the Humaniser on the hero, then mark the identity LOCKED
+        // and ready for video production.
+        const fresh = await step.run("reload", () => getInfluencer(influencerId));
+        const persona = (fresh?.persona ?? inf.persona ?? {}) as Record<string, unknown>;
+        const refs = (fresh?.look_refs as { url: string; hero?: boolean }[]) || [];
+        const hero = (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url;
+        let realism = (persona.hero_realism_url as string) || null;
+        if (hero && !realism) {
+          try { realism = await step.run("humanise", () => enhanceImage(hero)); } catch { /* non-fatal: lock anyway */ }
+        }
+        await step.run("mark-locked", () =>
+          updateInfluencer(influencerId, { status: "ready", persona: { ...persona, hero_realism_url: realism, locked: true } }),
+        );
+        return { ready: true, soulId, locked: true };
       }
       if (status === "failed") {
         await step.run("mark-soul-failed", () => updateInfluencer(influencerId, { status: "soul_failed" }));

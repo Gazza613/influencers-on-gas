@@ -37,6 +37,7 @@ export default function ReferenceGen({
   candidates: initialCandidates,
   lookRefs,
   soulId,
+  lockedInit,
 }: {
   influencerId: string;
   status: string;
@@ -44,6 +45,7 @@ export default function ReferenceGen({
   candidates: Ref[];
   lookRefs: Ref[];
   soulId: string | null;
+  lockedInit: boolean;
 }) {
   const [st, setSt] = useState(status);
   const [prompt, setPrompt] = useState(identityPrompt);
@@ -52,17 +54,19 @@ export default function ReferenceGen({
   const [frames, setFrames] = useState<Ref[]>(lookRefs || []);
   const [selected, setSelected] = useState<Set<string>>(new Set((lookRefs || []).map((r) => r.url)));
   const [trained, setTrained] = useState(!!soulId);
+  const [locked, setLocked] = useState(!!lockedInit);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
 
-  const TERMINAL = ["cast_ready", "frames_ready", "ready", "gen_failed", "soul_failed"];
   const casting = st === "casting";
   const building = st === "generating";
   const training = st === "training";
   const hasSet = frames.length > 0;
-  const activeQuips = training ? TRAIN_QUIPS : building ? BUILD_QUIPS : CAST_QUIPS;
+  // Soul is trained but the Humaniser + lock haven't finished yet.
+  const humanising = busy && trained && !training && !locked;
+  const activeQuips = training || humanising ? TRAIN_QUIPS : building ? BUILD_QUIPS : CAST_QUIPS;
   const working = busy || casting || building || training;
 
   // Rotate the engaging copy while a job runs.
@@ -89,12 +93,11 @@ export default function ReferenceGen({
         setSelected((sel) => (sel.size ? sel : new Set(inf.look_refs.map((x: Ref) => x.url))));
       }
       setTrained(!!inf.higgsfield_soul_id);
-      if (TERMINAL.includes(inf.status)) {
-        if (inf.status === "gen_failed") setErr(inf.persona?.gen_error || "Generation failed");
-        if (inf.status === "soul_failed") setErr(inf.persona?.soul_error || "Soul training failed");
-        setBusy(false);
-        return;
-      }
+      if (inf.persona?.locked) { setLocked(true); setBusy(false); return; } // lock down complete
+      if (inf.status === "gen_failed") { setErr(inf.persona?.gen_error || "Generation failed"); setBusy(false); return; }
+      if (inf.status === "soul_failed") { setErr(inf.persona?.soul_error || "Soul training failed"); setBusy(false); return; }
+      if (inf.status === "cast_ready" || inf.status === "frames_ready") { setBusy(false); return; }
+      // casting / generating / training / ready(humanising) → keep polling
     }
     return poll(tries + 1);
   }
@@ -136,14 +139,16 @@ export default function ReferenceGen({
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-5">
       <div className="flex items-center justify-between">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">{hasSet ? "Photoshoot" : "Casting"}</div>
-        <span className={`text-xs ${st === "ready" || st === "frames_ready" || st === "cast_ready" ? "text-ready" : st.includes("failed") ? "text-alert" : "text-active"}`}>{st}</span>
+        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">{locked ? "Locked" : trained || training ? "③ Lock down" : hasSet ? "② Photoshoot" : "① Casting"}</div>
+        <span className={`text-xs ${locked ? "text-ready" : st === "frames_ready" || st === "cast_ready" ? "text-ready" : st.includes("failed") ? "text-alert" : "text-active"}`}>{locked ? "locked" : st}</span>
       </div>
 
       {/* Step hint */}
       <p className="mt-1 text-[11px] text-ink-faint">
-        {trained && !training ? "Identity locked." :
-         hasSet ? "Photoshoot: pick your strongest 5+ frames (the face shots train the sharpest identity), then lock it in." :
+        {locked ? "Identity locked and ready for video production." :
+         humanising ? "Soul trained. Running the Humaniser to lock the look in." :
+         training ? "Locking down the identity. This runs in the background." :
+         hasSet ? "Photoshoot: pick your strongest 5+ frames (the face shots train the sharpest identity), then lock it down." :
          showChoose ? "Casting: choose your model. We then run a full photoshoot on that exact face." :
          "Casting: we generate a set of distinct, photoreal looks for you to choose your model from."}
       </p>
@@ -164,7 +169,7 @@ export default function ReferenceGen({
         {hasSet && !trained && (
           <button onClick={train} disabled={busy || selected.size < 5}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
-            {training ? "Training identity… (~10 min)" : `Train identity (${selected.size} selected)`}
+            {training ? "Locking down… (~10 min)" : `🔒 Lock down identity (${selected.size} selected)`}
           </button>
         )}
       </div>
@@ -187,14 +192,15 @@ export default function ReferenceGen({
             ) : <div className="h-full w-1/4 animate-pulse rounded-full bg-accent" />}
           </div>
           <p className="mt-2 text-[11px] text-ink-faint">
-            {training ? "Locking the identity. This runs in the background, you can carry on elsewhere." :
+            {humanising ? "Running the Humaniser for real-skin detail, then it is locked. Hang tight." :
+             training ? "Locking the identity (training the Soul). This runs in the background, you can carry on elsewhere." :
              building ? "Photoshoot in progress: angles, close-ups and your scene. Frames appear as they are ready." :
              "Casting your influencer. Fresh looks appear as they land."}
           </p>
         </div>
       )}
 
-      {trained && !training && <p className="mt-3 text-xs text-ready">✓ Identity locked. This exact face now carries across every video.</p>}
+      {locked && <p className="mt-3 text-xs text-ready">✓ Identity locked and humanised. This exact face is ready for video production.</p>}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
 
       {/* Casting board — choose one */}

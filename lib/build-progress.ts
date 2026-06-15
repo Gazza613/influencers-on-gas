@@ -13,13 +13,13 @@ export function buildProgress(inf: ProgressInput): { pct: number; done: number; 
   const p = (inf.persona ?? {}) as Record<string, unknown>;
   const candidates = Array.isArray(p.candidates) ? (p.candidates as unknown[]) : [];
   const refs = Array.isArray(inf.look_refs) ? inf.look_refs : [];
+  // Build phase = Bible → Casting → Photoshoot → Lock down. Voice/Presenter are video
+  // production (a later phase), so the ring hits 100% when the identity is locked.
   const stages: BuildStage[] = [
     { key: "bible", label: "Bible", done: !!p.bible },
     { key: "cast", label: "Casting", done: candidates.length > 0 || refs.length > 0 },
-    { key: "shoot", label: "Photoshoot", done: refs.length > 0 },
-    { key: "identity", label: "Identity", done: !!inf.higgsfield_soul_id },
-    { key: "voice", label: "Voice", done: !!inf.voice_id },
-    { key: "presenter", label: "Presenter", done: !!inf.heygen_avatar_id },
+    { key: "shoot", label: "Photoshoot", done: refs.length > 1 },
+    { key: "locked", label: "Lock down", done: !!p.locked },
   ];
   const done = stages.filter((s) => s.done).length;
   return { pct: Math.round((100 * done) / stages.length), done, total: stages.length, stages };
