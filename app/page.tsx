@@ -34,12 +34,12 @@ function useTypewriter() {
 
 // Six floating card slots (position, rotation, size, float timing).
 const CARDS = [
-  { left: "-28px", top: "6%", w: 158, rot: "-9deg", opacity: 0.5, period: 8, sway: 11, delay: 0.0 },
-  { left: "28px", top: "43%", w: 138, rot: "5deg", opacity: 0.38, period: 10, sway: 14, delay: 1.6 },
-  { left: "-14px", top: "74%", w: 146, rot: "-5deg", opacity: 0.42, period: 12, sway: 16, delay: 0.8 },
-  { right: "-28px", top: "4%", w: 160, rot: "10deg", opacity: 0.5, period: 9, sway: 13, delay: 0.4 },
-  { right: "24px", top: "42%", w: 140, rot: "-7deg", opacity: 0.38, period: 11, sway: 15, delay: 2.0 },
-  { right: "-16px", top: "72%", w: 148, rot: "6deg", opacity: 0.44, period: 13, sway: 17, delay: 1.2 },
+  { left: "-28px", top: "6%", w: 158, rot: "-9deg", opacity: 0.92, period: 8, sway: 11, delay: 0.0 },
+  { left: "28px", top: "43%", w: 138, rot: "5deg", opacity: 0.78, period: 10, sway: 14, delay: 1.6 },
+  { left: "-14px", top: "74%", w: 146, rot: "-5deg", opacity: 0.84, period: 12, sway: 16, delay: 0.8 },
+  { right: "-28px", top: "4%", w: 160, rot: "10deg", opacity: 0.92, period: 9, sway: 13, delay: 0.4 },
+  { right: "24px", top: "42%", w: 140, rot: "-7deg", opacity: 0.78, period: 11, sway: 15, delay: 2.0 },
+  { right: "-16px", top: "72%", w: 148, rot: "6deg", opacity: 0.86, period: 13, sway: 17, delay: 1.2 },
 ] as const;
 
 type Inf = { persona?: { hero_url?: string } | null; look_refs?: { url: string; hero?: boolean }[] | null };
@@ -104,14 +104,14 @@ export default function Landing() {
             <div style={{ position: "relative", animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`, borderRadius: 18, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)", opacity: cardFade[i] ? 0 : 1, transition: "opacity 0.75s ease" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt="" style={{ width: "100%", aspectRatio: "2/3", objectFit: "cover", display: "block" }} />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,14,0.45) 0%, transparent 55%)" }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,14,0.16) 0%, transparent 42%)" }} />
             </div>
           </div>
         );
       })}
 
       {/* Vignette */}
-      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(7,7,14,0.82) 100%)", pointerEvents: "none", zIndex: 1 }} />
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(7,7,14,0.5) 100%)", pointerEvents: "none", zIndex: 1 }} />
 
       {/* Center content */}
       <div style={{ maxWidth: 680, position: "relative", zIndex: 2 }}>
