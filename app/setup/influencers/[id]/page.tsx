@@ -17,12 +17,13 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
   const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]) : [];
   const candidates = Array.isArray(persona.candidates) ? (persona.candidates as { url: string }[]) : [];
   const realismUrl = (persona.hero_realism_url as string) ?? null;
+  const referenceUrl = (persona.reference_url as string) ?? null;
   const locked = !!persona.locked;
   const heroUrl = refs.find((r) => r.hero)?.url || (refs.length ? refs[0]?.url : null) || (persona.hero_url as string) || null;
-  const faceUrl = locked && realismUrl ? realismUrl : heroUrl;
+  const faceUrl = locked && realismUrl ? realismUrl : heroUrl || referenceUrl;
 
   // 3-step build progress
-  const step1Done = candidates.length > 0 || refs.length > 0;
+  const step1Done = candidates.length > 0 || refs.length > 0 || !!referenceUrl;
   const step2Done = refs.length > 1;
   const steps = [
     { n: "①", label: "Casting", done: step1Done },
@@ -94,6 +95,7 @@ export default async function InfluencerDetail({ params }: { params: Promise<{ i
           lookRefs={refs}
           soulId={inf.higgsfield_soul_id}
           lockedInit={locked}
+          referenceUrl={referenceUrl}
         />
       </div>
 

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { Influencer } from "@/lib/influencers";
 import { buildProgress, ringColour } from "@/lib/build-progress";
 import ConsentGate from "@/components/ConsentGate";
+import Uploader from "@/components/Uploader";
 
 type Mode = "synthetic" | "twin";
 
@@ -31,27 +32,33 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   const [consentFor, setConsentFor] = useState<{ name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
+  const [refUrl, setRefUrl] = useState<string | null>(null); // optional reference for synthetic
   const [twinName, setTwinName] = useState("");
+  const [twinConsentId, setTwinConsentId] = useState<string | null>(null);
+  const [twinPhoto, setTwinPhoto] = useState<string | null>(null);
+
+  function reset() { setModal(null); setConsentFor(null); setName(""); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhoto(null); }
 
   async function createSynthetic() {
     if (!name.trim() || busy) return;
     setBusy(true);
     const r = await fetch("/api/influencers", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), mode: "synthetic", persona: {} }),
+      body: JSON.stringify({ name: name.trim(), mode: "synthetic", persona: refUrl ? { reference_url: refUrl } : {} }),
     });
     setBusy(false);
-    if (r.ok) { const { id } = await r.json(); setModal(null); setName(""); router.push(`/setup/influencers/${id}`); router.refresh(); }
+    if (r.ok) { const { id } = await r.json(); reset(); router.push(`/setup/influencers/${id}`); router.refresh(); }
   }
 
-  async function createTwin(consentId: string) {
+  async function createTwin() {
+    if (!twinConsentId || !twinPhoto || busy) return;
     setBusy(true);
     const r = await fetch("/api/influencers", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: twinName.trim(), mode: "twin", consentId }),
+      body: JSON.stringify({ name: twinName.trim(), mode: "twin", consentId: twinConsentId, persona: { reference_url: twinPhoto } }),
     });
-    setBusy(false); setConsentFor(null); setModal(null); setTwinName("");
-    if (r.ok) { const { id } = await r.json(); router.push(`/setup/influencers/${id}`); router.refresh(); }
+    setBusy(false);
+    if (r.ok) { const { id } = await r.json(); reset(); router.push(`/setup/influencers/${id}`); router.refresh(); }
   }
 
   return (
@@ -95,22 +102,35 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
       </button>
 
       {modal === "synthetic" && (
-        <Modal title="New influencer" onClose={() => setModal(null)}>
+        <Modal title="New influencer" onClose={reset}>
           <p className="text-xs text-ink-dim">Give it a name. The Character Bible, casting and the rest happen on the next screen.</p>
           <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createSynthetic()}
             placeholder="e.g. Ava" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent" />
-          <Actions onCancel={() => setModal(null)} onConfirm={createSynthetic} label={busy ? "Creating…" : "Create"} disabled={!name.trim() || busy} />
+          <div>
+            <p className="mb-1 text-[11px] text-ink-faint">Optional: upload a reference image to steer the look. With one, we skip casting and shoot straight from your reference.</p>
+            <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />
+          </div>
+          <Actions onCancel={reset} onConfirm={createSynthetic} label={busy ? "Creating…" : "Create"} disabled={!name.trim() || busy} />
         </Modal>
       )}
       {modal === "twin" && !consentFor && (
-        <Modal title="Build Me: digital twin" onClose={() => setModal(null)}>
-          <p className="text-xs text-ink-dim">Your own likeness, from photos and voice. We capture consent before any upload (POPIA / GDPR).</p>
+        <Modal title="Build Me: digital twin" onClose={reset}>
+          <p className="text-xs text-ink-dim">Your own likeness, from a photo. We capture consent before any upload (POPIA / GDPR).</p>
           <input autoFocus value={twinName} onChange={(e) => setTwinName(e.target.value)} placeholder="e.g. Gary"
             className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent" />
-          <Actions onCancel={() => setModal(null)} onConfirm={() => setConsentFor({ name: twinName })} label="Continue to consent →" disabled={!twinName.trim()} />
+          <Actions onCancel={reset} onConfirm={() => setConsentFor({ name: twinName })} label="Continue to consent →" disabled={!twinName.trim()} />
         </Modal>
       )}
-      {modal === "twin" && consentFor && <ConsentGate dataType="image" onCancel={() => setConsentFor(null)} onConfirm={createTwin} />}
+      {modal === "twin" && consentFor && !twinConsentId && (
+        <ConsentGate dataType="image" onCancel={() => setConsentFor(null)} onConfirm={(consentId) => setTwinConsentId(consentId)} />
+      )}
+      {modal === "twin" && twinConsentId && (
+        <Modal title="Upload your photo" onClose={reset}>
+          <p className="text-xs text-ink-dim">This photo is the identity. We skip casting and run the photoshoot straight from your face, then lock it down.</p>
+          <Uploader kind="twin" label="Your photo" current={twinPhoto} onUploaded={setTwinPhoto} />
+          <Actions onCancel={reset} onConfirm={createTwin} label={busy ? "Creating…" : "Create digital twin"} disabled={!twinPhoto || busy} />
+        </Modal>
+      )}
     </div>
   );
 }

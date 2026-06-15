@@ -38,6 +38,7 @@ export default function ReferenceGen({
   lookRefs,
   soulId,
   lockedInit,
+  referenceUrl,
 }: {
   influencerId: string;
   status: string;
@@ -46,6 +47,7 @@ export default function ReferenceGen({
   lookRefs: Ref[];
   soulId: string | null;
   lockedInit: boolean;
+  referenceUrl: string | null;
 }) {
   const [st, setSt] = useState(status);
   const [prompt, setPrompt] = useState(identityPrompt);
@@ -109,14 +111,15 @@ export default function ReferenceGen({
     setSt("casting"); setCandidates([]); poll();
   }
 
-  async function build() {
-    if (!chosen || busy) return;
+  async function build(url?: string) {
+    const src = url ?? chosen;
+    if (!src || busy) return;
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/build`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chosenUrl: chosen }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chosenUrl: src }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not build the identity set"); setBusy(false); return; }
-    setSt("generating"); setFrames([{ url: chosen, hero: true }]); poll();
+    setSt("generating"); setFrames([{ url: src, hero: true }]); poll();
   }
 
   async function train() {
@@ -139,7 +142,7 @@ export default function ReferenceGen({
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-5">
       <div className="flex items-center justify-between">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">{locked ? "Locked" : trained || training ? "③ Lock down" : hasSet ? "② Photoshoot" : "① Casting"}</div>
+        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">{locked ? "Locked" : trained || training ? "③ Lock down" : hasSet || referenceUrl ? "② Photoshoot" : "① Casting"}</div>
         <span className={`text-xs ${locked ? "text-ready" : st === "frames_ready" || st === "cast_ready" ? "text-ready" : st.includes("failed") ? "text-alert" : "text-active"}`}>{locked ? "locked" : st}</span>
       </div>
 
@@ -149,19 +152,31 @@ export default function ReferenceGen({
          humanising ? "Soul trained. Running the Humaniser to lock the look in." :
          training ? "Locking down the identity. This runs in the background." :
          hasSet ? "Photoshoot: pick your strongest 5+ frames (the face shots train the sharpest identity), then lock it down." :
+         referenceUrl ? "Your reference photo is the model. Run the photoshoot to build the consistent set, casting is skipped." :
          showChoose ? "Casting: choose your model. We then run a full photoshoot on that exact face." :
          "Casting: we generate a set of distinct, photoreal looks for you to choose your model from."}
       </p>
 
+      {/* Reference-photo flow (twin / "use my reference") — casting skipped */}
+      {!hasSet && referenceUrl && (
+        <div className="mt-3 flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={referenceUrl} alt="reference" className="h-16 w-16 rounded-lg border border-line object-cover" />
+          <button onClick={() => build(referenceUrl)} disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+            {building ? "Starting photoshoot…" : "Start photoshoot from your reference →"}
+          </button>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="mt-3 flex flex-wrap gap-2">
-        {!hasSet && (
+        {!hasSet && !referenceUrl && (
           <button onClick={cast} disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
             {casting ? "Casting…" : candidates.length ? "Re-cast looks" : "Generate looks"}
           </button>
         )}
         {showChoose && (
-          <button onClick={build} disabled={busy || !chosen}
+          <button onClick={() => build()} disabled={busy || !chosen}
             className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink hover:border-line-strong disabled:opacity-50">
             {chosen ? "Start photoshoot with this model →" : "Pick a model to continue"}
           </button>

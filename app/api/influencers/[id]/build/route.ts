@@ -14,9 +14,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Validate the chosen URL is one of this influencer's casting candidates.
   const inf = await getInfluencer(id);
-  const candidates = ((inf?.persona as { candidates?: { url: string }[] } | undefined)?.candidates ?? []).map((c) => c.url);
-  if (!chosenUrl || !candidates.includes(chosenUrl)) {
-    return NextResponse.json({ error: "Pick one of the generated looks first." }, { status: 400 });
+  const p = (inf?.persona ?? {}) as { candidates?: { url: string }[]; reference_url?: string };
+  const candidates = (p.candidates ?? []).map((c) => c.url);
+  // Valid source = a chosen casting look OR an uploaded reference photo (twins / "use my reference").
+  const allowed = chosenUrl && (candidates.includes(chosenUrl) || chosenUrl === p.reference_url);
+  if (!allowed) {
+    return NextResponse.json({ error: "Pick a look, or upload a reference photo first." }, { status: 400 });
   }
 
   await updateInfluencer(id, { status: "generating" });
