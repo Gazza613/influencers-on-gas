@@ -27,9 +27,9 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
           <Link href="/setup/influencers" className="rounded-md px-2.5 py-2 text-[13px] text-ink-dim hover:bg-surface-2 hover:text-ink">
             Influencers
           </Link>
-          <div className="flex items-center justify-between rounded-md px-2.5 py-2 text-[13px] text-ink-faint">
-            Brains <span className="tabular text-[9px] uppercase tracking-wide">Phase 4</span>
-          </div>
+          <Link href="/setup/brains" className="rounded-md px-2.5 py-2 text-[13px] text-ink-dim hover:bg-surface-2 hover:text-ink">
+            Brains
+          </Link>
         </nav>
         <main className="min-h-0 overflow-y-auto p-8">{children}</main>
       </div>

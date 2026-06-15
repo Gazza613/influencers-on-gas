@@ -4,6 +4,9 @@ import { buildIdentityPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { enhanceImage } from "@/lib/vendors/magnific";
+import { scrape } from "@/lib/vendors/firecrawl";
+import { chunkText, ingestChunks } from "@/lib/rag";
+import { setSourceStatus } from "@/lib/brains";
 
 const CANDIDATE_COUNT = 6;
 
@@ -122,6 +125,40 @@ export const buildIdentity = inngest.createFunction(
       await step.run("mark-failed", () =>
         updateInfluencer(influencerId, { status: "gen_failed", persona: { ...persona, gen_error: String((e as Error)?.message || e).slice(0, 300) } }),
       );
+      throw e;
+    }
+  },
+);
+
+// BRAIN INGEST — pull a knowledge source into a client's brain: scrape (website) or use
+// pasted text, chunk it, embed + store (all scoped to client_id). Durable; survives the
+// slow free-tier embedding limit.
+export const ingestSource = inngest.createFunction(
+  { id: "ingest-source", retries: 1, triggers: [{ event: "brain/ingest.source" }] },
+  async ({ event, step }) => {
+    const sourceId = String(event.data.sourceId);
+    const clientId = String(event.data.clientId);
+    const type = String(event.data.type || "text");
+    const uri = String(event.data.uri || "");
+    const text = String(event.data.text || "");
+
+    try {
+      let items: { content: string; metadata?: Record<string, unknown> }[];
+      if (type === "website") {
+        const page = await step.run("scrape", () => scrape(uri));
+        if (!page.content) throw new Error("page had no readable content");
+        items = chunkText(page.content).map((c) => ({ content: c, metadata: { url: page.url, title: page.title } }));
+      } else {
+        items = chunkText(text).map((c) => ({ content: c, metadata: { title: uri || "Pasted note" } }));
+      }
+      if (!items.length) throw new Error("nothing to ingest");
+
+      // ingestChunks embeds in batches; can take a while on the free tier (429 retries).
+      const stored = await step.run("embed-store", () => ingestChunks(clientId, sourceId, items));
+      await step.run("mark-indexed", () => setSourceStatus(sourceId, "indexed"));
+      return { ok: true, chunks: stored };
+    } catch (e) {
+      await step.run("mark-failed", () => setSourceStatus(sourceId, "failed"));
       throw e;
     }
   },
