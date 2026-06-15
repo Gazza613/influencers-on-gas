@@ -6,7 +6,7 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
     <div className="flex h-dvh flex-col bg-surface-0 text-ink">
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface-1 px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 font-extrabold tracking-tight">
+          <Link href="/studio" className="flex items-center gap-2 font-extrabold tracking-tight">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/gas-logo.png" alt="GAS" className="h-6 w-6 rounded-full" />
             <span>Influencers <span className="text-accent">on</span> GAS</span>
@@ -15,7 +15,7 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
           <span className="text-sm text-ink-dim">Setup</span>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-xs text-ink-dim hover:text-ink">← Studio</Link>
+          <Link href="/studio" className="text-xs text-ink-dim hover:text-ink">← Studio</Link>
           <SignOutButton />
         </div>
       </header>
