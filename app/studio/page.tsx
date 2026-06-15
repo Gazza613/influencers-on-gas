@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import SignOutButton from "@/components/SignOutButton";
 import StudioSelectors from "@/components/StudioSelectors";
+import CostReadout from "@/components/CostReadout";
 import { listConnections } from "@/lib/connections";
 
 // Produce-flow stages (ux-flow.md). Skeleton for Phase 1 — wired up in later phases.
@@ -36,9 +37,7 @@ export default async function StudioPage() {
           <StudioSelectors />
         </div>
         <div className="flex items-center gap-4">
-          <div className="tabular text-xs text-ink-dim">
-            cost <span className="text-ink">$0.00</span> <span className="text-ink-faint">▮▮▯</span>
-          </div>
+          <CostReadout />
           <Link href="/setup/influencers" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">
             Influencers
           </Link>

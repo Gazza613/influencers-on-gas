@@ -228,6 +228,20 @@ export async function soulStatus(soulId: string): Promise<string> {
   return "training";
 }
 
+// Live credit balance (ground truth). Tries the read-only account tools.
+export async function getBalance(): Promise<{ remaining: number | null; raw?: unknown }> {
+  const { call } = await openSession();
+  for (const tool of ["balance", "show_plans_and_credits"]) {
+    try {
+      const data = unwrapMCP(await call(tool, {}));
+      const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+      const m = str.match(/"(?:credits|remaining|balance|available|credit_balance|remaining_credits)"\s*:\s*"?([0-9][0-9,.]*)"?/i);
+      if (m) return { remaining: Math.round(Number(m[1].replace(/,/g, ""))), raw: data };
+    } catch { /* try next tool */ }
+  }
+  return { remaining: null };
+}
+
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
 export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
   const token = await getValidHFAccessToken();

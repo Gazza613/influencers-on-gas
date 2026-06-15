@@ -7,6 +7,7 @@ import { enhanceImage } from "@/lib/vendors/magnific";
 import { scrape } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
+import { recordUsage } from "@/lib/usage";
 
 const CANDIDATE_COUNT = 6;
 
@@ -64,6 +65,7 @@ export const generateCandidates = inngest.createFunction(
       await step.run("save-candidates", () =>
         updateInfluencer(influencerId, { status: "cast_ready", persona: { ...persona, candidates } }),
       );
+      await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "casting", count: candidates.length }));
       return { ok: true, candidates: candidates.length };
     } catch (e) {
       await step.run("mark-failed", () =>
@@ -129,6 +131,7 @@ export const buildIdentity = inngest.createFunction(
           persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected },
         }),
       );
+      await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: Math.max(0, frames.length - 1) }));
       return { ok: true, frames: frames.length, element: !!elementId };
     } catch (e) {
       await step.run("mark-failed", () =>
@@ -190,6 +193,7 @@ export const createPresenter = inngest.createFunction(
       await step.run("save", () =>
         updateInfluencer(influencerId, { heygen_avatar_id: talkingPhotoId, persona: { ...inf.persona, presenter_error: null } }),
       );
+      await step.run("usage", () => recordUsage({ influencerId, provider: "heygen", model: "talking_photo", unit: "avatar", action: "presenter", count: 1 }));
       return { ok: true, talkingPhotoId };
     } catch (e) {
       await step.run("fail", () =>
@@ -251,6 +255,7 @@ export const trainSoulJob = inngest.createFunction(
       throw e;
     }
     await step.run("save-soul-id", () => updateInfluencer(influencerId, { higgsfield_soul_id: soulId, status: "training" }));
+    await step.run("usage-soul", () => recordUsage({ influencerId, provider: "higgsfield", model: "soul_train", unit: "train", action: "soul", count: 1 }));
 
     // Poll up to ~16 min (32 × 30s) with durable sleeps.
     for (let i = 0; i < 32; i++) {
@@ -265,7 +270,10 @@ export const trainSoulJob = inngest.createFunction(
         const hero = (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url;
         let realism = (persona.hero_realism_url as string) || null;
         if (hero && !realism) {
-          try { realism = await step.run("humanise", () => enhanceImage(hero)); } catch { /* non-fatal: lock anyway */ }
+          try {
+            realism = await step.run("humanise", () => enhanceImage(hero));
+            await step.run("usage-humanise", () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "humaniser", count: 1 }));
+          } catch { /* non-fatal: lock anyway */ }
         }
         await step.run("mark-locked", () =>
           updateInfluencer(influencerId, { status: "ready", persona: { ...persona, hero_realism_url: realism, locked: true } }),

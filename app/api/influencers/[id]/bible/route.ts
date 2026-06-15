@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { generateBible } from "@/lib/vendors/anthropic";
+import { recordUsage } from "@/lib/usage";
 
 // Claude expands a short brief into the full Character Bible (one-off, ~20-40s).
 export const maxDuration = 120;
@@ -34,6 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const bible = await generateBible(inf.name, brief);
     await updateInfluencer(id, { persona: { ...inf.persona, brief, bible } });
+    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-opus-4-8", unit: "bible", action: "bible", count: 1 }).catch(() => {});
     return NextResponse.json({ bible });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

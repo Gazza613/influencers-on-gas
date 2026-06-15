@@ -234,3 +234,25 @@ select 1, 'I confirm I have the right to use this person''s image / voice. '
        || 'I understand the purpose: producing marketing video content. '
        || 'I understand consent can be withdrawn and the data deleted at any time.'
 where not exists (select 1 from consent_texts where version = 1);
+
+-- ── Cost tracking (Phase 6) ───────────────────────────────────────────────────
+-- Higgsfield works in CREDITS (9,000/mo Ultra pool); we also store a ZAR estimate.
+alter table rate_card add column if not exists credits_per_unit numeric not null default 0;
+create unique index if not exists uq_rate_card_pmu on rate_card(provider, model, unit);
+
+-- Every paid generation appends one row here (per influencer / brain / member).
+create table if not exists usage_events (
+  id            uuid primary key default gen_random_uuid(),
+  influencer_id uuid references influencers(id) on delete set null,
+  client_id     uuid references clients(id) on delete set null,
+  user_email    text,
+  provider      text not null,                 -- higgsfield | heygen | magnific | voyage | anthropic
+  model         text,
+  action        text,                          -- casting | photoshoot | soul | presenter | humaniser
+  credits       numeric not null default 0,    -- Higgsfield credit pool burn
+  cents         int not null default 0,        -- ZAR cents estimate
+  count         int not null default 1,
+  created_at    timestamptz not null default now()
+);
+create index if not exists idx_usage_events_created on usage_events(created_at);
+create index if not exists idx_usage_events_influencer on usage_events(influencer_id);
