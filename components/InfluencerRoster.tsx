@@ -24,7 +24,9 @@ function Ring({ pct, size = 34 }: { pct: number; size?: number }) {
 export default function InfluencerRoster({ influencers }: { influencers: Influencer[] }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [list] = useState(influencers);
+  // Render the live list from the layout (do NOT snapshot into state, or newly
+  // created influencers won't appear until a hard reload).
+  const list = influencers;
   const [modal, setModal] = useState<Mode | null>(null);
   const [consentFor, setConsentFor] = useState<{ name: string } | null>(null);
   const [busy, setBusy] = useState(false);
