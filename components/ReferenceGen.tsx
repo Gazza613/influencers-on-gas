@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Lightbox from "@/components/Lightbox";
 
 type Ref = { url: string; hero?: boolean };
 
@@ -54,6 +55,7 @@ export default function ReferenceGen({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [quip, setQuip] = useState(0);
+  const [zoom, setZoom] = useState<string | null>(null);
 
   const TERMINAL = ["cast_ready", "frames_ready", "ready", "gen_failed", "soul_failed"];
   const casting = st === "casting";
@@ -203,12 +205,14 @@ export default function ReferenceGen({
             {candidates.map((c, i) => {
               const sel = chosen === c.url;
               return (
-                <button key={i} onClick={() => !busy && setChosen(c.url)} className="relative block">
+                <div key={i} onClick={() => !busy && setChosen(c.url)} className="group relative block cursor-pointer">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={c.url} alt={`look ${i + 1}`}
                     className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-accent" : "border-line opacity-80 hover:opacity-100"}`} />
                   {sel && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] text-white">✓</span>}
-                </button>
+                  <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="View full size"
+                    className="absolute bottom-1.5 right-1.5 hidden h-6 w-6 items-center justify-center rounded-md bg-black/60 text-xs text-white group-hover:flex">⤢</button>
+                </div>
               );
             })}
           </div>
@@ -223,7 +227,7 @@ export default function ReferenceGen({
             {frames.map((f, i) => {
               const sel = selected.has(f.url);
               return (
-                <button key={i} onClick={() => !trained && toggle(f.url)} className="relative block">
+                <div key={i} onClick={() => !trained && toggle(f.url)} className={`group relative block ${trained ? "" : "cursor-pointer"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={f.url} alt={`frame ${i + 1}`}
                     className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel && !trained ? "border-accent" : "border-line opacity-80"}`} />
@@ -231,7 +235,9 @@ export default function ReferenceGen({
                     <span className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${sel ? "bg-accent text-white" : "bg-black/50 text-ink-faint"}`}>{sel ? "✓" : ""}</span>
                   )}
                   {f.hero && <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Chosen</span>}
-                </button>
+                  <button onClick={(e) => { e.stopPropagation(); setZoom(f.url); }} title="View full size"
+                    className="absolute bottom-1.5 right-1.5 hidden h-6 w-6 items-center justify-center rounded-md bg-black/60 text-xs text-white group-hover:flex">⤢</button>
+                </div>
               );
             })}
           </div>
@@ -244,6 +250,8 @@ export default function ReferenceGen({
           <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-surface-2 p-3 text-[11px] leading-relaxed text-ink-dim">{prompt}</pre>
         </details>
       )}
+
+      {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} />}
     </div>
   );
 }
