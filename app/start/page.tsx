@@ -13,7 +13,7 @@ type Inf = { id: string; name: string; mode: string; persona?: Record<string, un
 const OPTIONS = [
   { key: "new", emoji: "✨", title: "Build a new influencer", blurb: "Cast a brand-new face from a one-line brief.", grad: "linear-gradient(135deg,#EC4899,#A855F7)" },
   { key: "twin", emoji: "🧬", title: "Build my digital twin", blurb: "Turn your own photo into a lifelike twin.", grad: "linear-gradient(135deg,#FFB020,#FF2D55)" },
-  { key: "existing", emoji: "♻️", title: "Use an existing influencer", blurb: "Pick one you've already built and carry on.", grad: "linear-gradient(135deg,#60A5FA,#8B5CF6)" },
+  { key: "existing", emoji: "♻️", title: "Use existing influencer", blurb: "Pick one you've already built and carry on.", grad: "linear-gradient(135deg,#60A5FA,#8B5CF6)" },
 ] as const;
 
 export default function StartPage() {
@@ -65,12 +65,14 @@ export default function StartPage() {
             <p className="mt-3 text-sm text-ink-dim">Three ways to bring an influencer to life. Pick one, lock the identity, then take it to video production.</p>
             <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
               {OPTIONS.map((o, i) => (
-                <button key={o.key} onClick={() => setView(o.key as View)} className="start-card group relative overflow-hidden rounded-2xl border border-line bg-surface-1 p-6 text-left transition" style={{ animation: `cardIn 0.5s ease ${0.05 + i * 0.08}s both` }}>
-                  <div className="absolute inset-x-0 top-0 h-1 opacity-80" style={{ background: o.grad }} />
+                <button key={o.key} onClick={() => setView(o.key as View)} className="start-card group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface-1 p-6 text-left transition" style={{ animation: `cardIn 0.5s ease ${0.05 + i * 0.08}s both` }}>
+                  <div className="start-bar absolute inset-x-0 top-0 h-1" style={{ background: o.grad }} />
                   <div className="text-3xl">{o.emoji}</div>
-                  <div className="mt-3 text-base font-bold text-white">{o.title}</div>
-                  <div className="mt-1 text-xs leading-relaxed text-ink-dim">{o.blurb}</div>
-                  <div className="mt-4 text-xs font-semibold text-accent opacity-0 transition group-hover:opacity-100">Start →</div>
+                  <div className="mt-3 truncate text-base font-bold text-white">{o.title}</div>
+                  <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-ink-dim">{o.blurb}</div>
+                  <span className="start-cta mt-5 inline-flex w-fit items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold text-white shadow-lg transition" style={{ background: o.grad }}>
+                    Start <span className="start-arrow transition-transform">→</span>
+                  </span>
                 </button>
               ))}
             </div>
@@ -143,7 +145,13 @@ export default function StartPage() {
       <style>{`
         @keyframes sOrb { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(40px,-30px) scale(1.08)} }
         @keyframes cardIn { from{opacity:0; transform:translateY(16px)} to{opacity:1; transform:translateY(0)} }
-        .start-card:hover { transform: translateY(-4px); box-shadow: 0 20px 50px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.18); }
+        .start-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+        .start-card:hover { transform: translateY(-5px); box-shadow: 0 22px 55px rgba(0,0,0,0.55); border-color: rgba(255,255,255,0.2); }
+        .start-bar { height: 3px; transition: height .2s ease, filter .2s ease; }
+        .start-card:hover .start-bar { height: 5px; filter: brightness(1.15); }
+        .start-cta { opacity: .92; }
+        .start-card:hover .start-cta { opacity: 1; transform: translateY(-1px); filter: saturate(1.1) brightness(1.06); box-shadow: 0 8px 26px rgba(168,85,247,0.35); }
+        .start-card:hover .start-arrow { transform: translateX(4px); }
       `}</style>
     </div>
   );
