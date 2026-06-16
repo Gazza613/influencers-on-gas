@@ -22,6 +22,11 @@ export default async function LockdownPage({ params }: { params: Promise<{ id: s
       selectedCount={selectedCount}
       realismUrl={(persona.hero_realism_url as string) ?? null}
       soulStartedAt={typeof persona.soul_started_at === "string" ? persona.soul_started_at : null}
+      refCards={{
+        faceCard: (persona.face_card_url as string) ?? null,
+        featureSheet: (persona.feature_sheet_url as string) ?? null,
+        turnaround: (persona.turnaround_url as string) ?? null,
+      }}
     />
   );
 }

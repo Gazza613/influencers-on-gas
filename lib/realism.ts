@@ -98,6 +98,18 @@ export function buildCreativeImagePrompt(o: {
   ].join("\n\n");
 }
 
+// ── Canonical identity reference set (archive gem). Generated once from the chosen face
+// and reused as forensic @image refs in every creative. @image1 = the chosen face. ──────
+export function buildIdentityCardPrompt(): string {
+  return "A clean studio identity headshot, like a casting reference card. @image1 is the person, replicate their face EXACTLY: facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and texture, freckles, moles and natural asymmetries. Front on, head level, looking straight into the lens, neutral relaxed expression, head and shoulders. Clean seamless pale-grey background, soft even two-softbox lighting, subtle catchlights, real visible pore texture, zero retouching. One real photograph. " + CLOTHED + ".";
+}
+export function buildFeatureSheetPrompt(): string {
+  return "A clinical beauty feature reference sheet on a pure white background, bold black uppercase labels above each panel, clear white gutters between panels. Replicate the person in @image1 EXACTLY. Panels: EYE (extreme macro of both irises), BROW (brow shape, arch and forehead skin), LIP (lip shape, cupid's bow and natural colour), SKIN TEXTURE (macro cheek skin showing pores and freckles), HAIR TEXTURE (close-up of hair strands), HANDS (hand showing nails and knuckle skin). Ultra-sharp photoreal macro detail, raw skin detail, zero retouching.";
+}
+export function buildTurnaroundPrompt(): string {
+  return "A full-body character turnaround sheet on a pure white seamless background, soft even flat studio lighting. Four equal full-body panels in one row labelled FRONT VIEW, SIDE VIEW, BACK VIEW, THREE-QUARTER VIEW. Replicate the person in @image1 EXACTLY across all four panels: identical face, body, proportions, skin tone and hair, and the same outfit in every panel. Photoreal, raw skin detail, zero retouching. " + CLOTHED + ".";
+}
+
 export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin, " +

@@ -16,7 +16,7 @@ const LOCKDOWN_NARRATION = [
 ];
 
 export default function LockdownStep({
-  influencerId, status: initialStatus, lockedInit, selectedCount, realismUrl, soulStartedAt,
+  influencerId, status: initialStatus, lockedInit, selectedCount, realismUrl, soulStartedAt, refCards,
 }: {
   influencerId: string;
   status: string;
@@ -24,6 +24,7 @@ export default function LockdownStep({
   selectedCount: number;
   realismUrl: string | null;
   soulStartedAt?: string | null;
+  refCards?: { faceCard: string | null; featureSheet: string | null; turnaround: string | null };
 }) {
   const [st, setSt] = useState(initialStatus);
   const [locked, setLocked] = useState(lockedInit);
@@ -86,11 +87,31 @@ export default function LockdownStep({
           <div className="min-w-[220px] flex-1">
             <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready">🔒 Identity locked</div>
             <p className="mt-1 text-sm text-ink">
-              Done. This exact face is trained, humanised and locked. It will stay perfectly consistent across every
-              video you ever make with this influencer. That is the magic, no drifting faces, no surprises.
+              Done. This exact face is locked. It will stay perfectly consistent across every creative and video you
+              ever make with this influencer. That is the magic, no drifting faces, no surprises.
             </p>
           </div>
         </div>
+
+        {refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround) && (
+          <div className="rounded-xl border border-line bg-surface-1 p-5">
+            <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Identity reference card</div>
+            <p className="mt-1 text-[11px] text-ink-faint">The forensic lock: a clean identity headshot, a macro feature sheet and a full turnaround. Every creative is matched against these.</p>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {([["faceCard", "Identity"], ["featureSheet", "Features"], ["turnaround", "Turnaround"]] as const).map(([k, label]) => {
+                const url = refCards[k];
+                if (!url) return null;
+                return (
+                  <a key={k} href={url} target="_blank" rel="noreferrer" className="group block">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={label} className="aspect-square w-full rounded-lg border border-line object-cover transition group-hover:border-[#a855f7]/50" />
+                    <div className="mt-1 text-center text-[10px] text-ink-faint">{label}</div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="rounded-xl border border-ready/40 bg-surface-1 p-5">
           <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready font-semibold">✓ Your next step</div>
           <div className="mt-1 text-lg font-bold text-ink">Create &amp; download her creatives</div>

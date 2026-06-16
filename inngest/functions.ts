@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
@@ -159,6 +159,33 @@ export const buildIdentity = inngest.createFunction(
           persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected },
         }),
       );
+
+      // Canonical reference set (archive gem): a clean identity card, a macro feature sheet
+      // and a turnaround, generated from the chosen face. Reused as forensic refs in every
+      // creative AND shown as a "feature card" flex. Best-effort, never blocks the build.
+      const cards = await step.run("reference-cards", async () => {
+        const faceMedia = await importMediaUrl(chosenUrl).catch(() => null);
+        if (!faceMedia) return null;
+        const ex = { medias: [{ value: faceMedia, role: "image" }] };
+        const [card, sheet, turn] = await Promise.all([
+          generateBatch([buildIdentityCardPrompt()], IMAGE_MODEL, "1:1", ex).catch(() => []),
+          generateBatch([buildFeatureSheetPrompt()], IMAGE_MODEL, "3:4", ex).catch(() => []),
+          generateBatch([buildTurnaroundPrompt()], IMAGE_MODEL, "16:9", ex).catch(() => []),
+        ]);
+        const pick = (a: (string | null)[]) => (a && a[0]) || null;
+        const [c, s, t] = await Promise.all([
+          pick(card) ? rehostToBlob(pick(card)!, "refs").catch(() => null) : null,
+          pick(sheet) ? rehostToBlob(pick(sheet)!, "refs").catch(() => null) : null,
+          pick(turn) ? rehostToBlob(pick(turn)!, "refs").catch(() => null) : null,
+        ]);
+        return { face_card_url: c || pick(card), feature_sheet_url: s || pick(sheet), turnaround_url: t || pick(turn) };
+      });
+      if (cards && (cards.face_card_url || cards.feature_sheet_url || cards.turnaround_url)) {
+        const fresh = await step.run("reload-pre-cards", () => getInfluencer(influencerId));
+        await step.run("save-cards", () => updateInfluencer(influencerId, { persona: { ...((fresh?.persona as Record<string, unknown>) || persona), ...cards } }));
+        const made = [cards.face_card_url, cards.feature_sheet_url, cards.turnaround_url].filter(Boolean).length;
+        if (made) await step.run("usage-cards", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: made }));
+      }
       return { ok: true, frames: frames.length, element: !!elementId };
     } catch (e) {
       await step.run("mark-failed", () =>
@@ -353,25 +380,31 @@ export const generateCreatives = inngest.createFunction(
     try {
       const lockMode = event.data.identityLock === "flexible" ? "flexible" : "strong";
       const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
-      // Lock onto the face the user CHOSE at casting (hero), not a drifted photoshoot frame.
-      const idRefUrl = (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || "";
-      // Import the references → media ids. Face = identity; optional clothing/scene refs.
-      const [idMedia, clothMedia, locMedia] = await step.run("import-refs", () => Promise.all([
+      // Prefer the clean canonical identity card (archive gem) for @image1, then fall back
+      // to the chosen casting face. Feature sheet (if any) is a forensic @image2.
+      const idRefUrl = (persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || "";
+      const featureUrl = (persona.feature_sheet_url as string) || "";
+      // Import the references → media ids. Face = identity, feature sheet = forensic detail,
+      // optional clothing/scene refs.
+      const [idMedia, featMedia, clothMedia, locMedia] = await step.run("import-refs", () => Promise.all([
         idRefUrl ? importMediaUrl(idRefUrl) : Promise.resolve(null),
+        featureUrl ? importMediaUrl(featureUrl) : Promise.resolve(null),
         clothingRef ? importMediaUrl(clothingRef) : Promise.resolve(null),
         locationRef ? importMediaUrl(locationRef) : Promise.resolve(null),
       ]));
-      const medias = [idMedia, clothMedia, locMedia].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
+      const medias = [idMedia, featMedia, clothMedia, locMedia].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
       const extra = medias.length ? { medias } : {};
       // @image tags follow the medias order. Tell the model how to use each one.
       let n = 0;
       const faceTag = idMedia ? `@image${++n}` : null;
+      const featTag = featMedia ? `@image${++n}` : null;
       const clothTag = clothMedia ? `@image${++n}` : null;
       const locTag = locMedia ? `@image${++n}` : null;
       const refInstruction = [
         faceTag && (lockMode === "flexible"
           ? `IDENTITY REFERENCE: ${faceTag} shows the person. Match their facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and hair. IGNORE ${faceTag}'s clothing, background, pose and lighting; take the wardrobe, scene and pose from the description above.`
           : `IDENTITY LOCK: ${faceTag} is the appearance reference. Replicate this person EXACTLY, facial bone structure, face shape, jaw, nose, lip shape, eye shape and colour, eyebrow arch, skin tone and texture, freckles, moles and natural asymmetries. Zero facial drift, it must be unmistakably the same individual. IGNORE ${faceTag}'s clothing, background, pose and lighting; take those only from the scene described above.`),
+        featTag && `${featTag} is a forensic FEATURE reference: match the exact eyes, brows, lips, skin texture and hair shown in it. Do NOT copy its panel layout, labels or white background.`,
         clothTag && `${clothTag} is a WARDROBE reference: match its outfit (silhouette, fabric, styling). Do NOT copy any face or person from ${clothTag}.`,
         locTag && `${locTag} is a SCENE reference: match its location and setting. Do NOT copy any face or person from ${locTag}.`,
       ].filter(Boolean).join(" ");
