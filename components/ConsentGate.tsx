@@ -83,7 +83,7 @@ export default function ConsentGate({
           <button
             onClick={confirm}
             disabled={!ready}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
             {busy ? "Recording…" : "Record consent & continue"}
           </button>

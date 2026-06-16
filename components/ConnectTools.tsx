@@ -105,7 +105,7 @@ export default function ConnectTools({
               <button
                 onClick={() => save(c.id)}
                 disabled={busy || !secret.trim()}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-60"
               >
                 {busy ? "Saving…" : "Save"}
               </button>

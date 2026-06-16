@@ -109,3 +109,32 @@ export async function generateBible(name: string, brief: string): Promise<Charac
   if (!block || block.type !== "tool_use") throw new Error("No character bible returned");
   return block.input as CharacterBible;
 }
+
+// Reimagine ONE section of an existing bible, kept consistent with the rest.
+export async function generateBibleSection(
+  name: string, brief: string, bible: Record<string, unknown>, section: string,
+): Promise<unknown> {
+  const sub = (BIBLE_SCHEMA.properties as Record<string, unknown>)[section] as { type?: string } | undefined;
+  if (!sub) throw new Error(`Unknown section: ${section}`);
+  const isString = sub.type === "string";
+  // Tool input must be an object; wrap scalar sections in { value }.
+  const schema = isString
+    ? { type: "object", additionalProperties: false, properties: { value: sub }, required: ["value"] }
+    : sub;
+
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 2500,
+    system: SYSTEM,
+    tools: [{ name: "section", description: `Return ONLY the "${section}" section of the character bible.`, input_schema: schema as unknown as Anthropic.Tool["input_schema"] }],
+    tool_choice: { type: "tool", name: "section" },
+    messages: [{
+      role: "user",
+      content: `Influencer: ${name}\n\nBrief:\n${brief || "(no brief provided)"}\n\nHere is the current character bible as JSON. Reimagine ONLY the "${section}" section with a fresh, distinct take, while keeping it fully consistent with the rest of this character. Return just that section.\n\n${JSON.stringify(bible).slice(0, 6000)}`,
+    }],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") throw new Error("No section returned");
+  return isString ? (block.input as { value: unknown }).value : block.input;
+}

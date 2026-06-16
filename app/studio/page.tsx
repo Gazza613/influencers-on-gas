@@ -32,7 +32,7 @@ export default async function StudioPage() {
           <Link href="/" className="flex items-center gap-2 font-extrabold tracking-tight">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/gas-logo.png" alt="GAS" className="h-7 w-7 rounded-full" />
-            <span>Influencers <span className="text-accent">on</span> GAS</span>
+            <span>Influencers <span className="brand-grad">on</span> GAS</span>
           </Link>
           <StudioSelectors />
         </div>
@@ -86,7 +86,7 @@ export default async function StudioPage() {
                   Connect required tools to start producing
                 </div>
                 <p className="mt-1 text-xs text-ink-dim">Still needed: {missingRequired.join(", ")}.</p>
-                <Link href="/setup/connect" className="mt-3 inline-block rounded-md bg-accent px-3 py-1.5 text-xs font-bold text-white">
+                <Link href="/setup/connect" className="btn-brand mt-3 inline-block rounded-md px-3 py-1.5 text-xs font-bold">
                   Go to Connect Tools →
                 </Link>
               </div>
@@ -117,7 +117,7 @@ export default async function StudioPage() {
             Build spine
           </span>
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full w-0 bg-accent" />
+            <div className="h-full w-0 bg-[#a855f7]" />
           </div>
           <span className="tabular text-[10px] text-ink-faint">0 / 45s</span>
         </div>

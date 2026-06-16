@@ -24,12 +24,26 @@ function Field({ label, value, onChange, multiline }: { label: string; value: un
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-line bg-surface-2 p-4">
-      <div className="tabular mb-2 border-b border-line/60 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#c79bff]">{title}</div>
+      <div className="mb-2 flex items-center justify-between border-b border-line/60 pb-2">
+        <div className="tabular text-[11px] font-semibold uppercase tracking-[0.22em] text-[#c79bff]">{title}</div>
+        {action}
+      </div>
       <div className="space-y-1">{children}</div>
     </div>
+  );
+}
+
+// Per-section "reimagine with AI" button.
+function Regen({ section, busy, onClick }: { section: string; busy: string | null; onClick: (s: string) => void }) {
+  const active = busy === section;
+  return (
+    <button onClick={() => onClick(section)} disabled={!!busy} title="Reimagine this section with AI"
+      className="flex items-center gap-1 rounded-md border border-[#a855f7]/30 px-2 py-0.5 text-[10px] font-semibold text-[#c79bff] transition hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
+      <span className={active ? "inline-block animate-spin" : ""}>↻</span> {active ? "Reimagining…" : "Reimagine"}
+    </button>
   );
 }
 
@@ -40,7 +54,25 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState<"idle" | "saving" | "saved">("idle");
+  const [regen, setRegen] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function reimagine(section: string) {
+    if (regen) return;
+    setRegen(section);
+    const r = await fetch(`/api/influencers/${influencerId}/bible/section`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setRegen(null);
+    if (r.ok && "value" in d) {
+      // The server already saved; mirror it locally so the edit shows immediately.
+      setBible((prev) => ({ ...(prev as Bible), [section]: d.value }));
+      setSaved("saved");
+    } else {
+      setErr(d?.error || "Could not reimagine that section");
+    }
+  }
 
   function scheduleSave(next: Bible) {
     setSaved("saving");
@@ -110,49 +142,50 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
         <div className="mt-4 space-y-3">
           <div className="rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[11px] text-ink-dim">
             ✎ Everything below is yours to tweak. Click any line to rewrite it, it saves automatically as you type.
-            Want a totally different take? Hit <span className="text-[#c79bff]">↻ Re-brief</span> up top.
+            Not feeling one part? Hit <span className="text-[#c79bff]">↻ Reimagine</span> on that section and the AI re-rolls
+            just that bit, in keeping with the rest. Want a whole new character? <span className="text-[#c79bff]">↻ Re-brief</span> up top.
           </div>
           <Bare value={String(bible.signature_line ?? "")} onChange={(v) => edit((b) => { b.signature_line = v; })} placeholder="Signature line" />
 
           <div className="space-y-3">
-            <Section title="Identity">
+            <Section title="Identity" action={<Regen section="identity" busy={regen} onClick={reimagine} />}>
               {["profession", "age", "height", "build", "ethnicity_design"].map((k) => (
                 <Field key={k} label={k} value={get(["identity"])[k]} onChange={(v) => edit((b) => { ((b.identity ??= {}) as Bible)[k] = v; })} />
               ))}
               <Field label="bio" value={get(["identity"]).bio} multiline onChange={(v) => edit((b) => { ((b.identity ??= {}) as Bible).bio = v; })} />
             </Section>
 
-            <Section title="Face">
+            <Section title="Face" action={<Regen section="face" busy={regen} onClick={reimagine} />}>
               {["structure", "skin", "eyes", "hair", "distinct_features"].map((k) => (
                 <Field key={k} label={k} value={get(["face"])[k]} multiline onChange={(v) => edit((b) => { ((b.face ??= {}) as Bible)[k] = v; })} />
               ))}
             </Section>
 
-            <Section title="Psychology">
+            <Section title="Psychology" action={<Regen section="psychology" busy={regen} onClick={reimagine} />}>
               <Field label="core_traits" value={arr(["psychology"], "core_traits").join(", ")} onChange={(v) => edit((b) => { ((b.psychology ??= {}) as Bible).core_traits = v.split(",").map((s) => s.trim()).filter(Boolean); })} />
               <Field label="internal_conflict" value={get(["psychology"]).internal_conflict} multiline onChange={(v) => edit((b) => { ((b.psychology ??= {}) as Bible).internal_conflict = v; })} />
               <Field label="behaviour_patterns" value={arr(["psychology"], "behaviour_patterns").join(" · ")} multiline onChange={(v) => edit((b) => { ((b.psychology ??= {}) as Bible).behaviour_patterns = v.split(/·|\n/).map((s) => s.trim()).filter(Boolean); })} />
               <Field label="emotional_baseline" value={get(["psychology"]).emotional_baseline} multiline onChange={(v) => edit((b) => { ((b.psychology ??= {}) as Bible).emotional_baseline = v; })} />
             </Section>
 
-            <Section title="Performance">
+            <Section title="Performance" action={<Regen section="performance" busy={regen} onClick={reimagine} />}>
               {["body_language", "movement_rhythm", "idle_behaviour"].map((k) => (
                 <Field key={k} label={k} value={get(["performance"])[k]} multiline onChange={(v) => edit((b) => { ((b.performance ??= {}) as Bible)[k] = v; })} />
               ))}
             </Section>
 
-            <Section title="Cinematic portrait">
+            <Section title="Cinematic portrait" action={<Regen section="portrait" busy={regen} onClick={reimagine} />}>
               {["environment", "lighting", "colour_tone", "expression", "camera"].map((k) => (
                 <Field key={k} label={k} value={get(["portrait"])[k]} onChange={(v) => edit((b) => { ((b.portrait ??= {}) as Bible)[k] = v; })} />
               ))}
             </Section>
 
-            <Section title="Voice">
+            <Section title="Voice" action={<Regen section="voice_descriptor" busy={regen} onClick={reimagine} />}>
               <Bare value={String(bible.voice_descriptor ?? "")} multiline onChange={(v) => edit((b) => { b.voice_descriptor = v; })} />
             </Section>
           </div>
 
-          <Section title="Wardrobe">
+          <Section title="Wardrobe" action={<Regen section="wardrobe" busy={regen} onClick={reimagine} />}>
             <div className="space-y-1">
               {garments.map((g, i) => (
                 <div key={i} className="grid grid-cols-3 gap-1">
@@ -167,7 +200,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
             <Field label="props" value={arr(["wardrobe"], "props").join(", ")} onChange={(v) => edit((b) => { ((b.wardrobe ??= {}) as Bible).props = v.split(",").map((s) => s.trim()).filter(Boolean); })} />
           </Section>
 
-          <Section title="Colour palette">
+          <Section title="Colour palette" action={<Regen section="palette" busy={regen} onClick={reimagine} />}>
             {["skin_tones", "hair_eyes", "wardrobe_colours"].map((k) => (
               <Field key={k} label={k} value={arr(["palette"], k).join(", ")} onChange={(v) => edit((b) => { ((b.palette ??= {}) as Bible)[k] = v.split(",").map((s) => s.trim()).filter(Boolean); })} />
             ))}

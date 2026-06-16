@@ -53,7 +53,7 @@ export default function StartPage() {
     <div style={{ minHeight: "100vh", position: "relative", overflow: "hidden", background: "#07070E" }} className="flex flex-col items-center justify-center px-6 py-16 text-center">
       {/* ambient */}
       <div style={{ position: "absolute", width: 700, height: 700, top: "-20%", left: "-15%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.18) 0%, transparent 65%)", animation: "sOrb 16s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: 640, height: 640, bottom: "-22%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(255,106,0,0.16) 0%, transparent 65%)", animation: "sOrb 21s ease-in-out infinite reverse", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: 640, height: 640, bottom: "-22%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.16) 0%, transparent 65%)", animation: "sOrb 21s ease-in-out infinite reverse", pointerEvents: "none" }} />
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "30px 30px", pointerEvents: "none" }} />
 
       <div className="relative z-10 w-full max-w-3xl">
@@ -83,10 +83,10 @@ export default function StartPage() {
           <Panel title="Build a new influencer" onBack={back}>
             <p className="text-sm text-ink-dim">Name it. Then write a one-line brief and our co-pilot designs the whole character, or upload a reference to steer the look (we then skip casting and shoot from it).</p>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && name.trim() && create({ name: name.trim(), mode: "synthetic", persona: refUrl ? { reference_url: refUrl } : {} })}
-              placeholder="Name (e.g. Ava)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-accent" />
+              placeholder="Name (e.g. Ava)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
             <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />
             <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: refUrl ? { reference_url: refUrl } : {} })} disabled={!name.trim() || busy}
-              className="w-full rounded-lg bg-accent py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "Creating…" : "Create influencer →"}</button>
+              className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : "Create influencer →"}</button>
           </Panel>
         )}
 
@@ -95,8 +95,8 @@ export default function StartPage() {
             {!consenting && !twinConsentId && (
               <>
                 <p className="text-sm text-ink-dim">Your own likeness from a photo. We capture consent first (POPIA / GDPR), then you upload, and we skip casting and shoot straight from your face.</p>
-                <input autoFocus value={twinName} onChange={(e) => setTwinName(e.target.value)} placeholder="Name (e.g. Gary)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-accent" />
-                <button onClick={() => setConsenting(true)} disabled={!twinName.trim()} className="w-full rounded-lg bg-accent py-3 text-sm font-bold text-white disabled:opacity-50">Continue to consent →</button>
+                <input autoFocus value={twinName} onChange={(e) => setTwinName(e.target.value)} placeholder="Name (e.g. Gary)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
+                <button onClick={() => setConsenting(true)} disabled={!twinName.trim()} className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">Continue to consent →</button>
               </>
             )}
             {consenting && !twinConsentId && <ConsentGate dataType="image" onCancel={() => setConsenting(false)} onConfirm={(id) => setTwinConsentId(id)} />}
@@ -105,7 +105,7 @@ export default function StartPage() {
                 <p className="text-sm text-ink-dim">Upload your photo. This is the identity, so pick a clear, well-lit face shot.</p>
                 <Uploader kind="twin" label="Your photo" current={twinPhoto} onUploaded={setTwinPhoto} />
                 <button onClick={() => create({ name: twinName.trim(), mode: "twin", consentId: twinConsentId, persona: { reference_url: twinPhoto } })} disabled={!twinPhoto || busy}
-                  className="w-full rounded-lg bg-accent py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "Creating…" : "Create my twin →"}</button>
+                  className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : "Create my twin →"}</button>
               </>
             )}
           </Panel>

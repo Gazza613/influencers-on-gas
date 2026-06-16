@@ -30,7 +30,7 @@ export default function Lightbox({ url, onClose }: { url: string; onClose: () =>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="frame" className="max-h-[82vh] w-auto rounded-lg border border-line object-contain" />
         <div className="mt-3 flex items-center justify-center gap-3">
-          <button onClick={download} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white">Download</button>
+          <button onClick={download} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold">Download</button>
           <a href={url} target="_blank" rel="noopener" className="rounded-lg border border-line px-4 py-2 text-sm text-ink-dim hover:text-ink">Open original</a>
           <button onClick={onClose} className="rounded-lg border border-line px-4 py-2 text-sm text-ink-dim hover:text-ink">Close</button>
         </div>

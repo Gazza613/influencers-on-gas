@@ -65,8 +65,8 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Feed the brain</div>
         <div className="mt-3 flex gap-2">
-          <button onClick={() => setMode("website")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "website" ? "bg-accent text-white" : "border border-line text-ink-dim"}`}>Website</button>
-          <button onClick={() => setMode("text")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "text" ? "bg-accent text-white" : "border border-line text-ink-dim"}`}>Paste text</button>
+          <button onClick={() => setMode("website")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "website" ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim"}`}>Website</button>
+          <button onClick={() => setMode("text")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "text" ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim"}`}>Paste text</button>
         </div>
         {mode === "website" ? (
           <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://client-website.com/about"
@@ -75,7 +75,7 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Paste brand notes, positioning, proof points…"
             className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
         )}
-        <button onClick={add} disabled={adding} className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+        <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
           {adding ? "Adding to brain…" : "Add to brain"}
         </button>
         {addErr && <p className="mt-2 text-xs text-alert">{addErr}</p>}
