@@ -3,6 +3,18 @@ import { auth } from "@/auth";
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 
+// Abort a running lock-down: reset to frames_ready so the user isn't blocked and can
+// retry. The durable job notices the status change on its next tick and stops.
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const inf = await getInfluencer(id);
+  const persona = (inf?.persona ?? {}) as Record<string, unknown>;
+  await updateInfluencer(id, { status: "frames_ready", persona: { ...persona, locked: false, soul_error: null } });
+  return NextResponse.json({ ok: true });
+}
+
 // Kicks off Soul training for an influencer from selected reference frames (>=5).
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

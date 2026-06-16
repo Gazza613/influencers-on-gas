@@ -271,34 +271,45 @@ export const trainSoulJob = inngest.createFunction(
     await step.run("save-soul-id", () => updateInfluencer(influencerId, { higgsfield_soul_id: soulId, status: "training" }));
     await step.run("usage-soul", () => recordUsage({ influencerId, provider: "higgsfield", model: "soul_train", unit: "train", action: "soul", count: 1 }));
 
-    // Poll up to ~16 min (32 × 30s) with durable sleeps.
-    for (let i = 0; i < 32; i++) {
-      await step.sleep(`wait-${i}`, "30s");
-      const status = await step.run(`status-${i}`, () => soulStatus(soulId));
-      if (status === "ready") {
-        // Lock Down step 2: run the Humaniser on the hero, then mark the identity LOCKED
-        // and ready for video production.
+    // Poll up to ~30 min (40 × 45s) with durable sleeps (Soul training can run long).
+    for (let i = 0; i < 40; i++) {
+      await step.sleep(`wait-${i}`, "45s");
+      // Each tick: bail if the user aborted (status reset away from training), else check the Soul.
+      const cur = await step.run(`check-${i}`, async () => {
+        const f = await getInfluencer(influencerId);
+        if (f && f.status !== "training") return { abort: true, status: "" };
+        return { abort: false, status: await soulStatus(soulId) };
+      });
+      if (cur.abort) return { aborted: true, soulId };
+
+      if (cur.status === "ready") {
+        // Lock the identity the MOMENT the Soul is trained, so it can't be blocked by a
+        // slow Humaniser. Then enrich with the Humaniser (best-effort, non-blocking).
         const fresh = await step.run("reload", () => getInfluencer(influencerId));
         const persona = (fresh?.persona ?? inf.persona ?? {}) as Record<string, unknown>;
         const refs = (fresh?.look_refs as { url: string; hero?: boolean }[]) || [];
         const hero = (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url;
-        let realism = (persona.hero_realism_url as string) || null;
-        if (hero && !realism) {
-          try {
-            realism = await step.run("humanise", () => enhanceImage(hero));
-            await step.run("usage-humanise", () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "humaniser", count: 1 }));
-          } catch { /* non-fatal: lock anyway */ }
-        }
         await step.run("mark-locked", () =>
-          updateInfluencer(influencerId, { status: "ready", persona: { ...persona, hero_realism_url: realism, locked: true } }),
+          updateInfluencer(influencerId, { status: "ready", persona: { ...persona, locked: true } }),
         );
+        if (hero && !persona.hero_realism_url) {
+          try {
+            const realism = await step.run("humanise", () => enhanceImage(hero));
+            await step.run("usage-humanise", () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "humaniser", count: 1 }));
+            await step.run("save-realism", () => updateInfluencer(influencerId, { persona: { ...persona, locked: true, hero_realism_url: realism } }));
+          } catch { /* non-fatal: already locked */ }
+        }
         return { ready: true, soulId, locked: true };
       }
-      if (status === "failed") {
-        await step.run("mark-soul-failed", () => updateInfluencer(influencerId, { status: "soul_failed" }));
+      if (cur.status === "failed") {
+        await step.run("mark-soul-failed", () => updateInfluencer(influencerId, { status: "soul_failed", persona: { ...inf.persona, soul_error: "Soul training failed. You can retry the lock-down." } }));
         return { failed: true, soulId };
       }
     }
+    // Took longer than the window — recover so the UI isn't stuck on "training".
+    await step.run("timeout", () =>
+      updateInfluencer(influencerId, { status: "soul_failed", persona: { ...inf.persona, soul_error: "Lock-down is taking longer than usual. The training may still finish, or you can retry." } }),
+    );
     return { timeout: true, soulId };
   },
 );

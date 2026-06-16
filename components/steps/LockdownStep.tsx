@@ -60,6 +60,12 @@ export default function LockdownStep({
     setSt("training"); poll();
   }
 
+  async function abort() {
+    if (!confirm("Abort this lock-down? You can start it again afterwards.")) return;
+    await fetch(`/api/influencers/${influencerId}/train`, { method: "DELETE" }).catch(() => {});
+    setBusy(false); setErr(""); setSt("frames_ready");
+  }
+
   if (locked) {
     return (
       <div className="space-y-5">
@@ -122,9 +128,12 @@ export default function LockdownStep({
               <div className="h-full w-1/3 animate-pulse rounded-full bg-ready" />
             </div>
             <p className="mt-2 text-[11px] text-ink-faint">
-              Locking down in the background. Feel free to leave this page or start another influencer, we will keep going.
-              Come back in ~10 minutes.
+              Locking down on our servers. It keeps running even if you leave this page or start another influencer,
+              come back in ~10 minutes. Soul training can occasionally take up to ~30 minutes.
             </p>
+            <button onClick={abort} className="mt-3 rounded-md border border-line px-3 py-1.5 text-[11px] font-semibold text-ink-dim hover:border-alert/50 hover:text-alert">
+              Abort lock-down
+            </button>
           </div>
         )}
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}
