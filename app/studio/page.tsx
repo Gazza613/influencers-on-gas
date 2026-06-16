@@ -38,6 +38,9 @@ export default async function StudioPage() {
         </div>
         <div className="flex items-center gap-4">
           <CostReadout />
+          <Link href="/cost-control" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">
+            Cost Control
+          </Link>
           <Link href="/setup/influencers" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">
             Influencers
           </Link>

@@ -28,7 +28,7 @@ export default function CostReadout() {
   const pct = bal?.remaining != null ? Math.max(0, Math.min(100, Math.round((bal.remaining / bal.monthly) * 100))) : null;
 
   return (
-    <Link href="/studio/costs" className="group tabular flex items-center gap-2 rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink" title="Cost intelligence">
+    <Link href="/cost-control" className="group tabular flex items-center gap-2 rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink" title="Cost Control">
       <span>
         spend{" "}
         <span className="text-ink">{sum ? rand(sum.total.cents) : "…"}</span>

@@ -256,3 +256,15 @@ create table if not exists usage_events (
 );
 create index if not exists idx_usage_events_created on usage_events(created_at);
 create index if not exists idx_usage_events_influencer on usage_events(influencer_id);
+
+-- Daily cost audit: snapshot the live Higgsfield credit balance vs our ledger so
+-- the Cost Control view can prove it stays 100% accurate over time.
+create table if not exists balance_snapshots (
+  id              uuid primary key default gen_random_uuid(),
+  taken_at        timestamptz not null default now(),
+  remaining       numeric,                       -- live Higgsfield credits remaining (null if unreadable)
+  ledger_credits  numeric not null default 0,    -- total credits our ledger has recorded to date
+  ledger_cents    int not null default 0,        -- total ZAR cents our ledger has recorded to date
+  note            text
+);
+create index if not exists idx_balance_snapshots_taken on balance_snapshots(taken_at);

@@ -15,6 +15,25 @@ type Init = {
 
 const BUILDING = new Set(["casting", "generating", "training", "ready"]);
 
+const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+// Live running build cost chip with a traffic-light signal.
+function RunningCost({ name, cents }: { name: string; cents: number }) {
+  const tier = cents > 100000 ? "red" : cents >= 50000 ? "amber" : "green";
+  const styles: Record<string, string> = {
+    green: "border-ready/40 bg-ready/10 text-ready",
+    amber: "border-active/50 bg-active/10 text-active",
+    red: "border-alert/50 bg-alert/12 text-alert",
+  };
+  return (
+    <Link href="/cost-control" title="Open Cost Control"
+      className={`tabular ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${styles[tier]} ${tier === "red" ? "pulse-alert" : ""}`}>
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${tier === "red" ? "bg-alert" : tier === "amber" ? "bg-active" : "bg-ready"}`} />
+      {name} running build cost <span className="ml-0.5">{rand(cents)}</span>
+    </Link>
+  );
+}
+
 // Live header for the 3-step build journey: avatar, name, "influencer" tag, a
 // glowing realtime "building" tag, and the step tabs (each a real page).
 export default function BuildHeader({
@@ -22,14 +41,18 @@ export default function BuildHeader({
 }: { id: string; name: string; mode: string; consentId: string | null; initial: Init }) {
   const pathname = usePathname();
   const [s, setS] = useState(initial);
+  const [spendCents, setSpendCents] = useState<number | null>(null);
 
-  // Poll status so the live tag + step ticks update while jobs run elsewhere.
+  // Poll status + running build cost while jobs run.
   const stop = useRef(false);
   useEffect(() => {
     stop.current = false;
     let t: ReturnType<typeof setTimeout>;
     async function tick() {
-      const r = await fetch(`/api/influencers/${id}`, { cache: "no-store" }).catch(() => null);
+      const [r, c] = await Promise.all([
+        fetch(`/api/influencers/${id}`, { cache: "no-store" }).catch(() => null),
+        fetch(`/api/usage?influencerId=${id}`, { cache: "no-store" }).catch(() => null),
+      ]);
       if (r?.ok) {
         const inf = (await r.json()).influencer;
         const persona = inf.persona ?? {};
@@ -44,9 +67,10 @@ export default function BuildHeader({
           faceUrl: face,
         });
       }
+      if (c?.ok) { const d = await c.json(); setSpendCents(d.influencer?.cents ?? 0); }
       if (!stop.current) t = setTimeout(tick, 6000);
     }
-    t = setTimeout(tick, 6000);
+    tick();
     return () => { stop.current = true; clearTimeout(t); };
   }, [id]);
 
@@ -85,6 +109,9 @@ export default function BuildHeader({
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-ready" /> Building live
           </span>
         ) : null}
+
+        {/* Running build cost for THIS influencer — green < R500, orange < R1000, red beyond (pulsing). */}
+        {spendCents != null && <RunningCost name={name} cents={spendCents} />}
       </div>
 
       {/* Step tabs — real pages */}

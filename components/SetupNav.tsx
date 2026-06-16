@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/setup/influencers", label: "Influencers" },
   { href: "/setup/brains", label: "Brains" },
   { href: "/setup/connect", label: "Connect Tools" },
+  { href: "/cost-control", label: "Cost Control" },
 ];
 
 // Top-bar section nav for Setup (replaces the old left sidebar so the build
