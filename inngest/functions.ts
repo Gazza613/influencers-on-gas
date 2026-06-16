@@ -346,11 +346,11 @@ export const generateCreatives = inngest.createFunction(
           ? `the same person, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`
           : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
 
-      const made: Creative[] = [];
-      let qaReviewed = 0, qaRejected = 0;
-      for (const ratio of ratios) {
+      // Process every format CONCURRENTLY (each: generate → QA → re-roll), so multi-format
+      // runs finish in ~one format's wall-clock instead of the sum.
+      const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
         const kept: string[] = [];
-        // Generate, QA each shot, keep only passers; up to 2 rounds to fill the count.
+        let reviewed = 0, rejected = 0;
         for (let attempt = 0; attempt < 2 && kept.length < perRatio; attempt++) {
           const need = perRatio - kept.length;
           const prompts = Array.from({ length: need }, (_, i) => buildPrompt(attempt * perRatio + i));
@@ -360,20 +360,20 @@ export const generateCreatives = inngest.createFunction(
             got = await step.run(`upscale-${ratio}-${attempt}`, () => Promise.all(got.map((u) => upscaleUrlTo(u, "4k").then((r) => r || u).catch(() => u))));
             await step.run(`usage-up-${ratio}-${attempt}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: got.length }));
           }
-          // Vision QA — reject shirtless / collage / bad-proportion / broken; on QA error, reject.
+          // Vision QA — reject shirtless / collage / bad-proportion / broken; on QA error, keep.
           const verdicts = await step.run(`qa-${ratio}-${attempt}`, () =>
             Promise.all(got.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
           );
-          for (const v of verdicts) {
-            qaReviewed++;
-            if (v.pass && kept.length < perRatio) kept.push(v.u);
-            else if (!v.pass) qaRejected++;
-          }
-          // Persist progress as shots pass QA.
-          const partial = [...made, ...kept.map((url) => ({ url, ratio, resolution, scene: sceneText, at: Date.now() })), ...existing].slice(0, 120);
-          await step.run(`save-${ratio}-${attempt}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: partial, creatives_status: "running" } }));
+          for (const v of verdicts) { reviewed++; if (v.pass && kept.length < perRatio) kept.push(v.u); else if (!v.pass) rejected++; }
         }
-        for (const url of kept) made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
+        return { ratio, kept, reviewed, rejected };
+      }));
+
+      const made: Creative[] = [];
+      let qaReviewed = 0, qaRejected = 0;
+      for (const r of perRatioResults) {
+        qaReviewed += r.reviewed; qaRejected += r.rejected;
+        for (const url of r.kept) made.push({ url, ratio: r.ratio, resolution, scene: sceneText, at: Date.now() });
       }
       const qa = { reviewed: qaReviewed, approved: made.length, rejected: qaRejected, at: Date.now() };
       await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done", creatives_qa: qa } }));

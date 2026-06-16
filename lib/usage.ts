@@ -75,7 +75,7 @@ export type CostReport = {
   total: { credits: number; cents: number; events: number };
   split: { image: { count: number; cents: number }; video: { count: number; cents: number }; other: { count: number; cents: number } };
   byUser: { user_email: string; credits: number; cents: number; events: number }[];
-  byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number }[];
+  byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
   byAction: { action: string; credits: number; cents: number }[];
   byDay: { day: string; credits: number; cents: number }[];
@@ -127,9 +127,10 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
     select i.id as id, coalesce(i.name,'(removed)') as name,
            sum(u.credits)::float as credits, sum(u.cents)::int as cents,
            sum(case when u.action in ('casting','photoshoot','humaniser','creative') then u.count else 0 end)::int as images,
-           sum(case when u.provider='heygen' or u.action in ('presenter','video') then u.count else 0 end)::int as videos
+           sum(case when u.provider='heygen' or u.action in ('presenter','video') then u.count else 0 end)::int as videos,
+           to_char(max(u.created_at) at time zone 'Africa/Johannesburg','Mon DD, HH24:MI') as last_at
     from usage_events u left join influencers i on i.id = u.influencer_id ${where}
-    group by i.id, i.name order by cents desc limit 200`)) as CostReport["byInfluencer"];
+    group by i.id, i.name order by max(u.created_at) desc limit 200`)) as CostReport["byInfluencer"];
 
   const byProvider = (await q(`select u.provider, sum(u.credits)::float as credits, sum(u.cents)::int as cents from usage_events u ${where} group by u.provider order by cents desc`)) as CostReport["byProvider"];
   const byAction = (await q(`select coalesce(u.action,'(other)') as action, sum(u.credits)::float as credits, sum(u.cents)::int as cents from usage_events u ${where} group by u.action order by cents desc`)) as CostReport["byAction"];

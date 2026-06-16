@@ -7,7 +7,7 @@ type Report = {
   total: { credits: number; cents: number; events: number };
   split: { image: { count: number; cents: number }; video: { count: number; cents: number }; other: { count: number; cents: number } };
   byUser: { user_email: string; credits: number; cents: number; events: number }[];
-  byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number }[];
+  byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
   byAction: { action: string; credits: number; cents: number }[];
   byDay: { day: string; credits: number; cents: number }[];
@@ -278,8 +278,8 @@ export default function CostControlPage() {
 
         {/* Tables */}
         <Section title="By team member">{report && <Table rows={report.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, credits: u.credits, cents: u.cents, sub: `${u.events} jobs` }))} />}</Section>
-        <Section title="By influencer (creation · edits · running cost)">
-          {report && <Table rows={report.byInfluencer.map((i) => ({ label: i.name, credits: i.credits, cents: i.cents, sub: `${i.images} images · ${i.videos} videos` }))} />}
+        <Section title="By influencer (latest builds first)">
+          {report && <Table rows={report.byInfluencer.map((i) => ({ label: i.name, credits: i.credits, cents: i.cents, sub: `${i.images} img · ${i.videos} vid · last ${i.last_at}` }))} />}
         </Section>
         <Section title="By platform / API">{report && <Table rows={report.byProvider.map((p) => ({ label: PROVIDER_LABEL[p.provider] ?? p.provider, credits: p.credits, cents: p.cents }))} />}</Section>
         <Section title="By function">{report && <Table rows={report.byAction.map((a) => ({ label: ACTION_LABEL[a.action] ?? a.action, credits: a.credits, cents: a.cents }))} />}</Section>
