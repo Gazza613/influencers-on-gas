@@ -42,9 +42,15 @@ const CARDS = [
   { right: "-16px", top: "72%", w: 148, rot: "6deg", opacity: 0.86, period: 13, sway: 17, delay: 1.2 },
 ] as const;
 
-type Inf = { persona?: { hero_url?: string } | null; look_refs?: { url: string; hero?: boolean }[] | null };
+type Inf = { status?: string; persona?: { hero_url?: string; hero_realism_url?: string; locked?: boolean } | null; look_refs?: { url: string; hero?: boolean }[] | null };
 function heroOf(inf: Inf): string | null {
-  return inf.persona?.hero_url || inf.look_refs?.find?.((r) => r.hero)?.url || inf.look_refs?.[0]?.url || null;
+  return inf.persona?.hero_realism_url || inf.persona?.hero_url || inf.look_refs?.find?.((r) => r.hero)?.url || inf.look_refs?.[0]?.url || null;
+}
+// Showcase finished influencers first: locked/ready lead, then in-build, then generating.
+function rank(inf: Inf): number {
+  if (inf.persona?.locked || inf.status === "ready") return 0;
+  if (inf.status === "frames_ready" || inf.status === "cast_ready") return 1;
+  return 2;
 }
 
 export default function Landing() {
@@ -58,7 +64,10 @@ export default function Landing() {
     fetch("/api/influencers", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { influencers: [] }))
       .then((d) => {
-        const imgs = [...new Set(((d.influencers as Inf[]) || []).map(heroOf).filter((u): u is string => !!u))];
+        const list = (d.influencers as Inf[]) || [];
+        const imgs = [...new Set(
+          [...list].sort((a, b) => rank(a) - rank(b)).map(heroOf).filter((u): u is string => !!u),
+        )];
         setCardSrcs(CARDS.map((_, i) => imgs[i] ?? null));
       })
       .catch(() => {});
