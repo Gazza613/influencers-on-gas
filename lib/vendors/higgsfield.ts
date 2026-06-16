@@ -316,7 +316,7 @@ export async function importMediaUrl(url: string): Promise<string | null> {
 
 // Native Higgsfield upscale (bytedance) → 2K/4K. Imports the URL, reads its dimensions,
 // submits the upscale, polls for the result. Replaces the external Magnific upscaler.
-export async function upscaleUrlTo(url: string, resolution: "2k" | "4k" = "4k"): Promise<string | null> {
+export async function upscaleUrlTo(url: string, resolution: "2k" | "4k" = "4k", rounds = 60): Promise<string | null> {
   let width = 0, height = 0;
   try {
     const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
@@ -329,7 +329,7 @@ export async function upscaleUrlTo(url: string, resolution: "2k" | "4k" = "4k"):
   const r = await call("upscale_image", { params: { provider: "bytedance", image_id: imageId, width, height, resolution } });
   let out: string | null = extractImageUrls(r)[0] ?? null;
   const jobId = extractJobIds(r)[0] ?? null;
-  if (!out && jobId) out = await pollJob(call, jobId);
+  if (!out && jobId) out = await pollJob(call, jobId, rounds);
   return out;
 }
 
