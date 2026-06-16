@@ -11,12 +11,13 @@ const LINKS = [
 ];
 
 // Top-bar section nav for Setup (replaces the old left sidebar so the build
-// journey gets the full canvas width).
-export default function SetupNav() {
+// journey gets the full canvas width). Team is super-admin only.
+export default function SetupNav({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const pathname = usePathname();
+  const links = isSuperAdmin ? [...LINKS, { href: "/setup/users", label: "Team" }] : LINKS;
   return (
     <nav className="flex items-center gap-1">
-      {LINKS.map((l) => {
+      {links.map((l) => {
         const active = pathname === l.href || pathname.startsWith(l.href + "/");
         return (
           <Link

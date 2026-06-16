@@ -7,11 +7,10 @@ type Bible = Record<string, unknown>;
 // Auto-growing editable text that reads like a document but is obviously editable
 // (subtle dashed underline at rest, accent glow + raised surface on focus).
 function Bare({ value, onChange, multiline, placeholder }: { value: string; onChange: (v: string) => void; multiline?: boolean; placeholder?: string }) {
-  const cls = "w-full resize-none rounded-md border border-dashed border-line/70 bg-transparent px-2.5 py-1.5 text-sm leading-relaxed text-ink outline-none transition hover:border-line-strong hover:bg-surface-1 focus:border-[#a855f7] focus:bg-surface-1 focus:shadow-[0_0_0_3px_rgba(168,85,247,0.14)]";
-  if (multiline) {
-    return <textarea value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} rows={Math.max(2, Math.ceil((value?.length || 0) / 60))} className={cls} />;
-  }
-  return <input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={cls} />;
+  // Always a textarea so every descriptor wraps and shows in full (never clipped).
+  const cls = "block w-full resize-none whitespace-pre-wrap break-words rounded-md border border-dashed border-line/70 bg-transparent px-2.5 py-1.5 text-sm leading-relaxed text-ink outline-none transition hover:border-line-strong hover:bg-surface-1 focus:border-[#a855f7] focus:bg-surface-1 focus:shadow-[0_0_0_3px_rgba(168,85,247,0.14)]";
+  const rows = Math.max(multiline ? 2 : 1, Math.ceil((value?.length || 0) / 52));
+  return <textarea value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} rows={rows} className={cls} />;
 }
 
 // One labelled field — label sits ABOVE the value so long text gets the full width.

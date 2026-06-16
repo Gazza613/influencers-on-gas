@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import SignOutButton from "@/components/SignOutButton";
 import CostReadout from "@/components/CostReadout";
 import SetupNav from "@/components/SetupNav";
 
-export default function SetupLayout({ children }: { children: React.ReactNode }) {
+export default async function SetupLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  const isSuperAdmin = session?.user?.role === "super_admin";
   return (
     <div className="flex h-dvh flex-col bg-surface-0 text-ink">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-y-2 border-b border-line bg-surface-1 px-4 py-2.5">
@@ -14,7 +17,7 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
             <span className="hidden sm:inline">Influencers <span className="brand-grad">on</span> GAS</span>
           </Link>
           <span className="hidden text-ink-faint sm:inline">/</span>
-          <SetupNav />
+          <SetupNav isSuperAdmin={isSuperAdmin} />
         </div>
         <div className="flex items-center gap-3">
           <CostReadout />

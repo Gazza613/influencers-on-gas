@@ -22,12 +22,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorize: async (creds) => {
         const email = String(creds?.email ?? "").toLowerCase().trim();
         const password = String(creds?.password ?? "");
+        if (!email || !password) return null;
+
+        // 1) Env super-admin (Gary) — always works, even if the DB is down.
         const saEmail = (process.env.SUPER_ADMIN_EMAIL ?? "").toLowerCase().trim();
         const saPass = process.env.SUPER_ADMIN_PASSWORD ?? "";
-        if (!saEmail || !saPass) return null;
-        if (!email.endsWith(ALLOWED_DOMAIN)) return null;
-        if (safeEqual(email, saEmail) && safeEqual(password, saPass)) {
+        if (saEmail && saPass && email.endsWith(ALLOWED_DOMAIN) && safeEqual(email, saEmail) && safeEqual(password, saPass)) {
           return { id: email, email, name: "Gary Berman", role: "super_admin" };
+        }
+
+        // 2) Invited team members from the users table (active + password set).
+        try {
+          const { verifyUser } = await import("./lib/users");
+          const u = await verifyUser(email, password);
+          if (u) return { id: u.id, email: u.email, name: u.name ?? u.email, role: u.role };
+        } catch {
+          /* DB unreachable — fall through to deny */
         }
         return null;
       },

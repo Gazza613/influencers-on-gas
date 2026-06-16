@@ -11,6 +11,6 @@ export const config = {
   matcher: [
     // Gate page routes. API routes self-gate (return JSON 401/403) so they aren't
     // redirected to /login. Excludes Next internals + static assets too.
-    "/((?!api|login|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|json)$).*)",
+    "/((?!api|login|invite|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|json)$).*)",
   ],
 };

@@ -274,3 +274,12 @@ create index if not exists idx_balance_snapshots_taken on balance_snapshots(take
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
 values ('firecrawl','scrape','page', 0, 15, true)
 on conflict (provider, model, unit) do nothing;
+
+-- ── Team access (Phase 1b): invited members + passwords ──────────────────────
+-- super_admin (env Gary) can invite/remove; invited users set a password via an
+-- emailed link, then sign in. All signed-in users can see Cost Control.
+alter table users add column if not exists password_hash  text;
+alter table users add column if not exists status         text not null default 'active'; -- 'invited' | 'active'
+alter table users add column if not exists invite_token   text;
+alter table users add column if not exists invite_expires timestamptz;
+create index if not exists idx_users_invite_token on users(invite_token);
