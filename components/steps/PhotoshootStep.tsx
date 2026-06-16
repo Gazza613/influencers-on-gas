@@ -1,20 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
+import WorkingPanel from "@/components/WorkingPanel";
+import { CREW } from "@/lib/crew";
 import { flex, pick, PHOTO_LINES } from "@/lib/flex";
 
 type Ref = { url: string; hero?: boolean };
 
 const SET_TOTAL = 7; // chosen hero + 4 face-coverage + 2 scene shots
-const QUIPS = [
-  "Locking in the chosen face…",
-  "Shooting every angle…",
-  "Getting the close-up skin detail…",
-  "On location for the scene shots…",
-  "Dialling in the lighting…",
+const PHOTO_NARRATION = [
+  "On set — locking the chosen face as the one true identity…",
+  "Shooting every angle so the camera never loses them…",
+  "Capturing close-up skin detail: pores, catchlights, the lot…",
+  "Setting up the scene shots in your location…",
+  "Dialling in the lighting and colour to match the room…",
+  "Building a coverage set sharp enough to train a Soul…",
 ];
 
 export default function PhotoshootStep({
@@ -33,7 +36,6 @@ export default function PhotoshootStep({
   );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
   const [locationRef, setLocationRef] = useState<string | null>(null);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
@@ -43,15 +45,6 @@ export default function PhotoshootStep({
 
   const hasSet = frames.length > 1;
   const building = st === "generating" || busy;
-
-  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (building) {
-      tick.current = setInterval(() => setQuip((q) => (q + 1) % QUIPS.length), 3200);
-      return () => { if (tick.current) clearInterval(tick.current); };
-    }
-    setQuip(0);
-  }, [building]);
 
   async function poll(tries = 0): Promise<void> {
     if (tries > 200) { setBusy(false); return; }
@@ -78,7 +71,9 @@ export default function PhotoshootStep({
       body: JSON.stringify({ chosenUrl: modelUrl, locationRef, clothingRef, locationText: locationText.trim(), clothingText: clothingText.trim() }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start the photoshoot"); setBusy(false); return; }
-    setSt("generating"); setFrames([{ url: modelUrl, hero: true }]); poll();
+    setSt("generating"); setFrames([{ url: modelUrl, hero: true }]);
+    flex(`${CREW.photoshoot.emoji} ${CREW.photoshoot.name}, your ${CREW.photoshoot.role}: ${CREW.photoshoot.greeting}`);
+    poll();
   }
 
   function persist(next: Set<string>) {
@@ -135,18 +130,9 @@ export default function PhotoshootStep({
       )}
 
       {building && (
-        <div className="rounded-xl border border-line bg-surface-2 p-4">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-ink">{QUIPS[quip]}</span>
-            <span className="tabular text-ink-faint">{frames.length}/{SET_TOTAL} frames</span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-1">
-            {frames.length > 1
-              ? <div className="h-full rounded-full bg-[#a855f7] transition-all duration-700" style={{ width: `${pct}%` }} />
-              : <div className="h-full w-1/4 animate-pulse rounded-full bg-[#a855f7]" />}
-          </div>
-          <p className="mt-2 text-[11px] text-ink-faint">Angles, close-ups and your scene. Frames appear as they are ready, about two minutes.</p>
-        </div>
+        <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 2 min"
+          pct={frames.length > 1 ? pct : null} sub={`${frames.length}/${SET_TOTAL} frames`}
+          note="Angles, close-ups and your scene — frames appear as they land." />
       )}
 
       {err && <p className="text-xs text-alert">{err}</p>}

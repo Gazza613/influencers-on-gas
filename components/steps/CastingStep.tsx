@@ -1,20 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import BibleEditor from "@/components/BibleEditor";
 import Lightbox from "@/components/Lightbox";
+import WorkingPanel from "@/components/WorkingPanel";
+import { CREW } from "@/lib/crew";
 import { flex, pick, CAST_LINES } from "@/lib/flex";
 
 type Ref = { url: string };
 
 const CAST_TOTAL = 6;
-const QUIPS = [
-  "Casting your influencer…",
-  "Auditioning some faces…",
-  "Lining up the talent…",
-  "Scouting the perfect look…",
-  "Bringing the options to life…",
+const CASTING_NARRATION = [
+  "Our casting director is reading your character brief…",
+  "Auditioning six distinct faces, each a real, believable human…",
+  "Art-directing the lighting and mood for every look…",
+  "No two faces alike — you'll pick the one that clicks…",
+  "Layering in real-skin detail so none of them read as AI…",
+  "Almost there — lining up your audition board…",
 ];
 
 export default function CastingStep({
@@ -34,21 +37,11 @@ export default function CastingStep({
   const [chosen, setChosen] = useState<string | null>(chosenUrl);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
   const [broken, setBroken] = useState<Set<string>>(new Set());
   const bibleFlush = useRef<(() => Promise<void>) | null>(null); // save character edits before casting
 
   const casting = st === "casting" || busy;
-
-  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (casting) {
-      tick.current = setInterval(() => setQuip((q) => (q + 1) % QUIPS.length), 3200);
-      return () => { if (tick.current) clearInterval(tick.current); };
-    }
-    setQuip(0);
-  }, [casting]);
 
   async function poll(tries = 0): Promise<void> {
     if (tries > 160) { setBusy(false); return; }
@@ -71,7 +64,9 @@ export default function CastingStep({
     try { await bibleFlush.current?.(); } catch { /* non-fatal */ }
     const r = await fetch(`/api/influencers/${influencerId}/generate`, { method: "POST" });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start casting"); setBusy(false); return; }
-    setSt("casting"); setCandidates([]); poll();
+    setSt("casting"); setCandidates([]);
+    flex(`${CREW.casting.emoji} ${CREW.casting.name}, your ${CREW.casting.role}: ${CREW.casting.greeting}`);
+    poll();
   }
 
   async function choose(url: string) {
@@ -125,17 +120,10 @@ export default function CastingStep({
             )}
 
             {casting && (
-              <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-ink">{QUIPS[quip]}</span>
-                  <span className="tabular text-ink-faint">{candidates.length}/{CAST_TOTAL} looks</span>
-                </div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-1">
-                  {candidates.length
-                    ? <div className="h-full rounded-full bg-[#a855f7] transition-all duration-700" style={{ width: `${pct}%` }} />
-                    : <div className="h-full w-1/4 animate-pulse rounded-full bg-[#a855f7]" />}
-                </div>
-                <p className="mt-2 text-[11px] text-ink-faint">Fresh looks pop in as they land. Hang tight, about two minutes.</p>
+              <div className="mt-4">
+                <WorkingPanel title="Casting" lines={CASTING_NARRATION} crew={CREW.casting} eta="about 2 min"
+                  pct={candidates.length ? pct : null} sub={`${candidates.length}/${CAST_TOTAL} looks`}
+                  note="Fresh, distinct faces appear as they're cast." />
               </div>
             )}
 

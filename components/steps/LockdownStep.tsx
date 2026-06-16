@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import WorkingPanel from "@/components/WorkingPanel";
+import { CREW } from "@/lib/crew";
 import { flex } from "@/lib/flex";
 
-const QUIPS = [
-  "Teaching the AI every angle of this face…",
-  "Memorising the smile…",
-  "Building a face the camera will never forget…",
-  "Locking the identity in for good…",
-  "Running the Humaniser for real-skin detail…",
+const LOCKDOWN_NARRATION = [
+  "Studying every angle of this face — the bone structure, the asymmetry, the tells…",
+  "Teaching the model the smile, the eyes, the way the light catches the skin…",
+  "Forging a dedicated identity the camera will never forget…",
+  "Running the Humaniser — real pores, real catchlights, real skin…",
+  "Welding the identity shut so it can never drift between shots…",
+  "Almost there — this face is becoming pixel-consistent, forever…",
 ];
 
 export default function LockdownStep({
@@ -25,18 +28,8 @@ export default function LockdownStep({
   const [locked, setLocked] = useState(lockedInit);
   const [busy, setBusy] = useState(initialStatus === "training" || initialStatus === "ready");
   const [err, setErr] = useState("");
-  const [quip, setQuip] = useState(0);
 
   const working = busy || st === "training" || st === "ready";
-
-  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (working && !locked) {
-      tick.current = setInterval(() => setQuip((q) => (q + 1) % QUIPS.length), 3500);
-      return () => { if (tick.current) clearInterval(tick.current); };
-    }
-    setQuip(0);
-  }, [working, locked]);
 
   async function poll(tries = 0): Promise<void> {
     if (tries > 220) { setBusy(false); return; }
@@ -58,7 +51,9 @@ export default function LockdownStep({
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/train`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ useSelected: true }) });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start lock-down"); setBusy(false); return; }
-    setSt("training"); poll();
+    setSt("training");
+    flex(`${CREW.lockdown.emoji} ${CREW.lockdown.name}, your ${CREW.lockdown.role}: ${CREW.lockdown.greeting}`);
+    poll();
   }
 
   async function abort() {
@@ -126,21 +121,10 @@ export default function LockdownStep({
         )}
 
         {working && (
-          <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
-            <div className="flex items-center gap-2 text-xs text-ink">
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-ready" />
-              {QUIPS[quip]}
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-1">
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-ready" />
-            </div>
-            <p className="mt-2 text-[11px] text-ink-faint">
-              Locking down on our servers. It keeps running even if you leave this page or start another influencer,
-              come back in ~10 minutes. Soul training can occasionally take up to ~30 minutes.
-            </p>
-            <button onClick={abort} className="mt-3 rounded-md border border-line px-3 py-1.5 text-[11px] font-semibold text-ink-dim hover:border-alert/50 hover:text-alert">
-              Abort lock-down
-            </button>
+          <div className="mt-4">
+            <WorkingPanel title="Lock-down" lines={LOCKDOWN_NARRATION} crew={CREW.lockdown} eta="about 10 min" pct={null}
+              onAbort={abort}
+              note="Running on our servers — it keeps going even if you leave or start another influencer. Soul training can occasionally take up to ~30 min." />
           </div>
         )}
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}

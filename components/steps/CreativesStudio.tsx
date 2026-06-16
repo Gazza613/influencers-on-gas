@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
+import WorkingPanel from "@/components/WorkingPanel";
+import { CREW } from "@/lib/crew";
 import { flex, pick, QA_LINES } from "@/lib/flex";
 
 type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
@@ -23,14 +25,14 @@ const PLATFORMS: { key: string; label: string; ratios: string[] }[] = [
   { key: "google", label: "Google Ads", ratios: ["16:9", "1:1"] },
 ];
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const QUIPS = [
-  "Art-directing your creatives…",
-  "Framing each format…",
-  "Dialling in the light…",
-  "Rendering social-ready shots…",
-  "🔎 AI Vision QA reviewing each shot…",
-  "Checking wardrobe, composition & proportions…",
-  "Re-rolling anything that doesn't make the cut…",
+const CREATIVE_NARRATION = [
+  "Reading your scene brief and art-directing the shoot…",
+  "Posing your locked influencer — same face, every single frame…",
+  "Framing each format: vertical for Reels, square for feed, wide for ads…",
+  "Dialling in the light, the colour and the wardrobe…",
+  "🔎 AI Vision QA inspecting every shot — clothed, single frame, true proportions…",
+  "Re-rolling anything that doesn't make the cut, no compromises…",
+  "Upscaling the keepers to crisp, publish-ready 4K…",
 ];
 
 export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
@@ -52,7 +54,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [broken, setBroken] = useState<Set<string>>(new Set());
   const [err, setErr] = useState("");
-  const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
 
   const running = status === "running";
@@ -80,12 +81,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     return d;
   }
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-
-  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (running) { tick.current = setInterval(() => setQuip((q) => (q + 1) % QUIPS.length), 3000); return () => { if (tick.current) clearInterval(tick.current); }; }
-    setQuip(0);
-  }, [running]);
 
   async function poll(tries = 0): Promise<void> {
     if (tries > 160) return;
@@ -138,6 +133,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
       body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, model: tier, clothingRef, locationRef, extras }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
+    flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);
     poll();
   }
 
@@ -286,12 +282,10 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}
 
         {running && (
-          <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs text-ink"><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#a855f7]" />{QUIPS[quip]}</div>
-              <button onClick={abort} className="rounded-md border border-line px-2.5 py-1 text-[11px] font-semibold text-ink-dim hover:border-alert/50 hover:text-alert">Abort</button>
-            </div>
-            <p className="mt-2 text-[11px] text-ink-faint">Generating, QA-checking and (for 4K) upscaling each shot. {res === "4k" ? "4K adds an upscale per shot, so it takes longer." : ""} They appear here when ready. Stuck? Hit Abort and run again.</p>
+          <div className="mt-4">
+            <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null}
+              onAbort={abort}
+              note={`Generating, QA-checking${res === "4k" ? " and upscaling to 4K" : ""} each shot — they appear below as they pass review.${res === "4k" ? " 4K adds an upscale per shot, so it takes a little longer." : ""} Stuck? Hit Abort and run again.`} />
           </div>
         )}
       </div>
