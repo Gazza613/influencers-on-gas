@@ -10,14 +10,14 @@ import { flex, pick, PHOTO_LINES } from "@/lib/flex";
 
 type Ref = { url: string; hero?: boolean };
 
-const SET_TOTAL = 7; // chosen hero + 4 face-coverage + 2 scene shots
+const SET_TOTAL = 10; // chosen hero + 9 varied training frames (angle/light/expression/distance)
 const PHOTO_NARRATION = [
   "On set, locking the chosen face as the one true identity…",
-  "Shooting every angle so the camera never loses them…",
+  "Shooting every angle: front, three-quarter, profile, up and down…",
   "Capturing close-up skin detail: pores, catchlights, the lot…",
-  "Setting up the scene shots in your location…",
-  "Dialling in the lighting and colour to match the room…",
-  "Building a coverage set sharp enough to train a Soul…",
+  "Varying the light: soft daylight, warm indoor, golden hour…",
+  "Catching real expressions: neutral, a smile, mid-conversation…",
+  "Building a clean, varied coverage set sharp enough to train a faithful Soul…",
 ];
 
 export default function PhotoshootStep({
@@ -103,9 +103,9 @@ export default function PhotoshootStep({
         <div className="min-w-[200px] flex-1">
           <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Your model</div>
           <p className="mt-1 text-sm text-ink-dim">
-            This is the face every shot is built around. The photoshoot deliberately captures it across different
-            outfits, settings and angles, the face stays identical while the looks vary. That variety is what teaches
-            the identity to hold rock-solid while still letting your creatives restyle wardrobe and scenes freely.
+            This is the face every shot is built around. The photoshoot captures it across many angles, lighting setups,
+            expressions and distances on a clean background, the proven recipe for a faithful identity. The face stays
+            identical throughout, which is what lets your creatives restyle wardrobe and scenes freely afterwards.
           </p>
         </div>
       </div>

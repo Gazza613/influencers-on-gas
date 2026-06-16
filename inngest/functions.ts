@@ -16,18 +16,23 @@ const CANDIDATE_COUNT = 6;
 // <<<element>>> identity lock we need for consistent photoshoot frames.
 const IMAGE_MODEL = "nano_banana_2";
 
-// Stage 2 (Photoshoot) builds the training set from the CHOSEN look. TRAINING_LOOKS is a
-// VARIED set (different wardrobe + setting + framing) with the face as the only constant,
-// so the trained identity generalises instead of cloning one outfit/scene. Each frame is
-// locked to the chosen face via the Element, so every frame is ONE consistent identity.
-type TrainingLook = { wardrobe: string; env: string; frame: string; full?: boolean };
+// Stage 2 (Photoshoot) builds the Soul TRAINING SET from the chosen face. Recipe follows
+// the Higgsfield Soul photo guide: 8 to 12 sharp, single-person frames that vary ANGLE,
+// LIGHTING, EXPRESSION and DISTANCE while keeping ONE clear, consistent face. We do NOT
+// vary outfit/scene to extremes (the guide warns against costumes): a Soul captures the
+// FACE, and wardrobe + location are then driven by the prompt at generation time. Clean,
+// neutral backgrounds keep the training focused on identity (no scene to clone later).
+type TrainingLook = { frame: string; light: string; wardrobe: string; full?: boolean };
 const TRAINING_LOOKS: TrainingLook[] = [
-  { wardrobe: "a plain crew-neck t-shirt", env: "a clean light-grey studio backdrop", frame: "tight beauty close-up of the face, sharp catchlights in the eyes, natural skin texture with visible pores" },
-  { wardrobe: "a smart-casual button shirt or blouse", env: "a bright modern interior beside a large window", frame: "head-and-shoulders portrait at a three-quarter left angle, calm neutral expression" },
-  { wardrobe: "a relaxed knit jumper", env: "a neutral studio backdrop", frame: "straight-on eye-level portrait looking directly into the lens, warm authentic smile" },
-  { wardrobe: "a tailored blazer over a plain top", env: "an outdoor city street in soft daylight", frame: "waist-up medium shot at a three-quarter right angle", full: true },
-  { wardrobe: "a simple casual summer outfit", env: "a relaxed outdoor setting with natural greenery", frame: "full-length head to toe, natural relaxed standing pose", full: true },
-  { wardrobe: "casual everyday clothing", env: "a bright indoor cafe with the room clearly in frame", frame: "medium three-quarter shot with the environment in frame", full: true },
+  { frame: "tight head-shot close-up, front on, neutral relaxed expression, sharp eye catchlights and natural skin pores", light: "soft even indoor light", wardrobe: "a plain crew-neck t-shirt" },
+  { frame: "head-and-shoulders portrait, three-quarter left angle, faint natural smile", light: "soft daylight from a window", wardrobe: "a casual button shirt" },
+  { frame: "head-and-shoulders portrait, three-quarter right angle, mid-conversation talking expression", light: "warm indoor light", wardrobe: "a relaxed knit top" },
+  { frame: "head-shot, chin slightly down looking up into the lens, calm", light: "soft diffused studio light", wardrobe: "a plain t-shirt" },
+  { frame: "head-shot, chin slightly raised, relaxed neutral", light: "bright natural daylight", wardrobe: "a simple casual top" },
+  { frame: "clean side profile of the face, neutral", light: "directional studio key light", wardrobe: "a plain top" },
+  { frame: "head-and-shoulders, straight on into the lens, warm genuine smile", light: "soft golden-hour light", wardrobe: "a smart-casual top" },
+  { frame: "waist-up medium shot, front on, easy natural expression", light: "even soft daylight", wardrobe: "an everyday casual outfit", full: true },
+  { frame: "full-length head to toe, standing in a relaxed natural pose", light: "even studio light", wardrobe: "a simple casual outfit", full: true },
 ];
 
 // STAGE 1, Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the
@@ -85,9 +90,7 @@ export const buildIdentity = inngest.createFunction(
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const chosenUrl = String(event.data.chosenUrl || "");
-    const locationRef = (event.data.locationRef as string) || "";
     const clothingRef = (event.data.clothingRef as string) || "";
-    const locationText = ((event.data.locationText as string) || "").trim();
     const clothingText = ((event.data.clothingText as string) || "").trim();
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "influencer not found" };
@@ -100,39 +103,42 @@ export const buildIdentity = inngest.createFunction(
     const prompt = (persona.identity_prompt as string) || buildIdentityPrompt(inf.persona).prompt;
     const looks = TRAINING_LOOKS.map((l) => ({ ...l }));
     const expected = looks.length + 1;
+    // The character bible assigns a UNIQUE set of natural imperfections (mole, freckles,
+    // a small scar, asymmetry, skin texture) per build. Thread them through every training
+    // frame so the Soul learns them as part of the identity (consistent skin, not generic).
+    const bibleFace = ((persona.bible as { face?: { skin?: string; distinct_features?: string } })?.face) ?? {};
+    const faceMarks = [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 300);
 
     try {
       // Lock the chosen face as a reusable Element (import the URL → media reference).
       const elementId = await step.run("element", () => createFaceElement(null, chosenUrl, `${inf.name}-${influencerId.slice(0, 8)}`));
-      // Optional uploaded references → their own Elements (steer wardrobe + location).
+      // Optional uploaded clothing reference → its own Element (features a signature outfit).
       const clothEl = clothingRef ? await step.run("cloth-element", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
-      const locEl = locationRef ? await step.run("loc-element", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
 
-      const frames: { url: string; hero?: boolean }[] = [{ url: chosenUrl, hero: true }];
+      const frames: { url: string; hero?: boolean; face?: boolean }[] = [{ url: chosenUrl, hero: true }];
       await step.run("save-hero", () =>
         updateInfluencer(influencerId, { look_refs: [...frames], persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected } }),
       );
 
-      // Each <<<id>>> placeholder injects that reference image (face / clothing / location).
+      // Each <<<id>>> placeholder injects that reference image (face / clothing).
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
       const look = lookClause(persona); // makeup / grooming per the chosen look
-      // Honour any user-supplied wardrobe/location by applying it to ONE look only, so the
-      // rest stay varied and the trained identity still generalises.
+      // If the user supplied a signature outfit, feature it on ONE frame; the rest keep the
+      // natural varied wardrobe. (Location is NOT used here: training stays on neutral
+      // backgrounds so the Soul learns the face, not a scene; location is a creatives input.)
       const userIdx = 3;
       if (clothingText) looks[userIdx].wardrobe = clothingText;
-      if (locationText) looks[userIdx].env = locationText;
 
-      // The unchanging constant across every training frame is the FACE, never the outfit.
-      const constant = "the same exact person, with an IDENTICAL face, hairstyle, skin tone and facial features in every frame";
+      // Training frames: ONE clear consistent face, single person, clean neutral background,
+      // varied angle/light/expression/distance. No background extras (single person per
+      // photo, per the Soul photo guide). The FACE is the only constant.
+      const constant = `the same exact person, a single person alone with a clear unobstructed face, IDENTICAL face, hairstyle, skin tone and facial features in every frame${faceMarks ? `, with the same consistent natural skin detail and unique features (${faceMarks})` : ""}`;
       const vPrompts = looks.map((l, i) => {
         const useCloth = clothEl && i === userIdx;
-        const useLoc = locEl && i === userIdx;
         const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
-        const people = l.full ? `, ${SCENE_PEOPLE}` : "";
         const wardrobePhrase = useCloth ? "wearing the same outfit as the clothing reference" : `wearing ${l.wardrobe}`;
-        const envPhrase = useLoc ? "placed naturally in the same location as the location reference image" : `in ${l.env}`;
-        const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${useLoc ? tag(locEl) : ""}${constant}` : prompt;
-        return `${head}, ${wardrobePhrase}, ${l.frame}, ${envPhrase}, ${look}. ${core}${people}.`;
+        const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${constant}` : prompt;
+        return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${core}.`;
       });
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
       const produced = urls.filter((u): u is string => !!u);
