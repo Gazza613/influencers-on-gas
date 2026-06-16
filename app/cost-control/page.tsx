@@ -137,7 +137,9 @@ export default function CostControlPage() {
                 {calibrating ? "Calibrating…" : "Recalibrate costs"}
               </button>
             )}
-            <button onClick={load} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">↻ Refresh</button>
+            <button onClick={() => load()} disabled={loading} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-60">
+              {loading ? <span className="spinner-ring" /> : <span>↻</span>}{loading ? "Refreshing…" : "Refresh"}
+            </button>
           </div>
         </div>
         {calMsg && <p className="tabular mt-1 text-[11px] text-ink-faint">{calMsg}</p>}
