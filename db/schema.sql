@@ -291,3 +291,8 @@ on conflict (provider, model, unit) do nothing;
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
 values ('higgsfield','soul_cinematic','image', 4, 256, true)
 on conflict (provider, model, unit) do nothing;
+
+-- Native Higgsfield 4K upscale (bytedance) — replaces the external Magnific upscaler.
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('higgsfield','upscale_image','image', 2, 128, true)
+on conflict (provider, model, unit) do nothing;

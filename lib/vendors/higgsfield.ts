@@ -1,3 +1,4 @@
+import { imageSize } from "image-size";
 import { getValidHFAccessToken } from "../hf-token";
 
 // Server-side Higgsfield MCP client (ported from the proven Vite integration).
@@ -280,6 +281,25 @@ export async function callMcp(name: string, args: AnyObj): Promise<unknown> {
 export async function importMediaUrl(url: string): Promise<string | null> {
   const { call } = await openSession();
   return importMedia(call, url).catch(() => null);
+}
+
+// Native Higgsfield upscale (bytedance) → 2K/4K. Imports the URL, reads its dimensions,
+// submits the upscale, polls for the result. Replaces the external Magnific upscaler.
+export async function upscaleUrlTo(url: string, resolution: "2k" | "4k" = "4k"): Promise<string | null> {
+  let width = 0, height = 0;
+  try {
+    const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
+    const d = imageSize(buf);
+    width = d.width || 0; height = d.height || 0;
+  } catch { /* dims unknown */ }
+  const imageId = await importMediaUrl(url);
+  if (!imageId || !width || !height) return null;
+  const { call } = await openSession();
+  const r = await call("upscale_image", { params: { provider: "bytedance", image_id: imageId, width, height, resolution } });
+  let out: string | null = extractImageUrls(r)[0] ?? null;
+  const jobId = extractJobIds(r)[0] ?? null;
+  if (!out && jobId) out = await pollJob(call, jobId);
+  return out;
 }
 
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).

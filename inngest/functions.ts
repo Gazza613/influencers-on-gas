@@ -1,9 +1,8 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM } from "@/lib/realism";
-import { createFaceElement, generateBatch, trainSoul, soulStatus, importMediaUrl } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, trainSoul, soulStatus, importMediaUrl, upscaleUrlTo } from "@/lib/vendors/higgsfield";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
-import { enhanceImage } from "@/lib/vendors/magnific";
 import { scrape } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
@@ -218,33 +217,6 @@ export const createPresenter = inngest.createFunction(
   },
 );
 
-// REALISM — run the hero through Magnific for skin realism. Stores the enhanced URL
-// as persona.hero_realism_url (kept alongside the original).
-export const enhanceRealism = inngest.createFunction(
-  { id: "enhance-realism", retries: 1, triggers: [{ event: "influencer/enhance.realism" }] },
-  async ({ event, step }) => {
-    const influencerId = String(event.data.influencerId);
-    const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
-    if (!inf) return { skipped: "influencer not found" };
-    const refs = (inf.look_refs as { url: string; hero?: boolean }[]) || [];
-    const hero = (inf.persona as { hero_url?: string })?.hero_url || refs.find((r) => r.hero)?.url || refs[0]?.url;
-    if (!hero) return { error: "no hero image yet" };
-
-    try {
-      const enhanced = await step.run("enhance", () => enhanceImage(hero));
-      await step.run("save", () =>
-        updateInfluencer(influencerId, { persona: { ...inf.persona, hero_realism_url: enhanced, realism_error: null } }),
-      );
-      return { ok: true, enhanced };
-    } catch (e) {
-      await step.run("fail", () =>
-        updateInfluencer(influencerId, { persona: { ...inf.persona, realism_error: String((e as Error)?.message || e).slice(0, 300) } }),
-      );
-      throw e;
-    }
-  },
-);
-
 // STAGE 3 — Train a reusable Soul from selected frames (~10 min). Uses step.sleep so
 // the function is durably suspended between status polls (survives function timeouts).
 export const trainSoulJob = inngest.createFunction(
@@ -376,8 +348,9 @@ export const generateCreatives = inngest.createFunction(
         if (got.length) await step.run(`usage-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: got.length }));
         let finals = got;
         if (fourK && got.length) {
-          finals = await step.run(`upscale-${ratio}`, async () => Promise.all(got.map((u) => enhanceImage(u).catch(() => u))));
-          await step.run(`usage-upscale-${ratio}`, () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "creative", count: got.length }));
+          // Native Higgsfield 4K upscale (replaces Magnific).
+          finals = await step.run(`upscale-${ratio}`, async () => Promise.all(got.map((u) => upscaleUrlTo(u, "4k").then((r) => r || u).catch(() => u))));
+          await step.run(`usage-upscale-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: got.length }));
         }
         for (const url of finals) made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
         await step.run(`save-${ratio}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "running" } }));

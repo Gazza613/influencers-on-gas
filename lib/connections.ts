@@ -10,8 +10,7 @@ export const PROVIDERS = [
   { id: "firecrawl",  label: "Firecrawl",          role: "Website knowledge ingestion",      required: false, env: ["FIRECRAWL_API_KEY"] },
   { id: "elevenlabs", label: "ElevenLabs",         role: "Voice · music · SFX · STT",        required: true,  env: ["ELEVENLABS_API_KEY"] },
   { id: "heygen",     label: "HeyGen",             role: "A-roll talking-head avatar",       required: true,  env: ["HEYGEN_API_KEY"] },
-  { id: "higgsfield", label: "Higgsfield",         role: "Identity (Soul) + b-roll",         required: true,  env: ["HIGGSFIELD_API_KEY", "HF_REFRESH_TOKEN"] },
-  { id: "magnific",   label: "Magnific",           role: "Skin realism on hero frames",      required: false, env: ["MAGNIFIC_API_KEY"] },
+  { id: "higgsfield", label: "Higgsfield",         role: "Identity (Soul) + b-roll + 4K upscale", required: true, env: ["HIGGSFIELD_API_KEY", "HF_REFRESH_TOKEN"] },
   { id: "shotstack",  label: "Shotstack",          role: "Stitch · captions · mix",          required: true,  env: ["SHOTSTACK_API_KEY"] },
 ] as const;
 
