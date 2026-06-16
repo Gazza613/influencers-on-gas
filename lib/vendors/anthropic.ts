@@ -150,7 +150,7 @@ const QA_SCHEMA = {
   additionalProperties: false,
   properties: {
     pass: { type: "boolean", description: "true ONLY if every check below is true" },
-    fully_clothed: { type: "boolean", description: "subject wears a top covering the torso AND bottoms; false if shirtless, topless, bare-chested, underwear, swimwear or nude" },
+    fully_clothed: { type: "boolean", description: "EVERY person in the frame (the subject AND every background person) wears a complete outfit: a top covering the torso AND bottoms (trousers, jeans, skirt or tailored shorts). false if ANYONE, including someone in the background, is shirtless, topless, bare-chested, bare-legged with no visible bottoms, in underwear, in swimwear or nude" },
     single_frame: { type: "boolean", description: "ONE continuous photograph of a single moment. false if there is ANY collage, grid, split-screen, diptych/triptych, stacked panels, OR a separate side strip / inset / border panel showing a different scene or different people (even a thin vertical or horizontal band down one edge)" },
     realistic_proportions: { type: "boolean", description: "natural human body and head-to-body proportions, and believable scale relative to the background; false if distorted, oversized, tiny or pasted-on" },
     coherent_photo: { type: "boolean", description: "a real, coherent photograph (not blank, corrupt, warped or garbled)" },
@@ -183,7 +183,7 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; issues: 
       messages: [{
         role: "user",
         content: [
-          { type: "text", text: "You are QA for social-media creatives of an AI influencer. Judge this image strictly. pass must be true ONLY if: fully_clothed (top covering torso AND bottoms, FAIL shirtless/topless/underwear/nude), single_frame (ONE continuous photo, FAIL any collage/grid/split/stacked panels OR a side strip/inset/border band showing a different scene), realistic_proportions (natural body + believable scale vs background), and coherent_photo. List concrete issues." },
+          { type: "text", text: "You are QA for social-media creatives of an AI influencer. Judge this image strictly. pass must be true ONLY if: fully_clothed (EVERY person in frame, the subject AND anyone in the background, has a top covering the torso AND bottoms; FAIL if ANYONE is shirtless/topless/bare-legged/underwear/swimwear/nude, including background people), single_frame (ONE continuous photo, FAIL any collage/grid/split/stacked panels OR a side strip/inset/border band showing a different scene), realistic_proportions (natural body + believable scale vs background), and coherent_photo. Look carefully at the background figures for missing bottoms. List concrete issues." },
           { type: "image", source: { type: "base64", media_type: mt as "image/jpeg", data: b64 } },
         ],
       }],

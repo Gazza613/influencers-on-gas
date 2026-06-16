@@ -136,10 +136,13 @@ export const buildIdentity = inngest.createFunction(
       });
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
       const produced = urls.filter((u): u is string => !!u);
+      // looks[0] is the tight face close-up; tag it as the clean identity anchor for
+      // creatives (a face reference clones far less wardrobe/scene than a full photo).
+      const closeUpUrl = urls[0] || null;
       // Meter what Higgsfield produced (billed), before dropping any that fail to load.
       if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
       const validFrames = await step.run("validate-frames", () => filterLoadable(produced));
-      for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url });
+      for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url, ...(url === closeUpUrl ? { face: true } : {}) });
 
       await step.run("save-frames", () =>
         updateInfluencer(influencerId, {
@@ -350,10 +353,17 @@ export const generateCreatives = inngest.createFunction(
       // outfit and background, which overrides a custom scene. When the user writes their
       // own brief we drop the reference so soul_id holds the face while the prompt drives
       // wardrobe and location. (Identity vs prompt-adherence trade-off, chosen per run.)
-      const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]) : [];
-      const heroUrl = (persona.hero_realism_url as string) || (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url || (persona.reference_url as string) || "";
-      const heroMedia = useSoul && heroUrl && !userScene ? await step.run("hero-media", () => importMediaUrl(heroUrl)) : null;
-      const extra = useSoul ? { soul_id: soulId, ...(heroMedia ? { medias: [{ value: heroMedia, role: "image" }] } : {}) } : {};
+      // Identity anchor. soul_id alone does not hold the face strongly enough, so we pass a
+      // reference image. A FULL hero photo clones its outfit + scene, so we prefer a clean
+      // FACE close-up (tagged at photoshoot time): it anchors the face with little scene to
+      // clone. The "identity lock" dial decides whether the reference is used at all:
+      //   strong  = reference on  (max likeness, may pull the shot toward the reference)
+      //   flexible = reference off (soul_id only, follows the brief but can drift)
+      const lockMode = event.data.identityLock === "flexible" ? "flexible" : "strong";
+      const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
+      const idRefUrl = refs.find((r) => r.face)?.url || (persona.hero_realism_url as string) || (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url || (persona.reference_url as string) || "";
+      const idMedia = useSoul && idRefUrl && lockMode === "strong" ? await step.run("id-ref", () => importMediaUrl(idRefUrl)) : null;
+      const extra = useSoul ? { soul_id: soulId, ...(idMedia ? { medias: [{ value: idMedia, role: "image" }] } : {}) } : {};
 
       // Lead with the user's scene brief so it is the dominant instruction (not buried
       // behind boilerplate). When the user wrote their own brief we use FRAMING-only

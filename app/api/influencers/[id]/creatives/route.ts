@@ -37,7 +37,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 // Abort a stuck/running render: reset status so the UI unblocks (the durable job's
-// final save is harmless if it lands later — it just writes whatever it finished).
+// final save is harmless if it lands later, it just writes whatever it finished).
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -68,11 +68,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
   const locationRef = typeof body.locationRef === "string" ? body.locationRef : "";
   const extras = body.extras !== false; // default: include diverse background extras
+  const identityLock = body.identityLock === "flexible" ? "flexible" : "strong"; // default: max likeness
   if (!ratios.length) return NextResponse.json({ error: "Pick at least one format." }, { status: 400 });
 
   await updateInfluencer(id, { persona: { ...persona, creatives_status: "running", creatives_error: null } });
   try {
-    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, model, clothingRef, locationRef, extras } });
+    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, model, clothingRef, locationRef, extras, identityLock } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }

@@ -45,6 +45,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [refining, setRefining] = useState(false);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
   const [locationRef, setLocationRef] = useState<string | null>(null);
+  const [identityLock, setIdentityLock] = useState<"strong" | "flexible">("strong");
 
   const [rates, setRates] = useState<Rates | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>(initial.creatives || []);
@@ -130,7 +131,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setErr(""); setStatus("running");
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, model: tier, clothingRef, locationRef, extras }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, model: tier, clothingRef, locationRef, extras, identityLock }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);
@@ -265,6 +266,23 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               );
             })}
           </div>
+        </div>
+
+        {/* Identity lock */}
+        <div className="mt-4">
+          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Identity lock</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {([["strong", "Strong likeness", "Anchors hard to her locked face. Most consistent, but the shot leans toward the reference."], ["flexible", "Follow my scene", "Leans on the trained identity only. Follows your brief most closely, but the face can vary a little."]] as const).map(([k, label, hint]) => {
+              const on = identityLock === k;
+              return (
+                <button key={k} onClick={() => setIdentityLock(k)} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
+                  <div className={`text-sm font-bold ${on ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
+                  <div className="text-[10px] text-ink-faint">{hint}</div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[11px] text-ink-faint">Tip: a well-retrained influencer holds her face even on &ldquo;Follow my scene&rdquo;. Use Strong if you see her drifting.</p>
         </div>
 
         {/* Optional clothing + location */}

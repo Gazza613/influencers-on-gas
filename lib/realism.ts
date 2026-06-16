@@ -2,24 +2,25 @@
 // identity + b-roll generation so people don't read as AI. The user only picks
 // simple controls (setting, wardrobe); this scaffolding stays hidden.
 
-// Non-negotiable: every subject is FULLY CLOTHED — a top covering the torso AND bottoms.
+// Non-negotiable: every subject is FULLY CLOTHED, a top covering the torso AND bottoms.
 export const CLOTHED =
   "fully and appropriately dressed in a complete, tasteful outfit: a top covering the torso and chest (shirt, blouse, t-shirt, knit, or dress) AND bottoms (trousers, jeans, a skirt or tailored shorts); the chest and torso are always fully covered; never shirtless, topless, bare-chested, in underwear or swimwear, and never nude";
 
-// Single-frame guard — no collage / contact-sheet / split-panel outputs.
+// Single-frame guard, no collage / contact-sheet / split-panel outputs.
 export const SINGLE_FRAME =
   "a single photograph, one continuous frame of one moment, NOT a collage, contact sheet, grid, diptych, triptych, split screen or multiple stacked panels";
 
 // Background people: actively REQUIRE a diverse SA crowd (imperative, so it isn't ignored).
 export const SCENE_PEOPLE =
-  "the scene is busy with several other people clearly visible in the background — a believable, natural mix reflecting South African diversity (Black, White, Indian, Coloured), each rendered realistically, in sharp focus and at correct scale; a lived-in populated setting, never empty";
+  "the scene is busy with several other people clearly visible in the background, a believable, natural mix reflecting South African diversity (Black, White, Indian, Coloured), each rendered realistically, in sharp focus and at correct scale; a lived-in populated setting, never empty; " +
+  "EVERY background person is also FULLY CLOTHED in a complete, tasteful outfit including a top covering the torso AND bottoms (trousers, jeans, a skirt or tailored shorts), never bare-legged, in underwear or swimwear, never partially nude";
 
 // No extras: the subject is alone in the scene.
 export const NO_EXTRAS =
   "no other people anywhere in the scene, the subject is completely alone, clean and uncluttered background";
 
 // Concise realism core for Soul generation (long stacked clauses confuse the model and
-// hurt quality — the Soul + reference handle identity, so keep the scene direction tight).
+// hurt quality, the Soul + reference handle identity, so keep the scene direction tight).
 export const SOUL_SCENE =
   "candid photoreal photograph, fully clothed with a top and bottoms (never shirtless or nude), " +
   "true-to-life body proportions and correct scale in the scene, background in sharp focus, " +
