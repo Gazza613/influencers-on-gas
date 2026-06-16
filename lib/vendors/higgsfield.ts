@@ -246,25 +246,32 @@ function parseCredits(data: unknown): number | null {
 }
 
 // Live credit balance (ground truth). Discovers the account/credit tool dynamically
-// (names vary) and parses flexibly. Returns raw + tried for debugging.
-export async function getBalance(): Promise<{ remaining: number | null; raw?: unknown; tried?: string[] }> {
+// (names vary) and parses flexibly. Returns rich debug (tool list + raw samples).
+export async function getBalance(): Promise<{ remaining: number | null; raw?: unknown; tried?: string[]; allTools?: string[]; samples?: { tool: string; raw: string }[] }> {
   const { call } = await openSession();
-  let candidates = ["balance", "show_plans_and_credits", "credits", "show_credits", "get_credits", "account", "wallet", "subscription"];
+  let allTools: string[] = [];
+  let discovered: string[] = [];
   try {
-    const names = (await listTools()).map((t) => t.name).filter((n) => /credit|balance|plan|account|wallet|subscription/i.test(n));
-    candidates = [...new Set([...names, ...candidates])];
+    allTools = (await listTools()).map((t) => t.name);
+    discovered = allTools.filter((n) => /credit|balance|plan|account|wallet|subscription|usage|me|profile/i.test(n));
   } catch { /* discovery optional */ }
+  const candidates = [...new Set([...discovered, "balance", "show_plans_and_credits", "credits", "show_credits", "get_credits", "account", "wallet", "subscription"])];
 
   const tried: string[] = [];
+  const samples: { tool: string; raw: string }[] = [];
   for (const tool of candidates) {
     try {
       const data = unwrapMCP(await call(tool, {}));
       tried.push(tool);
+      const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+      samples.push({ tool, raw: str.slice(0, 220) });
       const n = parseCredits(data);
-      if (n != null) return { remaining: n, raw: data, tried };
-    } catch { /* try next */ }
+      if (n != null) return { remaining: n, raw: data, tried, allTools, samples };
+    } catch (e) {
+      samples.push({ tool, raw: "ERR " + String((e as Error)?.message || e).slice(0, 120) });
+    }
   }
-  return { remaining: null, tried };
+  return { remaining: null, tried, allTools, samples };
 }
 
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
