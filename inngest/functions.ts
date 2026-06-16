@@ -58,14 +58,16 @@ export const generateCandidates = inngest.createFunction(
       // gpt_image_2 is ~150s PER IMAGE, so generating all 6 CONCURRENTLY collapses casting
       // to ~one image's wall-clock (~2.5 min) instead of 6× (~15 min).
       const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16"));
+      const produced = [...new Set(urls.filter((u): u is string => !!u))];
+      // Meter what Higgsfield produced (billed) — BEFORE dropping any that fail to load.
+      if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "casting", count: produced.length }));
       // Only keep looks whose image actually loads (drops broken/expired URLs).
-      const valid = await step.run("validate", () => filterLoadable([...new Set(urls.filter((u): u is string => !!u))]));
+      const valid = await step.run("validate", () => filterLoadable(produced));
       const candidates = valid.map((url) => ({ url }));
       if (!candidates.length) throw new Error("no candidate looks generated");
       await step.run("save-candidates", () =>
         updateInfluencer(influencerId, { status: "cast_ready", persona: { ...persona, candidates } }),
       );
-      await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "casting", count: candidates.length }));
       return { ok: true, candidates: candidates.length };
     } catch (e) {
       await step.run("mark-failed", () =>
@@ -138,7 +140,10 @@ export const buildIdentity = inngest.createFunction(
       );
       const vPrompts = elementId ? [...facePrompts, ...scenePrompts] : [...faceCoverage, ...sceneCoverage].map((v) => `${prompt}. ${v}`);
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
-      const validFrames = await step.run("validate-frames", () => filterLoadable(urls.filter((u): u is string => !!u)));
+      const produced = urls.filter((u): u is string => !!u);
+      // Meter what Higgsfield produced (billed) — before dropping any that fail to load.
+      if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
+      const validFrames = await step.run("validate-frames", () => filterLoadable(produced));
       for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url });
 
       await step.run("save-frames", () =>
@@ -148,7 +153,6 @@ export const buildIdentity = inngest.createFunction(
           persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected },
         }),
       );
-      await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: Math.max(0, frames.length - 1) }));
       return { ok: true, frames: frames.length, element: !!elementId };
     } catch (e) {
       await step.run("mark-failed", () =>
