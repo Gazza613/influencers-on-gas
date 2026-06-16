@@ -337,57 +337,50 @@ export const generateCreatives = inngest.createFunction(
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "influencer not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
-    const elementId = (persona.element_id as string) || null;
-    const soulId = (inf.higgsfield_soul_id as string) || null;
     const look = lookClause(persona);
     const sceneText = scene || "a clean, on-brand social media portrait, looking at the camera";
     const fourK = resolution === "4k";
     const existing = Array.isArray(persona.creatives) ? (persona.creatives as Creative[]) : [];
 
-    // Identity lock: prefer the trained Soul (soul_2 / soul_cinematic + soul_id), far more
-    // consistent than injecting a reference element into nano. Fall back to nano if no Soul.
-    const useSoul = !!soulId;
-    const soulModel = event.data.model === "soul_cinematic" ? "soul_cinematic" : "soul_2";
-    const genModel = useSoul ? soulModel : IMAGE_MODEL;
+    // ARCHIVE-PROVEN identity recipe (the old SPA never used Soul/soul_id). Identity comes
+    // from REFERENCE IMAGES + an explicit instruction, on gpt_image_2 (high-fidelity, takes
+    // up to 8 image refs). Higgsfield Soul did not hold identity in testing; references do.
+    const genModel = "gpt_image_2";
+    const cinematic = event.data.model === "soul_cinematic";
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
 
     try {
-      // Nano fallback path only (no Soul) uses element injection. Soul renders natively
-      // from the prompt + soul_id, NOT from a location reference media (that produced
-      // collages/odd composites), so the scene is described in the prompt instead.
-      const clothEl = !useSoul && clothingRef ? await step.run("cloth-el", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
-      const locEl = !useSoul && locationRef ? await step.run("loc-el", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
-      const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
-
-      const userScene = !!scene;
-      // Identity anchor (proven recipe from the archive). soul_id alone does NOT hold the
-      // face, and a reference image passed without instruction gets CLONED wholesale
-      // (framing, wardrobe, background). So we ALWAYS attach a clean FACE close-up as
-      // @image1 AND instruct the model to use it for the FACE/identity only, ignoring its
-      // clothing, background, pose and lighting. That locks the face while the scene brief
-      // drives wardrobe + location. The dial only changes how literally to match the face.
       const lockMode = event.data.identityLock === "flexible" ? "flexible" : "strong";
       const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
-      // Lock onto the face the user actually CHOSE at casting (hero), not a photoshoot frame
-      // that may have drifted. The @image1 instruction stops it cloning the hero's scene.
+      // Lock onto the face the user CHOSE at casting (hero), not a drifted photoshoot frame.
       const idRefUrl = (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || "";
-      const idMedia = useSoul && idRefUrl ? await step.run("id-ref", () => importMediaUrl(idRefUrl)) : null;
-      const extra = useSoul ? { soul_id: soulId, ...(idMedia ? { medias: [{ value: idMedia, role: "image" }] } : {}) } : {};
-      // The instruction that makes the reference lock the FACE without copying its scene.
-      const refInstruction = idMedia
-        ? (lockMode === "flexible"
-            ? " IDENTITY REFERENCE: @image1 shows the person. Match their facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and hair. IGNORE @image1's clothing, background, pose, framing and lighting completely; take the wardrobe, scene, pose and composition entirely from the description above."
-            : " IDENTITY LOCK: @image1 is the appearance reference. Replicate this person EXACTLY, facial bone structure, face shape, jaw, nose, lip shape, eye shape and colour, eyebrow arch, skin tone and texture, freckles, moles and natural asymmetries. Zero facial drift, it must be unmistakably the same individual. IGNORE @image1's clothing, background, pose, framing and lighting; take those only from the scene described above.")
-        : "";
+      // Import the references → media ids. Face = identity; optional clothing/scene refs.
+      const [idMedia, clothMedia, locMedia] = await step.run("import-refs", () => Promise.all([
+        idRefUrl ? importMediaUrl(idRefUrl) : Promise.resolve(null),
+        clothingRef ? importMediaUrl(clothingRef) : Promise.resolve(null),
+        locationRef ? importMediaUrl(locationRef) : Promise.resolve(null),
+      ]));
+      const medias = [idMedia, clothMedia, locMedia].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
+      const extra = medias.length ? { medias } : {};
+      // @image tags follow the medias order. Tell the model how to use each one.
+      let n = 0;
+      const faceTag = idMedia ? `@image${++n}` : null;
+      const clothTag = clothMedia ? `@image${++n}` : null;
+      const locTag = locMedia ? `@image${++n}` : null;
+      const refInstruction = [
+        faceTag && (lockMode === "flexible"
+          ? `IDENTITY REFERENCE: ${faceTag} shows the person. Match their facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and hair. IGNORE ${faceTag}'s clothing, background, pose and lighting; take the wardrobe, scene and pose from the description above.`
+          : `IDENTITY LOCK: ${faceTag} is the appearance reference. Replicate this person EXACTLY, facial bone structure, face shape, jaw, nose, lip shape, eye shape and colour, eyebrow arch, skin tone and texture, freckles, moles and natural asymmetries. Zero facial drift, it must be unmistakably the same individual. IGNORE ${faceTag}'s clothing, background, pose and lighting; take those only from the scene described above.`),
+        clothTag && `${clothTag} is a WARDROBE reference: match its outfit (silhouette, fabric, styling). Do NOT copy any face or person from ${clothTag}.`,
+        locTag && `${locTag} is a SCENE reference: match its location and setting. Do NOT copy any face or person from ${locTag}.`,
+      ].filter(Boolean).join(" ");
 
-      // Lead with the user's scene brief so it is the dominant instruction. When the user
-      // wrote their own brief we use FRAMING-only variations for shot-to-shot variety.
+      const userScene = !!scene;
       const variations = userScene ? FRAMING_VARIATIONS : CREATIVE_VARIATIONS;
+      const styleClause = cinematic ? ", cinematic film-grade lighting, rich filmic colour grade, gentle shallow depth, dramatic but natural mood" : "";
       const buildPrompt = (idx: number) =>
-        useSoul
-          ? `${sceneText}${variations[idx % variations.length]}.${refInstruction} ${look}. ${SOUL_SCENE}, ${peopleClause}.`
-          : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}${sceneText}. The same exact person${clothEl ? ", wearing the same outfit as the clothing reference" : ""}${locEl ? ", in the same location as the location reference image" : ""}${variations[idx % variations.length]}. ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
+        `${sceneText}${variations[idx % variations.length]}. ${refInstruction} ${look}${styleClause}. ${SCENE_REALISM}, ${peopleClause}.`;
 
       // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
       // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is

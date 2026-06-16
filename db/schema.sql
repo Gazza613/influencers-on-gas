@@ -297,6 +297,11 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
 values ('higgsfield','upscale_image','image', 2, 128, true)
 on conflict (provider, model, unit) do nothing;
 
+-- GPT Image 2 (creatives identity engine: reference-image + identity-lock, ~4 credits/image).
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('higgsfield','gpt_image_2','image', 4, 308, true)
+on conflict (provider, model, unit) do nothing;
+
 -- ── Showcase: a public brag wall of finished influencer videos ────────────────
 -- Producers flag a complete production into the showcase; a single unguessable
 -- public token serves the wall to prospects without a login.
