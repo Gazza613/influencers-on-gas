@@ -1,42 +1,29 @@
 import Link from "next/link";
 import SignOutButton from "@/components/SignOutButton";
 import CostReadout from "@/components/CostReadout";
+import SetupNav from "@/components/SetupNav";
 
 export default function SetupLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-dvh flex-col bg-surface-0 text-ink">
-      <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface-1 px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <Link href="/studio" className="flex items-center gap-2 font-extrabold tracking-tight">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-y-2 border-b border-line bg-surface-1 px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/" className="flex items-center gap-2 font-extrabold tracking-tight">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/gas-logo.png" alt="GAS" className="h-6 w-6 rounded-full" />
-            <span>Influencers <span className="text-accent">on</span> GAS</span>
+            <span className="hidden sm:inline">Influencers <span className="brand-grad">on</span> GAS</span>
           </Link>
-          <span className="text-ink-faint">/</span>
-          <span className="text-sm text-ink-dim">Setup</span>
+          <span className="hidden text-ink-faint sm:inline">/</span>
+          <SetupNav />
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <CostReadout />
-          <Link href="/studio" className="text-xs text-ink-dim hover:text-ink">← Studio</Link>
+          <Link href="/studio" className="hidden text-xs text-ink-dim hover:text-ink sm:inline">Studio →</Link>
           <SignOutButton />
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[200px_1fr]">
-        <nav className="flex flex-col gap-1 border-r border-line bg-surface-1 p-3">
-          <p className="tabular mb-2 px-2 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Setup</p>
-          <Link href="/setup/connect" className="rounded-md px-2.5 py-2 text-[13px] text-ink-dim hover:bg-surface-2 hover:text-ink">
-            Connect Tools
-          </Link>
-          <Link href="/setup/influencers" className="rounded-md px-2.5 py-2 text-[13px] text-ink-dim hover:bg-surface-2 hover:text-ink">
-            Influencers
-          </Link>
-          <Link href="/setup/brains" className="rounded-md px-2.5 py-2 text-[13px] text-ink-dim hover:bg-surface-2 hover:text-ink">
-            Brains
-          </Link>
-        </nav>
-        <main className="min-h-0 overflow-y-auto p-8">{children}</main>
-      </div>
+      <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
     </div>
   );
 }

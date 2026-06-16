@@ -11,6 +11,7 @@ export default function Uploader({ kind = "ref", label, onUploaded, current }: {
   const ref = useRef<HTMLInputElement>(null);
 
   async function upload(file: File) {
+    if (file.size > 10 * 1024 * 1024) { setErr("That image is over 10MB. Pop in a smaller one."); return; }
     setBusy(true); setErr("");
     const fd = new FormData();
     fd.append("file", file);
@@ -38,7 +39,7 @@ export default function Uploader({ kind = "ref", label, onUploaded, current }: {
         )}
         <div className="min-w-0 flex-1">
           <div className="text-sm text-ink">{busy ? "Beaming it up…" : url ? `${label} ✓` : label}</div>
-          <div className="text-[11px] text-ink-faint">{busy ? "Hang tight, uploading your image." : url ? "Tap to replace." : "Tap or drop an image (max 15MB)."}</div>
+          <div className="text-[11px] text-ink-faint">{busy ? "Hang tight, uploading your image." : url ? "Tap to replace." : "Tap or drop an image (max 10MB)."}</div>
         </div>
       </div>
       <input ref={ref} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />

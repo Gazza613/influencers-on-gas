@@ -16,9 +16,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
+
+  // Merge a small persona patch (step hand-off: chosen face, selected frames).
+  let persona: Record<string, unknown> | undefined;
+  if (body.personaPatch && typeof body.personaPatch === "object") {
+    const inf = await getInfluencer(id);
+    if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    persona = { ...(inf.persona as Record<string, unknown>), ...body.personaPatch };
+  }
+
   await updateInfluencer(id, {
     voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
     status: typeof body.status === "string" ? body.status : undefined,
+    ...(persona ? { persona } : {}),
   });
   return NextResponse.json({ ok: true });
 }

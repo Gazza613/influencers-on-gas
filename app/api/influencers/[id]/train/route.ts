@@ -12,9 +12,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = await req.json().catch(() => ({}));
   let images = Array.isArray(body.images) ? body.images.filter((u: unknown) => typeof u === "string") : [];
   if (images.length < 5) {
-    // fall back to all of the influencer's reference frames
+    // Use the frames the user selected in the photoshoot, else all reference frames.
     const inf = await getInfluencer(id);
-    images = (inf?.look_refs as { url: string }[] | undefined)?.map((r) => r.url).filter(Boolean) ?? [];
+    const persona = (inf?.persona ?? {}) as { selected_frames?: string[] };
+    const sel = Array.isArray(persona.selected_frames) ? persona.selected_frames.filter((u) => typeof u === "string") : [];
+    images = sel.length >= 5 ? sel : (inf?.look_refs as { url: string }[] | undefined)?.map((r) => r.url).filter(Boolean) ?? [];
   }
   if (images.length < 5) {
     return NextResponse.json({ error: "Select at least 5 reference frames to train." }, { status: 400 });

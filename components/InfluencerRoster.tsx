@@ -36,8 +36,21 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   const [twinName, setTwinName] = useState("");
   const [twinConsentId, setTwinConsentId] = useState<string | null>(null);
   const [twinPhoto, setTwinPhoto] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   function reset() { setModal(null); setConsentFor(null); setName(""); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhoto(null); }
+
+  async function remove(e: React.MouseEvent, inf: Influencer) {
+    e.preventDefault(); e.stopPropagation();
+    if (deleting || !confirm(`Delete "${inf.name}"? This removes the influencer and all its looks. This cannot be undone.`)) return;
+    setDeleting(inf.id);
+    const r = await fetch(`/api/influencers/${inf.id}`, { method: "DELETE" });
+    setDeleting(null);
+    if (r.ok) {
+      if (pathname.startsWith(`/setup/influencers/${inf.id}`)) router.push("/setup/influencers");
+      router.refresh();
+    }
+  }
 
   async function createSynthetic() {
     if (!name.trim() || busy) return;
@@ -65,7 +78,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-1 pb-2">
         <span className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Influencers</span>
-        <button onClick={() => setModal("synthetic")} className="rounded-md bg-accent px-2 py-1 text-xs font-bold text-white">+ New</button>
+        <button onClick={() => setModal("synthetic")} className="btn-brand rounded-md px-2.5 py-1 text-xs font-bold">+ New</button>
       </div>
 
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
@@ -76,7 +89,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
           const face = (inf.persona as { hero_url?: string })?.hero_url || (inf.look_refs as { url: string; hero?: boolean }[])?.find?.((r) => r.hero)?.url;
           return (
             <Link key={inf.id} href={`/setup/influencers/${inf.id}`}
-              className={`flex items-center gap-3 rounded-lg px-2 py-2 transition ${active ? "bg-surface-2" : "hover:bg-surface-2/60"}`}>
+              className={`group relative flex items-center gap-3 rounded-lg px-2 py-2 transition ${active ? "bg-surface-2" : "hover:bg-surface-2/60"}`}>
               <div className="relative">
                 <Ring pct={pct} />
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -90,8 +103,12 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-ink">{inf.name}</div>
-                <div className="tabular text-[10px] uppercase tracking-wide text-ink-faint">{inf.mode === "twin" ? "digital twin" : "synthetic"}</div>
+                <div className="tabular text-[10px] uppercase tracking-wide text-ink-faint">{inf.mode === "twin" ? "digital twin" : "influencer"}</div>
               </div>
+              <button onClick={(e) => remove(e, inf)} title={`Delete ${inf.name}`}
+                className="absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded-md text-ink-faint hover:bg-alert/15 hover:text-alert group-hover:flex">
+                {deleting === inf.id ? "…" : "✕"}
+              </button>
             </Link>
           );
         })}
@@ -103,21 +120,21 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
 
       {modal === "synthetic" && (
         <Modal title="New influencer" onClose={reset}>
-          <p className="text-xs text-ink-dim">Give it a name. The Character Bible, casting and the rest happen on the next screen.</p>
+          <p className="text-xs text-ink-dim">Just a name to start. Character Casting, the look casting and everything else happen on the next screen.</p>
           <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createSynthetic()}
-            placeholder="e.g. Ava" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent" />
+            placeholder="e.g. Ava" className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
           <div>
             <p className="mb-1 text-[11px] text-ink-faint">Optional: upload a reference image to steer the look. With one, we skip casting and shoot straight from your reference.</p>
             <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />
           </div>
-          <Actions onCancel={reset} onConfirm={createSynthetic} label={busy ? "Creating…" : "Create"} disabled={!name.trim() || busy} />
+          <Actions onCancel={reset} onConfirm={createSynthetic} label={busy ? "Creating…" : "Create influencer →"} disabled={!name.trim() || busy} />
         </Modal>
       )}
       {modal === "twin" && !consentFor && (
         <Modal title="Build Me: digital twin" onClose={reset}>
           <p className="text-xs text-ink-dim">Your own likeness, from a photo. We capture consent before any upload (POPIA / GDPR).</p>
           <input autoFocus value={twinName} onChange={(e) => setTwinName(e.target.value)} placeholder="e.g. Gary"
-            className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent" />
+            className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
           <Actions onCancel={reset} onConfirm={() => setConsentFor({ name: twinName })} label="Continue to consent →" disabled={!twinName.trim()} />
         </Modal>
       )}
@@ -150,7 +167,7 @@ function Actions({ onCancel, onConfirm, label, disabled }: { onCancel: () => voi
   return (
     <div className="flex justify-end gap-3 pt-2">
       <button onClick={onCancel} className="rounded-lg border border-line px-4 py-2 text-sm text-ink-dim hover:text-ink">Cancel</button>
-      <button onClick={onConfirm} disabled={disabled} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{label}</button>
+      <button onClick={onConfirm} disabled={disabled} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{label}</button>
     </div>
   );
 }

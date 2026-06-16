@@ -34,3 +34,68 @@ body {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Brand accent (pink → purple → blue) — shared across login, landing, build.
+   Orange stays the GAS mark only. */
+.brand-grad {
+  background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Primary brand CTA — pink→purple pill with a purple glow. */
+.btn-brand {
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+  color: #fff;
+  box-shadow: 0 0 28px rgba(168, 85, 247, 0.4), 0 4px 18px rgba(0, 0, 0, 0.45);
+  transition: transform 0.16s, box-shadow 0.16s, filter 0.16s;
+}
+.btn-brand:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06) saturate(1.06);
+  box-shadow: 0 0 52px rgba(168, 85, 247, 0.62), 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+.btn-brand:disabled { opacity: 0.5; }
+
+/* Subtly animated pink/purple glow border for input/option panels. */
+.glow-accent {
+  border: 1px solid rgba(168, 85, 247, 0.32);
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.05), 0 0 26px rgba(168, 85, 247, 0.12);
+  animation: glowAccent 4.5s ease-in-out infinite;
+}
+@keyframes glowAccent {
+  0%, 100% { border-color: rgba(168, 85, 247, 0.30); box-shadow: 0 0 0 1px rgba(168,85,247,0.05), 0 0 22px rgba(168,85,247,0.10); }
+  50%      { border-color: rgba(236, 72, 153, 0.5);  box-shadow: 0 0 0 1px rgba(168,85,247,0.12), 0 0 44px rgba(168,85,247,0.26); }
+}
+
+/* "This is your next step" — green glowing pulse on the CTA that moves the journey forward. */
+.next-pulse {
+  background: linear-gradient(135deg, #34c759 0%, #1f9d4d 100%);
+  color: #fff;
+  box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.5);
+  animation: nextPulse 2s ease-in-out infinite;
+  transition: transform 0.16s;
+}
+.next-pulse:hover { transform: translateY(-1px); }
+@keyframes nextPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(52,199,89,0.5), 0 0 22px rgba(52,199,89,0.35); }
+  70%  { box-shadow: 0 0 0 12px rgba(52,199,89,0), 0 0 30px rgba(52,199,89,0.5); }
+  100% { box-shadow: 0 0 0 0 rgba(52,199,89,0), 0 0 22px rgba(52,199,89,0.35); }
+}
+
+/* Live "building" tag — soft green glow that breathes to show realtime work. */
+.live-building {
+  color: #34c759;
+  background: rgba(52, 199, 89, 0.12);
+  border: 1px solid rgba(52, 199, 89, 0.35);
+  animation: liveGlow 1.8s ease-in-out infinite;
+}
+@keyframes liveGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52,199,89,0.0); border-color: rgba(52,199,89,0.3); }
+  50%      { box-shadow: 0 0 14px 0 rgba(52,199,89,0.45); border-color: rgba(52,199,89,0.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-accent, .next-pulse, .live-building { animation: none; }
+}

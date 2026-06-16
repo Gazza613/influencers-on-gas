@@ -4,29 +4,31 @@ import { useEffect, useRef, useState } from "react";
 
 type Bible = Record<string, unknown>;
 
-// Bare, document-style field: looks like text, glows an accent border on focus.
+// Auto-growing editable text that reads like a document but is obviously editable
+// (subtle dashed underline at rest, accent glow + raised surface on focus).
 function Bare({ value, onChange, multiline, placeholder }: { value: string; onChange: (v: string) => void; multiline?: boolean; placeholder?: string }) {
-  const cls = "w-full resize-none rounded border border-transparent bg-transparent px-2 py-1 text-sm text-ink outline-none transition hover:border-line focus:border-accent focus:bg-surface-2";
+  const cls = "w-full resize-none rounded-md border border-dashed border-line/70 bg-transparent px-2.5 py-1.5 text-sm leading-relaxed text-ink outline-none transition hover:border-line-strong hover:bg-surface-1 focus:border-[#a855f7] focus:bg-surface-1 focus:shadow-[0_0_0_3px_rgba(168,85,247,0.14)]";
   if (multiline) {
-    return <textarea value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} rows={2} className={cls} />;
+    return <textarea value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} rows={Math.max(2, Math.ceil((value?.length || 0) / 60))} className={cls} />;
   }
   return <input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={cls} />;
 }
 
+// One labelled field — label sits ABOVE the value so long text gets the full width.
 function Field({ label, value, onChange, multiline }: { label: string; value: unknown; onChange: (v: string) => void; multiline?: boolean }) {
   return (
-    <div className="flex items-start gap-2 border-b border-line/50 py-1">
-      <span className="mt-1.5 w-28 shrink-0 text-[11px] capitalize text-ink-dim">{label.replace(/_/g, " ")}</span>
-      <div className="min-w-0 flex-1"><Bare value={String(value ?? "")} onChange={onChange} multiline={multiline} /></div>
+    <div className="py-1.5">
+      <div className="tabular mb-0.5 px-1 text-[10px] uppercase tracking-[0.18em] text-ink-faint">{label.replace(/_/g, " ")}</div>
+      <Bare value={String(value ?? "")} onChange={onChange} multiline={multiline} />
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-line bg-surface-2 p-3">
-      <div className="tabular mb-1 text-[10px] uppercase tracking-[0.25em] text-ink-faint">{title}</div>
-      {children}
+    <div className="rounded-xl border border-line bg-surface-2 p-4">
+      <div className="tabular mb-2 border-b border-line/60 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#c79bff]">{title}</div>
+      <div className="space-y-1">{children}</div>
     </div>
   );
 }
@@ -65,7 +67,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/bible`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief }) });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) { setErr(d?.error || "Could not write the bible"); setBusy(false); return; }
+    if (!r.ok) { setErr(d?.error || "Could not design the character"); setBusy(false); return; }
     setBible(d.bible); setOpen(false); setBusy(false); setSaved("saved");
   }
 
@@ -78,35 +80,41 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-5">
       <div className="flex items-center justify-between">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-accent">Character Bible</div>
+        <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Character Casting</div>
         <div className="flex items-center gap-3">
           {bible && saved !== "idle" && <span className="text-[10px] text-ink-faint">{saved === "saving" ? "saving…" : "saved ✓"}</span>}
-          {bible && <button onClick={() => setOpen((o) => !o)} className="text-xs text-ink-dim hover:text-ink">{open ? "Hide brief" : "Re-brief"}</button>}
+          {bible && <button onClick={() => setOpen((o) => !o)} className="text-xs text-ink-dim hover:text-ink">{open ? "Hide brief" : "↻ Re-brief"}</button>}
         </div>
       </div>
-      <p className="mt-2 text-sm text-ink">
-        Give us a line or two and our co-pilot designs a full film-grade character bible. Every field below is
-        yours to fine-tune in place, it is the blueprint every casting shot and script is built from.
+      <p className="mt-2 text-sm text-ink-dim">
+        This is where your influencer is born. Tell us a line or two about who they are, and our co-pilot
+        casts a full film-grade character: their face, their story, the way they move, even their wardrobe.
+        Think of it as the audition before the photoshoot. The richer the brief, the more alive they feel.
       </p>
 
       {(open || !bible) && (
         <div className="mt-3">
           <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
             placeholder="e.g. 42, Indonesian-Dutch concert pianist, warm and intellectual, plays jazz in intimate clubs, calm confidence with flashes of humour."
-            className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
-          <button onClick={generate} disabled={busy || brief.trim().length < 10} className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
-            {busy ? "Designing the character…" : bible ? "Regenerate bible" : "Co-write with AI"}
+            className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
+          <button onClick={generate} disabled={busy || brief.trim().length < 10} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+            {busy ? "Casting the character…" : bible ? "✨ Re-cast the character" : "✨ Bring them to life"}
           </button>
-          {busy && <p className="mt-2 text-[11px] text-ink-faint">Our co-pilot is casting the character. This takes around half a minute.</p>}
+          {brief.trim().length > 0 && brief.trim().length < 10 && <p className="mt-2 text-[11px] text-ink-faint">Give us a touch more to work with, a sentence or two.</p>}
+          {busy && <p className="mt-2 text-[11px] text-ink-faint">Our co-pilot is in the casting room dreaming them up. About half a minute, worth the wait.</p>}
           {err && <p className="mt-2 text-xs text-alert">{err}</p>}
         </div>
       )}
 
       {bible && !open && (
         <div className="mt-4 space-y-3">
+          <div className="rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[11px] text-ink-dim">
+            ✎ Everything below is yours to tweak. Click any line to rewrite it, it saves automatically as you type.
+            Want a totally different take? Hit <span className="text-[#c79bff]">↻ Re-brief</span> up top.
+          </div>
           <Bare value={String(bible.signature_line ?? "")} onChange={(v) => edit((b) => { b.signature_line = v; })} placeholder="Signature line" />
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="space-y-3">
             <Section title="Identity">
               {["profession", "age", "height", "build", "ethnicity_design"].map((k) => (
                 <Field key={k} label={k} value={get(["identity"])[k]} onChange={(v) => edit((b) => { ((b.identity ??= {}) as Bible)[k] = v; })} />
