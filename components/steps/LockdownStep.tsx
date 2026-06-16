@@ -83,11 +83,17 @@ export default function LockdownStep({
           </div>
         </div>
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Next phase · video production</div>
+          <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Next · create &amp; download your creatives</div>
           <p className="mt-2 text-sm text-ink-dim">
-            Voice, presenter and the full produce pipeline live in the Studio. Your locked influencer is ready to perform.
+            Head to Creatives to generate social-ready images (9:16, 1:1, 16:9 in 2K or 4K) and download them for
+            Reels, Stories, feeds and ads. Voice and the full video pipeline arrive later in the Studio.
           </p>
-          <Link href="/studio" className="next-pulse mt-3 inline-block rounded-full px-5 py-2.5 text-sm font-bold">Go to the Studio →</Link>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link href={`/setup/influencers/${influencerId}/creatives`} className="next-pulse inline-block rounded-full px-5 py-2.5 text-sm font-bold">
+              ✦ Create &amp; download images →
+            </Link>
+            <Link href="/studio" className="text-xs text-ink-dim hover:text-ink">Video production (Studio) →</Link>
+          </div>
         </div>
       </div>
     );
