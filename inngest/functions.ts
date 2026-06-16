@@ -256,11 +256,11 @@ export const trainSoulJob = inngest.createFunction(
       );
       throw e;
     }
-    await step.run("save-soul-id", () => updateInfluencer(influencerId, { higgsfield_soul_id: soulId, status: "training" }));
+    await step.run("save-soul-id", () => updateInfluencer(influencerId, { higgsfield_soul_id: soulId, status: "training", persona: { ...((inf.persona as Record<string, unknown>) || {}), soul_started_at: new Date().toISOString(), soul_error: null } }));
     await step.run("usage-soul", () => recordUsage({ influencerId, provider: "higgsfield", model: "soul_train", unit: "train", action: "soul", count: 1 }));
 
-    // Poll up to ~30 min (40 × 45s) with durable sleeps (Soul training can run long).
-    for (let i = 0; i < 40; i++) {
+    // Poll up to ~52 min (70 × 45s) with durable sleeps (Soul training can run long).
+    for (let i = 0; i < 70; i++) {
       await step.sleep(`wait-${i}`, "45s");
       // Each tick: bail if the user aborted (status reset away from training), else check the Soul.
       const cur = await step.run(`check-${i}`, async () => {
@@ -286,6 +286,14 @@ export const trainSoulJob = inngest.createFunction(
         await step.run("mark-soul-failed", () => updateInfluencer(influencerId, { status: "soul_failed", persona: { ...inf.persona, soul_error: "Soul training failed. You can retry the lock-down." } }));
         return { failed: true, soulId };
       }
+    }
+    // Final check before giving up: the Soul may have completed right at the window edge.
+    const finalStatus = await step.run("final-check", () => soulStatus(soulId).catch(() => ""));
+    if (finalStatus === "ready") {
+      const fresh = await step.run("reload-final", () => getInfluencer(influencerId));
+      const persona = (fresh?.persona ?? inf.persona ?? {}) as Record<string, unknown>;
+      await step.run("mark-locked-final", () => updateInfluencer(influencerId, { status: "ready", persona: { ...persona, locked: true } }));
+      return { ready: true, soulId, locked: true, late: true };
     }
     // Took longer than the window, recover so the UI isn't stuck on "training".
     await step.run("timeout", () =>

@@ -21,6 +21,7 @@ export default async function LockdownPage({ params }: { params: Promise<{ id: s
       lockedInit={!!persona.locked}
       selectedCount={selectedCount}
       realismUrl={(persona.hero_realism_url as string) ?? null}
+      soulStartedAt={typeof persona.soul_started_at === "string" ? persona.soul_started_at : null}
     />
   );
 }

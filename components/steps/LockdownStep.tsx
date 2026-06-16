@@ -16,24 +16,27 @@ const LOCKDOWN_NARRATION = [
 ];
 
 export default function LockdownStep({
-  influencerId, status: initialStatus, lockedInit, selectedCount, realismUrl,
+  influencerId, status: initialStatus, lockedInit, selectedCount, realismUrl, soulStartedAt,
 }: {
   influencerId: string;
   status: string;
   lockedInit: boolean;
   selectedCount: number;
   realismUrl: string | null;
+  soulStartedAt?: string | null;
 }) {
   const [st, setSt] = useState(initialStatus);
   const [locked, setLocked] = useState(lockedInit);
   const [busy, setBusy] = useState(initialStatus === "training" || initialStatus === "ready");
   const [retraining, setRetraining] = useState(false);
   const [err, setErr] = useState("");
+  const [localStart, setLocalStart] = useState<number | null>(null);
+  const startedMs = soulStartedAt ? Date.parse(soulStartedAt) : localStart;
 
   const working = busy || st === "training" || st === "ready";
 
   async function poll(tries = 0): Promise<void> {
-    if (tries > 220) { setBusy(false); return; }
+    if (tries > 600) { setBusy(false); return; } // ~60 min, comfortably past the backend window
     await new Promise((r) => setTimeout(r, 6000));
     const r = await fetch(`/api/influencers/${influencerId}`, { cache: "no-store" });
     if (r.ok) {
@@ -52,7 +55,7 @@ export default function LockdownStep({
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/train`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ useSelected: true }) });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start lock-down"); setBusy(false); return; }
-    setSt("training");
+    setSt("training"); setLocalStart(Date.now());
     flex(`${CREW.lockdown.emoji} ${CREW.lockdown.name}, your ${CREW.lockdown.role}: ${CREW.lockdown.greeting}`);
     poll();
   }
@@ -147,7 +150,7 @@ export default function LockdownStep({
         {working && (
           <div className="mt-4">
             <WorkingPanel title="Lock-down" lines={LOCKDOWN_NARRATION} crew={CREW.lockdown} eta="about 10 min" pct={null}
-              onAbort={abort}
+              startedAt={startedMs} onAbort={abort}
               note="Running on our servers, it keeps going even if you leave or start another influencer. Soul training can occasionally take up to ~30 min." />
           </div>
         )}

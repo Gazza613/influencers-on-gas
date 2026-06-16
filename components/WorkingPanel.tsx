@@ -8,7 +8,7 @@ import type { CrewMember } from "@/lib/crew";
 // rotating narration that flexes what the platform is doing, and a progress / sweep bar.
 // Turns dead waits into an over-the-shoulder, premium moment. Used across every build step.
 export default function WorkingPanel({
-  title, lines, pct, sub, note, onAbort, crew, eta,
+  title, lines, pct, sub, note, onAbort, crew, eta, startedAt,
 }: {
   title: string;
   lines: string[];
@@ -18,20 +18,22 @@ export default function WorkingPanel({
   onAbort?: () => void;
   crew?: CrewMember;
   eta?: string; // e.g. "about 2 min"
+  startedAt?: number | null; // epoch ms; when set, the clock shows TRUE elapsed (survives navigation)
 }) {
   const [i, setI] = useState(0);
-  const [secs, setSecs] = useState(0);
+  const [secs, setSecs] = useState(startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0);
 
   useEffect(() => {
     const t = setInterval(() => setI((v) => (v + 1) % lines.length), 2800);
     return () => clearInterval(t);
   }, [lines.length]);
 
-  // Elapsed clock, the single strongest "it's alive" signal during long renders.
+  // Elapsed clock, the single strongest "it's alive" signal during long renders. When a
+  // real start time is provided it reflects true elapsed (does not reset on remount).
   useEffect(() => {
-    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    const t = setInterval(() => setSecs(startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : (s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [startedAt]);
   const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
 
   return (
