@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SignOutButton from "@/components/SignOutButton";
+import CostReadout from "@/components/CostReadout";
 
 export default function SetupLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,7 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
           <span className="text-sm text-ink-dim">Setup</span>
         </div>
         <div className="flex items-center gap-4">
+          <CostReadout />
           <Link href="/studio" className="text-xs text-ink-dim hover:text-ink">← Studio</Link>
           <SignOutButton />
         </div>
