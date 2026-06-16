@@ -5,7 +5,8 @@ import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
 
 type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
-type Rates = { image: { credits: number; cents: number }; upscale: { credits: number; cents: number } };
+type Rate = { credits: number; cents: number };
+type Rates = { soul_2: Rate; soul_cinematic: Rate; upscale: Rate };
 
 const PER_RATIO = 3; // distinct shots generated per format
 const RATIOS = [
@@ -26,6 +27,7 @@ const QUIPS = ["Art-directing your creatives…", "Framing each format…", "Dia
 export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
+  const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
   const [res, setRes] = useState<"2k" | "4k">("2k");
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
@@ -83,8 +85,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
 
   const nFormats = ratios.size;
   const images = nFormats * PER_RATIO;
-  const estCents = rates ? images * (rates.image.cents + (res === "4k" ? rates.upscale.cents : 0)) : 0;
-  const estCredits = rates ? images * (rates.image.credits + (res === "4k" ? rates.upscale.credits : 0)) : 0;
+  const tierRate = rates ? rates[tier] : null;
+  const estCents = rates && tierRate ? images * (tierRate.cents + (res === "4k" ? rates.upscale.cents : 0)) : 0;
+  const estCredits = rates && tierRate ? images * (tierRate.credits + (res === "4k" ? rates.upscale.credits : 0)) : 0;
 
   async function perfect() {
     if (refining) return;
@@ -101,7 +104,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setErr(""); setStatus("running");
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, clothingRef, locationRef }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, model: tier, clothingRef, locationRef }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     poll();
@@ -162,6 +165,20 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               );
             })}
           </div>
+        </div>
+
+        {/* Quality tier (Soul model) */}
+        <div className="mt-4">
+          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {([["soul_2", "Realism (Soul 2)", "Authentic UGC / fashion editorial — the default social look"], ["soul_cinematic", "Cinematic (Soul Cinema)", "Cinema-grade, dramatic lighting — premium hero shots"]] as const).map(([k, label, hint]) => (
+              <button key={k} onClick={() => setTier(k)} className={`rounded-lg border px-3 py-2 text-left transition ${tier === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
+                <div className={`text-sm font-bold ${tier === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
+                <div className="text-[10px] text-ink-faint">{hint}</div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-ink-faint">Both lock your trained Soul for identical identity across every shot — the consistency video production needs.</p>
         </div>
 
         {/* Resolution */}

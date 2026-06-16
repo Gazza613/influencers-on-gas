@@ -346,10 +346,11 @@ export const generateCreatives = inngest.createFunction(
     const fourK = resolution === "4k";
     const existing = Array.isArray(persona.creatives) ? (persona.creatives as Creative[]) : [];
 
-    // Identity lock: prefer the trained Soul (model soul_2 + soul_id) — far more consistent
-    // than injecting a reference element into nano. Fall back to nano + element if no Soul.
+    // Identity lock: prefer the trained Soul (soul_2 / soul_cinematic + soul_id) — far more
+    // consistent than injecting a reference element into nano. Fall back to nano if no Soul.
     const useSoul = !!soulId;
-    const genModel = useSoul ? "soul_2" : IMAGE_MODEL;
+    const soulModel = event.data.model === "soul_cinematic" ? "soul_cinematic" : "soul_2";
+    const genModel = useSoul ? soulModel : IMAGE_MODEL;
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
 

@@ -23,15 +23,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const inf = await getInfluencer(id);
   if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
-  // Creatives run on locked influencers via the Soul model.
-  const [image, upscale] = await Promise.all([rate("higgsfield", "soul_2"), rate("magnific", "upscaler")]);
+  // Creatives run on locked influencers via the Soul model (per quality tier).
+  const [soul2, cinematic, upscale] = await Promise.all([rate("higgsfield", "soul_2"), rate("higgsfield", "soul_cinematic"), rate("magnific", "upscaler")]);
   return NextResponse.json({
     creatives: Array.isArray(persona.creatives) ? persona.creatives : [],
     videoSelects: Array.isArray(persona.video_selects) ? persona.video_selects : [],
     status: persona.creatives_status ?? "idle",
     error: persona.creatives_error ?? null,
     locked: !!persona.locked,
-    rates: { image, upscale }, // per-image: base + (4K upscale)
+    rates: { soul_2: soul2, soul_cinematic: cinematic, upscale }, // per-image
   });
 }
 
@@ -51,13 +51,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const resolution = body.resolution === "4k" ? "4k" : "2k";
   const scene = typeof body.scene === "string" ? body.scene.trim().slice(0, 800) : "";
   const count = Math.max(1, Math.min(6, Number(body.count) || 3));
+  const model = body.model === "soul_cinematic" ? "soul_cinematic" : "soul_2";
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
   const locationRef = typeof body.locationRef === "string" ? body.locationRef : "";
   if (!ratios.length) return NextResponse.json({ error: "Pick at least one format." }, { status: 400 });
 
   await updateInfluencer(id, { persona: { ...persona, creatives_status: "running", creatives_error: null } });
   try {
-    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, clothingRef, locationRef } });
+    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, model, clothingRef, locationRef } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
