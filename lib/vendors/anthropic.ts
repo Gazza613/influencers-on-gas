@@ -281,3 +281,33 @@ export async function researchHiggsfieldTips(): Promise<string> {
   const html = res.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   return html || "NO_SIGNIFICANT_FINDINGS";
 }
+
+// TWO-STAGE prompt writer (archive's core quality engine). Claude expands the producer's
+// brief into a rich, art-directed SCENE paragraph using the influencer's bible. The face
+// comes from a reference image (@image1), so this never describes facial features. The
+// caller wraps the returned paragraph in the structured iPhone-realism prompt + identity
+// lock + constraints. Returns null on failure (caller falls back to the raw brief).
+export async function composeCreativeScene(opts: { bible: Record<string, unknown>; scene: string; cinematic: boolean; extras: boolean }): Promise<string | null> {
+  try {
+    const c = await client();
+    const id = (opts.bible?.identity ?? {}) as Record<string, string>;
+    const wardrobe = (opts.bible?.wardrobe ?? {}) as Record<string, unknown>;
+    const persona = [id.age, id.profession, id.ethnicity_design].filter(Boolean).join(", ") + (Object.keys(wardrobe).length ? `; signature wardrobe: ${JSON.stringify(wardrobe).slice(0, 300)}` : "");
+    const res = await c.messages.create({
+      model: MODEL,
+      max_tokens: 500,
+      system:
+        "You are a creative director writing the SCENE for ONE photoreal social-media image of an existing AI influencer. The face and identity come from a separate reference image, so NEVER describe facial features, skin marks, eye colour or hair, refer to them only as 'the person' / 'she' / 'he'. " +
+        "Expand the producer's brief into a single vivid paragraph covering: the setting and time of day, the wardrobe (specific garments, fabric, colour, how worn), the pose and action, the mood, and the natural lighting. Keep the producer's specifics; fill gaps tastefully from the persona. " +
+        (opts.cinematic ? "Cinematic film mood. " : "A natural, candid, everyday iPhone-snapshot mood, not a posed studio shoot. ") +
+        (opts.extras ? "Include a believable, busy South African background crowd (a natural mix of Black, White, Indian and Coloured people), all fully clothed and in sharp focus. " : "No other people in the scene. ") +
+        "Everyone is always fully clothed in complete outfits. Under 120 words. UK spelling, no em dashes. Output ONLY the paragraph, no preamble.",
+      messages: [{ role: "user", content: `Influencer persona: ${persona || "not specified"}\n\nProducer brief: ${opts.scene}\n\nWrite the scene paragraph.` }],
+    });
+    const block = res.content.find((b) => b.type === "text");
+    const text = block && block.type === "text" ? block.text.trim() : "";
+    return text || null;
+  } catch {
+    return null;
+  }
+}

@@ -3,7 +3,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
-import { qaCreative } from "@/lib/vendors/anthropic";
+import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
@@ -385,8 +385,20 @@ export const generateCreatives = inngest.createFunction(
       const g = genderWord(persona.gender) || "person";
       const subjectLine = [bibleId.age, g, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || g;
       const faceMarks = [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 220);
+
+      // TWO-STAGE writer: when the user gave a brief, let Claude expand it into a rich,
+      // art-directed scene (using the bible) before we wrap it in the structured prompt.
+      // Falls back to the raw brief if Claude is unavailable.
+      let richScene = sceneText;
+      if (scene) {
+        const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: (persona.bible as Record<string, unknown>) || {}, scene: sceneText, cinematic, extras: event.data.extras !== false }));
+        if (composed) {
+          richScene = composed;
+          await step.run("usage-compose", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "compose", count: 1 }));
+        }
+      }
       const buildPrompt = (idx: number, ratio: string) =>
-        buildCreativeImagePrompt({ sceneText, variation: variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
+        buildCreativeImagePrompt({ sceneText: richScene, variation: variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
 
       // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
       // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is
