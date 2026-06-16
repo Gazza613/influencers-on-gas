@@ -44,7 +44,7 @@ export default function TeamManager() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-xl font-bold">Team</h1>
-      <p className="mt-1 text-sm text-ink-dim">Invite teammates and manage access. Everyone can see Cost Control; only a super admin can invite or remove members.</p>
+      <p className="mt-1 text-sm text-ink-dim">Invite teammates and manage access. Gated to <span className="text-ink-dim">@gasmarketing.co.za</span> emails for now. Everyone can see Cost Control; only a super admin can invite or remove members.</p>
 
       {/* Invite */}
       <div className="glow-accent mt-5 rounded-xl bg-surface-1 p-4">

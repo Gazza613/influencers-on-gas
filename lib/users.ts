@@ -2,6 +2,10 @@ import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 
+// Access is gated to GAS Marketing employees/teams for now.
+export const GAS_DOMAIN = "@gasmarketing.co.za";
+export const isGasEmail = (email: string) => email.toLowerCase().trim().endsWith(GAS_DOMAIN);
+
 // Upsert a user row (the env super-admin has no row until first action). Used to
 // satisfy FK attribution (consents.granted_by, influencers.created_by) and to
 // start populating the users table ahead of Phase 1b.

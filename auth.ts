@@ -32,6 +32,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         // 2) Invited team members from the users table (active + password set).
+        // Gated to GAS Marketing emails only.
+        if (!email.endsWith(ALLOWED_DOMAIN)) return null;
         try {
           const { verifyUser } = await import("./lib/users");
           const u = await verifyUser(email, password);

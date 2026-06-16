@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { listUsers, inviteUser } from "@/lib/users";
+import { listUsers, inviteUser, isGasEmail } from "@/lib/users";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { inviteEmail } from "@/lib/invite-email";
 
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : undefined;
   const role = body.role === "admin" ? "admin" : "producer";
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
+  if (!isGasEmail(email)) return NextResponse.json({ error: "Access is for @gasmarketing.co.za only. For external access, email grow@gasmarketing.co.za." }, { status: 400 });
 
   const token = await inviteUser({ email, name, role });
   const link = `https://influencers.gasmarketing.co.za/invite/${token}`;

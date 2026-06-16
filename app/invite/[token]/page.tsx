@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { getInvite } from "@/lib/users";
+import { getInvite, isGasEmail } from "@/lib/users";
 import SetPassword from "@/components/SetPassword";
 
 export const dynamic = "force-dynamic";
 
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const invite = await getInvite(token);
+  const found = await getInvite(token);
+  const invite = found && isGasEmail(found.email) ? found : null;
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6" style={{ background: "#07070E" }}>
@@ -29,7 +30,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           ) : (
             <div className="text-center">
               <div className="text-sm font-semibold text-ink">This invite link is invalid or expired</div>
-              <p className="mt-2 text-xs text-ink-dim">Ask Gary to send you a fresh invite.</p>
+              <p className="mt-2 text-xs text-ink-dim">Access is for GAS Marketing (@gasmarketing.co.za). For a fresh invite or external access, email <a href="mailto:grow@gasmarketing.co.za" className="text-accent">grow@gasmarketing.co.za</a>.</p>
               <Link href="/login" className="mt-4 inline-block text-xs text-accent">← Back to sign in</Link>
             </div>
           )}

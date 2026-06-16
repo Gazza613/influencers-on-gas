@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { acceptInvite, getInvite } from "@/lib/users";
+import { acceptInvite, getInvite, isGasEmail } from "@/lib/users";
 
 // Public (logged-out): an invited member sets their password from the emailed link.
 export async function POST(req: Request) {
@@ -11,6 +11,7 @@ export async function POST(req: Request) {
 
   const inv = await getInvite(token);
   if (!inv) return NextResponse.json({ error: "This invite link is invalid or has expired. Ask Gary to re-send it." }, { status: 400 });
+  if (!isGasEmail(inv.email)) return NextResponse.json({ error: "Access is gated to GAS Marketing (@gasmarketing.co.za). For external access, email grow@gasmarketing.co.za." }, { status: 403 });
 
   const ok = await acceptInvite(token, password);
   if (!ok) return NextResponse.json({ error: "Could not set your password. The link may have expired." }, { status: 400 });
