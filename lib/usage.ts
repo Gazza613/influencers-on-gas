@@ -54,7 +54,8 @@ export type CostReport = {
 };
 
 // `case` expression that buckets an event into image / video / other.
-const KIND = `case when u.unit='image' then 'image' when u.provider='heygen' or u.unit in ('video','avatar') then 'video' else 'other' end`;
+// (usage_events stores action/provider, not a unit column.)
+const KIND = `case when u.action in ('casting','photoshoot','humaniser') then 'image' when u.provider='heygen' or u.action in ('presenter','video') then 'video' else 'other' end`;
 
 function whereClause(f: CostFilters): { sql: string; params: unknown[] } {
   const parts: string[] = [];
@@ -82,8 +83,8 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
   const byInfluencer = (await q(`
     select i.id as id, coalesce(i.name,'(removed)') as name,
            sum(u.credits)::float as credits, sum(u.cents)::int as cents,
-           sum(case when u.unit='image' then u.count else 0 end)::int as images,
-           sum(case when u.provider='heygen' or u.unit in ('video','avatar') then u.count else 0 end)::int as videos
+           sum(case when u.action in ('casting','photoshoot','humaniser') then u.count else 0 end)::int as images,
+           sum(case when u.provider='heygen' or u.action in ('presenter','video') then u.count else 0 end)::int as videos
     from usage_events u left join influencers i on i.id = u.influencer_id ${where}
     group by i.id, i.name order by cents desc limit 200`)) as CostReport["byInfluencer"];
 
