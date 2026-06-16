@@ -28,7 +28,7 @@ const PROVIDER_LABEL: Record<string, string> = {
 };
 const ACTION_LABEL: Record<string, string> = {
   casting: "Casting (looks)", photoshoot: "Photoshoot", soul: "Lock-down (Soul)", humaniser: "Humaniser",
-  presenter: "Presenter", bible: "Character Casting", ingest: "Brain ingestion",
+  presenter: "Presenter", bible: "Character Casting", ingest: "Brain ingestion", creative: "Creatives (social)",
 };
 
 const usd = (cents: number, zarPerUsd: number) => zarPerUsd ? "$" + (cents / 100 / zarPerUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";

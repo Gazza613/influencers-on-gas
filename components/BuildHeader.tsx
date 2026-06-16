@@ -79,10 +79,12 @@ export default function BuildHeader({
   const step2Done = s.frames > 1 || s.locked;
   const base = `/setup/influencers/${id}`;
   const tabs = [
-    { href: base, label: "Build my influencer", done: step1Done, match: (p: string) => p === base },
-    { href: `${base}/photoshoot`, label: "Photoshoot", done: step2Done, match: (p: string) => p.endsWith("/photoshoot") },
-    { href: `${base}/lockdown`, label: "Lock down", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
+    { href: base, label: "Build my influencer", icon: "①", done: step1Done, match: (p: string) => p === base },
+    { href: `${base}/photoshoot`, label: "Photoshoot", icon: "②", done: step2Done, match: (p: string) => p.endsWith("/photoshoot") },
+    { href: `${base}/lockdown`, label: "Lock down", icon: "③", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
   ];
+  // Creatives unlocks once the identity is locked (social outputs).
+  if (s.locked) tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: false, match: (p: string) => p.endsWith("/creatives") });
 
   return (
     <div>
@@ -116,7 +118,7 @@ export default function BuildHeader({
 
       {/* Step tabs — real pages */}
       <div className="mt-4 -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
-        {tabs.map((t, i) => {
+        {tabs.map((t) => {
           const active = t.match(pathname);
           return (
             <Link key={t.href} href={t.href}
@@ -125,7 +127,7 @@ export default function BuildHeader({
                 : t.done ? "border-ready/40 bg-ready/10 text-ready"
                 : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"
               }`}>
-              <span>{t.done && !active ? "✓" : ["①", "②", "③"][i]}</span>
+              <span>{t.done && !active ? "✓" : t.icon}</span>
               <span className="font-semibold">{t.label}</span>
             </Link>
           );

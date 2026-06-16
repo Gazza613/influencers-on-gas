@@ -313,3 +313,55 @@ export const trainSoulJob = inngest.createFunction(
     return { timeout: true, soulId };
   },
 );
+
+// CREATIVES — social-ready outputs from a LOCKED influencer. Renders one image per
+// selected aspect ratio (best framing), optionally upscaled to 4K. Identity is locked
+// via the face Element. Cost-aware: only the chosen ratios render; 4K adds an upscale.
+type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
+
+export const generateCreatives = inngest.createFunction(
+  { id: "generate-creatives", retries: 1, triggers: [{ event: "influencer/generate.creatives" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const ratios = (Array.isArray(event.data.ratios) ? event.data.ratios : ["9:16"]) as string[];
+    const resolution = String(event.data.resolution || "2k");
+    const scene = String(event.data.scene || "").trim();
+
+    const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "influencer not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const elementId = (persona.element_id as string) || null;
+    const look = lookClause(persona);
+    const sceneText = scene || "a clean, on-brand social media portrait, looking at the camera";
+    const tag = elementId ? `<<<${elementId}>>> ` : "";
+    const fourK = resolution === "4k";
+    const existing = Array.isArray(persona.creatives) ? (persona.creatives as Creative[]) : [];
+
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
+
+    try {
+      const made: Creative[] = [];
+      for (const ratio of ratios) {
+        const prompt = `${tag}the same exact person, ${sceneText}, ${look}. ${SCENE_REALISM}.`;
+        const urls = await step.run(`gen-${ratio}`, () => generateBatch([prompt], IMAGE_MODEL, ratio));
+        let url = urls[0];
+        if (!url) continue;
+        await step.run(`usage-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
+        if (fourK) {
+          try {
+            url = await step.run(`upscale-${ratio}`, () => enhanceImage(url as string));
+            await step.run(`usage-upscale-${ratio}`, () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "creative", count: 1 }));
+          } catch { /* keep 2k if upscale fails */ }
+        }
+        made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
+        // Save incrementally so the gallery fills in live.
+        await step.run(`save-${ratio}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 80), creatives_status: "running" } }));
+      }
+      await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 80), creatives_status: "done" } }));
+      return { ok: true, made: made.length };
+    } catch (e) {
+      await step.run("fail", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "failed", creatives_error: String((e as Error)?.message || e).slice(0, 200) } }));
+      throw e;
+    }
+  },
+);
