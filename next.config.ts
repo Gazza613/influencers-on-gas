@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
       { protocol: "https", hostname: "d8j0ntlcm91z4.cloudfront.net" },
     ],
+    qualities: [75], // Next 16 only allows qualities listed here; the cards request q=75
   },
 };
 
