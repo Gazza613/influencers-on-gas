@@ -19,14 +19,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   // Merge a small persona patch (step hand-off only). Allow-listed so a client can't
   // overwrite gates like `locked` or identity fields (element_id / soul references).
-  const ALLOWED_PATCH = new Set(["chosen_url", "selected_frames", "video_selects"]);
+  const ALLOWED_PATCH = new Set(["chosen_url", "selected_frames", "video_selects", "creatives"]);
   let persona: Record<string, unknown> | undefined;
   if (body.personaPatch && typeof body.personaPatch === "object") {
     const inf = await getInfluencer(id);
     if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const existing = inf.persona as Record<string, unknown>;
     const patch: Record<string, unknown> = {};
-    for (const k of Object.keys(body.personaPatch)) if (ALLOWED_PATCH.has(k)) patch[k] = body.personaPatch[k];
-    persona = { ...(inf.persona as Record<string, unknown>), ...patch };
+    for (const k of Object.keys(body.personaPatch)) {
+      if (!ALLOWED_PATCH.has(k)) continue;
+      // `creatives` is prune-only: the new list must be a SUBSET of the existing creatives
+      // (by url), so a client can remove shots but never inject arbitrary images.
+      if (k === "creatives") {
+        const have = new Set((Array.isArray(existing?.creatives) ? existing.creatives : []).map((c: { url?: string }) => c?.url));
+        const next = Array.isArray(body.personaPatch[k]) ? body.personaPatch[k] : [];
+        patch[k] = next.filter((c: { url?: string }) => c && typeof c.url === "string" && have.has(c.url));
+      } else {
+        patch[k] = body.personaPatch[k];
+      }
+    }
+    persona = { ...existing, ...patch };
   }
 
   await updateInfluencer(id, {
