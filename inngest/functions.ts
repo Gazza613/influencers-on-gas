@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, REALISM_POSITIVE, SCENE_REALISM } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { enhanceImage } from "@/lib/vendors/magnific";
@@ -124,12 +124,13 @@ export const buildIdentity = inngest.createFunction(
       // Environment phrase: prefer the uploaded location reference; else the brief's text;
       // else a clean studio. Never inject the studio default when a reference exists.
       const env = locEl ? "placed naturally in the same location as the location reference image" : locText ? `in ${locText}` : "in a clean editorial studio backdrop";
+      const look = lookClause(persona); // makeup / grooming per the chosen look
 
       const facePrompts = faceCoverage.map((v) =>
-        `${tag(elementId)}${tag(clothEl)}${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${v}. ${REALISM_POSITIVE}.`,
+        `${tag(elementId)}${tag(clothEl)}${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${v}. ${look}, ${REALISM_POSITIVE}.`,
       );
       const scenePrompts = sceneCoverage.map((v) =>
-        `${tag(elementId)}${tag(locEl)}${clothEl ? `${tag(clothEl)}wearing the same outfit as the clothing reference, ` : ""}the same exact person ${v}, ${env}, identical face and hair. ${SCENE_REALISM}.`,
+        `${tag(elementId)}${tag(locEl)}${clothEl ? `${tag(clothEl)}wearing the same outfit as the clothing reference, ` : ""}the same exact person ${v}, ${env}, identical face and hair, ${look}. ${SCENE_REALISM}.`,
       );
       const vPrompts = elementId ? [...facePrompts, ...scenePrompts] : [...faceCoverage, ...sceneCoverage].map((v) => `${prompt}. ${v}`);
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));

@@ -99,19 +99,24 @@ Humanising (critical for believability):
 - Give this person a SMALL, UNIQUE set of natural imperfections that make them read as a real human, never an AI render. Draw from a WIDE range and vary it every time: freckles, sun spots, a beauty mark or mole, faint acne scarring, slightly uneven skin tone, a rosacea flush, a small scar, a chipped or slightly crooked tooth, an asymmetric smile, uneven brows, a crooked nose bridge, laugh lines, a cowlick, stubble shadow, and so on.
 - Choose imperfections that suit THIS person's age, ethnicity and lifestyle, and make the combination distinctive to them. No two characters should share the same tells.
 - Do NOT default to the same feature each time. In particular, do NOT reflexively write "a gap between the front teeth" unless it is genuinely the standout choice for this specific person (it rarely should be). Reach for different, fresh details.
-- Keep imperfections subtle and believable, not caricatured. Spread them across face.skin, face.distinct_features and face.structure.`;
+- Keep imperfections SUBTLE, SPARING and believable, never caricatured or over-used. One or two understated tells is plenty. Spread them lightly across face.skin, face.distinct_features and face.structure.
+
+Look / finish (adapt to the requested look):
+- "natural" look: minimal or no makeup, understated grooming, bare believable skin. Keep imperfections present but very subtle.
+- "photoshoot" look: professionally styled hair and, for women, tasteful natural makeup; clean, well-prepped, camera-ready skin so visible blemishes are minimal and softened. Still photoreal, never plastic.`;
 
 // Expand a brief into a full Character Bible.
-export async function generateBible(name: string, brief: string, gender?: string): Promise<CharacterBible> {
+export async function generateBible(name: string, brief: string, gender?: string, look?: string): Promise<CharacterBible> {
   const c = await client();
   const genderLine = gender ? `Gender: ${gender} (design unmistakably as a ${gender}).\n` : "";
+  const lookLine = look ? `Look: ${look} look (adapt makeup, grooming and skin finish accordingly).\n` : "";
   const res = await c.messages.create({
     model: MODEL,
     max_tokens: 8000,
     system: SYSTEM,
     tools: [{ name: "character_bible", description: "Return the complete character bible for this influencer.", input_schema: BIBLE_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
     tool_choice: { type: "tool", name: "character_bible" },
-    messages: [{ role: "user", content: `Influencer name: ${name}\n${genderLine}\nBrief:\n${brief}\n\nDesign the complete character bible. Give them a fresh, distinctive set of humanising imperfections unique to this person.` }],
+    messages: [{ role: "user", content: `Influencer name: ${name}\n${genderLine}${lookLine}\nBrief:\n${brief}\n\nDesign the complete character bible. Give them a fresh, distinctive set of subtle humanising imperfections unique to this person.` }],
   });
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("No character bible returned");

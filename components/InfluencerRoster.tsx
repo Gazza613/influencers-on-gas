@@ -33,13 +33,14 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [gender, setGender] = useState<"female" | "male" | "">("");
+  const [look, setLook] = useState<"natural" | "photoshoot">("natural");
   const [refUrl, setRefUrl] = useState<string | null>(null); // optional reference for synthetic
   const [twinName, setTwinName] = useState("");
   const [twinConsentId, setTwinConsentId] = useState<string | null>(null);
   const [twinPhoto, setTwinPhoto] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  function reset() { setModal(null); setConsentFor(null); setName(""); setGender(""); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhoto(null); }
+  function reset() { setModal(null); setConsentFor(null); setName(""); setGender(""); setLook("natural"); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhoto(null); }
 
   async function remove(e: React.MouseEvent, inf: Influencer) {
     e.preventDefault(); e.stopPropagation();
@@ -58,7 +59,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     setBusy(true);
     const r = await fetch("/api/influencers", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), mode: "synthetic", persona: { ...(refUrl ? { reference_url: refUrl } : {}), gender } }),
+      body: JSON.stringify({ name: name.trim(), mode: "synthetic", persona: { ...(refUrl ? { reference_url: refUrl } : {}), gender, look } }),
     });
     setBusy(false);
     if (r.ok) { const { id } = await r.json(); reset(); router.push(`/setup/influencers/${id}`); router.refresh(); }
@@ -135,6 +136,20 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
               ))}
             </div>
           </div>
+          {gender && (
+            <div>
+              <p className="mb-1.5 text-[11px] text-ink-faint">Look</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([["natural", gender === "female" ? "minimal / no makeup" : "understated, bare skin"], ["photoshoot", gender === "female" ? "styled + tasteful makeup" : "groomed, editorial"]] as const).map(([k, hint]) => (
+                  <button key={k} type="button" onClick={() => setLook(k as "natural" | "photoshoot")}
+                    className={`rounded-lg border px-2 py-2 text-left transition ${look === k ? "border-[#a855f7] bg-[#a855f7]/15" : "border-line hover:border-line-strong"}`}>
+                    <div className={`text-sm font-semibold capitalize ${look === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{k}</div>
+                    <div className="text-[10px] text-ink-faint">{hint}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <p className="mb-1 text-[11px] text-ink-faint">Optional: upload a reference image to steer the look. With one, we skip casting and shoot straight from your reference.</p>
             <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />

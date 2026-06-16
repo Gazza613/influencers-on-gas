@@ -33,8 +33,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (brief.length < 10) return NextResponse.json({ error: "Add a sentence or two of brief to work from." }, { status: 400 });
 
   try {
-    const gender = typeof (inf.persona as Record<string, unknown>)?.gender === "string" ? ((inf.persona as Record<string, unknown>).gender as string) : undefined;
-    const bible = await generateBible(inf.name, brief, gender);
+    const p = (inf.persona ?? {}) as Record<string, unknown>;
+    const gender = typeof p.gender === "string" ? (p.gender as string) : undefined;
+    const look = typeof p.look === "string" ? (p.look as string) : undefined;
+    const bible = await generateBible(inf.name, brief, gender, look);
     await updateInfluencer(id, { persona: { ...inf.persona, brief, bible } });
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-opus-4-8", unit: "bible", action: "bible", count: 1 }).catch(() => {});
     return NextResponse.json({ bible });

@@ -25,6 +25,7 @@ export default function StartPage() {
   // new
   const [name, setName] = useState("");
   const [gender, setGender] = useState<"female" | "male" | "">("");
+  const [look, setLook] = useState<"natural" | "photoshoot">("natural");
   const [refUrl, setRefUrl] = useState<string | null>(null);
   // twin
   const [twinName, setTwinName] = useState("");
@@ -86,8 +87,9 @@ export default function StartPage() {
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
               placeholder="Name (e.g. Ava)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
             <GenderToggle value={gender} onChange={setGender} />
+            {gender && <LookToggle value={look} onChange={setLook} female={gender === "female"} />}
             <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />
-            <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: { ...(refUrl ? { reference_url: refUrl } : {}), gender } })} disabled={!name.trim() || !gender || busy}
+            <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: { ...(refUrl ? { reference_url: refUrl } : {}), gender, look } })} disabled={!name.trim() || !gender || busy}
               className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : !gender ? "Pick a gender to continue" : "Create influencer →"}</button>
           </Panel>
         )}
@@ -168,6 +170,27 @@ function GenderToggle({ value, onChange }: { value: "female" | "male" | ""; onCh
           <button key={g} type="button" onClick={() => onChange(g)}
             className={`rounded-lg border py-2.5 text-sm font-semibold capitalize transition ${value === g ? "border-[#a855f7] bg-[#a855f7]/15 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
             {g === "female" ? "♀ Female" : "♂ Male"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LookToggle({ value, onChange, female }: { value: "natural" | "photoshoot"; onChange: (v: "natural" | "photoshoot") => void; female: boolean }) {
+  const opts = [
+    { key: "natural" as const, label: "Natural", hint: female ? "minimal / no makeup" : "understated, bare skin" },
+    { key: "photoshoot" as const, label: "Photoshoot", hint: female ? "styled + tasteful makeup" : "groomed, editorial" },
+  ];
+  return (
+    <div>
+      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Look</div>
+      <div className="grid grid-cols-2 gap-2">
+        {opts.map((o) => (
+          <button key={o.key} type="button" onClick={() => onChange(o.key)}
+            className={`rounded-lg border px-2 py-2 text-left transition ${value === o.key ? "border-[#a855f7] bg-[#a855f7]/15" : "border-line hover:border-line-strong"}`}>
+            <div className={`text-sm font-semibold ${value === o.key ? "text-[#c79bff]" : "text-ink-dim"}`}>{o.label}</div>
+            <div className="text-[10px] text-ink-faint">{o.hint}</div>
           </button>
         ))}
       </div>

@@ -4,8 +4,8 @@
 
 export const REALISM_POSITIVE =
   "photorealistic, natural skin with visible pores and fine vellus hair, subsurface scattering, " +
-  "subtle imperfections and natural asymmetry, realistic catchlights in the eyes, natural under-eye area, " +
-  "minimal or no makeup, soft directional key light with gentle falloff, shot on 85mm at f/2.0, " +
+  "subtle, restrained natural imperfections and gentle asymmetry, realistic catchlights in the eyes, natural under-eye area, " +
+  "soft directional key light with gentle falloff, shot on 85mm at f/2.0, " +
   "shallow depth of field, neutral filmic color grade, relaxed candid expression, true-to-life proportions";
 
 // Scene/location realism (full-body, environmental) — keeps proportions, placement
@@ -44,6 +44,20 @@ export function genderWord(gender?: unknown): string {
   return "";
 }
 
+// Makeup / grooming clause driven by the chosen look (and gender). Defaults to the
+// natural look (Gary prefers understated; blemishes were over-used).
+export function lookClause(persona: Record<string, unknown> = {}): string {
+  const look = typeof persona.look === "string" ? persona.look.toLowerCase() : "natural";
+  const g = genderWord(persona.gender);
+  if (look === "photoshoot") {
+    return g === "woman"
+      ? "professionally styled hair and tasteful natural makeup, camera-ready editorial grooming, clean well-prepped skin"
+      : "well-groomed and styled, editorial polish, clean well-prepped skin";
+  }
+  // natural
+  return "minimal or no makeup, natural understated grooming, bare believable skin";
+}
+
 // Compose a persona spec with the always-on realism core into a generation prompt.
 export function buildIdentityPrompt(persona: Record<string, unknown> = {}) {
   const bible = persona.bible as Record<string, unknown> | undefined;
@@ -63,7 +77,8 @@ export function buildIdentityPrompt(persona: Record<string, unknown> = {}) {
   const g = genderWord(persona.gender);
   const genderPrefix = g ? `a ${g}, ` : "";
   const subjectStr = subject ? subject + ". " : "";
-  return { prompt: `${genderPrefix}${subjectStr}${REALISM_POSITIVE}.`, negative: REALISM_NEGATIVE };
+  const look = lookClause(persona);
+  return { prompt: `${genderPrefix}${subjectStr}${look}, ${REALISM_POSITIVE}.`, negative: REALISM_NEGATIVE };
 }
 
 // Self-check before accepting a generated frame (influencer-builder.md).
