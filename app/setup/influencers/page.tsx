@@ -41,8 +41,8 @@ export default async function InfluencersIndex() {
   return (
     <div className="mx-auto max-w-5xl">
       <div>
-        <h1 className="text-2xl font-bold">Your roster</h1>
-        <p className="mt-1 text-sm text-ink-dim">Reusable, identity-locked influencers, ready to deploy across video and social. {influencers.length} in your stable.</p>
+        <h1 className="text-2xl font-bold">Your AI Cast <span className="align-middle">✨</span></h1>
+        <p className="mt-1 text-sm text-ink-dim">Identity-locked stars, built once and ready to deploy across video, social and campaigns. {influencers.length} in the cast.</p>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
