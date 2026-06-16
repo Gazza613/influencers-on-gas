@@ -50,38 +50,19 @@ function heroOf(inf: Inf): string | null {
 export default function Landing() {
   const router = useRouter();
   const animatedWord = useTypewriter();
-  const [pool, setPool] = useState<string[]>([]); // real influencer hero images
   const [cardSrcs, setCardSrcs] = useState<(string | null)[]>(CARDS.map(() => null));
-  const [cardFade, setCardFade] = useState<boolean[]>(CARDS.map(() => false));
 
-  // Load real influencer hero images for the floating wall.
+  // Load real influencer hero images: ONE distinct influencer per card (no repeats, no
+  // cycling). Cards beyond the number of available influencers stay empty.
   useEffect(() => {
     fetch("/api/influencers", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { influencers: [] }))
       .then((d) => {
-        const imgs = ((d.influencers as Inf[]) || []).map(heroOf).filter((u): u is string => !!u);
-        setPool(imgs);
-        setCardSrcs(CARDS.map((_, i) => imgs[i % (imgs.length || 1)] ?? null));
+        const imgs = [...new Set(((d.influencers as Inf[]) || []).map(heroOf).filter((u): u is string => !!u))];
+        setCardSrcs(CARDS.map((_, i) => imgs[i] ?? null));
       })
       .catch(() => {});
   }, []);
-
-  // Crossfade rotation when there are more images than slots.
-  useEffect(() => {
-    if (pool.length <= CARDS.length) return;
-    let alive = true;
-    const id = setInterval(() => {
-      if (!alive) return;
-      const i = Math.floor(Math.random() * CARDS.length);
-      setCardFade((p) => { const n = [...p]; n[i] = true; return n; });
-      setTimeout(() => {
-        if (!alive) return;
-        setCardSrcs((p) => { const opts = pool.filter((s) => s !== p[i]); const n = [...p]; n[i] = opts[Math.floor(Math.random() * opts.length)]; return n; });
-        setCardFade((p) => { const n = [...p]; n[i] = false; return n; });
-      }, 750);
-    }, 2800);
-    return () => { alive = false; clearInterval(id); };
-  }, [pool]);
 
   return (
     <div style={{ minHeight: "100vh", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#07070E", overflow: "hidden", padding: "40px 24px 80px", textAlign: "center" }}>
@@ -101,7 +82,7 @@ export default function Landing() {
         if ("right" in card) pos.right = card.right as string;
         return (
           <div key={i} className="landing-card" style={{ position: "absolute", top: card.top, ...pos, width: card.w, transform: `rotate(${card.rot})`, opacity: 0, ["--target-opacity" as string]: card.opacity, animation: `cardAppear 1s ease ${card.delay + 0.2}s forwards`, pointerEvents: "none", zIndex: 0 }}>
-            <div style={{ position: "relative", animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`, borderRadius: 18, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)", opacity: cardFade[i] ? 0 : 1, transition: "opacity 0.75s ease" }}>
+            <div style={{ position: "relative", animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`, borderRadius: 18, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`/_next/image?url=${encodeURIComponent(src)}&w=384&q=75`} alt="" loading="lazy" decoding="async"
                 onError={(e) => { const t = e.currentTarget; if (!t.dataset.fb) { t.dataset.fb = "1"; t.src = src; } }}
