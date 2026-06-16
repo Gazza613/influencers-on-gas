@@ -59,7 +59,7 @@ function rank(inf: Inf): number {
 export default function Landing() {
   const router = useRouter();
   const animatedWord = useTypewriter();
-  const [cardSrcs, setCardSrcs] = useState<(string | null)[]>(CARDS.map(() => null));
+  const [cardSrcs, setCardSrcs] = useState<({ url: string; hero: string } | null)[]>(CARDS.map(() => null));
 
   // Load real influencer hero images: ONE distinct influencer per card (no repeats, no
   // cycling). Cards beyond the number of available influencers stay empty.
@@ -71,14 +71,18 @@ export default function Landing() {
         // One photo per influencer, but ROTATE the frame by position so look-alike builds
         // show different shots (a unique, varied photo per card rather than 6 headshots).
         const used = new Set<string>();
-        const picks: string[] = [];
+        const picks: { url: string; hero: string }[] = [];
         list.forEach((inf, idx) => {
           const cands = imagesOf(inf);
           if (!cands.length) return;
+          const hero = cands[0]; // reliable curated image, used as the load fallback
+          let chosen = hero;
           for (let off = 0; off < cands.length; off++) {
             const c = cands[(idx + off) % cands.length];
-            if (!used.has(c)) { used.add(c); picks.push(c); break; }
+            if (!used.has(c)) { chosen = c; break; }
           }
+          used.add(chosen);
+          picks.push({ url: chosen, hero });
         });
         setCardSrcs(CARDS.map((_, i) => picks[i] ?? null));
       })
@@ -96,8 +100,9 @@ export default function Landing() {
 
       {/* Floating influencer cards (real heroes) */}
       {CARDS.map((card, i) => {
-        const src = cardSrcs[i];
-        if (!src) return null;
+        const pick = cardSrcs[i];
+        if (!pick) return null;
+        const opt = (u: string) => `/_next/image?url=${encodeURIComponent(u)}&w=384&q=75`;
         const pos: Record<string, string> = {};
         if ("left" in card) pos.left = card.left as string;
         if ("right" in card) pos.right = card.right as string;
@@ -105,8 +110,13 @@ export default function Landing() {
           <div key={i} className="landing-card" style={{ position: "absolute", top: card.top, ...pos, width: card.w, transform: `rotate(${card.rot})`, opacity: 0, ["--target-opacity" as string]: card.opacity, animation: `cardAppear 1s ease ${card.delay + 0.2}s forwards`, pointerEvents: "none", zIndex: 0 }}>
             <div style={{ position: "relative", animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`, borderRadius: 18, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/_next/image?url=${encodeURIComponent(src)}&w=384&q=75`} alt="" loading="lazy" decoding="async"
-                onError={(e) => { const t = e.currentTarget; if (!t.dataset.fb) { t.dataset.fb = "1"; t.src = src; } }}
+              <img src={opt(pick.url)} alt="" loading="lazy" decoding="async"
+                onError={(e) => {
+                  // Self-heal a broken/expired frame: optimised hero, then raw hero, then stop.
+                  const t = e.currentTarget; const step = t.dataset.step || "0";
+                  if (step === "0") { t.dataset.step = "1"; t.src = opt(pick.hero); }
+                  else if (step === "1") { t.dataset.step = "2"; t.src = pick.hero; }
+                }}
                 style={{ width: "100%", aspectRatio: "2/3", objectFit: "cover", display: "block" }} />
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,14,0.16) 0%, transparent 42%)" }} />
             </div>
