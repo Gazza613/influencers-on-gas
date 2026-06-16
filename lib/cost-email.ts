@@ -2,7 +2,7 @@ import type { CostReport } from "@/lib/usage";
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PROVIDER_LABEL: Record<string, string> = {
-  higgsfield: "Higgsfield · images & Soul", heygen: "HeyGen · presenter", magnific: "Magnific · Humaniser",
+  higgsfield: "Higgsfield · images, Soul & upscale", heygen: "HeyGen · presenter",
   anthropic: "Claude · Character Casting", elevenlabs: "ElevenLabs · voice", voyage: "Voyage · embeddings", firecrawl: "Firecrawl · crawl",
 };
 const ACTION_LABEL: Record<string, string> = {
