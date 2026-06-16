@@ -201,8 +201,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         <div className="mt-4">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Scene / brief (optional)</span>
-            <button onClick={perfect} disabled={refining} className="rounded-md border border-[#a855f7]/30 px-2.5 py-1 text-[11px] font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
-              {refining ? "Perfecting…" : "✨ Perfect with AI"}
+            <button onClick={perfect} disabled={refining} className="inline-flex items-center gap-1.5 rounded-md border border-[#a855f7]/30 px-2.5 py-1 text-[11px] font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
+              {refining && <span className="spinner-ring" />}{refining ? "Perfecting…" : "✨ Perfect with AI"}
             </button>
           </div>
           <textarea value={scene} onChange={(e) => setScene(e.target.value)} rows={3}
@@ -273,7 +273,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               const sel = picked.has(c.url);
               const forVideo = videoSelects.includes(c.url);
               return (
-                <div key={i} className={`group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
+                <div key={i} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={c.url} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(c.url)} />
                   <button onClick={() => togglePick(c.url)} className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/70 bg-black/45 text-transparent hover:text-white/70"}`}>✓</button>

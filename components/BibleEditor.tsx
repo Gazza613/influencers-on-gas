@@ -147,8 +147,8 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
           <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
             placeholder="e.g. 42, Indonesian-Dutch concert pianist, warm and intellectual, plays jazz in intimate clubs, calm confidence with flashes of humour."
             className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
-          <button onClick={generate} disabled={busy || brief.trim().length < 10} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
-            {busy ? "Casting the character…" : bible ? "✨ Re-cast the character" : "✨ Bring them to life"}
+          <button onClick={generate} disabled={busy || brief.trim().length < 10} className="btn-brand mt-2 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+            {busy && <span className="spinner-ring" />}{busy ? "Casting the character…" : bible ? "✨ Re-cast the character" : "✨ Bring them to life"}
           </button>
           {brief.trim().length > 0 && brief.trim().length < 10 && <p className="mt-2 text-[11px] text-ink-faint">Give us a touch more to work with, a sentence or two.</p>}
           {busy && <p className="mt-2 text-[11px] text-ink-faint">Our co-pilot is in the casting room dreaming them up. About half a minute, worth the wait.</p>}

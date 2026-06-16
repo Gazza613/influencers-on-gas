@@ -36,7 +36,9 @@ export default function Uploader({ kind = "ref", label, onUploaded, current }: {
         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) upload(f); }}
         className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-surface-2 p-3 hover:border-line-strong"
       >
-        {url ? (
+        {busy ? (
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-1 text-[#c79bff]"><span className="spinner-ring text-xl" /></div>
+        ) : url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt="reference" className="h-14 w-14 rounded-lg object-cover" />
         ) : (

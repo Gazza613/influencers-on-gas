@@ -103,6 +103,31 @@ body {
   50%      { box-shadow: 0 0 14px 0 rgba(52,199,89,0.45); border-color: rgba(52,199,89,0.6); }
 }
 
+/* Skeleton shimmer behind images while they load (the img covers it once loaded). */
+.shimmer { position: relative; background: var(--color-surface-2); overflow: hidden; }
+.shimmer::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.10), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* Branded spinner ring — use inline (1em) or sized via font-size/width. */
+.spinner-ring {
+  display: inline-block; width: 1em; height: 1em; border-radius: 50%;
+  border: 2px solid rgba(168, 85, 247, 0.25); border-top-color: #c79bff;
+  animation: spinRing 0.7s linear infinite; vertical-align: -0.15em;
+}
+@keyframes spinRing { to { transform: rotate(360deg); } }
+
+/* Thin top progress bar shown during route navigation. */
+.route-progress {
+  position: fixed; top: 0; left: 0; height: 2px; z-index: 100;
+  background: linear-gradient(90deg, #ec4899, #a855f7, #60a5fa);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.6);
+  transition: width 0.3s ease, opacity 0.3s ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .glow-accent, .next-pulse, .live-building { animation: none; }
+  .glow-accent, .next-pulse, .live-building, .shimmer::after, .spinner-ring { animation: none; }
 }

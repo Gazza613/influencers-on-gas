@@ -145,7 +145,7 @@ export default function PhotoshootStep({
             {frames.map((f, i) => {
               const sel = selected.has(f.url);
               return (
-                <div key={i} onClick={() => toggle(f.url)} className="group relative block cursor-pointer">
+                <div key={i} onClick={() => toggle(f.url)} className="shimmer group relative block cursor-pointer overflow-hidden rounded-lg">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={f.url} alt={`frame ${i + 1}`}
                     className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7]" : "border-line opacity-60"}`} />

@@ -148,7 +148,7 @@ export default function CastingStep({
                   {candidates.map((c, i) => {
                     const sel = chosen === c.url;
                     return (
-                      <div key={i} onClick={() => !busy && choose(c.url)} className="group relative block cursor-pointer">
+                      <div key={i} onClick={() => !busy && choose(c.url)} className="shimmer group relative block cursor-pointer overflow-hidden rounded-lg">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={c.url} alt={`look ${i + 1}`}
                           className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_22px_rgba(168,85,247,0.45)]" : "border-line opacity-85 hover:opacity-100"}`} />
