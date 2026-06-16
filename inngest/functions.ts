@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
-import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -260,8 +260,11 @@ export const createPresenter = inngest.createFunction(
   },
 );
 
-// STAGE 3, Train a reusable Soul from selected frames (~10 min). Uses step.sleep so
-// the function is durably suspended between status polls (survives function timeouts).
+// STAGE 3, Lock the identity. Identity is already captured at the photoshoot (the chosen
+// face + the canonical reference set: identity card, feature sheet, turnaround) and every
+// creative locks onto those references, so the lock is INSTANT. No slow Soul training.
+// (A trained Soul is no longer needed for image creatives; if the future video pipeline
+// needs one, train it there.)
 export const trainSoulJob = inngest.createFunction(
   { id: "train-soul", retries: 0, triggers: [{ event: "influencer/train.soul" }] },
   async ({ event, step }) => {
@@ -273,60 +276,10 @@ export const trainSoulJob = inngest.createFunction(
       await step.run("too-few", () => updateInfluencer(influencerId, { status: "frames_ready" }));
       return { error: "need at least 5 images" };
     }
-
-    let soulId: string;
-    try {
-      soulId = await step.run("launch-train", () => trainSoul({ name: inf.name, images }));
-    } catch (e) {
-      await step.run("train-failed", () =>
-        updateInfluencer(influencerId, { status: "soul_failed", persona: { ...inf.persona, soul_error: String((e as Error)?.message || e).slice(0, 300) } }),
-      );
-      throw e;
-    }
-    await step.run("save-soul-id", () => updateInfluencer(influencerId, { higgsfield_soul_id: soulId, status: "training", persona: { ...((inf.persona as Record<string, unknown>) || {}), soul_started_at: new Date().toISOString(), soul_error: null } }));
-    await step.run("usage-soul", () => recordUsage({ influencerId, provider: "higgsfield", model: "soul_train", unit: "train", action: "soul", count: 1 }));
-
-    // Poll up to ~52 min (70 × 45s) with durable sleeps (Soul training can run long).
-    for (let i = 0; i < 70; i++) {
-      await step.sleep(`wait-${i}`, "45s");
-      // Each tick: bail if the user aborted (status reset away from training), else check the Soul.
-      const cur = await step.run(`check-${i}`, async () => {
-        const f = await getInfluencer(influencerId);
-        if (f && f.status !== "training") return { abort: true, status: "" };
-        return { abort: false, status: await soulStatus(soulId) };
-      });
-      if (cur.abort) return { aborted: true, soulId };
-
-      if (cur.status === "ready") {
-        // Lock the identity the MOMENT the Soul is trained, so it can't be blocked by a
-        // slow Humaniser. Then enrich with the Humaniser (best-effort, non-blocking).
-        const fresh = await step.run("reload", () => getInfluencer(influencerId));
-        const persona = (fresh?.persona ?? inf.persona ?? {}) as Record<string, unknown>;
-        // Soul is trained = identity locked. Soul 2 renders realistically, so the old
-        // Magnific "humaniser" pass is no longer needed here.
-        await step.run("mark-locked", () =>
-          updateInfluencer(influencerId, { status: "ready", persona: { ...persona, locked: true } }),
-        );
-        return { ready: true, soulId, locked: true };
-      }
-      if (cur.status === "failed") {
-        await step.run("mark-soul-failed", () => updateInfluencer(influencerId, { status: "soul_failed", persona: { ...inf.persona, soul_error: "Soul training failed. You can retry the lock-down." } }));
-        return { failed: true, soulId };
-      }
-    }
-    // Final check before giving up: the Soul may have completed right at the window edge.
-    const finalStatus = await step.run("final-check", () => soulStatus(soulId).catch(() => ""));
-    if (finalStatus === "ready") {
-      const fresh = await step.run("reload-final", () => getInfluencer(influencerId));
-      const persona = (fresh?.persona ?? inf.persona ?? {}) as Record<string, unknown>;
-      await step.run("mark-locked-final", () => updateInfluencer(influencerId, { status: "ready", persona: { ...persona, locked: true } }));
-      return { ready: true, soulId, locked: true, late: true };
-    }
-    // Took longer than the window, recover so the UI isn't stuck on "training".
-    await step.run("timeout", () =>
-      updateInfluencer(influencerId, { status: "soul_failed", persona: { ...inf.persona, soul_error: "Lock-down is taking longer than usual. The training may still finish, or you can retry." } }),
+    await step.run("lock", () =>
+      updateInfluencer(influencerId, { status: "ready", persona: { ...((inf.persona as Record<string, unknown>) || {}), locked: true, soul_error: null } }),
     );
-    return { timeout: true, soulId };
+    return { ok: true, locked: true };
   },
 );
 

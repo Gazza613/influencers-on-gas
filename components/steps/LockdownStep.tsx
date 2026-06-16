@@ -7,12 +7,9 @@ import { CREW } from "@/lib/crew";
 import { flex } from "@/lib/flex";
 
 const LOCKDOWN_NARRATION = [
-  "Studying every angle of this face, the bone structure, the asymmetry, the tells…",
-  "Teaching the model the smile, the eyes, the way the light catches the skin…",
-  "Forging a dedicated identity the camera will never forget…",
-  "Running the Humaniser, real pores, real catchlights, real skin…",
+  "Locking the chosen face and its reference set as the one true identity…",
   "Welding the identity shut so it can never drift between shots…",
-  "Almost there, this face is becoming pixel-consistent, forever…",
+  "Almost there…",
 ];
 
 export default function LockdownStep({
@@ -148,16 +145,14 @@ export default function LockdownStep({
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Lock down the identity</div>
         <p className="mt-2 text-sm text-ink-dim">
-          This is the big one. We train a dedicated AI model on your chosen frames so it truly knows <span className="text-ink">this person</span>,
-          then run the Humaniser to add real-skin detail. The result is a face that stays identical in every
-          future shot, expression and scene. No two-heads, no hallucinating, no &ldquo;who is that?&rdquo; moments.
+          This seals <span className="text-ink">this person</span> as the one true identity. Her face and her reference set
+          (identity card, feature sheet and turnaround) become the lock that every creative is matched against, so she
+          stays identical in every future shot, expression and scene. No drifting faces, no &ldquo;who is that?&rdquo; moments.
         </p>
         <ul className="mt-3 space-y-1.5 text-[13px] text-ink-dim">
-          <li>⏱️ It takes about <span className="text-ink">10 minutes</span>. Kick it off, then go grab a coffee or get on with other work, it runs in the background.</li>
-          <li>🧬 <span className="text-ink">Why lock down?</span> Until it is locked, the face can drift between generations. Locking trains the identity so it is pixel-consistent forever.</li>
-          <li>➕ Want to build another influencer while you wait? Go for it. Each lock-down runs on its own, starting a new one will <span className="text-ink">not</span> interrupt this one.</li>
-          <li>🎬 Video production needs the locked identity (that is what keeps the face consistent), so it unlocks the moment this finishes.</li>
-          <li>☕ You do not have to sit here, pop back in 10.</li>
+          <li>⚡ It is <span className="text-ink">near instant</span> now, the heavy lifting already happened in the photoshoot.</li>
+          <li>🧬 <span className="text-ink">Why lock down?</span> Until it is locked, the identity is not sealed. Locking fixes it as the reference for every creative.</li>
+          <li>🎬 Creatives and (later) video both build from this locked identity, so it unlocks them the moment you lock.</li>
         </ul>
 
         {!working && (
@@ -171,9 +166,9 @@ export default function LockdownStep({
 
         {working && (
           <div className="mt-4">
-            <WorkingPanel title="Lock-down" lines={LOCKDOWN_NARRATION} crew={CREW.lockdown} eta="about 10 min" pct={null}
+            <WorkingPanel title="Lock-down" lines={LOCKDOWN_NARRATION} crew={CREW.lockdown} eta="a few seconds" pct={null}
               startedAt={startedMs} onAbort={abort}
-              note="Running on our servers, it keeps going even if you leave or start another influencer. Soul training can occasionally take up to ~30 min." />
+              note="Sealing the identity. This is quick now." />
           </div>
         )}
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}
