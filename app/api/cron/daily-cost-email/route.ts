@@ -12,16 +12,20 @@ export const maxDuration = 60;
 export async function GET(req: Request) {
   if (!cronAuthed(req)) return NextResponse.json({ error: "forbidden" }, { status: 401 });
 
-  const to = process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
-  const yesterday = isoDaysAgo(1);
-  const [report, monthReport] = await Promise.all([
-    getReport({ from: yesterday, to: yesterday }),
-    getReport({ from: monthStartIso() }),
-  ]);
-  let remaining: number | null = null;
-  try { remaining = (await getBalance()).remaining; } catch { /* ignore */ }
+  try {
+    const to = process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
+    const yesterday = isoDaysAgo(1);
+    const [report, monthReport] = await Promise.all([
+      getReport({ from: yesterday, to: yesterday }),
+      getReport({ from: monthStartIso() }),
+    ]);
+    let remaining: number | null = null;
+    try { remaining = (await getBalance()).remaining; } catch { /* ignore */ }
 
-  const { subject, html } = buildCostEmail({ periodLabel: "Yesterday", report, monthReport, remaining, monthly: MONTHLY_CREDITS });
-  const result = await sendEmail({ to, subject, html });
-  return NextResponse.json({ ...result, configured: emailConfigured(), to });
+    const { subject, html } = buildCostEmail({ periodLabel: "Yesterday", report, monthReport, remaining, monthly: MONTHLY_CREDITS });
+    const result = await sendEmail({ to, subject, html });
+    return NextResponse.json({ ...result, configured: emailConfigured(), to });
+  } catch (e) {
+    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 500 });
+  }
 }
