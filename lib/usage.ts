@@ -142,6 +142,15 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
   return { total, split, byUser, byInfluencer, byProvider, byAction, byDay, influencers, providers };
 }
 
+// Total ledger credits/cents recorded since a date (for cycle reconciliation).
+export async function getCreditsSince(fromIso: string): Promise<{ credits: number; cents: number }> {
+  const rows = (await db().query(
+    `select coalesce(sum(credits),0)::float as credits, coalesce(sum(cents),0)::int as cents from usage_events where created_at >= $1`,
+    [fromIso],
+  )) as { credits: number; cents: number }[];
+  return rows[0] ?? { credits: 0, cents: 0 };
+}
+
 // Running spend for one influencer (for the live build-cost chip).
 export async function getInfluencerSpend(id: string): Promise<{ credits: number; cents: number }> {
   const rows = (await db().query(

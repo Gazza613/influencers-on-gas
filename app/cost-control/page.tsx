@@ -67,6 +67,7 @@ export default function CostControlPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [audit, setAudit] = useState<Audit>([]);
   const [prev, setPrev] = useState<{ cents: number; credits: number } | null>(null);
+  const [cycle, setCycle] = useState<{ start: string; trackedCredits: number; trackedCents: number } | null>(null);
   const [rate, setRate] = useState(0);
   const [bal, setBal] = useState<{ remaining: number | null; monthly: number; creditZarCents: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +86,7 @@ export default function CostControlPage() {
     const cmp = prevWindow(from, to);
     if (cmp) { qs.set("cmpFrom", cmp.cmpFrom); qs.set("cmpTo", cmp.cmpTo); }
     const r = await fetch(`/api/cost-control?${qs}`).then((x) => x.json()).catch(() => null);
-    if (r?.report) { setReport(r.report); setAudit(r.audit || []); setPrev(r.previous ?? null); setRate(r.zarPerUsd || 0); }
+    if (r?.report) { setReport(r.report); setAudit(r.audit || []); setPrev(r.previous ?? null); setCycle(r.cycle ?? null); setRate(r.zarPerUsd || 0); }
     setLoading(false);
   }, [from, to, influencerId, provider, userEmail]);
 
@@ -182,6 +183,38 @@ export default function CostControlPage() {
             ) : <div className="text-[11px] text-ink-faint">first audit pending</div>}
           </Kpi>
         </div>
+
+        {/* Cycle reconciliation: platform ledger vs actual Higgsfield balance */}
+        {bal?.remaining != null && cycle && (() => {
+          const cz = bal.creditZarCents || 77;
+          const crR = (cr: number) => "R" + ((cr * cz) / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const crU = (cr: number) => (rate ? " ($" + ((cr * cz) / 100 / rate).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")" : "");
+          const actualUsed = Math.max(0, bal.monthly - (bal.remaining ?? 0));
+          const tracked = cycle.trackedCredits;
+          const direct = actualUsed - tracked;
+          const Row = ({ label, cr, strong, tone }: { label: string; cr: number; strong?: boolean; tone?: string }) => (
+            <div className="flex items-center justify-between border-b border-line/60 py-2 last:border-0">
+              <span className={`text-sm ${strong ? "font-semibold text-ink" : "text-ink-dim"}`}>{label}</span>
+              <span className={`tabular text-sm ${tone ?? "text-ink"}`}>{Math.round(cr).toLocaleString()} cr · {crR(cr)}<span className="text-ink-faint">{crU(cr)}</span></span>
+            </div>
+          );
+          return (
+            <section className="mt-6 rounded-xl border border-line bg-surface-1 p-5">
+              <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Cycle reconciliation · since {cycle.start}</div>
+              <p className="mt-1 text-[11px] text-ink-faint">Higgsfield tops up {bal.monthly.toLocaleString()} credits each cycle. This reconciles what the platform tracked against what Higgsfield actually consumed.</p>
+              <div className="mt-3">
+                <Row label="Higgsfield actually used (live balance)" cr={actualUsed} strong />
+                <Row label="Tracked by this platform" cr={tracked} tone="text-ready" />
+                <Row label={direct >= 0 ? "Direct / outside the platform" : "Platform over-estimate (re-calibrate)"} cr={Math.abs(direct)} strong tone={direct > 50 ? "text-active" : "text-ink-dim"} />
+              </div>
+              <p className="mt-2 text-[11px] text-ink-faint">
+                {direct >= 0
+                  ? "“Direct” = credits spent straight on Higgsfield (manual generations) or beyond what we metered — so nothing is hidden."
+                  : "Our per-model estimates are running higher than Higgsfield's actual burn. Hit “Recalibrate costs” to true them up via get_cost."}
+              </p>
+            </section>
+          );
+        })()}
 
         {/* Pickers */}
         <div className="mt-6 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface-1 p-4">
