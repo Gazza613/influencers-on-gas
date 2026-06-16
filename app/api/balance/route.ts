@@ -6,13 +6,17 @@ import { CREDIT_ZAR_CENTS, MONTHLY_CREDITS } from "@/lib/usage";
 // Live Higgsfield credit balance (ground truth). Slower (MCP call), so it's separate.
 export const maxDuration = 30;
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const debug = new URL(req.url).searchParams.get("debug") === "1" && session.user.role === "super_admin";
   try {
-    const { remaining } = await getBalance();
-    return NextResponse.json({ remaining, monthly: MONTHLY_CREDITS, creditZarCents: CREDIT_ZAR_CENTS });
+    const b = await getBalance();
+    return NextResponse.json({
+      remaining: b.remaining, monthly: MONTHLY_CREDITS, creditZarCents: CREDIT_ZAR_CENTS,
+      ...(debug ? { tried: b.tried, raw: typeof b.raw === "string" ? b.raw.slice(0, 1500) : b.raw } : {}),
+    });
   } catch (e) {
-    return NextResponse.json({ remaining: null, error: String((e as Error)?.message || e).slice(0, 120) });
+    return NextResponse.json({ remaining: null, error: String((e as Error)?.message || e).slice(0, 200) });
   }
 }

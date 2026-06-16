@@ -228,18 +228,43 @@ export async function soulStatus(soulId: string): Promise<string> {
   return "training";
 }
 
-// Live credit balance (ground truth). Tries the read-only account tools.
-export async function getBalance(): Promise<{ remaining: number | null; raw?: unknown }> {
+// Pull a credit number out of any account/plan response. Prefers "remaining"-type
+// keys, then credit/balance/available, so we report what's left, not the allotment.
+function parseCredits(data: unknown): number | null {
+  const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+  const patterns = [
+    /"[a-z_]*remaining[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
+    /"[a-z_]*credit[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
+    /"[a-z_]*balance[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
+    /"[a-z_]*available[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
+  ];
+  for (const re of patterns) {
+    const m = str.match(re);
+    if (m) { const v = Math.round(Number(m[1].replace(/,/g, ""))); if (!Number.isNaN(v)) return v; }
+  }
+  return null;
+}
+
+// Live credit balance (ground truth). Discovers the account/credit tool dynamically
+// (names vary) and parses flexibly. Returns raw + tried for debugging.
+export async function getBalance(): Promise<{ remaining: number | null; raw?: unknown; tried?: string[] }> {
   const { call } = await openSession();
-  for (const tool of ["balance", "show_plans_and_credits"]) {
+  let candidates = ["balance", "show_plans_and_credits", "credits", "show_credits", "get_credits", "account", "wallet", "subscription"];
+  try {
+    const names = (await listTools()).map((t) => t.name).filter((n) => /credit|balance|plan|account|wallet|subscription/i.test(n));
+    candidates = [...new Set([...names, ...candidates])];
+  } catch { /* discovery optional */ }
+
+  const tried: string[] = [];
+  for (const tool of candidates) {
     try {
       const data = unwrapMCP(await call(tool, {}));
-      const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
-      const m = str.match(/"(?:credits|remaining|balance|available|credit_balance|remaining_credits)"\s*:\s*"?([0-9][0-9,.]*)"?/i);
-      if (m) return { remaining: Math.round(Number(m[1].replace(/,/g, ""))), raw: data };
-    } catch { /* try next tool */ }
+      tried.push(tool);
+      const n = parseCredits(data);
+      if (n != null) return { remaining: n, raw: data, tried };
+    } catch { /* try next */ }
   }
-  return { remaining: null };
+  return { remaining: null, tried };
 }
 
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).

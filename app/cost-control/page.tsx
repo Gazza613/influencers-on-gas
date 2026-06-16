@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import AppHeader from "@/components/AppHeader";
 
 type Report = {
   total: { credits: number; cents: number; events: number };
@@ -107,17 +107,7 @@ export default function CostControlPage() {
 
   return (
     <div className="min-h-dvh bg-surface-0 text-ink">
-      <header className="flex flex-wrap items-center justify-between gap-y-2 border-b border-line bg-surface-1 px-4 py-2.5">
-        <Link href="/studio" className="flex items-center gap-2 font-extrabold tracking-tight">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gas-logo.png" alt="GAS" className="h-7 w-7 rounded-full" />
-          <span>Influencers <span className="brand-grad">on</span> GAS</span>
-        </Link>
-        <div className="flex items-center gap-3">
-          <Link href="/studio" className="text-xs text-ink-dim hover:text-ink">Studio</Link>
-          <Link href="/setup/influencers" className="text-xs text-ink-dim hover:text-ink">Influencers</Link>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="mx-auto max-w-5xl px-5 py-7">
         <div className="flex items-end justify-between">
