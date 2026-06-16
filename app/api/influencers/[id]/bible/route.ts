@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { generateBible } from "@/lib/vendors/anthropic";
+import { generateBible, generateTagline } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
 
 // Claude expands a short brief into the full Character Bible (one-off, ~20-40s).
@@ -37,7 +37,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const gender = typeof p.gender === "string" ? (p.gender as string) : undefined;
     const look = typeof p.look === "string" ? (p.look as string) : undefined;
     const bible = await generateBible(inf.name, brief, gender, look);
-    await updateInfluencer(id, { persona: { ...inf.persona, brief, bible } });
+    const tagline = await generateTagline(inf.name, bible as unknown as Record<string, unknown>).catch(() => "");
+    await updateInfluencer(id, { persona: { ...inf.persona, brief, bible, tagline } });
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-opus-4-8", unit: "bible", action: "bible", count: 1 }).catch(() => {});
     return NextResponse.json({ bible });
   } catch (e) {

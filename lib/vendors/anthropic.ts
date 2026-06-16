@@ -125,6 +125,23 @@ export async function generateBible(name: string, brief: string, gender?: string
   return block.input as CharacterBible;
 }
 
+// A short, baity marketing hook for the influencer showcase (rent-me-later catalogue).
+export async function generateTagline(name: string, bible: Record<string, unknown>): Promise<string> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 120,
+    system:
+      "You write a single short, baity marketing hook for an AI influencer a brand could hire. " +
+      "12 to 20 words, third person, vivid and intriguing, selling their vibe, niche and the audience they'd win. " +
+      "UK spelling, no em dashes, no surrounding quotes, no hashtags. Return ONLY the hook line.",
+    messages: [{ role: "user", content: `Influencer: ${name}\nCharacter (JSON): ${JSON.stringify(bible).slice(0, 2500)}\n\nWrite the hook.` }],
+  });
+  const block = res.content.find((b) => b.type === "text");
+  const t = block && block.type === "text" ? block.text.trim().replace(/^["'\s]+|["'\s]+$/g, "") : "";
+  return t.slice(0, 160);
+}
+
 // Vision QA gate: inspect a generated creative and FAIL it if it breaks the rules.
 // Uses Haiku (fast + cheap) — this runs on every image before the user sees it.
 const QA_MODEL = "claude-haiku-4-5";

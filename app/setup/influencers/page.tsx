@@ -4,6 +4,7 @@ import { listInfluencers, type Influencer } from "@/lib/influencers";
 export const dynamic = "force-dynamic";
 
 type Persona = {
+  tagline?: string;
   bible?: { signature_line?: string; identity?: { profession?: string } };
   brief?: string; hero_realism_url?: string; hero_url?: string; reference_url?: string; locked?: boolean;
 };
@@ -17,7 +18,7 @@ function thumb(inf: Influencer): string | null {
 function blurb(inf: Influencer): string {
   const p = (inf.persona ?? {}) as Persona;
   const b = p.bible ?? {};
-  const line = b.signature_line || b.identity?.profession || p.brief;
+  const line = p.tagline || b.signature_line || b.identity?.profession || p.brief;
   if (line) return line.length > 130 ? line.slice(0, 128).trim() + "…" : line;
   return inf.mode === "twin" ? "A digital twin, built from a real likeness." : "New influencer, still in the build.";
 }
