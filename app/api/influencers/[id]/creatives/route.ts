@@ -62,7 +62,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = await req.json().catch(() => ({}));
   const ratios = Array.isArray(body.ratios) ? body.ratios.filter((r: unknown) => RATIOS.includes(r as string)) : [];
   const resolution = body.resolution === "4k" ? "4k" : "2k";
-  const scene = typeof body.scene === "string" ? body.scene.trim().slice(0, 800) : "";
+  const scene = typeof body.scene === "string" ? body.scene.trim().slice(0, 2000) : "";
   const count = Math.max(1, Math.min(6, Number(body.count) || 3));
   const model = body.model === "soul_cinematic" ? "soul_cinematic" : "soul_2";
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";

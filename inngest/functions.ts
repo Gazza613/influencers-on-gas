@@ -295,10 +295,18 @@ export const trainSoulJob = inngest.createFunction(
 // via the face Element. Cost-aware: only the chosen ratios render; 4K adds an upscale.
 type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
 
+// Used for the DEFAULT brief (no user scene) — these dictate pose/gaze for variety.
 const CREATIVE_VARIATIONS = [
-  "a natural candid moment, looking towards the camera",
-  "a slightly different pose and angle, glancing away mid-action",
-  "a warm genuine expression, three-quarter angle",
+  ", in a natural candid moment looking towards the camera",
+  ", in a slightly different pose glancing away mid-action",
+  ", with a warm genuine expression at a three-quarter angle",
+];
+// Used when the user wrote their OWN brief — vary only framing, never pose/gaze, so we
+// never contradict a brief that already describes how they stand, look or hold themselves.
+const FRAMING_VARIATIONS = [
+  "",
+  ", captured from a slightly different angle and framing",
+  ", captured in a slightly wider framing",
 ];
 
 export const generateCreatives = inngest.createFunction(
@@ -348,10 +356,16 @@ export const generateCreatives = inngest.createFunction(
       const heroMedia = useSoul && heroUrl ? await step.run("hero-media", () => importMediaUrl(heroUrl)) : null;
       const extra = useSoul ? { soul_id: soulId, ...(heroMedia ? { medias: [{ value: heroMedia, role: "image" }] } : {}) } : {};
 
+      // Lead with the user's scene brief so it is the dominant instruction (not buried
+      // behind boilerplate). When the user wrote their own brief we use FRAMING-only
+      // variations for shot-to-shot variety — pose/gaze directions would contradict a
+      // brief that already specifies them. The default brief keeps the richer variations.
+      const userScene = !!scene;
+      const variations = userScene ? FRAMING_VARIATIONS : CREATIVE_VARIATIONS;
       const buildPrompt = (idx: number) =>
         useSoul
-          ? `the same exact person from the reference, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SOUL_SCENE}, ${peopleClause}.`
-          : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
+          ? `${sceneText}. The subject is the same exact person from the reference${variations[idx % variations.length]}. ${wardrobe}${place}${look}. ${SOUL_SCENE}, ${peopleClause}.`
+          : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}${sceneText}. The same exact person${clothEl ? ", wearing the same outfit as the clothing reference" : ""}${locEl ? ", in the same location as the location reference image" : ""}${variations[idx % variations.length]}. ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
 
       // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
       // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is
