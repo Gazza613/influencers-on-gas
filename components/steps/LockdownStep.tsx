@@ -100,7 +100,7 @@ export default function LockdownStep({
         <p className="mt-2 text-sm text-ink-dim">
           This is the big one. We train a dedicated AI model on your chosen frames so it truly <span className="text-ink">knows</span> this
           person, then run the Humaniser to add real-skin detail. The result is a face that stays identical in every
-          future shot, expression and scene. No two-heads, no morphing, no &ldquo;who is that?&rdquo; moments.
+          future shot, expression and scene. No two-heads, no hallucinating, no &ldquo;who is that?&rdquo; moments.
         </p>
         <ul className="mt-3 space-y-1.5 text-[13px] text-ink-dim">
           <li>⏱️ It takes about <span className="text-ink">10 minutes</span>. Kick it off, then go grab a coffee or get on with other work, it runs in the background.</li>
