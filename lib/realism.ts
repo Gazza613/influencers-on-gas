@@ -46,10 +46,10 @@ export const SCENE_REALISM =
 // candid friend-shot, NOT a professional studio camera (pro-camera language is what makes
 // AI images read as fake stock). Backgrounds stay sharp so shots are reusable for video.
 export const UGC_REALISM =
-  "an authentic candid photo that looks shot on a recent iPhone main lens at f/1.8, held at arm's length or by a friend, " +
-  "natural automatic exposure, subtle real sensor noise in the shadows, true-to-life colour, real natural light for the setting, " +
-  "natural skin with visible pores and subtle imperfections, a genuine un-posed candid moment (never a studio shoot, never a stiff pose, never a stock photo), " +
-  "true-to-life proportions and correct real-world scale in the scene, the whole scene and background in sharp focus (never blurred), " +
+  "a real photo a friend just took on a recent iPhone and posted to Instagram: handheld at arm's length, natural found light, automatic exposure, faint sensor noise in the shadows, " +
+  "a real person living their life, NOT a model on a shoot, relaxed end-of-day lived-in energy, a genuine un-posed candid moment, " +
+  "real un-retouched skin with visible pores, a little natural shine at the high points and a couple of honest imperfections and gentle asymmetry, no beauty filter, " +
+  "true-to-life proportions and correct real-world scale, the whole scene and background in natural sharp focus (no bokeh, never blurred), " +
   CLOTHED + ", " + SINGLE_FRAME;
 
 // CREATIVES cinematic tier: film-grade lighting and colour, but still believable and with
