@@ -12,11 +12,14 @@ const ACTION_LABEL: Record<string, string> = {
 
 const BASE = "https://influencers.gasmarketing.co.za";
 
+// Escape user-controlled values (influencer names, emails) before HTML interpolation.
+const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+
 function rows(items: { label: string; cents: number; sub?: string }[]) {
   if (!items.length) return `<tr><td style="padding:10px 14px;color:#8a8f98;font-size:13px;">No spend.</td></tr>`;
   return items.map((r, i) => `
     <tr style="background:${i % 2 ? "#0f141b" : "#0c1117"};">
-      <td style="padding:9px 14px;color:#e6e8eb;font-size:13px;">${r.label}${r.sub ? `<span style="color:#6b7280;font-size:11px;"> · ${r.sub}</span>` : ""}</td>
+      <td style="padding:9px 14px;color:#e6e8eb;font-size:13px;">${esc(r.label)}${r.sub ? `<span style="color:#6b7280;font-size:11px;"> · ${esc(r.sub)}</span>` : ""}</td>
       <td style="padding:9px 14px;color:#fff;font-size:13px;text-align:right;font-weight:600;white-space:nowrap;">${rand(r.cents)}</td>
     </tr>`).join("");
 }

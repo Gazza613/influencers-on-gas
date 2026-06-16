@@ -3,7 +3,7 @@
 // we allow the call (so crons work out of the box) but you should set CRON_SECRET.
 export function cronAuthed(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) return false; // fail closed: no secret configured ⇒ no cron access
   if (req.headers.get("authorization") === `Bearer ${secret}`) return true;
   const key = new URL(req.url).searchParams.get("key");
   return key === secret;

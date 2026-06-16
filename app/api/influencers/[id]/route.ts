@@ -17,12 +17,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
 
-  // Merge a small persona patch (step hand-off: chosen face, selected frames).
+  // Merge a small persona patch (step hand-off only). Allow-listed so a client can't
+  // overwrite gates like `locked` or identity fields (element_id / soul references).
+  const ALLOWED_PATCH = new Set(["chosen_url", "selected_frames", "video_selects"]);
   let persona: Record<string, unknown> | undefined;
   if (body.personaPatch && typeof body.personaPatch === "object") {
     const inf = await getInfluencer(id);
     if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    persona = { ...(inf.persona as Record<string, unknown>), ...body.personaPatch };
+    const patch: Record<string, unknown> = {};
+    for (const k of Object.keys(body.personaPatch)) if (ALLOWED_PATCH.has(k)) patch[k] = body.personaPatch[k];
+    persona = { ...(inf.persona as Record<string, unknown>), ...patch };
   }
 
   await updateInfluencer(id, {
