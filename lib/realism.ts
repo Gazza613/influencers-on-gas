@@ -8,6 +8,13 @@ export const REALISM_POSITIVE =
   "minimal or no makeup, soft directional key light with gentle falloff, shot on 85mm at f/2.0, " +
   "shallow depth of field, neutral filmic color grade, relaxed candid expression, true-to-life proportions";
 
+// Scene/location realism (full-body, environmental) — keeps proportions, placement
+// and colour/lighting believable when the person is set in a location.
+export const SCENE_REALISM =
+  "photorealistic editorial photograph, natural skin texture, true-to-life human proportions and correct scale relative to the scene, " +
+  "the person standing naturally with feet firmly on the ground and realistic perspective, lighting direction and white balance matched to the environment, " +
+  "natural shadows and contact with the ground, neutral filmic colour grade, candid and unposed, shot on 35mm at f/4 so the environment reads clearly, sharp and clean";
+
 export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin";

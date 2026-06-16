@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt } from "@/lib/realism";
+import { buildIdentityPrompt, REALISM_POSITIVE, SCENE_REALISM } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { enhanceImage } from "@/lib/vendors/magnific";
@@ -28,14 +28,15 @@ const FACE_COVERAGE = [
   "the same exact person, straight-on at eye level, looking directly into the lens, warm authentic smile, identical face and wardrobe, photorealistic portrait",
 ];
 
-// 2 shots of the same person in the brief's location (the money shots you'll actually use).
-function sceneShots(setting?: string): string[] {
-  const loc = (setting || "").trim() || "a clean editorial studio backdrop";
-  return [
-    `the same exact person in ${loc}, natural medium shot with full scene context, face clearly visible and identical, photorealistic editorial photo`,
-    `the same exact person in ${loc}, candid wider lifestyle shot, environment in frame, identical face, photorealistic`,
-  ];
-}
+// Scene-shot framings (the "money shots"). The location itself is supplied either by
+// an uploaded location Element (preferred) or by text; we never inject a default
+// backdrop when a reference is present, so it can't fight the upload.
+const SCENE_FRAMINGS = [
+  "standing full-length, full body head to toe, natural relaxed pose",
+  "medium three-quarter shot with the environment clearly in frame",
+  "wider candid lifestyle shot with plenty of the environment around them",
+  "seated or leaning naturally in the space, relaxed candid moment",
+];
 
 // STAGE 1 — Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the
 // producer can choose the face. Each is an independent generation (different person),
@@ -100,7 +101,8 @@ export const buildIdentity = inngest.createFunction(
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const prompt = (persona.identity_prompt as string) || buildIdentityPrompt(inf.persona).prompt;
     const faceCoverage = [...FACE_COVERAGE];
-    const sceneCoverage = sceneShots(persona.setting as string | undefined);
+    const sceneCoverage = [...SCENE_FRAMINGS];
+    const locText = (persona.setting as string | undefined)?.trim() || "";
     const expected = faceCoverage.length + sceneCoverage.length + 1;
 
     try {
@@ -115,11 +117,20 @@ export const buildIdentity = inngest.createFunction(
         updateInfluencer(influencerId, { look_refs: [...frames], persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected } }),
       );
 
-      // Compose prompts: face element always; clothing element on face-coverage; location
-      // element on scene shots. Each <<<id>>> placeholder injects that reference image.
+      // Compose prompts. Face/portrait coverage gets the portrait realism core; scene
+      // shots get the scene realism core (proportions, placement, matched light/colour).
+      // Each <<<id>>> placeholder injects that reference image (face / clothing / location).
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
-      const facePrompts = faceCoverage.map((v) => `${tag(elementId)}${tag(clothEl)}${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${v}`);
-      const scenePrompts = sceneCoverage.map((v) => `${tag(elementId)}${tag(locEl)}${locEl ? "in the same location as the location reference, " : ""}${v}`);
+      // Environment phrase: prefer the uploaded location reference; else the brief's text;
+      // else a clean studio. Never inject the studio default when a reference exists.
+      const env = locEl ? "placed naturally in the same location as the location reference image" : locText ? `in ${locText}` : "in a clean editorial studio backdrop";
+
+      const facePrompts = faceCoverage.map((v) =>
+        `${tag(elementId)}${tag(clothEl)}${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${v}. ${REALISM_POSITIVE}.`,
+      );
+      const scenePrompts = sceneCoverage.map((v) =>
+        `${tag(elementId)}${tag(locEl)}${clothEl ? `${tag(clothEl)}wearing the same outfit as the clothing reference, ` : ""}the same exact person ${v}, ${env}, identical face and hair. ${SCENE_REALISM}.`,
+      );
       const vPrompts = elementId ? [...facePrompts, ...scenePrompts] : [...faceCoverage, ...sceneCoverage].map((v) => `${prompt}. ${v}`);
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
       for (const url of urls) if (url && !frames.some((f) => f.url === url)) frames.push({ url });

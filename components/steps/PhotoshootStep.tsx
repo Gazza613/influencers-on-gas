@@ -7,7 +7,7 @@ import Uploader from "@/components/Uploader";
 
 type Ref = { url: string; hero?: boolean };
 
-const SET_TOTAL = 9;
+const SET_TOTAL = 11; // chosen hero + 6 face-coverage + 4 scene shots
 const QUIPS = [
   "Locking in the chosen face…",
   "Shooting every angle…",
