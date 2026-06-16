@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "../connections";
 
-// Claude (Anthropic) — the producer co-pilot brain. Vendor-neutral in the UI.
+// Claude (Anthropic), the producer co-pilot brain. Vendor-neutral in the UI.
 // Sonnet 4.6 designs the Character Casting + refines prompts: near-Opus quality for a
 // structured creative sheet, but markedly faster (Opus was noticeably slow here).
 const MODEL = "claude-sonnet-4-6";
@@ -143,7 +143,7 @@ export async function generateTagline(name: string, bible: Record<string, unknow
 }
 
 // Vision QA gate: inspect a generated creative and FAIL it if it breaks the rules.
-// Uses Haiku (fast + cheap) — this runs on every image before the user sees it.
+// Uses Haiku (fast + cheap), this runs on every image before the user sees it.
 const QA_MODEL = "claude-haiku-4-5";
 const QA_SCHEMA = {
   type: "object",
@@ -183,7 +183,7 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; issues: 
       messages: [{
         role: "user",
         content: [
-          { type: "text", text: "You are QA for social-media creatives of an AI influencer. Judge this image strictly. pass must be true ONLY if: fully_clothed (top covering torso AND bottoms — FAIL shirtless/topless/underwear/nude), single_frame (ONE continuous photo — FAIL any collage/grid/split/stacked panels OR a side strip/inset/border band showing a different scene), realistic_proportions (natural body + believable scale vs background), and coherent_photo. List concrete issues." },
+          { type: "text", text: "You are QA for social-media creatives of an AI influencer. Judge this image strictly. pass must be true ONLY if: fully_clothed (top covering torso AND bottoms, FAIL shirtless/topless/underwear/nude), single_frame (ONE continuous photo, FAIL any collage/grid/split/stacked panels OR a side strip/inset/border band showing a different scene), realistic_proportions (natural body + believable scale vs background), and coherent_photo. List concrete issues." },
           { type: "image", source: { type: "base64", media_type: mt as "image/jpeg", data: b64 } },
         ],
       }],
@@ -192,7 +192,7 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; issues: 
     const out = block && block.type === "tool_use" ? (block.input as { pass?: boolean; issues?: string[] }) : null;
     return { pass: !!out?.pass, issues: out?.issues ?? [] };
   } catch {
-    // QA service itself errored (not the image) — fail OPEN so a hiccup can't empty the gallery.
+    // QA service itself errored (not the image), fail OPEN so a hiccup can't empty the gallery.
     return { pass: true, issues: ["qa-unavailable"] };
   }
 }
@@ -203,13 +203,19 @@ export async function refineCreativePrompt(name: string, bible: Record<string, u
   const c = await client();
   const res = await c.messages.create({
     model: MODEL,
-    max_tokens: 400,
+    max_tokens: 500,
     system:
-      "You are a creative director writing ONE vivid image prompt for a photoreal social-media shot of an existing AI influencer. " +
-      "One or two sentences, concrete and art-directed: setting, action, wardrobe feel, mood, light. " +
-      "The subject is ALWAYS fully clothed with a complete outfit including bottoms. Any background people reflect South African diversity " +
-      "(Black, White, Indian, Coloured) and stay in sharp focus; backgrounds are never blurred. UK spelling, no em dashes. Return ONLY the prompt text, no preamble.",
-    messages: [{ role: "user", content: `Influencer: ${name}\nCharacter (JSON): ${JSON.stringify(bible).slice(0, 3000)}\n\nProducer's rough idea: ${scene || "an on-brand lifestyle shot"}\n\nWrite the polished image prompt.` }],
+      "You are a creative director shaping a producer's rough idea into ONE clean, model-followable image brief for a " +
+      "photoreal social-media shot of an existing AI influencer whose FACE and identity are already locked by a trained model. " +
+      "RULES:\n" +
+      "- The producer's idea is the brief. Expand and structure it, never replace its intent. Keep their specifics (outfit, location, props, mood).\n" +
+      "- Order it: subject + action, then wardrobe, then setting/background (and any people in it), then framing/shot, then light + mood.\n" +
+      "- Keep it tight: 3 to 5 sentences. A wall of forensic detail makes the model follow LESS, not more, so distil to what matters.\n" +
+      "- Do NOT describe her facial features, skin marks, hair type or likeness. Her face comes from the trained identity, not the words; dictating it only causes drift. Refer to her simply as the influencer / the same person.\n" +
+      "- Resolve any contradictions in the idea (for example a described pose that fights a described gaze).\n" +
+      "- The subject is ALWAYS fully clothed with a complete outfit including bottoms. Any background people reflect South African diversity (Black, White, Indian, Coloured) and stay in sharp focus; backgrounds are never blurred.\n" +
+      "- UK spelling, no em dashes. Return ONLY the brief text, no preamble.",
+    messages: [{ role: "user", content: `Influencer: ${name}\n\nProducer's rough idea:\n${scene || "an on-brand lifestyle shot for this influencer"}\n\nWrite the polished brief.` }],
   });
   const block = res.content.find((b) => b.type === "text");
   return block && block.type === "text" ? block.text.trim() : scene;

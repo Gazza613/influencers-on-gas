@@ -244,6 +244,11 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <textarea value={scene} onChange={(e) => setScene(e.target.value)} rows={3}
             placeholder="e.g. holding a takeaway coffee on a Braamfontein street at golden hour, smiling at camera"
             className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
+          <p className="mt-1.5 text-[11px] text-ink-faint">
+            Describe the outfit, location, who is around, the framing and the mood. Her face stays locked, so you do not
+            need to describe it. Keep it focused: a tight brief is followed more closely than a long one. Hit
+            <span className="text-[#c79bff] font-semibold"> ✨ Perfect with AI</span> to shape a rough idea into a clean brief.
+          </p>
         </div>
 
         {/* Background extras */}
