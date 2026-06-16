@@ -349,18 +349,22 @@ export const generateCreatives = inngest.createFunction(
       const wardrobe = clothingRef ? "wearing an outfit like the clothing reference, " : "";
       const place = locationRef ? "in a setting like the location reference, " : "";
 
-      // Anchor identity: Soul models take the locked face as a reference image (role: image)
-      // alongside soul_id — this is what keeps the person actually looking like themselves.
+      const userScene = !!scene;
+      // Anchor identity. soul_id carries the trained face. We ALSO pass the locked hero
+      // photo as a reference image to maximise likeness, but ONLY for the default brief:
+      // that reference behaves as a strong image-to-image anchor and clones its own
+      // outfit and background, which overrides a custom scene. When the user writes their
+      // own brief we drop the reference so soul_id holds the face while the prompt drives
+      // wardrobe and location. (Identity vs prompt-adherence trade-off, chosen per run.)
       const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]) : [];
       const heroUrl = (persona.hero_realism_url as string) || (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url || (persona.reference_url as string) || "";
-      const heroMedia = useSoul && heroUrl ? await step.run("hero-media", () => importMediaUrl(heroUrl)) : null;
+      const heroMedia = useSoul && heroUrl && !userScene ? await step.run("hero-media", () => importMediaUrl(heroUrl)) : null;
       const extra = useSoul ? { soul_id: soulId, ...(heroMedia ? { medias: [{ value: heroMedia, role: "image" }] } : {}) } : {};
 
       // Lead with the user's scene brief so it is the dominant instruction (not buried
       // behind boilerplate). When the user wrote their own brief we use FRAMING-only
-      // variations for shot-to-shot variety — pose/gaze directions would contradict a
+      // variations for shot-to-shot variety: pose/gaze directions would contradict a
       // brief that already specifies them. The default brief keeps the richer variations.
-      const userScene = !!scene;
       const variations = userScene ? FRAMING_VARIATIONS : CREATIVE_VARIATIONS;
       const buildPrompt = (idx: number) =>
         useSoul
