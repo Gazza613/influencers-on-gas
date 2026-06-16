@@ -268,3 +268,9 @@ create table if not exists balance_snapshots (
   note            text
 );
 create index if not exists idx_balance_snapshots_taken on balance_snapshots(taken_at);
+
+-- Firecrawl scrape rate (Voyage embeddings already seeded at 0). Nominal ZAR estimate
+-- so brain ingestion shows up in Cost Control with real counts.
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('firecrawl','scrape','page', 0, 15, true)
+on conflict (provider, model, unit) do nothing;

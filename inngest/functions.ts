@@ -158,6 +158,7 @@ export const ingestSource = inngest.createFunction(
       let items: { content: string; metadata?: Record<string, unknown> }[];
       if (type === "website") {
         const page = await step.run("scrape", () => scrape(uri));
+        await step.run("usage-scrape", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: 1 }));
         if (!page.content) throw new Error("page had no readable content");
         items = chunkText(page.content).map((c) => ({ content: c, metadata: { url: page.url, title: page.title } }));
       } else {
@@ -167,6 +168,7 @@ export const ingestSource = inngest.createFunction(
 
       // ingestChunks embeds in batches; can take a while on the free tier (429 retries).
       const stored = await step.run("embed-store", () => ingestChunks(clientId, sourceId, items));
+      await step.run("usage-embed", () => recordUsage({ clientId, provider: "voyage", model: "voyage-3.5", unit: "embed", action: "ingest", count: stored }));
       await step.run("mark-indexed", () => setSourceStatus(sourceId, "indexed"));
       return { ok: true, chunks: stored };
     } catch (e) {

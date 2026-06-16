@@ -16,11 +16,28 @@ async function getRate(provider: string, model: string, unit: string): Promise<R
   return { credits: Number(rows[0].credits_per_unit) || 0, cents: Number(rows[0].price_cents_per_unit) || 0 };
 }
 
-// Append one cost event (priced from rate_card). Called from generation jobs.
-export async function recordUsage(o: {
+export type UsageInput = {
   influencerId?: string | null; clientId?: string | null; userEmail?: string | null;
   provider: string; model: string; unit: string; action: string; count?: number;
-}): Promise<void> {
+};
+
+// GUARDRAIL: every paid vendor call should go through here so it lands in Cost
+// Control. `metered()` runs the vendor call and records its cost together, so a
+// new production step can't ship untracked. `count` may be a number or derived
+// from the result (e.g. number of images / chunks returned). Recording never
+// throws into the caller — cost logging must not break a generation.
+export async function metered<T>(
+  meta: Omit<UsageInput, "count"> & { count?: number | ((r: T) => number) },
+  fn: () => Promise<T>,
+): Promise<T> {
+  const r = await fn();
+  const count = typeof meta.count === "function" ? (meta.count as (r: T) => number)(r) : meta.count ?? 1;
+  await recordUsage({ ...meta, count }).catch(() => {});
+  return r;
+}
+
+// Append one cost event (priced from rate_card). Called from generation jobs.
+export async function recordUsage(o: UsageInput): Promise<void> {
   const count = o.count ?? 1;
   if (count <= 0) return;
   const rate = await getRate(o.provider, o.model, o.unit);

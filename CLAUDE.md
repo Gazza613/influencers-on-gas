@@ -48,6 +48,13 @@ master brief).
 - **Prices live in the `rate_card` table, never in code.**
 - Cost control = **dials, never a quality cap**; nothing calls a paid API before
   passing the budget gate.
+- **Every paid vendor call MUST be metered** so it appears in Cost Control
+  (`/cost-control`): record via `recordUsage()` / `metered()` in `lib/usage.ts`
+  (durable jobs use a dedicated `step.run("usage-…")`), and add a `rate_card` row
+  for its `(provider, model, unit)`. A step that spends money without a usage event
+  is a bug. Tracked today: Higgsfield (casting/photoshoot/soul), Magnific (humaniser),
+  HeyGen (presenter), Claude (Character Casting), Voyage + Firecrawl (brain ingestion).
+  ElevenLabs / Shotstack land metered as they're built.
 
 ## Dev workflow
 

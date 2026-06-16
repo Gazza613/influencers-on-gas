@@ -24,6 +24,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   anthropic: "Claude · Character Casting",
   elevenlabs: "ElevenLabs · voice",
   voyage: "Voyage · embeddings",
+  firecrawl: "Firecrawl · crawl",
 };
 const ACTION_LABEL: Record<string, string> = {
   casting: "Casting (looks)", photoshoot: "Photoshoot", soul: "Lock-down (Soul)", humaniser: "Humaniser",

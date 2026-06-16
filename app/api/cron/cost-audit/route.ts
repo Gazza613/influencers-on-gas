@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { getBalance } from "@/lib/vendors/higgsfield";
 import { recordBalanceSnapshot } from "@/lib/usage";
 import { cronAuthed } from "@/lib/cron";
@@ -8,7 +9,8 @@ import { cronAuthed } from "@/lib/cron";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
-  if (!cronAuthed(req)) return NextResponse.json({ error: "forbidden" }, { status: 401 });
+  const session = await auth();
+  if (!cronAuthed(req) && !session?.user) return NextResponse.json({ error: "forbidden" }, { status: 401 });
   let remaining: number | null = null;
   try { remaining = (await getBalance()).remaining; } catch { /* balance unreadable — store null */ }
   await recordBalanceSnapshot(remaining, "daily auto-audit");
