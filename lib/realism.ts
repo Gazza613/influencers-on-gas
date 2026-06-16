@@ -59,6 +59,45 @@ export const CINEMATIC_REALISM =
   "photorealistic natural skin with real texture and subtle imperfections, true-to-life proportions and correct real-world scale, candid and unposed, balanced exposure with no blown-out highlights, " +
   CLOTHED + ", " + SINGLE_FRAME;
 
+// Aspect-ratio framing (archive gem): tell the model how to fill each frame so we never
+// get a distant wide shot or a portrait crop rotated sideways.
+export function aspectFraming(ratio: string): string {
+  if (ratio === "16:9") return "Horizontal landscape frame: the subject is close to camera, filling at least half the frame height, environment visible on both sides. Not a distant wide shot, not a portrait crop rotated sideways.";
+  if (ratio === "1:1") return "Square frame: the subject fills most of the frame, balanced natural composition.";
+  return "Vertical 9:16 frame: the subject fills 60 to 70 percent of the frame, a tight candid crop, not a wide environmental shot.";
+}
+
+// Archive's anti-AI + raw-photo constraints, the single biggest 'looks real' lever.
+const ANTI_AI = "No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow, no over-sharpening. No phone screen, social-media UI, app overlay, notification or status bar, captions or interface elements anywhere. A real, raw, un-retouched photograph.";
+const SKIN_FACTS = "Skin as real photographic fact: visible pores on the nose, cheeks and forehead and on all exposed skin (neck, arms, hands), a couple of honest imperfections and gentle natural asymmetry, a satin sheen only at the high points with the rest matte and lived-in. Zero skin smoothing, zero airbrushing, no beauty filter.";
+
+// Structured creative-image prompt (the archive's section format that gpt_image_2 follows
+// far better than a run-on sentence). Scene/wardrobe/pose come from the user's brief; we
+// wrap them in iPhone-realism (or cinematic) framing + identity lock + anti-AI constraints.
+export function buildCreativeImagePrompt(o: {
+  sceneText: string; variation: string; refInstruction: string; subjectLine: string;
+  faceMarks: string; look: string; peopleClause: string; cinematic: boolean; ratio: string;
+}): string {
+  const style = o.cinematic
+    ? "Photograph style: a cinematic film still, rich filmic colour grade, dramatic but natural directional light, the background still clearly readable (not heavily blurred)."
+    : "Photograph style: a real iPhone snapshot taken by the subject or a nearby friend, handheld, automatic settings, raw unedited iPhone output. The subject is just living their life, not posing for a shoot, the kind of photo a friend would post to Instagram.";
+  const camera = o.cinematic
+    ? "Camera and capture: cinematic camera, gentle depth, the whole subject and setting clearly legible."
+    : "Camera and capture: iPhone 16 Pro 24mm main lens f/1.78, handheld, natural sensor noise in the shadows, no bokeh, no artificial depth of field.";
+  return [
+    style,
+    `Scene: ${o.sceneText}${o.variation}. ${o.peopleClause}. The background is real and in sharp focus (never blurred), so the shot is reusable for video.`,
+    `Subject: ${o.subjectLine}. A real person living their life, NOT a model on a shoot, relaxed lived-in energy.${o.faceMarks ? ` Distinctive features to keep: ${o.faceMarks}.` : ""}`,
+    `Identity:${o.refInstruction}`,
+    `Pose and expression: a natural, un-posed candid moment, eyes toward the lens unless the scene says otherwise.`,
+    `Grooming: ${o.look}.`,
+    camera,
+    SKIN_FACTS,
+    `Wardrobe: ${CLOTHED}.`,
+    `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
+  ].join("\n\n");
+}
+
 export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin, " +

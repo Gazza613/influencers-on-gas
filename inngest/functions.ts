@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, UGC_REALISM, CINEMATIC_REALISM } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative } from "@/lib/vendors/anthropic";
@@ -378,9 +378,15 @@ export const generateCreatives = inngest.createFunction(
 
       const userScene = !!scene;
       const variations = userScene ? FRAMING_VARIATIONS : CREATIVE_VARIATIONS;
-      const realismCore = cinematic ? CINEMATIC_REALISM : UGC_REALISM;
-      const buildPrompt = (idx: number) =>
-        `${sceneText}${variations[idx % variations.length]}. ${refInstruction} ${look}. ${realismCore}, ${peopleClause}.`;
+      // Light subject line (body/age/heritage) for the structured prompt; the FACE comes
+      // from @image1, so we keep this general and let the reference own the likeness.
+      const bibleId = ((persona.bible as { identity?: { age?: string; build?: string; ethnicity_design?: string } })?.identity) ?? {};
+      const bibleFace = ((persona.bible as { face?: { skin?: string; distinct_features?: string } })?.face) ?? {};
+      const g = genderWord(persona.gender) || "person";
+      const subjectLine = [bibleId.age, g, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || g;
+      const faceMarks = [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 220);
+      const buildPrompt = (idx: number, ratio: string) =>
+        buildCreativeImagePrompt({ sceneText, variation: variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
 
       // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
       // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is
@@ -388,7 +394,7 @@ export const generateCreatives = inngest.createFunction(
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
         const rid = ratio.replace(/:/g, "x"); // safe slug for Inngest step IDs (no colons)
         // Over-generate by one for QA headroom.
-        const prompts = Array.from({ length: perRatio + 1 }, (_, i) => buildPrompt(i));
+        const prompts = Array.from({ length: perRatio + 1 }, (_, i) => buildPrompt(i, ratio));
         const rawProduced = (await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
         // Only keep images that actually load (drops broken/expired renders before QA).
         const produced = await step.run(`validate-${rid}`, () => filterLoadable(rawProduced));
