@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     const b = await getBalance();
     return NextResponse.json({
       remaining: b.remaining, monthly: MONTHLY_CREDITS, creditZarCents: CREDIT_ZAR_CENTS,
-      ...(debug ? { tried: b.tried, allTools: b.allTools, samples: b.samples } : {}),
+      ...(debug ? { tried: b.tried, samples: b.samples } : {}),
     });
   } catch (e) {
     return NextResponse.json({ remaining: null, error: String((e as Error)?.message || e).slice(0, 200) });

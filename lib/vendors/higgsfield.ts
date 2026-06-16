@@ -232,11 +232,12 @@ export async function soulStatus(soulId: string): Promise<string> {
 // keys, then credit/balance/available, so we report what's left, not the allotment.
 function parseCredits(data: unknown): number | null {
   const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
+  // Handles plain text ("Credits: 6658.93 | Plan: ultra") and JSON ("credits": 6658).
   const patterns = [
-    /"[a-z_]*remaining[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
-    /"[a-z_]*credit[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
-    /"[a-z_]*balance[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
-    /"[a-z_]*available[a-z_]*"\s*:\s*"?([0-9][0-9,.]*)"?/i,
+    /\bremaining[a-z_ ]*["']?\s*[:=]\s*["']?([0-9][0-9,.]*)/i,
+    /\bcredits?\b["']?\s*[:=]\s*["']?([0-9][0-9,.]*)/i,
+    /\bbalance[a-z_ ]*["']?\s*[:=]\s*["']?([0-9][0-9,.]*)/i,
+    /\bavailable[a-z_ ]*["']?\s*[:=]\s*["']?([0-9][0-9,.]*)/i,
   ];
   for (const re of patterns) {
     const m = str.match(re);
@@ -247,15 +248,10 @@ function parseCredits(data: unknown): number | null {
 
 // Live credit balance (ground truth). Discovers the account/credit tool dynamically
 // (names vary) and parses flexibly. Returns rich debug (tool list + raw samples).
-export async function getBalance(): Promise<{ remaining: number | null; raw?: unknown; tried?: string[]; allTools?: string[]; samples?: { tool: string; raw: string }[] }> {
+export async function getBalance(): Promise<{ remaining: number | null; raw?: unknown; tried?: string[]; samples?: { tool: string; raw: string }[] }> {
   const { call } = await openSession();
-  let allTools: string[] = [];
-  let discovered: string[] = [];
-  try {
-    allTools = (await listTools()).map((t) => t.name);
-    discovered = allTools.filter((n) => /credit|balance|plan|account|wallet|subscription|usage|me|profile/i.test(n));
-  } catch { /* discovery optional */ }
-  const candidates = [...new Set([...discovered, "balance", "show_plans_and_credits", "credits", "show_credits", "get_credits", "account", "wallet", "subscription"])];
+  // The `balance` tool returns e.g. "Credits: 6658.93 | Plan: ultra"; try it first.
+  const candidates = ["balance", "show_plans_and_credits", "transactions"];
 
   const tried: string[] = [];
   const samples: { tool: string; raw: string }[] = [];
@@ -266,12 +262,12 @@ export async function getBalance(): Promise<{ remaining: number | null; raw?: un
       const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
       samples.push({ tool, raw: str.slice(0, 220) });
       const n = parseCredits(data);
-      if (n != null) return { remaining: n, raw: data, tried, allTools, samples };
+      if (n != null) return { remaining: n, raw: data, tried, samples };
     } catch (e) {
       samples.push({ tool, raw: "ERR " + String((e as Error)?.message || e).slice(0, 120) });
     }
   }
-  return { remaining: null, tried, allTools, samples };
+  return { remaining: null, tried, samples };
 }
 
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
