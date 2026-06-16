@@ -81,7 +81,14 @@ function whereClause(f: CostFilters): { sql: string; params: unknown[] } {
   if (f.to) { params.push(f.to); parts.push(`u.created_at < ($${params.length}::date + interval '1 day')`); }
   if (f.influencerId) { params.push(f.influencerId); parts.push(`u.influencer_id = $${params.length}`); }
   if (f.provider) { params.push(f.provider); parts.push(`u.provider = $${params.length}`); }
-  if (f.userEmail) { params.push(f.userEmail); parts.push(`u.user_email = $${params.length}`); }
+  if (f.userEmail) {
+    if (f.userEmail === "Super Admin") {
+      params.push((process.env.SUPER_ADMIN_EMAIL ?? "").toLowerCase());
+      parts.push(`(u.user_email is null or lower(u.user_email) = $${params.length})`);
+    } else {
+      params.push(f.userEmail); parts.push(`u.user_email = $${params.length}`);
+    }
+  }
   return { sql: parts.length ? `where ${parts.join(" and ")}` : "", params };
 }
 
@@ -95,7 +102,13 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
   const split = { image: { count: 0, cents: 0 }, video: { count: 0, cents: 0 }, other: { count: 0, cents: 0 } };
   for (const r of splitRows) if (r.kind in split) (split as Record<string, { count: number; cents: number }>)[r.kind] = { count: r.count, cents: r.cents };
 
-  const byUser = (await q(`select coalesce(u.user_email,'(system)') as user_email, sum(u.credits)::float as credits, sum(u.cents)::int as cents, count(*)::int as events from usage_events u ${where} group by u.user_email order by cents desc`)) as CostReport["byUser"];
+  // The env super-admin (Gary) and unattributed system jobs are merged into "Super Admin".
+  const saEmail = (process.env.SUPER_ADMIN_EMAIL ?? "").toLowerCase();
+  const byUserParams = [...params, saEmail];
+  const byUser = (await db().query(
+    `select case when u.user_email is null or lower(u.user_email) = $${byUserParams.length} then 'Super Admin' else u.user_email end as user_email,
+            sum(u.credits)::float as credits, sum(u.cents)::int as cents, count(*)::int as events
+     from usage_events u ${where} group by 1 order by cents desc`, byUserParams)) as CostReport["byUser"];
 
   const byInfluencer = (await q(`
     select i.id as id, coalesce(i.name,'(removed)') as name,

@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM } from "@/lib/realism";
-import { createFaceElement, generateBatch, trainSoul, soulStatus } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, trainSoul, soulStatus, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { enhanceImage } from "@/lib/vendors/magnific";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -340,30 +340,46 @@ export const generateCreatives = inngest.createFunction(
     if (!inf) return { skipped: "influencer not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const elementId = (persona.element_id as string) || null;
+    const soulId = (inf.higgsfield_soul_id as string) || null;
     const look = lookClause(persona);
     const sceneText = scene || "a clean, on-brand social media portrait, looking at the camera";
     const fourK = resolution === "4k";
     const existing = Array.isArray(persona.creatives) ? (persona.creatives as Creative[]) : [];
 
+    // Identity lock: prefer the trained Soul (model soul_2 + soul_id) — far more consistent
+    // than injecting a reference element into nano. Fall back to nano + element if no Soul.
+    const useSoul = !!soulId;
+    const genModel = useSoul ? "soul_2" : IMAGE_MODEL;
+
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
 
     try {
-      // Optional uploaded clothing / location → Elements (steer wardrobe + scene).
-      const clothEl = clothingRef ? await step.run("cloth-el", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
-      const locEl = locationRef ? await step.run("loc-el", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
+      // Soul takes ONE reference media (prefer the location to ground the scene); nano uses
+      // multi-element injection. Either way, clothing/scene are also described in the prompt.
+      let refMediaId: string | null = null;
+      const clothEl = !useSoul && clothingRef ? await step.run("cloth-el", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
+      const locEl = !useSoul && locationRef ? await step.run("loc-el", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
+      if (useSoul && (locationRef || clothingRef)) {
+        refMediaId = await step.run("import-ref", () => importMediaUrl(locationRef || clothingRef));
+      }
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
-      const env = locEl ? "placed naturally in the same location as the location reference image" : "";
-      const wardrobe = clothEl ? "wearing the same outfit as the clothing reference, " : "";
+      const wardrobe = clothingRef ? "wearing the same outfit as the clothing reference, " : "";
+      const place = locationRef ? "in the same location as the location reference, " : "";
+      const extra = useSoul
+        ? { soul_id: soulId, ...(refMediaId ? { medias: [{ value: refMediaId, role: "image" }] } : {}) }
+        : {};
 
       const made: Creative[] = [];
       for (const ratio of ratios) {
-        // `perRatio` distinct shots for this format, identity locked to the Element.
+        // `perRatio` distinct shots for this format, identity locked (Soul or element).
         const prompts = Array.from({ length: perRatio }, (_, i) =>
-          `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${wardrobe}${env ? env + ", " : ""}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}.`,
+          useSoul
+            ? `the same person, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}.`
+            : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}.`,
         );
-        const urls = await step.run(`gen-${ratio}`, () => generateBatch(prompts, IMAGE_MODEL, ratio));
+        const urls = await step.run(`gen-${ratio}`, () => generateBatch(prompts, genModel, ratio, extra));
         const got = urls.filter((u): u is string => !!u);
-        if (got.length) await step.run(`usage-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: got.length }));
+        if (got.length) await step.run(`usage-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: got.length }));
         let finals = got;
         if (fourK && got.length) {
           finals = await step.run(`upscale-${ratio}`, async () => Promise.all(got.map((u) => enhanceImage(u).catch(() => u))));

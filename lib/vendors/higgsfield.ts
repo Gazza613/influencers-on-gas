@@ -176,8 +176,8 @@ export async function generateVariation(elementId: string | null, basePrompt: st
 // Generate many prompts CONCURRENTLY in one session: launch every job up front, then
 // poll them all in parallel. Wall-clock ≈ a single image, not the sum. Returns URLs
 // aligned to `prompts` (null where a job failed). Used for fast casting + coverage sets.
-export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16"): Promise<(string | null)[]> {
-  const base = baseParams(model, aspectRatio);
+export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}): Promise<(string | null)[]> {
+  const base = { ...baseParams(model, aspectRatio), ...extra };
   // Each prompt gets its OWN MCP session so generations run truly in parallel
   // (a shared session serializes requests). Wall-clock ≈ one image, not the sum.
   return Promise.all(prompts.map(async (p) => {
@@ -274,6 +274,12 @@ export async function getBalance(): Promise<{ remaining: number | null; raw?: un
 export async function callMcp(name: string, args: AnyObj): Promise<unknown> {
   const { call } = await openSession();
   return unwrapMCP(await call(name, args));
+}
+
+// Import a public image URL into Higgsfield → media_id (for use as a generation reference).
+export async function importMediaUrl(url: string): Promise<string | null> {
+  const { call } = await openSession();
+  return importMedia(call, url).catch(() => null);
 }
 
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).

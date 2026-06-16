@@ -23,7 +23,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const inf = await getInfluencer(id);
   if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
-  const [image, upscale] = await Promise.all([rate("higgsfield", "nano_banana_2"), rate("magnific", "upscaler")]);
+  // Creatives run on locked influencers via the Soul model.
+  const [image, upscale] = await Promise.all([rate("higgsfield", "soul_2"), rate("magnific", "upscaler")]);
   return NextResponse.json({
     creatives: Array.isArray(persona.creatives) ? persona.creatives : [],
     videoSelects: Array.isArray(persona.video_selects) ? persona.video_selects : [],

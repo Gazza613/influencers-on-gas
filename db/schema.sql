@@ -283,3 +283,11 @@ alter table users add column if not exists status         text not null default 
 alter table users add column if not exists invite_token   text;
 alter table users add column if not exists invite_expires timestamptz;
 create index if not exists idx_users_invite_token on users(invite_token);
+
+-- Soul (trained-identity) image generation rates. Estimates — tune against get_cost.
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('higgsfield','soul_2','image', 2, 128, true)
+on conflict (provider, model, unit) do nothing;
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('higgsfield','soul_cinematic','image', 4, 256, true)
+on conflict (provider, model, unit) do nothing;
