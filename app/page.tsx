@@ -43,8 +43,11 @@ const CARDS = [
 ] as const;
 
 type Inf = { status?: string; persona?: { hero_url?: string; hero_realism_url?: string; locked?: boolean } | null; look_refs?: { url: string; hero?: boolean }[] | null };
-function heroOf(inf: Inf): string | null {
-  return inf.persona?.hero_realism_url || inf.persona?.hero_url || inf.look_refs?.find?.((r) => r.hero)?.url || inf.look_refs?.[0]?.url || null;
+// All usable photos for an influencer, hero first, then their other frames.
+function imagesOf(inf: Inf): string[] {
+  const hero = inf.persona?.hero_realism_url || inf.persona?.hero_url || inf.look_refs?.find?.((r) => r.hero)?.url;
+  const frames = (inf.look_refs ?? []).map((r) => r.url).filter(Boolean);
+  return [...new Set([hero, ...frames].filter((u): u is string => !!u))];
 }
 // Showcase finished influencers first: locked/ready lead, then in-build, then generating.
 function rank(inf: Inf): number {
@@ -64,11 +67,20 @@ export default function Landing() {
     fetch("/api/influencers", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { influencers: [] }))
       .then((d) => {
-        const list = (d.influencers as Inf[]) || [];
-        const imgs = [...new Set(
-          [...list].sort((a, b) => rank(a) - rank(b)).map(heroOf).filter((u): u is string => !!u),
-        )];
-        setCardSrcs(CARDS.map((_, i) => imgs[i] ?? null));
+        const list = [...((d.influencers as Inf[]) || [])].sort((a, b) => rank(a) - rank(b));
+        // One photo per influencer, but ROTATE the frame by position so look-alike builds
+        // show different shots (a unique, varied photo per card rather than 6 headshots).
+        const used = new Set<string>();
+        const picks: string[] = [];
+        list.forEach((inf, idx) => {
+          const cands = imagesOf(inf);
+          if (!cands.length) return;
+          for (let off = 0; off < cands.length; off++) {
+            const c = cands[(idx + off) % cands.length];
+            if (!used.has(c)) { used.add(c); picks.push(c); break; }
+          }
+        });
+        setCardSrcs(CARDS.map((_, i) => picks[i] ?? null));
       })
       .catch(() => {});
   }, []);
