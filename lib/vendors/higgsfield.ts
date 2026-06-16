@@ -270,6 +270,12 @@ export async function getBalance(): Promise<{ remaining: number | null; raw?: un
   return { remaining: null, tried, samples };
 }
 
+// Generic one-shot MCP tool call (diagnostics / model catalog lookups).
+export async function callMcp(name: string, args: AnyObj): Promise<unknown> {
+  const { call } = await openSession();
+  return unwrapMCP(await call(name, args));
+}
+
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
 export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
   const token = await getValidHFAccessToken();
