@@ -2,6 +2,7 @@ import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, SOUL_SCENE } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
+import { rehostToBlob } from "@/lib/blob";
 import { qaCreative } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -305,7 +306,7 @@ export const generateCreatives = inngest.createFunction(
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const ratios = (Array.isArray(event.data.ratios) ? event.data.ratios : ["9:16"]) as string[];
-    const resolution = String(event.data.resolution || "2k");
+    const resolution = String(event.data.resolution || "4k");
     const scene = String(event.data.scene || "").trim();
     const perRatio = Math.max(1, Math.min(6, Number(event.data.count) || 3));
     const clothingRef = (event.data.clothingRef as string) || "";
@@ -358,20 +359,32 @@ export const generateCreatives = inngest.createFunction(
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
         // Over-generate by one for QA headroom.
         const prompts = Array.from({ length: perRatio + 1 }, (_, i) => buildPrompt(i));
-        const produced = (await step.run(`gen-${ratio}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
+        const rawProduced = (await step.run(`gen-${ratio}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
+        // Only keep images that actually load (drops broken/expired renders before QA).
+        const produced = await step.run(`validate-${ratio}`, () => filterLoadable(rawProduced));
         if (produced.length) await step.run(`usage-gen-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: produced.length }));
         // Vision QA at base res — reject shirtless / collage / bad-proportion / broken (QA error ⇒ keep).
         const verdicts = await step.run(`qa-${ratio}`, () =>
           Promise.all(produced.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
         );
-        let kept = verdicts.filter((v) => v.pass).slice(0, perRatio).map((v) => v.u);
+        const keptUrls = verdicts.filter((v) => v.pass).slice(0, perRatio).map((v) => v.u);
         const reviewed = verdicts.length;
         const rejected = verdicts.filter((v) => !v.pass).length;
-        // Upscale ONLY the keepers (if 4K requested).
-        if (fourK && kept.length) {
-          kept = await step.run(`upscale-${ratio}`, () => Promise.all(kept.map((u) => upscaleUrlTo(u, "4k").then((r) => r || u).catch(() => u))));
-          await step.run(`usage-up-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: kept.length }));
-        }
+        // Finalise each keeper: upscale to 4K (if requested + it loads), then re-host on Blob
+        // so the stored URL is permanent and never 404s. Badge the TRUE resolution per image —
+        // if 4K upscale or its re-host fails, we fall back to the base image and label it 2K.
+        const kept = await step.run(`finalize-${ratio}`, () => Promise.all(keptUrls.map(async (baseUrl) => {
+          let url = baseUrl, res = "2k";
+          if (fourK) {
+            const up = await upscaleUrlTo(baseUrl, "4k").catch(() => null);
+            if (up && (await filterLoadable([up])).length) { url = up; res = "4k"; }
+          }
+          let hosted = await rehostToBlob(url).catch(() => null);
+          if (!hosted && url !== baseUrl) { hosted = await rehostToBlob(baseUrl).catch(() => null); res = "2k"; }
+          return { url: hosted || url, resolution: res };
+        })));
+        const upscaled = kept.filter((k) => k.resolution === "4k").length;
+        if (fourK && upscaled) await step.run(`usage-up-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: upscaled }));
         return { ratio, kept, reviewed, rejected };
       }));
 
@@ -379,7 +392,7 @@ export const generateCreatives = inngest.createFunction(
       let qaReviewed = 0, qaRejected = 0;
       for (const r of perRatioResults) {
         qaReviewed += r.reviewed; qaRejected += r.rejected;
-        for (const url of r.kept) made.push({ url, ratio: r.ratio, resolution, scene: sceneText, at: Date.now() });
+        for (const it of r.kept) made.push({ url: it.url, ratio: r.ratio, resolution: it.resolution, scene: sceneText, at: Date.now() });
       }
       const qa = { reviewed: qaReviewed, approved: made.length, rejected: qaRejected, at: Date.now() };
       await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done", creatives_qa: qa } }));

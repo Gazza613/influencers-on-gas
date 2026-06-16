@@ -23,7 +23,7 @@ export const NO_EXTRAS =
 export const SOUL_SCENE =
   "candid photoreal photograph, fully clothed with a top and bottoms (never shirtless or nude), " +
   "true-to-life body proportions and correct scale in the scene, background in sharp focus, " +
-  "balanced natural exposure with no blown-out highlights, a single real photo (not a collage or split panels)";
+  "balanced natural exposure with no blown-out highlights, a single real photo that fills the entire frame edge to edge (not a collage, split panels, or a side strip / inset / border band showing another scene)";
 
 export const REALISM_POSITIVE =
   "photorealistic, natural skin with visible pores and fine vellus hair, subsurface scattering, " +
