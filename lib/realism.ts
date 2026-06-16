@@ -42,6 +42,23 @@ export const SCENE_REALISM =
   "shot on 35mm at f/8 with deep depth of field, the entire scene and background in sharp focus (no bokeh, never blurred), " +
   CLOTHED + ", " + SINGLE_FRAME;
 
+// CREATIVES realism (archive's secret to authentic renders): emulate a recent iPhone, a
+// candid friend-shot, NOT a professional studio camera (pro-camera language is what makes
+// AI images read as fake stock). Backgrounds stay sharp so shots are reusable for video.
+export const UGC_REALISM =
+  "an authentic candid photo that looks shot on a recent iPhone main lens at f/1.8, held at arm's length or by a friend, " +
+  "natural automatic exposure, subtle real sensor noise in the shadows, true-to-life colour, real natural light for the setting, " +
+  "natural skin with visible pores and subtle imperfections, a genuine un-posed candid moment (never a studio shoot, never a stiff pose, never a stock photo), " +
+  "true-to-life proportions and correct real-world scale in the scene, the whole scene and background in sharp focus (never blurred), " +
+  CLOTHED + ", " + SINGLE_FRAME;
+
+// CREATIVES cinematic tier: film-grade lighting and colour, but still believable and with
+// a usable (not heavily blurred) background so the shot can be reused for video b-roll.
+export const CINEMATIC_REALISM =
+  "a cinematic film-grade photograph, rich filmic colour grade, dramatic but natural directional lighting, gentle depth with the background still clearly readable (not heavily blurred), " +
+  "photorealistic natural skin with real texture and subtle imperfections, true-to-life proportions and correct real-world scale, candid and unposed, balanced exposure with no blown-out highlights, " +
+  CLOTHED + ", " + SINGLE_FRAME;
+
 export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin, " +

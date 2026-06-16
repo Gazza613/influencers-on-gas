@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, SOUL_SCENE } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, UGC_REALISM, CINEMATIC_REALISM } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative } from "@/lib/vendors/anthropic";
@@ -378,9 +378,9 @@ export const generateCreatives = inngest.createFunction(
 
       const userScene = !!scene;
       const variations = userScene ? FRAMING_VARIATIONS : CREATIVE_VARIATIONS;
-      const styleClause = cinematic ? ", cinematic film-grade lighting, rich filmic colour grade, gentle shallow depth, dramatic but natural mood" : "";
+      const realismCore = cinematic ? CINEMATIC_REALISM : UGC_REALISM;
       const buildPrompt = (idx: number) =>
-        `${sceneText}${variations[idx % variations.length]}. ${refInstruction} ${look}${styleClause}. ${SCENE_REALISM}, ${peopleClause}.`;
+        `${sceneText}${variations[idx % variations.length]}. ${refInstruction} ${look}. ${realismCore}, ${peopleClause}.`;
 
       // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
       // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is

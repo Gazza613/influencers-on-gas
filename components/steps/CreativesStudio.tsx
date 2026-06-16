@@ -209,7 +209,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["soul_2", "Realism (Soul 2)", "Authentic UGC / fashion editorial, the default social look"], ["soul_cinematic", "Cinematic (Soul Cinema)", "Cinema-grade, dramatic lighting, premium hero shots"]] as const).map(([k, label, hint]) => (
+            {([["soul_2", "Realism", "Authentic iPhone-style UGC, the default social look"], ["soul_cinematic", "Cinematic", "Film-grade lighting and colour, premium hero shots"]] as const).map(([k, label, hint]) => (
               <button key={k} onClick={() => setTier(k)} className={`rounded-lg border px-3 py-2 text-left transition ${tier === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
                 <div className={`text-sm font-bold ${tier === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
                 <div className="text-[10px] text-ink-faint">{hint}</div>
