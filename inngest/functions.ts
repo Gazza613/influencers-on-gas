@@ -287,18 +287,11 @@ export const trainSoulJob = inngest.createFunction(
         // slow Humaniser. Then enrich with the Humaniser (best-effort, non-blocking).
         const fresh = await step.run("reload", () => getInfluencer(influencerId));
         const persona = (fresh?.persona ?? inf.persona ?? {}) as Record<string, unknown>;
-        const refs = (fresh?.look_refs as { url: string; hero?: boolean }[]) || [];
-        const hero = (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url;
+        // Soul is trained = identity locked. Soul 2 renders realistically, so the old
+        // Magnific "humaniser" pass is no longer needed here.
         await step.run("mark-locked", () =>
           updateInfluencer(influencerId, { status: "ready", persona: { ...persona, locked: true } }),
         );
-        if (hero && !persona.hero_realism_url) {
-          try {
-            const realism = await step.run("humanise", () => enhanceImage(hero));
-            await step.run("usage-humanise", () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "humaniser", count: 1 }));
-            await step.run("save-realism", () => updateInfluencer(influencerId, { persona: { ...persona, locked: true, hero_realism_url: realism } }));
-          } catch { /* non-fatal: already locked */ }
-        }
         return { ready: true, soulId, locked: true };
       }
       if (cur.status === "failed") {
