@@ -123,7 +123,7 @@ export default function LockdownStep({
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Lock down the identity</div>
         <p className="mt-2 text-sm text-ink-dim">
-          This is the big one. We train a dedicated AI model on your chosen frames so it truly <span className="text-ink">knows this</span> person,
+          This is the big one. We train a dedicated AI model on your chosen frames so it truly knows <span className="text-ink">this person</span>,
           then run the Humaniser to add real-skin detail. The result is a face that stays identical in every
           future shot, expression and scene. No two-heads, no hallucinating, no &ldquo;who is that?&rdquo; moments.
         </p>
@@ -131,7 +131,8 @@ export default function LockdownStep({
           <li>⏱️ It takes about <span className="text-ink">10 minutes</span>. Kick it off, then go grab a coffee or get on with other work, it runs in the background.</li>
           <li>🧬 <span className="text-ink">Why lock down?</span> Until it is locked, the face can drift between generations. Locking trains the identity so it is pixel-consistent forever.</li>
           <li>➕ Want to build another influencer while you wait? Go for it. Each lock-down runs on its own, starting a new one will <span className="text-ink">not</span> interrupt this one.</li>
-          <li>🎬 Video production needs the locked identity (that is what keeps the face consistent), so it unlocks the moment this finishes. You do not have to sit here, pop back in 10.</li>
+          <li>🎬 Video production needs the locked identity (that is what keeps the face consistent), so it unlocks the moment this finishes.</li>
+          <li>☕ You do not have to sit here, pop back in 10.</li>
         </ul>
 
         {!working && (
