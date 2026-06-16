@@ -359,36 +359,34 @@ export const generateCreatives = inngest.createFunction(
       const clothEl = !useSoul && clothingRef ? await step.run("cloth-el", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
       const locEl = !useSoul && locationRef ? await step.run("loc-el", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
-      const wardrobe = clothingRef ? "wearing an outfit like the clothing reference, " : "";
-      const place = locationRef ? "in a setting like the location reference, " : "";
 
       const userScene = !!scene;
-      // Anchor identity. soul_id carries the trained face. We ALSO pass the locked hero
-      // photo as a reference image to maximise likeness, but ONLY for the default brief:
-      // that reference behaves as a strong image-to-image anchor and clones its own
-      // outfit and background, which overrides a custom scene. When the user writes their
-      // own brief we drop the reference so soul_id holds the face while the prompt drives
-      // wardrobe and location. (Identity vs prompt-adherence trade-off, chosen per run.)
-      // Identity anchor. soul_id alone does not hold the face strongly enough, so we pass a
-      // reference image. A FULL hero photo clones its outfit + scene, so we prefer a clean
-      // FACE close-up (tagged at photoshoot time): it anchors the face with little scene to
-      // clone. The "identity lock" dial decides whether the reference is used at all:
-      //   strong  = reference on  (max likeness, may pull the shot toward the reference)
-      //   flexible = reference off (soul_id only, follows the brief but can drift)
+      // Identity anchor (proven recipe from the archive). soul_id alone does NOT hold the
+      // face, and a reference image passed without instruction gets CLONED wholesale
+      // (framing, wardrobe, background). So we ALWAYS attach a clean FACE close-up as
+      // @image1 AND instruct the model to use it for the FACE/identity only, ignoring its
+      // clothing, background, pose and lighting. That locks the face while the scene brief
+      // drives wardrobe + location. The dial only changes how literally to match the face.
       const lockMode = event.data.identityLock === "flexible" ? "flexible" : "strong";
       const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
-      const idRefUrl = refs.find((r) => r.face)?.url || (persona.hero_realism_url as string) || (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url || (persona.reference_url as string) || "";
-      const idMedia = useSoul && idRefUrl && lockMode === "strong" ? await step.run("id-ref", () => importMediaUrl(idRefUrl)) : null;
+      // Lock onto the face the user actually CHOSE at casting (hero), not a photoshoot frame
+      // that may have drifted. The @image1 instruction stops it cloning the hero's scene.
+      const idRefUrl = (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || "";
+      const idMedia = useSoul && idRefUrl ? await step.run("id-ref", () => importMediaUrl(idRefUrl)) : null;
       const extra = useSoul ? { soul_id: soulId, ...(idMedia ? { medias: [{ value: idMedia, role: "image" }] } : {}) } : {};
+      // The instruction that makes the reference lock the FACE without copying its scene.
+      const refInstruction = idMedia
+        ? (lockMode === "flexible"
+            ? " Use @image1 only as a facial reference: match this person's facial features, proportions, skin tone and hair. IGNORE @image1's clothing, background, pose, framing and lighting completely; take the wardrobe, scene, pose and composition entirely from the description above."
+            : " Use @image1 to recreate this exact person's face and identity faithfully (face shape, skin tone, hair, distinctive features). IGNORE @image1's clothing, background, pose, framing and lighting; those come only from the scene described above.")
+        : "";
 
-      // Lead with the user's scene brief so it is the dominant instruction (not buried
-      // behind boilerplate). When the user wrote their own brief we use FRAMING-only
-      // variations for shot-to-shot variety: pose/gaze directions would contradict a
-      // brief that already specifies them. The default brief keeps the richer variations.
+      // Lead with the user's scene brief so it is the dominant instruction. When the user
+      // wrote their own brief we use FRAMING-only variations for shot-to-shot variety.
       const variations = userScene ? FRAMING_VARIATIONS : CREATIVE_VARIATIONS;
       const buildPrompt = (idx: number) =>
         useSoul
-          ? `${sceneText}. The subject is the same exact person from the reference${variations[idx % variations.length]}. ${wardrobe}${place}${look}. ${SOUL_SCENE}, ${peopleClause}.`
+          ? `${sceneText}${variations[idx % variations.length]}.${refInstruction} ${look}. ${SOUL_SCENE}, ${peopleClause}.`
           : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}${sceneText}. The same exact person${clothEl ? ", wearing the same outfit as the clothing reference" : ""}${locEl ? ", in the same location as the location reference image" : ""}${variations[idx % variations.length]}. ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
 
       // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
