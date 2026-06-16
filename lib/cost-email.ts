@@ -65,7 +65,7 @@ export function buildCostEmail(opts: {
       </div>
       ${usedPct != null ? `<div style="height:8px;border-radius:99px;background:#141b24;margin-top:10px;overflow:hidden;"><div style="height:100%;width:${usedPct}%;background:${usedPct > 88 ? "#ff453a" : "#34c759"};"></div></div>` : ""}
 
-      ${card("By team member", rows(monthReport.byUser.map((u) => ({ label: u.user_email, sub: `${u.events} jobs`, cents: u.cents }))))}
+      ${card("By team member", rows(monthReport.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, sub: `${u.events} jobs`, cents: u.cents }))))}
       ${card("By platform / API", rows(monthReport.byProvider.map((p) => ({ label: PROVIDER_LABEL[p.provider] ?? p.provider, cents: p.cents }))))}
       ${card("By function", rows(monthReport.byAction.map((a) => ({ label: ACTION_LABEL[a.action] ?? a.action, cents: a.cents }))))}
       ${card("By influencer", rows(monthReport.byInfluencer.slice(0, 12).map((i) => ({ label: i.name, sub: `${i.images} img · ${i.videos} vid`, cents: i.cents }))))}

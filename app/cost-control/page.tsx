@@ -167,7 +167,7 @@ export default function CostControlPage() {
           <Picker label="Team member">
             <select value={userEmail} onChange={(e) => setUserEmail(e.target.value)} className="rounded-md border border-line bg-surface-2 px-2 py-1.5 text-xs text-ink outline-none">
               <option value="">Everyone</option>
-              {report?.byUser.map((u) => <option key={u.user_email} value={u.user_email}>{u.user_email}</option>)}
+              {report?.byUser.map((u) => <option key={u.user_email} value={u.user_email}>{u.user_email === "(system)" ? "Super Admin" : u.user_email}</option>)}
             </select>
           </Picker>
           {(influencerId || provider || userEmail || preset !== "30") && (
@@ -190,7 +190,7 @@ export default function CostControlPage() {
         </div>
 
         {/* Tables */}
-        <Section title="By team member">{report && <Table rows={report.byUser.map((u) => ({ label: u.user_email, credits: u.credits, cents: u.cents, sub: `${u.events} jobs` }))} />}</Section>
+        <Section title="By team member">{report && <Table rows={report.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, credits: u.credits, cents: u.cents, sub: `${u.events} jobs` }))} />}</Section>
         <Section title="By influencer (creation · edits · running cost)">
           {report && <Table rows={report.byInfluencer.map((i) => ({ label: i.name, credits: i.credits, cents: i.cents, sub: `${i.images} images · ${i.videos} videos` }))} />}
         </Section>
