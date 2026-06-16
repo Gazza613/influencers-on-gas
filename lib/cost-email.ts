@@ -43,9 +43,12 @@ export function buildCostEmail(opts: {
   <div style="background:#07090d;padding:24px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
     <div style="max-width:640px;margin:0 auto;padding:0 18px;">
       <div style="text-align:center;padding:8px 0 18px;">
-        <img src="${BASE}/gas-logo.png" width="52" height="52" style="border-radius:50%;" alt="GAS" />
-        <div style="margin-top:10px;font-size:20px;font-weight:800;color:#fff;">Influencers <span style="background:linear-gradient(135deg,#ec4899,#a855f7,#60a5fa);-webkit-background-clip:text;background-clip:text;color:#a855f7;">on</span> GAS</div>
-        <div style="margin-top:4px;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#8a8f98;">Daily Cost Control · ${periodLabel}</div>
+        <img src="${BASE}/gas-logo.png" width="68" height="68" style="border-radius:50%;" alt="GAS" />
+        <div style="margin-top:12px;font-size:26px;font-weight:800;letter-spacing:-0.5px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#fff;">
+          <span style="background:linear-gradient(135deg,#ec4899,#a855f7 50%,#60a5fa);-webkit-background-clip:text;background-clip:text;color:#c79bff;">Influencers on</span>
+          <span style="font-weight:900;background:linear-gradient(135deg,#ffb020,#ff6a00 45%,#ff2d55);-webkit-background-clip:text;background-clip:text;color:#ff6a00;">GAS</span>
+        </div>
+        <div style="margin-top:5px;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#8a8f98;">Daily Cost Control · ${periodLabel}</div>
       </div>
 
       <!-- Hero numbers -->
