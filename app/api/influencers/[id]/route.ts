@@ -28,12 +28,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const patch: Record<string, unknown> = {};
     for (const k of Object.keys(body.personaPatch)) {
       if (!ALLOWED_PATCH.has(k)) continue;
-      // `creatives` is prune-only: the new list must be a SUBSET of the existing creatives
-      // (by url), so a client can remove shots but never inject arbitrary images.
+      // `creatives` is prune-only: rebuild the kept list from the STORED objects (keyed by
+      // url), so a client can remove shots but never inject images OR mutate other fields
+      // (resolution/scene/etc.) on a kept shot.
       if (k === "creatives") {
-        const have = new Set((Array.isArray(existing?.creatives) ? existing.creatives : []).map((c: { url?: string }) => c?.url));
+        const byUrl = new Map((Array.isArray(existing?.creatives) ? existing.creatives : []).map((c: { url?: string }) => [c?.url, c]));
         const next = Array.isArray(body.personaPatch[k]) ? body.personaPatch[k] : [];
-        patch[k] = next.filter((c: { url?: string }) => c && typeof c.url === "string" && have.has(c.url));
+        const seen = new Set<string>();
+        patch[k] = next
+          .map((c: { url?: string }) => (c && typeof c.url === "string" ? byUrl.get(c.url) : undefined))
+          .filter((c: { url?: string } | undefined): c is { url?: string } => !!c && !seen.has(c.url!) && (seen.add(c.url!), true));
       } else {
         patch[k] = body.personaPatch[k];
       }

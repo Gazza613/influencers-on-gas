@@ -71,11 +71,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const identityLock = body.identityLock === "flexible" ? "flexible" : "strong"; // default: max likeness
   if (!ratios.length) return NextResponse.json({ error: "Pick at least one format." }, { status: 400 });
 
-  await updateInfluencer(id, { persona: { ...persona, creatives_status: "running", creatives_error: null } });
+  // Send first; only flip to "running" once accepted, so a send failure can't strand the
+  // gallery showing "Rendering" forever with no job running.
   try {
     await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, model, clothingRef, locationRef, extras, identityLock } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
+  await updateInfluencer(id, { persona: { ...persona, creatives_status: "running", creatives_error: null } });
   return NextResponse.json({ ok: true });
 }

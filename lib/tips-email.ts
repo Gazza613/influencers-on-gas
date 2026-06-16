@@ -1,5 +1,24 @@
 const BASE = "https://influencers.gasmarketing.co.za";
 
+// The ideas HTML is produced by a model from LIVE web-search content, so treat it as
+// untrusted. Allow only safe formatting tags (keeping their inline style), and strip
+// scripts, images, links, iframes and any event handlers / dangerous URLs.
+const ALLOWED_TAGS = new Set(["h3", "p", "b", "strong", "em", "ul", "ol", "li", "br", "span"]);
+function sanitizeIdeasHtml(html: string): string {
+  let s = html
+    .replace(/<(script|style|iframe|object|embed|svg|img|a)\b[\s\S]*?<\/\1>/gi, "")
+    .replace(/<\/?(?:script|style|iframe|object|embed|svg|img|a|link|meta|form|input)\b[^>]*>/gi, "");
+  s = s.replace(/<(\/?)([a-zA-Z0-9]+)([^>]*)>/g, (_m, slash: string, tag: string, attrs: string) => {
+    const t = tag.toLowerCase();
+    if (!ALLOWED_TAGS.has(t)) return ""; // drop the tag, keep any inner text
+    if (slash) return `</${t}>`;
+    const sm = /\bstyle\s*=\s*"([^"]*)"/i.exec(attrs);
+    const style = sm ? ` style="${sm[1].replace(/expression\s*\(|url\s*\(|javascript:|@import/gi, "").replace(/"/g, "")}"` : "";
+    return `<${t}${style}>`;
+  });
+  return s;
+}
+
 // Branded shell for the daily "Higgsfield expert" ideas email. The ideas HTML fragment
 // is produced by researchHiggsfieldTips() (Claude + live web search).
 export function buildTipsEmail(opts: { ideasHtml: string; dateLabel: string }): { subject: string; html: string } {
@@ -22,7 +41,7 @@ export function buildTipsEmail(opts: { ideasHtml: string; dateLabel: string }): 
       </div>
 
       <div style="margin:6px 0 0;">
-        ${ideasHtml}
+        ${sanitizeIdeasHtml(ideasHtml)}
       </div>
 
       <div style="margin-top:22px;text-align:center;">

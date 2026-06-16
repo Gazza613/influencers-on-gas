@@ -20,18 +20,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     || refs.find((r) => r.hero)?.url || refs[0]?.url || (persona.reference_url as string) || "";
   if (!hero) return NextResponse.json({ error: "No locked face to retrain from." }, { status: 400 });
 
-  // Reset identity so the richer photoshoot + lock-down can run again from the same face.
+  // Send the job FIRST; only reset identity state if it was accepted, so a send failure
+  // never strands the influencer in "generating" with no job running.
+  try {
+    await inngest.send({ name: "influencer/build.identity", data: { influencerId: id, chosenUrl: hero } });
+  } catch {
+    return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
+  }
   await updateInfluencer(id, {
     status: "generating",
     higgsfield_soul_id: null,
     look_refs: [{ url: hero, hero: true }],
     persona: { ...persona, locked: false, soul_error: null, hero_url: hero, chosen_url: hero },
   });
-
-  try {
-    await inngest.send({ name: "influencer/build.identity", data: { influencerId: id, chosenUrl: hero } });
-  } catch {
-    return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
-  }
   return NextResponse.json({ ok: true });
 }

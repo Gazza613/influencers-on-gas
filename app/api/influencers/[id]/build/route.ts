@@ -27,11 +27,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const locationText = typeof body.locationText === "string" ? body.locationText.slice(0, 300) : "";
   const clothingText = typeof body.clothingText === "string" ? body.clothingText.slice(0, 300) : "";
 
-  await updateInfluencer(id, { status: "generating" });
+  // Send first; only flip status to "generating" once accepted, so a send failure can't
+  // strand the influencer in "generating" with no job running.
   try {
     await inngest.send({ name: "influencer/build.identity", data: { influencerId: id, chosenUrl, locationRef, clothingRef, locationText, clothingText } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
+  await updateInfluencer(id, { status: "generating" });
   return NextResponse.json({ ok: true });
 }

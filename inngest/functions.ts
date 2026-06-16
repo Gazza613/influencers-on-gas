@@ -385,14 +385,15 @@ export const generateCreatives = inngest.createFunction(
       // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is
       // far faster than retry-loops that upscale everything. Top-ups use "Generate more".
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
+        const rid = ratio.replace(/:/g, "x"); // safe slug for Inngest step IDs (no colons)
         // Over-generate by one for QA headroom.
         const prompts = Array.from({ length: perRatio + 1 }, (_, i) => buildPrompt(i));
-        const rawProduced = (await step.run(`gen-${ratio}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
+        const rawProduced = (await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
         // Only keep images that actually load (drops broken/expired renders before QA).
-        const produced = await step.run(`validate-${ratio}`, () => filterLoadable(rawProduced));
-        if (produced.length) await step.run(`usage-gen-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: produced.length }));
+        const produced = await step.run(`validate-${rid}`, () => filterLoadable(rawProduced));
+        if (produced.length) await step.run(`usage-gen-${rid}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: produced.length }));
         // Vision QA at base res, reject shirtless / collage / bad-proportion / broken (QA error ⇒ keep).
-        const verdicts = await step.run(`qa-${ratio}`, () =>
+        const verdicts = await step.run(`qa-${rid}`, () =>
           Promise.all(produced.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
         );
         const keptUrls = verdicts.filter((v) => v.pass).slice(0, perRatio).map((v) => v.u);
@@ -406,7 +407,7 @@ export const generateCreatives = inngest.createFunction(
         // not the sum. Upscale poll is capped (~120s); a slow upscale falls back to a
         // loadable 2K instead of killing the batch (reliability over guaranteed 4K).
         const kept = await Promise.all(keptUrls.map((baseUrl, k) =>
-          step.run(`finalize-${ratio}-${k}`, async () => {
+          step.run(`finalize-${rid}-${k}`, async () => {
             let url = baseUrl, res = "2k";
             if (fourK) {
               const up = await upscaleUrlTo(baseUrl, "4k", 40).catch(() => null);
@@ -418,7 +419,7 @@ export const generateCreatives = inngest.createFunction(
           }),
         ));
         const upscaled = kept.filter((k) => k.resolution === "4k").length;
-        if (fourK && upscaled) await step.run(`usage-up-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: upscaled }));
+        if (fourK && upscaled) await step.run(`usage-up-${rid}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: upscaled }));
         return { ratio, kept, reviewed, rejected };
       }));
 

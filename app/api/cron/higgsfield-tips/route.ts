@@ -23,7 +23,8 @@ export async function GET(req: Request) {
 
     // High-signal only: stay silent unless the research cleared the strict bar (a real
     // optimisation or a cost-control win). No noise on quiet days.
-    if (ideasHtml.replace(/<[^>]*>/g, "").trim().includes("NO_SIGNIFICANT_FINDINGS") || !ideasHtml.includes("<h3")) {
+    const stripped = ideasHtml.replace(/<[^>]*>/g, "").trim();
+    if (stripped === "NO_SIGNIFICANT_FINDINGS" || !ideasHtml.includes("<h3")) {
       return NextResponse.json({ sent: false, reason: "nothing cleared the bar today", to });
     }
 
