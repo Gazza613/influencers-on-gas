@@ -377,8 +377,8 @@ export const generateCreatives = inngest.createFunction(
       // The instruction that makes the reference lock the FACE without copying its scene.
       const refInstruction = idMedia
         ? (lockMode === "flexible"
-            ? " Use @image1 only as a facial reference: match this person's facial features, proportions, skin tone and hair. IGNORE @image1's clothing, background, pose, framing and lighting completely; take the wardrobe, scene, pose and composition entirely from the description above."
-            : " Use @image1 to recreate this exact person's face and identity faithfully (face shape, skin tone, hair, distinctive features). IGNORE @image1's clothing, background, pose, framing and lighting; those come only from the scene described above.")
+            ? " IDENTITY REFERENCE: @image1 shows the person. Match their facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and hair. IGNORE @image1's clothing, background, pose, framing and lighting completely; take the wardrobe, scene, pose and composition entirely from the description above."
+            : " IDENTITY LOCK: @image1 is the appearance reference. Replicate this person EXACTLY, facial bone structure, face shape, jaw, nose, lip shape, eye shape and colour, eyebrow arch, skin tone and texture, freckles, moles and natural asymmetries. Zero facial drift, it must be unmistakably the same individual. IGNORE @image1's clothing, background, pose, framing and lighting; take those only from the scene described above.")
         : "";
 
       // Lead with the user's scene brief so it is the dominant instruction. When the user
