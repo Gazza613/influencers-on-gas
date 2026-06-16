@@ -67,7 +67,7 @@ export default function LockdownStep({
   }
 
   async function retrain() {
-    if (!confirm("Retrain this identity on a richer, more varied photoshoot?\n\nWe re-shoot from the same face across different outfits and settings, then you re-lock. This gives later creatives far more freedom to restyle wardrobe and scenes. Your existing creatives are kept.")) return;
+    if (!confirm("Retrain this identity?\n\nThis is NOT your next step. It is only for influencers that keep returning the same outfit or scene in their creatives.\n\nWhat happens: we shoot a brand-new varied photoshoot, then take you to review the frames and re-lock the identity. It takes about 10 to 15 minutes and uses credits. Your existing creatives are kept.\n\nA freshly built influencer is already trained on the richer set and does not need this. Continue anyway?")) return;
     setRetraining(true);
     const r = await fetch(`/api/influencers/${influencerId}/retrain`, { method: "POST" }).catch(() => null);
     if (r?.ok) { window.location.href = `/setup/influencers/${influencerId}/photoshoot`; return; }
@@ -91,11 +91,12 @@ export default function LockdownStep({
             </p>
           </div>
         </div>
-        <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Next · create &amp; download your creatives</div>
-          <p className="mt-2 text-sm text-ink-dim">
-            Head to Creatives to generate social-ready images (9:16, 1:1, 16:9 in 2K or 4K) and download them for
-            Reels, Stories, feeds and ads. Voice and the full video pipeline arrive later in the Studio.
+        <div className="rounded-xl border border-ready/40 bg-surface-1 p-5">
+          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready font-semibold">✓ Your next step</div>
+          <div className="mt-1 text-lg font-bold text-ink">Create &amp; download her creatives</div>
+          <p className="mt-1 text-sm text-ink-dim">
+            Generate social-ready images (9:16, 1:1, 16:9 up to 4K) and download them for Reels, Stories, feeds and
+            ads. Voice and the full video pipeline arrive later in the Studio.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Link href={`/setup/influencers/${influencerId}/creatives`} className="next-pulse inline-block rounded-full px-5 py-2.5 text-sm font-bold">
@@ -105,15 +106,15 @@ export default function LockdownStep({
           </div>
         </div>
 
-        <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Identity flexibility</div>
-          <p className="mt-2 text-sm text-ink-dim">
-            Finding that creatives keep returning the same outfit or setting? Retrain the identity on a richer,
-            more varied photoshoot (different outfits, different scenes, the same face). It teaches the model the
-            person rather than one look, so your creative briefs get followed far more closely.
+        <div className="rounded-xl border border-line/60 bg-surface-1/40 p-4">
+          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Optional · advanced, rarely needed</div>
+          <p className="mt-2 text-[13px] text-ink-faint">
+            She is already trained on the rich, varied photoshoot, so you do <span className="text-ink-dim">not</span> need this.
+            Only if her creatives keep coming back in the same outfit or scene: a retrain shoots a fresh varied set and
+            then you re-lock her (about 10 to 15 minutes, uses credits). Existing creatives are kept.
           </p>
           <button onClick={retrain} disabled={retraining}
-            className="mt-3 rounded-lg border border-[#a855f7]/40 px-4 py-2 text-sm font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+            className="mt-3 rounded-lg border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-faint hover:border-[#a855f7]/40 hover:text-[#c79bff] disabled:opacity-50">
             {retraining ? "Starting retrain…" : "↻ Retrain on a richer set"}
           </button>
         </div>
