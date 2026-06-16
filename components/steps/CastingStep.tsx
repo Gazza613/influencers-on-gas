@@ -36,6 +36,7 @@ export default function CastingStep({
   const [err, setErr] = useState("");
   const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
+  const [broken, setBroken] = useState<Set<string>>(new Set());
   const bibleFlush = useRef<(() => Promise<void>) | null>(null); // save character edits before casting
 
   const casting = st === "casting" || busy;
@@ -149,10 +150,14 @@ export default function CastingStep({
                   {candidates.map((c, i) => {
                     const sel = chosen === c.url;
                     return (
-                      <div key={i} onClick={() => !busy && choose(c.url)} className="shimmer group relative block cursor-pointer overflow-hidden rounded-lg">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={c.url} alt={`look ${i + 1}`}
-                          className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_22px_rgba(168,85,247,0.45)]" : "border-line opacity-85 hover:opacity-100"}`} />
+                      <div key={i} onClick={() => !busy && !broken.has(c.url) && choose(c.url)} className="shimmer group relative block cursor-pointer overflow-hidden rounded-lg">
+                        {broken.has(c.url) ? (
+                          <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border-2 border-line bg-surface-2 px-2 text-center text-[10px] text-ink-faint">look didn&apos;t load — re-cast to refresh</div>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={c.url} alt={`look ${i + 1}`} onError={() => setBroken((b) => new Set(b).add(c.url))}
+                            className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_22px_rgba(168,85,247,0.45)]" : "border-line opacity-85 hover:opacity-100"}`} />
+                        )}
                         <span className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] transition ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/70 bg-black/45 text-transparent group-hover:text-white/70"}`}>✓</span>
                         <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="View full size"
                           className="absolute bottom-1.5 right-1.5 hidden h-6 w-6 items-center justify-center rounded-md bg-black/60 text-xs text-white group-hover:flex">⤢</button>

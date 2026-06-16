@@ -37,6 +37,9 @@ export default function PhotoshootStep({
   const [zoom, setZoom] = useState<string | null>(null);
   const [locationRef, setLocationRef] = useState<string | null>(null);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
+  const [locationText, setLocationText] = useState("");
+  const [clothingText, setClothingText] = useState("");
+  const [broken, setBroken] = useState<Set<string>>(new Set());
 
   const hasSet = frames.length > 1;
   const building = st === "generating" || busy;
@@ -71,7 +74,8 @@ export default function PhotoshootStep({
     if (!modelUrl || busy) return;
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/build`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chosenUrl: modelUrl, locationRef, clothingRef }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chosenUrl: modelUrl, locationRef, clothingRef, locationText: locationText.trim(), clothingText: clothingText.trim() }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start the photoshoot"); setBusy(false); return; }
     setSt("generating"); setFrames([{ url: modelUrl, hero: true }]); poll();
@@ -113,10 +117,18 @@ export default function PhotoshootStep({
       {!hasSet && !building && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
           <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Photoshoot options (optional)</div>
-          <p className="mt-1 text-[11px] text-ink-faint">Upload a location and/or an outfit to steer the scene shots and wardrobe. Leave blank to use the character.</p>
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Uploader kind="location" label="Location shot" current={locationRef} onUploaded={setLocationRef} />
-            <Uploader kind="clothing" label="Clothing style" current={clothingRef} onUploaded={setClothingRef} />
+          <p className="mt-1 text-[11px] text-ink-faint">Steer the scene and wardrobe by uploading a reference <span className="text-ink-dim">or</span> just describing it in words. Leave blank to use the character.</p>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Uploader kind="location" label="Location shot" current={locationRef} onUploaded={setLocationRef} />
+              <input value={locationText} onChange={(e) => setLocationText(e.target.value)} placeholder="…or describe the location (e.g. a sunlit Cape Town café)"
+                className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink outline-none focus:border-[#a855f7]" />
+            </div>
+            <div className="space-y-2">
+              <Uploader kind="clothing" label="Clothing style" current={clothingRef} onUploaded={setClothingRef} />
+              <input value={clothingText} onChange={(e) => setClothingText(e.target.value)} placeholder="…or describe the outfit (e.g. cream linen suit, white trainers)"
+                className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink outline-none focus:border-[#a855f7]" />
+            </div>
           </div>
           <button onClick={run} className="btn-brand mt-4 rounded-lg px-4 py-2 text-sm font-bold">📸 Run the photoshoot</button>
         </div>
@@ -146,10 +158,14 @@ export default function PhotoshootStep({
             {frames.map((f, i) => {
               const sel = selected.has(f.url);
               return (
-                <div key={i} onClick={() => toggle(f.url)} className="shimmer group relative block cursor-pointer overflow-hidden rounded-lg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={`frame ${i + 1}`}
-                    className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7]" : "border-line opacity-60"}`} />
+                <div key={i} onClick={() => !broken.has(f.url) && toggle(f.url)} className="shimmer group relative block cursor-pointer overflow-hidden rounded-lg">
+                  {broken.has(f.url) ? (
+                    <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border-2 border-line bg-surface-2 px-2 text-center text-[10px] text-ink-faint">frame didn&apos;t load</div>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={f.url} alt={`frame ${i + 1}`} onError={() => setBroken((b) => new Set(b).add(f.url))}
+                      className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7]" : "border-line opacity-60"}`} />
+                  )}
                   <span className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] transition ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/60 bg-black/45 text-transparent"}`}>✓</span>
                   {f.hero && <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Chosen</span>}
                   <button onClick={(e) => { e.stopPropagation(); setZoom(f.url); }} title="View full size"

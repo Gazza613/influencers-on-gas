@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS } from "@/lib/realism";
-import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable } from "@/lib/vendors/higgsfield";
 import { qaCreative } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -61,7 +61,9 @@ export const generateCandidates = inngest.createFunction(
       // gpt_image_2 is ~150s PER IMAGE, so generating all 6 CONCURRENTLY collapses casting
       // to ~one image's wall-clock (~2.5 min) instead of 6× (~15 min).
       const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16"));
-      const candidates = [...new Set(urls.filter((u): u is string => !!u))].map((url) => ({ url }));
+      // Only keep looks whose image actually loads (drops broken/expired URLs).
+      const valid = await step.run("validate", () => filterLoadable([...new Set(urls.filter((u): u is string => !!u))]));
+      const candidates = valid.map((url) => ({ url }));
       if (!candidates.length) throw new Error("no candidate looks generated");
       await step.run("save-candidates", () =>
         updateInfluencer(influencerId, { status: "cast_ready", persona: { ...persona, candidates } }),
@@ -91,6 +93,8 @@ export const buildIdentity = inngest.createFunction(
     const chosenUrl = String(event.data.chosenUrl || "");
     const locationRef = (event.data.locationRef as string) || "";
     const clothingRef = (event.data.clothingRef as string) || "";
+    const locationText = ((event.data.locationText as string) || "").trim();
+    const clothingText = ((event.data.clothingText as string) || "").trim();
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "influencer not found" };
     if (!chosenUrl) {
@@ -121,20 +125,24 @@ export const buildIdentity = inngest.createFunction(
       // shots get the scene realism core (proportions, placement, matched light/colour).
       // Each <<<id>>> placeholder injects that reference image (face / clothing / location).
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
-      // Environment phrase: prefer the uploaded location reference; else the brief's text;
-      // else a clean studio. Never inject the studio default when a reference exists.
-      const env = locEl ? "placed naturally in the same location as the location reference image" : locText ? `in ${locText}` : "in a clean editorial studio backdrop";
+      // Environment phrase: uploaded location reference > typed description > brief text > studio.
+      const env = locEl ? "placed naturally in the same location as the location reference image"
+        : locationText ? `in ${locationText}`
+        : locText ? `in ${locText}` : "in a clean editorial studio backdrop";
+      // Wardrobe phrase: uploaded clothing reference > typed description > the character's own.
+      const wardrobe = clothEl ? "wearing the same outfit as the clothing reference, " : clothingText ? `wearing ${clothingText}, ` : "";
       const look = lookClause(persona); // makeup / grooming per the chosen look
 
       const facePrompts = faceCoverage.map((v) =>
-        `${tag(elementId)}${tag(clothEl)}${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${v}. ${look}, ${REALISM_POSITIVE}.`,
+        `${tag(elementId)}${tag(clothEl)}${wardrobe}${v}. ${look}, ${REALISM_POSITIVE}.`,
       );
       const scenePrompts = sceneCoverage.map((v) =>
-        `${tag(elementId)}${tag(locEl)}${clothEl ? `${tag(clothEl)}wearing the same outfit as the clothing reference, ` : ""}the same exact person ${v}, ${env}, identical face and hair, ${look}. ${SCENE_REALISM}, ${SCENE_PEOPLE}.`,
+        `${tag(elementId)}${tag(locEl)}${wardrobe}the same exact person ${v}, ${env}, identical face and hair, ${look}. ${SCENE_REALISM}, ${SCENE_PEOPLE}.`,
       );
       const vPrompts = elementId ? [...facePrompts, ...scenePrompts] : [...faceCoverage, ...sceneCoverage].map((v) => `${prompt}. ${v}`);
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
-      for (const url of urls) if (url && !frames.some((f) => f.url === url)) frames.push({ url });
+      const validFrames = await step.run("validate-frames", () => filterLoadable(urls.filter((u): u is string => !!u)));
+      for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url });
 
       await step.run("save-frames", () =>
         updateInfluencer(influencerId, {

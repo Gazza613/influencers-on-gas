@@ -24,10 +24,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const locationRef = typeof body.locationRef === "string" ? body.locationRef : "";
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
+  const locationText = typeof body.locationText === "string" ? body.locationText.slice(0, 300) : "";
+  const clothingText = typeof body.clothingText === "string" ? body.clothingText.slice(0, 300) : "";
 
   await updateInfluencer(id, { status: "generating" });
   try {
-    await inngest.send({ name: "influencer/build.identity", data: { influencerId: id, chosenUrl, locationRef, clothingRef } });
+    await inngest.send({ name: "influencer/build.identity", data: { influencerId: id, chosenUrl, locationRef, clothingRef, locationText, clothingText } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }

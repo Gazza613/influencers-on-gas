@@ -277,6 +277,23 @@ export async function callMcp(name: string, args: AnyObj): Promise<unknown> {
   return unwrapMCP(await call(name, args));
 }
 
+// Keep only URLs that actually load (drops broken/expired image URLs). One retry with a
+// short wait covers CDN eventual-consistency right after generation.
+export async function filterLoadable(urls: string[]): Promise<string[]> {
+  const ok = async (u: string): Promise<boolean> => {
+    for (let i = 0; i < 2; i++) {
+      try {
+        const r = await fetch(u, { method: "GET", signal: AbortSignal.timeout(8000) });
+        if (r.ok) return true;
+      } catch { /* retry */ }
+      if (i === 0) await new Promise((r) => setTimeout(r, 1800));
+    }
+    return false;
+  };
+  const results = await Promise.all(urls.map(ok));
+  return urls.filter((_, i) => results[i]);
+}
+
 // Import a public image URL into Higgsfield → media_id (for use as a generation reference).
 export async function importMediaUrl(url: string): Promise<string | null> {
   const { call } = await openSession();
