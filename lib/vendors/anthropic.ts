@@ -125,6 +125,24 @@ export async function generateBible(name: string, brief: string, gender?: string
   return block.input as CharacterBible;
 }
 
+// Polish a producer's rough idea into a single vivid, art-directed image prompt for a
+// social creative of this influencer. Always clothed; diverse, in-focus backgrounds.
+export async function refineCreativePrompt(name: string, bible: Record<string, unknown>, scene: string): Promise<string> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system:
+      "You are a creative director writing ONE vivid image prompt for a photoreal social-media shot of an existing AI influencer. " +
+      "One or two sentences, concrete and art-directed: setting, action, wardrobe feel, mood, light. " +
+      "The subject is ALWAYS fully clothed with a complete outfit including bottoms. Any background people reflect South African diversity " +
+      "(Black, White, Indian, Coloured) and stay in sharp focus; backgrounds are never blurred. UK spelling, no em dashes. Return ONLY the prompt text, no preamble.",
+    messages: [{ role: "user", content: `Influencer: ${name}\nCharacter (JSON): ${JSON.stringify(bible).slice(0, 3000)}\n\nProducer's rough idea: ${scene || "an on-brand lifestyle shot"}\n\nWrite the polished image prompt.` }],
+  });
+  const block = res.content.find((b) => b.type === "text");
+  return block && block.type === "text" ? block.text.trim() : scene;
+}
+
 // Reimagine ONE section of an existing bible, kept consistent with the rest.
 export async function generateBibleSection(
   name: string, brief: string, bible: Record<string, unknown>, section: string,

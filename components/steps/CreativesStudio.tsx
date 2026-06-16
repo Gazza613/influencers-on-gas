@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Lightbox from "@/components/Lightbox";
+import Uploader from "@/components/Uploader";
 
 type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
 type Rates = { image: { credits: number; cents: number }; upscale: { credits: number; cents: number } };
 
+const PER_RATIO = 3; // distinct shots generated per format
 const RATIOS = [
   { key: "9:16", label: "9:16", sub: "Reels · Stories · TikTok" },
   { key: "1:1", label: "1:1", sub: "Feeds · LinkedIn" },
@@ -19,24 +21,34 @@ const PLATFORMS: { key: string; label: string; ratios: string[] }[] = [
   { key: "google", label: "Google Ads", ratios: ["16:9", "1:1"] },
 ];
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const QUIPS = ["Art-directing your creative…", "Framing for each format…", "Dialling in the light…", "Rendering social-ready shots…"];
+const QUIPS = ["Art-directing your creatives…", "Framing each format…", "Dialling in the light…", "Rendering social-ready shots…"];
 
 export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
+  const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [res, setRes] = useState<"2k" | "4k">("2k");
   const [scene, setScene] = useState("");
+  const [refining, setRefining] = useState(false);
+  const [clothingRef, setClothingRef] = useState<string | null>(null);
+  const [locationRef, setLocationRef] = useState<string | null>(null);
+
   const [rates, setRates] = useState<Rates | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>(initial.creatives || []);
+  const [videoSelects, setVideoSelects] = useState<string[]>([]);
   const [status, setStatus] = useState(initial.status || "idle");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [err, setErr] = useState("");
   const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
 
   const running = status === "running";
 
-  useEffect(() => {
-    fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).then((d) => { if (d.rates) setRates(d.rates); }).catch(() => {});
-  }, [influencerId]);
+  async function refresh() {
+    const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
+    if (d) { if (d.rates) setRates(d.rates); setCreatives(d.creatives || []); setVideoSelects(d.videoSelects || []); setStatus(d.status || "idle"); }
+    return d;
+  }
+  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
@@ -45,33 +57,70 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   }, [running]);
 
   async function poll(tries = 0): Promise<void> {
-    if (tries > 120) return;
+    if (tries > 160) return;
     await new Promise((r) => setTimeout(r, 5000));
-    const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
-    if (d) {
-      setCreatives(d.creatives || []);
-      setStatus(d.status || "idle");
-      if (d.status === "failed") { setErr(d.error || "Render failed"); return; }
-      if (d.status === "done") return;
-    }
+    const d = await refresh();
+    if (d?.status === "failed") { setErr(d.error || "Render failed"); return; }
+    if (d?.status === "done") return;
     return poll(tries + 1);
   }
 
-  function toggleRatio(k: string) { setRatios((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; }); }
-  function applyPlatform(p: { ratios: string[] }) { setRatios((s) => { const n = new Set(s); p.ratios.forEach((r) => n.add(r)); return n; }); }
+  // Platforms drive ratios; deselecting only drops ratios no other selected platform needs.
+  function togglePlatform(p: { key: string; ratios: string[] }) {
+    const selecting = !platforms.has(p.key);
+    const next = new Set(platforms);
+    selecting ? next.add(p.key) : next.delete(p.key);
+    setPlatforms(next);
+    const needed = new Set([...next].flatMap((k) => PLATFORMS.find((x) => x.key === k)?.ratios ?? []));
+    setRatios((rs) => {
+      const n = new Set(rs);
+      if (selecting) p.ratios.forEach((r) => n.add(r));
+      else p.ratios.forEach((r) => { if (!needed.has(r)) n.delete(r); });
+      return n;
+    });
+  }
+  function toggleRatio(r: string) { setRatios((s) => { const n = new Set(s); n.has(r) ? n.delete(r) : n.add(r); return n; }); }
 
-  const n = ratios.size;
-  const estCents = rates ? n * (rates.image.cents + (res === "4k" ? rates.upscale.cents : 0)) : 0;
-  const estCredits = rates ? n * (rates.image.credits + (res === "4k" ? rates.upscale.credits : 0)) : 0;
+  const nFormats = ratios.size;
+  const images = nFormats * PER_RATIO;
+  const estCents = rates ? images * (rates.image.cents + (res === "4k" ? rates.upscale.cents : 0)) : 0;
+  const estCredits = rates ? images * (rates.image.credits + (res === "4k" ? rates.upscale.credits : 0)) : 0;
+
+  async function perfect() {
+    if (refining) return;
+    setRefining(true); setErr("");
+    const d = await fetch(`/api/influencers/${influencerId}/creatives/refine`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene }),
+    }).then((r) => r.json()).catch(() => null);
+    setRefining(false);
+    if (d?.refined) setScene(d.refined); else setErr(d?.error || "Could not perfect the prompt");
+  }
 
   async function generate() {
-    if (!n || running) return;
+    if (!nFormats || running) return;
     setErr(""); setStatus("running");
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ratios: [...ratios], resolution: res, scene }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, clothingRef, locationRef }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     poll();
+  }
+
+  function togglePick(url: string) { setPicked((s) => { const n = new Set(s); n.has(url) ? n.delete(url) : n.add(url); return n; }); }
+
+  async function patchPersona(patch: Record<string, unknown>) {
+    await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: patch }) }).catch(() => {});
+  }
+  async function removePicked() {
+    const keep = creatives.filter((c) => !picked.has(c.url));
+    setCreatives(keep); setPicked(new Set());
+    await patchPersona({ creatives: keep, video_selects: videoSelects.filter((u) => keep.some((c) => c.url === u)) });
+  }
+  async function markForVideo() {
+    const next = [...new Set([...videoSelects, ...picked])];
+    setVideoSelects(next); setPicked(new Set());
+    await patchPersona({ video_selects: next });
   }
 
   return (
@@ -79,23 +128,27 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Creatives · social outputs</div>
         <p className="mt-2 text-sm text-ink-dim">
-          Render social-ready stills of this locked influencer. Pick the platforms or formats, choose the resolution,
-          and we generate one art-directed image per format. Videos will use this same picker.
+          Render social-ready shots of this locked influencer. Pick platforms or formats, optionally steer the wardrobe
+          and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
+          identity locked in. Backgrounds stay sharp and everyone stays fully clothed.
         </p>
 
-        {/* Platforms */}
+        {/* Platforms (toggle) */}
         <div className="mt-4">
-          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quick platform presets</div>
+          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Platforms (tap to add / remove)</div>
           <div className="flex flex-wrap gap-2">
-            {PLATFORMS.map((p) => (
-              <button key={p.key} onClick={() => applyPlatform(p)} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-[#a855f7]/60 hover:text-[#c79bff]">
-                + {p.label}
-              </button>
-            ))}
+            {PLATFORMS.map((p) => {
+              const on = platforms.has(p.key);
+              return (
+                <button key={p.key} onClick={() => togglePlatform(p)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-[#a855f7] bg-[#a855f7]/15 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+                  {on ? "✓ " : "+ "}{p.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Formats */}
+        {/* Formats (reflect platform selection, individually toggleable) */}
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Formats</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -123,25 +176,36 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               ))}
             </div>
           </div>
-          <p className="text-[11px] text-ink-faint">{res === "4k" ? "4K upscales each image (sharper, costs a little more)." : "2K is crisp for feeds, stories and reels."}</p>
+          <p className="text-[11px] text-ink-faint">{res === "4k" ? "4K upscales each shot (sharper, costs a little more)." : "2K is crisp for feeds, stories and reels."}</p>
         </div>
 
-        {/* Scene */}
+        {/* Scene + Perfect with AI */}
         <div className="mt-4">
-          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Scene / brief (optional)</div>
-          <textarea value={scene} onChange={(e) => setScene(e.target.value)} rows={2}
-            placeholder="e.g. holding a takeaway coffee on a city street at golden hour, smiling at camera"
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Scene / brief (optional)</span>
+            <button onClick={perfect} disabled={refining} className="rounded-md border border-[#a855f7]/30 px-2.5 py-1 text-[11px] font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
+              {refining ? "Perfecting…" : "✨ Perfect with AI"}
+            </button>
+          </div>
+          <textarea value={scene} onChange={(e) => setScene(e.target.value)} rows={3}
+            placeholder="e.g. holding a takeaway coffee on a Braamfontein street at golden hour, smiling at camera"
             className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
         </div>
 
-        {/* Cost + generate */}
+        {/* Optional clothing + location */}
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Uploader kind="clothing" label="Clothing reference (optional)" current={clothingRef} onUploaded={setClothingRef} />
+          <Uploader kind="location" label="Scene / location reference (optional)" current={locationRef} onUploaded={setLocationRef} />
+        </div>
+
+        {/* Generate */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button onClick={generate} disabled={!n || running} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">
-            {running ? "Rendering…" : `✨ Generate ${n} creative${n === 1 ? "" : "s"}`}
+          <button onClick={generate} disabled={!nFormats || running} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">
+            {running ? "Rendering…" : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} creatives`}
           </button>
-          {rates && n > 0 && (
+          {rates && nFormats > 0 && (
             <span className="tabular text-xs text-ink-dim">
-              ≈ <span className="text-ink">{rand(estCents)}</span>{estCredits > 0 && <span className="text-ink-faint"> · {estCredits} credits</span>} for {n} image{n === 1 ? "" : "s"}
+              {nFormats} format{nFormats === 1 ? "" : "s"} × {PER_RATIO} = {images} shots · ≈ <span className="text-ink">{rand(estCents)}</span>{estCredits > 0 && <span className="text-ink-faint"> · {estCredits} credits</span>}
             </span>
           )}
         </div>
@@ -150,7 +214,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         {running && (
           <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
             <div className="flex items-center gap-2 text-xs text-ink"><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#a855f7]" />{QUIPS[quip]}</div>
-            <p className="mt-2 text-[11px] text-ink-faint">Each format renders independently. They appear below as they land.</p>
+            <p className="mt-2 text-[11px] text-ink-faint">Each format renders {PER_RATIO} distinct shots. They appear below as they land.</p>
           </div>
         )}
       </div>
@@ -158,20 +222,47 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
       {/* Gallery */}
       {creatives.length > 0 && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular mb-3 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Your creatives</div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {creatives.map((c, i) => (
-              <div key={i} className="group relative cursor-pointer overflow-hidden rounded-lg border border-line" onClick={() => setZoom(c.url)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.url} alt={c.scene} className="aspect-square w-full object-cover" />
-                <div className="absolute left-1.5 top-1.5 flex gap-1">
-                  <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
-                  <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
-                </div>
-                <span className="absolute bottom-1.5 right-1.5 hidden rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] text-white group-hover:block">⤢ open</span>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Your creatives · {creatives.length}</div>
+            {picked.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-ink-dim">{picked.size} selected</span>
+                <button onClick={markForVideo} className="rounded-md border border-ready/40 px-2.5 py-1 text-xs font-semibold text-ready hover:bg-ready/10">★ For video</button>
+                <button onClick={removePicked} className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-alert/50 hover:text-alert">Remove</button>
+                <button onClick={() => setPicked(new Set())} className="text-xs text-ink-faint hover:text-ink">clear</button>
               </div>
-            ))}
+            )}
           </div>
+          <p className="mb-3 text-[11px] text-ink-faint">Tap the tick to select shots, then ★ keep your best for video production, or remove the ones you don&apos;t want and generate more. Click an image to view full size and download.</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {creatives.map((c, i) => {
+              const sel = picked.has(c.url);
+              const forVideo = videoSelects.includes(c.url);
+              return (
+                <div key={i} className={`group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.url} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(c.url)} />
+                  <button onClick={() => togglePick(c.url)} className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/70 bg-black/45 text-transparent hover:text-white/70"}`}>✓</button>
+                  <div className="absolute left-1.5 top-1.5 flex gap-1">
+                    <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
+                    <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
+                  </div>
+                  {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Video production hand-off */}
+      {videoSelects.length > 0 && (
+        <div className="rounded-xl border border-ready/30 bg-ready/5 p-5">
+          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready">★ Selected for video production · {videoSelects.length}</div>
+          <p className="mt-1 text-sm text-ink-dim">
+            These shots are earmarked for video production and b-roll (a mix of scenes and angles makes the video stronger).
+            The produce pipeline will pull them in when it arrives in the Studio.
+          </p>
         </div>
       )}
 

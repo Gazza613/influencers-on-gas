@@ -319,6 +319,12 @@ export const trainSoulJob = inngest.createFunction(
 // via the face Element. Cost-aware: only the chosen ratios render; 4K adds an upscale.
 type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
 
+const CREATIVE_VARIATIONS = [
+  "a natural candid moment, looking towards the camera",
+  "a slightly different pose and angle, glancing away mid-action",
+  "a warm genuine expression, three-quarter angle",
+];
+
 export const generateCreatives = inngest.createFunction(
   { id: "generate-creatives", retries: 1, triggers: [{ event: "influencer/generate.creatives" }] },
   async ({ event, step }) => {
@@ -326,6 +332,9 @@ export const generateCreatives = inngest.createFunction(
     const ratios = (Array.isArray(event.data.ratios) ? event.data.ratios : ["9:16"]) as string[];
     const resolution = String(event.data.resolution || "2k");
     const scene = String(event.data.scene || "").trim();
+    const perRatio = Math.max(1, Math.min(6, Number(event.data.count) || 3));
+    const clothingRef = (event.data.clothingRef as string) || "";
+    const locationRef = (event.data.locationRef as string) || "";
 
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "influencer not found" };
@@ -333,31 +342,37 @@ export const generateCreatives = inngest.createFunction(
     const elementId = (persona.element_id as string) || null;
     const look = lookClause(persona);
     const sceneText = scene || "a clean, on-brand social media portrait, looking at the camera";
-    const tag = elementId ? `<<<${elementId}>>> ` : "";
     const fourK = resolution === "4k";
     const existing = Array.isArray(persona.creatives) ? (persona.creatives as Creative[]) : [];
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
 
     try {
+      // Optional uploaded clothing / location → Elements (steer wardrobe + scene).
+      const clothEl = clothingRef ? await step.run("cloth-el", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
+      const locEl = locationRef ? await step.run("loc-el", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
+      const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
+      const env = locEl ? "placed naturally in the same location as the location reference image" : "";
+      const wardrobe = clothEl ? "wearing the same outfit as the clothing reference, " : "";
+
       const made: Creative[] = [];
       for (const ratio of ratios) {
-        const prompt = `${tag}the same exact person, ${sceneText}, ${look}. ${SCENE_REALISM}.`;
-        const urls = await step.run(`gen-${ratio}`, () => generateBatch([prompt], IMAGE_MODEL, ratio));
-        let url = urls[0];
-        if (!url) continue;
-        await step.run(`usage-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
-        if (fourK) {
-          try {
-            url = await step.run(`upscale-${ratio}`, () => enhanceImage(url as string));
-            await step.run(`usage-upscale-${ratio}`, () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "creative", count: 1 }));
-          } catch { /* keep 2k if upscale fails */ }
+        // `perRatio` distinct shots for this format, identity locked to the Element.
+        const prompts = Array.from({ length: perRatio }, (_, i) =>
+          `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${wardrobe}${env ? env + ", " : ""}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}.`,
+        );
+        const urls = await step.run(`gen-${ratio}`, () => generateBatch(prompts, IMAGE_MODEL, ratio));
+        const got = urls.filter((u): u is string => !!u);
+        if (got.length) await step.run(`usage-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: got.length }));
+        let finals = got;
+        if (fourK && got.length) {
+          finals = await step.run(`upscale-${ratio}`, async () => Promise.all(got.map((u) => enhanceImage(u).catch(() => u))));
+          await step.run(`usage-upscale-${ratio}`, () => recordUsage({ influencerId, provider: "magnific", model: "upscaler", unit: "image", action: "creative", count: got.length }));
         }
-        made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
-        // Save incrementally so the gallery fills in live.
-        await step.run(`save-${ratio}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 80), creatives_status: "running" } }));
+        for (const url of finals) made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
+        await step.run(`save-${ratio}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "running" } }));
       }
-      await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 80), creatives_status: "done" } }));
+      await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done" } }));
       return { ok: true, made: made.length };
     } catch (e) {
       await step.run("fail", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "failed", creatives_error: String((e as Error)?.message || e).slice(0, 200) } }));

@@ -26,6 +26,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [image, upscale] = await Promise.all([rate("higgsfield", "nano_banana_2"), rate("magnific", "upscaler")]);
   return NextResponse.json({
     creatives: Array.isArray(persona.creatives) ? persona.creatives : [],
+    videoSelects: Array.isArray(persona.video_selects) ? persona.video_selects : [],
     status: persona.creatives_status ?? "idle",
     error: persona.creatives_error ?? null,
     locked: !!persona.locked,
@@ -47,12 +48,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = await req.json().catch(() => ({}));
   const ratios = Array.isArray(body.ratios) ? body.ratios.filter((r: unknown) => RATIOS.includes(r as string)) : [];
   const resolution = body.resolution === "4k" ? "4k" : "2k";
-  const scene = typeof body.scene === "string" ? body.scene.trim().slice(0, 500) : "";
+  const scene = typeof body.scene === "string" ? body.scene.trim().slice(0, 800) : "";
+  const count = Math.max(1, Math.min(6, Number(body.count) || 3));
+  const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
+  const locationRef = typeof body.locationRef === "string" ? body.locationRef : "";
   if (!ratios.length) return NextResponse.json({ error: "Pick at least one format." }, { status: 400 });
 
   await updateInfluencer(id, { persona: { ...persona, creatives_status: "running", creatives_error: null } });
   try {
-    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene } });
+    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, clothingRef, locationRef } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
