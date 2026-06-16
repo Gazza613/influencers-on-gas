@@ -54,6 +54,14 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     }
   }
 
+  async function rename(e: React.MouseEvent, inf: Influencer) {
+    e.preventDefault(); e.stopPropagation();
+    const next = window.prompt("Rename influencer", inf.name)?.trim();
+    if (!next || next === inf.name) return;
+    const r = await fetch(`/api/influencers/${inf.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next }) });
+    if (r.ok) router.refresh();
+  }
+
   async function createSynthetic() {
     if (!name.trim() || !gender || busy) return;
     setBusy(true);
@@ -107,10 +115,14 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
                 <div className="truncate text-sm font-semibold text-ink">{inf.name}</div>
                 <div className="tabular text-[10px] uppercase tracking-wide text-ink-faint">{inf.mode === "twin" ? "digital twin" : "influencer"}</div>
               </div>
-              <button onClick={(e) => remove(e, inf)} title={`Delete ${inf.name}`}
-                className="absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded-md text-ink-faint hover:bg-alert/15 hover:text-alert group-hover:flex">
-                {deleting === inf.id ? "…" : "✕"}
-              </button>
+              <div className="absolute right-1 top-1 hidden items-center gap-0.5 group-hover:flex">
+                <button onClick={(e) => rename(e, inf)} title={`Rename ${inf.name}`}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faint hover:bg-[#a855f7]/15 hover:text-[#c79bff]">✎</button>
+                <button onClick={(e) => remove(e, inf)} title={`Delete ${inf.name}`}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faint hover:bg-alert/15 hover:text-alert">
+                  {deleting === inf.id ? "…" : "✕"}
+                </button>
+              </div>
             </Link>
           );
         })}

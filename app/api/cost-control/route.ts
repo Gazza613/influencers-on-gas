@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getReport, getAuditTrail, type CostFilters } from "@/lib/usage";
+import { getZarPerUsd } from "@/lib/fx";
 
 // Filtered Cost Control report (DB only — fast). Live balance comes from /api/balance.
 export async function GET(req: Request) {
@@ -15,6 +16,15 @@ export async function GET(req: Request) {
     provider: u.searchParams.get("provider"),
     userEmail: u.searchParams.get("userEmail"),
   };
-  const [report, audit] = await Promise.all([getReport(filters), getAuditTrail(30)]);
-  return NextResponse.json({ report, audit });
+  // Optional previous-period comparison (same-length window immediately before).
+  const cmpFrom = u.searchParams.get("cmpFrom");
+  const cmpTo = u.searchParams.get("cmpTo");
+
+  const [report, audit, zarPerUsd, prev] = await Promise.all([
+    getReport(filters),
+    getAuditTrail(30),
+    getZarPerUsd(),
+    cmpFrom && cmpTo ? getReport({ ...filters, from: cmpFrom, to: cmpTo }) : Promise.resolve(null),
+  ]);
+  return NextResponse.json({ report, audit, zarPerUsd, previous: prev ? { cents: prev.total.cents, credits: prev.total.credits } : null });
 }

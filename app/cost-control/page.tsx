@@ -31,28 +31,44 @@ const ACTION_LABEL: Record<string, string> = {
   presenter: "Presenter", bible: "Character Casting", ingest: "Brain ingestion",
 };
 
-function isoDaysAgo(n: number) {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - n);
-  return d.toISOString().slice(0, 10);
-}
-const PRESETS = [
-  { key: "7", label: "7 days", from: () => isoDaysAgo(7) },
-  { key: "30", label: "30 days", from: () => isoDaysAgo(30) },
-  { key: "90", label: "90 days", from: () => isoDaysAgo(90) },
-  { key: "all", label: "All time", from: () => "" },
+const usd = (cents: number, zarPerUsd: number) => zarPerUsd ? "$" + (cents / 100 / zarPerUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+const today = () => new Date().toISOString().slice(0, 10);
+function addDays(s: string, n: number) { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return ymd(d); }
+function startOfWeek() { const d = new Date(); const wd = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - wd); return ymd(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))); }
+function startOfMonth() { const d = new Date(); return ymd(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1))); }
+function startOfLastMonth() { const d = new Date(); return ymd(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1))); }
+function endOfLastMonth() { const d = new Date(); return ymd(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 0))); }
+function startOfYear() { const d = new Date(); return ymd(new Date(Date.UTC(d.getUTCFullYear(), 0, 1))); }
+
+const PERIODS = [
+  { key: "week", label: "This week", range: () => ({ from: startOfWeek(), to: today() }) },
+  { key: "month", label: "This month", range: () => ({ from: startOfMonth(), to: today() }) },
+  { key: "lastmonth", label: "Last month", range: () => ({ from: startOfLastMonth(), to: endOfLastMonth() }) },
+  { key: "ytd", label: "Year to date", range: () => ({ from: startOfYear(), to: today() }) },
+  { key: "all", label: "All time", range: () => ({ from: "", to: "" }) },
 ];
 
+// Previous equal-length window immediately before [from,to] (for week-on-week etc.).
+function prevWindow(from: string, to: string): { cmpFrom: string; cmpTo: string } | null {
+  if (!from) return null;
+  const end = to || today();
+  const days = Math.max(1, Math.round((Date.parse(end) - Date.parse(from)) / 86400000) + 1);
+  return { cmpFrom: addDays(from, -days), cmpTo: addDays(from, -1) };
+}
+
 export default function CostControlPage() {
-  const [from, setFrom] = useState<string>(isoDaysAgo(30));
-  const [to, setTo] = useState<string>("");
-  const [preset, setPreset] = useState("30");
+  const [from, setFrom] = useState<string>(startOfMonth());
+  const [to, setTo] = useState<string>(today());
+  const [preset, setPreset] = useState("month");
   const [influencerId, setInfluencerId] = useState("");
   const [provider, setProvider] = useState("");
   const [userEmail, setUserEmail] = useState("");
 
   const [report, setReport] = useState<Report | null>(null);
   const [audit, setAudit] = useState<Audit>([]);
+  const [prev, setPrev] = useState<{ cents: number; credits: number } | null>(null);
+  const [rate, setRate] = useState(0);
   const [bal, setBal] = useState<{ remaining: number | null; monthly: number; creditZarCents: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -64,8 +80,10 @@ export default function CostControlPage() {
     if (influencerId) qs.set("influencerId", influencerId);
     if (provider) qs.set("provider", provider);
     if (userEmail) qs.set("userEmail", userEmail);
+    const cmp = prevWindow(from, to);
+    if (cmp) { qs.set("cmpFrom", cmp.cmpFrom); qs.set("cmpTo", cmp.cmpTo); }
     const r = await fetch(`/api/cost-control?${qs}`).then((x) => x.json()).catch(() => null);
-    if (r?.report) { setReport(r.report); setAudit(r.audit || []); }
+    if (r?.report) { setReport(r.report); setAudit(r.audit || []); setPrev(r.previous ?? null); setRate(r.zarPerUsd || 0); }
     setLoading(false);
   }, [from, to, influencerId, provider, userEmail]);
 
@@ -76,13 +94,16 @@ export default function CostControlPage() {
 
   function applyPreset(key: string) {
     setPreset(key);
-    const p = PRESETS.find((x) => x.key === key);
-    if (p) { setFrom(p.from()); setTo(""); }
+    const p = PERIODS.find((x) => x.key === key);
+    if (p) { const r = p.range(); setFrom(r.from); setTo(r.to); }
   }
 
   const pct = bal?.remaining != null ? Math.max(0, Math.min(100, (bal.remaining / bal.monthly) * 100)) : null;
   const lastAudit = audit[0];
   const auditDelta = lastAudit && lastAudit.remaining != null ? (bal?.monthly ?? 9000) - lastAudit.remaining - lastAudit.ledger_credits : null;
+  // Spend delta vs the previous equal-length period.
+  const curCents = report?.total.cents ?? 0;
+  const delta = prev && prev.cents > 0 ? Math.round(((curCents - prev.cents) / prev.cents) * 100) : null;
 
   return (
     <div className="min-h-dvh bg-surface-0 text-ink">
@@ -119,9 +140,16 @@ export default function CostControlPage() {
               </>
             ) : <div className="text-sm text-ink-faint">reading…</div>}
           </Kpi>
-          <Kpi label="Tracked spend (period)">
+          <Kpi label="Total spend (period)">
             <div className="tabular text-2xl font-bold">{report ? rand(report.total.cents) : "…"}</div>
-            <div className="tabular mt-1 text-xs text-ink-dim">{report ? `${Math.round(report.total.credits).toLocaleString()} credits` : ""}</div>
+            <div className="tabular mt-1 text-xs text-ink-dim">
+              {report ? `${rate > 0 ? usd(report.total.cents, rate) + " · " : ""}${Math.round(report.total.credits).toLocaleString()} credits used` : ""}
+            </div>
+            {delta != null && (
+              <div className={`tabular mt-1 text-[11px] font-semibold ${delta > 0 ? "text-active" : "text-ready"}`}>
+                {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}% vs previous period
+              </div>
+            )}
           </Kpi>
           <Kpi label="Jobs run (period)">
             <div className="tabular text-2xl font-bold">{report ? report.total.events.toLocaleString() : "…"}</div>
@@ -143,8 +171,8 @@ export default function CostControlPage() {
         <div className="mt-6 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface-1 p-4">
           <div>
             <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Range</div>
-            <div className="flex gap-1">
-              {PRESETS.map((p) => (
+            <div className="flex flex-wrap gap-1">
+              {PERIODS.map((p) => (
                 <button key={p.key} onClick={() => applyPreset(p.key)}
                   className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${preset === p.key ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:bg-surface-2"}`}>{p.label}</button>
               ))}
@@ -170,8 +198,8 @@ export default function CostControlPage() {
               {report?.byUser.map((u) => <option key={u.user_email} value={u.user_email}>{u.user_email === "(system)" ? "Super Admin" : u.user_email}</option>)}
             </select>
           </Picker>
-          {(influencerId || provider || userEmail || preset !== "30") && (
-            <button onClick={() => { setInfluencerId(""); setProvider(""); setUserEmail(""); applyPreset("30"); }} className="rounded-md border border-line px-2.5 py-1.5 text-xs text-ink-dim hover:text-ink">Clear</button>
+          {(influencerId || provider || userEmail || preset !== "month") && (
+            <button onClick={() => { setInfluencerId(""); setProvider(""); setUserEmail(""); applyPreset("month"); }} className="rounded-md border border-line px-2.5 py-1.5 text-xs text-ink-dim hover:text-ink">Clear</button>
           )}
         </div>
 

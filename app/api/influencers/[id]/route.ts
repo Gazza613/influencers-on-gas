@@ -26,6 +26,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   await updateInfluencer(id, {
+    name: typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 80) : undefined,
     voice_id: typeof body.voice_id === "string" ? body.voice_id : undefined,
     status: typeof body.status === "string" ? body.status : undefined,
     ...(persona ? { persona } : {}),
