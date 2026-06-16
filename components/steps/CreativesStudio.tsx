@@ -296,6 +296,20 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         )}
       </div>
 
+      {/* In-progress placeholders so it's clear shots are rendering + being QA'd (not ready to click). */}
+      {running && (
+        <div className="rounded-xl border border-line bg-surface-1 p-5">
+          <div className="tabular mb-3 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Rendering &amp; reviewing · {images} shots</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {Array.from({ length: images }).map((_, i) => (
+              <div key={i} className="shimmer flex aspect-square items-center justify-center rounded-lg border border-line">
+                <span className="flex flex-col items-center gap-1.5 text-[10px] text-ink-faint"><span className="spinner-ring text-base text-[#c79bff]" /> reviewing…</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Gallery */}
       {creatives.length > 0 && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">

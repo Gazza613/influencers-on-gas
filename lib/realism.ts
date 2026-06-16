@@ -10,9 +10,9 @@ export const CLOTHED =
 export const SINGLE_FRAME =
   "a single photograph, one continuous frame of one moment, NOT a collage, contact sheet, grid, diptych, triptych, split screen or multiple stacked panels";
 
-// Background people, when present, reflect real South African diversity and stay in focus.
+// Background people: actively REQUIRE a diverse SA crowd (imperative, so it isn't ignored).
 export const SCENE_PEOPLE =
-  "any other people in frame are a believable, natural mix reflecting South African diversity (Black, White, Indian, Coloured), each rendered realistically and kept in sharp focus, and at correct scale relative to the subject";
+  "the scene is busy with several other people clearly visible in the background — a believable, natural mix reflecting South African diversity (Black, White, Indian, Coloured), each rendered realistically, in sharp focus and at correct scale; a lived-in populated setting, never empty";
 
 // No extras: the subject is alone in the scene.
 export const NO_EXTRAS =
