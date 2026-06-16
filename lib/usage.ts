@@ -1,9 +1,11 @@
 import { db } from "./db";
 
-// ≈ R0.64 per Higgsfield credit (Ultra: $310 / 9,000 credits at ~R18.7/$). Used to
-// convert the live credit balance to Rand. Per-generation prices live in rate_card.
-export const CREDIT_ZAR_CENTS = 64;
+// Higgsfield Ultra: $375 / 9,000 credits per month ⇒ ≈ $0.0417 per credit.
+// In Rand at ~R18.5/$ that is ≈ R0.77 (77c) per credit. Per-generation prices live
+// in rate_card; the live $ figures use the daily FX rate (lib/fx.ts).
+export const MONTHLY_USD = 375;
 export const MONTHLY_CREDITS = 9000;
+export const CREDIT_ZAR_CENTS = 77;
 
 type Rate = { credits: number; cents: number };
 

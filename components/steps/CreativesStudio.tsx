@@ -22,7 +22,15 @@ const PLATFORMS: { key: string; label: string; ratios: string[] }[] = [
   { key: "google", label: "Google Ads", ratios: ["16:9", "1:1"] },
 ];
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const QUIPS = ["Art-directing your creatives…", "Framing each format…", "Dialling in the light…", "Rendering social-ready shots…"];
+const QUIPS = [
+  "Art-directing your creatives…",
+  "Framing each format…",
+  "Dialling in the light…",
+  "Rendering social-ready shots…",
+  "🔎 AI Vision QA reviewing each shot…",
+  "Checking wardrobe, composition & proportions…",
+  "Re-rolling anything that doesn't make the cut…",
+];
 
 export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
@@ -38,6 +46,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [rates, setRates] = useState<Rates | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>(initial.creatives || []);
   const [videoSelects, setVideoSelects] = useState<string[]>([]);
+  const [qa, setQa] = useState<{ reviewed: number; approved: number; rejected: number } | null>(null);
   const [status, setStatus] = useState(initial.status || "idle");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [broken, setBroken] = useState<Set<string>>(new Set());
@@ -49,7 +58,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
 
   async function refresh() {
     const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
-    if (d) { if (d.rates) setRates(d.rates); setCreatives(d.creatives || []); setVideoSelects(d.videoSelects || []); setStatus(d.status || "idle"); }
+    if (d) { if (d.rates) setRates(d.rates); setCreatives(d.creatives || []); setVideoSelects(d.videoSelects || []); setQa(d.qa || null); setStatus(d.status || "idle"); }
     return d;
   }
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -137,6 +146,10 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
           identity locked in. Backgrounds stay sharp and everyone stays fully clothed.
         </p>
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[11px] text-ink-dim">
+          <span className="text-base leading-none">🔎</span>
+          <span><span className="text-[#c79bff] font-semibold">AI Vision QA</span> reviews every single shot before you see it — wardrobe, composition, proportions and realism are all checked, and anything that doesn&apos;t pass is rejected and re-rolled automatically. You only ever get keepers.</span>
+        </div>
 
         {/* Platforms (toggle) */}
         <div className="mt-4">
@@ -257,7 +270,15 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
       {/* Gallery */}
       {creatives.length > 0 && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          {qa && qa.reviewed > 0 && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-ready/30 bg-ready/5 px-3 py-2 text-[11px]">
+            <span className="text-base leading-none">🔎</span>
+            <span className="text-ink-dim">
+              <span className="font-semibold text-ready">AI Vision QA</span> reviewed <span className="text-ink">{qa.reviewed}</span> shot{qa.reviewed === 1 ? "" : "s"} · <span className="text-ready">{qa.approved} approved</span>{qa.rejected > 0 && <> · <span className="text-active">{qa.rejected} re-rolled for quality</span></>}.
+            </span>
+          </div>
+        )}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Your creatives · {creatives.length}</div>
             {picked.size > 0 && (
               <div className="flex items-center gap-2">
@@ -287,6 +308,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
                   </div>
                   {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
+                  {!broken.has(c.url) && <span className="absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-ready" title="Passed AI Vision QA">QA ✓</span>}
                 </div>
               );
             })}

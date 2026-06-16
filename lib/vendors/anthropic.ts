@@ -142,24 +142,42 @@ const QA_SCHEMA = {
   required: ["pass", "fully_clothed", "single_frame", "realistic_proportions", "coherent_photo", "issues"],
 } as unknown as Anthropic.Tool["input_schema"];
 
+const QA_MEDIA = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
 export async function qaCreative(url: string): Promise<{ pass: boolean; issues: string[] }> {
-  const c = await client();
-  const res = await c.messages.create({
-    model: QA_MODEL,
-    max_tokens: 400,
-    tools: [{ name: "qa", description: "Report the QA verdict for this creative image.", input_schema: QA_SCHEMA }],
-    tool_choice: { type: "tool", name: "qa" },
-    messages: [{
-      role: "user",
-      content: [
-        { type: "text", text: "You are QA for social-media creatives of an AI influencer. Judge this image strictly. pass must be true ONLY if: fully_clothed (top covering torso AND bottoms — FAIL shirtless/topless/underwear/nude), single_frame (one photo, not a collage/grid/split/stacked panels), realistic_proportions (natural body + scale vs background), and coherent_photo. List concrete issues." },
-        { type: "image", source: { type: "url", url } },
-      ],
-    }],
-  });
-  const block = res.content.find((b) => b.type === "tool_use");
-  const out = block && block.type === "tool_use" ? (block.input as { pass?: boolean; issues?: string[] }) : null;
-  return { pass: !!out?.pass, issues: out?.issues ?? [] };
+  // Fetch + inspect as base64 (works on any SDK version; also validates the image loads).
+  let b64: string, mt: string;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return { pass: false, issues: ["image did not load"] }; // broken → reject
+    mt = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
+    if (!QA_MEDIA.has(mt)) mt = "image/jpeg";
+    b64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+  } catch {
+    return { pass: false, issues: ["image fetch failed"] }; // broken → reject
+  }
+  try {
+    const c = await client();
+    const res = await c.messages.create({
+      model: QA_MODEL,
+      max_tokens: 400,
+      tools: [{ name: "qa", description: "Report the QA verdict for this creative image.", input_schema: QA_SCHEMA }],
+      tool_choice: { type: "tool", name: "qa" },
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: "You are QA for social-media creatives of an AI influencer. Judge this image strictly. pass must be true ONLY if: fully_clothed (top covering torso AND bottoms — FAIL shirtless/topless/underwear/nude), single_frame (one photo, not a collage/grid/split/stacked panels), realistic_proportions (natural body + believable scale vs background), and coherent_photo. List concrete issues." },
+          { type: "image", source: { type: "base64", media_type: mt as "image/jpeg", data: b64 } },
+        ],
+      }],
+    });
+    const block = res.content.find((b) => b.type === "tool_use");
+    const out = block && block.type === "tool_use" ? (block.input as { pass?: boolean; issues?: string[] }) : null;
+    return { pass: !!out?.pass, issues: out?.issues ?? [] };
+  } catch {
+    // QA service itself errored (not the image) — fail OPEN so a hiccup can't empty the gallery.
+    return { pass: true, issues: ["qa-unavailable"] };
+  }
 }
 
 // Polish a producer's rough idea into a single vivid, art-directed image prompt for a

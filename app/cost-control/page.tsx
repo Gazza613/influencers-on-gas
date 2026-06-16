@@ -277,7 +277,7 @@ export default function CostControlPage() {
           ) : <div className="px-4 py-5 text-center text-xs text-ink-faint">No audits yet — the first daily snapshot will appear here.</div>}
         </Section>
 
-        <p className="mt-8 text-xs text-ink-faint">Prices come from the rate_card table (R0.64 / credit on the Ultra plan). {loading ? "Updating…" : ""}</p>
+        <p className="mt-8 text-xs text-ink-faint">Prices come from the rate_card table · Higgsfield Ultra $375 / 9,000 credits ≈ R0.77 per credit. {loading ? "Updating…" : ""}</p>
       </main>
     </div>
   );

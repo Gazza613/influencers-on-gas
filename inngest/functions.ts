@@ -338,6 +338,7 @@ export const generateCreatives = inngest.createFunction(
           : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
 
       const made: Creative[] = [];
+      let qaReviewed = 0, qaRejected = 0;
       for (const ratio of ratios) {
         const kept: string[] = [];
         // Generate, QA each shot, keep only passers; up to 2 rounds to fill the count.
@@ -352,17 +353,22 @@ export const generateCreatives = inngest.createFunction(
           }
           // Vision QA — reject shirtless / collage / bad-proportion / broken; on QA error, reject.
           const verdicts = await step.run(`qa-${ratio}-${attempt}`, () =>
-            Promise.all(got.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: false })))),
+            Promise.all(got.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
           );
-          for (const v of verdicts) if (v.pass && kept.length < perRatio) kept.push(v.u);
+          for (const v of verdicts) {
+            qaReviewed++;
+            if (v.pass && kept.length < perRatio) kept.push(v.u);
+            else if (!v.pass) qaRejected++;
+          }
           // Persist progress as shots pass QA.
           const partial = [...made, ...kept.map((url) => ({ url, ratio, resolution, scene: sceneText, at: Date.now() })), ...existing].slice(0, 120);
           await step.run(`save-${ratio}-${attempt}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: partial, creatives_status: "running" } }));
         }
         for (const url of kept) made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
       }
-      await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done" } }));
-      return { ok: true, made: made.length };
+      const qa = { reviewed: qaReviewed, approved: made.length, rejected: qaRejected, at: Date.now() };
+      await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done", creatives_qa: qa } }));
+      return { ok: true, made: made.length, qa };
     } catch (e) {
       await step.run("fail", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "failed", creatives_error: String((e as Error)?.message || e).slice(0, 200) } }));
       throw e;

@@ -76,7 +76,7 @@ export function buildCostEmail(opts: {
       <div style="text-align:center;margin-top:18px;">
         <a href="${BASE}/cost-control" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 28px;border-radius:99px;">Open Cost Control →</a>
       </div>
-      <div style="text-align:center;margin-top:16px;font-size:11px;color:#6b7280;">Sent daily from Influencers on GAS · figures from the rate_card (R0.64/credit, Ultra plan).</div>
+      <div style="text-align:center;margin-top:16px;font-size:11px;color:#6b7280;">Sent daily from Influencers on GAS · Higgsfield Ultra $375 / 9,000 credits (≈ R0.77/credit).</div>
     </div>
   </div>`;
 

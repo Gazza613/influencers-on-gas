@@ -28,6 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json({
     creatives: Array.isArray(persona.creatives) ? persona.creatives : [],
     videoSelects: Array.isArray(persona.video_selects) ? persona.video_selects : [],
+    qa: persona.creatives_qa ?? null,
     status: persona.creatives_status ?? "idle",
     error: persona.creatives_error ?? null,
     locked: !!persona.locked,
