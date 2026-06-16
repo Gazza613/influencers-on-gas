@@ -386,12 +386,11 @@ export const generateCreatives = inngest.createFunction(
         // so the stored URL is permanent and never 404s. Badge the TRUE resolution per image:
         // if 4K upscale or its re-host fails, we fall back to the base image and label it 2K.
         // One step PER image (not all keepers in one) so no single invocation risks the
-        // 300s function cap. Upscale poll is capped (~120s) so a slow upscale falls back to
-        // a loadable 2K instead of killing the whole batch, reliability over guaranteed 4K.
-        const kept: { url: string; resolution: string }[] = [];
-        for (let k = 0; k < keptUrls.length; k++) {
-          const baseUrl = keptUrls[k];
-          const item = await step.run(`finalize-${ratio}-${k}`, async () => {
+        // 300s function cap, AND run them in PARALLEL so total time is one image's upscale,
+        // not the sum. Upscale poll is capped (~120s); a slow upscale falls back to a
+        // loadable 2K instead of killing the batch (reliability over guaranteed 4K).
+        const kept = await Promise.all(keptUrls.map((baseUrl, k) =>
+          step.run(`finalize-${ratio}-${k}`, async () => {
             let url = baseUrl, res = "2k";
             if (fourK) {
               const up = await upscaleUrlTo(baseUrl, "4k", 40).catch(() => null);
@@ -400,9 +399,8 @@ export const generateCreatives = inngest.createFunction(
             let hosted = await rehostToBlob(url).catch(() => null);
             if (!hosted && url !== baseUrl) { hosted = await rehostToBlob(baseUrl).catch(() => null); res = "2k"; }
             return { url: hosted || url, resolution: res };
-          });
-          kept.push(item);
-        }
+          }),
+        ));
         const upscaled = kept.filter((k) => k.resolution === "4k").length;
         if (fourK && upscaled) await step.run(`usage-up-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: upscaled }));
         return { ratio, kept, reviewed, rejected };
