@@ -2,9 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "../connections";
 
 // Claude (Anthropic) — the producer co-pilot brain. Vendor-neutral in the UI.
-// Opus 4.8 is the premium, most-capable model; the Character Bible is a one-off,
-// high-value creative artefact, so we use the best.
-const MODEL = "claude-opus-4-8";
+// Sonnet 4.6 designs the Character Casting + refines prompts: near-Opus quality for a
+// structured creative sheet, but markedly faster (Opus was noticeably slow here).
+const MODEL = "claude-sonnet-4-6";
 
 async function client(): Promise<Anthropic> {
   const key = await getSecret("anthropic");
@@ -114,7 +114,7 @@ export async function generateBible(name: string, brief: string, gender?: string
   const lookLine = look ? `Look: ${look} look (adapt makeup, grooming and skin finish accordingly).\n` : "";
   const res = await c.messages.create({
     model: MODEL,
-    max_tokens: 8000,
+    max_tokens: 5000,
     system: SYSTEM,
     tools: [{ name: "character_bible", description: "Return the complete character bible for this influencer.", input_schema: BIBLE_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
     tool_choice: { type: "tool", name: "character_bible" },
