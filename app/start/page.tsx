@@ -24,6 +24,7 @@ export default function StartPage() {
 
   // new
   const [name, setName] = useState("");
+  const [gender, setGender] = useState<"female" | "male" | "">("");
   const [refUrl, setRefUrl] = useState<string | null>(null);
   // twin
   const [twinName, setTwinName] = useState("");
@@ -81,12 +82,13 @@ export default function StartPage() {
 
         {view === "new" && (
           <Panel title="Build a new influencer" onBack={back}>
-            <p className="text-sm text-ink-dim">Name it. Then write a one-line brief and our co-pilot designs the whole character, or upload a reference to steer the look (we then skip casting and shoot from it).</p>
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && name.trim() && create({ name: name.trim(), mode: "synthetic", persona: refUrl ? { reference_url: refUrl } : {} })}
+            <p className="text-sm text-ink-dim">Name it and pick the gender. Then write a one-line brief and our co-pilot designs the whole character, or upload a reference to steer the look (we then skip casting and shoot from it).</p>
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
               placeholder="Name (e.g. Ava)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
+            <GenderToggle value={gender} onChange={setGender} />
             <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />
-            <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: refUrl ? { reference_url: refUrl } : {} })} disabled={!name.trim() || busy}
-              className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : "Create influencer →"}</button>
+            <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: { ...(refUrl ? { reference_url: refUrl } : {}), gender } })} disabled={!name.trim() || !gender || busy}
+              className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : !gender ? "Pick a gender to continue" : "Create influencer →"}</button>
           </Panel>
         )}
 
@@ -153,6 +155,22 @@ export default function StartPage() {
         .start-card:hover .start-cta { opacity: 1; transform: translateY(-1px); filter: saturate(1.1) brightness(1.06); box-shadow: 0 8px 26px rgba(168,85,247,0.35); }
         .start-card:hover .start-arrow { transform: translateX(4px); }
       `}</style>
+    </div>
+  );
+}
+
+function GenderToggle({ value, onChange }: { value: "female" | "male" | ""; onChange: (v: "female" | "male") => void }) {
+  return (
+    <div>
+      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Gender</div>
+      <div className="grid grid-cols-2 gap-2">
+        {(["female", "male"] as const).map((g) => (
+          <button key={g} type="button" onClick={() => onChange(g)}
+            className={`rounded-lg border py-2.5 text-sm font-semibold capitalize transition ${value === g ? "border-[#a855f7] bg-[#a855f7]/15 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+            {g === "female" ? "♀ Female" : "♂ Male"}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

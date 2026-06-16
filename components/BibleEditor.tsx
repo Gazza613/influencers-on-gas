@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Bible = Record<string, unknown>;
 
@@ -46,7 +46,7 @@ function Regen({ section, busy, onClick }: { section: string; busy: string | nul
   );
 }
 
-export default function BibleEditor({ influencerId, initialBrief, initialBible }: { influencerId: string; initialBrief: string | null; initialBible: Bible | null }) {
+export default function BibleEditor({ influencerId, initialBrief, initialBible, flushRef }: { influencerId: string; initialBrief: string | null; initialBible: Bible | null; flushRef?: React.MutableRefObject<(() => Promise<void>) | null> }) {
   const [brief, setBrief] = useState(initialBrief || "");
   const [bible, setBible] = useState<Bible | null>(initialBible);
   const [open, setOpen] = useState(!initialBible);
@@ -55,6 +55,26 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
   const [saved, setSaved] = useState<"idle" | "saving" | "saved">("idle");
   const [regen, setRegen] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<Bible | null>(null); // latest edit not yet written
+
+  // Write the pending edit now (used by the debounce, on blur, and before casting).
+  const doSave = useCallback(async () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    const next = pending.current;
+    if (!next) return;
+    pending.current = null;
+    setSaved("saving");
+    try {
+      await fetch(`/api/influencers/${influencerId}/bible`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bible: next }) });
+      setSaved("saved");
+    } catch {
+      pending.current = next; // keep it so a later flush retries
+      setSaved("idle");
+    }
+  }, [influencerId]);
+
+  // Expose a flush so the casting step can guarantee edits are saved before it runs.
+  useEffect(() => { if (flushRef) flushRef.current = doSave; }, [flushRef, doSave]);
 
   async function reimagine(section: string) {
     if (regen) return;
@@ -74,14 +94,13 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
   }
 
   function scheduleSave(next: Bible) {
+    pending.current = next;
     setSaved("saving");
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      await fetch(`/api/influencers/${influencerId}/bible`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bible: next }) }).catch(() => {});
-      setSaved("saved");
-    }, 800);
+    timer.current = setTimeout(() => { doSave(); }, 600);
   }
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  // Flush any pending edit if the component unmounts (e.g. navigating away).
+  useEffect(() => () => { if (pending.current) doSave(); }, [doSave]);
 
   // Immutable nested update + autosave.
   function edit(mutate: (b: Bible) => void) {
@@ -138,7 +157,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible }
       )}
 
       {bible && !open && (
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3" onBlur={() => { if (pending.current) doSave(); }}>
           <div className="rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[11px] text-ink-dim">
             ✎ Everything below is yours to tweak. Click any line to rewrite it, it saves automatically as you type.
             Not feeling one part? Hit <span className="text-[#c79bff]">↻ Reimagine</span> on that section and the AI re-rolls

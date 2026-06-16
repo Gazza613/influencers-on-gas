@@ -1,24 +1,29 @@
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { auth } from "@/auth";
 
-// Upload an image to Vercel Blob → returns a public URL usable as a generation
-// reference (face, location, clothing) and for display.
-export const maxDuration = 30;
-const MAX_BYTES = 10 * 1024 * 1024;
-
+// Client-side direct upload to Vercel Blob. This issues a short-lived upload token
+// so the browser uploads straight to Blob, bypassing the 4.5MB serverless request
+// body limit (large PNGs etc. now work). Auth is checked before the token is issued.
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const form = await req.formData().catch(() => null);
-  const file = form?.get("file");
-  const kind = (form?.get("kind") as string) || "ref";
-  if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
-  if (!file.type.startsWith("image/")) return NextResponse.json({ error: "Please upload an image." }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image is too large (max 10MB)." }, { status: 400 });
-
-  const safe = (file.name || "image").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-40);
-  const blob = await put(`influencers/${kind}/${safe}`, file, { access: "public", addRandomSuffix: true });
-  return NextResponse.json({ url: blob.url });
+  const body = (await req.json()) as HandleUploadBody;
+  try {
+    const json = await handleUpload({
+      body,
+      request: req,
+      onBeforeGenerateToken: async () => {
+        const session = await auth();
+        if (!session?.user) throw new Error("Unauthorized");
+        return {
+          allowedContentTypes: ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/avif"],
+          maximumSizeInBytes: 10 * 1024 * 1024,
+          addRandomSuffix: true,
+        };
+      },
+      onUploadCompleted: async () => { /* no-op */ },
+    });
+    return NextResponse.json(json);
+  } catch (e) {
+    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 400 });
+  }
 }

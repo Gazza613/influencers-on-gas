@@ -32,13 +32,14 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   const [consentFor, setConsentFor] = useState<{ name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
+  const [gender, setGender] = useState<"female" | "male" | "">("");
   const [refUrl, setRefUrl] = useState<string | null>(null); // optional reference for synthetic
   const [twinName, setTwinName] = useState("");
   const [twinConsentId, setTwinConsentId] = useState<string | null>(null);
   const [twinPhoto, setTwinPhoto] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  function reset() { setModal(null); setConsentFor(null); setName(""); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhoto(null); }
+  function reset() { setModal(null); setConsentFor(null); setName(""); setGender(""); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhoto(null); }
 
   async function remove(e: React.MouseEvent, inf: Influencer) {
     e.preventDefault(); e.stopPropagation();
@@ -53,11 +54,11 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   }
 
   async function createSynthetic() {
-    if (!name.trim() || busy) return;
+    if (!name.trim() || !gender || busy) return;
     setBusy(true);
     const r = await fetch("/api/influencers", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), mode: "synthetic", persona: refUrl ? { reference_url: refUrl } : {} }),
+      body: JSON.stringify({ name: name.trim(), mode: "synthetic", persona: { ...(refUrl ? { reference_url: refUrl } : {}), gender } }),
     });
     setBusy(false);
     if (r.ok) { const { id } = await r.json(); reset(); router.push(`/setup/influencers/${id}`); router.refresh(); }
@@ -124,10 +125,21 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
           <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createSynthetic()}
             placeholder="e.g. Ava" className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
           <div>
+            <p className="mb-1.5 text-[11px] text-ink-faint">Gender</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["female", "male"] as const).map((g) => (
+                <button key={g} type="button" onClick={() => setGender(g)}
+                  className={`rounded-lg border py-2 text-sm font-semibold transition ${gender === g ? "border-[#a855f7] bg-[#a855f7]/15 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+                  {g === "female" ? "♀ Female" : "♂ Male"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <p className="mb-1 text-[11px] text-ink-faint">Optional: upload a reference image to steer the look. With one, we skip casting and shoot straight from your reference.</p>
             <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />
           </div>
-          <Actions onCancel={reset} onConfirm={createSynthetic} label={busy ? "Creating…" : "Create influencer →"} disabled={!name.trim() || busy} />
+          <Actions onCancel={reset} onConfirm={createSynthetic} label={busy ? "Creating…" : "Create influencer →"} disabled={!name.trim() || !gender || busy} />
         </Modal>
       )}
       {modal === "twin" && !consentFor && (

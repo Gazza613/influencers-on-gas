@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { upload as blobUpload } from "@vercel/blob/client";
 
-// Reusable image uploader → Vercel Blob. Drag/drop or click; shows a preview and a
-// quirky uploading state. Calls onUploaded(url) when done.
+// Reusable image uploader → Vercel Blob (direct client upload, so large PNGs work).
+// Drag/drop or click; shows a preview and a quirky uploading state. Calls onUploaded(url).
 export default function Uploader({ kind = "ref", label, onUploaded, current }: { kind?: string; label: string; onUploaded: (url: string) => void; current?: string | null }) {
   const [url, setUrl] = useState<string | null>(current ?? null);
   const [busy, setBusy] = useState(false);
@@ -11,16 +12,20 @@ export default function Uploader({ kind = "ref", label, onUploaded, current }: {
   const ref = useRef<HTMLInputElement>(null);
 
   async function upload(file: File) {
+    if (!file.type.startsWith("image/")) { setErr("That's not an image. Pop in a JPG, PNG or WebP."); return; }
     if (file.size > 10 * 1024 * 1024) { setErr("That image is over 10MB. Pop in a smaller one."); return; }
     setBusy(true); setErr("");
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("kind", kind);
-    const r = await fetch("/api/upload", { method: "POST", body: fd });
-    const d = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) { setErr(d?.error || "Upload failed"); return; }
-    setUrl(d.url); onUploaded(d.url);
+    const safe = (file.name || "image").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-40);
+    try {
+      const blob = await blobUpload(`influencers/${kind}/${safe}`, file, {
+        access: "public", handleUploadUrl: "/api/upload", clientPayload: kind,
+      });
+      setUrl(blob.url); onUploaded(blob.url);
+    } catch (e) {
+      setErr(String((e as Error)?.message || e).slice(0, 160) || "Upload failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

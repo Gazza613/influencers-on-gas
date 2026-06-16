@@ -29,6 +29,14 @@ function subjectFromBible(b: Record<string, unknown>): string {
   return parts.join(", ");
 }
 
+// Map the stored gender enum to a natural prompt word.
+export function genderWord(gender?: unknown): string {
+  const g = typeof gender === "string" ? gender.toLowerCase() : "";
+  if (g === "female" || g === "woman") return "woman";
+  if (g === "male" || g === "man") return "man";
+  return "";
+}
+
 // Compose a persona spec with the always-on realism core into a generation prompt.
 export function buildIdentityPrompt(persona: Record<string, unknown> = {}) {
   const bible = persona.bible as Record<string, unknown> | undefined;
@@ -43,8 +51,12 @@ export function buildIdentityPrompt(persona: Record<string, unknown> = {}) {
       .filter(Boolean)
       .join(", ");
   }
+  // Pin the gender explicitly so every casting look is one consistent gender
+  // (the bible's prose alone can read ambiguous to the image model).
+  const g = genderWord(persona.gender);
+  const genderPrefix = g ? `a ${g}, ` : "";
   const subjectStr = subject ? subject + ". " : "";
-  return { prompt: `${subjectStr}${REALISM_POSITIVE}.`, negative: REALISM_NEGATIVE };
+  return { prompt: `${genderPrefix}${subjectStr}${REALISM_POSITIVE}.`, negative: REALISM_NEGATIVE };
 }
 
 // Self-check before accepting a generated frame (influencer-builder.md).

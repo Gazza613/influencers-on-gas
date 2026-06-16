@@ -35,6 +35,7 @@ export default function CastingStep({
   const [err, setErr] = useState("");
   const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
+  const bibleFlush = useRef<(() => Promise<void>) | null>(null); // save character edits before casting
 
   const casting = st === "casting" || busy;
 
@@ -64,6 +65,8 @@ export default function CastingStep({
   async function cast() {
     if (busy) return;
     setBusy(true); setErr(""); setChosen(null);
+    // Make sure any in-flight character edits are written before we build the prompt.
+    try { await bibleFlush.current?.(); } catch { /* non-fatal */ }
     const r = await fetch(`/api/influencers/${influencerId}/generate`, { method: "POST" });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start casting"); setBusy(false); return; }
     setSt("casting"); setCandidates([]); poll();
