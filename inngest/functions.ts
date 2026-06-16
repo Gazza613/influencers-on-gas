@@ -16,27 +16,21 @@ const CANDIDATE_COUNT = 6;
 // <<<element>>> identity lock we need for consistent photoshoot frames.
 const IMAGE_MODEL = "nano_banana_2";
 
-// Stage 2 (Photoshoot) — same-person coverage from the CHOSEN look. FACE_COVERAGE is the
-// angle/expression/close-up set that trains a faithful identity; sceneShots() places the
-// same face in the brief's required location. Each is locked to the chosen face via the
-// Element, so every frame is ONE consistent identity.
-// Lean coverage set for Soul training (kept small for speed; 5+ frames is plenty).
-const FACE_COVERAGE = [
-  "the same exact person, three-quarter left angle, soft natural daylight, calm neutral expression, identical face and wardrobe, photorealistic portrait",
-  "the same exact person, three-quarter right angle, warm indoor lighting, subtle genuine smile, identical face and wardrobe, photorealistic portrait",
-  "the same exact person, tight beauty close-up of the face, sharp catchlight in the eyes, natural skin texture with visible pores and fine detail, identical features, photorealistic",
-  "the same exact person, straight-on at eye level, looking directly into the lens, warm authentic smile, identical face and wardrobe, photorealistic portrait",
+// Stage 2 (Photoshoot) builds the training set from the CHOSEN look. TRAINING_LOOKS is a
+// VARIED set (different wardrobe + setting + framing) with the face as the only constant,
+// so the trained identity generalises instead of cloning one outfit/scene. Each frame is
+// locked to the chosen face via the Element, so every frame is ONE consistent identity.
+type TrainingLook = { wardrobe: string; env: string; frame: string; full?: boolean };
+const TRAINING_LOOKS: TrainingLook[] = [
+  { wardrobe: "a plain crew-neck t-shirt", env: "a clean light-grey studio backdrop", frame: "tight beauty close-up of the face, sharp catchlights in the eyes, natural skin texture with visible pores" },
+  { wardrobe: "a smart-casual button shirt or blouse", env: "a bright modern interior beside a large window", frame: "head-and-shoulders portrait at a three-quarter left angle, calm neutral expression" },
+  { wardrobe: "a relaxed knit jumper", env: "a neutral studio backdrop", frame: "straight-on eye-level portrait looking directly into the lens, warm authentic smile" },
+  { wardrobe: "a tailored blazer over a plain top", env: "an outdoor city street in soft daylight", frame: "waist-up medium shot at a three-quarter right angle", full: true },
+  { wardrobe: "a simple casual summer outfit", env: "a relaxed outdoor setting with natural greenery", frame: "full-length head to toe, natural relaxed standing pose", full: true },
+  { wardrobe: "casual everyday clothing", env: "a bright indoor cafe with the room clearly in frame", frame: "medium three-quarter shot with the environment in frame", full: true },
 ];
 
-// Scene-shot framings (the "money shots"). The location itself is supplied either by
-// an uploaded location Element (preferred) or by text; we never inject a default
-// backdrop when a reference is present, so it can't fight the upload.
-const SCENE_FRAMINGS = [
-  "standing full-length, full body head to toe, natural relaxed pose",
-  "medium three-quarter shot with the environment clearly in frame",
-];
-
-// STAGE 1 — Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the
+// STAGE 1, Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the
 // producer can choose the face. Each is an independent generation (different person),
 // persisted as it lands for a live progress board. Images are free on Ultra.
 export const generateCandidates = inngest.createFunction(
@@ -60,7 +54,7 @@ export const generateCandidates = inngest.createFunction(
       // to ~one image's wall-clock (~2.5 min) instead of 6× (~15 min).
       const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16"));
       const produced = [...new Set(urls.filter((u): u is string => !!u))];
-      // Meter what Higgsfield produced (billed) — BEFORE dropping any that fail to load.
+      // Meter what Higgsfield produced (billed), BEFORE dropping any that fail to load.
       if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "casting", count: produced.length }));
       // Only keep looks whose image actually loads (drops broken/expired URLs).
       const valid = await step.run("validate", () => filterLoadable(produced));
@@ -79,7 +73,7 @@ export const generateCandidates = inngest.createFunction(
   },
 );
 
-// STAGE 2 — Build the identity set from the chosen look. Lock the chosen face as an
+// STAGE 2, Build the identity set from the chosen look. Lock the chosen face as an
 // Element, then shoot the multi-angle/close-up coverage. Frames persist as they land.
 export const buildIdentity = inngest.createFunction(
   {
@@ -104,10 +98,8 @@ export const buildIdentity = inngest.createFunction(
 
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const prompt = (persona.identity_prompt as string) || buildIdentityPrompt(inf.persona).prompt;
-    const faceCoverage = [...FACE_COVERAGE];
-    const sceneCoverage = [...SCENE_FRAMINGS];
-    const locText = (persona.setting as string | undefined)?.trim() || "";
-    const expected = faceCoverage.length + sceneCoverage.length + 1;
+    const looks = TRAINING_LOOKS.map((l) => ({ ...l }));
+    const expected = looks.length + 1;
 
     try {
       // Lock the chosen face as a reusable Element (import the URL → media reference).
@@ -121,28 +113,30 @@ export const buildIdentity = inngest.createFunction(
         updateInfluencer(influencerId, { look_refs: [...frames], persona: { ...persona, hero_url: chosenUrl, element_id: elementId, frames_expected: expected } }),
       );
 
-      // Compose prompts. Face/portrait coverage gets the portrait realism core; scene
-      // shots get the scene realism core (proportions, placement, matched light/colour).
       // Each <<<id>>> placeholder injects that reference image (face / clothing / location).
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
-      // Environment phrase: uploaded location reference > typed description > brief text > studio.
-      const env = locEl ? "placed naturally in the same location as the location reference image"
-        : locationText ? `in ${locationText}`
-        : locText ? `in ${locText}` : "in a clean editorial studio backdrop";
-      // Wardrobe phrase: uploaded clothing reference > typed description > the character's own.
-      const wardrobe = clothEl ? "wearing the same outfit as the clothing reference, " : clothingText ? `wearing ${clothingText}, ` : "";
       const look = lookClause(persona); // makeup / grooming per the chosen look
+      // Honour any user-supplied wardrobe/location by applying it to ONE look only, so the
+      // rest stay varied and the trained identity still generalises.
+      const userIdx = 3;
+      if (clothingText) looks[userIdx].wardrobe = clothingText;
+      if (locationText) looks[userIdx].env = locationText;
 
-      const facePrompts = faceCoverage.map((v) =>
-        `${tag(elementId)}${tag(clothEl)}${wardrobe}${v}. ${look}, ${REALISM_POSITIVE}.`,
-      );
-      const scenePrompts = sceneCoverage.map((v) =>
-        `${tag(elementId)}${tag(locEl)}${wardrobe}the same exact person ${v}, ${env}, identical face and hair, ${look}. ${SCENE_REALISM}, ${SCENE_PEOPLE}.`,
-      );
-      const vPrompts = elementId ? [...facePrompts, ...scenePrompts] : [...faceCoverage, ...sceneCoverage].map((v) => `${prompt}. ${v}`);
+      // The unchanging constant across every training frame is the FACE, never the outfit.
+      const constant = "the same exact person, with an IDENTICAL face, hairstyle, skin tone and facial features in every frame";
+      const vPrompts = looks.map((l, i) => {
+        const useCloth = clothEl && i === userIdx;
+        const useLoc = locEl && i === userIdx;
+        const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
+        const people = l.full ? `, ${SCENE_PEOPLE}` : "";
+        const wardrobePhrase = useCloth ? "wearing the same outfit as the clothing reference" : `wearing ${l.wardrobe}`;
+        const envPhrase = useLoc ? "placed naturally in the same location as the location reference image" : `in ${l.env}`;
+        const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${useLoc ? tag(locEl) : ""}${constant}` : prompt;
+        return `${head}, ${wardrobePhrase}, ${l.frame}, ${envPhrase}, ${look}. ${core}${people}.`;
+      });
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
       const produced = urls.filter((u): u is string => !!u);
-      // Meter what Higgsfield produced (billed) — before dropping any that fail to load.
+      // Meter what Higgsfield produced (billed), before dropping any that fail to load.
       if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
       const validFrames = await step.run("validate-frames", () => filterLoadable(produced));
       for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url });
@@ -164,7 +158,7 @@ export const buildIdentity = inngest.createFunction(
   },
 );
 
-// BRAIN INGEST — pull a knowledge source into a client's brain: scrape (website) or use
+// BRAIN INGEST, pull a knowledge source into a client's brain: scrape (website) or use
 // pasted text, chunk it, embed + store (all scoped to client_id). Durable; survives the
 // slow free-tier embedding limit.
 export const ingestSource = inngest.createFunction(
@@ -200,7 +194,7 @@ export const ingestSource = inngest.createFunction(
   },
 );
 
-// PRESENTER — turn the chosen hero into a HeyGen Talking Photo (the talking a-roll
+// PRESENTER, turn the chosen hero into a HeyGen Talking Photo (the talking a-roll
 // avatar). Fast; stored as heygen_avatar_id for the produce pipeline to drive later.
 export const createPresenter = inngest.createFunction(
   { id: "create-presenter", retries: 1, triggers: [{ event: "influencer/create.presenter" }] },
@@ -228,7 +222,7 @@ export const createPresenter = inngest.createFunction(
   },
 );
 
-// STAGE 3 — Train a reusable Soul from selected frames (~10 min). Uses step.sleep so
+// STAGE 3, Train a reusable Soul from selected frames (~10 min). Uses step.sleep so
 // the function is durably suspended between status polls (survives function timeouts).
 export const trainSoulJob = inngest.createFunction(
   { id: "train-soul", retries: 0, triggers: [{ event: "influencer/train.soul" }] },
@@ -282,7 +276,7 @@ export const trainSoulJob = inngest.createFunction(
         return { failed: true, soulId };
       }
     }
-    // Took longer than the window — recover so the UI isn't stuck on "training".
+    // Took longer than the window, recover so the UI isn't stuck on "training".
     await step.run("timeout", () =>
       updateInfluencer(influencerId, { status: "soul_failed", persona: { ...inf.persona, soul_error: "Lock-down is taking longer than usual. The training may still finish, or you can retry." } }),
     );
@@ -290,18 +284,18 @@ export const trainSoulJob = inngest.createFunction(
   },
 );
 
-// CREATIVES — social-ready outputs from a LOCKED influencer. Renders one image per
+// CREATIVES, social-ready outputs from a LOCKED influencer. Renders one image per
 // selected aspect ratio (best framing), optionally upscaled to 4K. Identity is locked
 // via the face Element. Cost-aware: only the chosen ratios render; 4K adds an upscale.
 type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
 
-// Used for the DEFAULT brief (no user scene) — these dictate pose/gaze for variety.
+// Used for the DEFAULT brief (no user scene), these dictate pose/gaze for variety.
 const CREATIVE_VARIATIONS = [
   ", in a natural candid moment looking towards the camera",
   ", in a slightly different pose glancing away mid-action",
   ", with a warm genuine expression at a three-quarter angle",
 ];
-// Used when the user wrote their OWN brief — vary only framing, never pose/gaze, so we
+// Used when the user wrote their OWN brief, vary only framing, never pose/gaze, so we
 // never contradict a brief that already describes how they stand, look or hold themselves.
 const FRAMING_VARIATIONS = [
   "",
@@ -331,7 +325,7 @@ export const generateCreatives = inngest.createFunction(
     const fourK = resolution === "4k";
     const existing = Array.isArray(persona.creatives) ? (persona.creatives as Creative[]) : [];
 
-    // Identity lock: prefer the trained Soul (soul_2 / soul_cinematic + soul_id) — far more
+    // Identity lock: prefer the trained Soul (soul_2 / soul_cinematic + soul_id), far more
     // consistent than injecting a reference element into nano. Fall back to nano if no Soul.
     const useSoul = !!soulId;
     const soulModel = event.data.model === "soul_cinematic" ? "soul_cinematic" : "soul_2";
@@ -341,7 +335,7 @@ export const generateCreatives = inngest.createFunction(
 
     try {
       // Nano fallback path only (no Soul) uses element injection. Soul renders natively
-      // from the prompt + soul_id — NOT from a location reference media (that produced
+      // from the prompt + soul_id, NOT from a location reference media (that produced
       // collages/odd composites), so the scene is described in the prompt instead.
       const clothEl = !useSoul && clothingRef ? await step.run("cloth-el", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
       const locEl = !useSoul && locationRef ? await step.run("loc-el", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
@@ -381,7 +375,7 @@ export const generateCreatives = inngest.createFunction(
         // Only keep images that actually load (drops broken/expired renders before QA).
         const produced = await step.run(`validate-${ratio}`, () => filterLoadable(rawProduced));
         if (produced.length) await step.run(`usage-gen-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: produced.length }));
-        // Vision QA at base res — reject shirtless / collage / bad-proportion / broken (QA error ⇒ keep).
+        // Vision QA at base res, reject shirtless / collage / bad-proportion / broken (QA error ⇒ keep).
         const verdicts = await step.run(`qa-${ratio}`, () =>
           Promise.all(produced.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
         );
@@ -389,11 +383,11 @@ export const generateCreatives = inngest.createFunction(
         const reviewed = verdicts.length;
         const rejected = verdicts.filter((v) => !v.pass).length;
         // Finalise each keeper: upscale to 4K (if requested + it loads), then re-host on Blob
-        // so the stored URL is permanent and never 404s. Badge the TRUE resolution per image —
+        // so the stored URL is permanent and never 404s. Badge the TRUE resolution per image:
         // if 4K upscale or its re-host fails, we fall back to the base image and label it 2K.
         // One step PER image (not all keepers in one) so no single invocation risks the
         // 300s function cap. Upscale poll is capped (~120s) so a slow upscale falls back to
-        // a loadable 2K instead of killing the whole batch — reliability over guaranteed 4K.
+        // a loadable 2K instead of killing the whole batch, reliability over guaranteed 4K.
         const kept: { url: string; resolution: string }[] = [];
         for (let k = 0; k < keptUrls.length; k++) {
           const baseUrl = keptUrls[k];

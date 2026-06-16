@@ -103,8 +103,9 @@ export default function PhotoshootStep({
         <div className="min-w-[200px] flex-1">
           <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Your model</div>
           <p className="mt-1 text-sm text-ink-dim">
-            This is the face every shot is built around. The photoshoot captures it from every angle, plus close-ups and
-            scene shots, so the identity stays rock-solid across all your videos.
+            This is the face every shot is built around. The photoshoot deliberately captures it across different
+            outfits, settings and angles, the face stays identical while the looks vary. That variety is what teaches
+            the identity to hold rock-solid while still letting your creatives restyle wardrobe and scenes freely.
           </p>
         </div>
       </div>
@@ -112,7 +113,7 @@ export default function PhotoshootStep({
       {!hasSet && !building && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
           <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Photoshoot options (optional)</div>
-          <p className="mt-1 text-[11px] text-ink-faint">Steer the scene and wardrobe by uploading a reference <span className="text-ink-dim">or</span> just describing it in words. Leave blank to use the character.</p>
+          <p className="mt-1 text-[11px] text-ink-faint">Optional: feature a specific outfit or location in one of the shots, by uploading a reference <span className="text-ink-dim">or</span> describing it. The rest of the set still varies on purpose to build a flexible identity. Leave blank to let us choose.</p>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Uploader kind="location" label="Location shot" current={locationRef} onUploaded={setLocationRef} />
@@ -139,7 +140,7 @@ export default function PhotoshootStep({
 
       {hasSet && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <p className="text-[11px] text-ink-faint">Every frame is the same person. Tap to deselect any odd ones, keep your strongest 5 or more, the sharper the set the better the lock-down.</p>
+          <p className="text-[11px] text-ink-faint">Every frame is the same person across different outfits and settings (that variety is intentional, it makes the identity flexible). Tap to deselect any odd ones, keep your strongest 5 or more, the sharper and more varied the set the better the lock-down.</p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {frames.map((f, i) => {
               const sel = selected.has(f.url);

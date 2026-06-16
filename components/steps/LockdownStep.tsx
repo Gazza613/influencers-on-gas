@@ -27,6 +27,7 @@ export default function LockdownStep({
   const [st, setSt] = useState(initialStatus);
   const [locked, setLocked] = useState(lockedInit);
   const [busy, setBusy] = useState(initialStatus === "training" || initialStatus === "ready");
+  const [retraining, setRetraining] = useState(false);
   const [err, setErr] = useState("");
 
   const working = busy || st === "training" || st === "ready";
@@ -62,6 +63,15 @@ export default function LockdownStep({
     setBusy(false); setErr(""); setSt("frames_ready");
   }
 
+  async function retrain() {
+    if (!confirm("Retrain this identity on a richer, more varied photoshoot?\n\nWe re-shoot from the same face across different outfits and settings, then you re-lock. This gives later creatives far more freedom to restyle wardrobe and scenes. Your existing creatives are kept.")) return;
+    setRetraining(true);
+    const r = await fetch(`/api/influencers/${influencerId}/retrain`, { method: "POST" }).catch(() => null);
+    if (r?.ok) { window.location.href = `/setup/influencers/${influencerId}/photoshoot`; return; }
+    setRetraining(false);
+    alert("Could not start the retrain. Please try again.");
+  }
+
   if (locked) {
     return (
       <div className="space-y-5">
@@ -90,6 +100,19 @@ export default function LockdownStep({
             </Link>
             <Link href="/studio" className="text-xs text-ink-dim hover:text-ink">Video production (Studio) →</Link>
           </div>
+        </div>
+
+        <div className="rounded-xl border border-line bg-surface-1 p-5">
+          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Identity flexibility</div>
+          <p className="mt-2 text-sm text-ink-dim">
+            Finding that creatives keep returning the same outfit or setting? Retrain the identity on a richer,
+            more varied photoshoot (different outfits, different scenes, the same face). It teaches the model the
+            person rather than one look, so your creative briefs get followed far more closely.
+          </p>
+          <button onClick={retrain} disabled={retraining}
+            className="mt-3 rounded-lg border border-[#a855f7]/40 px-4 py-2 text-sm font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+            {retraining ? "Starting retrain…" : "↻ Retrain on a richer set"}
+          </button>
         </div>
       </div>
     );

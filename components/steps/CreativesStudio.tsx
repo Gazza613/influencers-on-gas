@@ -339,7 +339,12 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.url} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(c.url)} onError={() => setBroken((b) => new Set(b).add(c.url))} />
                   )}
-                  <button onClick={() => togglePick(c.url)} className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/70 bg-black/45 text-transparent hover:text-white/70"}`}>✓</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); togglePick(c.url); }}
+                    aria-pressed={sel}
+                    title={sel ? "Selected" : "Select this shot"}
+                    className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"}`}
+                  >✓</button>
                   <div className="absolute left-1.5 top-1.5 flex gap-1">
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
