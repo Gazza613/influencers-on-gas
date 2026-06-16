@@ -10,14 +10,15 @@ import { flex, pick, PHOTO_LINES } from "@/lib/flex";
 
 type Ref = { url: string; hero?: boolean };
 
-const SET_TOTAL = 10; // chosen hero + 9 varied training frames (angle/light/expression/distance)
+const SET_TOTAL = 12; // chosen hero + 11 varied training frames (angle/light/expression/distance/hands/back)
 const PHOTO_NARRATION = [
   "On set, locking the chosen face as the one true identity…",
-  "Shooting every angle: front, three-quarter, profile, up and down…",
+  "Shooting the full turnaround: front, three-quarter, profile and back…",
   "Capturing close-up skin detail: pores, catchlights, the lot…",
+  "Getting a clean hands frame so the fingers always come out right…",
   "Varying the light: soft daylight, warm indoor, golden hour…",
   "Catching real expressions: neutral, a smile, mid-conversation…",
-  "Building a clean, varied coverage set sharp enough to train a faithful Soul…",
+  "Building a clean, forensic coverage set sharp enough to train a faithful Soul…",
 ];
 
 export default function PhotoshootStep({
