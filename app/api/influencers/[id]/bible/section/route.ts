@@ -28,7 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const value = await generateBibleSection(inf.name, (persona.brief as string) ?? "", bible, section);
     const nextBible = { ...bible, [section]: value };
     await updateInfluencer(id, { persona: { ...persona, bible: nextBible } });
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-opus-4-8", unit: "bible", action: "bible", count: 1 }).catch(() => {});
+    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "bible", action: "bible", count: 1 }).catch(() => {});
     return NextResponse.json({ section, value });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

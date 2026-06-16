@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 
 type Report = {
@@ -95,6 +95,16 @@ export default function CostControlPage() {
     fetch("/api/balance").then((r) => r.json()).then((d) => setBal({ remaining: d.remaining ?? null, monthly: d.monthly ?? 9000, creditZarCents: d.creditZarCents ?? 64 })).catch(() => {});
     fetch("/api/me").then((r) => (r.ok ? r.json() : { user: null })).then((d) => setIsSuper(d.user?.role === "super_admin")).catch(() => {});
   }, []);
+
+  // Self-heal the daily audit: snapshot once a day when someone opens Cost Control,
+  // so it stays current even if the cron hasn't fired.
+  const snapped = useRef(false);
+  useEffect(() => {
+    if (snapped.current || loading) return;
+    const haveToday = audit.length > 0 && audit[0].taken_at.slice(0, 10) === today();
+    snapped.current = true;
+    if (!haveToday) fetch("/api/cost-control/snapshot", { method: "POST" }).then(() => load()).catch(() => {});
+  }, [audit, loading, load]);
 
   async function calibrate() {
     if (calibrating) return;

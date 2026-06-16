@@ -18,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   try {
     const refined = await refineCreativePrompt(inf.name, (persona.bible as Record<string, unknown>) ?? {}, typeof scene === "string" ? scene : "");
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-opus-4-8", unit: "bible", action: "creative", count: 1 }).catch(() => {});
+    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "bible", action: "creative", count: 1 }).catch(() => {});
     return NextResponse.json({ refined });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
