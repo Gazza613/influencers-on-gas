@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import BibleEditor from "@/components/BibleEditor";
 import Lightbox from "@/components/Lightbox";
+import { flex, pick, CAST_LINES } from "@/lib/flex";
 
 type Ref = { url: string };
 
@@ -57,7 +58,7 @@ export default function CastingStep({
       setSt(inf.status);
       if (Array.isArray(inf.persona?.candidates)) setCandidates(inf.persona.candidates);
       if (inf.status === "gen_failed") { setErr(inf.persona?.gen_error || "Casting failed. Give it another go."); setBusy(false); return; }
-      if (inf.status === "cast_ready") { setBusy(false); return; }
+      if (inf.status === "cast_ready") { flex(pick(CAST_LINES)); setBusy(false); return; }
     }
     return poll(tries + 1);
   }

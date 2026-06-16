@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import HardRefreshGate from "@/components/HardRefreshGate";
 import RouteProgress from "@/components/RouteProgress";
+import FlexToasts from "@/components/FlexToasts";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -30,6 +31,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full">
         <RouteProgress />
+        <FlexToasts />
         <HardRefreshGate />
         {children}
       </body>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
+import { flex, pick, PHOTO_LINES } from "@/lib/flex";
 
 type Ref = { url: string; hero?: boolean };
 
@@ -61,7 +62,7 @@ export default function PhotoshootStep({
         setSelected((sel) => (sel.size ? sel : new Set(inf.look_refs.map((x: Ref) => x.url))));
       }
       if (inf.status === "gen_failed") { setErr(inf.persona?.gen_error || "The photoshoot stalled. Try again."); setBusy(false); return; }
-      if (inf.status === "frames_ready") { setBusy(false); return; }
+      if (inf.status === "frames_ready") { flex(pick(PHOTO_LINES)); setBusy(false); return; }
     }
     return poll(tries + 1);
   }

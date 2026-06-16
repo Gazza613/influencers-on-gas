@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flex, pick, BIBLE_LINES } from "@/lib/flex";
 
 type Bible = Record<string, unknown>;
 
@@ -118,7 +119,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
     const r = await fetch(`/api/influencers/${influencerId}/bible`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(d?.error || "Could not design the character"); setBusy(false); return; }
-    setBible(d.bible); setOpen(false); setBusy(false); setSaved("saved");
+    setBible(d.bible); setOpen(false); setBusy(false); setSaved("saved"); flex(pick(BIBLE_LINES));
   }
 
   const get = (path: string[]): Bible => path.reduce((o: Bible, k) => (o?.[k] ?? {}) as Bible, (bible ?? {}) as Bible);

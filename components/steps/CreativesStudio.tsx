@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
+import { flex, pick, QA_LINES } from "@/lib/flex";
 
 type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
 type Rate = { credits: number; cents: number };
@@ -56,9 +57,26 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
 
   const running = status === "running";
 
+  const prevCount = useRef(initial.creatives?.length || 0);
+  const prevStatus = useRef(initial.status || "idle");
   async function refresh() {
     const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
-    if (d) { if (d.rates) setRates(d.rates); setCreatives(d.creatives || []); setVideoSelects(d.videoSelects || []); setQa(d.qa || null); setStatus(d.status || "idle"); }
+    if (d) {
+      const list = d.creatives || [];
+      // Flash a QA call-out for each newly-landed shot while a run is in progress.
+      const fresh = list.length - prevCount.current;
+      if (fresh > 0 && prevStatus.current === "running") {
+        for (let i = 0; i < Math.min(fresh, 3); i++) setTimeout(() => flex(pick(QA_LINES)), i * 500);
+      }
+      // Milestone burst when the run completes.
+      if (prevStatus.current === "running" && d.status === "done") {
+        const approved = d.qa?.approved ?? list.length;
+        flex(`✨ ${approved} shot${approved === 1 ? "" : "s"} approved by AI Vision QA`, { milestone: true });
+      }
+      prevCount.current = list.length;
+      prevStatus.current = d.status || "idle";
+      if (d.rates) setRates(d.rates); setCreatives(list); setVideoSelects(d.videoSelects || []); setQa(d.qa || null); setStatus(d.status || "idle");
+    }
     return d;
   }
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);

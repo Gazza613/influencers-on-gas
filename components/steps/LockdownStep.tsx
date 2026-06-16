@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { flex } from "@/lib/flex";
 
 const QUIPS = [
   "Teaching the AI every angle of this face…",
@@ -44,7 +45,7 @@ export default function LockdownStep({
     if (r.ok) {
       const inf = (await r.json()).influencer;
       setSt(inf.status);
-      if (inf.persona?.locked) { setLocked(true); setBusy(false); return; }
+      if (inf.persona?.locked) { setLocked(true); setBusy(false); flex("🔒 Identity locked — pixel-consistent forever", { milestone: true }); return; }
       if (inf.status === "soul_failed") { setErr(inf.persona?.soul_error || "Lock-down failed. You can retry."); setBusy(false); return; }
     }
     return poll(tries + 1);
