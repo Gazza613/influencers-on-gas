@@ -307,3 +307,9 @@ create table if not exists app_settings (
   value      text,
   updated_at timestamptz not null default now()
 );
+
+-- Daily "Higgsfield expert" research call (Claude + web search). Nominal ZAR estimate
+-- per run so the daily research shows in Cost Control.
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('anthropic','claude-sonnet-4-6','request', 0, 200, true)
+on conflict (provider, model, unit) do nothing;

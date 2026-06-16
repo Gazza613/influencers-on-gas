@@ -249,3 +249,35 @@ export async function generateBibleSection(
   if (!block || block.type !== "tool_use") throw new Error("No section returned");
   return isString ? (block.input as { value: unknown }).value : block.input;
 }
+
+// Daily "Higgsfield expert" research. Uses Claude with live web search to pull the
+// latest Higgsfield features, Soul training and prompt best practices, and AI-influencer
+// trends, then turns them into concrete ideas to implement in Influencers on GAS.
+// Returns a clean HTML fragment (list of ideas) for the daily email.
+const TIPS_SYSTEM = `You are the in-house Higgsfield and AI-influencer expert for "Influencers on GAS", an agency platform that builds CONSISTENT AI influencers and their social creatives. Our stack: a brief becomes a Character Bible, then casting (Nano Banana), then a varied multi-angle photoshoot, then a trained Higgsfield Soul (soul_2 for editorial, soul_cinematic for cinematic), then social creatives with optional 4K upscale (bytedance). Identity must stay perfectly consistent; wardrobe and scene are prompt-driven; everyone is always fully clothed; backgrounds stay sharp; background extras reflect South African diversity.
+
+Research the LATEST Higgsfield updates and AI-influencer best practices (new or updated models, Soul training technique, prompt craft, consistency tricks, upscaling, cost and speed), prioritising the last few weeks where possible.
+
+STRICT BAR: only surface an idea if it would FUNDAMENTALLY optimise what we have built (a real step change in identity consistency, realism, quality or speed) OR materially improve our COST CONTROL (cheaper or faster models, better credit usage, smarter routing, pricing changes worth acting on). Ignore minor, generic or nice-to-have tips. Quality over quantity: 1 to 3 ideas that truly clear the bar is ideal.
+
+If, after researching, NOTHING today genuinely clears that bar, output EXACTLY this token and nothing else: NO_SIGNIFICANT_FINDINGS
+
+Otherwise, for each qualifying idea output exactly:
+<h3 style="margin:16px 0 4px;font-size:15px;color:#e6e8eb;">[short punchy title]</h3>
+<p style="margin:0 0 6px;color:#b8bcc4;font-size:13px;line-height:1.5;">[what it is and why it is a step change for us, 1 to 2 sentences]</p>
+<p style="margin:0 0 2px;color:#8a8f98;font-size:12px;"><b style="color:#c79bff;">Implement:</b> [a specific, practical step for our platform]</p>
+
+Rules: UK British spelling. NO em dashes (use commas or full stops). Be specific and practical, not generic. Only output the HTML fragments (or the NO_SIGNIFICANT_FINDINGS token), no preamble, no closing remarks, no markdown fences.`;
+
+export async function researchHiggsfieldTips(): Promise<string> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 2500,
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 6 } as unknown as Anthropic.Tool],
+    system: TIPS_SYSTEM,
+    messages: [{ role: "user", content: "Research today's best Higgsfield and AI-influencer practices and give me concrete ideas to implement in Influencers on GAS." }],
+  });
+  const html = res.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
+  return html || "NO_SIGNIFICANT_FINDINGS";
+}
