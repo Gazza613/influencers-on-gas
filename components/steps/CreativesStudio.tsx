@@ -37,7 +37,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
-  const [res, setRes] = useState<"2k" | "4k">("2k");
+  const [res, setRes] = useState<"2k" | "4k">("4k");
   const [extras, setExtras] = useState(true);
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
@@ -91,8 +91,10 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     if (tries > 160) return;
     await new Promise((r) => setTimeout(r, 5000));
     const d = await refresh();
-    if (d?.status === "failed") { setErr(d.error || "Render failed"); return; }
-    if (d?.status === "done") return;
+    if (!d) return poll(tries + 1);
+    if (d.status === "failed") { setErr(d.error || "Render failed"); return; }
+    // Stop on ANY non-running state (done / idle / aborted) so it can never loop forever.
+    if (d.status !== "running") return;
     return poll(tries + 1);
   }
 
@@ -137,6 +139,12 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     poll();
+  }
+
+  async function abort() {
+    if (!confirm("Abort this render? Anything already finished is kept; you can run again.")) return;
+    await fetch(`/api/influencers/${influencerId}/creatives`, { method: "DELETE" }).catch(() => {});
+    setStatus("idle"); setErr("");
   }
 
   function togglePick(url: string) { setPicked((s) => { const n = new Set(s); n.has(url) ? n.delete(url) : n.add(url); return n; }); }
@@ -279,8 +287,11 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
 
         {running && (
           <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
-            <div className="flex items-center gap-2 text-xs text-ink"><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#a855f7]" />{QUIPS[quip]}</div>
-            <p className="mt-2 text-[11px] text-ink-faint">Each format renders {PER_RATIO} distinct shots. They appear below as they land.</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs text-ink"><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#a855f7]" />{QUIPS[quip]}</div>
+              <button onClick={abort} className="rounded-md border border-line px-2.5 py-1 text-[11px] font-semibold text-ink-dim hover:border-alert/50 hover:text-alert">Abort</button>
+            </div>
+            <p className="mt-2 text-[11px] text-ink-faint">Generating, QA-checking and (for 4K) upscaling each shot. {res === "4k" ? "4K adds an upscale per shot, so it takes longer." : ""} They appear here when ready. Stuck? Hit Abort and run again.</p>
           </div>
         )}
       </div>
@@ -327,6 +338,10 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                   </div>
                   {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
                   {!broken.has(c.url) && <span className="absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-ready" title="Passed AI Vision QA">QA ✓</span>}
+                  {!broken.has(c.url) && (
+                    <button onClick={() => setZoom(c.url)} title="Review full size"
+                      className="absolute inset-0 m-auto hidden h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/55 text-lg text-white backdrop-blur-sm transition group-hover:flex hover:bg-black/75">👁</button>
+                  )}
                 </div>
               );
             })}

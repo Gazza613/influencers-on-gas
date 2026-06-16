@@ -177,11 +177,23 @@ export async function generateVariation(elementId: string | null, basePrompt: st
 // Generate many prompts CONCURRENTLY in one session: launch every job up front, then
 // poll them all in parallel. Wall-clock ≈ a single image, not the sum. Returns URLs
 // aligned to `prompts` (null where a job failed). Used for fast casting + coverage sets.
+// Bound concurrent generations so parallel formats don't overwhelm Higgsfield (which
+// silently drops jobs under heavy concurrency). Module-level, per function invocation.
+let _active = 0;
+const _queue: (() => void)[] = [];
+const MAX_CONCURRENT = 4;
+async function acquireSlot(): Promise<void> {
+  if (_active < MAX_CONCURRENT) { _active++; return; }
+  await new Promise<void>((res) => _queue.push(res));
+  _active++;
+}
+function releaseSlot(): void { _active = Math.max(0, _active - 1); const next = _queue.shift(); if (next) next(); }
+
 export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}): Promise<(string | null)[]> {
   const base = { ...baseParams(model, aspectRatio), ...extra };
-  // Each prompt gets its OWN MCP session so generations run truly in parallel
-  // (a shared session serializes requests). Wall-clock ≈ one image, not the sum.
+  // Each prompt gets its OWN MCP session; concurrency is capped so jobs aren't dropped.
   return Promise.all(prompts.map(async (p) => {
+    await acquireSlot();
     try {
       const { call } = await openSession();
       const r = await call("generate_image", { params: { ...base, prompt: p } });
@@ -189,7 +201,7 @@ export async function generateBatch(prompts: string[], model = "gpt_image_2", as
       const jobId = extractJobIds(r)[0] ?? null;
       if (!url && jobId) url = await pollJob(call, jobId);
       return url;
-    } catch { return null; }
+    } catch { return null; } finally { releaseSlot(); }
   }));
 }
 

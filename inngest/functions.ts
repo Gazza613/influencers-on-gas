@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS } from "@/lib/realism";
-import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable } from "@/lib/vendors/higgsfield";
+import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, SOUL_SCENE } from "@/lib/realism";
+import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { qaCreative } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -339,32 +339,38 @@ export const generateCreatives = inngest.createFunction(
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
       const wardrobe = clothingRef ? "wearing an outfit like the clothing reference, " : "";
       const place = locationRef ? "in a setting like the location reference, " : "";
-      const extra = useSoul ? { soul_id: soulId } : {};
+
+      // Anchor identity: Soul models take the locked face as a reference image (role: image)
+      // alongside soul_id — this is what keeps the person actually looking like themselves.
+      const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]) : [];
+      const heroUrl = (persona.hero_realism_url as string) || (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url || (persona.reference_url as string) || "";
+      const heroMedia = useSoul && heroUrl ? await step.run("hero-media", () => importMediaUrl(heroUrl)) : null;
+      const extra = useSoul ? { soul_id: soulId, ...(heroMedia ? { medias: [{ value: heroMedia, role: "image" }] } : {}) } : {};
 
       const buildPrompt = (idx: number) =>
         useSoul
-          ? `the same person, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`
+          ? `the same exact person from the reference, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SOUL_SCENE}, ${peopleClause}.`
           : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
 
-      // Process every format CONCURRENTLY (each: generate → QA → re-roll), so multi-format
-      // runs finish in ~one format's wall-clock instead of the sum.
+      // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
+      // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is
+      // far faster than retry-loops that upscale everything. Top-ups use "Generate more".
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
-        const kept: string[] = [];
-        let reviewed = 0, rejected = 0;
-        for (let attempt = 0; attempt < 2 && kept.length < perRatio; attempt++) {
-          const need = perRatio - kept.length;
-          const prompts = Array.from({ length: need }, (_, i) => buildPrompt(attempt * perRatio + i));
-          let got = (await step.run(`gen-${ratio}-${attempt}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
-          if (got.length) await step.run(`usage-gen-${ratio}-${attempt}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: got.length }));
-          if (fourK && got.length) {
-            got = await step.run(`upscale-${ratio}-${attempt}`, () => Promise.all(got.map((u) => upscaleUrlTo(u, "4k").then((r) => r || u).catch(() => u))));
-            await step.run(`usage-up-${ratio}-${attempt}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: got.length }));
-          }
-          // Vision QA — reject shirtless / collage / bad-proportion / broken; on QA error, keep.
-          const verdicts = await step.run(`qa-${ratio}-${attempt}`, () =>
-            Promise.all(got.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
-          );
-          for (const v of verdicts) { reviewed++; if (v.pass && kept.length < perRatio) kept.push(v.u); else if (!v.pass) rejected++; }
+        // Over-generate by one for QA headroom.
+        const prompts = Array.from({ length: perRatio + 1 }, (_, i) => buildPrompt(i));
+        const produced = (await step.run(`gen-${ratio}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
+        if (produced.length) await step.run(`usage-gen-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: produced.length }));
+        // Vision QA at base res — reject shirtless / collage / bad-proportion / broken (QA error ⇒ keep).
+        const verdicts = await step.run(`qa-${ratio}`, () =>
+          Promise.all(produced.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
+        );
+        let kept = verdicts.filter((v) => v.pass).slice(0, perRatio).map((v) => v.u);
+        const reviewed = verdicts.length;
+        const rejected = verdicts.filter((v) => !v.pass).length;
+        // Upscale ONLY the keepers (if 4K requested).
+        if (fourK && kept.length) {
+          kept = await step.run(`upscale-${ratio}`, () => Promise.all(kept.map((u) => upscaleUrlTo(u, "4k").then((r) => r || u).catch(() => u))));
+          await step.run(`usage-up-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: kept.length }));
         }
         return { ratio, kept, reviewed, rejected };
       }));

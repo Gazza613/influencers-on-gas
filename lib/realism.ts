@@ -18,6 +18,13 @@ export const SCENE_PEOPLE =
 export const NO_EXTRAS =
   "no other people anywhere in the scene, the subject is completely alone, clean and uncluttered background";
 
+// Concise realism core for Soul generation (long stacked clauses confuse the model and
+// hurt quality — the Soul + reference handle identity, so keep the scene direction tight).
+export const SOUL_SCENE =
+  "candid photoreal photograph, fully clothed with a top and bottoms (never shirtless or nude), " +
+  "true-to-life body proportions and correct scale in the scene, background in sharp focus, " +
+  "balanced natural exposure with no blown-out highlights, a single real photo (not a collage or split panels)";
+
 export const REALISM_POSITIVE =
   "photorealistic, natural skin with visible pores and fine vellus hair, subsurface scattering, " +
   "subtle, restrained natural imperfections and gentle asymmetry, realistic catchlights in the eyes, natural under-eye area, " +
@@ -30,7 +37,7 @@ export const SCENE_REALISM =
   "photorealistic editorial photograph, natural skin texture, true-to-life human proportions, " +
   "the subject rendered at CORRECT REAL-WORLD SCALE and perspective relative to the background: head height, body size and distance consistent with doorways, counters, furniture and any other people in the scene, " +
   "feet firmly planted on the ground plane with natural contact shadows, accurate camera height and lens perspective, never oversized, undersized, floating or pasted-on, " +
-  "lighting direction and white balance matched to the environment, neutral filmic colour grade, candid and unposed, " +
+  "lighting direction and white balance matched to the environment, balanced natural exposure with a full tonal range and NO blown-out highlights or over-exposure, neutral filmic colour grade, candid and unposed, " +
   "shot on 35mm at f/8 with deep depth of field, the entire scene and background in sharp focus (no bokeh, never blurred), " +
   CLOTHED + ", " + SINGLE_FRAME;
 

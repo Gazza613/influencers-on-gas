@@ -36,6 +36,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
 }
 
+// Abort a stuck/running render: reset status so the UI unblocks (the durable job's
+// final save is harmless if it lands later — it just writes whatever it finished).
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const inf = await getInfluencer(id);
+  const persona = (inf?.persona ?? {}) as Record<string, unknown>;
+  await updateInfluencer(id, { persona: { ...persona, creatives_status: "idle", creatives_error: null } });
+  return NextResponse.json({ ok: true });
+}
+
 // Kick off a creatives render (one image per selected ratio; optional 4K upscale).
 export const maxDuration = 60;
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
