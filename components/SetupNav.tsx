@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/setup/influencers", label: "Influencers" },
   { href: "/setup/brains", label: "Brains" },
   { href: "/setup/connect", label: "Connect Tools" },
+  { href: "/showcase", label: "Showcase" },
   { href: "/cost-control", label: "Cost Control" },
 ];
 

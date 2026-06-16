@@ -296,3 +296,14 @@ on conflict (provider, model, unit) do nothing;
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
 values ('higgsfield','upscale_image','image', 2, 128, true)
 on conflict (provider, model, unit) do nothing;
+
+-- ── Showcase: a public brag wall of finished influencer videos ────────────────
+-- Producers flag a complete production into the showcase; a single unguessable
+-- public token serves the wall to prospects without a login.
+alter table productions add column if not exists showcased boolean not null default false;
+
+create table if not exists app_settings (
+  key        text primary key,
+  value      text,
+  updated_at timestamptz not null default now()
+);

@@ -15,9 +15,9 @@ const CASTING_NARRATION = [
   "Our casting director is reading your character brief…",
   "Auditioning six distinct faces, each a real, believable human…",
   "Art-directing the lighting and mood for every look…",
-  "No two faces alike — you'll pick the one that clicks…",
+  "No two faces alike, you'll pick the one that clicks…",
   "Layering in real-skin detail so none of them read as AI…",
-  "Almost there — lining up your audition board…",
+  "Almost there, lining up your audition board…",
 ];
 
 export default function CastingStep({
@@ -88,7 +88,7 @@ export default function CastingStep({
         <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Cast the looks</div>
 
         {referenceUrl ? (
-          // Reference / twin path — casting is skipped.
+          // Reference / twin path, casting is skipped.
           <div className="mt-3">
             <p className="text-sm text-ink-dim">
               You gave us a reference photo, so we skip casting and shoot straight from that face. Nice shortcut.
@@ -140,7 +140,7 @@ export default function CastingStep({
                     return (
                       <div key={i} onClick={() => !busy && !broken.has(c.url) && choose(c.url)} className="shimmer group relative block cursor-pointer overflow-hidden rounded-lg">
                         {broken.has(c.url) ? (
-                          <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border-2 border-line bg-surface-2 px-2 text-center text-[10px] text-ink-faint">look didn&apos;t load — re-cast to refresh</div>
+                          <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border-2 border-line bg-surface-2 px-2 text-center text-[10px] text-ink-faint">look didn&apos;t load, re-cast to refresh</div>
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={c.url} alt={`look ${i + 1}`} onError={() => setBroken((b) => new Set(b).add(c.url))}
@@ -158,7 +158,7 @@ export default function CastingStep({
           </>
         )}
 
-        {/* Next step — only once a face is chosen (or reference path handled above) */}
+        {/* Next step, only once a face is chosen (or reference path handled above) */}
         {!referenceUrl && chosen && (
           <div className="mt-5 rounded-lg border border-ready/30 bg-ready/5 p-4">
             <p className="text-sm text-ink">Step one done. Next we run a full photoshoot on this exact face.</p>

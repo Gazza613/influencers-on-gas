@@ -27,7 +27,7 @@ export default function WorkingPanel({
     return () => clearInterval(t);
   }, [lines.length]);
 
-  // Elapsed clock — the single strongest "it's alive" signal during long renders.
+  // Elapsed clock, the single strongest "it's alive" signal during long renders.
   useEffect(() => {
     const t = setInterval(() => setSecs((s) => s + 1), 1000);
     return () => clearInterval(t);

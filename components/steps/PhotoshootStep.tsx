@@ -12,7 +12,7 @@ type Ref = { url: string; hero?: boolean };
 
 const SET_TOTAL = 7; // chosen hero + 4 face-coverage + 2 scene shots
 const PHOTO_NARRATION = [
-  "On set — locking the chosen face as the one true identity…",
+  "On set, locking the chosen face as the one true identity…",
   "Shooting every angle so the camera never loses them…",
   "Capturing close-up skin detail: pores, catchlights, the lot…",
   "Setting up the scene shots in your location…",
@@ -132,7 +132,7 @@ export default function PhotoshootStep({
       {building && (
         <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 2 min"
           pct={frames.length > 1 ? pct : null} sub={`${frames.length}/${SET_TOTAL} frames`}
-          note="Angles, close-ups and your scene — frames appear as they land." />
+          note="Angles, close-ups and your scene, frames appear as they land." />
       )}
 
       {err && <p className="text-xs text-alert">{err}</p>}

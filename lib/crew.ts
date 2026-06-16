@@ -1,4 +1,4 @@
-// The "production crew" — each build step is fronted by a named AI specialist so the
+// The "production crew", each build step is fronted by a named AI specialist so the
 // journey feels like collaborating with a real studio team, not waiting on a spinner.
 // Purely cosmetic identity + flex copy; the actual work is done by the pipeline.
 
@@ -27,7 +27,7 @@ export const CREW: Record<string, CrewMember> = {
     emoji: "🧬",
     name: "Neo",
     role: "Identity Engineer",
-    greeting: "I'm training a dedicated model on this exact face — locking it forever.",
+    greeting: "I'm training a dedicated model on this exact face, locking it forever.",
   },
   creatives: {
     emoji: "✨",

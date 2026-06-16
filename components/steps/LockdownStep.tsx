@@ -7,12 +7,12 @@ import { CREW } from "@/lib/crew";
 import { flex } from "@/lib/flex";
 
 const LOCKDOWN_NARRATION = [
-  "Studying every angle of this face — the bone structure, the asymmetry, the tells…",
+  "Studying every angle of this face, the bone structure, the asymmetry, the tells…",
   "Teaching the model the smile, the eyes, the way the light catches the skin…",
   "Forging a dedicated identity the camera will never forget…",
-  "Running the Humaniser — real pores, real catchlights, real skin…",
+  "Running the Humaniser, real pores, real catchlights, real skin…",
   "Welding the identity shut so it can never drift between shots…",
-  "Almost there — this face is becoming pixel-consistent, forever…",
+  "Almost there, this face is becoming pixel-consistent, forever…",
 ];
 
 export default function LockdownStep({
@@ -38,7 +38,7 @@ export default function LockdownStep({
     if (r.ok) {
       const inf = (await r.json()).influencer;
       setSt(inf.status);
-      if (inf.persona?.locked) { setLocked(true); setBusy(false); flex("🔒 Identity locked — pixel-consistent forever", { milestone: true }); return; }
+      if (inf.persona?.locked) { setLocked(true); setBusy(false); flex("🔒 Identity locked, pixel-consistent forever", { milestone: true }); return; }
       if (inf.status === "soul_failed") { setErr(inf.persona?.soul_error || "Lock-down failed. You can retry."); setBusy(false); return; }
     }
     return poll(tries + 1);
@@ -124,7 +124,7 @@ export default function LockdownStep({
           <div className="mt-4">
             <WorkingPanel title="Lock-down" lines={LOCKDOWN_NARRATION} crew={CREW.lockdown} eta="about 10 min" pct={null}
               onAbort={abort}
-              note="Running on our servers — it keeps going even if you leave or start another influencer. Soul training can occasionally take up to ~30 min." />
+              note="Running on our servers, it keeps going even if you leave or start another influencer. Soul training can occasionally take up to ~30 min." />
           </div>
         )}
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}

@@ -27,10 +27,10 @@ const PLATFORMS: { key: string; label: string; ratios: string[] }[] = [
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const CREATIVE_NARRATION = [
   "Reading your scene brief and art-directing the shoot…",
-  "Posing your locked influencer — same face, every single frame…",
+  "Posing your locked influencer, same face, every single frame…",
   "Framing each format: vertical for Reels, square for feed, wide for ads…",
   "Dialling in the light, the colour and the wardrobe…",
-  "🔎 AI Vision QA inspecting every shot — clothed, single frame, true proportions…",
+  "🔎 AI Vision QA inspecting every shot, clothed, single frame, true proportions…",
   "Re-rolling anything that doesn't make the cut, no compromises…",
   "Upscaling the keepers to crisp, publish-ready 4K…",
 ];
@@ -170,7 +170,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         </p>
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[11px] text-ink-dim">
           <span className="text-base leading-none">🔎</span>
-          <span><span className="text-[#c79bff] font-semibold">AI Vision QA</span> reviews every single shot before you see it — wardrobe, composition, proportions and realism are all checked, and anything that doesn&apos;t pass is rejected and re-rolled automatically. You only ever get keepers.</span>
+          <span><span className="text-[#c79bff] font-semibold">AI Vision QA</span> reviews every single shot before you see it, wardrobe, composition, proportions and realism are all checked, and anything that doesn&apos;t pass is rejected and re-rolled automatically. You only ever get keepers.</span>
         </div>
 
         {/* Platforms (toggle) */}
@@ -208,14 +208,14 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["soul_2", "Realism (Soul 2)", "Authentic UGC / fashion editorial — the default social look"], ["soul_cinematic", "Cinematic (Soul Cinema)", "Cinema-grade, dramatic lighting — premium hero shots"]] as const).map(([k, label, hint]) => (
+            {([["soul_2", "Realism (Soul 2)", "Authentic UGC / fashion editorial, the default social look"], ["soul_cinematic", "Cinematic (Soul Cinema)", "Cinema-grade, dramatic lighting, premium hero shots"]] as const).map(([k, label, hint]) => (
               <button key={k} onClick={() => setTier(k)} className={`rounded-lg border px-3 py-2 text-left transition ${tier === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
                 <div className={`text-sm font-bold ${tier === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
                 <div className="text-[10px] text-ink-faint">{hint}</div>
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-faint">Both lock your trained Soul for identical identity across every shot — the consistency video production needs.</p>
+          <p className="mt-1.5 text-[11px] text-ink-faint">Both lock your trained Soul for identical identity across every shot, the consistency video production needs.</p>
         </div>
 
         {/* Resolution */}
@@ -285,7 +285,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <div className="mt-4">
             <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null}
               onAbort={abort}
-              note={`Generating, QA-checking${res === "4k" ? " and upscaling to 4K" : ""} each shot — they appear below as they pass review.${res === "4k" ? " 4K adds an upscale per shot, so it takes a little longer." : ""} Stuck? Hit Abort and run again.`} />
+              note={`Generating, QA-checking${res === "4k" ? " and upscaling to 4K" : ""} each shot, they appear below as they pass review.${res === "4k" ? " 4K adds an upscale per shot, so it takes a little longer." : ""} Stuck? Hit Abort and run again.`} />
           </div>
         )}
       </div>
