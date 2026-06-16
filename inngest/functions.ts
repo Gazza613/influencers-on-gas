@@ -19,12 +19,11 @@ const IMAGE_MODEL = "nano_banana_2";
 // angle/expression/close-up set that trains a faithful identity; sceneShots() places the
 // same face in the brief's required location. Each is locked to the chosen face via the
 // Element, so every frame is ONE consistent identity.
+// Lean coverage set for Soul training (kept small for speed; 5+ frames is plenty).
 const FACE_COVERAGE = [
   "the same exact person, three-quarter left angle, soft natural daylight, calm neutral expression, identical face and wardrobe, photorealistic portrait",
   "the same exact person, three-quarter right angle, warm indoor lighting, subtle genuine smile, identical face and wardrobe, photorealistic portrait",
-  "the same exact person, near-profile side view, gentle side lighting, relaxed expression, identical face and wardrobe, photorealistic portrait",
   "the same exact person, tight beauty close-up of the face, sharp catchlight in the eyes, natural skin texture with visible pores and fine detail, identical features, photorealistic",
-  "the same exact person, close-up on the lower face and lips, soft natural light, realistic skin and lip detail, identical features, photorealistic",
   "the same exact person, straight-on at eye level, looking directly into the lens, warm authentic smile, identical face and wardrobe, photorealistic portrait",
 ];
 
@@ -34,8 +33,6 @@ const FACE_COVERAGE = [
 const SCENE_FRAMINGS = [
   "standing full-length, full body head to toe, natural relaxed pose",
   "medium three-quarter shot with the environment clearly in frame",
-  "wider candid lifestyle shot with plenty of the environment around them",
-  "seated or leaning naturally in the space, relaxed candid moment",
 ];
 
 // STAGE 1 — Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the

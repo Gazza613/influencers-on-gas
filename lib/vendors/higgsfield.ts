@@ -283,10 +283,12 @@ export async function filterLoadable(urls: string[]): Promise<string[]> {
   const ok = async (u: string): Promise<boolean> => {
     for (let i = 0; i < 2; i++) {
       try {
-        const r = await fetch(u, { method: "GET", signal: AbortSignal.timeout(8000) });
+        // HEAD is cheap (no body); fall back to GET if HEAD isn't allowed.
+        let r = await fetch(u, { method: "HEAD", signal: AbortSignal.timeout(6000) });
+        if (r.status === 405 || r.status === 501) r = await fetch(u, { method: "GET", signal: AbortSignal.timeout(8000) });
         if (r.ok) return true;
       } catch { /* retry */ }
-      if (i === 0) await new Promise((r) => setTimeout(r, 1800));
+      if (i === 0) await new Promise((r) => setTimeout(r, 1500));
     }
     return false;
   };
