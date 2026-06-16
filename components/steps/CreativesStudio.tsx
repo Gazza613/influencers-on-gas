@@ -40,6 +40,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [videoSelects, setVideoSelects] = useState<string[]>([]);
   const [status, setStatus] = useState(initial.status || "idle");
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [broken, setBroken] = useState<Set<string>>(new Set());
   const [err, setErr] = useState("");
   const [quip, setQuip] = useState(0);
   const [zoom, setZoom] = useState<string | null>(null);
@@ -274,8 +275,12 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               const forVideo = videoSelects.includes(c.url);
               return (
                 <div key={i} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={c.url} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(c.url)} />
+                  {broken.has(c.url) ? (
+                    <div className="flex aspect-square w-full items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">image didn&apos;t load</div>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.url} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(c.url)} onError={() => setBroken((b) => new Set(b).add(c.url))} />
+                  )}
                   <button onClick={() => togglePick(c.url)} className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/70 bg-black/45 text-transparent hover:text-white/70"}`}>✓</button>
                   <div className="absolute left-1.5 top-1.5 flex gap-1">
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>

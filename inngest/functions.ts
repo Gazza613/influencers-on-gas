@@ -1,7 +1,8 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS } from "@/lib/realism";
-import { createFaceElement, generateBatch, trainSoul, soulStatus, importMediaUrl, upscaleUrlTo } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, trainSoul, soulStatus, upscaleUrlTo } from "@/lib/vendors/higgsfield";
+import { qaCreative } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
@@ -321,40 +322,44 @@ export const generateCreatives = inngest.createFunction(
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
 
     try {
-      // Soul takes ONE reference media (prefer the location to ground the scene); nano uses
-      // multi-element injection. Either way, clothing/scene are also described in the prompt.
-      let refMediaId: string | null = null;
+      // Nano fallback path only (no Soul) uses element injection. Soul renders natively
+      // from the prompt + soul_id — NOT from a location reference media (that produced
+      // collages/odd composites), so the scene is described in the prompt instead.
       const clothEl = !useSoul && clothingRef ? await step.run("cloth-el", () => createFaceElement(null, clothingRef, `${inf.name}-cloth`)) : null;
       const locEl = !useSoul && locationRef ? await step.run("loc-el", () => createFaceElement(null, locationRef, `${inf.name}-loc`)) : null;
-      if (useSoul && (locationRef || clothingRef)) {
-        refMediaId = await step.run("import-ref", () => importMediaUrl(locationRef || clothingRef));
-      }
       const tag = (id: string | null) => (id ? `<<<${id}>>> ` : "");
-      const wardrobe = clothingRef ? "wearing the same outfit as the clothing reference, " : "";
-      const place = locationRef ? "in the same location as the location reference, " : "";
-      const extra = useSoul
-        ? { soul_id: soulId, ...(refMediaId ? { medias: [{ value: refMediaId, role: "image" }] } : {}) }
-        : {};
+      const wardrobe = clothingRef ? "wearing an outfit like the clothing reference, " : "";
+      const place = locationRef ? "in a setting like the location reference, " : "";
+      const extra = useSoul ? { soul_id: soulId } : {};
+
+      const buildPrompt = (idx: number) =>
+        useSoul
+          ? `the same person, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`
+          : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[idx % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`;
 
       const made: Creative[] = [];
       for (const ratio of ratios) {
-        // `perRatio` distinct shots for this format, identity locked (Soul or element).
-        const prompts = Array.from({ length: perRatio }, (_, i) =>
-          useSoul
-            ? `the same person, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`
-            : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`,
-        );
-        const urls = await step.run(`gen-${ratio}`, () => generateBatch(prompts, genModel, ratio, extra));
-        const got = urls.filter((u): u is string => !!u);
-        if (got.length) await step.run(`usage-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: got.length }));
-        let finals = got;
-        if (fourK && got.length) {
-          // Native Higgsfield 4K upscale (replaces Magnific).
-          finals = await step.run(`upscale-${ratio}`, async () => Promise.all(got.map((u) => upscaleUrlTo(u, "4k").then((r) => r || u).catch(() => u))));
-          await step.run(`usage-upscale-${ratio}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: got.length }));
+        const kept: string[] = [];
+        // Generate, QA each shot, keep only passers; up to 2 rounds to fill the count.
+        for (let attempt = 0; attempt < 2 && kept.length < perRatio; attempt++) {
+          const need = perRatio - kept.length;
+          const prompts = Array.from({ length: need }, (_, i) => buildPrompt(attempt * perRatio + i));
+          let got = (await step.run(`gen-${ratio}-${attempt}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
+          if (got.length) await step.run(`usage-gen-${ratio}-${attempt}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: got.length }));
+          if (fourK && got.length) {
+            got = await step.run(`upscale-${ratio}-${attempt}`, () => Promise.all(got.map((u) => upscaleUrlTo(u, "4k").then((r) => r || u).catch(() => u))));
+            await step.run(`usage-up-${ratio}-${attempt}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: got.length }));
+          }
+          // Vision QA — reject shirtless / collage / bad-proportion / broken; on QA error, reject.
+          const verdicts = await step.run(`qa-${ratio}-${attempt}`, () =>
+            Promise.all(got.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: false })))),
+          );
+          for (const v of verdicts) if (v.pass && kept.length < perRatio) kept.push(v.u);
+          // Persist progress as shots pass QA.
+          const partial = [...made, ...kept.map((url) => ({ url, ratio, resolution, scene: sceneText, at: Date.now() })), ...existing].slice(0, 120);
+          await step.run(`save-${ratio}-${attempt}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: partial, creatives_status: "running" } }));
         }
-        for (const url of finals) made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
-        await step.run(`save-${ratio}`, () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "running" } }));
+        for (const url of kept) made.push({ url, ratio, resolution, scene: sceneText, at: Date.now() });
       }
       await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done" } }));
       return { ok: true, made: made.length };

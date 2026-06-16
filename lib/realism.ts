@@ -2,9 +2,13 @@
 // identity + b-roll generation so people don't read as AI. The user only picks
 // simple controls (setting, wardrobe); this scaffolding stays hidden.
 
-// Non-negotiable: every subject is FULLY CLOTHED with a complete outfit including bottoms.
+// Non-negotiable: every subject is FULLY CLOTHED — a top covering the torso AND bottoms.
 export const CLOTHED =
-  "fully clothed with a complete, tasteful outfit including bottoms (trousers, jeans, a skirt or tailored shorts), modest and brand-safe";
+  "fully and appropriately dressed in a complete, tasteful outfit: a top covering the torso and chest (shirt, blouse, t-shirt, knit, or dress) AND bottoms (trousers, jeans, a skirt or tailored shorts); the chest and torso are always fully covered; never shirtless, topless, bare-chested, in underwear or swimwear, and never nude";
+
+// Single-frame guard — no collage / contact-sheet / split-panel outputs.
+export const SINGLE_FRAME =
+  "a single photograph, one continuous frame of one moment, NOT a collage, contact sheet, grid, diptych, triptych, split screen or multiple stacked panels";
 
 // Background people, when present, reflect real South African diversity and stay in focus.
 export const SCENE_PEOPLE =
@@ -18,7 +22,7 @@ export const REALISM_POSITIVE =
   "photorealistic, natural skin with visible pores and fine vellus hair, subsurface scattering, " +
   "subtle, restrained natural imperfections and gentle asymmetry, realistic catchlights in the eyes, natural under-eye area, " +
   "soft directional key light with gentle falloff, shot on 85mm at f/2.0, " +
-  "neutral filmic color grade, relaxed candid expression, true-to-life proportions, " + CLOTHED;
+  "neutral filmic color grade, relaxed candid expression, true-to-life proportions, " + CLOTHED + ", " + SINGLE_FRAME;
 
 // Scene/location realism (full-body, environmental). Deep focus on purpose: backgrounds
 // stay sharp (never blurred) so the shots are usable for video/b-roll later.
@@ -28,7 +32,7 @@ export const SCENE_REALISM =
   "feet firmly planted on the ground plane with natural contact shadows, accurate camera height and lens perspective, never oversized, undersized, floating or pasted-on, " +
   "lighting direction and white balance matched to the environment, neutral filmic colour grade, candid and unposed, " +
   "shot on 35mm at f/8 with deep depth of field, the entire scene and background in sharp focus (no bokeh, never blurred), " +
-  CLOTHED;
+  CLOTHED + ", " + SINGLE_FRAME;
 
 export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +

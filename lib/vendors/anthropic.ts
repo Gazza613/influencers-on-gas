@@ -125,6 +125,43 @@ export async function generateBible(name: string, brief: string, gender?: string
   return block.input as CharacterBible;
 }
 
+// Vision QA gate: inspect a generated creative and FAIL it if it breaks the rules.
+// Uses Haiku (fast + cheap) — this runs on every image before the user sees it.
+const QA_MODEL = "claude-haiku-4-5";
+const QA_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    pass: { type: "boolean", description: "true ONLY if every check below is true" },
+    fully_clothed: { type: "boolean", description: "subject wears a top covering the torso AND bottoms; false if shirtless, topless, bare-chested, underwear, swimwear or nude" },
+    single_frame: { type: "boolean", description: "one single photo; false if it is a collage, grid, split-screen, diptych/triptych or multiple stacked panels" },
+    realistic_proportions: { type: "boolean", description: "natural human body and head-to-body proportions, and believable scale relative to the background; false if distorted, oversized, tiny or pasted-on" },
+    coherent_photo: { type: "boolean", description: "a real, coherent photograph (not blank, corrupt, warped or garbled)" },
+    issues: { type: "array", items: { type: "string" } },
+  },
+  required: ["pass", "fully_clothed", "single_frame", "realistic_proportions", "coherent_photo", "issues"],
+} as unknown as Anthropic.Tool["input_schema"];
+
+export async function qaCreative(url: string): Promise<{ pass: boolean; issues: string[] }> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: QA_MODEL,
+    max_tokens: 400,
+    tools: [{ name: "qa", description: "Report the QA verdict for this creative image.", input_schema: QA_SCHEMA }],
+    tool_choice: { type: "tool", name: "qa" },
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: "You are QA for social-media creatives of an AI influencer. Judge this image strictly. pass must be true ONLY if: fully_clothed (top covering torso AND bottoms — FAIL shirtless/topless/underwear/nude), single_frame (one photo, not a collage/grid/split/stacked panels), realistic_proportions (natural body + scale vs background), and coherent_photo. List concrete issues." },
+        { type: "image", source: { type: "url", url } },
+      ],
+    }],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  const out = block && block.type === "tool_use" ? (block.input as { pass?: boolean; issues?: string[] }) : null;
+  return { pass: !!out?.pass, issues: out?.issues ?? [] };
+}
+
 // Polish a producer's rough idea into a single vivid, art-directed image prompt for a
 // social creative of this influencer. Always clothed; diverse, in-focus backgrounds.
 export async function refineCreativePrompt(name: string, bible: Record<string, unknown>, scene: string): Promise<string> {
