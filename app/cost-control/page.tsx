@@ -71,6 +71,9 @@ export default function CostControlPage() {
   const [rate, setRate] = useState(0);
   const [bal, setBal] = useState<{ remaining: number | null; monthly: number; creditZarCents: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSuper, setIsSuper] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
+  const [calMsg, setCalMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,7 +93,20 @@ export default function CostControlPage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     fetch("/api/balance").then((r) => r.json()).then((d) => setBal({ remaining: d.remaining ?? null, monthly: d.monthly ?? 9000, creditZarCents: d.creditZarCents ?? 64 })).catch(() => {});
+    fetch("/api/me").then((r) => (r.ok ? r.json() : { user: null })).then((d) => setIsSuper(d.user?.role === "super_admin")).catch(() => {});
   }, []);
+
+  async function calibrate() {
+    if (calibrating) return;
+    setCalibrating(true); setCalMsg("");
+    const d = await fetch("/api/cost-control/calibrate", { method: "POST" }).then((r) => r.json()).catch(() => null);
+    setCalibrating(false);
+    if (d?.results) {
+      const ok = d.results.filter((r: { updated: boolean }) => r.updated).map((r: { model: string; credits: number }) => `${r.model}=${r.credits}cr`);
+      setCalMsg(ok.length ? `Updated: ${ok.join(", ")}` : "Couldn't read costs — check Higgsfield connection.");
+      load();
+    } else setCalMsg("Calibration failed.");
+  }
 
   function applyPreset(key: string) {
     setPreset(key);
@@ -115,8 +131,17 @@ export default function CostControlPage() {
             <h1 className="text-2xl font-bold">Cost Control</h1>
             <p className="mt-1 text-sm text-ink-dim">Every credit and Rand this platform spends, by member, influencer, tool and function. Audited daily against the live balance.</p>
           </div>
-          <button onClick={load} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">↻ Refresh</button>
+          <div className="flex items-center gap-2">
+            {isSuper && (
+              <button onClick={calibrate} disabled={calibrating} title="Read each model's real credit cost from Higgsfield and update the rate card"
+                className="rounded-lg border border-[#a855f7]/30 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
+                {calibrating ? "Calibrating…" : "Recalibrate costs"}
+              </button>
+            )}
+            <button onClick={load} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">↻ Refresh</button>
+          </div>
         </div>
+        {calMsg && <p className="tabular mt-1 text-[11px] text-ink-faint">{calMsg}</p>}
 
         {/* Hero KPIs */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

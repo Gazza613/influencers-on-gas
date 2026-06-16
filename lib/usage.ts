@@ -48,6 +48,17 @@ export async function recordUsage(o: UsageInput): Promise<void> {
   );
 }
 
+// Upsert a rate_card row (used by cost calibration). cents derived from credits.
+export async function setRate(provider: string, model: string, unit: string, credits: number): Promise<void> {
+  const cents = Math.round(credits * CREDIT_ZAR_CENTS);
+  await db().query(
+    `insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+     values ($1,$2,$3,$4,$5,true)
+     on conflict (provider, model, unit) do update set credits_per_unit = $4, price_cents_per_unit = $5, active = true`,
+    [provider, model, unit, credits, cents],
+  );
+}
+
 export type UsageSummary = {
   total: { credits: number; cents: number; events: number };
   byInfluencer: { name: string; credits: number; cents: number }[];
