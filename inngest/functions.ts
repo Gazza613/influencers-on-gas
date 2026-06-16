@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS } from "@/lib/realism";
 import { createFaceElement, generateBatch, trainSoul, soulStatus, importMediaUrl, upscaleUrlTo } from "@/lib/vendors/higgsfield";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -129,7 +129,7 @@ export const buildIdentity = inngest.createFunction(
         `${tag(elementId)}${tag(clothEl)}${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${v}. ${look}, ${REALISM_POSITIVE}.`,
       );
       const scenePrompts = sceneCoverage.map((v) =>
-        `${tag(elementId)}${tag(locEl)}${clothEl ? `${tag(clothEl)}wearing the same outfit as the clothing reference, ` : ""}the same exact person ${v}, ${env}, identical face and hair, ${look}. ${SCENE_REALISM}.`,
+        `${tag(elementId)}${tag(locEl)}${clothEl ? `${tag(clothEl)}wearing the same outfit as the clothing reference, ` : ""}the same exact person ${v}, ${env}, identical face and hair, ${look}. ${SCENE_REALISM}, ${SCENE_PEOPLE}.`,
       );
       const vPrompts = elementId ? [...facePrompts, ...scenePrompts] : [...faceCoverage, ...sceneCoverage].map((v) => `${prompt}. ${v}`);
       const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
@@ -300,6 +300,7 @@ export const generateCreatives = inngest.createFunction(
     const perRatio = Math.max(1, Math.min(6, Number(event.data.count) || 3));
     const clothingRef = (event.data.clothingRef as string) || "";
     const locationRef = (event.data.locationRef as string) || "";
+    const peopleClause = event.data.extras === false ? NO_EXTRAS : SCENE_PEOPLE;
 
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "influencer not found" };
@@ -340,8 +341,8 @@ export const generateCreatives = inngest.createFunction(
         // `perRatio` distinct shots for this format, identity locked (Soul or element).
         const prompts = Array.from({ length: perRatio }, (_, i) =>
           useSoul
-            ? `the same person, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}.`
-            : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}.`,
+            ? `the same person, ${sceneText}, ${wardrobe}${place}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`
+            : `${tag(elementId)}${tag(clothEl)}${tag(locEl)}the same exact person, ${sceneText}, ${clothEl ? "wearing the same outfit as the clothing reference, " : ""}${locEl ? "placed naturally in the same location as the location reference image, " : ""}${CREATIVE_VARIATIONS[i % CREATIVE_VARIATIONS.length]}, ${look}. ${SCENE_REALISM}, ${peopleClause}.`,
         );
         const urls = await step.run(`gen-${ratio}`, () => generateBatch(prompts, genModel, ratio, extra));
         const got = urls.filter((u): u is string => !!u);

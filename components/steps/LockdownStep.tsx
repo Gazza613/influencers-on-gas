@@ -104,8 +104,8 @@ export default function LockdownStep({
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Lock down the identity</div>
         <p className="mt-2 text-sm text-ink-dim">
-          This is the big one. We train a dedicated AI model on your chosen frames so it truly <span className="text-ink">knows</span> this
-          person, then run the Humaniser to add real-skin detail. The result is a face that stays identical in every
+          This is the big one. We train a dedicated AI model on your chosen frames so it truly <span className="text-ink">knows this</span> person,
+          then run the Humaniser to add real-skin detail. The result is a face that stays identical in every
           future shot, expression and scene. No two-heads, no hallucinating, no &ldquo;who is that?&rdquo; moments.
         </p>
         <ul className="mt-3 space-y-1.5 text-[13px] text-ink-dim">

@@ -8,7 +8,11 @@ export const CLOTHED =
 
 // Background people, when present, reflect real South African diversity and stay in focus.
 export const SCENE_PEOPLE =
-  "any other people in frame are a believable, natural mix reflecting South African diversity (Black, White, Indian, Coloured), each rendered realistically and kept in sharp focus";
+  "any other people in frame are a believable, natural mix reflecting South African diversity (Black, White, Indian, Coloured), each rendered realistically and kept in sharp focus, and at correct scale relative to the subject";
+
+// No extras: the subject is alone in the scene.
+export const NO_EXTRAS =
+  "no other people anywhere in the scene, the subject is completely alone, clean and uncluttered background";
 
 export const REALISM_POSITIVE =
   "photorealistic, natural skin with visible pores and fine vellus hair, subsurface scattering, " +
@@ -19,11 +23,12 @@ export const REALISM_POSITIVE =
 // Scene/location realism (full-body, environmental). Deep focus on purpose: backgrounds
 // stay sharp (never blurred) so the shots are usable for video/b-roll later.
 export const SCENE_REALISM =
-  "photorealistic editorial photograph, natural skin texture, true-to-life human proportions and correct scale relative to the scene, " +
-  "the person standing naturally with feet firmly on the ground and realistic perspective, lighting direction and white balance matched to the environment, " +
-  "natural shadows and contact with the ground, neutral filmic colour grade, candid and unposed, " +
+  "photorealistic editorial photograph, natural skin texture, true-to-life human proportions, " +
+  "the subject rendered at CORRECT REAL-WORLD SCALE and perspective relative to the background: head height, body size and distance consistent with doorways, counters, furniture and any other people in the scene, " +
+  "feet firmly planted on the ground plane with natural contact shadows, accurate camera height and lens perspective, never oversized, undersized, floating or pasted-on, " +
+  "lighting direction and white balance matched to the environment, neutral filmic colour grade, candid and unposed, " +
   "shot on 35mm at f/8 with deep depth of field, the entire scene and background in sharp focus (no bokeh, never blurred), " +
-  CLOTHED + ", " + SCENE_PEOPLE;
+  CLOTHED;
 
 export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +

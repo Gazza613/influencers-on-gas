@@ -29,6 +29,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
   const [res, setRes] = useState<"2k" | "4k">("2k");
+  const [extras, setExtras] = useState(true);
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setErr(""); setStatus("running");
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, model: tier, clothingRef, locationRef }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, model: tier, clothingRef, locationRef, extras }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     poll();
@@ -207,6 +208,22 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <textarea value={scene} onChange={(e) => setScene(e.target.value)} rows={3}
             placeholder="e.g. holding a takeaway coffee on a Braamfontein street at golden hour, smiling at camera"
             className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
+        </div>
+
+        {/* Background extras */}
+        <div className="mt-4">
+          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {([["true", "Include extras", "A diverse SA crowd in the background, in focus"], ["false", "No extras", "Just the influencer, clean background"]] as const).map(([k, label, hint]) => {
+              const on = (k === "true") === extras;
+              return (
+                <button key={k} onClick={() => setExtras(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
+                  <div className={`text-sm font-bold ${on ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
+                  <div className="text-[10px] text-ink-faint">{hint}</div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Optional clothing + location */}
