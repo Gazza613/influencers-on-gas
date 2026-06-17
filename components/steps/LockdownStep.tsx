@@ -123,7 +123,7 @@ export default function LockdownStep({
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Lock down the identity</div>
         <p className="mt-2 text-sm text-ink-dim">
-          This seals <span className="text-ink">this person</span> as the one true identity. Her face and her reference set
+          This seals <span className="text-ink">this person</span>{" "}as the one true identity. Their face and reference set
           (identity card, feature sheet and turnaround) become the lock that every creative is matched against, so she
           stays identical in every future shot, expression and scene. No drifting faces, no &ldquo;who is that?&rdquo; moments.
         </p>

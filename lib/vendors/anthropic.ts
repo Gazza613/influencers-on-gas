@@ -108,17 +108,22 @@ Look / finish (adapt to the requested look):
 - "photoshoot" look: professionally styled hair and, for women, tasteful natural makeup; clean, well-prepped, camera-ready skin so visible blemishes are minimal and softened. Still photoreal, never plastic.`;
 
 // Expand a brief into a full Character Bible.
-export async function generateBible(name: string, brief: string, gender?: string, look?: string): Promise<CharacterBible> {
+export async function generateBible(name: string, brief: string, gender?: string, look?: string, twin = false): Promise<CharacterBible> {
   const c = await client();
   const genderLine = gender ? `Gender: ${gender} (design unmistakably as a ${gender}; use only ${gender === "female" ? "she/her" : gender === "male" ? "he/him" : "their"} pronouns throughout, never the opposite).\n` : "";
   const lookLine = look ? `Look: ${look} look (adapt makeup, grooming and skin finish accordingly).\n` : "";
+  // A DIGITAL TWIN is a real person from their own photo: never invent facial marks.
+  const twinLine = twin
+    ? "THIS IS A DIGITAL TWIN OF A REAL PERSON, built from their own reference photo. Do NOT invent any moles, freckles, scars, birthmarks or distinctive marks, the real photo defines the actual face. Keep face.distinct_features EMPTY or to truly generic descriptors only, and face.skin generic. Never add features the person may not have.\n"
+    : "";
+  const imperfectionAsk = twin ? "Keep the face fields generic; the real photo is the source of truth for their appearance." : "Give them a fresh, distinctive set of subtle humanising imperfections unique to this person.";
   const res = await c.messages.create({
     model: MODEL,
     max_tokens: 5000,
     system: SYSTEM,
     tools: [{ name: "character_bible", description: "Return the complete character bible for this influencer.", input_schema: BIBLE_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
     tool_choice: { type: "tool", name: "character_bible" },
-    messages: [{ role: "user", content: `Influencer name: ${name}\n${genderLine}${lookLine}\nBrief:\n${brief}\n\nDesign the complete character bible. Give them a fresh, distinctive set of subtle humanising imperfections unique to this person.` }],
+    messages: [{ role: "user", content: `Influencer name: ${name}\n${genderLine}${lookLine}${twinLine}\nBrief:\n${brief}\n\nDesign the complete character bible. ${imperfectionAsk}` }],
   });
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("No character bible returned");

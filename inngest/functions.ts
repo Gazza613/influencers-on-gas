@@ -108,8 +108,10 @@ export const buildIdentity = inngest.createFunction(
     // The character bible assigns a UNIQUE set of natural imperfections (mole, freckles,
     // a small scar, asymmetry, skin texture) per build. Thread them through every training
     // frame so the Soul learns them as part of the identity (consistent skin, not generic).
+    const isTwin = inf.mode === "twin";
     const bibleFace = ((persona.bible as { face?: { skin?: string; distinct_features?: string } })?.face) ?? {};
-    const faceMarks = [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 300);
+    // For a digital twin (real person) NEVER thread invented marks; the real photo is truth.
+    const faceMarks = isTwin ? "" : [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 300);
 
     try {
       // Lock the chosen face as a reusable Element (import the URL → media reference).
@@ -178,29 +180,33 @@ export const buildIdentity = inngest.createFunction(
       );
 
       // Canonical reference set (archive gem): a clean identity card, a macro feature sheet
-      // and a turnaround, generated from the chosen face. Reused as forensic refs in every
-      // creative AND shown as a "feature card" flex. Best-effort, never blocks the build.
-      const cards = await step.run("reference-cards", async () => {
-        const faceMedia = await importMediaUrl(chosenUrl).catch(() => null);
-        if (!faceMedia) return null;
-        const ex = { medias: [{ value: faceMedia, role: "image" }] };
-        const [card, sheet, turn] = await Promise.all([
-          generateBatch([buildIdentityCardPrompt()], IMAGE_MODEL, "1:1", ex).catch(() => []),
-          generateBatch([buildFeatureSheetPrompt()], IMAGE_MODEL, "3:4", ex).catch(() => []),
-          generateBatch([buildTurnaroundPrompt()], IMAGE_MODEL, "16:9", ex).catch(() => []),
-        ]);
-        const pick = (a: (string | null)[]) => (a && a[0]) || null;
-        const [c, s, t] = await Promise.all([
-          pick(card) ? rehostToBlob(pick(card)!, "refs").catch(() => null) : null,
-          pick(sheet) ? rehostToBlob(pick(sheet)!, "refs").catch(() => null) : null,
-          pick(turn) ? rehostToBlob(pick(turn)!, "refs").catch(() => null) : null,
-        ]);
-        return { face_card_url: c || pick(card), feature_sheet_url: s || pick(sheet), turnaround_url: t || pick(turn) };
-      });
+      // and a turnaround. For a SYNTHETIC influencer we generate these from the chosen face.
+      // For a TWIN (real person) we DO NOT regenerate the face, AI redraw drifts and invents
+      // marks, so the real uploaded photo IS the identity card. Best-effort, never blocks.
+      const cards = isTwin
+        ? { face_card_url: chosenUrl, feature_sheet_url: null, turnaround_url: null }
+        : await step.run("reference-cards", async () => {
+            const faceMedia = await importMediaUrl(chosenUrl).catch(() => null);
+            if (!faceMedia) return null;
+            const ex = { medias: [{ value: faceMedia, role: "image" }] };
+            const [card, sheet, turn] = await Promise.all([
+              generateBatch([buildIdentityCardPrompt()], IMAGE_MODEL, "1:1", ex).catch(() => []),
+              generateBatch([buildFeatureSheetPrompt()], IMAGE_MODEL, "3:4", ex).catch(() => []),
+              generateBatch([buildTurnaroundPrompt()], IMAGE_MODEL, "16:9", ex).catch(() => []),
+            ]);
+            const pick = (a: (string | null)[]) => (a && a[0]) || null;
+            const [c, s, t] = await Promise.all([
+              pick(card) ? rehostToBlob(pick(card)!, "refs").catch(() => null) : null,
+              pick(sheet) ? rehostToBlob(pick(sheet)!, "refs").catch(() => null) : null,
+              pick(turn) ? rehostToBlob(pick(turn)!, "refs").catch(() => null) : null,
+            ]);
+            return { face_card_url: c || pick(card), feature_sheet_url: s || pick(sheet), turnaround_url: t || pick(turn) };
+          });
       if (cards && (cards.face_card_url || cards.feature_sheet_url || cards.turnaround_url)) {
         const fresh = await step.run("reload-pre-cards", () => getInfluencer(influencerId));
         await step.run("save-cards", () => updateInfluencer(influencerId, { persona: { ...((fresh?.persona as Record<string, unknown>) || persona), ...cards } }));
-        const made = [cards.face_card_url, cards.feature_sheet_url, cards.turnaround_url].filter(Boolean).length;
+        // Only meter NEW generations (twins reuse the real photo, no generation, no cost).
+        const made = isTwin ? 0 : [cards.face_card_url, cards.feature_sheet_url, cards.turnaround_url].filter(Boolean).length;
         if (made) await step.run("usage-cards", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: made }));
       }
       return { ok: true, frames: frames.length, element: !!elementId };
@@ -364,7 +370,11 @@ export const generateCreatives = inngest.createFunction(
       const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
       // Prefer the clean canonical identity card (archive gem) for @image1, then fall back
       // to the chosen casting face. Feature sheet (if any) is a forensic @image2.
-      const idRefUrl = (persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || "";
+      // For a TWIN (real person) the truest likeness is the uploaded photo, so anchor to it
+      // first; never to a regenerated frame (those drift). Synthetic uses the clean card.
+      const idRefUrl = inf.mode === "twin"
+        ? ((persona.reference_url as string) || (persona.face_card_url as string) || (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url || "")
+        : ((persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || "");
       const featureUrl = (persona.feature_sheet_url as string) || "";
       // Import the references → media ids. Face = identity, feature sheet = forensic detail,
       // optional clothing/scene refs.
