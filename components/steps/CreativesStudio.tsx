@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
 import WorkingPanel from "@/components/WorkingPanel";
@@ -174,7 +175,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     await patchPersona({ creatives: keep, video_selects: videoSelects.filter((u) => keep.some((c) => c.url === u)) });
   }
   async function markForVideo() {
-    const add = creatives.filter((c) => picked.has(c.id || "") && c.status === "approved" && !!c.url).map((c) => c.url as string);
+    const add = creatives.filter((c) => picked.has(c.id || "") && !!c.url).map((c) => c.url as string);
     const next = [...new Set([...videoSelects, ...add])];
     setVideoSelects(next); setPicked(new Set());
     await patchPersona({ video_selects: next });
@@ -323,11 +324,16 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
             {running ? "Rendering…" : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} creatives`}
           </button>
           {rates && nFormats > 0 && (
-            <span className="tabular text-xs text-ink-dim">
-              {nFormats} format{nFormats === 1 ? "" : "s"} × {PER_RATIO} = {images} shots · ≈ <span className="text-ink">{rand(estCents)}</span>{estCredits > 0 && <span className="text-ink-faint"> · {estCredits} credits</span>}
+            <span className="tabular flex items-center gap-2 rounded-full border border-[#a855f7]/45 bg-[#a855f7]/12 px-3 py-1.5 text-xs font-semibold text-[#c79bff]">
+              <span className="text-ink-faint">{nFormats} format{nFormats === 1 ? "" : "s"} × {PER_RATIO} = {images} shots</span>
+              <span className="text-sm text-ink">≈ {rand(estCents)}</span>
+              {estCredits > 0 && <span className="text-ink-faint">· {estCredits} credits</span>}
             </span>
           )}
         </div>
+        {rates && nFormats > 0 && (
+          <p className="mt-1.5 text-[11px] text-ink-faint">Each run (and each &ldquo;generate more&rdquo;) costs the above. Track every cent in <Link href="/cost-control" className="text-[#c79bff] hover:underline">Cost Control</Link>.</p>
+        )}
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}
 
         {running && (
@@ -360,14 +366,14 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-ready/30 bg-ready/5 px-3 py-2 text-[11px]">
             <span className="text-base leading-none">🔎</span>
             <span className="text-ink-dim">
-              <span className="font-semibold text-ready">AI Vision QA</span> reviewed <span className="text-ink">{qa.reviewed}</span> shot{qa.reviewed === 1 ? "" : "s"} · <span className="text-ready">{qa.approved} approved</span>{qa.rejected > 0 && <> · <span className="text-active">{qa.rejected} failed QA</span></>}{Number((qa as { failed_generation?: number } | null)?.failed_generation || 0) > 0 && <> · <span className="text-alert">{Number((qa as { failed_generation?: number }).failed_generation || 0)} failed generation</span></>}.
+              <span className="font-semibold text-ready">AI Vision QA</span> reviewed <span className="text-ink">{qa.reviewed}</span> shot{qa.reviewed === 1 ? "" : "s"} · <span className="text-ready">{qa.approved} good</span>{qa.rejected > 0 && <> · <span className="text-active">{qa.rejected} to reroll</span></>}{Number((qa as { failed_generation?: number } | null)?.failed_generation || 0) > 0 && <> · <span className="text-alert">{Number((qa as { failed_generation?: number }).failed_generation || 0)} did not render</span></>}.
             </span>
           </div>
         )}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Your creatives · {creatives.length}</div>
             <div className="flex items-center gap-1">
-              {([ ["all", "All"], ["passed", "Passed"], ["needs", "Needs reroll"] ] as const).map(([k, label]) => (
+              {([ ["all", "All"], ["passed", "Good"], ["needs", "Needs reroll"] ] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setView(k)}
@@ -390,8 +396,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               const id = c.id || `${c.url || "none"}-${i}`;
               const sel = picked.has(id);
               const forVideo = !!c.url && videoSelects.includes(c.url);
-              const canPick = c.status === "approved" && !!c.url && !broken.has(c.url);
-              const qaScore = typeof c.qa?.score10 === "number" ? c.qa.score10.toFixed(1) : null;
+              // Any shot that produced an image can be selected and downloaded, even if QA
+              // scored it lower, some lower-scored shots are still perfectly usable.
+              const canPick = !!c.url && !broken.has(c.url);
               const u = c.url || ""; // stable non-null url for closures/handlers
               return (
                 <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
@@ -422,13 +429,13 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                   </div>
                   {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
                   {c.url && !broken.has(c.url) && c.status === "approved" && (
-                    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-ready" title="Passed AI Vision QA">
-                      QA {qaScore || "-"}/10 ✓
+                    <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${(c.qa?.score10 ?? 8) >= 7 ? "bg-ready/85" : "bg-active/85"}`} title="Passed AI Vision QA">
+                      {(c.qa?.score10 ?? 8) >= 7 ? "✓ Good" : "✓ Average"}
                     </span>
                   )}
                   {c.url && !broken.has(c.url) && c.status === "failed_qa" && (
-                    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-active" title={(c.qa?.issues || []).join(" · ") || "Failed AI Vision QA"}>
-                      QA {qaScore || "-"}/10 reroll
+                    <span className="absolute bottom-1.5 right-1.5 rounded bg-alert/85 px-1.5 py-0.5 text-[9px] font-bold text-white" title={(c.qa?.issues || []).join(" · ") || "Below the AI Vision QA bar"}>
+                      Needs reroll
                     </span>
                   )}
                   {c.url && !broken.has(c.url) && c.status === "failed_generation" && (
