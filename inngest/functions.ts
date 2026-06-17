@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
-import { createFaceElement, generateBatch, generateAngles2_0, generateWithSupercomputer, generateWithSupercomputerVideo, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, generateAngles2_0, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -415,39 +415,16 @@ export const generateCreatives = inngest.createFunction(
       const buildPrompt = (idx: number, ratio: string) =>
         buildCreativeImagePrompt({ sceneText: richScene, variation: variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
 
-      // Track Supercomputer credit usage per session (200 credit cap for images).
-      let supercomputerSpent = 0;
-      const SUPERCOMPUTER_IMAGE_CAP = 200;
-
       // Each format runs CONCURRENTLY and preserves one persisted record per requested
       // attempt. Failed generations and QA rejects are visible to producers, not dropped.
+      // Identity comes from the @image1 reference (extra.medias), so we render on the
+      // VALIDATED gpt_image_2 path (the Supercomputer route dropped the reference and was
+      // returning no image).
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
         const rid = ratio.replace(/:/g, "x"); // safe slug for Inngest step IDs (no colons)
         const prompts = Array.from({ length: perRatio }, (_, i) => buildPrompt(i, ratio));
-        
-        // Try Supercomputer first (cost-efficient routing). Fall back to gpt_image_2 if unavailable or over budget.
-        let rawProduced: (string | null)[] = [];
-        let selectedModel = genModel;
-        try {
-          if (supercomputerSpent < SUPERCOMPUTER_IMAGE_CAP) {
-            const superResults = await step.run(`gen-super-${rid}`, () => generateWithSupercomputer({ prompts, aspectRatio: ratio, count: perRatio }));
-            if (superResults.length > 0) {
-              rawProduced = superResults;
-              selectedModel = "supercomputer";
-              // Estimate: 3 credits per image on average; will be finalized by rate_card lookup on metering.
-              supercomputerSpent += superResults.length * 3;
-            }
-          }
-        } catch (e) {
-          console.log(`Supercomputer fallback (${rid}):`, String(e).slice(0, 100));
-        }
-        
-        // Fallback to gpt_image_2 if Supercomputer unavailable or budget exhausted.
-        if (!rawProduced.length) {
-          rawProduced = await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra));
-          selectedModel = genModel;
-        }
-        
+        const selectedModel = genModel;
+        const rawProduced = await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra));
         const produced = rawProduced.filter((u): u is string => !!u);
         const valid = produced.length ? await step.run(`validate-${rid}`, () => filterLoadable(produced)) : [];
         const validSet = new Set(valid);
