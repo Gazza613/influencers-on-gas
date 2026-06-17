@@ -119,19 +119,13 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     return poll(tries + 1);
   }
 
-  // Platforms drive ratios; deselecting only drops ratios no other selected platform needs.
+  // Platforms drive the formats: the selected formats are exactly the union of the chosen
+  // platforms' ratios, recomputed on every toggle so switching platforms always updates.
   function togglePlatform(p: { key: string; ratios: string[] }) {
-    const selecting = !platforms.has(p.key);
     const next = new Set(platforms);
-    selecting ? next.add(p.key) : next.delete(p.key);
+    next.has(p.key) ? next.delete(p.key) : next.add(p.key);
     setPlatforms(next);
-    const needed = new Set([...next].flatMap((k) => PLATFORMS.find((x) => x.key === k)?.ratios ?? []));
-    setRatios((rs) => {
-      const n = new Set(rs);
-      if (selecting) p.ratios.forEach((r) => n.add(r));
-      else p.ratios.forEach((r) => { if (!needed.has(r)) n.delete(r); });
-      return n;
-    });
+    setRatios(new Set([...next].flatMap((k) => PLATFORMS.find((x) => x.key === k)?.ratios ?? [])));
   }
   function toggleRatio(r: string) { setRatios((s) => { const n = new Set(s); n.has(r) ? n.delete(r) : n.add(r); return n; }); }
 
@@ -241,7 +235,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["soul_2", "Realism", "Authentic iPhone-style UGC, the default social look"], ["soul_cinematic", "Cinematic", "Film-grade lighting and colour, premium hero shots"]] as const).map(([k, label, hint]) => (
+            {([["soul_2", "Realism (recommended)", "Authentic iPhone-style UGC, the default social look"], ["soul_cinematic", "Cinematic", "Film-grade lighting and colour, premium hero shots"]] as const).map(([k, label, hint]) => (
               <button key={k} onClick={() => setTier(k)} className={`rounded-lg border px-3 py-2 text-left transition ${tier === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
                 <div className={`text-sm font-bold ${tier === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
                 <div className="text-[10px] text-ink-faint">{hint}</div>
@@ -277,8 +271,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <textarea value={scene} onChange={(e) => setScene(e.target.value)} rows={3}
             placeholder="e.g. holding a takeaway coffee on a Braamfontein street at golden hour, smiling at camera"
             className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
-          <p className="mt-1.5 text-[11px] text-ink-faint">
-            Describe the outfit, location, who is around, the framing and the mood. Her face stays locked, so you do not
+          <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
+            Describe the outfit, location, who is around, the framing and the mood. The face stays locked, so you do not
             need to describe it. Keep it focused: a tight brief is followed more closely than a long one. Hit
             <span className="text-[#c79bff] font-semibold"> ✨ Perfect with AI</span> to shape a rough idea into a clean brief.
           </p>
