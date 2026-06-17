@@ -38,10 +38,6 @@ export default function PhotoshootStep({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
-  const [locationRef, setLocationRef] = useState<string | null>(null);
-  const [clothingRef, setClothingRef] = useState<string | null>(null);
-  const [locationText, setLocationText] = useState("");
-  const [clothingText, setClothingText] = useState("");
   const [broken, setBroken] = useState<Set<string>>(new Set());
 
   const hasSet = frames.length > 1;
@@ -69,7 +65,7 @@ export default function PhotoshootStep({
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/build`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chosenUrl: modelUrl, locationRef, clothingRef, locationText: locationText.trim(), clothingText: clothingText.trim() }),
+      body: JSON.stringify({ chosenUrl: modelUrl }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start the photoshoot"); setBusy(false); return; }
     setSt("generating"); setFrames([{ url: modelUrl, hero: true }]);
@@ -113,20 +109,7 @@ export default function PhotoshootStep({
 
       {!hasSet && !building && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Photoshoot options (optional)</div>
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-dim">Optional: feature a specific outfit or location in one of the shots, by uploading a reference <span className="text-ink">or</span> describing it. The rest of the set still varies on purpose to build a flexible identity. Leave blank to let us choose.</p>
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Uploader kind="location" label="Location shot" current={locationRef} onUploaded={setLocationRef} />
-              <input value={locationText} onChange={(e) => setLocationText(e.target.value)} placeholder="…or describe the location (e.g. a sunlit Cape Town café)"
-                className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink outline-none focus:border-[#a855f7]" />
-            </div>
-            <div className="space-y-2">
-              <Uploader kind="clothing" label="Clothing style" current={clothingRef} onUploaded={setClothingRef} />
-              <input value={clothingText} onChange={(e) => setClothingText(e.target.value)} placeholder="…or describe the outfit (e.g. cream linen suit, white trainers)"
-                className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink outline-none focus:border-[#a855f7]" />
-            </div>
-          </div>
+          <p className="text-[13px] leading-relaxed text-ink-dim">This step is all about her face. We shoot a clean, varied identity set (many angles, lighting and expressions on neutral backgrounds), the proven recipe for a faithful, consistent identity. Wardrobe and locations come later, in Creatives, where you can restyle her freely.</p>
           <button onClick={run} className="btn-brand mt-4 rounded-lg px-4 py-2 text-sm font-bold">📸 Run the photoshoot</button>
         </div>
       )}
