@@ -194,7 +194,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
               ))}
             </div>
           )}
-          <div className="mt-3"><Uploader kind="twin" label={twinPhotos.length ? "Add another photo" : "Add a photo"} current={null} onUploaded={(u) => setTwinPhotos((p) => (u && !p.includes(u) ? [...p, u] : p))} /></div>
+          <div className="mt-3"><Uploader kind="twin" multiple label={twinPhotos.length ? "Add more photos" : "Add photos"} current={null} onUploaded={(u) => setTwinPhotos((p) => (u && !p.includes(u) ? [...p, u] : p))} /></div>
           <p className="mt-2 text-[11px] text-ink-faint">{twinPhotos.length} added{twinPhotos.length > 0 && twinPhotos.length < 3 ? ` · ${3 - twinPhotos.length} more needed` : ""}</p>
           <Actions onCancel={reset} onConfirm={createTwin} label={busy ? "Creating…" : "Create digital twin"} disabled={twinPhotos.length < 3 || busy} />
         </Modal>
