@@ -96,8 +96,9 @@ export default function BuildHeader({
           <img src={s.faceUrl} alt={name} className="h-12 w-12 rounded-full border border-line object-cover" />
         )}
         <h1 className="text-xl font-bold">{name}</h1>
-        <span className="tabular rounded bg-surface-2 px-2 py-0.5 text-[10px] uppercase tracking-wide text-ink-faint">
-          {mode === "twin" ? "digital twin" : "influencer"}
+        <span className="tabular rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
+          style={{ background: "linear-gradient(135deg,#ec4899,#a855f7 55%,#60a5fa)", boxShadow: "0 0 14px rgba(168,85,247,0.45)" }}>
+          {mode === "twin" ? "✦ digital twin" : "✦ influencer"}
         </span>
         {mode === "twin" && (
           <span className={`tabular rounded px-2 py-0.5 text-[10px] uppercase tracking-wide ${consentId ? "bg-ready/15 text-ready" : "bg-alert/15 text-alert"}`}>
