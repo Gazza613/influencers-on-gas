@@ -44,6 +44,25 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
     setAdding(false);
   }
 
+  async function removeSource(s: Source) {
+    if (!confirm(`Delete this source and everything it taught the brain?\n\n${s.uri}\n\nThis wipes its chunks and embeddings. It cannot be undone.`)) return;
+    await fetch(`/api/brains/${brainId}/sources?sourceId=${encodeURIComponent(s.id)}`, { method: "DELETE" }).catch(() => {});
+    setSources((list) => list.filter((x) => x.id !== s.id));
+  }
+
+  async function nukeAll() {
+    if (!confirm("NUKE all knowledge in this brain?\n\nEvery source, chunk and embedding is permanently deleted. The brain stays but forgets everything. This cannot be undone.")) return;
+    await fetch(`/api/brains/${brainId}/sources?sourceId=all`, { method: "DELETE" }).catch(() => {});
+    setSources([]); setHits(null);
+  }
+
+  async function deleteBrainNow() {
+    if (!confirm("Delete this entire brain?\n\nThe brain and ALL its data are permanently removed. This cannot be undone.")) return;
+    const r = await fetch(`/api/brains/${brainId}`, { method: "DELETE" }).catch(() => null);
+    if (r?.ok) window.location.href = "/setup/brains";
+    else alert("Could not delete the brain. Please try again.");
+  }
+
   async function runQuery() {
     if (!query.trim() || querying) return;
     setQuerying(true); setQErr(""); setHits(null);
@@ -84,7 +103,12 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
 
       {/* Sources */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Knowledge sources</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Knowledge sources</div>
+          {sources.length > 0 && (
+            <button onClick={nukeAll} className="rounded-md border border-alert/40 px-2.5 py-1 text-[11px] font-semibold text-alert hover:bg-alert/10">Nuke all data</button>
+          )}
+        </div>
         {sources.length === 0 ? (
           <p className="mt-3 text-sm text-ink-dim">No sources yet.</p>
         ) : (
@@ -95,6 +119,7 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
                 <span className="flex shrink-0 items-center gap-3 text-[11px]">
                   <span className="text-ink-faint">{s.chunk_count ?? 0} chunks</span>
                   <span className={badge(s.status)}>{s.status === "pending" ? "indexing…" : s.status}</span>
+                  <button onClick={() => removeSource(s)} title="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
                 </span>
               </li>
             ))}
@@ -125,6 +150,13 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Danger zone */}
+      <div className="rounded-xl border border-alert/30 bg-alert/5 p-5">
+        <div className="tabular text-xs uppercase tracking-[0.2em] text-alert">Danger zone</div>
+        <p className="mt-2 text-[13px] text-ink-dim">Delete this entire brain and everything in it. This cannot be undone.</p>
+        <button onClick={deleteBrainNow} className="mt-3 rounded-lg border border-alert/50 px-4 py-2 text-sm font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
       </div>
     </div>
   );

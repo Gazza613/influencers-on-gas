@@ -85,3 +85,14 @@ export async function createSource(clientId: string, type: string, uri: string):
 export async function setSourceStatus(id: string, status: string): Promise<void> {
   await db().query("update knowledge_sources set status = $2, last_synced_at = now() where id = $1", [id, status]);
 }
+
+// Delete one source (its chunks + embeddings cascade). Scoped to the brain for safety.
+export async function deleteSource(clientId: string, sourceId: string): Promise<void> {
+  await db().query("delete from knowledge_sources where id = $1 and client_id = $2", [sourceId, clientId]);
+}
+
+// Nuke ALL knowledge for a brain (every source + every chunk/embedding), keeping the brain itself.
+export async function purgeBrain(clientId: string): Promise<void> {
+  await db().query("delete from knowledge_chunks where client_id = $1", [clientId]);
+  await db().query("delete from knowledge_sources where client_id = $1", [clientId]);
+}

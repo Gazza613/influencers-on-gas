@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { inngest } from "@/lib/inngest";
-import { getBrain, createSource } from "@/lib/brains";
+import { getBrain, createSource, deleteSource, purgeBrain } from "@/lib/brains";
 
 // Add a knowledge source to a brain: a website URL (scraped) or pasted text.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,4 +30,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
   return NextResponse.json({ ok: true, sourceId });
+}
+
+// Delete one source (?sourceId=…) or nuke ALL knowledge for the brain (?sourceId=all).
+// Chunks + embeddings cascade. The brain itself stays (use DELETE /api/brains/[id] to remove it).
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const brain = await getBrain(id);
+  if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
+  const sourceId = new URL(req.url).searchParams.get("sourceId") || "";
+  if (!sourceId) return NextResponse.json({ error: "Missing sourceId" }, { status: 400 });
+  if (sourceId === "all") await purgeBrain(id);
+  else await deleteSource(id, sourceId);
+  return NextResponse.json({ ok: true });
 }
