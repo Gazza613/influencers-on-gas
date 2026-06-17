@@ -110,7 +110,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   async function poll(tries = 0): Promise<void> {
-    if (tries > 160) return;
+    if (tries > 160) { setStatus("idle"); setErr("That run took too long and was reset, you can generate again."); fetch(`/api/influencers/${influencerId}/creatives`, { method: "DELETE" }).catch(() => {}); return; }
     await new Promise((r) => setTimeout(r, 5000));
     const d = await refresh();
     if (!d) return poll(tries + 1);
@@ -299,7 +299,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Identity lock</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["strong", "Strong likeness", "Anchors hard to her locked face. Most consistent, but the shot leans toward the reference."], ["flexible", "Follow my scene", "Leans on the trained identity only. Follows your brief most closely, but the face can vary a little."]] as const).map(([k, label, hint]) => {
+            {([["strong", "Strong likeness (recommended)", "Anchors hard to the locked face. Most consistent, but the shot leans toward the reference."], ["flexible", "Follow my scene", "Leans on the trained identity only. Follows your brief most closely, but the face can vary a little."]] as const).map(([k, label, hint]) => {
               const on = identityLock === k;
               return (
                 <button key={k} onClick={() => setIdentityLock(k)} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
@@ -323,6 +323,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <button onClick={generate} disabled={!nFormats || running} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">
             {running ? "Rendering…" : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} creatives`}
           </button>
+          {running && (
+            <button onClick={abort} className="rounded-lg border border-alert/60 px-4 py-2.5 text-sm font-bold text-alert hover:bg-alert/10">■ Abort</button>
+          )}
           {rates && nFormats > 0 && (
             <span className="tabular flex items-center gap-2 rounded-full border border-[#a855f7]/45 bg-[#a855f7]/12 px-3 py-1.5 text-xs font-semibold text-[#c79bff]">
               <span className="text-ink-faint">{nFormats} format{nFormats === 1 ? "" : "s"} × {PER_RATIO} = {images} shots</span>
@@ -428,16 +431,15 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
                   </div>
                   {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
-                  {c.url && !broken.has(c.url) && c.status === "approved" && (
-                    <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${(c.qa?.score10 ?? 8) >= 7 ? "bg-ready/85" : "bg-active/85"}`} title="Passed AI Vision QA">
-                      {(c.qa?.score10 ?? 8) >= 7 ? "✓ Good" : "✓ Average"}
-                    </span>
-                  )}
-                  {c.url && !broken.has(c.url) && c.status === "failed_qa" && (
-                    <span className="absolute bottom-1.5 right-1.5 rounded bg-alert/85 px-1.5 py-0.5 text-[9px] font-bold text-white" title={(c.qa?.issues || []).join(" · ") || "Below the AI Vision QA bar"}>
-                      Needs reroll
-                    </span>
-                  )}
+                  {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (() => {
+                    const s = c.qa?.score10 ?? 7;
+                    const g = s >= 8 ? { t: "Great", cls: "bg-ready/85" } : s >= 6 ? { t: "Good", cls: "bg-active/85" } : { t: "Average", cls: "bg-alert/85" };
+                    return (
+                      <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
+                        {g.t}
+                      </span>
+                    );
+                  })()}
                   {c.url && !broken.has(c.url) && c.status === "failed_generation" && (
                     <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-alert" title={c.error || "Generation failed"}>
                       failed
