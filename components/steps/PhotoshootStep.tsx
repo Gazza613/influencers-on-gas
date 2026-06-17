@@ -114,7 +114,7 @@ export default function PhotoshootStep({
       {!hasSet && !building && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
           <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Photoshoot options (optional)</div>
-          <p className="mt-1 text-[11px] text-ink-faint">Optional: feature a specific outfit or location in one of the shots, by uploading a reference <span className="text-ink-dim">or</span> describing it. The rest of the set still varies on purpose to build a flexible identity. Leave blank to let us choose.</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-ink-dim">Optional: feature a specific outfit or location in one of the shots, by uploading a reference <span className="text-ink">or</span> describing it. The rest of the set still varies on purpose to build a flexible identity. Leave blank to let us choose.</p>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Uploader kind="location" label="Location shot" current={locationRef} onUploaded={setLocationRef} />
@@ -142,7 +142,7 @@ export default function PhotoshootStep({
       {hasSet && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-ink-faint">Every frame is the same person across angles, lighting and expressions. The highlighted ones are the frames you have kept. Tap to deselect any odd ones, keep your strongest 5 or more.</p>
+            <p className="text-[13px] leading-relaxed text-ink-dim">Every frame is the same person across angles, lighting and expressions. The highlighted ones are the frames you have kept. Tap to deselect any odd ones, keep your strongest 5 or more.</p>
             <span className="tabular shrink-0 rounded-full border border-[#a855f7]/40 bg-[#a855f7]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#c79bff]">{selected.size} kept</span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
