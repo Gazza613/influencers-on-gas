@@ -38,7 +38,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
 
       {/* Public share link */}
       <div className="rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/8 p-4">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Public share link</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Public share link</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <code className="tabular flex-1 truncate rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink">{publicUrl}</code>
           <button onClick={copyLink} className="btn-brand shrink-0 rounded-lg px-4 py-2 text-sm font-bold">{copied ? "Copied" : "Copy link"}</button>
@@ -60,7 +60,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
         <>
           {/* On the showreel */}
           <section>
-            <div className="tabular mb-3 text-[10px] uppercase tracking-[0.25em] text-ready">★ On the showreel · {onReel.length}</div>
+            <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ready">★ On the showreel · {onReel.length}</div>
             {onReel.length === 0
               ? <p className="text-sm text-ink-faint">Nothing on the showreel yet. Flag your best videos in from below.</p>
               : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{onReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} reel />)}</div>}
@@ -69,7 +69,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
           {/* Finished, not on the reel */}
           {offReel.length > 0 && (
             <section>
-              <div className="tabular mb-3 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Finished videos · {offReel.length}</div>
+              <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Finished videos · {offReel.length}</div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{offReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} />)}</div>
             </section>
           )}

@@ -45,7 +45,7 @@ export default function WorkingPanel({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">{title}</span>
+            <span className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">{title}</span>
             {crew && <span className="text-[11px] text-ink-dim">· {crew.name}, {crew.role}</span>}
           </div>
           <div key={i} className="narrate-line mt-1 text-sm text-ink">{lines[i]}</div>

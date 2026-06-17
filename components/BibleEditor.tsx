@@ -28,7 +28,7 @@ function Section({ title, children, action }: { title: string; children: React.R
   return (
     <div className="rounded-xl border border-line bg-surface-2 p-4">
       <div className="mb-2 flex items-center justify-between border-b border-line/60 pb-2">
-        <div className="tabular text-[11px] font-semibold uppercase tracking-[0.22em] text-[#c79bff]">{title}</div>
+        <div className="tabular text-xs font-semibold uppercase tracking-[0.2em] text-[#c79bff]">{title}</div>
         {action}
       </div>
       <div className="space-y-1">{children}</div>
@@ -131,7 +131,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-5">
       <div className="flex items-center justify-between">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Character Casting</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Character Casting</div>
         <div className="flex items-center gap-3">
           {bible && saved !== "idle" && <span className="text-[10px] text-ink-faint">{saved === "saving" ? "saving…" : "saved ✓"}</span>}
           {bible && <button onClick={() => setOpen((o) => !o)} className="text-xs text-ink-dim hover:text-ink">{open ? "Hide brief" : "↻ Re-brief"}</button>}
@@ -159,7 +159,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
 
       {bible && !open && (
         <div className="mt-4 space-y-3" onBlur={() => { if (pending.current) doSave(); }}>
-          <div className="rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[11px] text-ink-dim">
+          <div className="rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[13px] leading-relaxed text-ink-dim">
             ✎ Everything below is yours to tweak. Click any line to rewrite it, it saves automatically as you type.
             Not feeling one part? Hit <span className="text-[#c79bff]">↻ Reimagine</span> on that section and the AI re-rolls
             just that bit, in keeping with the rest. Want a whole new character? <span className="text-[#c79bff]">↻ Re-brief</span> up top.

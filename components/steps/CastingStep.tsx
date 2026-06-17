@@ -85,7 +85,7 @@ export default function CastingStep({
 
       {/* Look casting */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Cast the looks</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Cast the looks</div>
 
         {referenceUrl ? (
           // Reference / twin path, casting is skipped.

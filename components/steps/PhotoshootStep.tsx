@@ -102,7 +102,7 @@ export default function PhotoshootStep({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={modelUrl} alt="model" className="h-24 w-24 rounded-lg border border-line object-cover" />
         <div className="min-w-[200px] flex-1">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Your model</div>
+          <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Your model</div>
           <p className="mt-1 text-sm text-ink-dim">
             This is the face every shot is built around. The photoshoot captures it across many angles, lighting setups,
             expressions and distances on a clean background, the proven recipe for a faithful identity. The face stays
@@ -113,7 +113,7 @@ export default function PhotoshootStep({
 
       {!hasSet && !building && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Photoshoot options (optional)</div>
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Photoshoot options (optional)</div>
           <p className="mt-1 text-[11px] text-ink-faint">Optional: feature a specific outfit or location in one of the shots, by uploading a reference <span className="text-ink-dim">or</span> describing it. The rest of the set still varies on purpose to build a flexible identity. Leave blank to let us choose.</p>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">

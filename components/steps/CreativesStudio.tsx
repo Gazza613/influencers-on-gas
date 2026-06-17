@@ -195,7 +195,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Creatives · social outputs</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Creatives · social outputs</div>
         <p className="mt-2 text-sm text-ink-dim">
           Render social-ready shots of this locked influencer. Pick platforms or formats, optionally steer the wardrobe
           and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
@@ -348,7 +348,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
       {/* In-progress placeholders so it's clear shots are rendering + being QA'd (not ready to click). */}
       {running && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular mb-3 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Rendering &amp; reviewing · {images} shots</div>
+          <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Rendering &amp; reviewing · {images} shots</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {Array.from({ length: images }).map((_, i) => (
               <div key={i} className="shimmer flex aspect-square items-center justify-center rounded-lg border border-line">
@@ -371,7 +371,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           </div>
         )}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Your creatives · {creatives.length}</div>
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Your creatives · {creatives.length}</div>
             <div className="flex items-center gap-1">
               {([ ["all", "All"], ["passed", "Passed"], ["needs", "Needs reroll"] ] as const).map(([k, label]) => (
                 <button
@@ -456,7 +456,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
       {/* Video production hand-off */}
       {videoSelects.length > 0 && (
         <div className="rounded-xl border border-ready/30 bg-ready/5 p-5">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready">★ Selected for video production · {videoSelects.length}</div>
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">★ Selected for video production · {videoSelects.length}</div>
           <p className="mt-1 text-sm text-ink-dim">
             These shots are earmarked for video production and b-roll (a mix of scenes and angles makes the video stronger).
             The produce pipeline will pull them in when it arrives in the Studio.

@@ -48,7 +48,7 @@ export default function TeamManager() {
 
       {/* Invite */}
       <div className="glow-accent mt-5 rounded-xl bg-surface-1 p-4">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Invite a teammate</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Invite a teammate</div>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email"
             className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#a855f7]" />

@@ -56,7 +56,7 @@ export default async function StudioPage() {
       <div className="grid min-h-0 flex-1 grid-cols-[200px_1fr_300px]">
         {/* Left rail — produce stages */}
         <nav className="flex flex-col gap-1 overflow-y-auto border-r border-line bg-surface-1 p-3">
-          <p className="tabular mb-2 px-2 text-[10px] uppercase tracking-[0.25em] text-ink-faint">
+          <p className="tabular mb-2 px-2 text-xs uppercase tracking-[0.2em] text-ink-faint">
             Produce
           </p>
           {STAGES.map((s, i) => (
@@ -101,7 +101,7 @@ export default async function StudioPage() {
 
         {/* Right rail — producer co-pilot */}
         <aside className="flex min-h-0 flex-col border-l border-line bg-surface-1">
-          <div className="tabular border-b border-line px-4 py-3 text-[10px] uppercase tracking-[0.25em] text-ink-faint">
+          <div className="tabular border-b border-line px-4 py-3 text-xs uppercase tracking-[0.2em] text-ink-faint">
             Producer co-pilot
           </div>
           <div className="flex flex-1 items-center justify-center p-4 text-center text-xs text-ink-faint">
@@ -113,7 +113,7 @@ export default async function StudioPage() {
       {/* ── Bottom: Build Spine (45s timeline) */}
       <footer className="shrink-0 border-t border-line bg-surface-1 px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <span className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">
+          <span className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">
             Build spine
           </span>
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">

@@ -82,7 +82,7 @@ export default function LockdownStep({
             <img src={realismUrl} alt="locked face" className="h-24 w-24 rounded-lg border border-ready/40 object-cover" />
           )}
           <div className="min-w-[220px] flex-1">
-            <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready">🔒 Identity locked</div>
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">🔒 Identity locked</div>
             <p className="mt-1 text-sm text-ink">
               Done. This exact face is locked. It will stay perfectly consistent across every creative and video you
               ever make with this influencer. That is the magic, no drifting faces, no surprises.
@@ -92,7 +92,7 @@ export default function LockdownStep({
 
         {refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround) && (
           <div className="rounded-xl border border-line bg-surface-1 p-5">
-            <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Identity reference card</div>
+            <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Identity reference card</div>
             <p className="mt-1 text-[11px] text-ink-faint">The forensic lock: a clean identity headshot, a macro feature sheet and a full turnaround. Every creative is matched against these.</p>
             <div className="mt-3 grid grid-cols-3 gap-3">
               {([["faceCard", "Identity"], ["featureSheet", "Features"], ["turnaround", "Turnaround"]] as const).map(([k, label]) => {
@@ -110,7 +110,7 @@ export default function LockdownStep({
           </div>
         )}
         <div className="rounded-xl border border-ready/40 bg-surface-1 p-5">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready font-semibold">✓ Your next step</div>
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ready font-semibold">✓ Your next step</div>
           <div className="mt-1 text-lg font-bold text-ink">Create &amp; download her creatives</div>
           <p className="mt-1 text-sm text-ink-dim">
             Generate social-ready images (9:16, 1:1, 16:9 up to 4K) and download them for Reels, Stories, feeds and
@@ -125,7 +125,7 @@ export default function LockdownStep({
         </div>
 
         <div className="rounded-xl border border-line/60 bg-surface-1/40 p-4">
-          <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Optional · advanced, rarely needed</div>
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Optional · advanced, rarely needed</div>
           <p className="mt-2 text-[13px] text-ink-faint">
             She is already trained on the rich, varied photoshoot, so you do <span className="text-ink-dim">not</span> need this.
             Only if her creatives keep coming back in the same outfit or scene: a retrain shoots a fresh varied set and
@@ -143,7 +143,7 @@ export default function LockdownStep({
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Lock down the identity</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Lock down the identity</div>
         <p className="mt-2 text-sm text-ink-dim">
           This seals <span className="text-ink">this person</span> as the one true identity. Her face and her reference set
           (identity card, feature sheet and turnaround) become the lock that every creative is matched against, so she

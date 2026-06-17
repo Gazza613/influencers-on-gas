@@ -210,7 +210,7 @@ export default function CostControlPage() {
           );
           return (
             <section className="mt-6 rounded-xl border border-line bg-surface-1 p-5">
-              <div className="tabular text-[10px] uppercase tracking-[0.25em] brand-grad font-semibold">Cycle reconciliation · since {cycle.start}</div>
+              <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Cycle reconciliation · since {cycle.start}</div>
               <p className="mt-1 text-[11px] text-ink-faint">Higgsfield tops up {bal.monthly.toLocaleString()} credits each cycle. This reconciles what the platform tracked against what Higgsfield actually consumed.</p>
               <div className="mt-3">
                 <Row label="Higgsfield actually used (live balance)" cr={actualUsed} strong />
@@ -265,12 +265,12 @@ export default function CostControlPage() {
         {/* Image vs video split */}
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-ready/25 bg-ready/5 p-5">
-            <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ready">Images</div>
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Images</div>
             <div className="tabular mt-1 text-xl font-bold">{report?.split.image.count ?? 0} <span className="text-sm font-normal text-ink-dim">generated</span></div>
             <div className="tabular mt-1 text-sm text-ink-dim">{report ? rand(report.split.image.cents) : ""}</div>
           </div>
           <div className="rounded-xl border border-active/25 bg-active/5 p-5">
-            <div className="tabular text-[10px] uppercase tracking-[0.25em] text-active">Video / presenter</div>
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-active">Video / presenter</div>
             <div className="tabular mt-1 text-xl font-bold">{report?.split.video.count ?? 0} <span className="text-sm font-normal text-ink-dim">jobs</span></div>
             <div className="tabular mt-1 text-sm text-ink-dim">{report ? rand(report.split.video.cents) : ""}</div>
           </div>
@@ -285,7 +285,7 @@ export default function CostControlPage() {
         <Section title="By function">{report && <Table rows={report.byAction.map((a) => ({ label: ACTION_LABEL[a.action] ?? a.action, credits: a.credits, cents: a.cents }))} />}</Section>
 
         {/* Charts */}
-        <h2 className="tabular mt-9 mb-3 text-[10px] uppercase tracking-[0.25em] text-ink-faint">Visualisations</h2>
+        <h2 className="tabular mt-9 mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Visualisations</h2>
         <div className="rounded-xl border border-line bg-surface-1 p-5">
           <div className="text-sm font-semibold text-ink">Daily spend (Rand)</div>
           {report && <LineChart data={report.byDay.map((d) => ({ x: d.day.slice(5), y: d.cents / 100 }))} />}
@@ -335,7 +335,7 @@ function Picker({ label, children }: { label: string; children: React.ReactNode 
   return <div><div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">{label}</div>{children}</div>;
 }
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="mt-6"><h2 className="tabular mb-2 text-[10px] uppercase tracking-[0.25em] text-ink-faint">{title}</h2><div className="overflow-hidden rounded-xl border border-line bg-surface-1">{children}</div></section>;
+  return <section className="mt-6"><h2 className="tabular mb-2 text-xs uppercase tracking-[0.2em] text-ink-faint">{title}</h2><div className="overflow-hidden rounded-xl border border-line bg-surface-1">{children}</div></section>;
 }
 function Table({ rows }: { rows: { label: string; credits: number; cents: number; sub?: string }[] }) {
   if (!rows.length) return <div className="px-4 py-6 text-center text-xs text-ink-faint">No spend in this view yet.</div>;

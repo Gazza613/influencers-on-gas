@@ -87,7 +87,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-1 pb-2">
-        <span className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Influencers</span>
+        <span className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Influencers</span>
         <button onClick={() => setModal("synthetic")} className="btn-brand rounded-md px-2.5 py-1 text-xs font-bold">+ New</button>
       </div>
 

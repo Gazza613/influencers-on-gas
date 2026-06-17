@@ -63,7 +63,7 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
     <div className="mt-6 space-y-6">
       {/* Add knowledge */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Feed the brain</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Feed the brain</div>
         <div className="mt-3 flex gap-2">
           <button onClick={() => setMode("website")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "website" ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim"}`}>Website</button>
           <button onClick={() => setMode("text")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "text" ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim"}`}>Paste text</button>
@@ -84,7 +84,7 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
 
       {/* Sources */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Knowledge sources</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Knowledge sources</div>
         {sources.length === 0 ? (
           <p className="mt-3 text-sm text-ink-dim">No sources yet.</p>
         ) : (
@@ -104,7 +104,7 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
 
       {/* Test the brain */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Test the brain</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Test the brain</div>
         <div className="mt-3 flex gap-2">
           <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runQuery()}
             placeholder="Ask what the brain knows (e.g. what's the brand's positioning?)"
