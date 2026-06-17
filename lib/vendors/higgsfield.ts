@@ -400,7 +400,7 @@ export async function generateImages(opts: { prompt: string; count?: number; mod
 
 // Generate 12 camera angles from one hero frame using Angles 2.0. Single call replaces
 // multi-prompt photoshoot training set (60-80% cost reduction). Returns image URLs.
-export async function generateAngles2_0(opts: { heroUrl: string; elementId: string; count?: number }): Promise<string[]> {
+export async function generateAngles2_0(opts: { heroUrl: string; elementId: string | null; count?: number }): Promise<string[]> {
   const { heroUrl, elementId, count = 12 } = opts;
   const token = await getValidHFAccessToken();
 

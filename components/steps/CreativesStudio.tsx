@@ -398,6 +398,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               const forVideo = !!c.url && videoSelects.includes(c.url);
               const canPick = c.status === "approved" && !!c.url && !broken.has(c.url);
               const qaScore = typeof c.qa?.score10 === "number" ? c.qa.score10.toFixed(1) : null;
+              const u = c.url || ""; // stable non-null url for closures/handlers
               return (
                 <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
                   {!c.url ? (
@@ -405,14 +406,14 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                       <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">generation failed</span>
                       <span>{c.error || "No image returned"}</span>
                     </div>
-                  ) : broken.has(c.url) ? (
+                  ) : broken.has(u) ? (
                     <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
                       <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">image failed to load</span>
                       <span>{c.error || "image didn&apos;t load"}</span>
                     </div>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.url} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(c.url)} onError={() => setBroken((b) => new Set(b).add(c.url))} />
+                    <img src={u} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(u)} onError={() => setBroken((b) => new Set(b).add(u))} />
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); if (canPick) togglePick(id); }}

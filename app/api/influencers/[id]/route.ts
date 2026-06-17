@@ -32,12 +32,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       // id (fallback url)), so a client can remove shots but never inject images OR mutate
       // other fields (resolution/scene/etc.) on a kept shot.
       if (k === "creatives") {
-        const stored = Array.isArray(existing?.creatives) ? existing.creatives : [];
+        const stored = (Array.isArray(existing?.creatives) ? existing.creatives : []) as { id?: string; url?: string | null }[];
         const keyOf = (c: { id?: string; url?: string | null }) => (typeof c?.id === "string" && c.id ? `id:${c.id}` : (typeof c?.url === "string" && c.url ? `url:${c.url}` : null));
-        const byKey = new Map(stored.map((c: { id?: string; url?: string | null }) => {
-          const key = keyOf(c);
-          return key ? [key, c] : null;
-        }).filter((x): x is [string, unknown] => !!x));
+        const byKey = new Map<string, { id?: string; url?: string | null }>();
+        for (const c of stored) { const key = keyOf(c); if (key) byKey.set(key, c); }
         const next = Array.isArray(body.personaPatch[k]) ? body.personaPatch[k] : [];
         const seen = new Set<string>();
         patch[k] = next
