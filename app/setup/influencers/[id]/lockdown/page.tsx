@@ -17,6 +17,7 @@ export default async function LockdownPage({ params }: { params: Promise<{ id: s
   return (
     <LockdownStep
       influencerId={inf.id}
+      name={inf.name}
       status={inf.status}
       lockedInit={!!persona.locked}
       selectedCount={selectedCount}

@@ -141,7 +141,10 @@ export default function PhotoshootStep({
 
       {hasSet && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <p className="text-[11px] text-ink-faint">Every frame is the same person across different outfits and settings (that variety is intentional, it makes the identity flexible). Tap to deselect any odd ones, keep your strongest 5 or more, the sharper and more varied the set the better the lock-down.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-ink-faint">Every frame is the same person across angles, lighting and expressions. The highlighted ones are the frames you have kept. Tap to deselect any odd ones, keep your strongest 5 or more.</p>
+            <span className="tabular shrink-0 rounded-full border border-[#a855f7]/40 bg-[#a855f7]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#c79bff]">{selected.size} kept</span>
+          </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {frames.map((f, i) => {
               const sel = selected.has(f.url);
@@ -152,9 +155,9 @@ export default function PhotoshootStep({
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={f.url} alt={`frame ${i + 1}`} onError={() => setBroken((b) => new Set(b).add(f.url))}
-                      className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7]" : "border-line opacity-60"}`} />
+                      className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_18px_rgba(168,85,247,0.5)]" : "border-line opacity-40 hover:opacity-80"}`} />
                   )}
-                  <span className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] transition ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/60 bg-black/45 text-transparent"}`}>✓</span>
+                  <span className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border text-sm transition ${sel ? "border-white bg-[#a855f7] text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]" : "border-white/60 bg-black/45 text-transparent"}`}>✓</span>
                   {f.hero && <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Chosen</span>}
                   <button onClick={(e) => { e.stopPropagation(); setZoom(f.url); }} title="View full size"
                     className="absolute bottom-1.5 right-1.5 hidden h-6 w-6 items-center justify-center rounded-md bg-black/60 text-xs text-white group-hover:flex">⤢</button>

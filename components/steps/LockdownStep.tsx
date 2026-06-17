@@ -13,9 +13,10 @@ const LOCKDOWN_NARRATION = [
 ];
 
 export default function LockdownStep({
-  influencerId, status: initialStatus, lockedInit, selectedCount, realismUrl, soulStartedAt, refCards,
+  influencerId, name, status: initialStatus, lockedInit, selectedCount, realismUrl, soulStartedAt, refCards,
 }: {
   influencerId: string;
+  name: string;
   status: string;
   lockedInit: boolean;
   selectedCount: number;
@@ -85,7 +86,7 @@ export default function LockdownStep({
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">🔒 Identity locked</div>
             <p className="mt-1 text-sm text-ink">
               Done. This exact face is locked. It will stay perfectly consistent across every creative and video you
-              ever make with this influencer. That is the magic, no drifting faces, no surprises.
+              ever make for {name}. That is the magic, no drifting faces, no surprises.
             </p>
           </div>
         </div>
@@ -113,14 +114,14 @@ export default function LockdownStep({
           <div className="tabular text-xs uppercase tracking-[0.2em] text-ready font-semibold">✓ Your next step</div>
           <div className="mt-1 text-lg font-bold text-ink">Create &amp; download her creatives</div>
           <p className="mt-1 text-sm text-ink-dim">
-            Generate social-ready images (9:16, 1:1, 16:9 up to 4K) and download them for Reels, Stories, feeds and
-            ads. Voice and the full video pipeline arrive later in the Studio.
+            Generate social-ready images (9:16, 1:1, 16:9 up to 4K) for {name} and download them for Reels, Stories,
+            feeds and ads. These same images feed video production, so this is your step. Voice and the full video
+            pipeline arrive later in the Studio.
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div className="mt-3">
             <Link href={`/setup/influencers/${influencerId}/creatives`} className="next-pulse inline-block rounded-full px-5 py-2.5 text-sm font-bold">
               ✦ Create &amp; download images →
             </Link>
-            <Link href="/studio" className="text-xs text-ink-dim hover:text-ink">Video production (Studio) →</Link>
           </div>
         </div>
 
