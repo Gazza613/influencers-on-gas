@@ -24,7 +24,19 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
     <CreativesStudio
       influencerId={inf.id}
       initial={{
-        creatives: Array.isArray(persona.creatives) ? (persona.creatives as { url: string; ratio: string; resolution: string; scene: string; at: number }[]) : [],
+        creatives: Array.isArray(persona.creatives)
+          ? (persona.creatives as {
+            id?: string;
+            url: string | null;
+            ratio: string;
+            resolution: string;
+            scene: string;
+            at: number;
+            status?: "approved" | "failed_qa" | "failed_generation";
+            qa?: { pass: boolean; score10: number; issues: string[] } | null;
+            error?: string | null;
+          }[])
+          : [],
         status: (persona.creatives_status as string) ?? "idle",
       }}
     />

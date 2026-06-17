@@ -7,7 +7,17 @@ import WorkingPanel from "@/components/WorkingPanel";
 import { CREW } from "@/lib/crew";
 import { flex, pick, QA_LINES } from "@/lib/flex";
 
-type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
+type Creative = {
+  id?: string;
+  url: string | null;
+  ratio: string;
+  resolution: string;
+  scene: string;
+  at: number;
+  status?: "approved" | "failed_qa" | "failed_generation";
+  qa?: { pass: boolean; score10: number; issues: string[] } | null;
+  error?: string | null;
+};
 type Rate = { credits: number; cents: number };
 type Rates = { soul_2: Rate; soul_cinematic: Rate; upscale: Rate };
 
@@ -36,6 +46,7 @@ const CREATIVE_NARRATION = [
 ];
 
 export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
+    const [view, setView] = useState<"all" | "passed" | "needs">("all");
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
@@ -48,7 +59,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [identityLock, setIdentityLock] = useState<"strong" | "flexible">("strong");
 
   const [rates, setRates] = useState<Rates | null>(null);
-  const [creatives, setCreatives] = useState<Creative[]>(initial.creatives || []);
+  const [creatives, setCreatives] = useState<Creative[]>(normalize(initial.creatives || []));
   const [videoSelects, setVideoSelects] = useState<string[]>([]);
   const [qa, setQa] = useState<{ reviewed: number; approved: number; rejected: number } | null>(null);
   const [status, setStatus] = useState(initial.status || "idle");
@@ -59,12 +70,26 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
 
   const running = status === "running";
 
+  function normalize(list: Creative[]): Creative[] {
+    return list.map((c, i) => ({
+      id: c.id || `${c.at || Date.now()}-${i}`,
+      url: c.url ?? null,
+      ratio: c.ratio || "9:16",
+      resolution: c.resolution || "2k",
+      scene: c.scene || "",
+      at: c.at || Date.now(),
+      status: c.status || (c.url ? "approved" : "failed_generation"),
+      qa: c.qa ?? null,
+      error: c.error ?? null,
+    }));
+  }
+
   const prevCount = useRef(initial.creatives?.length || 0);
   const prevStatus = useRef(initial.status || "idle");
   async function refresh() {
     const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
     if (d) {
-      const list = d.creatives || [];
+      const list = normalize(d.creatives || []);
       // Flash a QA call-out for each newly-landed shot while a run is in progress.
       const fresh = list.length - prevCount.current;
       if (fresh > 0 && prevStatus.current === "running") {
@@ -144,21 +169,28 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setStatus("idle"); setErr("");
   }
 
-  function togglePick(url: string) { setPicked((s) => { const n = new Set(s); n.has(url) ? n.delete(url) : n.add(url); return n; }); }
+  function togglePick(id: string) { setPicked((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
   async function patchPersona(patch: Record<string, unknown>) {
     await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: patch }) }).catch(() => {});
   }
   async function removePicked() {
-    const keep = creatives.filter((c) => !picked.has(c.url));
+    const keep = creatives.filter((c) => !picked.has(c.id || ""));
     setCreatives(keep); setPicked(new Set());
     await patchPersona({ creatives: keep, video_selects: videoSelects.filter((u) => keep.some((c) => c.url === u)) });
   }
   async function markForVideo() {
-    const next = [...new Set([...videoSelects, ...picked])];
+    const add = creatives.filter((c) => picked.has(c.id || "") && c.status === "approved" && !!c.url).map((c) => c.url as string);
+    const next = [...new Set([...videoSelects, ...add])];
     setVideoSelects(next); setPicked(new Set());
     await patchPersona({ video_selects: next });
   }
+
+  const visible = creatives.filter((c) => {
+    if (view === "passed") return c.status === "approved";
+    if (view === "needs") return c.status === "failed_qa" || c.status === "failed_generation";
+    return true;
+  });
 
   return (
     <div className="space-y-5">
@@ -334,12 +366,21 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-ready/30 bg-ready/5 px-3 py-2 text-[11px]">
             <span className="text-base leading-none">🔎</span>
             <span className="text-ink-dim">
-              <span className="font-semibold text-ready">AI Vision QA</span> reviewed <span className="text-ink">{qa.reviewed}</span> shot{qa.reviewed === 1 ? "" : "s"} · <span className="text-ready">{qa.approved} approved</span>{qa.rejected > 0 && <> · <span className="text-active">{qa.rejected} re-rolled for quality</span></>}.
+              <span className="font-semibold text-ready">AI Vision QA</span> reviewed <span className="text-ink">{qa.reviewed}</span> shot{qa.reviewed === 1 ? "" : "s"} · <span className="text-ready">{qa.approved} approved</span>{qa.rejected > 0 && <> · <span className="text-active">{qa.rejected} failed QA</span></>}{Number((qa as { failed_generation?: number } | null)?.failed_generation || 0) > 0 && <> · <span className="text-alert">{Number((qa as { failed_generation?: number }).failed_generation || 0)} failed generation</span></>}.
             </span>
           </div>
         )}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="tabular text-[10px] uppercase tracking-[0.25em] text-ink-faint">Your creatives · {creatives.length}</div>
+            <div className="flex items-center gap-1">
+              {([ ["all", "All"], ["passed", "Passed"], ["needs", "Needs reroll"] ] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={() => setView(k)}
+                  className={`rounded-md border px-2 py-1 text-[11px] ${view === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-faint hover:text-ink"}`}
+                >{label}</button>
+              ))}
+            </div>
             {picked.size > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-ink-dim">{picked.size} selected</span>
@@ -351,30 +392,56 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           </div>
           <p className="mb-3 text-[11px] text-ink-faint">Tap the tick to select shots, then ★ keep your best for video production, or remove the ones you don&apos;t want and generate more. Click an image to view full size and download.</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {creatives.map((c, i) => {
-              const sel = picked.has(c.url);
-              const forVideo = videoSelects.includes(c.url);
+            {visible.map((c, i) => {
+              const id = c.id || `${c.url || "none"}-${i}`;
+              const sel = picked.has(id);
+              const forVideo = !!c.url && videoSelects.includes(c.url);
+              const canPick = c.status === "approved" && !!c.url && !broken.has(c.url);
+              const qaScore = typeof c.qa?.score10 === "number" ? c.qa.score10.toFixed(1) : null;
               return (
-                <div key={i} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
-                  {broken.has(c.url) ? (
-                    <div className="flex aspect-square w-full items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">image didn&apos;t load</div>
+                <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
+                  {!c.url ? (
+                    <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
+                      <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">generation failed</span>
+                      <span>{c.error || "No image returned"}</span>
+                    </div>
+                  ) : broken.has(c.url) ? (
+                    <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
+                      <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">image failed to load</span>
+                      <span>{c.error || "image didn&apos;t load"}</span>
+                    </div>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.url} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(c.url)} onError={() => setBroken((b) => new Set(b).add(c.url))} />
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); togglePick(c.url); }}
+                    onClick={(e) => { e.stopPropagation(); if (canPick) togglePick(id); }}
                     aria-pressed={sel}
-                    title={sel ? "Selected" : "Select this shot"}
-                    className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"}`}
+                    title={canPick ? (sel ? "Selected" : "Select this shot") : "Only approved shots can be selected"}
+                    disabled={!canPick}
+                    className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"} disabled:cursor-not-allowed disabled:opacity-45`}
                   >✓</button>
                   <div className="absolute left-1.5 top-1.5 flex gap-1">
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
                   </div>
                   {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
-                  {!broken.has(c.url) && <span className="absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-ready" title="Passed AI Vision QA">QA ✓</span>}
-                  {!broken.has(c.url) && (
+                  {c.url && !broken.has(c.url) && c.status === "approved" && (
+                    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-ready" title="Passed AI Vision QA">
+                      QA {qaScore || "-"}/10 ✓
+                    </span>
+                  )}
+                  {c.url && !broken.has(c.url) && c.status === "failed_qa" && (
+                    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-active" title={(c.qa?.issues || []).join(" · ") || "Failed AI Vision QA"}>
+                      QA {qaScore || "-"}/10 reroll
+                    </span>
+                  )}
+                  {c.url && !broken.has(c.url) && c.status === "failed_generation" && (
+                    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-alert" title={c.error || "Generation failed"}>
+                      failed
+                    </span>
+                  )}
+                  {c.url && !broken.has(c.url) && (
                     <button onClick={() => setZoom(c.url)} title="Review full size"
                       className="absolute inset-0 m-auto hidden h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/55 text-lg text-white backdrop-blur-sm transition group-hover:flex hover:bg-black/75">👁</button>
                   )}

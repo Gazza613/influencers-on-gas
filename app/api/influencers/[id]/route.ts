@@ -29,15 +29,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     for (const k of Object.keys(body.personaPatch)) {
       if (!ALLOWED_PATCH.has(k)) continue;
       // `creatives` is prune-only: rebuild the kept list from the STORED objects (keyed by
-      // url), so a client can remove shots but never inject images OR mutate other fields
-      // (resolution/scene/etc.) on a kept shot.
+      // id (fallback url)), so a client can remove shots but never inject images OR mutate
+      // other fields (resolution/scene/etc.) on a kept shot.
       if (k === "creatives") {
-        const byUrl = new Map((Array.isArray(existing?.creatives) ? existing.creatives : []).map((c: { url?: string }) => [c?.url, c]));
+        const stored = Array.isArray(existing?.creatives) ? existing.creatives : [];
+        const keyOf = (c: { id?: string; url?: string | null }) => (typeof c?.id === "string" && c.id ? `id:${c.id}` : (typeof c?.url === "string" && c.url ? `url:${c.url}` : null));
+        const byKey = new Map(stored.map((c: { id?: string; url?: string | null }) => {
+          const key = keyOf(c);
+          return key ? [key, c] : null;
+        }).filter((x): x is [string, unknown] => !!x));
         const next = Array.isArray(body.personaPatch[k]) ? body.personaPatch[k] : [];
         const seen = new Set<string>();
         patch[k] = next
-          .map((c: { url?: string }) => (c && typeof c.url === "string" ? byUrl.get(c.url) : undefined))
-          .filter((c: { url?: string } | undefined): c is { url?: string } => !!c && !seen.has(c.url!) && (seen.add(c.url!), true));
+          .map((c: { id?: string; url?: string | null }) => {
+            const key = keyOf(c);
+            return key ? byKey.get(key) : undefined;
+          })
+          .filter((c: { id?: string; url?: string | null } | undefined): c is { id?: string; url?: string | null } => {
+            if (!c) return false;
+            const key = keyOf(c);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
       } else {
         patch[k] = body.personaPatch[k];
       }

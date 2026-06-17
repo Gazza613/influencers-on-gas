@@ -292,6 +292,21 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
 values ('higgsfield','soul_cinematic','image', 4, 256, true)
 on conflict (provider, model, unit) do nothing;
 
+-- Angles 2.0: 12 camera angles from one hero frame (60-80% cost reduction vs multi-prompt).
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('higgsfield','angles_2_0','image', 1, 77, true)
+on conflict (provider, model, unit) do nothing;
+
+-- Supercomputer: adaptive model routing (image-only allowlist, best-cost inference).
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('higgsfield','supercomputer','image', 3, 231, true)
+on conflict (provider, model, unit) do nothing;
+
+-- Supercomputer for video b-roll (Kling 3.0 / Seedance 2.0, adaptive routing, 500 credit session cap).
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('higgsfield','supercomputer','video', 8, 615, true)
+on conflict (provider, model, unit) do nothing;
+
 -- Native Higgsfield 4K upscale (bytedance) — replaces the external Magnific upscaler.
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
 values ('higgsfield','upscale_image','image', 2, 128, true)

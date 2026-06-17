@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
-import { createFaceElement, generateBatch, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, generateAngles2_0, generateWithSupercomputer, generateWithSupercomputerVideo, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -135,20 +135,37 @@ export const buildIdentity = inngest.createFunction(
       // varied angle/light/expression/distance. No background extras (single person per
       // photo, per the Soul photo guide). The FACE is the only constant.
       const constant = `the same exact person, a single person alone with a clear unobstructed face, IDENTICAL face, hairstyle, skin tone and facial features in every frame${faceMarks ? `, with the same consistent natural skin detail and unique features (${faceMarks})` : ""}`;
-      const vPrompts = looks.map((l, i) => {
-        const useCloth = clothEl && i === userIdx;
-        const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
-        const wardrobePhrase = useCloth ? "wearing the same outfit as the clothing reference" : `wearing ${l.wardrobe}`;
-        const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${constant}` : prompt;
-        return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${core}.`;
-      });
-      const urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
+      
+      // Try Angles 2.0 first (single call, 60-80% cost reduction). Fall back to multi-prompt if unavailable.
+      let urls: (string | null)[] = [];
+      try {
+        const angles = await step.run("angles-2-0", () => generateAngles2_0({ heroUrl: chosenUrl, elementId, count: 12 }));
+        if (angles.length >= 8) {
+          urls = angles;
+          await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: "angles_2_0", unit: "image", action: "photoshoot", count: angles.length }));
+        }
+      } catch (e) {
+        console.log("Angles 2.0 fallback:", String(e).slice(0, 100));
+      }
+      
+      // Fallback: multi-prompt if Angles 2.0 returned empty or failed.
+      if (!urls.length) {
+        const vPrompts = looks.map((l, i) => {
+          const useCloth = clothEl && i === userIdx;
+          const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
+          const wardrobePhrase = useCloth ? "wearing the same outfit as the clothing reference" : `wearing ${l.wardrobe}`;
+          const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${constant}` : prompt;
+          return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${core}.`;
+        });
+        urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
+        const produced = urls.filter((u): u is string => !!u);
+        if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
+      }
+      
       const produced = urls.filter((u): u is string => !!u);
       // looks[0] is the tight face close-up; tag it as the clean identity anchor for
       // creatives (a face reference clones far less wardrobe/scene than a full photo).
-      const closeUpUrl = urls[0] || null;
-      // Meter what Higgsfield produced (billed), before dropping any that fail to load.
-      if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
+      const closeUpUrl = produced[0] || null;
       const validFrames = await step.run("validate-frames", () => filterLoadable(produced));
       for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url, ...(url === closeUpUrl ? { face: true } : {}) });
 
@@ -286,7 +303,19 @@ export const trainSoulJob = inngest.createFunction(
 // CREATIVES, social-ready outputs from a LOCKED influencer. Renders one image per
 // selected aspect ratio (best framing), optionally upscaled to 4K. Identity is locked
 // via the face Element. Cost-aware: only the chosen ratios render; 4K adds an upscale.
-type Creative = { url: string; ratio: string; resolution: string; scene: string; at: number };
+type CreativeStatus = "approved" | "failed_qa" | "failed_generation";
+type CreativeQa = { pass: boolean; score10: number; issues: string[] };
+type Creative = {
+  id: string;
+  url: string | null;
+  ratio: string;
+  resolution: "2k" | "4k" | "n/a";
+  scene: string;
+  at: number;
+  status: CreativeStatus;
+  qa: CreativeQa | null;
+  error: string | null;
+};
 
 // Used for the DEFAULT brief (no user scene), these dictate pose/gaze for variety.
 const CREATIVE_VARIATIONS = [
@@ -386,55 +415,113 @@ export const generateCreatives = inngest.createFunction(
       const buildPrompt = (idx: number, ratio: string) =>
         buildCreativeImagePrompt({ sceneText: richScene, variation: variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
 
-      // Each format runs CONCURRENTLY and in ONE lean round: generate a small buffer,
-      // QA at base resolution, then upscale ONLY the keepers (never the rejects). This is
-      // far faster than retry-loops that upscale everything. Top-ups use "Generate more".
+      // Track Supercomputer credit usage per session (200 credit cap for images).
+      let supercomputerSpent = 0;
+      const SUPERCOMPUTER_IMAGE_CAP = 200;
+
+      // Each format runs CONCURRENTLY and preserves one persisted record per requested
+      // attempt. Failed generations and QA rejects are visible to producers, not dropped.
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
         const rid = ratio.replace(/:/g, "x"); // safe slug for Inngest step IDs (no colons)
-        // Over-generate by one for QA headroom.
-        const prompts = Array.from({ length: perRatio + 1 }, (_, i) => buildPrompt(i, ratio));
-        const rawProduced = (await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra))).filter((u): u is string => !!u);
-        // Only keep images that actually load (drops broken/expired renders before QA).
-        const produced = await step.run(`validate-${rid}`, () => filterLoadable(rawProduced));
-        if (produced.length) await step.run(`usage-gen-${rid}`, () => recordUsage({ influencerId, provider: "higgsfield", model: genModel, unit: "image", action: "creative", count: produced.length }));
-        // Vision QA at base res, reject shirtless / collage / bad-proportion / broken (QA error ⇒ keep).
-        const verdicts = await step.run(`qa-${rid}`, () =>
-          Promise.all(produced.map((u) => qaCreative(u).then((v) => ({ u, pass: v.pass })).catch(() => ({ u, pass: true })))),
-        );
-        const keptUrls = verdicts.filter((v) => v.pass).slice(0, perRatio).map((v) => v.u);
-        const reviewed = verdicts.length;
-        const rejected = verdicts.filter((v) => !v.pass).length;
-        // Finalise each keeper: upscale to 4K (if requested + it loads), then re-host on Blob
-        // so the stored URL is permanent and never 404s. Badge the TRUE resolution per image:
-        // if 4K upscale or its re-host fails, we fall back to the base image and label it 2K.
-        // One step PER image (not all keepers in one) so no single invocation risks the
-        // 300s function cap, AND run them in PARALLEL so total time is one image's upscale,
-        // not the sum. Upscale poll is capped (~120s); a slow upscale falls back to a
-        // loadable 2K instead of killing the batch (reliability over guaranteed 4K).
-        const kept = await Promise.all(keptUrls.map((baseUrl, k) =>
-          step.run(`finalize-${rid}-${k}`, async () => {
-            let url = baseUrl, res = "2k";
-            if (fourK) {
-              const up = await upscaleUrlTo(baseUrl, "4k", 40).catch(() => null);
-              if (up && (await filterLoadable([up])).length) { url = up; res = "4k"; }
+        const prompts = Array.from({ length: perRatio }, (_, i) => buildPrompt(i, ratio));
+        
+        // Try Supercomputer first (cost-efficient routing). Fall back to gpt_image_2 if unavailable or over budget.
+        let rawProduced: (string | null)[] = [];
+        let selectedModel = genModel;
+        try {
+          if (supercomputerSpent < SUPERCOMPUTER_IMAGE_CAP) {
+            const superResults = await step.run(`gen-super-${rid}`, () => generateWithSupercomputer({ prompts, aspectRatio: ratio, count: perRatio }));
+            if (superResults.length > 0) {
+              rawProduced = superResults;
+              selectedModel = "supercomputer";
+              // Estimate: 3 credits per image on average; will be finalized by rate_card lookup on metering.
+              supercomputerSpent += superResults.length * 3;
             }
-            let hosted = await rehostToBlob(url).catch(() => null);
-            if (!hosted && url !== baseUrl) { hosted = await rehostToBlob(baseUrl).catch(() => null); res = "2k"; }
-            return { url: hosted || url, resolution: res };
+          }
+        } catch (e) {
+          console.log(`Supercomputer fallback (${rid}):`, String(e).slice(0, 100));
+        }
+        
+        // Fallback to gpt_image_2 if Supercomputer unavailable or budget exhausted.
+        if (!rawProduced.length) {
+          rawProduced = await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra));
+          selectedModel = genModel;
+        }
+        
+        const produced = rawProduced.filter((u): u is string => !!u);
+        const valid = produced.length ? await step.run(`validate-${rid}`, () => filterLoadable(produced)) : [];
+        const validSet = new Set(valid);
+        if (produced.length) await step.run(`usage-gen-${rid}`, () => recordUsage({ influencerId, provider: "higgsfield", model: selectedModel, unit: "image", action: "creative", count: produced.length }));
+        // Per attempt: failed generation stays visible, QA gets a score, and only approved
+        // shots are upscaled/rehosted.
+        const attempts = await Promise.all(rawProduced.map((sourceUrl, k) =>
+          step.run(`finalize-${rid}-${k}`, async () => {
+            const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            if (!sourceUrl) {
+              return { id, url: null, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: "generation returned no image" } as Creative;
+            }
+
+            if (!validSet.has(sourceUrl)) {
+              return { id, url: sourceUrl, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: "image url failed to load" } as Creative;
+            }
+
+            const verdict = await qaCreative(sourceUrl).catch(() => ({ pass: true, score10: 7, issues: ["qa-unavailable"] }));
+            const qa = { pass: verdict.pass, score10: verdict.score10, issues: verdict.issues || [] };
+            if (!verdict.pass) {
+              return {
+                id,
+                url: sourceUrl,
+                ratio,
+                resolution: "2k",
+                scene: sceneText,
+                at: Date.now(),
+                status: "failed_qa",
+                qa,
+                error: qa.issues[0] || "failed quality review",
+              } as Creative;
+            }
+
+            let finalUrl = sourceUrl;
+            let finalRes: "2k" | "4k" = "2k";
+            if (fourK) {
+              const up = await upscaleUrlTo(sourceUrl, "4k", 40).catch(() => null);
+              if (up && (await filterLoadable([up])).length) { finalUrl = up; finalRes = "4k"; }
+            }
+            let hosted = await rehostToBlob(finalUrl).catch(() => null);
+            if (!hosted && finalUrl !== sourceUrl) { hosted = await rehostToBlob(sourceUrl).catch(() => null); finalRes = "2k"; }
+            return {
+              id,
+              url: hosted || finalUrl,
+              ratio,
+              resolution: finalRes,
+              scene: sceneText,
+              at: Date.now(),
+              status: "approved",
+              qa,
+              error: null,
+            } as Creative;
           }),
         ));
-        const upscaled = kept.filter((k) => k.resolution === "4k").length;
+        const upscaled = attempts.filter((a) => a.status === "approved" && a.resolution === "4k").length;
         if (fourK && upscaled) await step.run(`usage-up-${rid}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: upscaled }));
-        return { ratio, kept, reviewed, rejected };
+        const reviewed = attempts.filter((a) => !!a.qa).length;
+        const rejected = attempts.filter((a) => a.status === "failed_qa").length;
+        const failedGeneration = attempts.filter((a) => a.status === "failed_generation").length;
+        return { attempts, reviewed, rejected, failedGeneration };
       }));
 
       const made: Creative[] = [];
-      let qaReviewed = 0, qaRejected = 0;
+      let qaReviewed = 0, qaRejected = 0, qaApproved = 0, generationFailed = 0;
       for (const r of perRatioResults) {
-        qaReviewed += r.reviewed; qaRejected += r.rejected;
-        for (const it of r.kept) made.push({ url: it.url, ratio: r.ratio, resolution: it.resolution, scene: sceneText, at: Date.now() });
+        qaReviewed += r.reviewed;
+        qaRejected += r.rejected;
+        generationFailed += r.failedGeneration;
+        for (const it of r.attempts) {
+          if (it.status === "approved") qaApproved += 1;
+          made.push(it);
+        }
       }
-      const qa = { reviewed: qaReviewed, approved: made.length, rejected: qaRejected, at: Date.now() };
+      const qa = { reviewed: qaReviewed, approved: qaApproved, rejected: qaRejected, failed_generation: generationFailed, at: Date.now() };
       await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done", creatives_qa: qa } }));
       return { ok: true, made: made.length, qa };
     } catch (e) {

@@ -150,28 +150,29 @@ const QA_SCHEMA = {
   additionalProperties: false,
   properties: {
     pass: { type: "boolean", description: "true ONLY if every check below is true" },
+    score_10: { type: "number", description: "Overall quality score from 0 to 10 (one decimal place). 10 means publication-ready, 0 means unusable." },
     fully_clothed: { type: "boolean", description: "EVERY person in the frame (the subject AND every background person) wears a complete outfit: a top covering the torso AND bottoms (trousers, jeans, skirt or tailored shorts). false if ANYONE, including someone in the background, is shirtless, topless, bare-chested, bare-legged with no visible bottoms, in underwear, in swimwear or nude" },
     single_frame: { type: "boolean", description: "ONE continuous photograph of a single moment. false if there is ANY collage, grid, split-screen, diptych/triptych, stacked panels, OR a separate side strip / inset / border panel showing a different scene or different people (even a thin vertical or horizontal band down one edge)" },
     realistic_proportions: { type: "boolean", description: "natural human body and head-to-body proportions, and believable scale relative to the background; false if distorted, oversized, tiny or pasted-on" },
     coherent_photo: { type: "boolean", description: "a real, coherent photograph (not blank, corrupt, warped or garbled)" },
     issues: { type: "array", items: { type: "string" } },
   },
-  required: ["pass", "fully_clothed", "single_frame", "realistic_proportions", "coherent_photo", "issues"],
+  required: ["pass", "score_10", "fully_clothed", "single_frame", "realistic_proportions", "coherent_photo", "issues"],
 } as unknown as Anthropic.Tool["input_schema"];
 
 const QA_MEDIA = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
-export async function qaCreative(url: string): Promise<{ pass: boolean; issues: string[] }> {
+export async function qaCreative(url: string): Promise<{ pass: boolean; score10: number; issues: string[] }> {
   // Fetch + inspect as base64 (works on any SDK version; also validates the image loads).
   let b64: string, mt: string;
   try {
     const res = await fetch(url);
-    if (!res.ok) return { pass: false, issues: ["image did not load"] }; // broken → reject
+    if (!res.ok) return { pass: false, score10: 0, issues: ["image did not load"] }; // broken → reject
     mt = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
     if (!QA_MEDIA.has(mt)) mt = "image/jpeg";
     b64 = Buffer.from(await res.arrayBuffer()).toString("base64");
   } catch {
-    return { pass: false, issues: ["image fetch failed"] }; // broken → reject
+    return { pass: false, score10: 0, issues: ["image fetch failed"] }; // broken → reject
   }
   try {
     const c = await client();
@@ -189,11 +190,13 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; issues: 
       }],
     });
     const block = res.content.find((b) => b.type === "tool_use");
-    const out = block && block.type === "tool_use" ? (block.input as { pass?: boolean; issues?: string[] }) : null;
-    return { pass: !!out?.pass, issues: out?.issues ?? [] };
+    const out = block && block.type === "tool_use" ? (block.input as { pass?: boolean; score_10?: number; issues?: string[] }) : null;
+    const raw = Number(out?.score_10);
+    const score10 = Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw * 10) / 10)) : 0;
+    return { pass: !!out?.pass, score10, issues: out?.issues ?? [] };
   } catch {
     // QA service itself errored (not the image), fail OPEN so a hiccup can't empty the gallery.
-    return { pass: true, issues: ["qa-unavailable"] };
+    return { pass: true, score10: 7, issues: ["qa-unavailable"] };
   }
 }
 

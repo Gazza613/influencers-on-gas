@@ -397,3 +397,182 @@ export async function generateImages(opts: { prompt: string; count?: number; mod
   if (!urls.length) throw new Error("Higgsfield generation timed out");
   return urls.slice(0, count);
 }
+
+// Generate 12 camera angles from one hero frame using Angles 2.0. Single call replaces
+// multi-prompt photoshoot training set (60-80% cost reduction). Returns image URLs.
+export async function generateAngles2_0(opts: { heroUrl: string; elementId: string; count?: number }): Promise<string[]> {
+  const { heroUrl, elementId, count = 12 } = opts;
+  const token = await getValidHFAccessToken();
+
+  const init = await rawPost(token, null, {
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, clientInfo: { name: "GAS Studio", version: "1.0" } },
+  });
+  const sid = init.sid;
+  const call = async (name: string, args: AnyObj) => {
+    const { parsed } = await rawPost(token, sid, { jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name, arguments: args } });
+    return (parsed?.result ?? parsed) as AnyObj;
+  };
+
+  // Angles 2.0: import hero as reference, derive 12 consistent angles in one pass.
+  // Fallback to multi-prompt if tool unavailable (graceful degrade for now).
+  try {
+    const r = await call("angles_2_0", { 
+      image_url: heroUrl,
+      reference_element_id: elementId,
+      count: Math.min(count, 12),
+      quality: "high"
+    });
+    const urls = extractImageUrls(r);
+    const jobIds = extractJobIds(r);
+    
+    if (urls.length >= Math.min(count, 12)) return urls.slice(0, count);
+    if (!jobIds.length) throw new Error("Angles 2.0 returned no job IDs");
+
+    const pending = new Set(jobIds);
+    const collected: string[] = [...urls];
+    for (let round = 0; round < 60 && pending.size > 0 && collected.length < count; round++) {
+      if (round) await new Promise((r) => setTimeout(r, 3000));
+      for (const jobId of [...pending]) {
+        try {
+          const data = unwrapMCP(await call("job_status", { jobId })) as AnyObj;
+          const item = (Array.isArray(data?.results) ? (data.results as AnyObj[])[0] : data) as AnyObj;
+          const ro = (item?.results as AnyObj) || {};
+          const url = (ro.rawUrl || ro.minUrl || item?.result_url || item?.url || extractImageUrls(data)[0]) as string | undefined;
+          const status = String(item?.status || data?.status || "").toLowerCase();
+          if (url) { pending.delete(jobId); if (!collected.includes(url)) collected.push(url); }
+          else if (TERMINAL.has(status)) pending.delete(jobId);
+        } catch {
+          /* transient — retry next round */
+        }
+      }
+    }
+    if (!collected.length) throw new Error("Angles 2.0 generation timed out");
+    return collected.slice(0, count);
+  } catch (e) {
+    // If angles_2_0 tool not available, return empty to signal fallback to multi-prompt.
+    if (String(e).includes("unknown tool") || String(e).includes("angles_2_0")) {
+      return [];
+    }
+    throw e;
+  }
+}
+
+// Generate images via Supercomputer (adaptive model routing for cost efficiency).
+// Returns empty array if tool unavailable (signals fallback to gpt_image_2).
+// Intended for creatives (image-only allowlist).
+export async function generateWithSupercomputer(opts: { prompts: string[]; aspectRatio?: string; count?: number }): Promise<string[]> {
+  const { prompts, aspectRatio = "9:16", count = prompts.length } = opts;
+  const token = await getValidHFAccessToken();
+
+  const init = await rawPost(token, null, {
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, clientInfo: { name: "GAS Studio", version: "1.0" } },
+  });
+  const sid = init.sid;
+  const call = async (name: string, args: AnyObj) => {
+    const { parsed } = await rawPost(token, sid, { jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name, arguments: args } });
+    return (parsed?.result ?? parsed) as AnyObj;
+  };
+
+  try {
+    // Supercomputer: adaptive model selection for creatives (image-only, best-cost inference).
+    const base = { aspect_ratio: aspectRatio, count: 1, quality: "high" };
+    const jobIds: string[] = [];
+    const direct: string[] = [];
+    for (const prompt of prompts.slice(0, count)) {
+      const r = await call("supercomputer", { params: { ...base, prompt } });
+      direct.push(...extractImageUrls(r));
+      jobIds.push(...extractJobIds(r));
+    }
+    if (direct.length >= count) return [...new Set(direct)].slice(0, count);
+    if (!jobIds.length) throw new Error("Supercomputer returned no job IDs");
+
+    const pending = new Set(jobIds);
+    const urls: string[] = [...new Set(direct)];
+    for (let round = 0; round < 60 && pending.size > 0 && urls.length < count; round++) {
+      if (round) await new Promise((r) => setTimeout(r, 3000));
+      for (const jobId of [...pending]) {
+        try {
+          const data = unwrapMCP(await call("job_status", { jobId })) as AnyObj;
+          const item = (Array.isArray(data?.results) ? (data.results as AnyObj[])[0] : data) as AnyObj;
+          const ro = (item?.results as AnyObj) || {};
+          const url = (ro.rawUrl || ro.minUrl || item?.result_url || item?.url || extractImageUrls(data)[0]) as string | undefined;
+          const status = String(item?.status || data?.status || "").toLowerCase();
+          if (url) { pending.delete(jobId); if (!urls.includes(url)) urls.push(url); }
+          else if (TERMINAL.has(status)) pending.delete(jobId);
+        } catch {
+          /* transient — retry next round */
+        }
+      }
+    }
+    if (!urls.length) throw new Error("Supercomputer generation timed out");
+    return urls.slice(0, count);
+  } catch (e) {
+    // If supercomputer tool not available, return empty to signal fallback to gpt_image_2.
+    if (String(e).includes("unknown tool") || String(e).includes("supercomputer")) {
+      return [];
+    }
+    throw e;
+  }
+}
+
+// Generate video via Supercomputer (adaptive model routing for b-roll: Kling 3.0 / Seedance 2.0).
+// Returns null if tool unavailable (signals fallback strategy).
+// Intended for b-roll generation in the video assembly stage.
+export async function generateWithSupercomputerVideo(opts: { prompt: string; imageRef?: string; duration?: number }): Promise<string | null> {
+  const { prompt, imageRef, duration = 5 } = opts;
+  const token = await getValidHFAccessToken();
+
+  const init = await rawPost(token, null, {
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, clientInfo: { name: "GAS Studio", version: "1.0" } },
+  });
+  const sid = init.sid;
+  const call = async (name: string, args: AnyObj) => {
+    const { parsed } = await rawPost(token, sid, { jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name, arguments: args } });
+    return (parsed?.result ?? parsed) as AnyObj;
+  };
+
+  try {
+    // Supercomputer for video: adaptive routing to best-cost model (Kling 3.0 / Seedance 2.0).
+    const args: AnyObj = { prompt, duration };
+    if (imageRef) args.image_url = imageRef; // Optional reference frame for consistency
+    
+    const r = await call("supercomputer_video", { ...args });
+    const urls = extractImageUrls(r); // Video may return as file URL
+    const jobIds = extractJobIds(r);
+    
+    // Direct result (rare — most vendor video is async).
+    if (urls.length > 0) return urls[0];
+    if (!jobIds.length) throw new Error("Supercomputer video returned no job IDs");
+
+    // Poll job status for async video generation.
+    const pending = new Set(jobIds);
+    let url: string | null = null;
+    for (let round = 0; round < 120 && pending.size > 0 && !url; round++) { // 120 × 5s = 10 min timeout for video
+      if (round) await new Promise((r) => setTimeout(r, 5000)); // 5s between polls (video is slower)
+      for (const jobId of [...pending]) {
+        try {
+          const data = unwrapMCP(await call("job_status", { jobId })) as AnyObj;
+          const item = (Array.isArray(data?.results) ? (data.results as AnyObj[])[0] : data) as AnyObj;
+          const ro = (item?.results as AnyObj) || {};
+          const videoUrl = (ro.rawUrl || ro.videoUrl || item?.result_url || item?.video_url || item?.url || extractImageUrls(data)[0]) as string | undefined;
+          const status = String(item?.status || data?.status || "").toLowerCase();
+          if (videoUrl) { pending.delete(jobId); url = videoUrl; }
+          else if (TERMINAL.has(status)) pending.delete(jobId);
+        } catch {
+          /* transient — retry next round */
+        }
+      }
+    }
+    if (!url) throw new Error("Supercomputer video generation timed out");
+    return url;
+  } catch (e) {
+    // If supercomputer_video tool not available, return null to signal fallback strategy.
+    if (String(e).includes("unknown tool") || String(e).includes("supercomputer")) {
+      return null;
+    }
+    throw e;
+  }
+}
