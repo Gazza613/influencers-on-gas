@@ -122,8 +122,9 @@ export default function BuildHeader({
           const active = t.match(pathname);
           return (
             <Link key={t.href} href={t.href}
+              aria-current={active ? "page" : undefined}
               className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition ${
-                active ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]"
+                active ? "step-active border-[#a855f7] bg-[#a855f7]/15 font-bold text-[#c79bff]"
                 : t.done ? "border-ready/40 bg-ready/10 text-ready"
                 : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"
               }`}>

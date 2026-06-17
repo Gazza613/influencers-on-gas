@@ -198,10 +198,8 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
                 <Field key={k} label={k} value={get(["portrait"])[k]} onChange={(v) => edit((b) => { ((b.portrait ??= {}) as Bible)[k] = v; })} />
               ))}
             </Section>
-
-            <Section title="Voice" action={<Regen section="voice_descriptor" busy={regen} onClick={reimagine} />}>
-              <Bare value={String(bible.voice_descriptor ?? "")} multiline onChange={(v) => edit((b) => { b.voice_descriptor = v; })} />
-            </Section>
+            {/* Voice descriptor is generated and kept in the bible, but it belongs to the
+                Voice section (designed later), so it is not shown or edited here. */}
           </div>
 
           <Section title="Wardrobe" action={<Regen section="wardrobe" busy={regen} onClick={reimagine} />}>

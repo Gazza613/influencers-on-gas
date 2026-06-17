@@ -144,9 +144,12 @@ export default function CastingStep({
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={c.url} alt={`look ${i + 1}`} onError={() => setBroken((b) => new Set(b).add(c.url))}
-                            className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_22px_rgba(168,85,247,0.45)]" : "border-line opacity-85 hover:opacity-100"}`} />
+                            className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_26px_rgba(168,85,247,0.6)]" : chosen ? "border-line opacity-40 hover:opacity-80" : "border-line opacity-90 hover:opacity-100"}`} />
                         )}
-                        <span className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] transition ${sel ? "border-[#a855f7] bg-[#a855f7] text-white" : "border-white/70 bg-black/45 text-transparent group-hover:text-white/70"}`}>✓</span>
+                        {sel && !broken.has(c.url) && (
+                          <span className="absolute bottom-1.5 left-1.5 z-10 rounded-full bg-[#a855f7] px-2 py-0.5 text-[10px] font-bold text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]">✓ Your pick</span>
+                        )}
+                        <span className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border text-sm transition ${sel ? "border-white bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.7)]" : "border-white/70 bg-black/45 text-transparent group-hover:text-white/70"}`}>✓</span>
                         <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="View full size"
                           className="absolute bottom-1.5 right-1.5 hidden h-6 w-6 items-center justify-center rounded-md bg-black/60 text-xs text-white group-hover:flex">⤢</button>
                       </div>

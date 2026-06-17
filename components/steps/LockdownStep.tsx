@@ -155,6 +155,26 @@ export default function LockdownStep({
           <li>🎬 Creatives and (later) video both build from this locked identity, so it unlocks them the moment you lock.</li>
         </ul>
 
+        {refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround) && !working && (
+          <div className="mt-4 rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/8 p-4">
+            <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">This is what you are locking in</div>
+            <p className="mt-1 text-[13px] text-ink-faint">Her forensic identity set: a clean identity card, a macro feature sheet (eyes, brows, lips, skin, hair, hands) and a full turnaround. Every future creative is matched against these.</p>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {([["faceCard", "Identity"], ["featureSheet", "Features"], ["turnaround", "Turnaround"]] as const).map(([k, label]) => {
+                const url = refCards[k];
+                if (!url) return null;
+                return (
+                  <a key={k} href={url} target="_blank" rel="noreferrer" className="group block">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={label} className="aspect-square w-full rounded-lg border border-line object-cover transition group-hover:border-[#a855f7]/60" />
+                    <div className="mt-1 text-center text-[11px] text-ink-faint">{label}</div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {!working && (
           <button onClick={lock} disabled={selectedCount < 5} className="btn-brand mt-4 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
             {selectedCount < 5 ? "Select 5+ frames in the photoshoot first" : `🔒 Lock down identity (${selectedCount} frames)`}
