@@ -49,7 +49,7 @@ export default function StartPage() {
     router.push(`/setup/influencers/${d.id}`);
   }
 
-  const back = () => { setView("menu"); setErr(""); setConsenting(false); setTwinConsentId(null); setTwinPhoto(null); };
+  const back = () => { setView("menu"); setErr(""); setConsenting(false); setTwinConsentId(null); setTwinPhotos([]); };
 
   return (
     <div style={{ minHeight: "100vh", position: "relative", overflow: "hidden", background: "#07070E" }} className="flex flex-col items-center justify-center px-6 py-16 text-center">
