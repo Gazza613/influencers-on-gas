@@ -31,7 +31,7 @@ export default function StartPage() {
   const [twinName, setTwinName] = useState("");
   const [consenting, setConsenting] = useState(false);
   const [twinConsentId, setTwinConsentId] = useState<string | null>(null);
-  const [twinPhoto, setTwinPhoto] = useState<string | null>(null);
+  const [twinPhotos, setTwinPhotos] = useState<string[]>([]);
   // existing
   const [list, setList] = useState<Inf[] | null>(null);
 
@@ -106,9 +106,21 @@ export default function StartPage() {
             {consenting && !twinConsentId && <ConsentGate dataType="image" onCancel={() => setConsenting(false)} onConfirm={(id) => setTwinConsentId(id)} />}
             {twinConsentId && (
               <>
-                <p className="text-sm text-ink-dim">Upload your photo. This is the identity, so pick a clear, well-lit face shot.</p>
-                <Uploader kind="twin" label="Your photo" current={twinPhoto} onUploaded={setTwinPhoto} />
-                <button onClick={() => create({ name: twinName.trim(), mode: "twin", consentId: twinConsentId, persona: { reference_url: twinPhoto } })} disabled={!twinPhoto || busy}
+                <p className="text-sm text-ink-dim">Upload <span className="text-ink">at least 3</span> clear photos (5 to 10 is ideal): different angles, lighting and expressions, one face per photo, no sunglasses or hats. More varied photos means a far more accurate twin.</p>
+                {twinPhotos.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {twinPhotos.map((u, i) => (
+                      <div key={u} className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={u} alt={`photo ${i + 1}`} className="aspect-square w-full rounded-lg border border-line object-cover" />
+                        <button onClick={() => setTwinPhotos((p) => p.filter((x) => x !== u))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Uploader kind="twin" multiple label={twinPhotos.length ? "Add more photos" : "Add photos"} current={null} onUploaded={(u) => setTwinPhotos((p) => (u && !p.includes(u) ? [...p, u] : p))} />
+                <p className="text-[11px] text-ink-faint">{twinPhotos.length} added{twinPhotos.length > 0 && twinPhotos.length < 3 ? ` · ${3 - twinPhotos.length} more needed` : ""}</p>
+                <button onClick={() => create({ name: twinName.trim(), mode: "twin", consentId: twinConsentId, persona: { reference_url: twinPhotos[0], reference_images: twinPhotos } })} disabled={twinPhotos.length < 3 || busy}
                   className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : "Create my twin →"}</button>
               </>
             )}
