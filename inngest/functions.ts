@@ -406,7 +406,7 @@ export const generateCreatives = inngest.createFunction(
       // Falls back to the raw brief if Claude is unavailable.
       let richScene = sceneText;
       if (scene) {
-        const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: (persona.bible as Record<string, unknown>) || {}, scene: sceneText, cinematic, extras: event.data.extras !== false }));
+        const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: (persona.bible as Record<string, unknown>) || {}, scene: sceneText, cinematic, extras: event.data.extras !== false, gender: String(persona.gender || "") }));
         if (composed) {
           richScene = composed;
           await step.run("usage-compose", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "compose", count: 1 }));

@@ -89,7 +89,7 @@ From a short brief, design a fully realised person. Be specific, art-directed an
 Rules:
 - UK British English spelling throughout (humaniser, colour, realise, neutralise).
 - No em dashes. Use commas, full stops or brackets.
-- The character has ONE clear, consistent gender (as specified in the brief). Never ambiguous or blended; write the bio, build and wardrobe to match it unmistakably.
+- The character has ONE clear, consistent gender (as specified in the brief). Never ambiguous or blended; write the bio, build and wardrobe to match it unmistakably. Use ONLY that gender's pronouns throughout every field (she/her for a woman, he/him for a man); NEVER use the opposite gender's pronouns anywhere.
 - core_traits: 3 to 5 dominant traits. behaviour_patterns: 3 telling habits.
 - palette entries: short descriptors or hex values (e.g. "warm sienna #B5651D").
 - signature_line: one short, in-character spoken line (their voice).
@@ -110,7 +110,7 @@ Look / finish (adapt to the requested look):
 // Expand a brief into a full Character Bible.
 export async function generateBible(name: string, brief: string, gender?: string, look?: string): Promise<CharacterBible> {
   const c = await client();
-  const genderLine = gender ? `Gender: ${gender} (design unmistakably as a ${gender}).\n` : "";
+  const genderLine = gender ? `Gender: ${gender} (design unmistakably as a ${gender}; use only ${gender === "female" ? "she/her" : gender === "male" ? "he/him" : "their"} pronouns throughout, never the opposite).\n` : "";
   const lookLine = look ? `Look: ${look} look (adapt makeup, grooming and skin finish accordingly).\n` : "";
   const res = await c.messages.create({
     model: MODEL,
@@ -290,17 +290,19 @@ export async function researchHiggsfieldTips(): Promise<string> {
 // comes from a reference image (@image1), so this never describes facial features. The
 // caller wraps the returned paragraph in the structured iPhone-realism prompt + identity
 // lock + constraints. Returns null on failure (caller falls back to the raw brief).
-export async function composeCreativeScene(opts: { bible: Record<string, unknown>; scene: string; cinematic: boolean; extras: boolean }): Promise<string | null> {
+export async function composeCreativeScene(opts: { bible: Record<string, unknown>; scene: string; cinematic: boolean; extras: boolean; gender?: string }): Promise<string | null> {
   try {
     const c = await client();
     const id = (opts.bible?.identity ?? {}) as Record<string, string>;
     const wardrobe = (opts.bible?.wardrobe ?? {}) as Record<string, unknown>;
     const persona = [id.age, id.profession, id.ethnicity_design].filter(Boolean).join(", ") + (Object.keys(wardrobe).length ? `; signature wardrobe: ${JSON.stringify(wardrobe).slice(0, 300)}` : "");
+    const gw = (opts.gender || "").toLowerCase();
+    const pronouns = gw === "female" || gw === "woman" ? "she/her (a woman)" : gw === "male" || gw === "man" ? "he/him (a man)" : "they/them";
     const res = await c.messages.create({
       model: MODEL,
       max_tokens: 500,
       system:
-        "You are a creative director writing the SCENE for ONE photoreal social-media image of an existing AI influencer. The face and identity come from a separate reference image, so NEVER describe facial features, skin marks, eye colour or hair, refer to them only as 'the person' / 'she' / 'he'. " +
+        `You are a creative director writing the SCENE for ONE photoreal social-media image of an existing AI influencer. The face and identity come from a separate reference image, so NEVER describe facial features, skin marks, eye colour or hair. The influencer's pronouns are ${pronouns}, use ONLY these pronouns and NEVER the opposite gender's. ` +
         "Expand the producer's brief into a single vivid paragraph covering: the setting and time of day, the wardrobe (specific garments, fabric, colour, how worn), the pose and action, the mood, and the natural lighting. Keep the producer's specifics; fill gaps tastefully from the persona. " +
         (opts.cinematic ? "Cinematic film mood. " : "A natural, candid, everyday iPhone-snapshot mood, not a posed studio shoot. ") +
         (opts.extras ? "Include a believable, busy South African background crowd (a natural mix of Black, White, Indian and Coloured people), all fully clothed and in sharp focus. " : "No other people in the scene. ") +

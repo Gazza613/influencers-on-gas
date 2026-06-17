@@ -201,8 +201,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
           identity locked in. Backgrounds stay sharp and everyone stays fully clothed.
         </p>
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[11px] text-ink-dim">
-          <span className="text-base leading-none">🔎</span>
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[13px] leading-relaxed text-ink-dim">
+          <span className="text-lg leading-none">🔎</span>
           <span><span className="text-[#c79bff] font-semibold">AI Vision QA</span> reviews every single shot before you see it, wardrobe, composition, proportions and realism are all checked, and anything that doesn&apos;t pass is rejected and re-rolled automatically. You only ever get keepers.</span>
         </div>
 

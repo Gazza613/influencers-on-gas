@@ -27,7 +27,6 @@ export default function LockdownStep({
   const [st, setSt] = useState(initialStatus);
   const [locked, setLocked] = useState(lockedInit);
   const [busy, setBusy] = useState(initialStatus === "training" || initialStatus === "ready");
-  const [retraining, setRetraining] = useState(false);
   const [err, setErr] = useState("");
   const [localStart, setLocalStart] = useState<number | null>(null);
   const startedMs = soulStartedAt ? Date.parse(soulStartedAt) : localStart;
@@ -63,15 +62,6 @@ export default function LockdownStep({
     if (!confirm("Abort this lock-down? You can start it again afterwards.")) return;
     await fetch(`/api/influencers/${influencerId}/train`, { method: "DELETE" }).catch(() => {});
     setBusy(false); setErr(""); setSt("frames_ready");
-  }
-
-  async function retrain() {
-    if (!confirm("Retrain this identity?\n\nThis is NOT your next step. It is only for influencers that keep returning the same outfit or scene in their creatives.\n\nWhat happens: we shoot a brand-new varied photoshoot, then take you to review the frames and re-lock the identity. It takes about 10 to 15 minutes and uses credits. Your existing creatives are kept.\n\nA freshly built influencer is already trained on the richer set and does not need this. Continue anyway?")) return;
-    setRetraining(true);
-    const r = await fetch(`/api/influencers/${influencerId}/retrain`, { method: "POST" }).catch(() => null);
-    if (r?.ok) { window.location.href = `/setup/influencers/${influencerId}/photoshoot`; return; }
-    setRetraining(false);
-    alert("Could not start the retrain. Please try again.");
   }
 
   if (locked) {
@@ -112,7 +102,7 @@ export default function LockdownStep({
         )}
         <div className="rounded-xl border border-ready/40 bg-surface-1 p-5">
           <div className="tabular text-xs uppercase tracking-[0.2em] text-ready font-semibold">✓ Your next step</div>
-          <div className="mt-1 text-lg font-bold text-ink">Create &amp; download her creatives</div>
+          <div className="mt-1 text-lg font-bold text-ink">Create &amp; download {name}&apos;s creatives</div>
           <p className="mt-1 text-sm text-ink-dim">
             Generate social-ready images (9:16, 1:1, 16:9 up to 4K) for {name} and download them for Reels, Stories,
             feeds and ads. These same images feed video production, so this is your step. Voice and the full video
@@ -120,22 +110,9 @@ export default function LockdownStep({
           </p>
           <div className="mt-3">
             <Link href={`/setup/influencers/${influencerId}/creatives`} className="next-pulse inline-block rounded-full px-5 py-2.5 text-sm font-bold">
-              ✦ Create &amp; download images →
+              ✦ Create &amp; download {name}&apos;s creatives →
             </Link>
           </div>
-        </div>
-
-        <div className="rounded-xl border border-line/60 bg-surface-1/40 p-4">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Optional · advanced, rarely needed</div>
-          <p className="mt-2 text-[13px] text-ink-faint">
-            She is already trained on the rich, varied photoshoot, so you do <span className="text-ink-dim">not</span> need this.
-            Only if her creatives keep coming back in the same outfit or scene: a retrain shoots a fresh varied set and
-            then you re-lock her (about 10 to 15 minutes, uses credits). Existing creatives are kept.
-          </p>
-          <button onClick={retrain} disabled={retraining}
-            className="mt-3 rounded-lg border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-faint hover:border-[#a855f7]/40 hover:text-[#c79bff] disabled:opacity-50">
-            {retraining ? "Starting retrain…" : "↻ Retrain on a richer set"}
-          </button>
         </div>
       </div>
     );
