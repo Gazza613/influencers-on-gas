@@ -113,6 +113,23 @@ export const buildIdentity = inngest.createFunction(
     // For a digital twin (real person) NEVER thread invented marks; the real photo is truth.
     const faceMarks = isTwin ? "" : [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 300);
 
+    // DIGITAL TWIN: the real uploaded photos ARE the identity. Do NOT regenerate the face
+    // (that drifts and invents marks). Use the uploads directly as the frame/reference set.
+    const twinPhotos = Array.isArray(persona.reference_images) ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
+    if (isTwin && twinPhotos.length) {
+      const valid = await step.run("validate-twin-photos", () => filterLoadable(twinPhotos));
+      const photos = valid.length ? valid : twinPhotos;
+      const twinFrames = photos.map((url, i) => ({ url, ...(i === 0 ? { hero: true, face: true } : {}) }));
+      await step.run("save-twin-frames", () =>
+        updateInfluencer(influencerId, {
+          look_refs: twinFrames,
+          status: "frames_ready",
+          persona: { ...persona, hero_url: photos[0], frames_expected: photos.length, face_card_url: photos[0], feature_sheet_url: null, turnaround_url: null },
+        }),
+      );
+      return { ok: true, frames: twinFrames.length, twin: true };
+    }
+
     try {
       // Lock the chosen face as a reusable Element (import the URL → media reference).
       const elementId = await step.run("element", () => createFaceElement(null, chosenUrl, `${inf.name}-${influencerId.slice(0, 8)}`));
@@ -368,34 +385,40 @@ export const generateCreatives = inngest.createFunction(
     try {
       const lockMode = event.data.identityLock === "flexible" ? "flexible" : "strong";
       const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
-      // Prefer the clean canonical identity card (archive gem) for @image1, then fall back
-      // to the chosen casting face. Feature sheet (if any) is a forensic @image2.
-      // For a TWIN (real person) the truest likeness is the uploaded photo, so anchor to it
-      // first; never to a regenerated frame (those drift). Synthetic uses the clean card.
-      const idRefUrl = inf.mode === "twin"
-        ? ((persona.reference_url as string) || (persona.face_card_url as string) || (persona.hero_url as string) || refs.find((r) => r.hero)?.url || refs[0]?.url || "")
-        : ((persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || "");
-      const featureUrl = (persona.feature_sheet_url as string) || "";
-      // Import the references → media ids. Face = identity, feature sheet = forensic detail,
-      // optional clothing/scene refs.
-      const [idMedia, featMedia, clothMedia, locMedia] = await step.run("import-refs", () => Promise.all([
-        idRefUrl ? importMediaUrl(idRefUrl) : Promise.resolve(null),
-        featureUrl ? importMediaUrl(featureUrl) : Promise.resolve(null),
-        clothingRef ? importMediaUrl(clothingRef) : Promise.resolve(null),
-        locationRef ? importMediaUrl(locationRef) : Promise.resolve(null),
-      ]));
-      const medias = [idMedia, featMedia, clothMedia, locMedia].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
+      // Identity references (face). A TWIN uses up to 4 of the REAL uploaded photos (more
+      // angles = more accurate likeness, never regenerated). A synthetic uses the clean
+      // identity card + the forensic feature sheet.
+      const twinPhotos = inf.mode === "twin" && Array.isArray(persona.reference_images)
+        ? (persona.reference_images as string[]).filter((u) => typeof u === "string").slice(0, 4) : [];
+      const idRefUrls = twinPhotos.length
+        ? twinPhotos
+        : [(persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || ""].filter(Boolean);
+      const featureUrl = twinPhotos.length ? "" : ((persona.feature_sheet_url as string) || "");
+      const imported = await step.run("import-refs", async () => {
+        const ids = (await Promise.all(idRefUrls.map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v);
+        const [feat, cloth, loc] = await Promise.all([
+          featureUrl ? importMediaUrl(featureUrl).catch(() => null) : Promise.resolve(null),
+          clothingRef ? importMediaUrl(clothingRef).catch(() => null) : Promise.resolve(null),
+          locationRef ? importMediaUrl(locationRef).catch(() => null) : Promise.resolve(null),
+        ]);
+        return { ids, feat, cloth, loc };
+      });
+      const idMedias = imported.ids;
+      const medias = [...idMedias, imported.feat, imported.cloth, imported.loc].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
       const extra = medias.length ? { medias } : {};
-      // @image tags follow the medias order. Tell the model how to use each one.
+      // @image tags follow the medias order. Identity refs come first.
       let n = 0;
-      const faceTag = idMedia ? `@image${++n}` : null;
-      const featTag = featMedia ? `@image${++n}` : null;
-      const clothTag = clothMedia ? `@image${++n}` : null;
-      const locTag = locMedia ? `@image${++n}` : null;
+      const faceTags = idMedias.map(() => `@image${++n}`);
+      const faceRange = faceTags.length > 1 ? `${faceTags[0]} to ${faceTags[faceTags.length - 1]}` : faceTags[0];
+      const featTag = imported.feat ? `@image${++n}` : null;
+      const clothTag = imported.cloth ? `@image${++n}` : null;
+      const locTag = imported.loc ? `@image${++n}` : null;
       const refInstruction = [
-        faceTag && (lockMode === "flexible"
-          ? `IDENTITY REFERENCE: ${faceTag} shows the person. Match their facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and hair. IGNORE ${faceTag}'s clothing, background, pose and lighting; take the wardrobe, scene and pose from the description above.`
-          : `IDENTITY LOCK: ${faceTag} is the appearance reference. Replicate this person EXACTLY, facial bone structure, face shape, jaw, nose, lip shape, eye shape and colour, eyebrow arch, skin tone and texture, freckles, moles and natural asymmetries. Zero facial drift, it must be unmistakably the same individual. IGNORE ${faceTag}'s clothing, background, pose and lighting; take those only from the scene described above.`),
+        faceTags.length && (faceTags.length > 1
+          ? `IDENTITY LOCK: ${faceRange} are photos of the SAME real person from different angles, lighting and expressions. Replicate this exact person faithfully, the same face, bone structure, eyes, nose, lips, skin tone and hair across all of them. Zero facial drift, unmistakably the same individual. Use them ONLY for the face and identity; IGNORE their clothing, backgrounds, poses and lighting.`
+          : (lockMode === "flexible"
+            ? `IDENTITY REFERENCE: ${faceTags[0]} shows the person. Match their facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and hair. IGNORE ${faceTags[0]}'s clothing, background, pose and lighting; take the wardrobe, scene and pose from the description above.`
+            : `IDENTITY LOCK: ${faceTags[0]} is the appearance reference. Replicate this person EXACTLY, facial bone structure, face shape, jaw, nose, lip shape, eye shape and colour, eyebrow arch, skin tone and texture, freckles, moles and natural asymmetries. Zero facial drift, it must be unmistakably the same individual. IGNORE ${faceTags[0]}'s clothing, background, pose and lighting; take those only from the scene described above.`)),
         featTag && `${featTag} is a forensic FEATURE reference: match the exact eyes, brows, lips, skin texture and hair shown in it. Do NOT copy its panel layout, labels or white background.`,
         clothTag && `${clothTag} is a WARDROBE reference: match its outfit (silhouette, fabric, styling). Do NOT copy any face or person from ${clothTag}.`,
         locTag && `${locTag} is a SCENE reference: match its location and setting. Do NOT copy any face or person from ${locTag}.`,

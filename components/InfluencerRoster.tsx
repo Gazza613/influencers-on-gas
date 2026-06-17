@@ -37,10 +37,10 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   const [refUrl, setRefUrl] = useState<string | null>(null); // optional reference for synthetic
   const [twinName, setTwinName] = useState("");
   const [twinConsentId, setTwinConsentId] = useState<string | null>(null);
-  const [twinPhoto, setTwinPhoto] = useState<string | null>(null);
+  const [twinPhotos, setTwinPhotos] = useState<string[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  function reset() { setModal(null); setConsentFor(null); setName(""); setGender(""); setLook("natural"); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhoto(null); }
+  function reset() { setModal(null); setConsentFor(null); setName(""); setGender(""); setLook("natural"); setRefUrl(null); setTwinName(""); setTwinConsentId(null); setTwinPhotos([]); }
 
   async function remove(e: React.MouseEvent, inf: Influencer) {
     e.preventDefault(); e.stopPropagation();
@@ -74,11 +74,11 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
   }
 
   async function createTwin() {
-    if (!twinConsentId || !twinPhoto || busy) return;
+    if (!twinConsentId || twinPhotos.length < 3 || busy) return;
     setBusy(true);
     const r = await fetch("/api/influencers", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: twinName.trim(), mode: "twin", consentId: twinConsentId, persona: { reference_url: twinPhoto } }),
+      body: JSON.stringify({ name: twinName.trim(), mode: "twin", consentId: twinConsentId, persona: { reference_url: twinPhotos[0], reference_images: twinPhotos } }),
     });
     setBusy(false);
     if (r.ok) { const { id } = await r.json(); reset(); router.push(`/setup/influencers/${id}`); router.refresh(); }
@@ -181,10 +181,22 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
         <ConsentGate dataType="image" onCancel={() => setConsentFor(null)} onConfirm={(consentId) => setTwinConsentId(consentId)} />
       )}
       {modal === "twin" && twinConsentId && (
-        <Modal title="Upload your photo" onClose={reset}>
-          <p className="text-xs text-ink-dim">This photo is the identity. We skip casting and run the photoshoot straight from your face, then lock it down.</p>
-          <Uploader kind="twin" label="Your photo" current={twinPhoto} onUploaded={setTwinPhoto} />
-          <Actions onCancel={reset} onConfirm={createTwin} label={busy ? "Creating…" : "Create digital twin"} disabled={!twinPhoto || busy} />
+        <Modal title="Upload your photos" onClose={reset}>
+          <p className="text-xs text-ink-dim">Upload <span className="text-ink">at least 3</span> clear photos (5 to 10 is ideal): different angles, lighting and expressions, one face per photo, no sunglasses or hats. More varied photos means a far more accurate twin.</p>
+          {twinPhotos.length > 0 && (
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {twinPhotos.map((u, i) => (
+                <div key={u} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={u} alt={`photo ${i + 1}`} className="aspect-square w-full rounded-lg border border-line object-cover" />
+                  <button onClick={() => setTwinPhotos((p) => p.filter((x) => x !== u))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-3"><Uploader kind="twin" label={twinPhotos.length ? "Add another photo" : "Add a photo"} current={null} onUploaded={(u) => setTwinPhotos((p) => (u && !p.includes(u) ? [...p, u] : p))} /></div>
+          <p className="mt-2 text-[11px] text-ink-faint">{twinPhotos.length} added{twinPhotos.length > 0 && twinPhotos.length < 3 ? ` · ${3 - twinPhotos.length} more needed` : ""}</p>
+          <Actions onCancel={reset} onConfirm={createTwin} label={busy ? "Creating…" : "Create digital twin"} disabled={twinPhotos.length < 3 || busy} />
         </Modal>
       )}
     </div>
