@@ -88,7 +88,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-1 pb-2">
         <span className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Influencers</span>
-        <button onClick={() => setModal("synthetic")} className="btn-brand rounded-md px-2.5 py-1 text-xs font-bold">+ New</button>
+        <button onClick={() => router.push("/start")} className="btn-brand rounded-md px-2.5 py-1 text-xs font-bold">+ New</button>
       </div>
 
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">

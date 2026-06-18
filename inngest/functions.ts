@@ -571,3 +571,45 @@ export const generateCreatives = inngest.createFunction(
     }
   },
 );
+
+// On-demand 4K upscale of a single chosen creative, as a DURABLE job so it can never time out
+// a request (a 4K bytedance render can take 1-2 min). The UI fires this, shows an "upscaling"
+// spinner, and polls the creatives list until the shot's resolution flips to 4k (or errors).
+type UpCreative = { id?: string; url?: string | null; resolution?: string; upscaling?: boolean; upscale_error?: string | null; [k: string]: unknown };
+export const upscaleCreative = inngest.createFunction(
+  { id: "upscale-creative", retries: 1, triggers: [{ event: "influencer/upscale.creative" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const creativeId = String(event.data.creativeId);
+    const inf = await step.run("load", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "influencer not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const creatives = (Array.isArray(persona.creatives) ? persona.creatives : []) as UpCreative[];
+    const target = creatives.find((c) => (c.id || "") === creativeId);
+    if (!target || !target.url) return { skipped: "shot not found" };
+    if (target.resolution === "4k") return { ok: true, already: true };
+
+    const up = await step.run("upscale", () => upscaleUrlTo(target.url as string, "4k", 40).catch(() => null));
+    const ok = up && (await step.run("validate", () => filterLoadable([up]))).length > 0;
+    if (!ok) {
+      // Clear the spinner and surface a per-shot error; leave the 2K original intact.
+      const fresh = (((await step.run("reload-fail", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+      const list = (Array.isArray(fresh.creatives) ? fresh.creatives : creatives) as UpCreative[];
+      const updated = list.map((c) => ((c.id || "") === creativeId ? { ...c, upscaling: false, upscale_error: "4K upscale did not return an image" } : c));
+      await step.run("save-fail", () => updateInfluencer(influencerId, { persona: { ...fresh, creatives: updated } }));
+      return { ok: false };
+    }
+    const hosted = (await step.run("rehost", () => rehostToBlob(up as string, "creatives").catch(() => null))) || (up as string);
+    await step.run("usage-up", () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: 1 }));
+
+    // Reload so we don't clobber other shots a parallel run may have changed.
+    const fresh = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+    const list = (Array.isArray(fresh.creatives) ? fresh.creatives : creatives) as UpCreative[];
+    const prevUrl = target.url;
+    const updated = list.map((c) => ((c.id || "") === creativeId ? { ...c, url: hosted, resolution: "4k", upscaling: false, upscale_error: null } : c));
+    const vs = (Array.isArray(fresh.video_selects) ? fresh.video_selects : []) as string[];
+    const remapped = vs.map((u) => (u === prevUrl ? hosted : u));
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, creatives: updated, video_selects: remapped } }));
+    return { ok: true };
+  },
+);

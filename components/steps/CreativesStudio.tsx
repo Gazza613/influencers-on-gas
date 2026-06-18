@@ -18,6 +18,8 @@ type Creative = {
   status?: "approved" | "failed_qa" | "failed_generation";
   qa?: { pass: boolean; score10: number; issues: string[] } | null;
   error?: string | null;
+  upscaling?: boolean;
+  upscale_error?: string | null;
 };
 type Rate = { credits: number; cents: number };
 type Rates = { soul_2: Rate; soul_cinematic: Rate; upscale: Rate };
@@ -81,6 +83,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
       status: c.status || (c.url ? "approved" : "failed_generation"),
       qa: c.qa ?? null,
       error: c.error ?? null,
+      upscaling: !!c.upscaling,
+      upscale_error: c.upscale_error ?? null,
     }));
   }
 
@@ -107,6 +111,12 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     return d;
   }
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // Resume polling any upscales still in flight (e.g. after a page refresh).
+  useEffect(() => {
+    const pend = new Set(normalize(initial.creatives || []).filter((c) => c.upscaling).map((c) => c.id || ""));
+    if (pend.size) pollUpscales(pend);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, []);
 
   async function poll(tries = 0): Promise<void> {
     if (tries > 160) { setStatus("idle"); setErr("That run took too long and was reset, you can generate again."); fetch(`/api/influencers/${influencerId}/creatives`, { method: "DELETE" }).catch(() => {}); return; }
@@ -196,19 +206,37 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     if (!ids.length) return;
     setUpscaling((s) => new Set([...s, ...ids]));
     setPicked(new Set());
-    // Run the picked upscales CONCURRENTLY so 3 keepers don't take 3x as long.
-    await Promise.all(ids.map(async (cid) => {
-      const prevUrl = creatives.find((c) => (c.id || "") === cid)?.url || "";
-      const r = await fetch(`/api/influencers/${influencerId}/creatives/upscale`, {
+    // Queue the durable upscale jobs (fast), then poll until each shot turns 4K. No long-held
+    // request, so it can never time out regardless of how long Higgsfield takes.
+    await Promise.all(ids.map((cid) =>
+      fetch(`/api/influencers/${influencerId}/creatives/upscale`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: cid }),
-      }).then((x) => x.json()).catch(() => null);
-      if (r?.creative) {
-        setCreatives((cs) => cs.map((c) => ((c.id || "") === cid ? { ...c, ...r.creative } : c)));
-        const newUrl = r.creative.url as string | undefined;
-        if (newUrl && prevUrl && newUrl !== prevUrl) setVideoSelects((vs) => vs.map((u) => (u === prevUrl ? newUrl : u)));
-      } else setErr("A 4K upscale did not come back, please try that shot again.");
-      setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; });
-    }));
+      }).then((x) => x.json()).catch(() => null),
+    ));
+    pollUpscales(new Set(ids));
+  }
+  function pollUpscales(pending: Set<string>) {
+    let tries = 0;
+    const tick = async () => {
+      tries++;
+      const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
+      if (d?.creatives) {
+        const list = normalize(d.creatives);
+        setCreatives(list);
+        if (Array.isArray(d.videoSelects)) setVideoSelects(d.videoSelects);
+        for (const cid of [...pending]) {
+          const c = list.find((x) => (x.id || "") === cid);
+          if (!c || c.resolution === "4k" || c.upscale_error || !c.upscaling) {
+            pending.delete(cid);
+            setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; });
+            if (c?.upscale_error) setErr("A 4K upscale failed on a shot, please try it again.");
+          }
+        }
+      }
+      if (pending.size && tries < 75) setTimeout(tick, 4000); // poll up to ~5 min
+      else if (pending.size) { pending.forEach((cid) => setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; })); setErr("A 4K upscale is taking longer than usual; it may still finish, refresh shortly."); }
+    };
+    setTimeout(tick, 4000);
   }
   // Finish-based grade: 4K = green Excellent; 2K keeper = orange Good; QA-flagged = red Average.
   function gradeOf(c: Creative): { t: string; cls: string } {
@@ -223,7 +251,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     const forVideo = !!c.url && videoSelects.includes(c.url);
     const canPick = !!c.url && !broken.has(c.url);
     const u = c.url || "";
-    const busy = upscaling.has(id);
+    const busy = upscaling.has(id) || !!c.upscaling;
     const g = gradeOf(c);
     return (
       <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
@@ -436,7 +464,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <div className="mt-4">
             <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null}
               onAbort={abort}
-              note={`Generating and QA-checking each shot in 2K, they appear below as they pass review. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
+              note={`Generating and quality checking each shot in 2K, they appear below as they pass review. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
           </div>
         )}
       </div>
