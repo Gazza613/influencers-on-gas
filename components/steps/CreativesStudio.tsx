@@ -43,7 +43,6 @@ const CREATIVE_NARRATION = [
   "Dialling in the light, the colour and the wardrobe…",
   "🔎 AI Vision QA inspecting every shot, clothed, single frame, true proportions…",
   "Re-rolling anything that doesn't make the cut, no compromises…",
-  "Upscaling the keepers to crisp, publish-ready 4K…",
 ];
 
 export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
