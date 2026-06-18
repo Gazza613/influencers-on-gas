@@ -41,3 +41,48 @@ export async function createTalkingPhoto(imageUrl: string): Promise<string> {
   if (!id) throw new Error(`No talking_photo_id (${res.status}): ${(data.message || data.msg || JSON.stringify(data)).slice(0, 180)}`);
   return id;
 }
+
+// ── A-roll video generation (Phase 2) ──────────────────────────────────────
+// Upload an audio clip (our ElevenLabs voice) to HeyGen → asset id, used as the
+// talking_photo's audio so the lip-sync matches our voice (not HeyGen's TTS).
+export async function uploadAudio(audioUrl: string): Promise<string> {
+  const k = await key();
+  const a = await fetch(audioUrl, { signal: AbortSignal.timeout(20000) });
+  if (!a.ok) throw new Error(`Could not fetch audio (${a.status})`);
+  const bytes = Buffer.from(await a.arrayBuffer());
+  const res = await fetch(`${UPLOAD}/v1/asset`, { method: "POST", headers: { "x-api-key": k, "Content-Type": "audio/mpeg" }, body: bytes });
+  const data = (await res.json().catch(() => ({}))) as { data?: { id?: string; asset_id?: string }; message?: string };
+  const id = data?.data?.id || data?.data?.asset_id;
+  if (!id) throw new Error(`No audio asset id (${res.status}): ${(data.message || JSON.stringify(data)).slice(0, 160)}`);
+  return id;
+}
+
+// Generate a talking-head a-roll clip from a talking_photo + our audio asset.
+// Returns the HeyGen video_id (poll videoStatus for the result url).
+export async function generateAvatarVideo(opts: { talkingPhotoId: string; audioAssetId: string; ratio?: string }): Promise<string> {
+  const k = await key();
+  const [w, h] = opts.ratio === "1:1" ? [1080, 1080] : opts.ratio === "16:9" ? [1920, 1080] : [1080, 1920]; // default 9:16
+  const body = {
+    video_inputs: [{
+      character: { type: "talking_photo", talking_photo_id: opts.talkingPhotoId },
+      voice: { type: "audio", audio_asset_id: opts.audioAssetId },
+    }],
+    dimension: { width: w, height: h },
+  };
+  const res = await fetch(`${API}/v2/video/generate`, {
+    method: "POST", headers: { "x-api-key": k, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { data?: { video_id?: string }; message?: string; error?: unknown };
+  const id = data?.data?.video_id;
+  if (!id) throw new Error(`No video_id (${res.status}): ${(data.message || JSON.stringify(data.error || data)).slice(0, 200)}`);
+  return id;
+}
+
+// Poll a HeyGen video render. Returns the final mp4 url, or null while pending / on failure.
+export async function videoStatus(videoId: string): Promise<{ status: string; url: string | null; error: string | null }> {
+  const k = await key();
+  const res = await fetch(`${API}/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`, { headers: { "x-api-key": k }, cache: "no-store" });
+  const data = (await res.json().catch(() => ({}))) as { data?: { status?: string; video_url?: string; error?: unknown } };
+  const status = String(data?.data?.status || "unknown");
+  return { status, url: data?.data?.video_url || null, error: status === "failed" ? JSON.stringify(data?.data?.error || "render failed").slice(0, 200) : null };
+}
