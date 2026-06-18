@@ -7,7 +7,7 @@ import { recordUsage } from "@/lib/usage";
 
 // Upscale ONE kept 2K shot to 4K on demand (so we only spend upscale credits on shots the
 // producer actually chooses). Swaps that creative's url + resolution in place.
-export const maxDuration = 120;
+export const maxDuration = 300; // a 4K bytedance upscale (import + job poll + rehost) can take 1-2 min
 
 type Creative = { id?: string; url?: string | null; resolution?: string; status?: string; [k: string]: unknown };
 

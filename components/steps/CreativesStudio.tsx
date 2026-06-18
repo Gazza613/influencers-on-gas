@@ -196,19 +196,19 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     if (!ids.length) return;
     setUpscaling((s) => new Set([...s, ...ids]));
     setPicked(new Set());
-    for (const cid of ids) {
+    // Run the picked upscales CONCURRENTLY so 3 keepers don't take 3x as long.
+    await Promise.all(ids.map(async (cid) => {
       const prevUrl = creatives.find((c) => (c.id || "") === cid)?.url || "";
       const r = await fetch(`/api/influencers/${influencerId}/creatives/upscale`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: cid }),
       }).then((x) => x.json()).catch(() => null);
       if (r?.creative) {
         setCreatives((cs) => cs.map((c) => ((c.id || "") === cid ? { ...c, ...r.creative } : c)));
-        // If this shot was already marked for video, point the selection at the new 4K url.
         const newUrl = r.creative.url as string | undefined;
         if (newUrl && prevUrl && newUrl !== prevUrl) setVideoSelects((vs) => vs.map((u) => (u === prevUrl ? newUrl : u)));
       } else setErr("A 4K upscale did not come back, please try that shot again.");
       setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; });
-    }
+    }));
   }
   // Finish-based grade: 4K = green Excellent; 2K keeper = orange Good; QA-flagged = red Average.
   function gradeOf(c: Creative): { t: string; cls: string } {
