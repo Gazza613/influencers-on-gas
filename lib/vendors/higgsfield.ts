@@ -150,9 +150,13 @@ async function createElement(call: Caller, jobId: string | null, url: string, na
 }
 
 function baseParams(model: string, aspectRatio: string): AnyObj {
-  return model === "gpt_image_2"
-    ? { model, aspect_ratio: aspectRatio, count: 1, quality: "high" }
-    : { model, aspect_ratio: aspectRatio, count: 1, quality: "2k" };
+  const base = { model, aspect_ratio: aspectRatio, count: 1 };
+  // Each model takes a different quality param. Nano Banana (pro/2/base) use `resolution`
+  // (1k/2k/4k, default 1k!) — sending `quality` is ignored and leaves them at 1k. GPT Image
+  // uses `quality`. Default everything else to a 2k quality.
+  if (model.startsWith("nano_banana")) return { ...base, resolution: "2k" };
+  if (model === "gpt_image_2" || model === "gpt_image") return { ...base, quality: "high" };
+  return { ...base, quality: "2k" };
 }
 
 // Generate ONE hero face. Returns { jobId, url } (url may be null on failure).
