@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { listTools } from "@/lib/vendors/higgsfield";
+import { listTools, callMcp } from "@/lib/vendors/higgsfield";
 
 // Super-admin: discover the live Higgsfield generate_image schema (accepted model ids +
 // aspect_ratio values) so we wire the EXACT Nano Banana Pro id and the right 1:1 token,
@@ -19,17 +19,23 @@ export async function GET() {
   try {
     const tools = await listTools();
     const gen = tools.find((t) => t.name === "generate_image");
-    // The model/aspect enums may live at the top level or nested under a "params" object.
     const schema = gen?.inputSchema as { properties?: { params?: unknown } } | undefined;
     const paramsSchema = schema?.properties?.params ?? schema;
+    // model/aspect are free-form strings validated against a server catalog → query it.
+    let catalog: unknown = null;
+    for (const args of [{}, { query: "nano banana" }, { category: "image" }]) {
+      try { catalog = await callMcp("models_explore", args); if (catalog) break; } catch { /* try next shape */ }
+    }
+    const catStr = typeof catalog === "string" ? catalog : JSON.stringify(catalog ?? "");
+    // Surface anything that looks like a nano-banana model id for convenience.
+    const nanoIds = [...new Set((catStr.match(/[a-z0-9_.-]*nano[a-z0-9_.-]*/gi) || []))];
     return NextResponse.json({
       ok: true,
       generate_image_found: !!gen,
-      models: pickEnum(paramsSchema, "model"),
-      aspect_ratio: pickEnum(paramsSchema, "aspect_ratio"),
-      quality: pickEnum(paramsSchema, "quality"),
+      aspect_ratio_schema: pickEnum(paramsSchema, "aspect_ratio"),
+      nano_model_ids_found: nanoIds,
+      models_catalog: catalog,
       tools: tools.map((t) => t.name),
-      raw_generate_image_schema: gen?.inputSchema ?? null,
     });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 500 });
