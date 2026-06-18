@@ -51,7 +51,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
-  const [res, setRes] = useState<"2k" | "4k">("2k");
   const [extras, setExtras] = useState(true);
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
@@ -134,8 +133,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const nFormats = ratios.size;
   const images = nFormats * PER_RATIO;
   const tierRate = rates ? rates[tier] : null;
-  const estCents = rates && tierRate ? images * (tierRate.cents + (res === "4k" ? rates.upscale.cents : 0)) : 0;
-  const estCredits = rates && tierRate ? images * (tierRate.credits + (res === "4k" ? rates.upscale.credits : 0)) : 0;
+  const estCents = rates && tierRate ? images * tierRate.cents : 0;
+  const estCredits = rates && tierRate ? images * tierRate.credits : 0;
 
   async function perfect() {
     if (refining) return;
@@ -152,7 +151,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setErr(""); setStatus("running");
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: res, scene, count: PER_RATIO, model: tier, clothingRef, locationRef, extras, identityLock }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, model: tier, clothingRef, locationRef, extras, identityLock }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);
@@ -348,21 +347,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <p className="mt-1.5 text-[11px] text-ink-faint">Both lock your trained Soul for identical identity across every shot, the consistency video production needs.</p>
         </div>
 
-        {/* Resolution */}
-        <div className="mt-4 flex flex-wrap items-end gap-4">
-          <div>
-            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Resolution</div>
-            <div className="flex gap-2">
-              {(["2k", "4k"] as const).map((q) => (
-                <button key={q} onClick={() => setRes(q)} className={`rounded-lg border px-4 py-2 text-sm font-semibold transition ${res === q ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>
-                  {q === "2k" ? "Standard 2K" : "Premium 4K"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="text-[11px] text-ink-faint">{res === "4k" ? "4K upscales each shot (sharper, costs a little more)." : "2K is crisp for feeds, stories and reels."}</p>
-        </div>
-
         {/* Scene + Perfect with AI */}
         <div className="mt-4">
           <div className="mb-1.5 flex items-center justify-between">
@@ -445,7 +429,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <div className="mt-4">
             <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null}
               onAbort={abort}
-              note={`Generating, QA-checking${res === "4k" ? " and upscaling to 4K" : ""} each shot, they appear below as they pass review.${res === "4k" ? " 4K adds an upscale per shot, so it takes a little longer." : ""} Stuck? Hit Abort and run again.`} />
+              note={`Generating and QA-checking each shot in 2K, they appear below as they pass review. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
           </div>
         )}
       </div>
