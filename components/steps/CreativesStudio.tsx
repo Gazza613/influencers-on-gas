@@ -189,9 +189,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   // Upscale the selected 2K keepers to 4K on demand (one paid upscale each, only on shots
   // the producer actually chose). Each upgraded shot moves to the 4K Finals section.
   async function upscalePicked() {
-    // Only upscale shots that produced an image and passed QA (don't promote a failed-QA shot
-    // to a green 4K "Excellent"). Skip ones already at 4K.
-    const targets = creatives.filter((c) => picked.has(c.id || "") && !!c.url && c.resolution !== "4k" && c.status === "approved");
+    // Upscale ANY kept shot that produced an image (the producer chooses keepers regardless of
+    // QA grade). Skip ones already at 4K and ones with no image.
+    const targets = creatives.filter((c) => picked.has(c.id || "") && !!c.url && !broken.has(c.url) && c.resolution !== "4k");
     const ids = targets.map((c) => c.id || "");
     if (!ids.length) return;
     setUpscaling((s) => new Set([...s, ...ids]));
