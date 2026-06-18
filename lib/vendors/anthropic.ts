@@ -345,9 +345,12 @@ export function friendlyAnthropicError(e: unknown): string {
 
 // Voice-direct a line for ElevenLabs v3 TTS: insert audio tags + emphasis so the read sounds
 // like a real, believable human influencer (not flat TTS). Keeps the original words/meaning.
-export async function expressifyScript(line: string, voiceDescriptor = "", tone = "natural and warm"): Promise<string> {
+export async function expressifyScript(line: string, voiceDescriptor = "", tone = "natural and warm", accent = ""): Promise<string> {
   try {
     const c = await client();
+    const accentRule = accent
+      ? `Accent: deliver in a ${accent} accent. Begin the line with an accent cue tag like [${accent} accent], and lightly reflect that accent's natural rhythm and word choices WITHOUT changing the words. `
+      : "";
     const res = await c.messages.create({
       model: MODEL,
       max_tokens: 600,
@@ -355,6 +358,7 @@ export async function expressifyScript(line: string, voiceDescriptor = "", tone 
         "You are a voice director preparing a line for ElevenLabs v3 text-to-speech so it sounds like a REAL person talking to camera, expressive, natural and believable, never flat or robotic. " +
         "Insert ElevenLabs audio tags in square brackets SPARINGLY and only where they genuinely lift the delivery: [warm], [excited], [thoughtful pause], [laughs softly], [chuckles], [sighs], [whispers], [reassuring]. " +
         "Use natural punctuation and ellipses for real pauses and breaths, and CAPITALISE one or two key words per sentence for emphasis. Do NOT change, add or remove the actual words, only add tags, pauses and emphasis. Keep it conversational and human. " +
+        accentRule +
         `Voice / persona: ${voiceDescriptor || "a natural, relatable influencer"}. Desired tone: ${tone}. ` +
         "Output ONLY the directed line, no preamble, no quotes.",
       messages: [{ role: "user", content: line }],

@@ -19,10 +19,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = await req.json().catch(() => ({}));
   const line = typeof body.line === "string" ? body.line.trim().slice(0, 1200) : "";
   const tone = typeof body.tone === "string" ? body.tone.slice(0, 60) : "natural and warm";
+  const accent = typeof body.accent === "string" ? body.accent.slice(0, 40) : "";
   if (line.length < 2) return NextResponse.json({ error: "Add a line first." }, { status: 400 });
 
   const descriptor = ((persona.bible as { voice_descriptor?: string })?.voice_descriptor) || "";
-  const tagged = await expressifyScript(line, descriptor, tone);
+  const tagged = await expressifyScript(line, descriptor, tone, accent);
   await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "voice_script", count: 1 }).catch(() => {});
   return NextResponse.json({ tagged });
 }

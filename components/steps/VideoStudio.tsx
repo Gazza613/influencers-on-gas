@@ -18,6 +18,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   const [line, setLine] = useState(initial.signatureLine || "");
   const [directed, setDirected] = useState("");
   const [tone, setTone] = useState("natural and warm");
+  const [accent, setAccent] = useState("");
   const [enhancing, setEnhancing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -87,7 +88,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
     if (!line.trim() || enhancing) return;
     setEnhancing(true); setErr(""); setPreviewUrl(null);
     const r = await fetch(`/api/influencers/${influencerId}/voice/script`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: line.trim(), tone }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: line.trim(), tone, accent }),
     }).then((x) => x.json()).catch(() => null);
     setEnhancing(false);
     if (r?.tagged) setDirected(r.tagged); else setErr(r?.error || "Could not enhance the script.");
@@ -185,6 +186,10 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           <select value={tone} onChange={(e) => setTone(e.target.value)} className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-[#a855f7]">
             {["natural and warm", "upbeat and energetic", "calm and reassuring", "confident and bold", "playful and fun", "sincere and heartfelt"].map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
+          <span className="text-[11px] text-ink-faint">Accent</span>
+          <select value={accent} onChange={(e) => setAccent(e.target.value)} className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-[#a855f7]">
+            {[["", "Voice default"], ["South African", "South African"], ["British", "British"], ["American", "American"], ["Australian", "Australian"], ["Nigerian", "Nigerian"], ["Indian", "Indian"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
           <button onClick={enhance} disabled={!line.trim() || enhancing} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{enhancing ? "Directing…" : "✨ Enhance with voice tags"}</button>
         </div>
 
@@ -257,7 +262,10 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
                     <span className="text-white/60">a few minutes</span>
                   </div>
                 )}
-                <div className="p-2.5 text-[12px] text-ink-dim"><span className="tabular text-[10px] text-ink-faint">{c.ratio || "9:16"}</span> · {c.line}</div>
+                <details className="px-2.5 py-2">
+                  <summary className="cursor-pointer list-none text-[11px] text-ink-faint hover:text-ink-dim"><span className="tabular">{c.ratio || "9:16"}</span> · view script ▾</summary>
+                  <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-dim">{c.line}</p>
+                </details>
               </div>
             ))}
           </div>
