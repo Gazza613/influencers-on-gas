@@ -150,7 +150,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setErr(""); setStatus("running");
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, model: tier, clothingRef, locationRef, extras, identityLock }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRef, extras, identityLock }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);

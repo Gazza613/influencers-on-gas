@@ -19,8 +19,8 @@ function parseCost(raw: unknown): number | null {
 // subscription). Keep this in sync with Higgsfield → Subscription → Active unlimited models.
 // As of Jun 2026: GPT Image is 365-unlimited; Nano Banana 2 unlimited EXPIRED Jun 17 so it is
 // billable again. (Nano Banana Pro is unlimited but we do not call it yet.)
-const UNLIMITED_MODELS = ["gpt_image_2"];
-// Billable models the pipeline actually calls: preflight their REAL credit cost via get_cost.
+const UNLIMITED_MODELS = ["gpt_image_2", "nano_banana_pro"];
+// Billable models the pipeline may fall back to: preflight their REAL credit cost via get_cost.
 const IMAGE_MODELS = ["nano_banana_2"];
 
 export async function POST() {

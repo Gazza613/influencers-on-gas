@@ -65,7 +65,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const resolution = body.resolution === "4k" ? "4k" : "2k";
   const scene = typeof body.scene === "string" ? body.scene.trim().slice(0, 2000) : "";
   const count = Math.max(1, Math.min(6, Number(body.count) || 3));
-  const model = body.model === "soul_cinematic" ? "soul_cinematic" : "soul_2";
+  // Style is an explicit flag now (both styles render on the same image model). Accept the
+  // legacy soul_cinematic model name too so older clients keep working.
+  const cinematic = body.cinematic === true || body.model === "soul_cinematic";
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
   const locationRef = typeof body.locationRef === "string" ? body.locationRef : "";
   const extras = body.extras !== false; // default: include diverse background extras
@@ -75,7 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Send first; only flip to "running" once accepted, so a send failure can't strand the
   // gallery showing "Rendering" forever with no job running.
   try {
-    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, model, clothingRef, locationRef, extras, identityLock } });
+    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, cinematic, clothingRef, locationRef, extras, identityLock } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }

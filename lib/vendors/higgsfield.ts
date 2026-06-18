@@ -189,15 +189,17 @@ async function acquireSlot(): Promise<void> {
 }
 function releaseSlot(): void { _active = Math.max(0, _active - 1); const next = _queue.shift(); if (next) next(); }
 
-export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}): Promise<(string | null)[]> {
-  return (await generateBatchDetailed(prompts, model, aspectRatio, extra)).map((r) => r.url);
+export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}, fallbackModel: string | null = null): Promise<(string | null)[]> {
+  return (await generateBatchDetailed(prompts, model, aspectRatio, extra, fallbackModel)).map((r) => r.url);
 }
 
 // Same as generateBatch but returns the failure REASON per prompt (raw Higgsfield response or
 // error), so the UI can show why a shot did not render instead of a generic "no image".
-export async function generateBatchDetailed(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}): Promise<{ url: string | null; error: string | null }[]> {
-  const base = { ...baseParams(model, aspectRatio), ...extra };
-  const once = async (p: string): Promise<{ url: string | null; error: string | null }> => {
+// `fallbackModel`: if the primary model yields no image (e.g. an unknown model id, or an
+// aspect it rejects), retry once on a known-good model so a model swap can never hard-break.
+export async function generateBatchDetailed(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}, fallbackModel: string | null = null): Promise<{ url: string | null; error: string | null }[]> {
+  const run = async (p: string, mdl: string): Promise<{ url: string | null; error: string | null }> => {
+    const base = { ...baseParams(mdl, aspectRatio), ...extra };
     const { call } = await openSession();
     const r = await call("generate_image", { params: { ...base, prompt: p } });
     let url: string | null = extractImageUrls(r)[0] ?? null;
@@ -205,14 +207,16 @@ export async function generateBatchDetailed(prompts: string[], model = "gpt_imag
     if (!url && jobId) url = await pollJob(call, jobId);
     if (url) return { url, error: null };
     const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
-    return { url: null, error: `no image [${aspectRatio}]: ${raw}`.slice(0, 280) };
+    return { url: null, error: `no image [${mdl} ${aspectRatio}]: ${raw}`.slice(0, 280) };
   };
+  const once = (p: string, mdl: string) => run(p, mdl).catch((e) => ({ url: null as string | null, error: `[${mdl}] ${String((e as Error)?.message || e)}`.slice(0, 280) }));
   // Each prompt gets its OWN MCP session; concurrency is capped so jobs aren't dropped.
   return Promise.all(prompts.map(async (p) => {
     await acquireSlot();
     try {
-      let res = await once(p).catch((e) => ({ url: null as string | null, error: String((e as Error)?.message || e).slice(0, 280) }));
-      if (!res.url) res = await once(p).catch((e) => ({ url: null as string | null, error: String((e as Error)?.message || e).slice(0, 280) })); // one transient retry
+      let res = await once(p, model);
+      if (!res.url) res = await once(p, model); // one transient retry on the primary model
+      if (!res.url && fallbackModel && fallbackModel !== model) res = await once(p, fallbackModel); // self-heal to a known-good model
       return res;
     } finally { releaseSlot(); }
   }));

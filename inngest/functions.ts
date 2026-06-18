@@ -12,9 +12,13 @@ import { recordUsage } from "@/lib/usage";
 
 const CANDIDATE_COUNT = 6;
 
-// Nano Banana Pro: 1 credit/image (vs gpt_image_2's 4), far faster, and supports the
-// <<<element>>> identity lock we need for consistent photoshoot frames.
-const IMAGE_MODEL = "nano_banana_2";
+// Image identity engine. Nano Banana Pro is best-of-breed for reference-conditioned face
+// consistency (blends many refs, native square) AND is UNLIMITED on our Ultra plan, so it is
+// free and should fix the gpt_image_2 1:1 failure. Env-overridable in case the live model id
+// differs; generation falls back to a known-good model per call so a wrong id never hard-breaks.
+const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "nano_banana_pro";
+const IMAGE_FALLBACK = "nano_banana_2"; // known-good casting/photoshoot model
+const CREATIVE_FALLBACK = "gpt_image_2"; // previously-validated creatives identity model
 
 // Stage 2 (Photoshoot) builds the Soul TRAINING SET from the chosen face. Recipe follows
 // the Higgsfield Soul photo guide: 8 to 12 sharp, single-person frames that vary ANGLE,
@@ -59,7 +63,7 @@ export const generateCandidates = inngest.createFunction(
     try {
       // gpt_image_2 is ~150s PER IMAGE, so generating all 6 CONCURRENTLY collapses casting
       // to ~one image's wall-clock (~2.5 min) instead of 6× (~15 min).
-      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16"));
+      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16", {}, IMAGE_FALLBACK));
       const produced = [...new Set(urls.filter((u): u is string => !!u))];
       // Meter what Higgsfield produced (billed), BEFORE dropping any that fail to load.
       if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "casting", count: produced.length }));
@@ -181,7 +185,7 @@ export const buildIdentity = inngest.createFunction(
           const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${constant}` : prompt;
           return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${core}.`;
         });
-        urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16"));
+        urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16", {}, IMAGE_FALLBACK));
         const produced = urls.filter((u): u is string => !!u);
         if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
       }
@@ -206,23 +210,24 @@ export const buildIdentity = inngest.createFunction(
       // For a TWIN (real person) we DO NOT regenerate the face, AI redraw drifts and invents
       // marks, so the real uploaded photo IS the identity card. Best-effort, never blocks.
       const cards = isTwin
-        ? { face_card_url: chosenUrl, feature_sheet_url: null, turnaround_url: null }
+        ? { face_card_url: chosenUrl, feature_sheet_url: null, turnaround_url: null, cards_rehosted: true }
         : await step.run("reference-cards", async () => {
             const faceMedia = await importMediaUrl(chosenUrl).catch(() => null);
             if (!faceMedia) return null;
             const ex = { medias: [{ value: faceMedia, role: "image" }] };
             const [card, sheet, turn] = await Promise.all([
-              generateBatch([buildIdentityCardPrompt()], IMAGE_MODEL, "1:1", ex).catch(() => []),
-              generateBatch([buildFeatureSheetPrompt()], IMAGE_MODEL, "3:4", ex).catch(() => []),
-              generateBatch([buildTurnaroundPrompt()], IMAGE_MODEL, "16:9", ex).catch(() => []),
+              generateBatch([buildIdentityCardPrompt()], IMAGE_MODEL, "1:1", ex, IMAGE_FALLBACK).catch(() => []),
+              generateBatch([buildFeatureSheetPrompt()], IMAGE_MODEL, "3:4", ex, IMAGE_FALLBACK).catch(() => []),
+              generateBatch([buildTurnaroundPrompt()], IMAGE_MODEL, "16:9", ex, IMAGE_FALLBACK).catch(() => []),
             ]);
             const pick = (a: (string | null)[]) => (a && a[0]) || null;
-            const [c, s, t] = await Promise.all([
-              pick(card) ? rehostToBlob(pick(card)!, "refs").catch(() => null) : null,
-              pick(sheet) ? rehostToBlob(pick(sheet)!, "refs").catch(() => null) : null,
-              pick(turn) ? rehostToBlob(pick(turn)!, "refs").catch(() => null) : null,
-            ]);
-            return { face_card_url: c || pick(card), feature_sheet_url: s || pick(sheet), turnaround_url: t || pick(turn) };
+            // These cards feed the video phase, so they MUST land on durable Blob, not a
+            // temporary Higgsfield CDN url. Retry the rehost once; flag if any did not stick.
+            const host = async (u: string | null) => (u ? (await rehostToBlob(u, "refs").catch(() => null)) || (await rehostToBlob(u, "refs").catch(() => null)) : null);
+            const [pc, ps, pt] = [pick(card), pick(sheet), pick(turn)];
+            const [c, s, t] = await Promise.all([host(pc), host(ps), host(pt)]);
+            const cardsRehosted = (!pc || !!c) && (!ps || !!s) && (!pt || !!t);
+            return { face_card_url: c || pc, feature_sheet_url: s || ps, turnaround_url: t || pt, cards_rehosted: cardsRehosted };
           });
       if (cards && (cards.face_card_url || cards.feature_sheet_url || cards.turnaround_url)) {
         const fresh = await step.run("reload-pre-cards", () => getInfluencer(influencerId));
@@ -379,11 +384,12 @@ export const generateCreatives = inngest.createFunction(
     const fourK = resolution === "4k";
     const existing = Array.isArray(persona.creatives) ? (persona.creatives as Creative[]) : [];
 
-    // ARCHIVE-PROVEN identity recipe (the old SPA never used Soul/soul_id). Identity comes
-    // from REFERENCE IMAGES + an explicit instruction, on gpt_image_2 (high-fidelity, takes
-    // up to 8 image refs). Higgsfield Soul did not hold identity in testing; references do.
-    const genModel = "gpt_image_2";
-    const cinematic = event.data.model === "soul_cinematic";
+    // Identity comes from REFERENCE IMAGES + an explicit IDENTITY LOCK instruction (Soul did
+    // not hold identity in testing; references do). Renders on Nano Banana Pro (best reference
+    // fidelity, native square, free on our plan), falling back to the previously-validated
+    // gpt_image_2 if the model is unavailable. `cinematic` is an explicit flag, not a model name.
+    const genModel = IMAGE_MODEL;
+    const cinematic = event.data.cinematic === true;
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
 
@@ -466,7 +472,7 @@ export const generateCreatives = inngest.createFunction(
         const prompts = Array.from({ length: perRatio }, (_, i) => buildPrompt(i, ratio));
         const selectedModel = genModel;
         // Detailed gen captures the failure REASON per shot (it also retries once internally).
-        const detailed = await step.run(`gen-${rid}`, () => generateBatchDetailed(prompts, genModel, ratio, extra));
+        const detailed = await step.run(`gen-${rid}`, () => generateBatchDetailed(prompts, genModel, ratio, extra, CREATIVE_FALLBACK));
         const rawProduced = detailed.map((d) => d.url);
         const genErrors = detailed.map((d) => d.error);
         const produced = rawProduced.filter((u): u is string => !!u);

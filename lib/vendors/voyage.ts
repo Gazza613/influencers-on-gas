@@ -1,8 +1,11 @@
 import { getSecret } from "../connections";
 
-// Voyage embeddings (voyage-3.5 → 1024-dim, matching the pgvector column).
+// Voyage embeddings → 1024-dim (Matryoshka), matching the pgvector column.
+// voyage-4-lite: equal quality to legacy voyage-3.5 at ~3x lower cost ($0.02 vs $0.06 / Mtok).
+// NOTE: v4 vectors are NOT compatible with 3.5 vectors, so any existing brain must be
+// fully RE-INGESTED per client_id after this change (do not mix old + new vectors).
 const BASE = "https://api.voyageai.com/v1/embeddings";
-const MODEL = "voyage-3.5";
+const MODEL = "voyage-4-lite";
 export const EMBED_DIM = 1024;
 
 async function key(): Promise<string> {
