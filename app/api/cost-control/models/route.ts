@@ -22,20 +22,28 @@ export async function GET() {
     const schema = gen?.inputSchema as { properties?: { params?: unknown } } | undefined;
     const paramsSchema = schema?.properties?.params ?? schema;
     // model/aspect are free-form strings validated against a server catalog → query it.
-    let catalog: unknown = null;
-    for (const args of [{ action: "search", query: "nano banana" }, { action: "list", category: "image" }, { action: "list" }]) {
-      try { const r = await callMcp("models_explore", args); if (r && !String(JSON.stringify(r)).includes("validation error")) { catalog = r; break; } } catch { /* try next shape */ }
+    // Pull the full model catalog (list) — search returned empty. Collect all items.
+    const items: Record<string, unknown>[] = [];
+    for (const args of [{ action: "list", limit: 500 }, { action: "list" }, { action: "list", kind: "image" }]) {
+      try {
+        const r = await callMcp("models_explore", args) as { structuredContent?: { items?: Record<string, unknown>[] } };
+        const got = r?.structuredContent?.items;
+        if (Array.isArray(got) && got.length) { items.push(...got); break; }
+      } catch { /* try next shape */ }
     }
-    const catStr = typeof catalog === "string" ? catalog : JSON.stringify(catalog ?? "");
-    // Surface anything that looks like a nano-banana model id for convenience.
-    const nanoIds = [...new Set((catStr.match(/[a-z0-9_.-]*nano[a-z0-9_.-]*/gi) || []))];
+    // Each item likely carries an id/slug + a name; surface a compact id->name map and the nano ones.
+    const idOf = (it: Record<string, unknown>) => String(it.id ?? it.model ?? it.slug ?? it.key ?? "");
+    const nameOf = (it: Record<string, unknown>) => String(it.name ?? it.title ?? it.label ?? "");
+    const allModels = items.map((it) => ({ id: idOf(it), name: nameOf(it) })).filter((m) => m.id || m.name);
+    const nano = allModels.filter((m) => /nano|banana/i.test(m.id + " " + m.name));
     return NextResponse.json({
       ok: true,
       generate_image_found: !!gen,
       aspect_ratio_schema: pickEnum(paramsSchema, "aspect_ratio"),
-      nano_model_ids_found: nanoIds,
-      models_catalog: catalog,
-      tools: tools.map((t) => t.name),
+      count: allModels.length,
+      nano_models: nano,
+      all_models: allModels,
+      sample_raw_item: items[0] ?? null,
     });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 500 });

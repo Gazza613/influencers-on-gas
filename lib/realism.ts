@@ -69,6 +69,8 @@ export function aspectFraming(ratio: string): string {
 
 // Archive's anti-AI + raw-photo constraints, the single biggest 'looks real' lever.
 const ANTI_AI = "No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow, no over-sharpening. No phone screen, social-media UI, app overlay, notification or status bar, captions or interface elements anywhere. A real, raw, un-retouched photograph.";
+// Subject scale + perspective relative to the scene (a common AI tell when wrong).
+const SCALE = "Scale and perspective: the subject is rendered at correct real-world scale and perspective for this exact setting; head height, body size and distance are believable against any doorways, windows, furniture, vehicles, architecture and other people in the scene; feet (or seat) make natural contact with the ground plane with matching contact shadows; one consistent camera height and lens perspective across subject and background; the subject is NEVER oversized, undersized, floating, leaning at an impossible angle or pasted-on, and never a giant against tiny background people or vice versa.";
 const SKIN_FACTS = "Skin as real photographic fact: visible pores on the nose, cheeks and forehead and on all exposed skin (neck, arms, hands), a couple of honest imperfections and gentle natural asymmetry, a satin sheen only at the high points with the rest matte and lived-in. Zero skin smoothing, zero airbrushing, no beauty filter.";
 
 // Structured creative-image prompt (the archive's section format that gpt_image_2 follows
@@ -93,6 +95,7 @@ export function buildCreativeImagePrompt(o: {
     `Grooming: ${o.look}.`,
     camera,
     SKIN_FACTS,
+    SCALE,
     `Wardrobe: ${CLOTHED}.`,
     `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
   ].join("\n\n");
