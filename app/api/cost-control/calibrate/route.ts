@@ -14,17 +14,26 @@ function parseCost(raw: unknown): number | null {
   return null;
 }
 
-// The models the pipeline actually calls today: nano_banana_2 (casting + photoshoot) and
-// gpt_image_2 (creatives identity). Soul models are no longer used for images, so they are
-// not calibrated. Higgsfield's get_cost returns the REAL credit cost for THIS plan, so if a
-// model is unlimited/included on Ultra it comes back at 0 and the ledger reflects that.
-const IMAGE_MODELS = ["nano_banana_2", "gpt_image_2"];
+// Models on UNLIMITED access on our Ultra plan cost 0 credits to us regardless of their
+// nominal get_cost, so we force them to 0 (do not trust get_cost to know about the
+// subscription). Keep this in sync with Higgsfield → Subscription → Active unlimited models.
+// As of Jun 2026: GPT Image is 365-unlimited; Nano Banana 2 unlimited EXPIRED Jun 17 so it is
+// billable again. (Nano Banana Pro is unlimited but we do not call it yet.)
+const UNLIMITED_MODELS = ["gpt_image_2"];
+// Billable models the pipeline actually calls: preflight their REAL credit cost via get_cost.
+const IMAGE_MODELS = ["nano_banana_2"];
 
 export async function POST() {
   const session = await auth();
   if (session?.user?.role !== "super_admin") return NextResponse.json({ error: "Super admin only" }, { status: 403 });
 
   const results: { model: string; credits: number | null; updated: boolean; raw: string }[] = [];
+
+  // Unlimited/included models cost us nothing: force 0.
+  for (const model of UNLIMITED_MODELS) {
+    await setRate("higgsfield", model, "image", 0);
+    results.push({ model, credits: 0, updated: true, raw: "unlimited on plan (forced 0)" });
+  }
 
   for (const model of IMAGE_MODELS) {
     try {
