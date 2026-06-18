@@ -342,7 +342,12 @@ export async function importMediaUrl(url: string): Promise<string | null> {
 // Native Higgsfield upscale (bytedance) → 2K/4K. Imports the URL, reads its dimensions,
 // submits the upscale, polls for the result. Replaces the external Magnific upscaler.
 export async function upscaleUrlTo(url: string, resolution: "2k" | "4k" = "4k", rounds = 60): Promise<string | null> {
-  if (!isSafePublicUrl(url)) return null; // SSRF guard
+  return (await upscaleUrlToDetailed(url, resolution, rounds)).url;
+}
+
+// As upscaleUrlTo but returns the failure REASON so callers can surface why an upscale failed.
+export async function upscaleUrlToDetailed(url: string, resolution: "2k" | "4k" = "4k", rounds = 60): Promise<{ url: string | null; error: string | null }> {
+  if (!isSafePublicUrl(url)) return { url: null, error: "unsafe or non-public image url" };
   let width = 0, height = 0;
   try {
     const buf = Buffer.from(await (await fetch(url, { signal: AbortSignal.timeout(15000) })).arrayBuffer());
@@ -350,13 +355,16 @@ export async function upscaleUrlTo(url: string, resolution: "2k" | "4k" = "4k", 
     width = d.width || 0; height = d.height || 0;
   } catch { /* dims unknown */ }
   const imageId = await importMediaUrl(url);
-  if (!imageId || !width || !height) return null;
+  if (!imageId) return { url: null, error: "could not import the image into Higgsfield (media_import_url returned no id)" };
+  if (!width || !height) return { url: null, error: "could not read the image dimensions" };
   const { call } = await openSession();
   const r = await call("upscale_image", { params: { provider: "bytedance", image_id: imageId, width, height, resolution } });
   let out: string | null = extractImageUrls(r)[0] ?? null;
   const jobId = extractJobIds(r)[0] ?? null;
   if (!out && jobId) out = await pollJob(call, jobId, rounds);
-  return out;
+  if (out) return { url: out, error: null };
+  const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+  return { url: null, error: `upscale no image [src ${width}x${height} ${resolution}]: ${raw}`.slice(0, 300) };
 }
 
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).

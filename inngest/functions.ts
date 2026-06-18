@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
-import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -589,13 +589,14 @@ export const upscaleCreative = inngest.createFunction(
     if (!target || !target.url) return { skipped: "shot not found" };
     if (target.resolution === "4k") return { ok: true, already: true };
 
-    const up = await step.run("upscale", () => upscaleUrlTo(target.url as string, "4k", 80).catch(() => null));
+    const res = await step.run("upscale", () => upscaleUrlToDetailed(target.url as string, "4k", 80).catch((e) => ({ url: null, error: String((e as Error)?.message || e).slice(0, 300) })));
+    const up = res.url;
     const ok = up && (await step.run("validate", () => filterLoadable([up]))).length > 0;
     if (!ok) {
-      // Clear the spinner and surface a per-shot error; leave the 2K original intact.
+      // Clear the spinner and surface the REAL per-shot reason; leave the 2K original intact.
       const fresh = (((await step.run("reload-fail", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
       const list = (Array.isArray(fresh.creatives) ? fresh.creatives : creatives) as UpCreative[];
-      const updated = list.map((c) => ((c.id || "") === creativeId ? { ...c, upscaling: false, upscale_error: "4K upscale did not return an image" } : c));
+      const updated = list.map((c) => ((c.id || "") === creativeId ? { ...c, upscaling: false, upscale_error: (res.error || "4K upscale did not return an image").slice(0, 200) } : c));
       await step.run("save-fail", () => updateInfluencer(influencerId, { persona: { ...fresh, creatives: updated } }));
       return { ok: false };
     }

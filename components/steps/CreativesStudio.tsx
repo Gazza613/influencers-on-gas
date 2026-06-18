@@ -327,6 +327,11 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
             failed
           </span>
         )}
+        {c.url && !broken.has(c.url) && !busy && c.upscale_error && (
+          <span className="absolute bottom-1.5 left-1.5 rounded bg-alert/85 px-1.5 py-0.5 text-[9px] font-semibold text-white" title={c.upscale_error}>
+            4K failed
+          </span>
+        )}
         {c.url && !broken.has(c.url) && (
           <button onClick={() => setZoom(c.url)} title="Review full size"
             className="absolute inset-0 m-auto hidden h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/55 text-lg text-white backdrop-blur-sm transition group-hover:flex hover:bg-black/75">👁</button>
