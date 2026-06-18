@@ -91,7 +91,7 @@ export function buildCreativeImagePrompt(o: {
     `Scene: ${o.sceneText}${o.variation}. ${o.peopleClause}. The background is real and in sharp focus (never blurred), so the shot is reusable for video.`,
     `Subject: ${o.subjectLine}. A real person living their life, NOT a model on a shoot, relaxed lived-in energy.${o.faceMarks ? ` Distinctive features to keep: ${o.faceMarks}.` : ""}`,
     `Identity:${o.refInstruction}`,
-    `Pose and expression: a natural, un-posed candid moment, eyes toward the lens unless the scene says otherwise. Hands relaxed at the sides or naturally occupied with the scene. NEVER a hand raised to the forehead, brow or face, never shielding or shading the eyes, never a hand-visor, never squinting into the sun.`,
+    `Pose and expression: front-on to the camera, face and eyes looking straight into the lens, head level and upright. NOT looking up, NOT tilting the chin or head up, NOT gazing at the sky or off into the distance, NOT looking away from camera. A natural, un-posed candid moment. Hands relaxed at the sides or naturally occupied with the scene; NEVER a hand raised to the forehead, brow or face, never shielding or shading the eyes, never a hand-visor, never squinting into the sun.`,
     `Grooming: ${o.look}.`,
     camera,
     SKIN_FACTS,
@@ -117,7 +117,8 @@ export const REALISM_NEGATIVE =
   "plastic or waxy skin, airbrushed, over-smoothed, beauty-filter, doll-like, CGI or 3D-render look, " +
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin, " +
   "nude, naked, partial nudity, topless, underwear only, lingerie, no trousers, no pants, missing bottoms, bare crotch, exposed groin, blurred background, heavy bokeh, " +
-  "hand shielding the eyes, hand raised to the forehead or brow, hand-visor over the eyes, shielding the face, squinting into the sun";
+  "hand shielding the eyes, hand raised to the forehead or brow, hand-visor over the eyes, shielding the face, squinting into the sun, " +
+  "looking up, gazing upward, chin raised, head tilted back, looking at the sky, looking away from the camera, eyes off to the side, profile view, back to camera";
 
 // Compose a rich subject line from a Character Bible when present (far more specific
 // than the simple persona fields), else fall back to the basic persona controls.

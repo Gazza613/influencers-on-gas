@@ -358,9 +358,9 @@ type Creative = {
 
 // Used for the DEFAULT brief (no user scene), these dictate pose/gaze for variety.
 const CREATIVE_VARIATIONS = [
-  ", in a natural candid moment looking towards the camera",
-  ", in a slightly different pose glancing away mid-action",
-  ", with a warm genuine expression at a three-quarter angle",
+  ", front on to the camera, looking straight into the lens with a relaxed natural expression",
+  ", front on to the camera, looking straight into the lens with a warm genuine smile",
+  ", front on to the camera, looking straight into the lens, easy confident expression",
 ];
 // Used when the user wrote their OWN brief, vary only framing, never pose/gaze, so we
 // never contradict a brief that already describes how they stand, look or hold themselves.
