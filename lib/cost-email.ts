@@ -53,7 +53,7 @@ export function buildCostEmail(opts: {
           <div style="font-size:12px;color:#9aa0a8;">${Math.round(report.total.credits).toLocaleString()} credits · ${report.total.events} jobs</div>
         </div>
         <div style="flex:1;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;background:#0c1117;">
-          <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a8f98;">Month to date</div>
+          <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a8f98;">This cycle (from the 10th)</div>
           <div style="font-size:26px;font-weight:800;color:#fff;margin-top:4px;">${rand(monthReport.total.cents)}</div>
           <div style="font-size:12px;color:#9aa0a8;">${remaining != null ? `${remaining.toLocaleString()} / ${monthly.toLocaleString()} credits left` : "balance n/a"}</div>
         </div>

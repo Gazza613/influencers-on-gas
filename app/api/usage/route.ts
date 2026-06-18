@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencerSpend, getReport } from "@/lib/usage";
 import { getZarPerUsd } from "@/lib/fx";
-import { monthStartIso } from "@/lib/cron";
+import { cycleStartIso } from "@/lib/cron";
 
 // ?influencerId= → that influencer's running spend (build chip).
 // otherwise → THIS MONTH's running total across all jobs + the live ZAR/USD rate.
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const influencerId = new URL(req.url).searchParams.get("influencerId");
   if (influencerId) return NextResponse.json({ influencer: await getInfluencerSpend(influencerId) });
 
-  const [report, zarPerUsd] = await Promise.all([getReport({ from: monthStartIso() }), getZarPerUsd()]);
+  const [report, zarPerUsd] = await Promise.all([getReport({ from: cycleStartIso() }), getZarPerUsd()]);
   return NextResponse.json({
     month: { cents: report.total.cents, credits: Math.round(report.total.credits), events: report.total.events },
     zarPerUsd,

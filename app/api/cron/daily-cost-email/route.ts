@@ -4,7 +4,7 @@ import { getReport, MONTHLY_CREDITS } from "@/lib/usage";
 import { getBalance } from "@/lib/vendors/higgsfield";
 import { buildCostEmail } from "@/lib/cost-email";
 import { sendEmail, emailConfigured } from "@/lib/email";
-import { cronAuthed, isoDaysAgo, monthStartIso } from "@/lib/cron";
+import { cronAuthed, isoDaysAgo, cycleStartIso } from "@/lib/cron";
 
 // Daily cost digest to Gary (line of sight on team spend). Scheduled in
 // vercel.json (05:30 UTC ≈ 07:30 SAST). Sends from grow@ Gmail once creds are set.
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     const yesterday = isoDaysAgo(1);
     const [report, monthReport] = await Promise.all([
       getReport({ from: yesterday, to: yesterday }),
-      getReport({ from: monthStartIso() }),
+      getReport({ from: cycleStartIso() }), // spend window = current Higgsfield cycle (10th to 10th)
     ]);
     let remaining: number | null = null;
     try { remaining = (await getBalance()).remaining; } catch { /* ignore */ }
