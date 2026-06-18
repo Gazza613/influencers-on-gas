@@ -83,8 +83,11 @@ export default function BuildHeader({
     { href: `${base}/photoshoot`, label: "Photoshoot", icon: "②", done: step2Done, match: (p: string) => p.endsWith("/photoshoot") },
     { href: `${base}/lockdown`, label: "Lock down", icon: "③", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
   ];
-  // Creatives unlocks once the identity is locked (social outputs).
-  if (s.locked) tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: false, match: (p: string) => p.endsWith("/creatives") });
+  // Creatives + Video unlock once the identity is locked.
+  if (s.locked) {
+    tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: false, match: (p: string) => p.endsWith("/creatives") });
+    tabs.push({ href: `${base}/video`, label: "Video & Voice", icon: "🎬", done: false, match: (p: string) => p.endsWith("/video") });
+  }
 
   return (
     <div>

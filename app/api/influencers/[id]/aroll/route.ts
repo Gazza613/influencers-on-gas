@@ -9,6 +9,20 @@ export const maxDuration = 30;
 
 type ArollClip = { id?: string; status?: string; [k: string]: unknown };
 
+// Current voice + a-roll clips (for polling).
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const inf = await getInfluencer(id);
+  if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const p = (inf.persona ?? {}) as Record<string, unknown>;
+  return NextResponse.json({
+    voice: p.voice_id ? { id: p.voice_id, name: p.voice_name ?? "Voice", preview: p.voice_preview_url ?? null } : null,
+    aroll: Array.isArray(p.aroll) ? p.aroll : [],
+  });
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
