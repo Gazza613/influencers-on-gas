@@ -59,13 +59,22 @@ export async function uploadAudio(audioUrl: string): Promise<string> {
 
 // Generate a talking-head a-roll clip from a talking_photo + our audio asset.
 // Returns the HeyGen video_id (poll videoStatus for the result url).
-export async function generateAvatarVideo(opts: { talkingPhotoId: string; audioAssetId: string; ratio?: string }): Promise<string> {
+export async function generateAvatarVideo(opts: { talkingPhotoId: string; audioAssetId: string; ratio?: string; motionPrompt?: string }): Promise<string> {
   const k = await key();
   const [w, h] = opts.ratio === "1:1" ? [1080, 1080] : opts.ratio === "16:9" ? [1920, 1080] : [1080, 1920]; // default 9:16
+  const motion = opts.motionPrompt || "natural lifelike movement: subtle head turns and nods, easy hand gestures, relaxed shoulders, talking expressively to camera";
   const body = {
     video_inputs: [{
-      character: { type: "talking_photo", talking_photo_id: opts.talkingPhotoId },
+      character: {
+        type: "talking_photo",
+        talking_photo_id: opts.talkingPhotoId,
+        // Avatar IV motion engine = realistic lip-sync, facial expression, head + hand motion.
+        talking_photo_style: "expressive",
+        motion_prompt: motion,
+        expressiveness: 0.9,
+      },
       voice: { type: "audio", audio_asset_id: opts.audioAssetId },
+      use_avatar_iv_model: true,
     }],
     dimension: { width: w, height: h },
   };

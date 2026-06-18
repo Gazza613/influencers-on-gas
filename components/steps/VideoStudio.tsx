@@ -21,7 +21,8 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   const [enhancing, setEnhancing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
-  const [ratio, setRatio] = useState<"9:16" | "1:1">("9:16");
+  const [sources, setSources] = useState<{ url: string; ratio: string }[]>([]);
+  const [sourceUrl, setSourceUrl] = useState<string>("");
   const [voicing, setVoicing] = useState(false);
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
@@ -34,6 +35,17 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => { fetch("/api/voices").then((r) => r.json()).then((d) => { if (Array.isArray(d?.voices)) setLib(d.voices); }).catch(() => {}); }, []);
+  // Source shots the producer can animate (the locked creatives). The clip uses this exact
+  // frame, so the scene AND aspect come from it (no white space).
+  useEffect(() => {
+    fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).then((d) => {
+      const list = (Array.isArray(d?.creatives) ? d.creatives : []).filter((c: { url?: string; status?: string }) => c.url && c.status === "approved").map((c: { url: string; ratio: string }) => ({ url: c.url, ratio: c.ratio || "9:16" }));
+      setSources(list);
+      if (list.length && !sourceUrl) setSourceUrl(list[0].url);
+    }).catch(() => {});
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [influencerId]);
+  const ratio = sources.find((s) => s.url === sourceUrl)?.ratio || "9:16";
 
   async function setVoiceVia(payload: Record<string, unknown>) {
     setVoicing(true); setErr("");
@@ -95,7 +107,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
     if (!text || gen) return;
     setGen(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/aroll`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: text, ratio }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: text, ratio, sourceUrl }),
     }).then((x) => x.json()).catch(() => null);
     setGen(false);
     if (r?.queued) { const d = await fetch(`/api/influencers/${influencerId}/aroll`).then((x) => x.json()).catch(() => null); if (d?.aroll) setClips(d.aroll); }
@@ -189,14 +201,28 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           {previewUrl && <audio src={previewUrl} controls autoPlay className="h-9" />}
         </div>
 
+        {/* Source shot — we animate THIS exact frame, so scene + aspect come from it */}
+        <div className="mt-4 border-t border-line pt-3">
+          <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Choose the shot to animate {sourceUrl ? `· ${ratio}` : ""}</div>
+          {sources.length === 0 ? (
+            <p className="text-[12px] text-ink-faint">No creatives yet. Render some in the Creatives tab first, then pick one here to bring it to life.</p>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {sources.map((s) => (
+                <button key={s.url} onClick={() => setSourceUrl(s.url)} className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${sourceUrl === s.url ? "border-[#a855f7]" : "border-line"}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.url} alt="source" className="h-24 w-auto object-cover" />
+                  <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1 py-0.5 text-[9px] font-semibold text-white">{s.ratio}</span>
+                  {sourceUrl === s.url && <span className="absolute right-1 top-1 rounded-full bg-[#a855f7] px-1.5 text-[10px] font-bold text-white">✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
-          <div className="flex gap-2">
-            {(["9:16", "1:1"] as const).map((r) => (
-              <button key={r} onClick={() => setRatio(r)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ratio === r ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{r}</button>
-            ))}
-          </div>
-          <button onClick={generate} disabled={!voice || !effectiveLine() || gen} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">{gen ? "Starting…" : "🎬 Generate talking clip"}</button>
-          <span className="text-[13px] text-ink-faint">Uses the directed read if you enhanced it. Renders in a few minutes.</span>
+          <button onClick={generate} disabled={!voice || !effectiveLine() || !sourceUrl || gen} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">{gen ? "Starting…" : "🎬 Generate talking clip"}</button>
+          <span className="text-[13px] text-ink-faint">Animates the chosen shot at its own aspect ({ratio}), using the directed read. Renders in a few minutes.</span>
         </div>
       </div>
 

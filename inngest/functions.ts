@@ -639,25 +639,23 @@ export const generateAroll = inngest.createFunction(
     if (!inf) return { skipped: "not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const voiceId = persona.voice_id as string | undefined;
-    const hero = (persona.face_card_url || persona.hero_url || persona.reference_url || (Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]).find((r) => r.hero)?.url : "")) as string;
+    // The producer CHOOSES which shot drives the clip; fall back to the hero. The clip aspect
+    // matches the chosen image so there is no letterboxing / white space.
+    const fallbackHero = (persona.hero_url || persona.face_card_url || persona.reference_url || (Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]).find((r) => r.hero)?.url : "")) as string;
+    const source = (typeof event.data.sourceUrl === "string" && event.data.sourceUrl) ? event.data.sourceUrl as string : fallbackHero;
     if (!voiceId) { await step.run("no-voice", () => setClip({ status: "failed", error: "No voice yet — create the influencer's voice first." })); return { error: "no voice" }; }
     if (!line) { await step.run("no-line", () => setClip({ status: "failed", error: "No line to say." })); return { error: "no line" }; }
-    if (!hero) { await step.run("no-hero", () => setClip({ status: "failed", error: "No hero image to drive the presenter." })); return { error: "no hero" }; }
+    if (!source) { await step.run("no-src", () => setClip({ status: "failed", error: "No source image to drive the presenter." })); return { error: "no source" }; }
 
     try {
-      // 1. Talking Photo (create once per influencer, reuse).
-      let tpId = persona.heygen_talking_photo_id as string | undefined;
-      if (!tpId) {
-        tpId = await step.run("talking-photo", () => createTalkingPhoto(hero));
-        const fresh = (((await step.run("reload-tp", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
-        await step.run("save-tp", () => updateInfluencer(influencerId, { persona: { ...fresh, heygen_talking_photo_id: tpId } }));
-      }
+      // 1. Talking Photo from the CHOSEN source image (Avatar IV animates this exact frame).
+      const tpId = await step.run("talking-photo", () => createTalkingPhoto(source));
       // 2. TTS our voice -> public Blob mp3 (HeyGen fetches it).
       const audioUrl = await step.run("tts", async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-audio", "mp3", "audio/mpeg"));
       await step.run("usage-tts", () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }));
-      // 3. HeyGen: upload audio + generate the talking clip.
+      // 3. HeyGen Avatar IV: upload audio + generate the talking clip at the source's aspect.
       const assetId = await step.run("upload-audio", () => uploadAudio(audioUrl));
-      const videoId = await step.run("gen-video", () => generateAvatarVideo({ talkingPhotoId: tpId as string, audioAssetId: assetId, ratio }));
+      const videoId = await step.run("gen-video", () => generateAvatarVideo({ talkingPhotoId: tpId, audioAssetId: assetId, ratio }));
       // 4. Poll the render (a few minutes).
       const result = await step.run("poll-video", async () => {
         for (let i = 0; i < 60; i++) {

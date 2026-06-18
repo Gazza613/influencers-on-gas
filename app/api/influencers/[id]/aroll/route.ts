@@ -33,16 +33,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!persona.voice_id) return NextResponse.json({ error: "Create the influencer's voice first." }, { status: 400 });
 
   const body = await req.json().catch(() => ({}));
-  const line = typeof body.line === "string" ? body.line.trim().slice(0, 800) : "";
+  const line = typeof body.line === "string" ? body.line.trim().slice(0, 1200) : "";
   const ratio = body.ratio === "1:1" || body.ratio === "16:9" ? body.ratio : "9:16";
+  const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl : "";
   if (line.length < 2) return NextResponse.json({ error: "Add a line for the influencer to say." }, { status: 400 });
 
   const clipId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const existing = (Array.isArray(persona.aroll) ? persona.aroll : []) as ArollClip[];
-  const clip = { id: clipId, line, ratio, status: "running", url: null, error: null, at: Date.now() };
+  const clip = { id: clipId, line, ratio, sourceUrl, status: "running", url: null, error: null, at: Date.now() };
   await updateInfluencer(id, { persona: { ...persona, aroll: [clip, ...existing].slice(0, 60) } });
   try {
-    await inngest.send({ name: "influencer/generate.aroll", data: { influencerId: id, clipId, line, ratio } });
+    await inngest.send({ name: "influencer/generate.aroll", data: { influencerId: id, clipId, line, ratio, sourceUrl } });
   } catch {
     const cleared = [clip, ...existing].map((c) => (c.id === clipId ? { ...c, status: "failed", error: "Could not queue (generation engine not connected)." } : c));
     await updateInfluencer(id, { persona: { ...persona, aroll: cleared } });
