@@ -38,6 +38,7 @@ const PLATFORMS: { key: string; label: string; ratios: string[] }[] = [
   { key: "google", label: "Google Ads", ratios: ["16:9", "1:1"] },
 ];
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtElapsed = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const CREATIVE_NARRATION = [
   "Reading your scene brief and art-directing the shoot…",
   "Posing your locked influencer, same face, every single frame…",
@@ -67,6 +68,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [broken, setBroken] = useState<Set<string>>(new Set());
   const [upscaling, setUpscaling] = useState<Set<string>>(new Set());
+  const [upStart, setUpStart] = useState<Map<string, number>>(new Map());
+  const [nowMs, setNowMs] = useState<number>(Date.now());
   const [err, setErr] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
 
@@ -113,10 +116,16 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   // Resume polling any upscales still in flight (e.g. after a page refresh).
   useEffect(() => {
-    const pend = new Set(normalize(initial.creatives || []).filter((c) => c.upscaling).map((c) => c.id || ""));
-    if (pend.size) pollUpscales(pend);
+    const pend = normalize(initial.creatives || []).filter((c) => c.upscaling).map((c) => c.id || "");
+    if (pend.length) { setUpStart((m) => { const n = new Map(m); pend.forEach((id) => n.set(id, Date.now())); return n; }); pollUpscales(new Set(pend)); }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
+  // Tick a 1s clock only while upscales are running (for the per-shot timer).
+  useEffect(() => {
+    if (!upscaling.size) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [upscaling]);
 
   async function poll(tries = 0): Promise<void> {
     if (tries > 160) { setStatus("idle"); setErr("That run took too long and was reset, you can generate again."); fetch(`/api/influencers/${influencerId}/creatives`, { method: "DELETE" }).catch(() => {}); return; }
@@ -205,6 +214,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     const ids = targets.map((c) => c.id || "");
     if (!ids.length) return;
     setUpscaling((s) => new Set([...s, ...ids]));
+    setUpStart((m) => { const n = new Map(m); const t = Date.now(); ids.forEach((id) => n.set(id, t)); return n; });
+    setNowMs(Date.now());
     setPicked(new Set());
     // Queue the durable upscale jobs (fast), then poll until each shot turns 4K. No long-held
     // request, so it can never time out regardless of how long Higgsfield takes.
@@ -233,7 +244,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           }
         }
       }
-      if (pending.size && tries < 75) setTimeout(tick, 4000); // poll up to ~5 min
+      if (pending.size && tries < 110) setTimeout(tick, 4000); // poll up to ~7 min (a 4K render can take 3-5)
       else if (pending.size) { pending.forEach((cid) => setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; })); setErr("A 4K upscale is taking longer than usual; it may still finish, refresh shortly."); }
     };
     setTimeout(tick, 4000);
@@ -270,9 +281,11 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <img src={u} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(u)} onError={() => setBroken((b) => new Set(b).add(u))} />
         )}
         {busy && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 bg-black/60 text-[10px] font-semibold text-white">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            upscaling to 4K…
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-2 text-center text-white">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <span className="text-[12px] font-bold">Upscaling to 4K</span>
+            <span className="text-[10px] leading-tight text-white/75">Takes 3 to 5 minutes<br />for perfection</span>
+            {upStart.has(id) && <span className="tabular mt-0.5 text-[11px] font-semibold text-[#c79bff]">{fmtElapsed(nowMs - (upStart.get(id) || nowMs))}</span>}
           </div>
         )}
         {canPick ? (
@@ -515,7 +528,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               </div>
             )}
           </div>
-          <p className="mb-3 text-[11px] text-ink-faint">Shots render fast in 2K. Tick the keepers, then <span className="text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). Upgraded shots move to 4K Finals. ★ keep your best for video, or remove the rest. Click an image to view full size and download.</p>
+          <p className="mb-3 text-[14px] leading-relaxed text-ink-dim">Shots render fast in 2K. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. ★ keep your best for video, or remove the rest. Click an image to view full size and download.</p>
           {twoK.length > 0 && (
             <div className="mb-5">
               <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}</div>
