@@ -27,11 +27,9 @@ export function buildTipsEmail(opts: { ideasHtml: string; dateLabel: string }): 
   <div style="background:#07090d;padding:24px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
     <div style="max-width:640px;margin:0 auto;padding:0 18px;">
       <div style="text-align:center;padding:8px 0 18px;">
-        <img src="${BASE}/gas-logo.png" width="68" height="68" style="border-radius:50%;" alt="GAS" />
-        <div style="margin-top:12px;font-size:26px;font-weight:800;letter-spacing:-0.5px;">
-          <span style="background:linear-gradient(135deg,#ec4899,#a855f7 50%,#60a5fa);-webkit-background-clip:text;background-clip:text;color:#a855f7;">Influencers on GAS</span>
-        </div>
-        <div style="margin-top:5px;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#8a8f98;">Higgsfield Expert · Daily Ideas · ${dateLabel}</div>
+        <img src="${BASE}/gas-logo.png" width="82" height="82" style="border-radius:50%;box-shadow:0 0 26px rgba(249,98,3,0.45);" alt="GAS" />
+        <div style="margin-top:12px;font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">Influencers on GAS</div>
+        <div style="margin-top:5px;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#8a8f98;">Higgsfield Expert · Daily Research · ${dateLabel}</div>
       </div>
 
       <div style="border:1px solid rgba(168,85,247,0.3);border-radius:14px;padding:16px 18px;background:rgba(168,85,247,0.06);">
@@ -47,8 +45,23 @@ export function buildTipsEmail(opts: { ideasHtml: string; dateLabel: string }): 
       <div style="margin-top:22px;text-align:center;">
         <a href="${BASE}/studio" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 22px;border-radius:999px;">Open the Studio</a>
       </div>
-      <div style="margin-top:18px;text-align:center;font-size:11px;color:#5b616b;">
-        Influencers on GAS · your daily Higgsfield brief
+
+      <!-- Signature -->
+      <div style="margin-top:30px;">
+        <div style="font-size:16px;font-weight:800;color:#ffffff;">Sami</div>
+        <div style="font-size:13px;font-weight:700;color:#f96203;">AI Influencer Expert</div>
+        <div style="font-size:13px;color:#8a8f98;">Creative Department</div>
+        <div style="height:1px;background:linear-gradient(90deg,rgba(168,85,247,0.5),transparent);margin:14px 0;"></div>
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="vertical-align:middle;padding-right:12px;">
+            <img src="${BASE}/gas-logo.png" width="44" height="44" style="border-radius:50%;box-shadow:0 0 16px rgba(249,98,3,0.4);" alt="GAS" />
+          </td>
+          <td style="vertical-align:middle;">
+            <div style="font-size:14px;font-weight:800;letter-spacing:2px;color:#ffffff;">INFLUENCERS <span style="color:#f96203;">ON</span> GAS</div>
+            <div style="font-size:11px;letter-spacing:2px;color:#8a8f98;">DAILY RESEARCH, 08:15 SAST</div>
+            <div style="font-size:11px;color:#8a8f98;">grow@gasmarketing.co.za</div>
+          </td>
+        </tr></table>
       </div>
     </div>
   </div>`;
