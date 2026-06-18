@@ -290,9 +290,9 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {clips.map((c, i) => (
               <div key={c.id || i} className="group relative overflow-hidden rounded-lg border border-line bg-surface-2">
-                {c.status !== "running" && c.id && (
-                  <button onClick={() => deleteClip(c.id as string)} title="Delete this clip"
-                    className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-alert/60 bg-black/60 text-xs text-alert opacity-0 transition hover:bg-alert/20 group-hover:opacity-100">✕</button>
+                {c.id && (
+                  <button onClick={() => deleteClip(c.id as string)} title={c.status === "running" ? "Abort this render" : "Delete this clip"}
+                    className={`absolute right-1.5 top-1.5 z-30 flex h-7 w-7 items-center justify-center rounded-full border border-alert/60 bg-black/70 text-xs text-alert transition hover:bg-alert/25 ${c.status === "running" ? "opacity-90" : "opacity-0 group-hover:opacity-100"}`}>✕</button>
                 )}
                 {c.status === "ready" && c.url ? (
                   <video src={c.url} controls playsInline className="aspect-[9/16] w-full bg-black object-cover" />
