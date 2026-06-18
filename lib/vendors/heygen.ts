@@ -62,22 +62,30 @@ export async function uploadAudio(audioUrl: string): Promise<string> {
 export async function generateAvatarVideo(opts: { talkingPhotoId: string; audioAssetId: string; ratio?: string; motionPrompt?: string }): Promise<string> {
   const k = await key();
   const [w, h] = opts.ratio === "1:1" ? [1080, 1080] : opts.ratio === "16:9" ? [1920, 1080] : [1080, 1920]; // default 9:16
-  const body = {
-    video_inputs: [{
-      character: { type: "talking_photo", talking_photo_id: opts.talkingPhotoId },
-      voice: { type: "audio", audio_asset_id: opts.audioAssetId },
-      // Avatar IV motion engine = realistic lip-sync, facial expression, head + hand motion.
-      use_avatar_iv_model: true,
-    }],
-    dimension: { width: w, height: h },
-  };
-  const res = await fetch(`${API}/v2/video/generate`, {
-    method: "POST", headers: { "x-api-key": k, "Content-Type": "application/json" }, body: JSON.stringify(body),
-  });
-  const data = (await res.json().catch(() => ({}))) as { data?: { video_id?: string }; message?: string; error?: unknown };
-  const id = data?.data?.video_id;
-  if (!id) throw new Error(`No video_id (${res.status}): ${(data.message || JSON.stringify(data.error || data)).slice(0, 200)}`);
-  return id;
+  const character = { type: "talking_photo", talking_photo_id: opts.talkingPhotoId };
+  const voice = { type: "audio", audio_asset_id: opts.audioAssetId };
+  const dimension = { width: w, height: h };
+  const motion = opts.motionPrompt || "natural, lively delivery: expressive face, easy head movement and natural hand gestures while talking to camera";
+  // Avatar IV's expressiveness DEFAULTS TO LOW (barely moves), so we push it HIGH with a motion
+  // prompt. Field placement isn't publicly schema'd, so try richest first and fall back on a 400
+  // so a render never hard-fails on an unknown field.
+  const variants = [
+    { video_inputs: [{ character, voice, use_avatar_iv_model: true, motion_prompt: motion, expressiveness: "high" }], dimension },
+    { video_inputs: [{ character, voice, use_avatar_iv_model: true }], dimension },
+    { video_inputs: [{ character, voice }], dimension },
+  ];
+  let lastErr = "";
+  for (const body of variants) {
+    const res = await fetch(`${API}/v2/video/generate`, {
+      method: "POST", headers: { "x-api-key": k, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const data = (await res.json().catch(() => ({}))) as { data?: { video_id?: string }; message?: string; error?: unknown };
+    const id = data?.data?.video_id;
+    if (id) return id;
+    lastErr = `${res.status}: ${(data.message || JSON.stringify(data.error || data)).slice(0, 200)}`;
+    if (res.status !== 400) break; // a non-validation error won't be fixed by dropping fields
+  }
+  throw new Error(`No video_id (${lastErr})`);
 }
 
 // Poll a HeyGen video render. Returns the final mp4 url, or null while pending / on failure.
