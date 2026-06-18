@@ -653,7 +653,7 @@ export const generateAroll = inngest.createFunction(
         await step.run("save-tp", () => updateInfluencer(influencerId, { persona: { ...fresh, heygen_talking_photo_id: tpId } }));
       }
       // 2. TTS our voice -> public Blob mp3 (HeyGen fetches it).
-      const audioUrl = await step.run("tts", async () => putBytes(await tts(voiceId, line), "aroll-audio", "mp3", "audio/mpeg"));
+      const audioUrl = await step.run("tts", async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-audio", "mp3", "audio/mpeg"));
       await step.run("usage-tts", () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }));
       // 3. HeyGen: upload audio + generate the talking clip.
       const assetId = await step.run("upload-audio", () => uploadAudio(audioUrl));

@@ -66,16 +66,32 @@ export async function cloneVoice(name: string, sampleUrls: string[]): Promise<st
   return data.voice_id;
 }
 
-// Text to speech → MP3 bytes. eleven_multilingual_v2 is the strong general voice model.
-export async function tts(voiceId: string, text: string, modelId = "eleven_multilingual_v2"): Promise<Buffer> {
+// The EXPRESSIVE model (supports inline audio tags like [excited], [whispers], [laughs],
+// [thoughtful pause]) for the most human, believable read. Env-overridable in case the
+// account's expressive model id differs; falls back to the stable model on error.
+export const EXPRESSIVE_MODEL = process.env.ELEVENLABS_TTS_MODEL || "eleven_v3";
+const STABLE_MODEL = "eleven_multilingual_v2";
+
+// Text to speech → MP3 bytes. `expressive` uses the audio-tag model + livelier settings
+// (lower stability = more emotional range), and falls back to the stable model if it errors.
+export async function tts(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<Buffer> {
   const k = await key();
-  const res = await fetch(`${BASE}/text-to-speech/${voiceId}`, {
-    method: "POST",
-    headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({ text, model_id: modelId, voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
-  });
-  if (!res.ok) throw new Error(`TTS failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 180)}`);
-  return Buffer.from(await res.arrayBuffer());
+  const expressive = opts.expressive ?? false;
+  const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
+  const voice_settings = expressive
+    ? { stability: 0.35, similarity_boost: 0.8, style: 0.6, use_speaker_boost: true }
+    : { stability: 0.5, similarity_boost: 0.75 };
+  const call = async (model: string) => {
+    const res = await fetch(`${BASE}/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({ text, model_id: model, voice_settings }),
+    });
+    if (!res.ok) throw new Error(`TTS failed (${res.status} ${model}): ${(await res.text().catch(() => "")).slice(0, 180)}`);
+    return Buffer.from(await res.arrayBuffer());
+  };
+  try { return await call(modelId); }
+  catch (e) { if (expressive && modelId !== STABLE_MODEL) return call(STABLE_MODEL); throw e; }
 }
 
 // Short preview line so the producer can hear a voice before locking it.

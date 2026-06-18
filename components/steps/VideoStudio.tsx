@@ -16,6 +16,11 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   const [voice, setVoice] = useState<Voice | null>(initial.voice);
   const [clips, setClips] = useState<Clip[]>(initial.aroll || []);
   const [line, setLine] = useState(initial.signatureLine || "");
+  const [directed, setDirected] = useState("");
+  const [tone, setTone] = useState("natural and warm");
+  const [enhancing, setEnhancing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [ratio, setRatio] = useState<"9:16" | "1:1">("9:16");
   const [voicing, setVoicing] = useState(false);
   const [gen, setGen] = useState(false);
@@ -65,11 +70,32 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
     polling.current = false;
   }
 
+  const effectiveLine = () => (directed.trim() || line.trim());
+  async function enhance() {
+    if (!line.trim() || enhancing) return;
+    setEnhancing(true); setErr(""); setPreviewUrl(null);
+    const r = await fetch(`/api/influencers/${influencerId}/voice/script`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: line.trim(), tone }),
+    }).then((x) => x.json()).catch(() => null);
+    setEnhancing(false);
+    if (r?.tagged) setDirected(r.tagged); else setErr(r?.error || "Could not enhance the script.");
+  }
+  async function preview() {
+    const text = effectiveLine();
+    if (!text || previewing) return;
+    setPreviewing(true); setErr(""); setPreviewUrl(null);
+    const r = await fetch(`/api/influencers/${influencerId}/voice/preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+    }).then((x) => x.json()).catch(() => null);
+    setPreviewing(false);
+    if (r?.url) setPreviewUrl(r.url); else setErr(r?.error || "Could not preview the read.");
+  }
   async function generate() {
-    if (!line.trim() || gen) return;
+    const text = effectiveLine();
+    if (!text || gen) return;
     setGen(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/aroll`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: line.trim(), ratio }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ line: text, ratio }),
     }).then((x) => x.json()).catch(() => null);
     setGen(false);
     if (r?.queued) { const d = await fetch(`/api/influencers/${influencerId}/aroll`).then((x) => x.json()).catch(() => null); if (d?.aroll) setClips(d.aroll); }
@@ -136,14 +162,41 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
         <div className="tabular mb-2 text-xs uppercase tracking-[0.2em] text-ink-faint">② Talking clip (a-roll)</div>
         <textarea value={line} onChange={(e) => setLine(e.target.value)} rows={3} placeholder={`What should ${name} say to camera?`}
           className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
+
+        {/* Voice producer: enhance with expressive tags, then preview */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] text-ink-faint">Tone</span>
+          <select value={tone} onChange={(e) => setTone(e.target.value)} className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-xs outline-none focus:border-[#a855f7]">
+            {["natural and warm", "upbeat and energetic", "calm and reassuring", "confident and bold", "playful and fun", "sincere and heartfelt"].map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <button onClick={enhance} disabled={!line.trim() || enhancing} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{enhancing ? "Directing…" : "✨ Enhance with voice tags"}</button>
+        </div>
+
+        {directed && (
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Directed read (edit the tags freely)</span>
+              <button onClick={() => setDirected("")} className="text-[11px] text-ink-faint hover:text-ink">reset to plain</button>
+            </div>
+            <textarea value={directed} onChange={(e) => { setDirected(e.target.value); setPreviewUrl(null); }} rows={3}
+              className="w-full rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
+            <p className="mt-1 text-[11px] text-ink-faint">Tags like [warm], [excited], [thoughtful pause] and CAPS for emphasis shape the delivery.</p>
+          </div>
+        )}
+
         <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button onClick={preview} disabled={!voice || !effectiveLine() || previewing} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-50">{previewing ? "Generating preview…" : "▶ Preview the read"}</button>
+          {previewUrl && <audio src={previewUrl} controls autoPlay className="h-9" />}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
           <div className="flex gap-2">
             {(["9:16", "1:1"] as const).map((r) => (
               <button key={r} onClick={() => setRatio(r)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ratio === r ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{r}</button>
             ))}
           </div>
-          <button onClick={generate} disabled={!voice || !line.trim() || gen} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">{gen ? "Starting…" : "🎬 Generate talking clip"}</button>
-          <span className="text-[13px] text-ink-faint">Renders in a few minutes.</span>
+          <button onClick={generate} disabled={!voice || !effectiveLine() || gen} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">{gen ? "Starting…" : "🎬 Generate talking clip"}</button>
+          <span className="text-[13px] text-ink-faint">Uses the directed read if you enhanced it. Renders in a few minutes.</span>
         </div>
       </div>
 

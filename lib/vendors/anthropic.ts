@@ -342,3 +342,26 @@ export function friendlyAnthropicError(e: unknown): string {
   if (m.includes("not connected") || m.includes("api key") || m.includes("authentication")) return "The AI co-pilot (Anthropic) is not connected. Check ANTHROPIC_API_KEY.";
   return String((e as Error)?.message || e).slice(0, 200);
 }
+
+// Voice-direct a line for ElevenLabs v3 TTS: insert audio tags + emphasis so the read sounds
+// like a real, believable human influencer (not flat TTS). Keeps the original words/meaning.
+export async function expressifyScript(line: string, voiceDescriptor = "", tone = "natural and warm"): Promise<string> {
+  try {
+    const c = await client();
+    const res = await c.messages.create({
+      model: MODEL,
+      max_tokens: 600,
+      system:
+        "You are a voice director preparing a line for ElevenLabs v3 text-to-speech so it sounds like a REAL person talking to camera, expressive, natural and believable, never flat or robotic. " +
+        "Insert ElevenLabs audio tags in square brackets SPARINGLY and only where they genuinely lift the delivery: [warm], [excited], [thoughtful pause], [laughs softly], [chuckles], [sighs], [whispers], [reassuring]. " +
+        "Use natural punctuation and ellipses for real pauses and breaths, and CAPITALISE one or two key words per sentence for emphasis. Do NOT change, add or remove the actual words, only add tags, pauses and emphasis. Keep it conversational and human. " +
+        `Voice / persona: ${voiceDescriptor || "a natural, relatable influencer"}. Desired tone: ${tone}. ` +
+        "Output ONLY the directed line, no preamble, no quotes.",
+      messages: [{ role: "user", content: line }],
+    });
+    const out = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
+    return out || line;
+  } catch {
+    return line; // fail open: a flat read beats no read
+  }
+}
