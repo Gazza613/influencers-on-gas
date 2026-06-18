@@ -96,3 +96,73 @@ export async function videoStatus(videoId: string): Promise<{ status: string; ur
   const status = String(data?.data?.status || "unknown");
   return { status, url: data?.data?.video_url || null, error: status === "failed" ? JSON.stringify(data?.data?.error || "render failed").slice(0, 200) : null };
 }
+
+// ── Avatar IV via the CURRENT v3 image→video API (most realistic; motion + expressiveness
+// actually apply here, unlike the legacy v2 talking_photo path). Falls back to v2 if v3 errs.
+const V3 = "https://api.heygen.com/v3";
+
+async function uploadAssetV3(url: string): Promise<string> {
+  const k = await key();
+  const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
+  if (!r.ok) throw new Error(`fetch asset ${r.status}`);
+  const ct = (r.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
+  const bytes = Buffer.from(await r.arrayBuffer());
+  const res = await fetch(`${V3}/assets`, { method: "POST", headers: { "x-api-key": k, "Content-Type": ct }, body: bytes });
+  const data = (await res.json().catch(() => ({}))) as { data?: { asset_id?: string; id?: string }; asset_id?: string; id?: string; message?: string };
+  const id = data?.data?.asset_id || data?.data?.id || data?.asset_id || data?.id;
+  if (!id) throw new Error(`no asset_id (${res.status}): ${(data.message || JSON.stringify(data)).slice(0, 160)}`);
+  return id;
+}
+
+function arOf(ratio?: string): string { return ratio === "1:1" ? "1:1" : ratio === "16:9" ? "16:9" : "9:16"; }
+
+async function generateV3(opts: { imageAssetId: string; audioAssetId: string; ratio?: string; motionPrompt?: string }): Promise<string> {
+  const k = await key();
+  const image = { type: "asset_id", asset_id: opts.imageAssetId };
+  const motion = opts.motionPrompt || "natural, lively delivery: relaxed posture, easy head movement and subtle hand gestures while talking to camera";
+  // Richest (expressiveness HIGH + motion) first; fall back if a field is rejected.
+  const variants = [
+    { type: "image", image, audio_asset_id: opts.audioAssetId, motion_prompt: motion, expressiveness: "high", resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" },
+    { type: "image", image, audio_asset_id: opts.audioAssetId, expressiveness: "high", resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" },
+    { type: "image", image, audio_asset_id: opts.audioAssetId, resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" },
+  ];
+  let lastErr = "";
+  for (const body of variants) {
+    const res = await fetch(`${V3}/videos`, { method: "POST", headers: { "x-api-key": k, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = (await res.json().catch(() => ({}))) as { data?: { video_id?: string; id?: string }; video_id?: string; id?: string; message?: string; error?: unknown };
+    const id = data?.data?.video_id || data?.data?.id || data?.video_id || data?.id;
+    if (id) return id;
+    lastErr = `${res.status}: ${(data.message || JSON.stringify(data.error || data)).slice(0, 180)}`;
+    if (res.status !== 400) break;
+  }
+  throw new Error(`v3 generate ${lastErr}`);
+}
+
+async function statusV3(videoId: string): Promise<{ status: string; url: string | null; error: string | null }> {
+  const k = await key();
+  const res = await fetch(`${V3}/videos/${encodeURIComponent(videoId)}`, { headers: { "x-api-key": k }, cache: "no-store" });
+  const data = (await res.json().catch(() => ({}))) as { data?: { status?: string; video_url?: string; url?: string; error?: unknown } };
+  const d = data?.data || (data as Record<string, unknown>);
+  const status = String((d as { status?: string })?.status || "unknown").toLowerCase();
+  const url = ((d as { video_url?: string }).video_url || (d as { url?: string }).url) || null;
+  return { status, url, error: status === "failed" ? JSON.stringify((d as { error?: unknown }).error || "render failed").slice(0, 200) : null };
+}
+
+// Start a talking clip from a SOURCE IMAGE url + our audio url. Tries the realistic v3 Avatar IV
+// path; falls back to the legacy v2 talking_photo path so a render never hard-fails.
+export async function startTalkingVideo(opts: { imageUrl: string; audioUrl: string; ratio?: string; motionPrompt?: string }): Promise<{ videoId: string; version: "v3" | "v2" }> {
+  try {
+    const [imageAssetId, audioAssetId] = await Promise.all([uploadAssetV3(opts.imageUrl), uploadAssetV3(opts.audioUrl)]);
+    const videoId = await generateV3({ imageAssetId, audioAssetId, ratio: opts.ratio, motionPrompt: opts.motionPrompt });
+    return { videoId, version: "v3" };
+  } catch {
+    const tpId = await createTalkingPhoto(opts.imageUrl);
+    const audioAssetId = await uploadAudio(opts.audioUrl);
+    const videoId = await generateAvatarVideo({ talkingPhotoId: tpId, audioAssetId, ratio: opts.ratio, motionPrompt: opts.motionPrompt });
+    return { videoId, version: "v2" };
+  }
+}
+
+export async function pollTalking(videoId: string, version: "v3" | "v2"): Promise<{ status: string; url: string | null; error: string | null }> {
+  return version === "v3" ? statusV3(videoId) : videoStatus(videoId);
+}

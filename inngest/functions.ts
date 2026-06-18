@@ -4,7 +4,7 @@ import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_RE
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts } from "@/lib/vendors/elevenlabs";
-import { uploadAudio, generateAvatarVideo, videoStatus } from "@/lib/vendors/heygen";
+import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -648,19 +648,17 @@ export const generateAroll = inngest.createFunction(
     if (!source) { await step.run("no-src", () => setClip({ status: "failed", error: "No source image to drive the presenter." })); return { error: "no source" }; }
 
     try {
-      // 1. Talking Photo from the CHOSEN source image (Avatar IV animates this exact frame).
-      const tpId = await step.run("talking-photo", () => createTalkingPhoto(source));
-      // 2. TTS our voice -> public Blob mp3 (HeyGen fetches it).
+      // 1. TTS our ElevenLabs voice -> public Blob mp3 (HeyGen fetches it).
       const audioUrl = await step.run("tts", async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-audio", "mp3", "audio/mpeg"));
       await step.run("usage-tts", () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }));
-      // 3. HeyGen Avatar IV: upload audio + generate the talking clip at the source's aspect.
-      const assetId = await step.run("upload-audio", () => uploadAudio(audioUrl));
-      const videoId = await step.run("gen-video", () => generateAvatarVideo({ talkingPhotoId: tpId, audioAssetId: assetId, ratio }));
-      // 4. Poll the render (a few minutes).
+      // 2. HeyGen Avatar IV (v3 image->video, expressiveness HIGH + motion) from the CHOSEN shot,
+      //    at the shot's own aspect. Falls back to v2 internally if v3 errors.
+      const started = await step.run("start-video", () => startTalkingVideo({ imageUrl: source, audioUrl, ratio }));
+      // 3. Poll the render (a few minutes).
       const result = await step.run("poll-video", async () => {
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 70; i++) {
           if (i) await new Promise((r) => setTimeout(r, 5000));
-          const s = await videoStatus(videoId).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null }));
+          const s = await pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null }));
           if (s.url) return { url: s.url, error: null as string | null };
           if (s.status === "failed") return { url: null as string | null, error: s.error };
         }
