@@ -323,7 +323,15 @@ export default function CostControlPage() {
           ) : <div className="px-4 py-5 text-center text-xs text-ink-faint">No audits yet — the first daily snapshot will appear here.</div>}
         </Section>
 
-        <p className="mt-8 text-xs text-ink-faint">Prices come from the rate_card table · Higgsfield Ultra $375 / 9,000 credits ≈ R0.77 per credit. {loading ? "Updating…" : ""}</p>
+        <div className="mt-8 text-xs text-ink-faint">
+          <div className="font-semibold text-ink-dim">Fixed monthly subscriptions (base cost ≈ $573/mo)</div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+            <span>Higgsfield Ultra <span className="text-ink">$375</span> · 9,000 credits · renews 10th</span>
+            <span>HeyGen Pro <span className="text-ink">$99</span> · ~121 video min · renews 29th</span>
+            <span>ElevenLabs Pro <span className="text-ink">$99</span> · 500k chars</span>
+          </div>
+          <div className="mt-1">Per-job prices come from the rate_card table (marginal/overage estimates; usage within each plan&apos;s allotment is covered by the flat fee). {loading ? "Updating…" : ""}</div>
+        </div>
       </main>
     </div>
   );
