@@ -217,9 +217,9 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           {sources.length === 0 ? (
             <p className="text-[12px] text-ink-faint">No creatives yet. Render some in the Creatives tab first, then pick one here to bring it to life.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="flex gap-3 overflow-x-auto pb-2">
               {sources.map((s) => (
-                <button key={s.url} onClick={() => setSourceUrl(s.url)} className={`relative overflow-hidden rounded-xl border-2 transition ${sourceUrl === s.url ? "border-[#a855f7] shadow-[0_0_0_3px_rgba(168,85,247,0.25)]" : "border-line hover:border-line-strong"}`}>
+                <button key={s.url} onClick={() => setSourceUrl(s.url)} className={`relative w-44 shrink-0 overflow-hidden rounded-xl border-2 transition ${sourceUrl === s.url ? "border-[#a855f7] shadow-[0_0_0_3px_rgba(168,85,247,0.25)]" : "border-line hover:border-line-strong"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={s.url} alt="source" className="aspect-[3/4] w-full object-cover" />
                   <span className="tabular absolute left-1.5 top-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-white">{s.ratio}</span>
