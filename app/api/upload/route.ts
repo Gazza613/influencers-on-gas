@@ -15,8 +15,12 @@ export async function POST(req: Request) {
         const session = await auth();
         if (!session?.user) throw new Error("Unauthorized");
         return {
-          allowedContentTypes: ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/avif"],
-          maximumSizeInBytes: 10 * 1024 * 1024,
+          allowedContentTypes: [
+            "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/avif",
+            // Voice samples (clone your own voice).
+            "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/x-m4a", "audio/mp4", "audio/aac", "audio/ogg", "audio/webm",
+          ],
+          maximumSizeInBytes: 25 * 1024 * 1024,
           addRandomSuffix: true,
         };
       },

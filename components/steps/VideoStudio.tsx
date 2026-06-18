@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { upload as blobUpload } from "@vercel/blob/client";
 
 type Voice = { id: string; name: string; preview: string | null };
+type LibVoice = { voice_id: string; name: string; labels?: Record<string, string>; preview_url?: string | null };
 type Clip = { id?: string; url?: string | null; line?: string; ratio?: string; status?: string; error?: string | null };
 
 export default function VideoStudio({ influencerId, name, mode, initial }: {
@@ -18,6 +20,31 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   const [voicing, setVoicing] = useState(false);
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
+  // Voice picker
+  const [vtab, setVtab] = useState<"library" | "auto" | "upload">("library");
+  const [lib, setLib] = useState<LibVoice[]>([]);
+  const [sel, setSel] = useState("");
+  const [sampleUrl, setSampleUrl] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => { fetch("/api/voices").then((r) => r.json()).then((d) => { if (Array.isArray(d?.voices)) setLib(d.voices); }).catch(() => {}); }, []);
+
+  async function setVoiceVia(payload: Record<string, unknown>) {
+    setVoicing(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/voice`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    }).then((x) => x.json()).catch(() => null);
+    setVoicing(false);
+    if (r?.voice_id) setVoice({ id: r.voice_id, name: r.voice_name, preview: r.preview_url ?? null });
+    else setErr(r?.error || "Could not set the voice.");
+  }
+  async function uploadSample(file: File) {
+    setUploading(true); setErr("");
+    try { const b = await blobUpload(file.name, file, { access: "public", handleUploadUrl: "/api/upload", clientPayload: "voice" }); setSampleUrl(b.url); }
+    catch (e) { setErr(String((e as Error)?.message || e).slice(0, 160) || "Upload failed"); }
+    setUploading(false);
+  }
 
   const polling = useRef(false);
   const running = clips.some((c) => c.status === "running");
@@ -36,16 +63,6 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
       }
     }
     polling.current = false;
-  }
-
-  async function makeVoice() {
-    setVoicing(true); setErr("");
-    const r = await fetch(`/api/influencers/${influencerId}/voice`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto" }),
-    }).then((x) => x.json()).catch(() => null);
-    setVoicing(false);
-    if (r?.voice_id) setVoice({ id: r.voice_id, name: r.voice_name, preview: r.preview_url ?? null });
-    else setErr(r?.error || "Could not set up the voice.");
   }
 
   async function generate() {
@@ -68,17 +85,48 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
 
       {/* Voice */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular mb-2 text-xs uppercase tracking-[0.2em] text-ink-faint">① Voice</div>
-        {voice ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-lg border border-ready/40 bg-ready/10 px-3 py-1.5 text-sm font-semibold text-ready">🔊 {voice.name}</span>
-            {voice.preview && <audio src={voice.preview} controls className="h-9" />}
-            <button onClick={makeVoice} disabled={voicing} className="text-xs text-ink-faint hover:text-ink disabled:opacity-50">{voicing ? "…" : "Change voice"}</button>
+        <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">① Voice</div>
+        {voice && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-ready/30 bg-ready/8 px-3 py-2">
+            <span className="text-sm font-semibold text-ready">🔊 {voice.name}</span>
+            {voice.preview && <audio src={voice.preview} controls className="h-8" />}
+            <span className="text-[11px] text-ink-faint">{name}&apos;s current voice</span>
           </div>
-        ) : (
+        )}
+        <div className="mb-3 flex gap-2">
+          {([["library", "Pick a voice"], ["upload", "Upload my own"], ["auto", "Auto-match"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setVtab(k)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${vtab === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{l}</button>
+          ))}
+        </div>
+
+        {vtab === "library" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={sel} onChange={(e) => setSel(e.target.value)} className="min-w-[220px] rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]">
+              <option value="">{lib.length ? "Choose a voice…" : "Loading voices…"}</option>
+              {lib.map((v) => <option key={v.voice_id} value={v.voice_id}>{v.name}{v.labels?.gender ? ` · ${v.labels.gender}` : ""}{v.labels?.accent ? ` · ${v.labels.accent}` : ""}</option>)}
+            </select>
+            {sel && lib.find((v) => v.voice_id === sel)?.preview_url && (
+              <audio src={lib.find((v) => v.voice_id === sel)?.preview_url || undefined} controls className="h-8" />
+            )}
+            <button onClick={() => sel && setVoiceVia({ action: "select", voiceId: sel, voiceName: lib.find((v) => v.voice_id === sel)?.name })} disabled={!sel || voicing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voicing ? "Setting…" : "Use this voice"}</button>
+          </div>
+        )}
+
+        {vtab === "upload" && (
+          <div className="space-y-2">
+            <p className="text-[13px] text-ink-faint">Upload a clear voice sample (20 to 60 seconds, one speaker, minimal background noise). We clone it as {name}&apos;s voice.</p>
+            <input type="file" accept="audio/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSample(f); }} className="block text-sm text-ink-dim file:mr-3 file:rounded-lg file:border-0 file:bg-[#a855f7]/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#c79bff]" />
+            {uploading && <p className="text-[12px] text-ink-faint">Uploading sample…</p>}
+            {sampleUrl && <audio src={sampleUrl} controls className="h-8" />}
+            <label className="flex items-center gap-2 text-[12px] text-ink-dim"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> I have the right to use this voice and consent to cloning it.</label>
+            <button onClick={() => setVoiceVia({ action: "clone", sampleUrls: [sampleUrl], consentId: consent ? "voice-upload-consent" : "" })} disabled={!sampleUrl || !consent || voicing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voicing ? "Cloning…" : "Clone this voice"}</button>
+          </div>
+        )}
+
+        {vtab === "auto" && (
           <div className="flex flex-wrap items-center gap-3">
-            <button onClick={makeVoice} disabled={voicing} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">{voicing ? "Setting up…" : `Give ${name} a voice`}</button>
-            <span className="text-[13px] text-ink-faint">{mode === "twin" ? "A matched voice for now; voice cloning from your own samples is coming next." : "A natural voice matched to this influencer."}</span>
+            <button onClick={() => setVoiceVia({ action: "auto" })} disabled={voicing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voicing ? "Setting up…" : "Use a matched voice"}</button>
+            <span className="text-[13px] text-ink-faint">We pick a natural voice matched to {name}&apos;s gender.</span>
           </div>
         )}
       </div>

@@ -40,6 +40,7 @@ export default async function InfluencerLayout({
           hasReference: !!persona.reference_url,
           locked: !!persona.locked,
           faceUrl: face,
+          creatives: Array.isArray(persona.creatives) ? persona.creatives.length : 0,
         }}
       />
       <div className="mt-6">{children}</div>

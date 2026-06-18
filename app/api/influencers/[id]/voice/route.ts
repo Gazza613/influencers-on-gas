@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { pickVoiceForGender, cloneVoice, previewVoice } from "@/lib/vendors/elevenlabs";
+import { pickVoiceForGender, cloneVoice, previewVoice, listVoices } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 
@@ -20,10 +20,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
 
   const body = await req.json().catch(() => ({}));
-  const action = body.action === "clone" ? "clone" : "auto";
+  const action = body.action === "clone" ? "clone" : body.action === "select" ? "select" : "auto";
   try {
     let voiceId: string; let voiceName: string;
-    if (action === "clone") {
+    if (action === "select") {
+      voiceId = typeof body.voiceId === "string" ? body.voiceId : "";
+      if (!voiceId) return NextResponse.json({ error: "Pick a voice." }, { status: 400 });
+      const v = (await listVoices().catch(() => [])).find((x) => x.voice_id === voiceId);
+      voiceName = typeof body.voiceName === "string" && body.voiceName ? body.voiceName : v?.name || "Selected voice";
+    } else if (action === "clone") {
       const samples = Array.isArray(body.sampleUrls) ? (body.sampleUrls as string[]).filter((u) => typeof u === "string") : [];
       if (samples.length < 1) return NextResponse.json({ error: "Add at least one clear voice sample (20 to 60 seconds is ideal)." }, { status: 400 });
       if (!body.consentId) return NextResponse.json({ error: "Voice consent is required to clone a real person's voice." }, { status: 400 });

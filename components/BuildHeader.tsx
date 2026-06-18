@@ -11,6 +11,7 @@ type Init = {
   hasReference: boolean;
   locked: boolean;
   faceUrl: string | null;
+  creatives: number;
 };
 
 const BUILDING = new Set(["casting", "generating", "training", "ready"]);
@@ -65,6 +66,7 @@ export default function BuildHeader({
           hasReference: !!persona.reference_url,
           locked: !!persona.locked,
           faceUrl: face,
+          creatives: Array.isArray(persona.creatives) ? persona.creatives.length : 0,
         });
       }
       if (c?.ok) { const d = await c.json(); setSpendCents(d.influencer?.cents ?? 0); }
@@ -78,14 +80,17 @@ export default function BuildHeader({
   const step1Done = s.candidates > 0 || s.frames > 0 || s.hasReference || s.locked;
   const step2Done = s.frames > 1 || s.locked;
   const base = `/setup/influencers/${id}`;
-  const tabs = [
+  const tabs: { href: string; label: string; icon: string; done: boolean; warn?: boolean; match: (p: string) => boolean }[] = [
     { href: base, label: "Build my influencer", icon: "①", done: step1Done, match: (p: string) => p === base },
     { href: `${base}/photoshoot`, label: "Photoshoot", icon: "②", done: step2Done, match: (p: string) => p.endsWith("/photoshoot") },
     { href: `${base}/lockdown`, label: "Lock down", icon: "③", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
   ];
-  // Creatives + Video unlock once the identity is locked.
+  // Creatives + Video unlock once the identity is locked. Creatives turns green once any shot
+  // is rendered; if you skip it and move to Video, it flags orange with a "?" (not done).
+  const creativesDone = s.creatives > 0;
   if (s.locked) {
-    tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: false, match: (p: string) => p.endsWith("/creatives") });
+    const onVideo = pathname.endsWith("/video");
+    tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: creativesDone, warn: !creativesDone && onVideo, match: (p: string) => p.endsWith("/creatives") });
     tabs.push({ href: `${base}/video`, label: "Video & Voice", icon: "🎬", done: false, match: (p: string) => p.endsWith("/video") });
   }
 
@@ -130,9 +135,10 @@ export default function BuildHeader({
               className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition ${
                 active ? "step-active border-[#a855f7] bg-[#a855f7]/15 font-bold text-[#c79bff]"
                 : t.done ? "border-ready/40 bg-ready/10 text-ready"
+                : t.warn ? "border-active/50 bg-active/10 text-active"
                 : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"
               }`}>
-              <span>{t.done && !active ? "✓" : t.icon}</span>
+              <span>{t.done && !active ? "✓" : t.warn && !active ? "?" : t.icon}</span>
               <span className="font-semibold">{t.label}</span>
             </Link>
           );
