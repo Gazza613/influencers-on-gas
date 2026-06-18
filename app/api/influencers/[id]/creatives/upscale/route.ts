@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { upscaleUrlTo, filterLoadable } from "@/lib/vendors/higgsfield";
-import { rehostToBlob } from "@/lib/blob";
-import { recordUsage } from "@/lib/usage";
+import { inngest } from "@/lib/inngest";
 
-// Upscale ONE kept 2K shot to 4K on demand. Synchronous (the proven path that produced our
-// existing 4K shots); 300s budget covers a 1-3 min bytedance render. The client also marks the
-// tile "upscaling" and polls, so a brief network blip still resolves from the server state.
-export const maxDuration = 300;
+// Queue a DURABLE 4K upscale of ONE kept 2K shot. A 4K bytedance render can run a few minutes,
+// too long for a synchronous request (it dies before saving). We mark the shot "upscaling",
+// fire the durable job, return immediately; the UI polls until the shot turns 4k (or errors).
+export const maxDuration = 30;
 
-type Creative = { id?: string; url?: string | null; resolution?: string; upscaling?: boolean; upscale_error?: string | null; [k: string]: unknown };
+type Creative = { id?: string; url?: string | null; resolution?: string; upscaling?: boolean; [k: string]: unknown };
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -25,22 +23,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const creatives = (Array.isArray(persona.creatives) ? persona.creatives : []) as Creative[];
   const target = creatives.find((c) => (c.id || "") === creativeId);
   if (!target || !target.url) return NextResponse.json({ error: "Shot not found" }, { status: 404 });
-  if (target.resolution === "4k") return NextResponse.json({ creative: target }); // already done
+  if (target.resolution === "4k") return NextResponse.json({ queued: false, creative: target });
 
-  const up = await upscaleUrlTo(target.url, "4k", 40).catch(() => null);
-  if (!up || !(await filterLoadable([up])).length) {
-    // Record the failure on the shot so the UI clears the spinner and shows it.
-    const failed = creatives.map((c) => ((c.id || "") === creativeId ? { ...c, upscaling: false, upscale_error: "4K upscale did not return an image" } : c));
-    await updateInfluencer(id, { persona: { ...persona, creatives: failed } }).catch(() => {});
-    return NextResponse.json({ error: "Upscale did not return an image, please try again." }, { status: 502 });
+  // Mark it upscaling so the UI shows the spinner and survives a refresh.
+  const marked = creatives.map((c) => ((c.id || "") === creativeId ? { ...c, upscaling: true, upscale_error: null } : c));
+  await updateInfluencer(id, { persona: { ...persona, creatives: marked } });
+  try {
+    await inngest.send({ name: "influencer/upscale.creative", data: { influencerId: id, creativeId } });
+  } catch {
+    const cleared = creatives.map((c) => ((c.id || "") === creativeId ? { ...c, upscaling: false } : c));
+    await updateInfluencer(id, { persona: { ...persona, creatives: cleared } });
+    return NextResponse.json({ error: "Could not queue the upscale (generation engine not connected)." }, { status: 503 });
   }
-  const hosted = (await rehostToBlob(up).catch(() => null)) || up;
-  await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: 1 }).catch(() => {});
-
-  const prevUrl = target.url;
-  const updated = creatives.map((c) => ((c.id || "") === creativeId ? { ...c, url: hosted, resolution: "4k", upscaling: false, upscale_error: null } : c));
-  const videoSelects = (Array.isArray(persona.video_selects) ? persona.video_selects : []) as string[];
-  const remappedSelects = videoSelects.map((u) => (u === prevUrl ? hosted : u));
-  await updateInfluencer(id, { persona: { ...persona, creatives: updated, video_selects: remappedSelects } });
-  return NextResponse.json({ creative: updated.find((c) => (c.id || "") === creativeId) });
+  return NextResponse.json({ queued: true });
 }

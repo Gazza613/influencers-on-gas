@@ -589,7 +589,7 @@ export const upscaleCreative = inngest.createFunction(
     if (!target || !target.url) return { skipped: "shot not found" };
     if (target.resolution === "4k") return { ok: true, already: true };
 
-    const up = await step.run("upscale", () => upscaleUrlTo(target.url as string, "4k", 40).catch(() => null));
+    const up = await step.run("upscale", () => upscaleUrlTo(target.url as string, "4k", 80).catch(() => null));
     const ok = up && (await step.run("validate", () => filterLoadable([up]))).length > 0;
     if (!ok) {
       // Clear the spinner and surface a per-shot error; leave the 2K original intact.
