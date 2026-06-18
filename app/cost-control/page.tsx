@@ -18,16 +18,17 @@ type Audit = { taken_at: string; remaining: number | null; ledger_credits: numbe
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PROVIDER_LABEL: Record<string, string> = {
-  higgsfield: "Higgsfield · images, Soul & upscale",
+  higgsfield: "Higgsfield · images & upscale",
   heygen: "HeyGen · presenter",
-  anthropic: "Claude · Character Casting",
+  anthropic: "Claude · co-pilot & QA",
   elevenlabs: "ElevenLabs · voice",
   voyage: "Voyage · embeddings",
   firecrawl: "Firecrawl · crawl",
 };
 const ACTION_LABEL: Record<string, string> = {
-  casting: "Casting (looks)", photoshoot: "Photoshoot", soul: "Lock-down (Soul)", humaniser: "Humaniser",
+  casting: "Casting (looks)", photoshoot: "Photoshoot", soul: "Lock-down (legacy Soul)", humaniser: "Humaniser",
   presenter: "Presenter", bible: "Character Casting", ingest: "Brain ingestion", creative: "Creatives (social)",
+  qa: "AI Vision QA", compose: "Scene writing", research: "Daily research",
 };
 
 const usd = (cents: number, zarPerUsd: number) => zarPerUsd ? "$" + (cents / 100 / zarPerUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";

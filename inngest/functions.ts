@@ -442,7 +442,7 @@ export const generateCreatives = inngest.createFunction(
         const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: (persona.bible as Record<string, unknown>) || {}, scene: sceneText, cinematic, extras: event.data.extras !== false, gender: String(persona.gender || "") }));
         if (composed) {
           richScene = composed;
-          await step.run("usage-compose", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "compose", count: 1 }));
+          await step.run("usage-compose", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "compose", count: 1 }));
         }
       }
       const buildPrompt = (idx: number, ratio: string) =>
@@ -468,6 +468,8 @@ export const generateCreatives = inngest.createFunction(
         const valid = produced.length ? await step.run(`validate-${rid}`, () => filterLoadable(produced)) : [];
         const validSet = new Set(valid);
         if (produced.length) await step.run(`usage-gen-${rid}`, () => recordUsage({ influencerId, provider: "higgsfield", model: selectedModel, unit: "image", action: "creative", count: produced.length }));
+        // AI Vision QA (Claude Haiku) runs once per loadable shot, meter it so it appears in Cost Control.
+        if (valid.length) await step.run(`usage-qa-${rid}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: valid.length }));
         // Per attempt: failed generation stays visible, QA gets a score, and only approved
         // shots are upscaled/rehosted.
         const attempts = await Promise.all(rawProduced.map((sourceUrl, k) =>

@@ -14,7 +14,11 @@ function parseCost(raw: unknown): number | null {
   return null;
 }
 
-const IMAGE_MODELS = ["soul_2", "soul_cinematic", "nano_banana_2"];
+// The models the pipeline actually calls today: nano_banana_2 (casting + photoshoot) and
+// gpt_image_2 (creatives identity). Soul models are no longer used for images, so they are
+// not calibrated. Higgsfield's get_cost returns the REAL credit cost for THIS plan, so if a
+// model is unlimited/included on Ultra it comes back at 0 and the ledger reflects that.
+const IMAGE_MODELS = ["nano_banana_2", "gpt_image_2"];
 
 export async function POST() {
   const session = await auth();
