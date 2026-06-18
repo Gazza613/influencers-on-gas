@@ -61,16 +61,38 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   }
 
   useEffect(() => { fetch("/api/voices").then((r) => r.json()).then((d) => { if (Array.isArray(d?.voices)) setLib(d.voices); }).catch(() => {}); }, []);
-  // Source shots the producer can animate (the locked creatives). The clip uses this exact
-  // frame, so the scene AND aspect come from it (no white space).
-  useEffect(() => {
-    fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).then((d) => {
-      const list = (Array.isArray(d?.creatives) ? d.creatives : []).filter((c: { url?: string; status?: string }) => c.url && c.status === "approved").map((c: { url: string; ratio: string }) => ({ url: c.url, ratio: c.ratio || "9:16" }));
-      setSources(list);
-      if (list.length && !sourceUrl) setSourceUrl(list[0].url);
-    }).catch(() => {});
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [influencerId]);
+  // Source shots the producer can animate (the locked creatives + presenter frames). The clip
+  // uses this exact frame, so the scene AND aspect come from it (no white space).
+  const [genPresenter, setGenPresenter] = useState(false);
+  const loadSources = async (autoselect = true) => {
+    const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
+    const list = (Array.isArray(d?.creatives) ? d.creatives : []).filter((c: { url?: string; status?: string }) => c.url && c.status === "approved").map((c: { url: string; ratio: string }) => ({ url: c.url, ratio: c.ratio || "9:16" }));
+    setSources(list);
+    if (autoselect && list.length && !sourceUrl) setSourceUrl(list[0].url);
+    return list as { url: string; ratio: string }[];
+  };
+  useEffect(() => { loadSources(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [influencerId]);
+
+  // Generate dedicated head-and-shoulders PRESENTER frames (the ideal a-roll source) via the
+  // proven creatives pipeline with a locked presenter brief. They appear in the carousel.
+  const PRESENTER_BRIEF = "A clean, professional head-and-shoulders presenter portrait of the influencer: framed from mid-chest up with the face large and centred, front-on to camera, looking directly into the lens, relaxed natural expression with the mouth closed, even soft flattering studio lighting, a plain uncluttered softly-lit neutral background, tack-sharp focus, hands not in frame.";
+  async function makePresenterFrames(presRatio: "9:16" | "1:1") {
+    if (genPresenter) return;
+    setGenPresenter(true); setErr("");
+    const before = sources.length;
+    const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ratios: [presRatio], scene: PRESENTER_BRIEF, count: 2, extras: false, identityLock: "strong", cinematic: false }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r || r.error) { setGenPresenter(false); setErr(r?.error || "Could not start presenter shots."); return; }
+    // Poll for the new frames to land, then auto-select the first new one.
+    for (let i = 0; i < 40; i++) {
+      await new Promise((res) => setTimeout(res, 8000));
+      const list = await loadSources(false);
+      if (list.length > before) { setSourceUrl(list[0].url); break; }
+    }
+    setGenPresenter(false);
+  }
   const ratio = sources.find((s) => s.url === sourceUrl)?.ratio || "9:16";
 
   async function setVoiceVia(payload: Record<string, unknown>) {
@@ -258,9 +280,22 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
 
         {/* Source shot — we animate THIS exact frame, so scene + aspect come from it */}
         <div className="mt-4 border-t border-line pt-3">
-          <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Choose any shot to animate (1:1 or 9:16) {sourceUrl ? `· selected ${ratio}` : ""}</div>
-          {sources.length === 0 ? (
-            <p className="text-[12px] text-ink-faint">No creatives yet. Render some in the Creatives tab first, then pick one here to bring it to life.</p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Choose any shot to animate (1:1 or 9:16) {sourceUrl ? `· selected ${ratio}` : ""}</span>
+            <span className="flex items-center gap-2">
+              {genPresenter ? (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-[#c79bff]"><span className="h-3 w-3 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />Generating presenter shots…</span>
+              ) : (
+                <>
+                  <span className="text-[11px] text-ink-faint">Best for talking heads:</span>
+                  <button onClick={() => makePresenterFrames("9:16")} className="rounded-lg border border-[#a855f7]/40 px-2.5 py-1 text-[11px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✨ Presenter 9:16</button>
+                  <button onClick={() => makePresenterFrames("1:1")} className="rounded-lg border border-[#a855f7]/40 px-2.5 py-1 text-[11px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">1:1</button>
+                </>
+              )}
+            </span>
+          </div>
+          {sources.length === 0 && !genPresenter ? (
+            <p className="text-[12px] text-ink-faint">No shots yet. Hit <span className="text-[#c79bff]">✨ Presenter</span> for a clean head-and-shoulders frame (ideal for talking heads), or render scene shots in the Creatives tab.</p>
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-2">
               {sources.map((s) => (
