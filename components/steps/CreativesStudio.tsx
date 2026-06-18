@@ -174,6 +174,13 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setCreatives(keep); setPicked(new Set());
     await patchPersona({ creatives: keep, video_selects: videoSelects.filter((u) => keep.some((c) => c.url === u)) });
   }
+  // Remove a single tile (used to dismiss failed shots that cannot be selected).
+  async function removeOne(id: string) {
+    const keep = creatives.filter((c) => (c.id || "") !== id);
+    setCreatives(keep);
+    setPicked((s) => { const n = new Set(s); n.delete(id); return n; });
+    await patchPersona({ creatives: keep, video_selects: videoSelects.filter((u) => keep.some((c) => c.url === u)) });
+  }
   async function markForVideo() {
     const add = creatives.filter((c) => picked.has(c.id || "") && !!c.url).map((c) => c.url as string);
     const next = [...new Set([...videoSelects, ...add])];
@@ -419,13 +426,20 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={u} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(u)} onError={() => setBroken((b) => new Set(b).add(u))} />
                   )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (canPick) togglePick(id); }}
-                    aria-pressed={sel}
-                    title={canPick ? (sel ? "Selected" : "Select this shot") : "Only approved shots can be selected"}
-                    disabled={!canPick}
-                    className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"} disabled:cursor-not-allowed disabled:opacity-45`}
-                  >✓</button>
+                  {canPick ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); togglePick(id); }}
+                      aria-pressed={sel}
+                      title={sel ? "Selected" : "Select this shot"}
+                      className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"}`}
+                    >✓</button>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeOne(id); }}
+                      title="Delete this failed shot"
+                      className="absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-alert/70 bg-black/60 text-sm text-alert transition hover:bg-alert/20 active:scale-90"
+                    >✕</button>
+                  )}
                   <div className="absolute left-1.5 top-1.5 flex gap-1">
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
                     <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
