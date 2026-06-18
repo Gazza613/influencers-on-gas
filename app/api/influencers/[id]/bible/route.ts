@@ -40,6 +40,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const tagline = await generateTagline(inf.name, bible as unknown as Record<string, unknown>).catch(() => "");
     await updateInfluencer(id, { persona: { ...inf.persona, brief, bible, tagline } });
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "bible", action: "bible", count: 1 }).catch(() => {});
+    // The tagline is a second (small) Claude call — meter it too so no paid call goes untracked.
+    if (tagline) await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "tagline", count: 1 }).catch(() => {});
     return NextResponse.json({ bible });
   } catch (e) {
     return NextResponse.json({ error: friendlyAnthropicError(e) }, { status: 500 });

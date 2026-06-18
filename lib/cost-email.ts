@@ -9,7 +9,7 @@ const PROVIDER_LABEL: Record<string, string> = {
 const ACTION_LABEL: Record<string, string> = {
   casting: "Casting (looks)", photoshoot: "Photoshoot", soul: "Lock-down (legacy Soul)", humaniser: "Humaniser",
   presenter: "Presenter", bible: "Character Casting", ingest: "Brain ingestion", creative: "Creatives (social)",
-  qa: "AI Vision QA", compose: "Scene writing", research: "Daily research",
+  qa: "AI Vision QA", compose: "Scene writing", research: "Daily research", tagline: "Tagline",
 };
 
 const BASE = "https://influencers.gasmarketing.co.za";
