@@ -98,3 +98,31 @@ export async function tts(voiceId: string, text: string, opts: { expressive?: bo
 export async function previewVoice(voiceId: string, line = "Hi, this is how I will sound in your videos."): Promise<Buffer> {
   return tts(voiceId, line);
 }
+
+// ── Design a voice from a text prompt (Voice Design, eleven_ttv_v3) ─────────
+// Generate candidate voices from a rich description; returns previews (generated_voice_id +
+// audio bytes) to play. text must be ~100+ chars for v3.
+export async function designVoicePreviews(description: string, text: string): Promise<{ generatedVoiceId: string; audio: Buffer }[]> {
+  const k = await key();
+  const res = await fetch(`${BASE}/text-to-voice/design`, {
+    method: "POST",
+    headers: { "xi-api-key": k, "Content-Type": "application/json" },
+    body: JSON.stringify({ voice_description: description, model_id: "eleven_ttv_v3", text }),
+  });
+  if (!res.ok) throw new Error(`Voice design failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  const data = (await res.json()) as { previews?: { generated_voice_id: string; audio_base_64?: string; audio_base64?: string }[] };
+  return (data.previews ?? []).map((p) => ({ generatedVoiceId: p.generated_voice_id, audio: Buffer.from(p.audio_base_64 || p.audio_base64 || "", "base64") }));
+}
+
+// Save a chosen designed preview as a permanent voice → voice_id.
+export async function createDesignedVoice(name: string, description: string, generatedVoiceId: string): Promise<string> {
+  const k = await key();
+  const res = await fetch(`${BASE}/text-to-voice`, {
+    method: "POST",
+    headers: { "xi-api-key": k, "Content-Type": "application/json" },
+    body: JSON.stringify({ voice_name: name, voice_description: description, generated_voice_id: generatedVoiceId }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { voice_id?: string; detail?: unknown };
+  if (!data.voice_id) throw new Error(`Create designed voice failed (${res.status}): ${JSON.stringify(data.detail || data).slice(0, 200)}`);
+  return data.voice_id;
+}

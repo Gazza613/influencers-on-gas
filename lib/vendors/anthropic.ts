@@ -369,3 +369,34 @@ export async function expressifyScript(line: string, voiceDescriptor = "", tone 
     return line; // fail open: a flat read beats no read
   }
 }
+
+// Voice designer: turn a casual description ("South African white female, 20s, slight Afrikaans
+// twang, mild lisp") into a rich ElevenLabs Voice Design prompt + a natural 100+ char sample
+// line. Returns { voice_description, sample_text }. Best-practice: cover age, gender, accent,
+// timbre, pacing, character and audio quality.
+export async function designVoiceBrief(description: string): Promise<{ voice_description: string; sample_text: string }> {
+  const fallback = { voice_description: description, sample_text: "Hey, so I just had to share this with you, honestly it has completely changed how I think about my day to day routine." };
+  try {
+    const c = await client();
+    const res = await c.messages.create({
+      model: MODEL,
+      max_tokens: 500,
+      system:
+        "You are an expert ElevenLabs Voice Design prompt engineer. Turn the user's casual voice description into the most effective Voice Design prompt for a REAL, believable human voice. " +
+        "A great voice_description (40 to 250 words) explicitly covers: age range, gender, accent/region (be specific, e.g. 'South African accent with a soft Afrikaans inflection'), timbre and pitch, pacing and rhythm, emotional default, any distinctive quirk (e.g. a mild lisp), and recording quality ('clean, close-mic, studio quality, no background noise'). Faithfully include EVERY trait the user gave. " +
+        "Also write a natural, conversational sample_text of 120 to 250 characters that shows the voice off (casual, first person, like an influencer talking to camera). " +
+        'Return ONLY strict JSON: {"voice_description": "...", "sample_text": "..."}',
+      messages: [{ role: "user", content: description }],
+    });
+    const txt = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return fallback;
+    const parsed = JSON.parse(m[0]) as { voice_description?: string; sample_text?: string };
+    return {
+      voice_description: parsed.voice_description?.trim() || description,
+      sample_text: (parsed.sample_text?.trim() && parsed.sample_text.trim().length >= 100) ? parsed.sample_text.trim() : fallback.sample_text,
+    };
+  } catch {
+    return fallback;
+  }
+}

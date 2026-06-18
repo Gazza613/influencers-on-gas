@@ -28,12 +28,37 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   const [gen, setGen] = useState(false);
   const [err, setErr] = useState("");
   // Voice picker
-  const [vtab, setVtab] = useState<"library" | "auto" | "upload">("library");
+  const [vtab, setVtab] = useState<"library" | "design" | "auto" | "upload">("library");
   const [lib, setLib] = useState<LibVoice[]>([]);
   const [sel, setSel] = useState("");
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Design-a-voice
+  const [desc, setDesc] = useState("");
+  const [designing, setDesigning] = useState(false);
+  const [designDesc, setDesignDesc] = useState("");
+  const [designPreviews, setDesignPreviews] = useState<{ generatedVoiceId: string; url: string }[]>([]);
+
+  async function designVoice() {
+    if (!desc.trim() || designing) return;
+    setDesigning(true); setErr(""); setDesignPreviews([]);
+    const r = await fetch(`/api/influencers/${influencerId}/voice/design`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: desc.trim() }),
+    }).then((x) => x.json()).catch(() => null);
+    setDesigning(false);
+    if (r?.previews?.length) { setDesignPreviews(r.previews); setDesignDesc(r.voice_description || ""); }
+    else setErr(r?.error || "Could not design a voice.");
+  }
+  async function useDesigned(generatedVoiceId: string) {
+    setVoicing(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/voice/design`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ generatedVoiceId, voice_description: designDesc }),
+    }).then((x) => x.json()).catch(() => null);
+    setVoicing(false);
+    if (r?.voice_id) { setVoice({ id: r.voice_id, name: r.voice_name, preview: r.preview_url ?? null }); setDesignPreviews([]); }
+    else setErr(r?.error || "Could not save the designed voice.");
+  }
 
   useEffect(() => { fetch("/api/voices").then((r) => r.json()).then((d) => { if (Array.isArray(d?.voices)) setLib(d.voices); }).catch(() => {}); }, []);
   // Source shots the producer can animate (the locked creatives). The clip uses this exact
@@ -138,7 +163,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           </div>
         )}
         <div className="mb-3 flex gap-2">
-          {([["library", "Pick a voice"], ["upload", "Upload my own"], ["auto", "Auto-match"]] as const).map(([k, l]) => (
+          {([["library", "Pick a voice"], ["design", "Design a voice"], ["upload", "Upload my own"], ["auto", "Auto-match"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setVtab(k)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${vtab === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{l}</button>
           ))}
         </div>
@@ -153,6 +178,26 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
               <audio src={lib.find((v) => v.voice_id === sel)?.preview_url || undefined} controls className="h-8" />
             )}
             <button onClick={() => sel && setVoiceVia({ action: "select", voiceId: sel, voiceName: lib.find((v) => v.voice_id === sel)?.name })} disabled={!sel || voicing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voicing ? "Setting…" : "Use this voice"}</button>
+          </div>
+        )}
+
+        {vtab === "design" && (
+          <div className="space-y-2">
+            <p className="text-[13px] text-ink-faint">Describe the voice and we design it in ElevenLabs. Be specific, e.g. &quot;South African white female, early twenties, soft Afrikaans twang, warm and chatty, slight lisp.&quot;</p>
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="Describe the voice…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
+            <button onClick={designVoice} disabled={!desc.trim() || designing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{designing ? "Designing voice options…" : "✨ Design voice options"}</button>
+            {designPreviews.length > 0 && (
+              <div className="mt-1 space-y-2">
+                <p className="text-[11px] text-ink-faint">Listen and pick your favourite:</p>
+                {designPreviews.map((p, i) => (
+                  <div key={p.generatedVoiceId} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2">
+                    <span className="text-xs font-semibold text-ink-dim">Option {i + 1}</span>
+                    <audio src={p.url} controls className="h-8" />
+                    <button onClick={() => useDesigned(p.generatedVoiceId)} disabled={voicing} className="rounded-lg border border-[#a855f7]/50 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{voicing ? "Saving…" : "Use this voice"}</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
