@@ -110,13 +110,18 @@ export const buildIdentity = inngest.createFunction(
     // frame so the Soul learns them as part of the identity (consistent skin, not generic).
     const isTwin = inf.mode === "twin";
     const bibleFace = ((persona.bible as { face?: { skin?: string; distinct_features?: string } })?.face) ?? {};
-    // For a digital twin (real person) NEVER thread invented marks; the real photo is truth.
-    const faceMarks = isTwin ? "" : [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 300);
 
-    // DIGITAL TWIN: the real uploaded photos ARE the identity. Do NOT regenerate the face
-    // (that drifts and invents marks). Use the uploads directly as the frame/reference set.
-    const twinPhotos = Array.isArray(persona.reference_images) ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
-    if (isTwin && twinPhotos.length) {
+    // UPLOADED REFERENCES (a twin's real photos, or a synthetic the user gave reference art):
+    // these ARE the identity. Do NOT regenerate the face (that drifts and invents marks); use
+    // the uploads directly as the frame/reference set, and never thread invented marks.
+    const uploadedRefs = Array.isArray(persona.reference_images) ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
+    const refFromUrl = typeof persona.reference_url === "string" && persona.reference_url ? [persona.reference_url] : [];
+    const twinPhotos = uploadedRefs.length ? uploadedRefs : refFromUrl;
+    const anchored = twinPhotos.length > 0;
+    // For an anchored identity NEVER thread invented marks; the real/uploaded photo is truth.
+    const faceMarks = anchored || isTwin ? "" : [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 300);
+
+    if (anchored) {
       const valid = await step.run("validate-twin-photos", () => filterLoadable(twinPhotos));
       const photos = valid.length ? valid : twinPhotos;
       const twinFrames = photos.map((url, i) => ({ url, ...(i === 0 ? { hero: true, face: true } : {}) }));
@@ -385,11 +390,14 @@ export const generateCreatives = inngest.createFunction(
     try {
       const lockMode = event.data.identityLock === "flexible" ? "flexible" : "strong";
       const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
-      // Identity references (face). A TWIN uses up to 4 of the REAL uploaded photos (more
-      // angles = more accurate likeness, never regenerated). A synthetic uses the clean
-      // identity card + the forensic feature sheet.
-      const twinPhotos = inf.mode === "twin" && Array.isArray(persona.reference_images)
-        ? (persona.reference_images as string[]).filter((u) => typeof u === "string").slice(0, 4) : [];
+      // Identity references (face). Any influencer with UPLOADED reference photos (a twin, or
+      // a synthetic the user gave reference art for) anchors to up to 4 of those REAL photos
+      // (more angles = more accurate likeness, never regenerated). A synthetic with no uploads
+      // uses the generated clean identity card + the forensic feature sheet.
+      const uploadedRefs = Array.isArray(persona.reference_images)
+        ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
+      const refFromUrl = typeof persona.reference_url === "string" && persona.reference_url ? [persona.reference_url] : [];
+      const twinPhotos = (uploadedRefs.length ? uploadedRefs : refFromUrl).slice(0, 4);
       const idRefUrls = twinPhotos.length
         ? twinPhotos
         : [(persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || ""].filter(Boolean);

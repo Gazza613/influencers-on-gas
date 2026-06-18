@@ -26,7 +26,7 @@ export default function StartPage() {
   const [name, setName] = useState("");
   const [gender, setGender] = useState<"female" | "male" | "">("");
   const [look, setLook] = useState<"natural" | "photoshoot">("natural");
-  const [refUrl, setRefUrl] = useState<string | null>(null);
+  const [refPhotos, setRefPhotos] = useState<string[]>([]);
   // twin
   const [twinName, setTwinName] = useState("");
   const [consenting, setConsenting] = useState(false);
@@ -49,7 +49,7 @@ export default function StartPage() {
     router.push(`/setup/influencers/${d.id}`);
   }
 
-  const back = () => { setView("menu"); setErr(""); setConsenting(false); setTwinConsentId(null); setTwinPhotos([]); };
+  const back = () => { setView("menu"); setErr(""); setConsenting(false); setTwinConsentId(null); setTwinPhotos([]); setRefPhotos([]); };
 
   return (
     <div style={{ minHeight: "100vh", position: "relative", overflow: "hidden", background: "#07070E" }} className="flex flex-col items-center justify-center px-6 py-16 text-center">
@@ -83,13 +83,28 @@ export default function StartPage() {
 
         {view === "new" && (
           <Panel title="Build a new influencer" onBack={back}>
-            <p className="text-sm text-ink-dim">Name it and pick the gender. Then write a one-line brief and our co-pilot designs the whole character, or upload a reference to steer the look (we then skip casting and shoot from it).</p>
+            <p className="text-sm text-ink-dim">Name it and pick the gender. Then write a one-line brief and our co-pilot designs the whole character, or upload your own reference images to steer the look (we then lock the identity to those and skip casting).</p>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
               placeholder="Name (e.g. Ava)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
             <GenderToggle value={gender} onChange={setGender} />
             {gender && <LookToggle value={look} onChange={setLook} female={gender === "female"} />}
-            <Uploader kind="reference" label="Reference image (optional)" current={refUrl} onUploaded={setRefUrl} />
-            <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: { ...(refUrl ? { reference_url: refUrl } : {}), gender, look } })} disabled={!name.trim() || !gender || busy}
+            <div>
+              <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Reference images (optional)</div>
+              {refPhotos.length > 0 && (
+                <div className="mb-2 grid grid-cols-4 gap-2">
+                  {refPhotos.map((u, i) => (
+                    <div key={u} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={u} alt={`reference ${i + 1}`} className="aspect-square w-full rounded-lg border border-line object-cover" />
+                      <button onClick={() => setRefPhotos((p) => p.filter((x) => x !== u))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Uploader kind="reference" multiple label={refPhotos.length ? "Add more references" : "Add reference images"} current={null} onUploaded={(u) => setRefPhotos((p) => (u && !p.includes(u) ? [...p, u] : p))} />
+              <p className="mt-1 text-[11px] text-ink-faint">{refPhotos.length ? `${refPhotos.length} added · identity will lock to these (more varied angles = better likeness)` : "Leave empty to cast a fresh face from a brief, or add a few to lock the look."}</p>
+            </div>
+            <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: { ...(refPhotos.length ? { reference_url: refPhotos[0], reference_images: refPhotos } : {}), gender, look } })} disabled={!name.trim() || !gender || busy}
               className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : !gender ? "Pick a gender to continue" : "Create influencer →"}</button>
           </Panel>
         )}
