@@ -2,7 +2,9 @@ import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
-import { rehostToBlob } from "@/lib/blob";
+import { rehostToBlob, putBytes } from "@/lib/blob";
+import { tts } from "@/lib/vendors/elevenlabs";
+import { uploadAudio, generateAvatarVideo, videoStatus } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -612,5 +614,68 @@ export const upscaleCreative = inngest.createFunction(
     const remapped = vs.map((u) => (u === prevUrl ? hosted : u));
     await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, creatives: updated, video_selects: remapped } }));
     return { ok: true };
+  },
+);
+
+// PHASE 2 — A-ROLL: one lip-synced talking-influencer clip. Durable (HeyGen renders take a few
+// minutes). TTS our ElevenLabs voice -> Blob -> HeyGen talking_photo + that audio -> poll -> save.
+// The route pre-creates the clip {status:"running"}; this updates it to ready/failed by id.
+type ArollClip = { id?: string; url?: string | null; line?: string; ratio?: string; status?: string; error?: string | null; at?: number; [k: string]: unknown };
+export const generateAroll = inngest.createFunction(
+  { id: "generate-aroll", retries: 1, triggers: [{ event: "influencer/generate.aroll" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const clipId = String(event.data.clipId || "");
+    const line = String(event.data.line || "").trim();
+    const ratio = String(event.data.ratio || "9:16");
+    const setClip = async (patch: Partial<ArollClip>) => {
+      const fresh = (((await getInfluencer(influencerId))?.persona as Record<string, unknown>) || {});
+      const list = (Array.isArray(fresh.aroll) ? fresh.aroll : []) as ArollClip[];
+      const updated = list.map((c) => ((c.id || "") === clipId ? { ...c, ...patch } : c));
+      await updateInfluencer(influencerId, { persona: { ...fresh, aroll: updated } });
+    };
+
+    const inf = await step.run("load", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const voiceId = persona.voice_id as string | undefined;
+    const hero = (persona.face_card_url || persona.hero_url || persona.reference_url || (Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean }[]).find((r) => r.hero)?.url : "")) as string;
+    if (!voiceId) { await step.run("no-voice", () => setClip({ status: "failed", error: "No voice yet — create the influencer's voice first." })); return { error: "no voice" }; }
+    if (!line) { await step.run("no-line", () => setClip({ status: "failed", error: "No line to say." })); return { error: "no line" }; }
+    if (!hero) { await step.run("no-hero", () => setClip({ status: "failed", error: "No hero image to drive the presenter." })); return { error: "no hero" }; }
+
+    try {
+      // 1. Talking Photo (create once per influencer, reuse).
+      let tpId = persona.heygen_talking_photo_id as string | undefined;
+      if (!tpId) {
+        tpId = await step.run("talking-photo", () => createTalkingPhoto(hero));
+        const fresh = (((await step.run("reload-tp", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+        await step.run("save-tp", () => updateInfluencer(influencerId, { persona: { ...fresh, heygen_talking_photo_id: tpId } }));
+      }
+      // 2. TTS our voice -> public Blob mp3 (HeyGen fetches it).
+      const audioUrl = await step.run("tts", async () => putBytes(await tts(voiceId, line), "aroll-audio", "mp3", "audio/mpeg"));
+      await step.run("usage-tts", () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }));
+      // 3. HeyGen: upload audio + generate the talking clip.
+      const assetId = await step.run("upload-audio", () => uploadAudio(audioUrl));
+      const videoId = await step.run("gen-video", () => generateAvatarVideo({ talkingPhotoId: tpId as string, audioAssetId: assetId, ratio }));
+      // 4. Poll the render (a few minutes).
+      const result = await step.run("poll-video", async () => {
+        for (let i = 0; i < 60; i++) {
+          if (i) await new Promise((r) => setTimeout(r, 5000));
+          const s = await videoStatus(videoId).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null }));
+          if (s.url) return { url: s.url, error: null as string | null };
+          if (s.status === "failed") return { url: null as string | null, error: s.error };
+        }
+        return { url: null as string | null, error: "render timed out" };
+      });
+      if (!result.url) { await step.run("render-fail", () => setClip({ status: "failed", error: (result.error || "render failed").slice(0, 200) })); return { ok: false }; }
+      await step.run("usage-video", () => recordUsage({ influencerId, provider: "heygen", model: "talking_photo", unit: "video", action: "presenter", count: 1 }));
+      const hosted = (await step.run("rehost", () => rehostToBlob(result.url as string, "aroll").catch(() => null))) || (result.url as string);
+      await step.run("save-clip", () => setClip({ status: "ready", url: hosted, error: null }));
+      return { ok: true };
+    } catch (e) {
+      await step.run("fail", () => setClip({ status: "failed", error: String((e as Error)?.message || e).slice(0, 200) }));
+      throw e;
+    }
   },
 );

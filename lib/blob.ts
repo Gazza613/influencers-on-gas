@@ -5,6 +5,14 @@ import { isSafePublicUrl } from "./safe-url";
 // always loadable in an <img> tag. Vendor CDNs (Higgsfield, upscale outputs) can expire,
 // require auth, or serve as attachments — re-hosting once at generation time fixes that
 // for good. Returns the Blob URL, or null if the source couldn't be fetched.
+// Upload raw bytes to public Blob and return the URL (e.g. a generated TTS mp3 that another
+// vendor, like HeyGen, then needs to fetch by URL).
+export async function putBytes(buf: Buffer, prefix: string, ext: string, contentType: string): Promise<string> {
+  const key = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const r = await put(key, buf, { access: "public", contentType, addRandomSuffix: false });
+  return r.url;
+}
+
 export async function rehostToBlob(url: string, prefix = "creatives"): Promise<string | null> {
   if (!isSafePublicUrl(url)) return null; // SSRF guard
   try {
