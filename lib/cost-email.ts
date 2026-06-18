@@ -1,4 +1,5 @@
 import type { CostReport } from "@/lib/usage";
+import { emailShell } from "./email-shell";
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PROVIDER_LABEL: Record<string, string> = {
@@ -42,17 +43,7 @@ export function buildCostEmail(opts: {
   const { report, monthReport, remaining, monthly, periodLabel } = opts;
   const usedPct = remaining != null ? Math.max(0, Math.min(100, Math.round(((monthly - remaining) / monthly) * 100))) : null;
 
-  const html = `
-  <div style="background:#07090d;padding:24px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-    <div style="max-width:640px;margin:0 auto;padding:0 18px;">
-      <div style="text-align:center;padding:8px 0 18px;">
-        <img src="${BASE}/gas-logo.png" width="68" height="68" style="border-radius:50%;" alt="GAS" />
-        <div style="margin-top:12px;font-size:26px;font-weight:800;letter-spacing:-0.5px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-          <span style="background:linear-gradient(135deg,#ffb020,#ff6a00 45%,#ff2d55);-webkit-background-clip:text;background-clip:text;color:#ff6a00;">Influencers on GAS</span>
-        </div>
-        <div style="margin-top:5px;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#8a8f98;">Daily Cost Control · ${periodLabel}</div>
-      </div>
-
+  const body = `
       <!-- Hero numbers -->
       <div style="display:flex;gap:10px;">
         <div style="flex:1;border:1px solid rgba(168,85,247,0.3);border-radius:14px;padding:14px;background:rgba(168,85,247,0.06);">
@@ -76,9 +67,8 @@ export function buildCostEmail(opts: {
       <div style="text-align:center;margin-top:18px;">
         <a href="${BASE}/cost-control" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 28px;border-radius:99px;">Open Cost Control →</a>
       </div>
-      <div style="text-align:center;margin-top:16px;font-size:11px;color:#6b7280;">Sent daily from Influencers on GAS · Higgsfield Ultra $375 / 9,000 credits (≈ R0.77/credit).</div>
-    </div>
-  </div>`;
+      <div style="text-align:center;margin-top:14px;font-size:11px;color:#6b7280;">Higgsfield Ultra $375 / 9,000 credits.</div>`;
 
+  const html = emailShell({ strapline: "GAS Daily Cost Control", dateLabel: periodLabel, body, cadence: "DAILY COST CONTROL, 07:30 SAST" });
   return { subject: `Cost Control · ${rand(report.total.cents)} spent ${periodLabel.toLowerCase()} · ${rand(monthReport.total.cents)} MTD`, html };
 }
