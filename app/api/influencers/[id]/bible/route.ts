@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { generateBible, generateTagline } from "@/lib/vendors/anthropic";
+import { generateBible, generateTagline, friendlyAnthropicError } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
 
 // Claude expands a short brief into the full Character Bible (one-off, ~20-40s).
@@ -42,6 +42,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "bible", action: "bible", count: 1 }).catch(() => {});
     return NextResponse.json({ bible });
   } catch (e) {
-    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
+    return NextResponse.json({ error: friendlyAnthropicError(e) }, { status: 500 });
   }
 }

@@ -321,3 +321,14 @@ export async function composeCreativeScene(opts: { bible: Record<string, unknown
     return null;
   }
 }
+
+// Map raw Anthropic SDK errors to a clear, user-facing message. The most common one in
+// practice is an empty account balance, which reads as a cryptic 400 otherwise.
+export function friendlyAnthropicError(e: unknown): string {
+  const m = String((e as Error)?.message || e || "").toLowerCase();
+  if (m.includes("credit") || m.includes("billing") || m.includes("insufficient") || m.includes("balance"))
+    return "The AI co-pilot (Anthropic) is out of credits. Top up the Anthropic account for this key, then try again.";
+  if (m.includes("rate") && m.includes("limit")) return "The AI co-pilot is rate-limited right now. Wait a moment and try again.";
+  if (m.includes("not connected") || m.includes("api key") || m.includes("authentication")) return "The AI co-pilot (Anthropic) is not connected. Check ANTHROPIC_API_KEY.";
+  return String((e as Error)?.message || e).slice(0, 200);
+}

@@ -458,6 +458,12 @@ export const generateCreatives = inngest.createFunction(
         const prompts = Array.from({ length: perRatio }, (_, i) => buildPrompt(i, ratio));
         const selectedModel = genModel;
         const rawProduced = await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra));
+        // Retry any shot that came back with no image once (transient Higgsfield failures).
+        if (rawProduced.some((u) => !u)) {
+          const idx = rawProduced.map((u, i) => (u ? -1 : i)).filter((i) => i >= 0);
+          const retried = await step.run(`gen-retry-${rid}`, () => generateBatch(idx.map((i) => prompts[i]), genModel, ratio, extra));
+          idx.forEach((i, k) => { if (retried[k]) rawProduced[i] = retried[k]; });
+        }
         const produced = rawProduced.filter((u): u is string => !!u);
         const valid = produced.length ? await step.run(`validate-${rid}`, () => filterLoadable(produced)) : [];
         const validSet = new Set(valid);
