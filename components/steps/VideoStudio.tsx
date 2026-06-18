@@ -102,6 +102,10 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
     setPreviewing(false);
     if (r?.url) setPreviewUrl(r.url); else setErr(r?.error || "Could not preview the read.");
   }
+  async function deleteClip(clipId: string) {
+    setClips((cs) => cs.filter((c) => (c.id || "") !== clipId)); // optimistic
+    await fetch(`/api/influencers/${influencerId}/aroll?clipId=${encodeURIComponent(clipId)}`, { method: "DELETE" }).catch(() => {});
+  }
   async function generate() {
     const text = effectiveLine();
     if (!text || gen) return;
@@ -234,7 +238,11 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Clips · {clips.length}</div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {clips.map((c, i) => (
-              <div key={c.id || i} className="overflow-hidden rounded-lg border border-line bg-surface-2">
+              <div key={c.id || i} className="group relative overflow-hidden rounded-lg border border-line bg-surface-2">
+                {c.status !== "running" && c.id && (
+                  <button onClick={() => deleteClip(c.id as string)} title="Delete this clip"
+                    className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-alert/60 bg-black/60 text-xs text-alert opacity-0 transition hover:bg-alert/20 group-hover:opacity-100">✕</button>
+                )}
                 {c.status === "ready" && c.url ? (
                   <video src={c.url} controls playsInline className="aspect-[9/16] w-full bg-black object-cover" />
                 ) : c.status === "failed" ? (

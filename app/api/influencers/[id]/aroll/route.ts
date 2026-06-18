@@ -9,6 +9,22 @@ export const maxDuration = 30;
 
 type ArollClip = { id?: string; status?: string; [k: string]: unknown };
 
+// Delete an a-roll clip the producer doesn't like. Removed clips never reach the showreel
+// (clips are drafts; the showreel is an explicit accept/decline at the END of production).
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const inf = await getInfluencer(id);
+  if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const persona = (inf.persona ?? {}) as Record<string, unknown>;
+  const clipId = new URL(req.url).searchParams.get("clipId") || "";
+  const list = (Array.isArray(persona.aroll) ? persona.aroll : []) as ArollClip[];
+  const kept = list.filter((c) => (c.id || "") !== clipId);
+  await updateInfluencer(id, { persona: { ...persona, aroll: kept } });
+  return NextResponse.json({ ok: true, aroll: kept });
+}
+
 // Current voice + a-roll clips (for polling).
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
