@@ -75,8 +75,9 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
       await new Promise((r) => setTimeout(r, 5000));
       const d = await fetch(`/api/influencers/${influencerId}/aroll`).then((r) => r.json()).catch(() => null);
       if (d?.aroll) {
-        setClips(d.aroll);
-        if (d.voice) setVoice(d.voice);
+        // Only update state when the data actually changed, so scrolling isn't jolted by needless re-renders.
+        setClips((prev) => (JSON.stringify(prev) === JSON.stringify(d.aroll) ? prev : d.aroll));
+        if (d.voice) setVoice((prev) => (prev?.id === d.voice.id ? prev : d.voice));
         if (!d.aroll.some((c: Clip) => c.status === "running")) break;
       }
     }
@@ -207,7 +208,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button onClick={preview} disabled={!voice || !effectiveLine() || previewing} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-50">{previewing ? "Generating preview…" : "▶ Preview the read"}</button>
-          {previewUrl && <audio src={previewUrl} controls autoPlay className="h-9" />}
+          {previewUrl && <audio src={previewUrl} controls className="h-9" />}
         </div>
 
         {/* Source shot — we animate THIS exact frame, so scene + aspect come from it */}
