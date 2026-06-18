@@ -258,7 +258,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
 
         {/* Source shot — we animate THIS exact frame, so scene + aspect come from it */}
         <div className="mt-4 border-t border-line pt-3">
-          <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Choose the shot to animate {sourceUrl ? `· ${ratio}` : ""}</div>
+          <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Choose any shot to animate (1:1 or 9:16) {sourceUrl ? `· selected ${ratio}` : ""}</div>
           {sources.length === 0 ? (
             <p className="text-[12px] text-ink-faint">No creatives yet. Render some in the Creatives tab first, then pick one here to bring it to life.</p>
           ) : (
