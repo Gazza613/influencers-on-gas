@@ -66,6 +66,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [status, setStatus] = useState(initial.status || "idle");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [broken, setBroken] = useState<Set<string>>(new Set());
+  const [upscaling, setUpscaling] = useState<Set<string>>(new Set());
   const [err, setErr] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
 
@@ -187,12 +188,106 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setVideoSelects(next); setPicked(new Set());
     await patchPersona({ video_selects: next });
   }
+  // Upscale the selected 2K keepers to 4K on demand (one paid upscale each, only on shots
+  // the producer actually chose). Each upgraded shot moves to the 4K Finals section.
+  async function upscalePicked() {
+    const ids = creatives.filter((c) => picked.has(c.id || "") && !!c.url && c.resolution !== "4k").map((c) => c.id || "");
+    if (!ids.length) return;
+    setUpscaling((s) => new Set([...s, ...ids]));
+    setPicked(new Set());
+    for (const cid of ids) {
+      const r = await fetch(`/api/influencers/${influencerId}/creatives/upscale`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: cid }),
+      }).then((x) => x.json()).catch(() => null);
+      if (r?.creative) setCreatives((cs) => cs.map((c) => ((c.id || "") === cid ? { ...c, ...r.creative } : c)));
+      else setErr("A 4K upscale did not come back, please try that shot again.");
+      setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; });
+    }
+  }
+  // Finish-based grade: 4K = green Excellent; 2K keeper = orange Good; QA-flagged = red Average.
+  function gradeOf(c: Creative): { t: string; cls: string } {
+    if (c.resolution === "4k") return { t: "Excellent", cls: "bg-ready/85 shadow-[0_0_10px_rgba(52,199,89,0.6)]" };
+    const s = c.qa?.score10 ?? 7;
+    if (c.status === "failed_qa" || s < 6) return { t: "Average", cls: "bg-alert/85" };
+    return { t: "Good", cls: "bg-[#ff6a00] shadow-[0_0_10px_rgba(255,106,0,0.75)]" };
+  }
+  const renderTile = (c: Creative, i: number) => {
+    const id = c.id || `${c.url || "none"}-${i}`;
+    const sel = picked.has(id);
+    const forVideo = !!c.url && videoSelects.includes(c.url);
+    const canPick = !!c.url && !broken.has(c.url);
+    const u = c.url || "";
+    const busy = upscaling.has(id);
+    const g = gradeOf(c);
+    return (
+      <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
+        {!c.url ? (
+          <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
+            <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">generation failed</span>
+            <span>{c.error || "No image returned"}</span>
+          </div>
+        ) : broken.has(u) ? (
+          <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
+            <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">image failed to load</span>
+            <span>{c.error || "image didn&apos;t load"}</span>
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={u} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(u)} onError={() => setBroken((b) => new Set(b).add(u))} />
+        )}
+        {busy && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 bg-black/60 text-[10px] font-semibold text-white">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            upscaling to 4K…
+          </div>
+        )}
+        {canPick ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); togglePick(id); }}
+            aria-pressed={sel}
+            title={sel ? "Selected" : "Select this shot"}
+            className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"}`}
+          >✓</button>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); removeOne(id); }}
+            title="Delete this failed shot"
+            className="absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-alert/70 bg-black/60 text-sm text-alert transition hover:bg-alert/20 active:scale-90"
+          >✕</button>
+        )}
+        <div className="absolute left-1.5 top-1.5 flex gap-1">
+          <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
+          <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
+        </div>
+        {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
+        {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (
+          <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
+            {g.t}
+          </span>
+        )}
+        {c.url && !broken.has(c.url) && c.status === "failed_generation" && (
+          <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-alert" title={c.error || "Generation failed"}>
+            failed
+          </span>
+        )}
+        {c.url && !broken.has(c.url) && (
+          <button onClick={() => setZoom(c.url)} title="Review full size"
+            className="absolute inset-0 m-auto hidden h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/55 text-lg text-white backdrop-blur-sm transition group-hover:flex hover:bg-black/75">👁</button>
+        )}
+      </div>
+    );
+  };
 
   const visible = creatives.filter((c) => {
     if (view === "passed") return c.status === "approved";
     if (view === "needs") return c.status === "failed_qa" || c.status === "failed_generation";
     return true;
   });
+  // Split into 2K previews (plus any failed shots, which keep their delete control) and 4K finals.
+  const isFourK = (c: Creative) => !!c.url && !broken.has(c.url) && c.resolution === "4k";
+  const fourK = visible.filter(isFourK);
+  const twoK = visible.filter((c) => !isFourK(c));
+  const pickedTwoK = creatives.some((c) => picked.has(c.id || "") && !!c.url && c.resolution !== "4k");
 
   return (
     <div className="space-y-5">
@@ -394,79 +489,26 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
             {picked.size > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-ink-dim">{picked.size} selected</span>
+                {pickedTwoK && <button onClick={upscalePicked} className="rounded-md border border-[#a855f7]/50 px-2.5 py-1 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">↑ Upscale to 4K</button>}
                 <button onClick={markForVideo} className="rounded-md border border-ready/40 px-2.5 py-1 text-xs font-semibold text-ready hover:bg-ready/10">★ For video</button>
                 <button onClick={removePicked} className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-alert/50 hover:text-alert">Remove</button>
                 <button onClick={() => setPicked(new Set())} className="text-xs text-ink-faint hover:text-ink">clear</button>
               </div>
             )}
           </div>
-          <p className="mb-3 text-[11px] text-ink-faint">Tap the tick to select shots, then ★ keep your best for video production, or remove the ones you don&apos;t want and generate more. Click an image to view full size and download.</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {visible.map((c, i) => {
-              const id = c.id || `${c.url || "none"}-${i}`;
-              const sel = picked.has(id);
-              const forVideo = !!c.url && videoSelects.includes(c.url);
-              // Any shot that produced an image can be selected and downloaded, even if QA
-              // scored it lower, some lower-scored shots are still perfectly usable.
-              const canPick = !!c.url && !broken.has(c.url);
-              const u = c.url || ""; // stable non-null url for closures/handlers
-              return (
-                <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
-                  {!c.url ? (
-                    <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
-                      <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">generation failed</span>
-                      <span>{c.error || "No image returned"}</span>
-                    </div>
-                  ) : broken.has(u) ? (
-                    <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
-                      <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">image failed to load</span>
-                      <span>{c.error || "image didn&apos;t load"}</span>
-                    </div>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={u} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(u)} onError={() => setBroken((b) => new Set(b).add(u))} />
-                  )}
-                  {canPick ? (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); togglePick(id); }}
-                      aria-pressed={sel}
-                      title={sel ? "Selected" : "Select this shot"}
-                      className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"}`}
-                    >✓</button>
-                  ) : (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removeOne(id); }}
-                      title="Delete this failed shot"
-                      className="absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-alert/70 bg-black/60 text-sm text-alert transition hover:bg-alert/20 active:scale-90"
-                    >✕</button>
-                  )}
-                  <div className="absolute left-1.5 top-1.5 flex gap-1">
-                    <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
-                    <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
-                  </div>
-                  {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
-                  {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (() => {
-                    const s = c.qa?.score10 ?? 7;
-                    const g = s >= 8 ? { t: "Great", cls: "bg-ready/85" } : s >= 6 ? { t: "Good", cls: "bg-[#ff6a00] shadow-[0_0_10px_rgba(255,106,0,0.75)]" } : { t: "Average", cls: "bg-alert/85" };
-                    return (
-                      <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
-                        {g.t}
-                      </span>
-                    );
-                  })()}
-                  {c.url && !broken.has(c.url) && c.status === "failed_generation" && (
-                    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-alert" title={c.error || "Generation failed"}>
-                      failed
-                    </span>
-                  )}
-                  {c.url && !broken.has(c.url) && (
-                    <button onClick={() => setZoom(c.url)} title="Review full size"
-                      className="absolute inset-0 m-auto hidden h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/55 text-lg text-white backdrop-blur-sm transition group-hover:flex hover:bg-black/75">👁</button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <p className="mb-3 text-[11px] text-ink-faint">Shots render fast in 2K. Tick the keepers, then <span className="text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). Upgraded shots move to 4K Finals. ★ keep your best for video, or remove the rest. Click an image to view full size and download.</p>
+          {twoK.length > 0 && (
+            <div className="mb-5">
+              <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}</div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">{twoK.map(renderTile)}</div>
+            </div>
+          )}
+          {fourK.length > 0 && (
+            <div>
+              <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ready">★ 4K finals · {fourK.length}</div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">{fourK.map(renderTile)}</div>
+            </div>
+          )}
         </div>
       )}
 
