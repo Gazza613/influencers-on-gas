@@ -321,7 +321,7 @@ export async function composeCreativeScene(opts: { bible: Record<string, unknown
         "Expand the producer's brief into a single vivid paragraph covering: the setting and time of day, the wardrobe (specific garments, fabric, colour, how worn), the pose and action, the mood, and the natural lighting. Keep the producer's specifics; fill gaps tastefully from the persona. " +
         (opts.cinematic ? "Cinematic film mood. " : "A natural, candid, everyday iPhone-snapshot mood, not a posed studio shoot. ") +
         (opts.extras ? "Include a believable, busy background crowd composed of roughly 70% white people and 30% black people, with an even 50/50 split of men and women of varied ages, and a mix of individuals, couples and small groups, all fully clothed and in sharp focus. " : "No other people in the scene. ") +
-        "Everyone is always fully clothed in complete outfits. Under 120 words. UK spelling, no em dashes. Output ONLY the paragraph, no preamble.",
+        "Everyone is always fully clothed in complete outfits. Keep poses fresh and natural with hands relaxed; do NOT use the clichéd pose of a hand raised to shield or shade the eyes from the sun, and never describe squinting into the sun. Under 120 words. UK spelling, no em dashes. Output ONLY the paragraph, no preamble.",
       messages: [{ role: "user", content: `Influencer persona: ${persona || "not specified"}\n\nProducer brief: ${opts.scene}\n\nWrite the scene paragraph.` }],
     });
     const block = res.content.find((b) => b.type === "text");
