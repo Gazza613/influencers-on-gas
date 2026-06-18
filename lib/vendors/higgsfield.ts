@@ -190,18 +190,31 @@ async function acquireSlot(): Promise<void> {
 function releaseSlot(): void { _active = Math.max(0, _active - 1); const next = _queue.shift(); if (next) next(); }
 
 export async function generateBatch(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}): Promise<(string | null)[]> {
+  return (await generateBatchDetailed(prompts, model, aspectRatio, extra)).map((r) => r.url);
+}
+
+// Same as generateBatch but returns the failure REASON per prompt (raw Higgsfield response or
+// error), so the UI can show why a shot did not render instead of a generic "no image".
+export async function generateBatchDetailed(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}): Promise<{ url: string | null; error: string | null }[]> {
   const base = { ...baseParams(model, aspectRatio), ...extra };
+  const once = async (p: string): Promise<{ url: string | null; error: string | null }> => {
+    const { call } = await openSession();
+    const r = await call("generate_image", { params: { ...base, prompt: p } });
+    let url: string | null = extractImageUrls(r)[0] ?? null;
+    const jobId = extractJobIds(r)[0] ?? null;
+    if (!url && jobId) url = await pollJob(call, jobId);
+    if (url) return { url, error: null };
+    const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+    return { url: null, error: `no image [${aspectRatio}]: ${raw}`.slice(0, 280) };
+  };
   // Each prompt gets its OWN MCP session; concurrency is capped so jobs aren't dropped.
   return Promise.all(prompts.map(async (p) => {
     await acquireSlot();
     try {
-      const { call } = await openSession();
-      const r = await call("generate_image", { params: { ...base, prompt: p } });
-      let url: string | null = extractImageUrls(r)[0] ?? null;
-      const jobId = extractJobIds(r)[0] ?? null;
-      if (!url && jobId) url = await pollJob(call, jobId);
-      return url;
-    } catch { return null; } finally { releaseSlot(); }
+      let res = await once(p).catch((e) => ({ url: null as string | null, error: String((e as Error)?.message || e).slice(0, 280) }));
+      if (!res.url) res = await once(p).catch((e) => ({ url: null as string | null, error: String((e as Error)?.message || e).slice(0, 280) })); // one transient retry
+      return res;
+    } finally { releaseSlot(); }
   }));
 }
 

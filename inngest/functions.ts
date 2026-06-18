@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
-import { createFaceElement, generateBatch, generateAngles2_0, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob } from "@/lib/blob";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -465,13 +465,10 @@ export const generateCreatives = inngest.createFunction(
         const rid = ratio.replace(/:/g, "x"); // safe slug for Inngest step IDs (no colons)
         const prompts = Array.from({ length: perRatio }, (_, i) => buildPrompt(i, ratio));
         const selectedModel = genModel;
-        const rawProduced = await step.run(`gen-${rid}`, () => generateBatch(prompts, genModel, ratio, extra));
-        // Retry any shot that came back with no image once (transient Higgsfield failures).
-        if (rawProduced.some((u) => !u)) {
-          const idx = rawProduced.map((u, i) => (u ? -1 : i)).filter((i) => i >= 0);
-          const retried = await step.run(`gen-retry-${rid}`, () => generateBatch(idx.map((i) => prompts[i]), genModel, ratio, extra));
-          idx.forEach((i, k) => { if (retried[k]) rawProduced[i] = retried[k]; });
-        }
+        // Detailed gen captures the failure REASON per shot (it also retries once internally).
+        const detailed = await step.run(`gen-${rid}`, () => generateBatchDetailed(prompts, genModel, ratio, extra));
+        const rawProduced = detailed.map((d) => d.url);
+        const genErrors = detailed.map((d) => d.error);
         const produced = rawProduced.filter((u): u is string => !!u);
         const valid = produced.length ? await step.run(`validate-${rid}`, () => filterLoadable(produced)) : [];
         const validSet = new Set(valid);
@@ -484,7 +481,7 @@ export const generateCreatives = inngest.createFunction(
           step.run(`finalize-${rid}-${k}`, async () => {
             const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
             if (!sourceUrl) {
-              return { id, url: null, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: "generation returned no image" } as Creative;
+              return { id, url: null, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: genErrors[k] || "generation returned no image" } as Creative;
             }
 
             if (!validSet.has(sourceUrl)) {
