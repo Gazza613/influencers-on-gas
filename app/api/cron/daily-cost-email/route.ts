@@ -13,7 +13,7 @@ export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const session = await auth();
-  if (!cronAuthed(req) && !session?.user) return NextResponse.json({ error: "forbidden" }, { status: 401 });
+  if (!cronAuthed(req) && session?.user?.role !== "super_admin") return NextResponse.json({ error: "forbidden" }, { status: 401 }); // manual trigger: super-admin only (these can spend money)
 
   try {
     const to = process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";

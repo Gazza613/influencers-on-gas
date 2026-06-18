@@ -127,7 +127,13 @@ export const buildIdentity = inngest.createFunction(
 
     if (anchored) {
       const valid = await step.run("validate-twin-photos", () => filterLoadable(twinPhotos));
-      const photos = valid.length ? valid : twinPhotos;
+      // If NONE of the uploaded photos load, don't save dead frames as "ready" (the influencer
+      // would look built with a broken hero). Surface a clear error so the user re-uploads.
+      if (!valid.length) {
+        await step.run("anchor-failed", () => updateInfluencer(influencerId, { status: "gen_failed", persona: { ...persona, soul_error: "None of the uploaded reference photos could be loaded. Please re-upload clear images." } }));
+        return { error: "no loadable reference photos" };
+      }
+      const photos = valid;
       const twinFrames = photos.map((url, i) => ({ url, ...(i === 0 ? { hero: true, face: true } : {}) }));
       await step.run("save-twin-frames", () =>
         updateInfluencer(influencerId, {
@@ -272,7 +278,7 @@ export const ingestSource = inngest.createFunction(
 
       // ingestChunks embeds in batches; can take a while on the free tier (429 retries).
       const stored = await step.run("embed-store", () => ingestChunks(clientId, sourceId, items));
-      await step.run("usage-embed", () => recordUsage({ clientId, provider: "voyage", model: "voyage-3.5", unit: "embed", action: "ingest", count: stored }));
+      await step.run("usage-embed", () => recordUsage({ clientId, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "ingest", count: stored }));
       await step.run("mark-indexed", () => setSourceStatus(sourceId, "indexed"));
       return { ok: true, chunks: stored };
     } catch (e) {
@@ -470,15 +476,21 @@ export const generateCreatives = inngest.createFunction(
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
         const rid = ratio.replace(/:/g, "x"); // safe slug for Inngest step IDs (no colons)
         const prompts = Array.from({ length: perRatio }, (_, i) => buildPrompt(i, ratio));
-        const selectedModel = genModel;
-        // Detailed gen captures the failure REASON per shot (it also retries once internally).
+        // Detailed gen captures the failure REASON and the model ACTUALLY used per shot (it
+        // also retries once internally and self-heals to the fallback model).
         const detailed = await step.run(`gen-${rid}`, () => generateBatchDetailed(prompts, genModel, ratio, extra, CREATIVE_FALLBACK));
         const rawProduced = detailed.map((d) => d.url);
         const genErrors = detailed.map((d) => d.error);
         const produced = rawProduced.filter((u): u is string => !!u);
         const valid = produced.length ? await step.run(`validate-${rid}`, () => filterLoadable(produced)) : [];
         const validSet = new Set(valid);
-        if (produced.length) await step.run(`usage-gen-${rid}`, () => recordUsage({ influencerId, provider: "higgsfield", model: selectedModel, unit: "image", action: "creative", count: produced.length }));
+        // Meter by the REAL model that produced each shot, so a fallback to the costed model
+        // is not invisibly billed as the free primary.
+        const byModel: Record<string, number> = {};
+        for (const d of detailed) if (d.url) byModel[d.model] = (byModel[d.model] || 0) + 1;
+        for (const [mdl, n] of Object.entries(byModel)) {
+          await step.run(`usage-gen-${rid}-${mdl}`, () => recordUsage({ influencerId, provider: "higgsfield", model: mdl, unit: "image", action: "creative", count: n }));
+        }
         // AI Vision QA (Claude Haiku) runs once per loadable shot, meter it so it appears in Cost Control.
         if (valid.length) await step.run(`usage-qa-${rid}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: valid.length }));
         // Per attempt: failed generation stays visible, QA gets a score, and only approved

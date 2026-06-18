@@ -1,5 +1,6 @@
 import { imageSize } from "image-size";
 import { getValidHFAccessToken } from "../hf-token";
+import { isSafePublicUrl } from "../safe-url";
 
 // Server-side Higgsfield MCP client (ported from the proven Vite integration).
 // Calls mcp.higgsfield.ai directly with the centralized OAuth bearer token.
@@ -197,20 +198,22 @@ export async function generateBatch(prompts: string[], model = "gpt_image_2", as
 // error), so the UI can show why a shot did not render instead of a generic "no image".
 // `fallbackModel`: if the primary model yields no image (e.g. an unknown model id, or an
 // aspect it rejects), retry once on a known-good model so a model swap can never hard-break.
-export async function generateBatchDetailed(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}, fallbackModel: string | null = null): Promise<{ url: string | null; error: string | null }[]> {
-  const run = async (p: string, mdl: string): Promise<{ url: string | null; error: string | null }> => {
+export async function generateBatchDetailed(prompts: string[], model = "gpt_image_2", aspectRatio = "9:16", extra: AnyObj = {}, fallbackModel: string | null = null): Promise<{ url: string | null; error: string | null; model: string }[]> {
+  const run = async (p: string, mdl: string): Promise<{ url: string | null; error: string | null; model: string }> => {
     const base = { ...baseParams(mdl, aspectRatio), ...extra };
     const { call } = await openSession();
     const r = await call("generate_image", { params: { ...base, prompt: p } });
     let url: string | null = extractImageUrls(r)[0] ?? null;
     const jobId = extractJobIds(r)[0] ?? null;
     if (!url && jobId) url = await pollJob(call, jobId);
-    if (url) return { url, error: null };
+    if (url) return { url, error: null, model: mdl };
     const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
-    return { url: null, error: `no image [${mdl} ${aspectRatio}]: ${raw}`.slice(0, 280) };
+    return { url: null, error: `no image [${mdl} ${aspectRatio}]: ${raw}`.slice(0, 280), model: mdl };
   };
-  const once = (p: string, mdl: string) => run(p, mdl).catch((e) => ({ url: null as string | null, error: `[${mdl}] ${String((e as Error)?.message || e)}`.slice(0, 280) }));
+  const once = (p: string, mdl: string) => run(p, mdl).catch((e) => ({ url: null as string | null, error: `[${mdl}] ${String((e as Error)?.message || e)}`.slice(0, 280), model: mdl }));
   // Each prompt gets its OWN MCP session; concurrency is capped so jobs aren't dropped.
+  // `model` in the result is the model that actually produced the image (or the last tried),
+  // so callers meter the REAL model when the self-healing fallback kicks in.
   return Promise.all(prompts.map(async (p) => {
     await acquireSlot();
     try {
@@ -327,6 +330,7 @@ export async function filterLoadable(urls: string[]): Promise<string[]> {
 
 // Import a public image URL into Higgsfield → media_id (for use as a generation reference).
 export async function importMediaUrl(url: string): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null; // SSRF guard: only fetch public https URLs
   const { call } = await openSession();
   return importMedia(call, url).catch(() => null);
 }
@@ -334,9 +338,10 @@ export async function importMediaUrl(url: string): Promise<string | null> {
 // Native Higgsfield upscale (bytedance) → 2K/4K. Imports the URL, reads its dimensions,
 // submits the upscale, polls for the result. Replaces the external Magnific upscaler.
 export async function upscaleUrlTo(url: string, resolution: "2k" | "4k" = "4k", rounds = 60): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null; // SSRF guard
   let width = 0, height = 0;
   try {
-    const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
+    const buf = Buffer.from(await (await fetch(url, { signal: AbortSignal.timeout(15000) })).arrayBuffer());
     const d = imageSize(buf);
     width = d.width || 0; height = d.height || 0;
   } catch { /* dims unknown */ }

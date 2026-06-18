@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 // Chunks + embeddings cascade. The brain itself stays (use DELETE /api/brains/[id] to remove it).
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session?.user?.role !== "super_admin") return NextResponse.json({ error: "Super admin only" }, { status: 403 });
   const { id } = await params;
   const brain = await getBrain(id);
   if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });

@@ -33,7 +33,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const hosted = (await rehostToBlob(up).catch(() => null)) || up;
   await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: 1 }).catch(() => {});
 
+  const prevUrl = target.url;
   const updated = creatives.map((c) => ((c.id || "") === creativeId ? { ...c, url: hosted, resolution: "4k" } : c));
-  await updateInfluencer(id, { persona: { ...persona, creatives: updated } });
+  // Keep any "for video" selection pointing at the new 4K url, not the dead 2K one.
+  const videoSelects = (Array.isArray(persona.video_selects) ? persona.video_selects : []) as string[];
+  const remappedSelects = videoSelects.map((u) => (u === prevUrl ? hosted : u));
+  await updateInfluencer(id, { persona: { ...persona, creatives: updated, video_selects: remappedSelects } });
   return NextResponse.json({ creative: updated.find((c) => (c.id || "") === creativeId) });
 }

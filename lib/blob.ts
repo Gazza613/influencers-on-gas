@@ -1,10 +1,12 @@
 import { put } from "@vercel/blob";
+import { isSafePublicUrl } from "./safe-url";
 
 // Re-host a remote image onto Vercel Blob so the stored URL is permanent, public and
 // always loadable in an <img> tag. Vendor CDNs (Higgsfield, upscale outputs) can expire,
 // require auth, or serve as attachments — re-hosting once at generation time fixes that
 // for good. Returns the Blob URL, or null if the source couldn't be fetched.
 export async function rehostToBlob(url: string, prefix = "creatives"): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null; // SSRF guard
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
     if (!res.ok) return null;

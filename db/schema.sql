@@ -272,7 +272,7 @@ create index if not exists idx_balance_snapshots_taken on balance_snapshots(take
 -- Firecrawl scrape rate (Voyage embeddings already seeded at 0). Nominal ZAR estimate
 -- so brain ingestion shows up in Cost Control with real counts.
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
-values ('firecrawl','scrape','page', 0, 15, true)
+values ('firecrawl','scrape','page', 0, 3, true)
 on conflict (provider, model, unit) do nothing;
 
 -- ── Team access (Phase 1b): invited members + passwords ──────────────────────
@@ -332,4 +332,16 @@ create table if not exists app_settings (
 -- per run so the daily research shows in Cost Control.
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
 values ('anthropic','claude-sonnet-4-6','request', 0, 200, true)
+on conflict (provider, model, unit) do nothing;
+
+-- Models the live pipeline actually uses (kept in sync with the live rate_card).
+-- Nano Banana Pro is the primary image engine and is UNLIMITED on our Higgsfield Ultra plan
+-- (0 cost). nano_banana_2 is the billable casting/photoshoot fallback. Scene-writer + Haiku
+-- vision QA are metered too. Firecrawl corrected to ~R0.03/page; Voyage on voyage-4-lite.
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active) values
+  ('higgsfield','nano_banana_pro','image', 0, 0, true),
+  ('higgsfield','nano_banana_2','image', 1, 77, true),
+  ('anthropic','claude-sonnet-4-6','scene', 0, 30, true),
+  ('anthropic','claude-haiku-4-5','image', 0, 5, true),
+  ('voyage','voyage-4-lite','embed', 0, 0, true)
 on conflict (provider, model, unit) do nothing;

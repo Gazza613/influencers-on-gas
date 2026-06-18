@@ -189,16 +189,24 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   // Upscale the selected 2K keepers to 4K on demand (one paid upscale each, only on shots
   // the producer actually chose). Each upgraded shot moves to the 4K Finals section.
   async function upscalePicked() {
-    const ids = creatives.filter((c) => picked.has(c.id || "") && !!c.url && c.resolution !== "4k").map((c) => c.id || "");
+    // Only upscale shots that produced an image and passed QA (don't promote a failed-QA shot
+    // to a green 4K "Excellent"). Skip ones already at 4K.
+    const targets = creatives.filter((c) => picked.has(c.id || "") && !!c.url && c.resolution !== "4k" && c.status === "approved");
+    const ids = targets.map((c) => c.id || "");
     if (!ids.length) return;
     setUpscaling((s) => new Set([...s, ...ids]));
     setPicked(new Set());
     for (const cid of ids) {
+      const prevUrl = creatives.find((c) => (c.id || "") === cid)?.url || "";
       const r = await fetch(`/api/influencers/${influencerId}/creatives/upscale`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: cid }),
       }).then((x) => x.json()).catch(() => null);
-      if (r?.creative) setCreatives((cs) => cs.map((c) => ((c.id || "") === cid ? { ...c, ...r.creative } : c)));
-      else setErr("A 4K upscale did not come back, please try that shot again.");
+      if (r?.creative) {
+        setCreatives((cs) => cs.map((c) => ((c.id || "") === cid ? { ...c, ...r.creative } : c)));
+        // If this shot was already marked for video, point the selection at the new 4K url.
+        const newUrl = r.creative.url as string | undefined;
+        if (newUrl && prevUrl && newUrl !== prevUrl) setVideoSelects((vs) => vs.map((u) => (u === prevUrl ? newUrl : u)));
+      } else setErr("A 4K upscale did not come back, please try that shot again.");
       setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; });
     }
   }
@@ -368,7 +376,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["true", "Include extras", "A diverse SA crowd in the background, in focus"], ["false", "No extras", "Just the influencer, clean background"]] as const).map(([k, label, hint]) => {
+            {([["true", "Include extras", "A diverse crowd in the background, in focus"], ["false", "No extras", "Just the influencer, clean background"]] as const).map(([k, label, hint]) => {
               const on = (k === "true") === extras;
               return (
                 <button key={k} onClick={() => setExtras(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
