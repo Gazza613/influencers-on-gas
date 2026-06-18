@@ -17,7 +17,8 @@ export async function GET(req: Request) {
 
   try {
     const to = process.env.TIPS_EMAIL_TO || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
-    const ideasHtml = await researchHiggsfieldTips();
+    const today = new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
+    const ideasHtml = await researchHiggsfieldTips(today);
     // Meter the research call (Claude + web search) so it shows in Cost Control.
     await recordUsage({ provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "research", count: 1 }).catch(() => {});
 

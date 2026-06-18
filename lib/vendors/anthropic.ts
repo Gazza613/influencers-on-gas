@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "../connections";
+import { PLATFORM_STATE } from "../platform-state";
 
 // Claude (Anthropic), the producer co-pilot brain. Vendor-neutral in the UI.
 // Sonnet 4.6 designs the Character Casting + refines prompts: near-Opus quality for a
@@ -262,29 +263,38 @@ export async function generateBibleSection(
 // latest Higgsfield features, Soul training and prompt best practices, and AI-influencer
 // trends, then turns them into concrete ideas to implement in Influencers on GAS.
 // Returns a clean HTML fragment (list of ideas) for the daily email.
-const TIPS_SYSTEM = `You are the in-house Higgsfield and AI-influencer expert for "Influencers on GAS", an agency platform that builds CONSISTENT AI influencers and their social creatives. Our stack: a brief becomes a Character Bible, then casting (Nano Banana), then a varied multi-angle photoshoot, then a trained Higgsfield Soul (soul_2 for editorial, soul_cinematic for cinematic), then social creatives with optional 4K upscale (bytedance). Identity must stay perfectly consistent; wardrobe and scene are prompt-driven; everyone is always fully clothed; backgrounds stay sharp; background extras reflect South African diversity.
+function tipsSystem(today: string): string {
+  return `You are the in-house Higgsfield and AI-influencer expert for "Influencers on GAS", an agency platform that builds consistent AI influencers and their social creatives. Today is ${today}.
 
-Research the LATEST Higgsfield updates and AI-influencer best practices (new or updated models, Soul training technique, prompt craft, consistency tricks, upscaling, cost and speed), prioritising the last few weeks where possible.
+${PLATFORM_STATE}
 
-STRICT BAR: only surface an idea if it would FUNDAMENTALLY optimise what we have built (a real step change in identity consistency, realism, quality or speed) OR materially improve our COST CONTROL (cheaper or faster models, better credit usage, smarter routing, pricing changes worth acting on). Ignore minor, generic or nice-to-have tips. Quality over quantity: 1 to 3 ideas that truly clear the bar is ideal.
+YOU MUST BE BUILD-AWARE. Before suggesting anything, check it against the CURRENT BUILD above. Do NOT propose anything we have already implemented (e.g. connecting the Higgsfield MCP, or a two-stage prompt writer) or anything we deliberately rejected (e.g. going back to Higgsfield Soul / soul_id for image identity). If a "best practice" you find conflicts with a decision we already made, either skip it or note explicitly why it still might be worth revisiting, do not naively recommend it.
 
-If, after researching, NOTHING today genuinely clears that bar, output EXACTLY this token and nothing else: NO_SIGNIFICANT_FINDINGS
+Research the LATEST Higgsfield updates and AI-influencer best practices (new or updated models, prompt craft, consistency tricks, upscaling, cost and speed), prioritising the last few weeks. Use web search and rely on what you can actually verify.
 
-Otherwise, for each qualifying idea output exactly:
+STRICT BAR: only surface an idea if it (a) FITS our actual build, (b) is NOT already done or deliberately rejected, and (c) would either FUNDAMENTALLY optimise what we have built (a real step change in identity consistency, realism, quality or speed) OR materially improve COST CONTROL without compromising quality. Quality over quantity: 0 to 3 ideas is ideal. It is completely fine to return nothing.
+
+If nothing today genuinely clears that bar, output EXACTLY this token and nothing else: NO_SIGNIFICANT_FINDINGS
+
+Otherwise, for each qualifying idea output EXACTLY this block (and nothing else):
 <h3 style="margin:16px 0 4px;font-size:15px;color:#e6e8eb;">[short punchy title]</h3>
-<p style="margin:0 0 6px;color:#b8bcc4;font-size:13px;line-height:1.5;">[what it is and why it is a step change for us, 1 to 2 sentences]</p>
-<p style="margin:0 0 2px;color:#8a8f98;font-size:12px;"><b style="color:#c79bff;">Implement:</b> [a specific, practical step for our platform]</p>
+<p style="margin:0 0 6px;color:#b8bcc4;font-size:13px;line-height:1.5;">[what it is and why it is a step change for OUR build specifically, 1 to 2 sentences]</p>
+<p style="margin:0 0 2px;color:#8a8f98;font-size:12px;"><b style="color:#c79bff;">Implement:</b> [a specific, practical step for our actual stack]</p>
+<p style="margin:0 0 2px;color:#6b7280;font-size:11px;"><b>Source:</b> [the source publication or site] · [the publication date you found, or "date unverified"] · [the full https URL as plain text]</p>
 
-Rules: UK British spelling. NO em dashes (use commas or full stops). Be specific and practical, not generic. Only output the HTML fragments (or the NO_SIGNIFICANT_FINDINGS token), no preamble, no closing remarks, no markdown fences.`;
+Source rules: every idea MUST carry a real source line. Prefer sources from the last few months and state their date. If you cannot verify a date or a source, say "date unverified" and do not dress it up as fresh. Never invent a URL.
 
-export async function researchHiggsfieldTips(): Promise<string> {
+Style: UK British spelling. NO em dashes (use commas or full stops). Output only the HTML blocks above (or the NO_SIGNIFICANT_FINDINGS token), no preamble, no closing remarks, no markdown fences.`;
+}
+
+export async function researchHiggsfieldTips(today: string): Promise<string> {
   const c = await client();
   const res = await c.messages.create({
     model: MODEL,
-    max_tokens: 2500,
+    max_tokens: 2800,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 6 } as unknown as Anthropic.Tool],
-    system: TIPS_SYSTEM,
-    messages: [{ role: "user", content: "Research today's best Higgsfield and AI-influencer practices and give me concrete ideas to implement in Influencers on GAS." }],
+    system: tipsSystem(today),
+    messages: [{ role: "user", content: "Research today's best Higgsfield and AI-influencer practices and give me concrete, build-aware, dated and sourced ideas to implement in Influencers on GAS. Skip anything we already do or rejected." }],
   });
   const html = res.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   return html || "NO_SIGNIFICANT_FINDINGS";
