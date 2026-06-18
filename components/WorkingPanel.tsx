@@ -62,14 +62,17 @@ export default function WorkingPanel({
           : <div className="bar-sweep" />}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-ink-faint">{note}{eta ? ` Usually ${eta}.` : ""}</p>
-        <div className="flex items-center gap-3">
-          {sub && <span className="tabular shrink-0 text-[11px] text-ink-faint">{sub}</span>}
-          {onAbort && (
-            <button onClick={onAbort} className="shrink-0 rounded-md border border-line px-2.5 py-1 text-[11px] font-semibold text-ink-dim hover:border-alert/50 hover:text-alert">Abort</button>
-          )}
+      {note && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-[#a855f7]/30 bg-gradient-to-r from-[#a855f7]/12 to-[#60a5fa]/8 px-3.5 py-3">
+          <span className="mt-1 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-[#c79bff] shadow-[0_0_10px_rgba(199,155,255,0.9)]" />
+          <p className="text-[15px] font-medium leading-relaxed text-ink">{note}{eta ? ` Usually ${eta}.` : ""}</p>
         </div>
+      )}
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
+        {sub && <span className="tabular shrink-0 text-[11px] text-ink-faint">{sub}</span>}
+        {onAbort && (
+          <button onClick={onAbort} className="shrink-0 rounded-md border border-line px-2.5 py-1 text-[11px] font-semibold text-ink-dim hover:border-alert/50 hover:text-alert">Abort</button>
+        )}
       </div>
     </div>
   );
