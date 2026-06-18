@@ -320,7 +320,7 @@ export async function composeCreativeScene(opts: { bible: Record<string, unknown
         `You are a creative director writing the SCENE for ONE photoreal social-media image of an existing AI influencer. The face and identity come from a separate reference image, so NEVER describe facial features, skin marks, eye colour or hair. The influencer's pronouns are ${pronouns}, use ONLY these pronouns and NEVER the opposite gender's. ` +
         "Expand the producer's brief into a single vivid paragraph covering: the setting and time of day, the wardrobe (specific garments, fabric, colour, how worn), the pose and action, the mood, and the natural lighting. Keep the producer's specifics; fill gaps tastefully from the persona. " +
         (opts.cinematic ? "Cinematic film mood. " : "A natural, candid, everyday iPhone-snapshot mood, not a posed studio shoot. ") +
-        (opts.extras ? "Include a believable, busy background crowd that is a natural, diverse multi-ethnic mix, all fully clothed and in sharp focus. " : "No other people in the scene. ") +
+        (opts.extras ? "Include a believable, busy background crowd with a BALANCED mix of ethnicities and skin tones (white, black, brown and mixed, no single group dominating), a balanced mix of men and women of varied ages, and a mix of individuals, couples and small groups, all fully clothed and in sharp focus. " : "No other people in the scene. ") +
         "Everyone is always fully clothed in complete outfits. Under 120 words. UK spelling, no em dashes. Output ONLY the paragraph, no preamble.",
       messages: [{ role: "user", content: `Influencer persona: ${persona || "not specified"}\n\nProducer brief: ${opts.scene}\n\nWrite the scene paragraph.` }],
     });

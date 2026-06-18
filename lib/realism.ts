@@ -10,9 +10,9 @@ export const CLOTHED =
 export const SINGLE_FRAME =
   "a single photograph, one continuous frame of one moment, NOT a collage, contact sheet, grid, diptych, triptych, split screen or multiple stacked panels";
 
-// Background people: actively REQUIRE a diverse crowd (imperative, so it isn't ignored).
+// Background people: actively REQUIRE a BALANCED diverse crowd (imperative, so it isn't ignored).
 export const SCENE_PEOPLE =
-  "the scene is busy with several other people clearly visible in the background, a believable, natural, diverse multi-ethnic mix, each rendered realistically, in sharp focus and at correct scale; a lived-in populated setting, never empty; " +
+  "the scene is busy with several other people clearly visible in the background, a believable, natural crowd with a BALANCED mix of ethnicities and skin tones (white, black, brown and mixed, with NO single group dominating), a balanced mix of men and women across a range of ages, and a mix of individuals, couples and small groups; each rendered realistically, in sharp focus and at correct scale; a lived-in populated setting, never empty; " +
   "EVERY background person is also FULLY CLOTHED in a complete, tasteful outfit including a top covering the torso AND bottoms (trousers, jeans, a skirt or tailored shorts), never bare-legged, in underwear or swimwear, never partially nude";
 
 // No extras: the subject is alone in the scene.
