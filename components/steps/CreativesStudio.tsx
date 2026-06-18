@@ -51,7 +51,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
-  const [res, setRes] = useState<"2k" | "4k">("4k");
+  const [res, setRes] = useState<"2k" | "4k">("2k");
   const [extras, setExtras] = useState(true);
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
@@ -447,7 +447,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
                   {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
                   {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (() => {
                     const s = c.qa?.score10 ?? 7;
-                    const g = s >= 8 ? { t: "Great", cls: "bg-ready/85" } : s >= 6 ? { t: "Good", cls: "bg-active/85" } : { t: "Average", cls: "bg-alert/85" };
+                    const g = s >= 8 ? { t: "Great", cls: "bg-ready/85" } : s >= 6 ? { t: "Good", cls: "bg-[#ff6a00] shadow-[0_0_10px_rgba(255,106,0,0.75)]" } : { t: "Average", cls: "bg-alert/85" };
                     return (
                       <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
                         {g.t}

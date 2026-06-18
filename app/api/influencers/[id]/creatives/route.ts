@@ -23,8 +23,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const inf = await getInfluencer(id);
   if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
-  // Creatives run on locked influencers via the Soul model (per quality tier).
-  const [soul2, cinematic, upscale] = await Promise.all([rate("higgsfield", "soul_2"), rate("higgsfield", "soul_cinematic"), rate("higgsfield", "upscale_image")]);
+  // Creatives render on gpt_image_2 (the only image model used now); both quality styles use
+  // it, so both share its rate. Only the optional 4K upscale adds cost.
+  const [gpt, upscale] = await Promise.all([rate("higgsfield", "gpt_image_2"), rate("higgsfield", "upscale_image")]);
   return NextResponse.json({
     creatives: Array.isArray(persona.creatives) ? persona.creatives : [],
     videoSelects: Array.isArray(persona.video_selects) ? persona.video_selects : [],
@@ -32,7 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     status: persona.creatives_status ?? "idle",
     error: persona.creatives_error ?? null,
     locked: !!persona.locked,
-    rates: { soul_2: soul2, soul_cinematic: cinematic, upscale }, // per-image
+    rates: { soul_2: gpt, soul_cinematic: gpt, upscale }, // per-image (both styles render on gpt_image_2)
   });
 }
 
