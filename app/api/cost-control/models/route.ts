@@ -23,8 +23,8 @@ export async function GET() {
     const paramsSchema = schema?.properties?.params ?? schema;
     // model/aspect are free-form strings validated against a server catalog → query it.
     let catalog: unknown = null;
-    for (const args of [{}, { query: "nano banana" }, { category: "image" }]) {
-      try { catalog = await callMcp("models_explore", args); if (catalog) break; } catch { /* try next shape */ }
+    for (const args of [{ action: "search", query: "nano banana" }, { action: "list", category: "image" }, { action: "list" }]) {
+      try { const r = await callMcp("models_explore", args); if (r && !String(JSON.stringify(r)).includes("validation error")) { catalog = r; break; } } catch { /* try next shape */ }
     }
     const catStr = typeof catalog === "string" ? catalog : JSON.stringify(catalog ?? "");
     // Surface anything that looks like a nano-banana model id for convenience.
