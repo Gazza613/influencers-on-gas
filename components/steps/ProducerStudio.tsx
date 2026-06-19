@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Uploader from "@/components/Uploader";
+import Lightbox from "@/components/Lightbox";
 
 type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
@@ -9,7 +10,7 @@ type Scene = {
   vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
-type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null };
+type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
 type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string } | null;
 
@@ -87,6 +88,29 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
     const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
+  }
+
+  const [zoom, setZoom] = useState<string | null>(null);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", motion: "" });
+  function openEdit(i: number, s: Scene) {
+    if (editIdx === i) { setEditIdx(null); return; }
+    setEditIdx(i);
+    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", motion: s.motion_prompt || "" });
+  }
+  async function reshootScene(i: number) {
+    setErr(""); setEditIdx(null);
+    setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
+    for (let k = 0; k < 45; k++) {
+      await new Promise((res) => setTimeout(res, 6000));
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
+      if (d?.production) { setProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
+    }
   }
 
   async function decideShowreel(decision: "accept" | "decline") {
@@ -224,7 +248,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
                 <div key={i} className="flex gap-4 rounded-xl border border-line bg-surface-1 p-4">
                   {s.role !== "graphic" && (
                     <div className="w-32 shrink-0">
-                      {clip?.url ? (
+                      {shot?.reshooting ? (
+                        <div className="relative">
+                          {shot.url
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={shot.url} alt="" className="aspect-[9/16] w-full rounded-lg border border-line object-cover opacity-25" />
+                            : <div className="aspect-[9/16] w-full rounded-lg border border-line bg-surface-2" />}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-[10px] text-[#c79bff]"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />re-shooting…</div>
+                        </div>
+                      ) : clip?.url ? (
                         <div className="relative">
                           <video src={clip.url} controls playsInline className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
                           <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
@@ -235,13 +267,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[9px] text-alert" title={clip.error || ""}>clip failed{shot?.url && <span className="text-ink-faint">(still ok)</span>}</div>
                       ) : shot?.url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={shot.url} alt={`scene ${i + 1}`} className="aspect-[9/16] w-full rounded-lg border border-line object-cover" />
+                        <img src={shot.url} alt={`scene ${i + 1}`} onClick={() => setZoom(shot.url!)} className="aspect-[9/16] w-full cursor-zoom-in rounded-lg border border-line object-cover transition hover:brightness-110" title="Click to preview full size" />
                       ) : shooting ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />shooting…</div>
                       ) : shot?.error ? (
                         <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-alert/30 bg-surface-2 text-center text-[10px] text-alert">shot failed</div>
                       ) : (
                         <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-dashed border-line bg-surface-2 text-center text-[10px] text-ink-faint">not shot yet</div>
+                      )}
+                      {/* per-scene re-shoot toggle (only once a shot exists for this scene) */}
+                      {shot && !shot.reshooting && !shooting && (
+                        <button onClick={() => openEdit(i, s)} className="mt-1.5 w-full rounded-md border border-[#a855f7]/40 px-2 py-1 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">↻ Re-shoot</button>
                       )}
                     </div>
                   )}
@@ -261,6 +297,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
                   {s.graphics?.length > 0 && <div className="mt-1 text-[12px] text-ink-faint">▣ {s.graphics.join(" · ")}</div>}
                   <div className="mt-1 text-[12px] text-ink-faint">🎵 {s.music_sfx} {s.transition ? `· ⟶ ${s.transition}` : ""}</div>
                   {clip?.status === "failed" && clip.error && <div className="mt-2 break-words rounded-lg border border-alert/30 bg-alert/5 px-3 py-2 text-[11px] text-alert">⚠ Clip failed: {clip.error}</div>}
+                  {editIdx === i && (
+                    <div className="mt-3 space-y-2 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-3">
+                      <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Tweak the direction, then re-shoot just this scene</div>
+                      <Field label="Location" v={ed.location} set={(x) => setEd((e) => ({ ...e, location: x }))} />
+                      <Area label="Action / blocking" v={ed.blocking} set={(x) => setEd((e) => ({ ...e, blocking: x }))} />
+                      <Field label="Shot / framing" v={ed.shot} set={(x) => setEd((e) => ({ ...e, shot: x }))} />
+                      <Field label="Motion" v={ed.motion} set={(x) => setEd((e) => ({ ...e, motion: x }))} />
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>
+                        <button onClick={() => setEditIdx(null)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
+                      </div>
+                      <p className="text-[10px] text-ink-faint">Leave it as-is for a fresh take, or edit to steer it. Only this scene re-renders, the others stay.</p>
+                    </div>
+                  )}
                   </div>
                 </div>
               );
@@ -318,6 +368,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
           )}
         </div>
       ) : null}
+      {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} />}
     </div>
   );
 }

@@ -1006,3 +1006,78 @@ export const assembleVideo = inngest.createFunction(
     return { ok: !!finalUrl, error: err };
   },
 );
+
+// THE PRODUCER — re-shoot ONE scene (keep the rest). Same identity + clothing/location refs as the
+// full board; anchors to an existing good frame for continuity; honours the scene's (edited) direction.
+export const reshootShot = inngest.createFunction(
+  { id: "reshoot-shot", retries: 1, triggers: [{ event: "influencer/reshoot.shot" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const index = Number(event.data.scene);
+    const inf = await step.run("load", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const production = (persona.production ?? null) as { brief?: Record<string, string>; storyboard?: { scenes?: Record<string, string>[]; format?: string }; shots?: ShotRow[] } | null;
+    const scenes = production?.storyboard?.scenes ?? [];
+    const sc = scenes[index] as Record<string, string> | undefined;
+    if (!sc) return { error: "no such scene" };
+    const role = String(sc.role || "a-roll");
+    if (role === "graphic") return { skipped: "graphic scene" };
+    const ratio = String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16";
+
+    const uploadedRefs = Array.isArray(persona.reference_images) ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
+    const refFromUrl = typeof persona.reference_url === "string" && persona.reference_url ? [persona.reference_url] : [];
+    const anchored = uploadedRefs.length ? uploadedRefs.slice(0, 4) : refFromUrl;
+    const idRefUrls = anchored.length ? anchored : [(persona.face_card_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || ""].filter(Boolean);
+    const featureUrl = anchored.length ? "" : ((persona.feature_sheet_url as string) || "");
+    const idMedias = await step.run("import-identity", async () => {
+      const ids = (await Promise.all(idRefUrls.map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v);
+      if (featureUrl) { const f = await importMediaUrl(featureUrl).catch(() => null); if (f) ids.push(f); }
+      return ids;
+    });
+    const bibleId = ((persona.bible as { identity?: { age?: string; build?: string; ethnicity_design?: string } })?.identity) ?? {};
+    const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
+    const look = lookClause(persona);
+    const brief = (production?.brief ?? {}) as Record<string, string>;
+    const clothMedia = brief.clothingRef ? await step.run("import-cloth", () => importMediaUrl(brief.clothingRef).catch(() => null)) : null;
+    const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;
+    // Continuity anchor: an existing good frame from another scene.
+    const others = (production?.shots ?? []).filter((s) => s.scene !== index && s.url);
+    const worldRef = others.length ? await step.run("import-world", () => importMediaUrl(others[0].url as string).catch(() => null)) : null;
+
+    let n = idMedias.length;
+    const faceTags = idMedias.map((_, k) => `@image${k + 1}`);
+    const clothTag = clothMedia ? `@image${++n}` : "";
+    const locTag = locMedia ? `@image${++n}` : "";
+    const worldTag = worldRef ? `@image${++n}` : "";
+    const refInstruction = [
+      faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY; zero drift. IGNORE their clothing, background and pose; take those from the direction below.` : "",
+      clothTag ? `${clothTag} is a WARDROBE reference: dress them in this exact outfit. Do NOT copy any face or person from it.` : "",
+      locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place. Do NOT copy any face or person from it.` : "",
+      worldTag ? `${worldTag} is the ESTABLISHED world: match its location, lighting and colour grade for continuity.` : "",
+    ].filter(Boolean).join(" ");
+    const prompt = buildShotPrompt({
+      location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
+      performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
+      hasPeople: true, worldAnchored: !!worldRef,
+    });
+    const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : [])].map((value) => ({ value, role: "image" }));
+    const url = await step.run("shot", () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null));
+    let hosted: string | null = null;
+    if (url) {
+      const ok = (await step.run("valid", () => filterLoadable([url]))).length > 0;
+      if (ok) {
+        hosted = (await step.run("host", () => rehostToBlob(url, "shots").catch(() => null))) || url;
+        await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
+      }
+    }
+    const fresh = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+    const prod = (fresh.production ?? production) as Record<string, unknown>;
+    const list = (Array.isArray(prod.shots) ? [...(prod.shots as ShotRow[])] : []) as (ShotRow & { reshooting?: boolean })[];
+    const row = { scene: index, role, beat: String(sc.beat || ""), url: hosted || (list.find((s) => s.scene === index)?.url ?? null), error: hosted ? null : "no image", reshooting: false };
+    const at = list.findIndex((s) => s.scene === index);
+    if (at >= 0) list[at] = row; else list.push(row);
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list } } }));
+    return { ok: !!hosted };
+  },
+);
