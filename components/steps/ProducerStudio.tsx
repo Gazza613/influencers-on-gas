@@ -40,6 +40,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
   const [locationRef, setLocationRef] = useState<string | null>(String((initialProduction?.brief as { locationRef?: string })?.locationRef || "") || null);
   const [logoUrl, setLogoUrl] = useState<string | null>(String((initialProduction?.brief as { logoUrl?: string })?.logoUrl || "") || null);
   const [logoPosition, setLogoPosition] = useState<string>(String((initialProduction?.brief as { logoPosition?: string })?.logoPosition || "topLeft"));
+  const [captions, setCaptions] = useState<boolean>((initialProduction?.brief as { captions?: boolean })?.captions !== false);
 
   const sb = production?.storyboard;
   const shots = production?.shots ?? [];
@@ -102,7 +103,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", logoPosition }),
+      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", logoPosition, captions }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); }
@@ -180,6 +181,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
               </div>
               <p className="mt-1 text-[10px] text-ink-faint">Burned onto the final cut. No logo? The brand name shows as small text instead.</p>
             </div>
+          </div>
+
+          {/* Captions on/off */}
+          <div>
+            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Captions</div>
+            <div className="flex gap-2">
+              {([[true, "Captions on"], [false, "Captions off"]] as const).map(([v, label]) => (
+                <button key={label} onClick={() => setCaptions(v)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${captions === v ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{label}</button>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] text-ink-faint">On burns the VO subtitles onto the cut; off leaves it clean.</p>
           </div>
 
           <Area label="Compliance / legal line (verbatim, optional)" v={legal} set={setLegal} placeholder="Used exactly as written on the end card. Optional." />

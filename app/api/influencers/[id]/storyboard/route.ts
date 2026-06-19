@@ -49,6 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     locationRef: typeof b.locationRef === "string" ? b.locationRef : "",
     logoUrl: typeof b.logoUrl === "string" ? b.logoUrl : "",
     logoPosition: ["topLeft", "topRight", "bottomLeft", "bottomRight"].includes(b.logoPosition) ? b.logoPosition : "topLeft",
+    captions: b.captions !== false, // default on; burned-in VO subtitles
   };
   if (!brief.brand || !brief.offer) return NextResponse.json({ error: "Add at least a brand/product and the core offer." }, { status: 400 });
 

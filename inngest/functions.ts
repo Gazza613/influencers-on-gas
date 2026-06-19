@@ -964,10 +964,12 @@ export const assembleVideo = inngest.createFunction(
       start: p.start, length: p.len, fit: "cover",
       transition: { in: "fade", out: "fade" },
     }));
-    const captionClips = placed.filter((p) => p.caption).map((p) => ({
+    // Captions on by default; producer can switch them off for a clean cut.
+    const captionsOn = (production?.brief as { captions?: boolean })?.captions !== false;
+    const captionClips = captionsOn ? placed.filter((p) => p.caption).map((p) => ({
       asset: { type: "title", text: p.caption, style: "subtitle", size: "small", position: "bottom" },
       start: p.start, length: p.len,
-    }));
+    })) : [];
     // Brand bug: a transparent-PNG logo (if uploaded) placed in the chosen corner, else the brand
     // name as small text. Shotstack positions: topLeft / topRight / bottomLeft / bottomRight.
     const logoUrl = (production?.brief?.logoUrl || "").trim();
