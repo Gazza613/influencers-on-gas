@@ -873,7 +873,7 @@ export const generateClips = inngest.createFunction(
         } catch (e) { return { scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 180) }; }
       }
       // b-roll (or a-roll with no line / no voice): animate the frame with Kling.
-      const res = await step.run(`broll-${i}`, () => generateVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
+      const res = await step.run(`broll-${i}`, () => generateVideoFromImage({ imageUrl: img, prompt: motion, ratio, rounds: 150 }));
       if (res.url) {
         await step.run(`u-broll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: process.env.HF_VIDEO_MODEL || "kling3", unit: "video", action: "broll", count: 1 }).catch(() => {}));
         const hosted = (await step.run(`hostb-${i}`, () => rehostToBlob(res.url as string, "clips").catch(() => null))) || (res.url as string);

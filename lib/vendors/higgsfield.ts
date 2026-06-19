@@ -661,7 +661,7 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
   }
   // Kling first (face-safe), then other discovered video models, then guesses.
   const kling = discovered.filter((m) => /kling/i.test(m));
-  const models = [...new Set([...kling, ...discovered, process.env.HF_VIDEO_MODEL, "kling3", "kling3_0", "kling-2.5"].filter(Boolean) as string[])];
+  const models = [...new Set([...kling, ...discovered, process.env.HF_VIDEO_MODEL, "kling3_0", "kling3", "kling-2.5"].filter(Boolean) as string[])];
   const shapeFor = (model: string): AnyObj[] => [
     { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, input_images: [{ type: "image", id: mediaId }] },
     { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, medias: [{ value: mediaId, role: "image" }] },
@@ -679,7 +679,7 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
         // A jobId means this model + shape were ACCEPTED. Commit to it: poll once and return the
         // result. Do NOT keep trying other combos (that's what made the b-roll run for minutes).
         if (jobId) {
-          const out = await pollJob(call, jobId, opts.rounds || 70); // ~70 x 3s ≈ 3.5 min, bounded
+          const out = await pollJob(call, jobId, opts.rounds || 150); // ~150 x 3s ≈ 7.5 min (Kling can be slow)
           return out ? { url: out, error: null } : { url: null, error: `b-roll render started (${model}) but did not finish in time` };
         }
         const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
