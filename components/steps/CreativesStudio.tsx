@@ -337,7 +337,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const visible = creatives.filter((c) => {
     if (view === "excellent") return c.status === "approved" && c.resolution === "4k";
     if (view === "good") return c.status === "approved" && c.resolution !== "4k" && gradeOf(c).t === "Good";
-    if (view === "average") return c.status === "failed_qa" || (c.status === "approved" && gradeOf(c).t === "Average");
+    if (view === "average") return c.resolution !== "4k" && (c.status === "failed_qa" || (c.status === "approved" && gradeOf(c).t === "Average"));
     return true;
   });
   // Split into 2K previews (plus any failed shots, which keep their delete control) and 4K finals.
