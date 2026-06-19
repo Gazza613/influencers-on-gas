@@ -15,7 +15,7 @@ const COOKIES = [
 ];
 
 export async function GET(req: Request) {
-  const res = NextResponse.redirect(new URL("/login", req.url));
+  const res = NextResponse.redirect(new URL("/", req.url));
   for (const name of COOKIES) res.cookies.set(name, "", { path: "/", expires: new Date(0) });
   // Don't let this hop get cached.
   res.headers.set("Cache-Control", "no-store");
