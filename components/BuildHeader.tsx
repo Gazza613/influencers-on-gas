@@ -91,7 +91,8 @@ export default function BuildHeader({
   if (s.locked) {
     const onVideo = pathname.endsWith("/video");
     tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: creativesDone, warn: !creativesDone && onVideo, match: (p: string) => p.endsWith("/creatives") });
-    tabs.push({ href: `${base}/video`, label: "Video & Voice", icon: "🎬", done: false, match: (p: string) => p.endsWith("/video") });
+    tabs.push({ href: `${base}/producer`, label: "Producer", icon: "🎬", done: false, match: (p: string) => p.endsWith("/producer") });
+    tabs.push({ href: `${base}/video`, label: "Video & Voice", icon: "🔊", done: false, match: (p: string) => p.endsWith("/video") });
   }
 
   return (
