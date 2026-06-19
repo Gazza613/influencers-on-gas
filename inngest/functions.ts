@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, HUMANISER } from "@/lib/realism";
-import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, generateVideoFromImage, humaniseUrl } from "@/lib/vendors/higgsfield";
+import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
+import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, generateVideoFromImage } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRender } from "@/lib/vendors/shotstack";
@@ -664,15 +664,7 @@ export const upscaleCreative = inngest.createFunction(
       await step.run("save-fail", () => updateInfluencer(influencerId, { persona: { ...fresh, creatives: updated } }));
       return { ok: false };
     }
-    // HUMANISER finishing pass: the bytedance upscaler smooths skin to plastic, so re-render the
-    // 4K through Nano Banana Pro using itself as the reference to restore real skin. Best-effort:
-    // if it fails or won't load, keep the plain upscale. (Nano is free on Ultra.)
-    const ar = (target as { aspect?: string }).aspect || "9:16";
-    const humanised = await step.run("humanise", () => humaniseUrl(up as string, { prompt: HUMANISER, ratio: ar, resolution: "4k" }).catch(() => null));
-    const humanOk = humanised && (await step.run("validate-humanise", () => filterLoadable([humanised]))).length > 0;
-    const finalUp = humanOk ? (humanised as string) : (up as string);
-    if (humanOk) await step.run("usage-humanise", () => recordUsage({ influencerId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "creative", count: 1 }).catch(() => {}));
-    const hosted = (await step.run("rehost", () => rehostToBlob(finalUp, "creatives").catch(() => null))) || finalUp;
+    const hosted = (await step.run("rehost", () => rehostToBlob(up as string, "creatives").catch(() => null))) || (up as string);
     await step.run("usage-up", () => recordUsage({ influencerId, provider: "higgsfield", model: "upscale_image", unit: "image", action: "creative", count: 1 }));
 
     // Reload so we don't clobber other shots a parallel run may have changed.

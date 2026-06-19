@@ -344,10 +344,12 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('anthropic','claude-sonnet-4-6','scene', 0, 30, true),
   ('anthropic','claude-haiku-4-5','image', 0, 5, true),
   ('voyage','voyage-4-lite','embed', 0, 0, true),
-  -- B-ROLL motion (Producer): Kling 3.0 image->video, ~5s. Face-safe. Estimate matches the
-  -- supercomputer_video credit tier; recalibrate against get_cost / the live job billing.
-  ('higgsfield','kling3','video', 8, 615, true),
-  -- Assembly (Producer): ElevenLabs Music bed per ad, Shotstack render per finished cut.
-  ('elevenlabs','music','music', 0, 200, true),
-  ('shotstack','edit','render', 0, 100, true)
+  -- B-ROLL motion (Producer): Kling 3.0 image->video ~5s std, from the 9,000-credit Ultra POOL.
+  -- ~6 credits/clip (2026 sourced; Higgsfield publishes no per-model table) × ~R0.77/credit.
+  ('higgsfield','kling3','video', 6, 462, true),
+  -- ElevenLabs Music bed: drawn from the ElevenLabs SUBSCRIPTION credit pool, so $0 marginal
+  -- within quota (like Higgsfield images). Metered for usage visibility.
+  ('elevenlabs','music','music', 0, 0, true),
+  -- Shotstack render: PAY-AS-YOU-GO (not a subscription) ~$0.30/rendered min => ~$0.24 per 45s cut.
+  ('shotstack','edit','render', 0, 450, true)
 on conflict (provider, model, unit) do nothing;
