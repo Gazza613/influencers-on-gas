@@ -35,4 +35,10 @@ export const CREW: Record<string, CrewMember> = {
     role: "Art Director",
     greeting: "Let's make scroll-stopping shots. Same face, every format.",
   },
+  producer: {
+    emoji: "🎬",
+    name: "Kiara",
+    role: "Producer",
+    greeting: "I'll direct the whole ad with you, shot by shot, then we shoot and cut it.",
+  },
 };
