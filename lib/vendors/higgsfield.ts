@@ -642,9 +642,26 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
   if (!mediaId) return { url: null, error: "could not import the still into Higgsfield" };
   const { call } = await openSession();
   const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : "9:16";
-  // Neither the Kling model id nor the input-image field name are publicly documented, so try the
-  // corroborated candidates and keep whichever the server accepts. (kling3_0 = the CLI job id.)
-  const models = [...new Set([process.env.HF_VIDEO_MODEL || "kling3", "kling3_0", "kling-2.5"].filter(Boolean))];
+  // SELF-DISCOVER the real video model ids from the live catalog (the server rejects guessed ids
+  // like "kling3" and tells us to use models_explore). Prefer Kling (face-safe), then fall back to
+  // any other video/i2v model, then the hardcoded guesses + env override.
+  const discovered: string[] = [];
+  for (const args of [{ action: "list", kind: "video" }, { action: "list" }]) {
+    try {
+      const data = unwrapMCP(await call("models_explore", args)) as AnyObj | null;
+      const items = (Array.isArray((data as AnyObj)?.items) ? (data as AnyObj).items : (data as AnyObj)?.structuredContent && Array.isArray(((data as AnyObj).structuredContent as AnyObj).items) ? ((data as AnyObj).structuredContent as AnyObj).items : Array.isArray(data) ? data : []) as AnyObj[];
+      for (const it of items) {
+        const id = String(it?.id ?? it?.model ?? it?.slug ?? it?.key ?? "");
+        const name = String(it?.name ?? it?.title ?? "");
+        const kind = String(it?.kind ?? it?.type ?? "");
+        if (id && (/kling|veo|seedance|wan|hailuo|video|i2v|image.?to.?video/i.test(`${id} ${name} ${kind}`))) discovered.push(id);
+      }
+      if (discovered.length) break;
+    } catch { /* try next */ }
+  }
+  // Kling first (face-safe), then other discovered video models, then guesses.
+  const kling = discovered.filter((m) => /kling/i.test(m));
+  const models = [...new Set([...kling, ...discovered, process.env.HF_VIDEO_MODEL, "kling3", "kling3_0", "kling-2.5"].filter(Boolean) as string[])];
   const shapeFor = (model: string): AnyObj[] => [
     { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, input_images: [{ type: "image", id: mediaId }] },
     { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, medias: [{ value: mediaId, role: "image" }] },
