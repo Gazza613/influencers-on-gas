@@ -21,7 +21,7 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      window.location.href = "/studio";
+      window.location.href = "/start";
     } catch {
       setError("Something went wrong signing in. Please try again.");
       setBusy(false);
