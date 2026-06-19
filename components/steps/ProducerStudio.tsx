@@ -10,7 +10,7 @@ type Scene = {
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null } | null;
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -81,6 +81,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
     const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
+  }
+
+  async function decideShowreel(decision: "accept" | "decline") {
+    setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/showreel`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.showreel_status) setProduction((p) => (p ? { ...p, showreel_status: r.showreel_status } : p));
+    else setErr(r?.error || "Couldn't record the decision.");
   }
 
   async function generate() {
@@ -255,6 +264,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
               </div>
             )}
           </div>
+
+          {/* Final step · the showreel gate */}
+          {finalUrl && (
+            <div className="rounded-xl border border-line bg-surface-1 p-5">
+              <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Final step · the showreel</div>
+              <p className="mt-1 text-sm text-ink-dim">Sami&apos;s last call: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button onClick={() => decideShowreel("accept")} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>✓ Accept into showreel</button>
+                <button onClick={() => decideShowreel("decline")} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "declined" ? "border-active bg-active/15 text-active" : "border-active/40 text-active hover:bg-active/10"}`}>✕ Decline</button>
+                {production?.showreel_status === "accepted" && <span className="tabular text-[11px] font-semibold text-ready">● In the showreel</span>}
+                {production?.showreel_status === "declined" && <span className="tabular text-[11px] font-semibold text-active">● Kept out</span>}
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
     </div>

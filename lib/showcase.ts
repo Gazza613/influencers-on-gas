@@ -58,3 +58,30 @@ export async function listFinishedVideos(): Promise<ShowcaseVideo[]> {
 export async function setShowcased(id: string, on: boolean): Promise<void> {
   await db()`update productions set showcased = ${on} where id = ${id}`;
 }
+
+// ── Showreel publishing for Producer cuts ──────────────────────────────────────
+// The finished Producer cut lives on the influencer persona; accepting it publishes a
+// row into productions so it flows into the existing showcase wall + public share link.
+// Resolve a client_id (productions requires one): the influencer's, else the first
+// client, else a seeded default agency client. Single-org safe.
+export async function resolveClientId(preferred: string | null): Promise<string> {
+  if (preferred) return preferred;
+  const rows = (await db()`select id from clients order by created_at asc limit 1`) as { id: string }[];
+  if (rows[0]) return rows[0].id;
+  const made = (await db()`insert into clients (name, slug) values ('GAS Marketing', 'gas-marketing') on conflict (slug) do update set name = excluded.name returning id`) as { id: string }[];
+  return made[0].id;
+}
+
+// Upsert the showcase row for a Producer cut. Pass an existing id to update it
+// (re-stitch / re-decide), or omit to insert. Returns the production id.
+export async function upsertProducerCut(opts: { showcaseId?: string | null; clientId: string; title: string; url: string; showcased: boolean }): Promise<string> {
+  if (opts.showcaseId) {
+    await db()`update productions set title = ${opts.title}, final_video_url = ${opts.url}, status = 'complete', showcased = ${opts.showcased} where id = ${opts.showcaseId}`;
+    return opts.showcaseId;
+  }
+  const rows = (await db()`
+    insert into productions (client_id, title, final_video_url, status, showcased)
+    values (${opts.clientId}, ${opts.title}, ${opts.url}, 'complete', ${opts.showcased})
+    returning id`) as { id: string }[];
+  return rows[0].id;
+}
