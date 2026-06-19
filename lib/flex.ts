@@ -18,7 +18,7 @@ export const QA_LINES = [
   "✓ Shot approved by AI Vision QA",
   "✓ Vision QA: wardrobe & composition checked",
   "✓ Approved — proportions & scale on point",
-  "✓ QA cleared: clean, on-brand, fully clothed",
+  "✓ QA cleared: clean, on-brand, sharp",
   "✓ Passed the Vision QA gate",
   "✓ Realism verified — into the keeper pile",
 ];

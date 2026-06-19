@@ -20,9 +20,15 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
     );
   }
 
+  // The Identity Lock toggle only changes anything for a SINGLE-reference / Soul-only build;
+  // with multiple reference photos the strong multi-image lock is always used, so hide it then.
+  const refImgs = Array.isArray(persona.reference_images) ? (persona.reference_images as unknown[]).filter((s): s is string => typeof s === "string") : [];
+  const multiRef = refImgs.length > 1;
+
   return (
     <CreativesStudio
       influencerId={inf.id}
+      multiRef={multiRef}
       initial={{
         creatives: Array.isArray(persona.creatives)
           ? (persona.creatives as {

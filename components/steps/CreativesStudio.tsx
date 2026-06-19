@@ -48,7 +48,7 @@ const CREATIVE_NARRATION = [
   "Re-rolling anything that doesn't make the cut, no compromises…",
 ];
 
-export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
+export default function CreativesStudio({ influencerId, initial, multiRef = false }: { influencerId: string; initial: { creatives: Creative[]; status: string }; multiRef?: boolean }) {
     const [view, setView] = useState<"all" | "excellent" | "good" | "average">("all");
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
@@ -439,7 +439,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           </div>
         </div>
 
-        {/* Identity lock */}
+        {/* Identity lock — only shown when it actually changes the result (single-reference /
+            Soul-only builds). Multi-photo influencers always use the strong multi-image lock. */}
+        {!multiRef && (
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Identity lock</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -455,6 +457,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           </div>
           <p className="mt-1.5 text-[11px] text-ink-faint">Tip: a well-retrained influencer holds her face even on &ldquo;Follow my scene&rdquo;. Use Strong if you see her drifting.</p>
         </div>
+        )}
 
         {/* Optional clothing + location */}
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
