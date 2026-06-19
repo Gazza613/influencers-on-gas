@@ -20,5 +20,5 @@ export default async function ProducerPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  return <ProducerStudio influencerId={inf.id} name={inf.name} initialProduction={(persona.production as Record<string, unknown>) ?? null} />;
+  return <ProducerStudio influencerId={inf.id} name={inf.name} initialVoiceId={String(persona.voice_id || "")} initialVoiceName={String(persona.voice_name || "")} initialProduction={(persona.production as Record<string, unknown>) ?? null} />;
 }

@@ -20,8 +20,17 @@ const ROLE = {
   graphic: { label: "GRAPHIC", cls: "bg-active/15 text-active border-active/30" },
 } as const;
 
-export default function ProducerStudio({ influencerId, name, initialProduction }: { influencerId: string; name: string; initialProduction: Production }) {
+export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string }) {
   const [production, setProduction] = useState<Production>(initialProduction);
+  const [voiceId, setVoiceId] = useState(initialVoiceId);
+  const [voiceName, setVoiceName] = useState(initialVoiceName);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  async function autoVoice() {
+    setVoiceBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/voice`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto" }) }).then((x) => x.json()).catch(() => null);
+    setVoiceBusy(false);
+    if (r?.voice_id) { setVoiceId(r.voice_id); setVoiceName(r.voice_name || "Matched voice"); } else setErr(r?.error || "Couldn't auto-match a voice. Try Video & Voice.");
+  }
   const [editing, setEditing] = useState(!initialProduction?.storyboard);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -52,6 +61,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
   const clipFor = (i: number) => clips.find((c) => c.scene === i);
   const shotsReady = shots.some((s) => s.url);
   const clipsReady = clips.some((c) => c.url);
+  const needsVoice = !!sb && sb.scenes.some((s) => s.role === "a-roll" && (s.vo_line || "").trim().length > 0);
+  const voiceMissing = needsVoice && !voiceId;
   const assembling = production?.assembly_status === "running";
   const finalUrl = production?.final_url || null;
 
@@ -373,7 +384,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
             <div className={`rounded-xl border p-5 ${shotsReady ? "border-[#60a5fa]/30 bg-[#60a5fa]/5" : "border-line bg-surface-1 opacity-60"}`}>
               <div className="tabular text-xs uppercase tracking-[0.2em] text-[#93c5fd]">Step 2 · Render the clips</div>
               <p className="mt-1 text-sm text-ink-dim">I bring every frame to life: a-roll scenes talk in {name}&apos;s voice (HeyGen), b-roll scenes get natural motion (Kling). A few minutes per scene.</p>
-              <button onClick={renderClips} disabled={rendering || !shotsReady} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering ? "🎞️ Rendering the clips…" : clipsReady ? "↻ Re-render the clips" : "🎞️ Render the clips"}</button>
+              {needsVoice && (voiceId ? (
+                <p className="mt-2 text-[11px] text-ink-faint">🎙️ Voice: <span className="text-ink-dim">{voiceName || "set"}</span> · <a href={`/setup/influencers/${influencerId}/video`} className="text-accent">change</a></p>
+              ) : (
+                <div className="mt-2 rounded-lg border border-active/30 bg-active/5 p-3 text-[12px]">
+                  <p className="text-ink-dim">A-roll scenes talk in {name}&apos;s voice, so pick one before rendering.</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <button onClick={autoVoice} disabled={voiceBusy} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50">{voiceBusy ? "Matching…" : "✨ Auto-match a voice"}</button>
+                    <a href={`/setup/influencers/${influencerId}/video`} className="text-xs font-semibold text-accent">Choose / design a voice →</a>
+                  </div>
+                </div>
+              ))}
+              <button onClick={renderClips} disabled={rendering || !shotsReady || voiceMissing} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering ? "🎞️ Rendering the clips…" : clipsReady ? "↻ Re-render the clips" : "🎞️ Render the clips"}</button>
               {!shotsReady && <p className="mt-2 text-[11px] text-ink-faint">Shoot the board first.</p>}
             </div>
           </div>
