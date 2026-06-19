@@ -329,6 +329,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}–{s.end}</span>
                     <span className="text-[11px] font-semibold text-ink-dim">{s.beat}</span>
                     <span className={`tabular rounded border px-1.5 py-0.5 text-[9px] font-bold ${role.cls}`}>{role.label}</span>
+                    {s.role !== "graphic" && <button onClick={() => openEdit(i, s)} className="ml-auto rounded-md border border-[#a855f7]/40 px-2 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">{editIdx === i ? "Close" : "✎ Edit script"}</button>}
                   </div>
                   <div className="text-[13px] text-ink-dim"><span className="text-ink-faint">📍 {s.location}</span></div>
                   <div className="mt-1 text-[13px] text-ink-dim"><span className="text-ink-faint">🎥</span> {s.shot}</div>
