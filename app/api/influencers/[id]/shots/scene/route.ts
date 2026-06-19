@@ -20,20 +20,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const index = Number(b.scene);
   if (!Array.isArray(scenes) || !scenes[index]) return NextResponse.json({ error: "No such scene." }, { status: 400 });
 
-  // Apply any edited direction to the scene (so it persists + drives the clip later).
+  // Apply edited direction + script to the scene (persists + drives the clip/caption later).
+  // vo_line + caption are script edits (no image regen needed); location/blocking/shot/motion change the image.
   const edited = { ...scenes[index] };
-  for (const k of ["location", "blocking", "shot", "motion_prompt"] as const) {
-    if (typeof b[k] === "string" && b[k].trim()) edited[k] = String(b[k]).trim();
+  for (const k of ["location", "blocking", "shot", "motion_prompt", "vo_line", "caption"] as const) {
+    if (typeof b[k] === "string") edited[k] = String(b[k]).trim();
   }
   const newScenes = scenes.map((s, i) => (i === index ? edited : s));
+  const reshoot = b.reshoot !== false; // false = save text only, no image regeneration
 
-  // Mark that scene re-shooting (keep the old frame visible meanwhile).
   const shots = Array.isArray(production?.shots) ? [...(production!.shots as Record<string, unknown>[])] : [];
-  const at = shots.findIndex((s) => Number(s.scene) === index);
-  if (at >= 0) shots[at] = { ...shots[at], reshooting: true };
-  else shots.push({ scene: index, role: edited.role, beat: edited.beat, url: null, reshooting: true });
+  if (reshoot) {
+    const at = shots.findIndex((s) => Number(s.scene) === index);
+    if (at >= 0) shots[at] = { ...shots[at], reshooting: true };
+    else shots.push({ scene: index, role: edited.role, beat: edited.beat, url: null, reshooting: true });
+  }
 
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, storyboard: { ...production!.storyboard, scenes: newScenes }, shots } } });
+  if (!reshoot) return NextResponse.json({ saved: true });
   try {
     await inngest.send({ name: "influencer/reshoot.shot", data: { influencerId: id, scene: index } });
   } catch {

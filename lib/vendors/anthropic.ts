@@ -505,3 +505,21 @@ export async function generateStoryboard(brief: {
   if (!block || block.type !== "tool_use") throw new Error("No storyboard returned");
   return block.input as Storyboard;
 }
+
+// THE PRODUCER's script helper: rewrite ONE scene's voiceover line + matching caption, in the
+// single-continuous-VO house style, optionally following a quick instruction from the producer.
+export async function rewriteSceneScript(o: { brand: string; tone: string; beat: string; role: string; blocking: string; currentVo: string; currentCaption: string; instruction?: string; fullVo?: string }): Promise<{ vo_line: string; caption: string }> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system:
+      "You are a sharp social-ad copy producer. Rewrite ONE scene's spoken VOICEOVER line for a short vertical video ad. House style: single continuous voiceover, second person, warm and confident, short punchy active sentences, benefit-led, no hard sell. UK spelling, no em dashes, no emojis, no quotes around the line. Also write a burned-in CAPTION that matches the VO almost word-for-word, 14 words max. Keep it the right length for the scene's beat. Return via the tool only.",
+    tools: [{ name: "scene_script", description: "The rewritten VO line and caption for this one scene.", input_schema: { type: "object", additionalProperties: false, properties: { vo_line: { type: "string" }, caption: { type: "string" } }, required: ["vo_line", "caption"] } as unknown as Anthropic.Tool["input_schema"] }],
+    tool_choice: { type: "tool", name: "scene_script" },
+    messages: [{ role: "user", content: `Brand: ${o.brand || "the brand"}. Tone: ${o.tone || "warm, confident"}. Scene beat: ${o.beat} (${o.role}). On screen: ${o.blocking}. Current VO: "${o.currentVo}". Current caption: "${o.currentCaption}".${o.instruction ? ` Producer instruction: ${o.instruction}.` : ""}${o.fullVo ? `\nFull-ad VO for flow/context: ${o.fullVo}` : ""}\n\nRewrite the VO line and its caption for THIS scene only.` }],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (block && block.type === "tool_use") return block.input as { vo_line: string; caption: string };
+  return { vo_line: o.currentVo, caption: o.currentCaption };
+}

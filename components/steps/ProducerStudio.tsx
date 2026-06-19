@@ -92,19 +92,42 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
 
   const [zoom, setZoom] = useState<string | null>(null);
   const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", motion: "" });
+  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", motion: "", vo: "", caption: "" });
+  const [aiInstr, setAiInstr] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { setEditIdx(null); return; }
-    setEditIdx(i);
-    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", motion: s.motion_prompt || "" });
+    setEditIdx(i); setAiInstr("");
+    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "" });
+  }
+  function applyEditsLocally(i: number) {
+    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption } : s)) } } : p));
+  }
+  async function aiRewrite(i: number) {
+    setAiBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/shots/scene/script`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, instruction: aiInstr }),
+    }).then((x) => x.json()).catch(() => null);
+    setAiBusy(false);
+    if (typeof r?.vo_line === "string") setEd((e) => ({ ...e, vo: r.vo_line, caption: r.caption || e.caption }));
+    else setErr(r?.error || "The producer couldn't rewrite that. Try again.");
+  }
+  async function saveScene(i: number) {
+    setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.saved) { applyEditsLocally(i); setEditIdx(null); } else setErr(r?.error || "Couldn't save.");
   }
   async function reshootScene(i: number) {
     setErr(""); setEditIdx(null);
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion }),
+      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption }),
     }).then((x) => x.json()).catch(() => null);
+    applyEditsLocally(i);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
     for (let k = 0; k < 45; k++) {
       await new Promise((res) => setTimeout(res, 6000));
@@ -298,17 +321,31 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
                   <div className="mt-1 text-[12px] text-ink-faint">🎵 {s.music_sfx} {s.transition ? `· ⟶ ${s.transition}` : ""}</div>
                   {clip?.status === "failed" && clip.error && <div className="mt-2 break-words rounded-lg border border-alert/30 bg-alert/5 px-3 py-2 text-[11px] text-alert">⚠ Clip failed: {clip.error}</div>}
                   {editIdx === i && (
-                    <div className="mt-3 space-y-2 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-3">
-                      <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Tweak the direction, then re-shoot just this scene</div>
-                      <Field label="Location" v={ed.location} set={(x) => setEd((e) => ({ ...e, location: x }))} />
-                      <Area label="Action / blocking" v={ed.blocking} set={(x) => setEd((e) => ({ ...e, blocking: x }))} />
-                      <Field label="Shot / framing" v={ed.shot} set={(x) => setEd((e) => ({ ...e, shot: x }))} />
-                      <Field label="Motion" v={ed.motion} set={(x) => setEd((e) => ({ ...e, motion: x }))} />
-                      <div className="flex gap-2 pt-1">
+                    <div className="mt-3 space-y-3 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-3">
+                      {/* Script */}
+                      <div className="space-y-2">
+                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Script for this scene</div>
+                        <Area label="Voiceover line (spoken)" v={ed.vo} set={(x) => setEd((e) => ({ ...e, vo: x }))} />
+                        <Field label="Caption (burned-in)" v={ed.caption} set={(x) => setEd((e) => ({ ...e, caption: x }))} />
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="min-w-[150px] flex-1"><Field label="Ask the producer to rewrite (optional)" v={aiInstr} set={setAiInstr} placeholder="e.g. punchier, lead with the free data" /></div>
+                          <button onClick={() => aiRewrite(i)} disabled={aiBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-2 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{aiBusy ? "✨ Writing…" : "✨ Rewrite with AI"}</button>
+                        </div>
+                      </div>
+                      {/* Image direction */}
+                      <div className="space-y-2 border-t border-line pt-3">
+                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Image direction (changing these needs a re-shoot)</div>
+                        <Field label="Location" v={ed.location} set={(x) => setEd((e) => ({ ...e, location: x }))} />
+                        <Area label="Action / blocking" v={ed.blocking} set={(x) => setEd((e) => ({ ...e, blocking: x }))} />
+                        <Field label="Shot / framing" v={ed.shot} set={(x) => setEd((e) => ({ ...e, shot: x }))} />
+                        <Field label="Motion" v={ed.motion} set={(x) => setEd((e) => ({ ...e, motion: x }))} />
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button onClick={() => saveScene(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save changes</button>
                         <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>
                         <button onClick={() => setEditIdx(null)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                       </div>
-                      <p className="text-[10px] text-ink-faint">Leave it as-is for a fresh take, or edit to steer it. Only this scene re-renders, the others stay.</p>
+                      <p className="text-[10px] text-ink-faint">Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched.</p>
                     </div>
                   )}
                   </div>
