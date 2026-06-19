@@ -862,7 +862,7 @@ export const generateClips = inngest.createFunction(
           await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
           const started = await step.run(`start-${i}`, () => startTalkingVideo({ imageUrl: img, audioUrl, ratio, motionPrompt: motion }));
           const out = await step.run(`poll-${i}`, async () => {
-            for (let n = 0; n < 70; n++) { if (n) await new Promise((r) => setTimeout(r, 5000)); const s = await pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })); if (s.url) return { url: s.url, error: null as string | null }; if (s.status === "failed") return { url: null as string | null, error: s.error }; } return { url: null as string | null, error: "render timed out" };
+            for (let n = 0; n < 52; n++) { if (n) await new Promise((r) => setTimeout(r, 5000)); const s = await pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })); if (s.url) return { url: s.url, error: null as string | null }; if (s.status === "failed") return { url: null as string | null, error: s.error }; } return { url: null as string | null, error: "render timed out" };
           });
           if (out.url) {
             await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "talking_photo", unit: "video", action: "presenter", count: 1 }).catch(() => {}));

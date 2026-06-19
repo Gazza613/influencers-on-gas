@@ -2,8 +2,9 @@ import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
 import { generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, assembleVideo, reshootShot } from "@/inngest/functions";
 
-// Image generation + polling can run up to a few minutes.
-export const maxDuration = 300;
+// Image/video generation + polling can run several minutes; give the invocation headroom so a
+// long render poll can't time out the whole function (which left clip jobs spinning forever).
+export const maxDuration = 800;
 
 // Inngest Cloud calls this endpoint to register + run functions (authenticated by
 // Inngest's signing key, not our session — so it's intentionally not behind the gate).

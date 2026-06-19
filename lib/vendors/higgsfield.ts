@@ -673,10 +673,15 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
     for (const params of shapeFor(model)) {
       try {
         const r = await call("generate_video", { params });
-        let url: string | null = extractImageUrls(r)[0] ?? null; // video comes back as a file url too
-        const jobId = extractJobIds(r)[0] ?? null;
-        if (!url && jobId) url = await pollJob(call, jobId, opts.rounds || 90);
+        const url: string | null = extractImageUrls(r)[0] ?? null; // immediate url (rare)
         if (url) return { url, error: null };
+        const jobId = extractJobIds(r)[0] ?? null;
+        // A jobId means this model + shape were ACCEPTED. Commit to it: poll once and return the
+        // result. Do NOT keep trying other combos (that's what made the b-roll run for minutes).
+        if (jobId) {
+          const out = await pollJob(call, jobId, opts.rounds || 70); // ~70 x 3s ≈ 3.5 min, bounded
+          return out ? { url: out, error: null } : { url: null, error: `b-roll render started (${model}) but did not finish in time` };
+        }
         const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
         lastErr = `[${model}] ${raw}`.slice(0, 220);
       } catch (e) { lastErr = `[${model}] ${String((e as Error)?.message || e)}`.slice(0, 220); }
