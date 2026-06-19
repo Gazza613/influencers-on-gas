@@ -4,7 +4,9 @@ import type { NextAuthConfig } from "next-auth";
 // (No providers here — providers with Node deps live in auth.ts.)
 export const authConfig = {
   trustHost: true,
-  pages: { signIn: "/login" },
+  // Unauthenticated access to a gated route lands on the public homepage (not the login form);
+  // the user enters via Get Started -> /login.
+  pages: { signIn: "/" },
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 }, // 8h
   callbacks: {
     // The public marketing homepage is open to everyone; every other matched route
