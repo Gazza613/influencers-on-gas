@@ -847,50 +847,58 @@ export const generateClips = inngest.createFunction(
     const shotUrl = (i: number) => shots.find((s) => s.scene === i)?.url || null;
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: [] } } }));
-    const clips: ClipRow[] = [];
-    const save = async (tag: string) => {
-      const fresh = (((await step.run(`reload-${tag}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
-      const prod = (fresh.production ?? production) as Record<string, unknown>;
-      await step.run(`save-${tag}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips } } }));
-    };
 
-    for (let i = 0; i < scenes.length; i++) {
-      const sc = scenes[i]; const role = String(sc.role || "a-roll"); const beat = String(sc.beat || "");
+    // Render ONE scene to a clip (its own steps, keyed by scene index so they're unique).
+    const renderOne = async (i: number, sc: Record<string, string>): Promise<ClipRow> => {
+      const role = String(sc.role || "a-roll"); const beat = String(sc.beat || "");
       const img = shotUrl(i);
-      if (role === "graphic") { clips.push({ scene: i, role, beat, kind: "graphic", url: null, status: "graphic" }); await save(`g${i}`); continue; }
-      if (!img) { clips.push({ scene: i, role, beat, kind: role, url: null, status: "failed", error: "no shot frame" }); await save(`n${i}`); continue; }
+      if (role === "graphic") return { scene: i, role, beat, kind: "graphic", url: null, status: "graphic" };
+      if (!img) return { scene: i, role, beat, kind: role, url: null, status: "failed", error: "no shot frame" };
       const line = String(sc.vo_line || "").trim();
       const motion = String(sc.motion_prompt || sc.blocking || "natural movement");
-
       if (role === "a-roll" && line && voiceId) {
         try {
           const audioUrl = await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-audio", "mp3", "audio/mpeg"));
-          await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }));
+          await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
           const started = await step.run(`start-${i}`, () => startTalkingVideo({ imageUrl: img, audioUrl, ratio, motionPrompt: motion }));
           const out = await step.run(`poll-${i}`, async () => {
             for (let n = 0; n < 70; n++) { if (n) await new Promise((r) => setTimeout(r, 5000)); const s = await pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })); if (s.url) return { url: s.url, error: null as string | null }; if (s.status === "failed") return { url: null as string | null, error: s.error }; } return { url: null as string | null, error: "render timed out" };
           });
           if (out.url) {
-            await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "talking_photo", unit: "video", action: "presenter", count: 1 }));
+            await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "talking_photo", unit: "video", action: "presenter", count: 1 }).catch(() => {}));
             const hosted = (await step.run(`host-${i}`, () => rehostToBlob(out.url as string, "clips").catch(() => null))) || (out.url as string);
-            clips.push({ scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready" });
-          } else clips.push({ scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: out.error });
-        } catch (e) { clips.push({ scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 180) }); }
-      } else {
-        // b-roll (or a-roll with no line / no voice): animate the frame with Kling.
-        const res = await step.run(`broll-${i}`, () => generateVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
-        if (res.url) {
-          await step.run(`u-broll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: process.env.HF_VIDEO_MODEL || "kling3", unit: "video", action: "broll", count: 1 }).catch(() => {}));
-          const hosted = (await step.run(`hostb-${i}`, () => rehostToBlob(res.url as string, "clips").catch(() => null))) || (res.url as string);
-          clips.push({ scene: i, role, beat, kind: "b-roll", url: hosted, status: "ready" });
-        } else clips.push({ scene: i, role, beat, kind: "b-roll", url: null, status: "failed", error: res.error });
+            return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready" };
+          }
+          return { scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: out.error };
+        } catch (e) { return { scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 180) }; }
       }
-      await save(`s${i}`);
-    }
+      // b-roll (or a-roll with no line / no voice): animate the frame with Kling.
+      const res = await step.run(`broll-${i}`, () => generateVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
+      if (res.url) {
+        await step.run(`u-broll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: process.env.HF_VIDEO_MODEL || "kling3", unit: "video", action: "broll", count: 1 }).catch(() => {}));
+        const hosted = (await step.run(`hostb-${i}`, () => rehostToBlob(res.url as string, "clips").catch(() => null))) || (res.url as string);
+        return { scene: i, role, beat, kind: "b-roll", url: hosted, status: "ready" };
+      }
+      return { scene: i, role, beat, kind: "b-roll", url: null, status: "failed", error: res.error };
+    };
+
+    // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
+    // scene merge-saves its result as it lands so the UI fills in live; a final save is authoritative.
+    const clips = await Promise.all(scenes.map(async (sc, i) => {
+      const row = await renderOne(i, sc);
+      const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+      const prod = (fresh.production ?? production) as Record<string, unknown>;
+      const list = Array.isArray(prod.clips) ? [...(prod.clips as ClipRow[])] : [];
+      const at = list.findIndex((c) => c.scene === i); if (at >= 0) list[at] = row; else list.push(row);
+      await step.run(`csave-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips: list } } }));
+      return row;
+    }));
+
+    const ordered = clips.slice().sort((a, b) => a.scene - b.scene);
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prodDone = (done.production ?? production) as Record<string, unknown>;
-    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, clips, clips_status: "done", status: "clips" } } }));
-    return { ok: true, clips: clips.length };
+    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, clips: ordered, clips_status: "done", status: "clips" } } }));
+    return { ok: true, clips: ordered.length };
   },
 );
 
