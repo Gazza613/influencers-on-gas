@@ -10,10 +10,13 @@ export const CLOTHED =
 export const SINGLE_FRAME =
   "a single photograph, one continuous frame of one moment, NOT a collage, contact sheet, grid, diptych, triptych, split screen or multiple stacked panels";
 
-// Background people: actively REQUIRE a BALANCED diverse crowd (imperative, so it isn't ignored).
+// Background people: a FEW believable extras, naturally placed for THIS setting, each visibly
+// DISTINCT (never clones), in a balanced diverse mix. Imperative so it isn't ignored.
 export const SCENE_PEOPLE =
-  "the scene is busy with several other people clearly visible in the background, a believable, natural crowd composed of roughly 70% white people and 30% black people, with an even 50/50 split of men and women across a range of ages, and a mix of individuals, couples and small groups; each rendered realistically, in sharp focus and at correct scale; a lived-in populated setting, never empty; " +
-  "EVERY background person is also FULLY CLOTHED in a complete, tasteful outfit including a top covering the torso AND bottoms (trousers, jeans, a skirt or tailored shorts), never bare-legged, in underwear or swimwear, never partially nude";
+  "a FEW other people are present in the background (roughly two to five, not a packed crowd), placed naturally for THIS specific setting the way real people occupy it (for a cafe: seated at different tables, queuing loosely, walking past) and NEVER arranged in a uniform row or tidy line; " +
+  "each background person is CLEARLY DISTINCT from the others, with a different age, build, hairstyle and a DIFFERENT outfit in different colours, doing a different natural activity; NEVER duplicate or near-duplicate people, and NEVER dress several of them in the same or matching clothing; " +
+  "the mix is balanced and natural: roughly 55% white, 25% black, 12% coloured and 8% indian people, with an even 50/50 split of men and women across a range of ages; each rendered realistically, in sharp focus and at correct scale; " +
+  "every background person is in a complete, tasteful outfit with a top and bottoms, never bare-legged, in underwear or swimwear";
 
 // No extras: the subject is alone in the scene.
 export const NO_EXTRAS =

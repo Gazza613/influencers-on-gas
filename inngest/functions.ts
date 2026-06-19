@@ -451,6 +451,7 @@ export const generateCreatives = inngest.createFunction(
         ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
       const refFromUrl = typeof persona.reference_url === "string" && persona.reference_url ? [persona.reference_url] : [];
       const twinPhotos = (uploadedRefs.length ? uploadedRefs : refFromUrl).slice(0, 4);
+      const anchored = twinPhotos.length > 0 || inf.mode === "twin"; // photo is the truth for skin/marks
       const idRefUrls = twinPhotos.length
         ? twinPhotos
         : [(persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || ""].filter(Boolean);
@@ -480,6 +481,8 @@ export const generateCreatives = inngest.createFunction(
           : (lockMode === "flexible"
             ? `IDENTITY REFERENCE: ${faceTags[0]} shows the person. Match their facial bone structure, face shape, eye shape and colour, brow arch, nose, lip shape, skin tone and hair. IGNORE ${faceTags[0]}'s clothing, background, pose and lighting; take the wardrobe, scene and pose from the description above.`
             : `IDENTITY LOCK: ${faceTags[0]} is the appearance reference. Replicate this person EXACTLY, facial bone structure, face shape, jaw, nose, lip shape, eye shape and colour, eyebrow arch, skin tone and texture, freckles, moles and natural asymmetries. Zero facial drift, it must be unmistakably the same individual. IGNORE ${faceTags[0]}'s clothing, background, pose and lighting; take those only from the scene described above.`)),
+        faceTags.length && "If the person wears glasses or any signature eyewear in the reference photos, keep that exact eyewear on them in this shot, unchanged; never remove, add or restyle their glasses.",
+        anchored && "The reference photos are the ONLY source of truth for their skin: do NOT add any moles, freckles, scars, beauty spots or skin marks that are not clearly visible in those photos.",
         featTag && `${featTag} is a forensic FEATURE reference: match the exact eyes, brows, lips, skin texture and hair shown in it. Do NOT copy its panel layout, labels or white background.`,
         clothTag && `${clothTag} is a WARDROBE reference: match its outfit (silhouette, fabric, styling). Do NOT copy any face or person from ${clothTag}.`,
         locTag && `${locTag} is a SCENE reference: match its location and setting. Do NOT copy any face or person from ${locTag}.`,
@@ -493,7 +496,9 @@ export const generateCreatives = inngest.createFunction(
       const bibleFace = ((persona.bible as { face?: { skin?: string; distinct_features?: string } })?.face) ?? {};
       const g = genderWord(persona.gender) || "person";
       const subjectLine = [bibleId.age, g, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || g;
-      const faceMarks = [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 220);
+      // NEVER thread bible-invented marks (moles/freckles) when anchored to a real photo —
+      // the reference is the source of truth, inventing marks puts a mole where there isn't one.
+      const faceMarks = anchored ? "" : [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 220);
 
       // TWO-STAGE writer: when the user gave a brief, let Claude expand it into a rich,
       // art-directed scene (using the bible) before we wrap it in the structured prompt.
