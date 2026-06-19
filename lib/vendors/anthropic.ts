@@ -400,3 +400,97 @@ export async function designVoiceBrief(description: string): Promise<{ voice_des
     return fallback;
   }
 }
+
+// ── THE PRODUCER: brief → directed storyboard (MTN-MoMo house style) ────────
+export type StoryScene = {
+  beat: string; role: "a-roll" | "b-roll" | "graphic";
+  start: string; end: string; location: string; talent: string[];
+  shot: string; blocking: string; performance: string; graphics: string[];
+  vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
+};
+export type Storyboard = {
+  title: string; format: string; duration_seconds: number; tone: string;
+  music_bed: string; full_vo: string; legal: string; scenes: StoryScene[];
+};
+
+const STORYBOARD_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    title: { type: "string" }, format: { type: "string" }, duration_seconds: { type: "number" },
+    tone: { type: "string" }, music_bed: { type: "string", description: "how the music behaves across the film" },
+    full_vo: { type: "string", description: "the entire continuous voiceover as one block" },
+    legal: { type: "string", description: "the mandatory legal line, verbatim, or empty" },
+    scenes: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false,
+        properties: {
+          beat: { type: "string", description: "Hook, Offer, Benefits, CTA graphic, Montage, End card, etc." },
+          role: { type: "string", enum: ["a-roll", "b-roll", "graphic"], description: "a-roll = presenter talks to camera; b-roll = scene/montage with motion, no talking; graphic = branded card" },
+          start: { type: "string" }, end: { type: "string" },
+          location: { type: "string" },
+          talent: { type: "array", items: { type: "string" } },
+          shot: { type: "string", description: "type, angle, movement, lens feel in one line" },
+          blocking: { type: "string" },
+          performance: { type: "string" },
+          graphics: { type: "array", items: { type: "string" } },
+          vo_line: { type: "string", description: "the spoken line for this scene, or empty if none" },
+          caption: { type: "string", description: "burned-in caption, matches vo_line, short beats split with |" },
+          motion_prompt: { type: "string", description: "for b-roll/a-roll: short natural movement direction for the video engine" },
+          music_sfx: { type: "string" },
+          transition: { type: "string" },
+        },
+        required: ["beat", "role", "start", "end", "location", "talent", "shot", "blocking", "performance", "graphics", "vo_line", "caption", "motion_prompt", "music_sfx", "transition"],
+      },
+    },
+  },
+  required: ["title", "format", "duration_seconds", "tone", "music_bed", "full_vo", "legal", "scenes"],
+};
+
+const PRODUCER_SYSTEM =
+`You are an elite short-form video creative director. Produce a DIRECTED STORYBOARD for a vertical social ad in this exact house style (proven on real campaigns):
+
+STRUCTURE — a 6-beat arc, scaled to the target duration (pacing guide of total runtime): Hook ~8%, Offer ~23%, Benefits ~28%, CTA graphic ~13%, Lifestyle montage ~22%, End card ~6%. Use ~6 scenes for 60s; fewer for shorter durations. Give each scene approximate start/end timecodes that sum to the duration.
+
+VOICE — ONE continuous voiceover across the whole film (never back-and-forth dialogue). Second person, warm, confident, effortless, optimistic, benefit-led, short active sentences, no jargon. Open with a hook in the first ~5s that names the product. Put the full continuous read in full_vo, and each scene's portion in vo_line (montage and end card usually have empty vo_line, carried by music).
+
+WORLD + CONTINUITY (critical for a world-class feel) — set the ENTIRE ad in ONE coherent, specific location/world (e.g. a particular sunlit coffee shop), with the SAME wardrobe, lighting and look on the influencer across every scene, so scenes cut together as one seamless film, never disconnected shots. The presenter is physically PRESENT IN the scene doing something real (sitting at a table with a coffee, leaning at the counter, walking through the space), with believable background people moving naturally, NEVER a floating head on a plain backdrop. Every b-roll uses the SAME location/world as the a-roll (different angles, details and moments of that same place) so the film flows. State the shared world in each scene's location and keep wardrobe consistent in blocking.
+
+ROLES — classify every scene: 'a-roll' = the influencer IN the scene talking to camera (sitting, standing or walking in the location, setting + extras visible behind, never a plain backdrop); 'b-roll' = a lifestyle/scene shot in the SAME location with NATURAL MOTION and believable background people, NO talking (music carries it); 'graphic' = a branded card (CTA badge or end card). In a-roll and b-roll motion_prompts include believable body movement (sitting down, gesturing, walking) and that background people move.
+
+CAPTIONS — burned-in, match vo_line word-for-word, split into short beats (~6-14 words each) using ' | '. Empty when there is no VO.
+
+MOTION — for a-roll and b-roll give a short motion_prompt (natural, not robotic): for a-roll subtle head movement + hand gestures; for b-roll the scene action and that background people move naturally.
+
+BRANDING + LEGAL — persistent logo top-left every scene (note in graphics). The end card restates the offer, CTA mechanic and the legal line. Use the provided legal line VERBATIM, never paraphrased; if none provided, leave legal empty.
+
+MUSIC — describe a single music bed that runs throughout, lifts under the CTA, breathes in the montage, resolves on the end card; add ambient SFX per scene where it helps.
+
+UK spelling. No em dashes. Be specific and art-directed, never generic. Return the storyboard via the tool.`;
+
+export async function generateStoryboard(brief: {
+  influencerName: string; brand: string; goal: string; offer: string; benefits: string;
+  cta: string; ctaCode?: string; durationSeconds: number; format: string; talent: string;
+  setting: string; tone: string; logo?: string; legal?: string;
+}): Promise<Storyboard> {
+  const c = await client();
+  const input =
+    `Brand / product: ${brief.brand}\nCampaign goal: ${brief.goal}\nCore offer / hook: ${brief.offer}\n` +
+    `Key benefits: ${brief.benefits}\nPrimary CTA: ${brief.cta}\nCTA mechanic / code: ${brief.ctaCode || "(none)"}\n` +
+    `Target duration: ${brief.durationSeconds} seconds\nFormat: ${brief.format}\n` +
+    `Talent (the locked influencer is the main presenter): ${brief.influencerName}. ${brief.talent}\n` +
+    `Setting / world: ${brief.setting}\nTone words: ${brief.tone}\n` +
+    `Persistent branding: ${brief.logo || `"${brief.brand}" logo top-left throughout`}\n` +
+    `Mandatory legal line (verbatim, or none): ${brief.legal || "(none)"}\n\nWrite the directed storyboard now.`;
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 6000,
+    system: PRODUCER_SYSTEM,
+    tools: [{ name: "storyboard", description: "Return the complete directed storyboard.", input_schema: STORYBOARD_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
+    tool_choice: { type: "tool", name: "storyboard" },
+    messages: [{ role: "user", content: input }],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") throw new Error("No storyboard returned");
+  return block.input as Storyboard;
+}
