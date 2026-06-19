@@ -36,14 +36,23 @@ export async function GET() {
     const nameOf = (it: Record<string, unknown>) => String(it.name ?? it.title ?? it.label ?? "");
     const allModels = items.map((it) => ({ id: idOf(it), name: nameOf(it) })).filter((m) => m.id || m.name);
     const nano = allModels.filter((m) => /nano|banana/i.test(m.id + " " + m.name));
+    // Hunt for POPCORN: as a model, and as a tool (name or description), since it may be a
+    // separate MCP tool rather than a generate_image model.
+    const popcornModels = allModels.filter((m) => /popcorn/i.test(m.id + " " + m.name));
+    const popcornTools = tools.filter((t) => /popcorn/i.test(t.name + " " + (t.description || "")));
+    // Tools whose description hints at multi-frame / storyboard / sequence capability.
+    const multiFrameTools = tools.filter((t) => /(storyboard|multi[- ]?frame|sequence|popcorn|frames|board|previs)/i.test(t.description || ""));
     return NextResponse.json({
       ok: true,
       generate_image_found: !!gen,
       aspect_ratio_schema: pickEnum(paramsSchema, "aspect_ratio"),
       count: allModels.length,
       nano_models: nano,
+      popcorn_models: popcornModels,
+      popcorn_tools: popcornTools.map((t) => ({ name: t.name, description: t.description })),
+      multiframe_tools: multiFrameTools.map((t) => ({ name: t.name, description: t.description })),
+      all_tools: tools.map((t) => ({ name: t.name, description: (t.description || "").slice(0, 120) })),
       all_models: allModels,
-      sample_raw_item: items[0] ?? null,
     });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 500 });
