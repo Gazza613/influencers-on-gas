@@ -7,8 +7,10 @@ export const authConfig = {
   pages: { signIn: "/login" },
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 }, // 8h
   callbacks: {
-    // Gate every matched route: only a signed-in user may pass.
-    authorized({ auth }) {
+    // The public marketing homepage is open to everyone; every other matched route
+    // requires a signed-in user (Get Started -> /login gates entry to the app).
+    authorized({ auth, request }) {
+      if (request.nextUrl.pathname === "/") return true;
       return !!auth?.user;
     },
     jwt({ token, user }) {
