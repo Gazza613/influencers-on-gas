@@ -49,7 +49,7 @@ const CREATIVE_NARRATION = [
 ];
 
 export default function CreativesStudio({ influencerId, initial }: { influencerId: string; initial: { creatives: Creative[]; status: string } }) {
-    const [view, setView] = useState<"all" | "passed" | "needs">("all");
+    const [view, setView] = useState<"all" | "excellent" | "good" | "average">("all");
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
@@ -335,8 +335,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   };
 
   const visible = creatives.filter((c) => {
-    if (view === "passed") return c.status === "approved";
-    if (view === "needs") return c.status === "failed_qa" || c.status === "failed_generation";
+    if (view === "excellent") return c.status === "approved" && c.resolution === "4k";
+    if (view === "good") return c.status === "approved" && c.resolution !== "4k" && gradeOf(c).t === "Good";
+    if (view === "average") return c.status === "failed_qa" || (c.status === "approved" && gradeOf(c).t === "Average");
     return true;
   });
   // Split into 2K previews (plus any failed shots, which keep their delete control) and 4K finals.
@@ -519,7 +520,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Your creatives · {creatives.length}</div>
             <div className="flex items-center gap-1">
-              {([ ["all", "All"], ["passed", "Good"], ["needs", "Needs reroll"] ] as const).map(([k, label]) => (
+              {([ ["all", "All"], ["excellent", "Excellent"], ["good", "Good"], ["average", "Average"] ] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setView(k)}
@@ -536,7 +537,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               </div>
             )}
           </div>
-          <p className="mb-3 text-[14px] leading-relaxed text-ink-dim">Shots render fast in 2K. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
+          <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">Shots render fast in 2K. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
           {twoK.length > 0 && (
             <div className="mb-5">
               <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}</div>
