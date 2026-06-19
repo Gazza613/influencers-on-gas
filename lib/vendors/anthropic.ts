@@ -109,22 +109,31 @@ Look / finish (adapt to the requested look):
 - "photoshoot" look: professionally styled hair and, for women, tasteful natural makeup; clean, well-prepped, camera-ready skin so visible blemishes are minimal and softened. Still photoreal, never plastic.`;
 
 // Expand a brief into a full Character Bible.
-export async function generateBible(name: string, brief: string, gender?: string, look?: string, twin = false): Promise<CharacterBible> {
+export async function generateBible(name: string, brief: string, gender?: string, look?: string, twin = false, referenceImageUrls: string[] = []): Promise<CharacterBible> {
   const c = await client();
+  const refUrls = referenceImageUrls.filter((u) => typeof u === "string" && /^https?:\/\//.test(u)).slice(0, 4);
+  const hasRefs = refUrls.length > 0;
+  // PHOTO-LED when reference images are supplied (a twin, or a new influencer seeded from a photo):
+  // the appearance must be READ from the image, never invented. Falls back to invention with no photo.
   const genderLine = gender ? `Gender: ${gender} (design unmistakably as a ${gender}; use only ${gender === "female" ? "she/her" : gender === "male" ? "he/him" : "their"} pronouns throughout, never the opposite).\n` : "";
   const lookLine = look ? `Look: ${look} look (adapt makeup, grooming and skin finish accordingly).\n` : "";
-  // A DIGITAL TWIN is a real person from their own photo: never invent facial marks.
-  const twinLine = twin
-    ? "THIS IS A DIGITAL TWIN OF A REAL PERSON, built from their own reference photo. Do NOT invent any moles, freckles, scars, birthmarks or distinctive marks, the real photo defines the actual face. Keep face.distinct_features EMPTY or to truly generic descriptors only, and face.skin generic. Never add features the person may not have.\n"
-    : "";
-  const imperfectionAsk = twin ? "Keep the face fields generic; the real photo is the source of truth for their appearance." : "Give them a fresh, distinctive set of subtle humanising imperfections unique to this person.";
+  const refLine = hasRefs
+    ? `REFERENCE PHOTO(S) ATTACHED — these images ARE this person. Derive EVERY physical trait from what you actually SEE: face shape and bone structure, real skin tone and complexion (describe the actual colouring you observe, do not guess a heritage), eye colour, hair, apparent age, and body build/proportions. Describe ONLY what is visible. Do NOT invent, change, embellish or add any physical feature, mark or colouring that is not in the photo. ${twin ? "This is a digital twin of a real person — " : ""}keep face.distinct_features to ONLY marks clearly visible in the photo (else leave it generic/empty). The brief drives their PERSONALITY, story, wardrobe and voice — never their physical appearance.\n`
+    : (twin ? "THIS IS A DIGITAL TWIN OF A REAL PERSON. Do NOT invent any moles, freckles, scars, birthmarks or distinctive marks; keep face.distinct_features empty or generic and face.skin generic.\n" : "");
+  const imperfectionAsk = hasRefs || twin
+    ? "The photo is the source of truth for their appearance — match it exactly and keep invented physical marks out."
+    : "Give them a fresh, distinctive set of subtle humanising imperfections unique to this person.";
+  const textPart = `Influencer name: ${name}\n${genderLine}${lookLine}${refLine}\nBrief:\n${brief}\n\nDesign the complete character bible. ${imperfectionAsk}\n\nWrite vivid but ECONOMICAL: every prose field 1 to 3 tight sentences (no flowery essays), every array 3 to 5 items. Production-useful detail, not padding. This keeps the casting fast and the bible sharp.`;
+  const content: Anthropic.ContentBlockParam[] = hasRefs
+    ? [...refUrls.map((url) => ({ type: "image" as const, source: { type: "url" as const, url } })), { type: "text" as const, text: textPart }]
+    : [{ type: "text" as const, text: textPart }];
   const res = await c.messages.create({
     model: MODEL,
     max_tokens: 5000,
     system: SYSTEM,
     tools: [{ name: "character_bible", description: "Return the complete character bible for this influencer.", input_schema: BIBLE_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
     tool_choice: { type: "tool", name: "character_bible" },
-    messages: [{ role: "user", content: `Influencer name: ${name}\n${genderLine}${lookLine}${twinLine}\nBrief:\n${brief}\n\nDesign the complete character bible. ${imperfectionAsk}` }],
+    messages: [{ role: "user", content }],
   });
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("No character bible returned");
