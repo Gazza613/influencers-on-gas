@@ -14,7 +14,7 @@ export default async function ProducerPage({ params }: { params: Promise<{ id: s
   if (!persona.locked) {
     return (
       <div className="rounded-xl border border-line bg-surface-1 p-6 text-center">
-        <p className="text-sm text-ink-dim">Lock {inf.name}&apos;s identity first, then Kiara can produce a video with them.</p>
+        <p className="text-sm text-ink-dim">Lock {inf.name}&apos;s identity first, then the Producer can make a video with them.</p>
         <Link href={`/setup/influencers/${id}/lockdown`} className="btn-brand mt-3 inline-block rounded-lg px-4 py-2 text-sm font-bold">Go to Lock down →</Link>
       </div>
     );

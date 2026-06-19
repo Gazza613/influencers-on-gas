@@ -166,11 +166,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
 
   return (
     <div className="space-y-5">
-      {/* Kiara, the Producer */}
+      {/* The Producer */}
       <div className="flex items-start gap-3 rounded-xl border border-[#a855f7]/30 bg-gradient-to-r from-[#a855f7]/12 to-[#60a5fa]/8 p-5">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#a855f7]/20 text-2xl">🎬</div>
         <div>
-          <div className="text-sm font-extrabold text-white">Kiara <span className="font-semibold text-[#c79bff]">· your Producer</span></div>
+          <div className="text-sm font-extrabold text-white">Your Producer</div>
           <p className="mt-1 text-sm text-ink-dim">
             {editing
               ? `Tell me about the ad and I'll direct a full storyboard for ${name}, shot by shot, in our house style. Then we shoot it together.`
