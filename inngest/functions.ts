@@ -136,13 +136,51 @@ export const buildIdentity = inngest.createFunction(
         await step.run("anchor-failed", () => updateInfluencer(influencerId, { status: "gen_failed", persona: { ...persona, soul_error: "None of the uploaded reference photos could be loaded. Please re-upload clear images." } }));
         return { error: "no loadable reference photos" };
       }
-      const photos = valid;
-      const twinFrames = photos.map((url, i) => ({ url, ...(i === 0 ? { hero: true, face: true } : {}) }));
+      // Import the uploads as forensic @image identity anchors, then GENERATE a real, varied
+      // photoshoot locked to them AND driven by the bible (build, complexion, age, styling).
+      // The uploaded photos stay as the identity truth (hero + face card); the generated frames
+      // give the angle/light/expression/distance variety a Soul + creatives need.
+      const refMedias = await step.run("anchor-import", async () =>
+        (await Promise.all(valid.slice(0, 4).map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v),
+      );
+      const g = genderWord(persona.gender);
+      const bibleId = ((persona.bible as { identity?: { age?: string; build?: string; ethnicity_design?: string } })?.identity) ?? {};
+      const subjectLine = [bibleId.age, g, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || g;
+      const look = lookClause(persona);
+
+      if (refMedias.length) {
+        const faceTags = refMedias.map((_, k) => `@image${k + 1}`).join(", ");
+        const idLock = `${faceTags} are the SAME real person — replicate their face EXACTLY (bone structure, eye shape and colour, nose, lips, real skin tone and texture, hair); unmistakably the same individual in every frame, zero drift. IGNORE their original clothing, background and pose; take those from the direction below.`;
+        const prompts = looks.map((l) => {
+          const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
+          return `A real photograph of ${subjectLine}. ${idLock} ${l.frame}, ${l.light}, wearing ${l.wardrobe}, against a clean simple neutral background, ${look}. ${core}.`;
+        });
+        const ex = { medias: refMedias.map((value) => ({ value, role: "image" })) };
+        const urls = await step.run("anchored-shoot", () => generateBatch(prompts, IMAGE_MODEL, "9:16", ex, IMAGE_FALLBACK));
+        const produced = urls.filter((u): u is string => !!u);
+        if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
+        const validShoot = await step.run("validate-shoot", () => filterLoadable(produced));
+        // Real uploads first (identity truth), then the generated varied frames.
+        const frames: { url: string; hero?: boolean; face?: boolean }[] = [{ url: valid[0], hero: true, face: true }];
+        for (const url of valid.slice(1)) if (!frames.some((f) => f.url === url)) frames.push({ url });
+        for (const url of validShoot) if (!frames.some((f) => f.url === url)) frames.push({ url });
+        await step.run("save-anchored-frames", () =>
+          updateInfluencer(influencerId, {
+            look_refs: frames,
+            status: "frames_ready",
+            persona: { ...persona, hero_url: valid[0], frames_expected: frames.length, face_card_url: valid[0], feature_sheet_url: null, turnaround_url: null },
+          }),
+        );
+        return { ok: true, frames: frames.length, anchored: true, generated: validShoot.length };
+      }
+
+      // Fallback: uploads could not be imported for reference → keep them as the frame set.
+      const twinFrames = valid.map((url, i) => ({ url, ...(i === 0 ? { hero: true, face: true } : {}) }));
       await step.run("save-twin-frames", () =>
         updateInfluencer(influencerId, {
           look_refs: twinFrames,
           status: "frames_ready",
-          persona: { ...persona, hero_url: photos[0], frames_expected: photos.length, face_card_url: photos[0], feature_sheet_url: null, turnaround_url: null },
+          persona: { ...persona, hero_url: valid[0], frames_expected: valid.length, face_card_url: valid[0], feature_sheet_url: null, turnaround_url: null },
         }),
       );
       return { ok: true, frames: twinFrames.length, twin: true };
