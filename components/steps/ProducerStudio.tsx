@@ -8,7 +8,8 @@ type Scene = {
   vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string } | null;
+type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null };
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -35,6 +36,22 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
   const [legal, setLegal] = useState(String((initialProduction?.brief as { legal?: string })?.legal || ""));
 
   const sb = production?.storyboard;
+  const shots = production?.shots ?? [];
+  const shooting = production?.shots_status === "running";
+  const shotFor = (i: number) => shots.find((s) => s.scene === i);
+
+  async function shootShots() {
+    if (shooting) return;
+    setErr("");
+    setProduction((p) => (p ? { ...p, shots: [], shots_status: "running" } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't start shooting."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
+    for (let i = 0; i < 90; i++) {
+      await new Promise((res) => setTimeout(res, 6000));
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
+      if (d?.production) { setProduction(d.production); if (d.production.shots_status !== "running") break; }
+    }
+  }
 
   async function generate() {
     if (!brand.trim() || !offer.trim() || busy) { if (!brand.trim() || !offer.trim()) setErr("Sami needs at least the brand and the core offer."); return; }
@@ -125,8 +142,24 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
           <div className="space-y-3">
             {sb.scenes.map((s, i) => {
               const role = ROLE[s.role] ?? ROLE["a-roll"];
+              const shot = shotFor(i);
               return (
-                <div key={i} className="rounded-xl border border-line bg-surface-1 p-4">
+                <div key={i} className="flex gap-4 rounded-xl border border-line bg-surface-1 p-4">
+                  {s.role !== "graphic" && (
+                    <div className="w-32 shrink-0">
+                      {shot?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={shot.url} alt={`scene ${i + 1}`} className="aspect-[9/16] w-full rounded-lg border border-line object-cover" />
+                      ) : shooting ? (
+                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />shooting…</div>
+                      ) : shot?.error ? (
+                        <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-alert/30 bg-surface-2 text-center text-[10px] text-alert">shot failed</div>
+                      ) : (
+                        <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-dashed border-line bg-surface-2 text-center text-[10px] text-ink-faint">not shot yet</div>
+                      )}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="tabular text-xs font-bold text-ink">Scene {i + 1}</span>
                     <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}–{s.end}</span>
@@ -141,6 +174,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
                   {s.motion_prompt && <div className="mt-1 text-[12px] text-ink-faint">↗ Motion: {s.motion_prompt}</div>}
                   {s.graphics?.length > 0 && <div className="mt-1 text-[12px] text-ink-faint">▣ {s.graphics.join(" · ")}</div>}
                   <div className="mt-1 text-[12px] text-ink-faint">🎵 {s.music_sfx} {s.transition ? `· ⟶ ${s.transition}` : ""}</div>
+                  </div>
                 </div>
               );
             })}
@@ -149,9 +183,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
           {sb.legal && <div className="rounded-xl border border-line bg-surface-2 p-3 text-[11px] text-ink-faint"><b>Legal (verbatim):</b> {sb.legal}</div>}
 
           <div className="rounded-xl border border-ready/30 bg-ready/5 p-5">
-            <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Next: shoot the storyboard</div>
-            <p className="mt-1 text-sm text-ink-dim">When the storyboard is right, Sami shoots each scene: presenter shots for a-roll, scene shots for b-roll (same world), the voiceover, then the talking + motion clips, music, captions and the final cut.</p>
-            <button disabled className="btn-brand mt-3 cursor-not-allowed rounded-lg px-4 py-2 text-sm font-bold opacity-50">Shoot the shots → (coming next)</button>
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Shoot the shots</div>
+            <p className="mt-1 text-sm text-ink-dim">Sami renders a coherent image for every scene from {name}&apos;s locked identity, holding one consistent world across the whole board (the frames anchor each other). These become the references for the a-roll and b-roll clips. A few minutes.</p>
+            <button onClick={shootShots} disabled={shooting} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Sami is shooting the board…" : shots.some((s) => s.url) ? "↻ Re-shoot the board" : "🎬 Shoot the shots"}</button>
           </div>
         </div>
       ) : null}

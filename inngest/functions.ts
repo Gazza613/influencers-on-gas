@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts } from "@/lib/vendors/elevenlabs";
@@ -673,5 +673,80 @@ export const generateAroll = inngest.createFunction(
       await step.run("fail", () => setClip({ status: "failed", error: String((e as Error)?.message || e).slice(0, 200) }));
       throw e;
     }
+  },
+);
+
+// THE PRODUCER — "shoot the shots": render one coherent image per storyboard scene with Nano
+// Banana Pro. Identity refs + a shared WORLD anchor (the first good frame, reused on the rest)
+// keep location/lighting/identity continuous across the board (the API equivalent of Popcorn).
+type ShotRow = { scene: number; role: string; beat: string; url: string | null; error?: string | null };
+export const generateShots = inngest.createFunction(
+  { id: "generate-shots", retries: 1, triggers: [{ event: "influencer/generate.shots" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const inf = await step.run("load", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const production = (persona.production ?? null) as { brief?: Record<string, unknown>; storyboard?: { scenes?: Record<string, unknown>[]; format?: string } } | null;
+    const scenes = production?.storyboard?.scenes ?? [];
+    if (!scenes.length) return { error: "no storyboard" };
+    const ratio = String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16";
+
+    // Identity references (same recipe as creatives): uploaded photos, else the canonical cards.
+    const uploadedRefs = Array.isArray(persona.reference_images) ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
+    const refFromUrl = typeof persona.reference_url === "string" && persona.reference_url ? [persona.reference_url] : [];
+    const anchored = uploadedRefs.length ? uploadedRefs.slice(0, 4) : refFromUrl;
+    const idRefUrls = anchored.length
+      ? anchored
+      : [(persona.face_card_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || ""].filter(Boolean);
+    const featureUrl = anchored.length ? "" : ((persona.feature_sheet_url as string) || "");
+    const idMedias = await step.run("import-identity", async () => {
+      const ids = (await Promise.all(idRefUrls.map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v);
+      if (featureUrl) { const f = await importMediaUrl(featureUrl).catch(() => null); if (f) ids.push(f); }
+      return ids;
+    });
+    const bibleId = ((persona.bible as { identity?: { age?: string; build?: string; ethnicity_design?: string } })?.identity) ?? {};
+    const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
+    const look = lookClause(persona);
+
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running" } } }));
+
+    const shots: ShotRow[] = [];
+    let worldRef: string | null = null; // first good frame, imported, reused to lock the world
+    for (let i = 0; i < scenes.length; i++) {
+      const sc = scenes[i] as Record<string, string>;
+      const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
+      if (role === "graphic") { shots.push({ scene: i, role, beat, url: null }); continue; }
+      const faceTags = idMedias.map((_, k) => `@image${k + 1}`);
+      const worldTag = worldRef ? `@image${idMedias.length + 1}` : "";
+      const refInstruction =
+        (faceTags.length ? ` IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. IGNORE their clothing, background and pose; take those from the scene.` : "") +
+        (worldTag ? ` ${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity.` : "");
+      const prompt = buildShotPrompt({
+        location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
+        performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
+        hasPeople: true, worldAnchored: !!worldRef,
+      });
+      const medias = [...idMedias, ...(worldRef ? [worldRef] : [])].map((value) => ({ value, role: "image" }));
+      const url = await step.run(`shot-${i}`, () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null));
+      let hosted: string | null = null;
+      if (url) {
+        const ok = (await step.run(`valid-${i}`, () => filterLoadable([url]))).length > 0;
+        if (ok) {
+          hosted = (await step.run(`host-${i}`, () => rehostToBlob(url, "shots").catch(() => null))) || url;
+          await step.run(`usage-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
+          if (!worldRef && hosted) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(hosted as string).catch(() => null));
+        }
+      }
+      shots.push({ scene: i, role, beat, url: hosted, error: hosted ? null : "no image" });
+      // Persist progressively so the UI fills in live.
+      const fresh = (((await step.run(`reload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+      const prod = (fresh.production ?? production) as Record<string, unknown>;
+      await step.run(`save-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots, shots_status: "running" } } }));
+    }
+    const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+    const prodDone = (done.production ?? production) as Record<string, unknown>;
+    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, shots, shots_status: "done", status: "shots" } } }));
+    return { ok: true, shots: shots.length };
   },
 );

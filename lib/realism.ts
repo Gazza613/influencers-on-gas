@@ -101,6 +101,31 @@ export function buildCreativeImagePrompt(o: {
   ].join("\n\n");
 }
 
+// ── THE PRODUCER: a directed shot from a storyboard scene, coherent across the board.
+// `worldAnchored` = a prior frame of the SAME world is supplied as an extra reference, so
+// location, lighting and style stay continuous shot-to-shot (the "Popcorn"-style coherence).
+export function buildShotPrompt(o: {
+  location: string; blocking: string; shot: string; performance: string; role: string;
+  subjectLine: string; look: string; refInstruction: string; ratio: string;
+  hasPeople: boolean; worldAnchored: boolean;
+}): string {
+  return [
+    "Photograph style: a real, candid documentary-style photo of the influencer living this exact moment in a real place, shot like a high-end social ad. Not a studio portrait, not a posed shot.",
+    `Scene: ${o.location}. ${o.blocking}. The background is real and in sharp focus (never blurred), so the shot is reusable for video.`,
+    o.worldAnchored ? "CONTINUITY: an additional reference image shows the ESTABLISHED world of this production; match its exact location, set dressing, lighting, time of day and colour grade so this shot cuts seamlessly with the others." : "",
+    `Subject: ${o.subjectLine}. The influencer is physically IN the scene (${o.blocking}), never a floating head on a plain backdrop.`,
+    `Identity:${o.refInstruction}`,
+    `Framing: ${o.shot}.`,
+    `Performance: ${o.performance}.`,
+    `Grooming/wardrobe: ${o.look}. Keep the same outfit and styling as the established world for continuity.`,
+    SKIN_FACTS,
+    SCALE,
+    o.hasPeople ? SCENE_PEOPLE : NO_EXTRAS,
+    `Wardrobe: ${CLOTHED}.`,
+    `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
+  ].filter(Boolean).join("\n\n");
+}
+
 // ── Canonical identity reference set (archive gem). Generated once from the chosen face
 // and reused as forensic @image refs in every creative. @image1 = the chosen face. ──────
 export function buildIdentityCardPrompt(): string {
