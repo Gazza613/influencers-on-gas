@@ -641,28 +641,29 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
   const mediaId = await importMediaUrl(opts.imageUrl);
   if (!mediaId) return { url: null, error: "could not import the still into Higgsfield" };
   const { call } = await openSession();
-  const model = process.env.HF_VIDEO_MODEL || "kling3"; // current Kling 3.0 (face-safe, best for character b-roll)
   const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : "9:16";
-  // Image-input field name isn't publicly documented; try the known shapes and keep whichever the
-  // server accepts. input_images[] + medias[] are the two corroborated by Higgsfield's CLI/MCP.
-  const shapes: AnyObj[] = [
+  // Neither the Kling model id nor the input-image field name are publicly documented, so try the
+  // corroborated candidates and keep whichever the server accepts. (kling3_0 = the CLI job id.)
+  const models = [...new Set([process.env.HF_VIDEO_MODEL || "kling3", "kling3_0", "kling-2.5"].filter(Boolean))];
+  const shapeFor = (model: string): AnyObj[] => [
     { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, input_images: [{ type: "image", id: mediaId }] },
     { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, medias: [{ value: mediaId, role: "image" }] },
     { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, image_id: mediaId },
     { model, prompt: opts.prompt, aspect_ratio: ar, start_image_id: mediaId },
   ];
   let lastErr = "";
-  for (const params of shapes) {
-    try {
-      const r = await call("generate_video", { params });
-      let url: string | null = extractImageUrls(r)[0] ?? null; // video comes back as a file url too
-      const jobId = extractJobIds(r)[0] ?? null;
-      if (!url && jobId) url = await pollJob(call, jobId, opts.rounds || 90);
-      if (url) return { url, error: null };
-      const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
-      lastErr = `${raw}`.slice(0, 200);
-      if (!/invalid|unknown|unexpected|required|not allowed|extra/i.test(raw)) break; // not a shape problem
-    } catch (e) { lastErr = String((e as Error)?.message || e).slice(0, 200); }
+  for (const model of models) {
+    for (const params of shapeFor(model)) {
+      try {
+        const r = await call("generate_video", { params });
+        let url: string | null = extractImageUrls(r)[0] ?? null; // video comes back as a file url too
+        const jobId = extractJobIds(r)[0] ?? null;
+        if (!url && jobId) url = await pollJob(call, jobId, opts.rounds || 90);
+        if (url) return { url, error: null };
+        const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+        lastErr = `[${model}] ${raw}`.slice(0, 220);
+      } catch (e) { lastErr = `[${model}] ${String((e as Error)?.message || e)}`.slice(0, 220); }
+    }
   }
-  return { url: null, error: `b-roll video failed [${model} ${ar}]: ${lastErr}`.slice(0, 250) };
+  return { url: null, error: `b-roll video failed (${ar}): ${lastErr}`.slice(0, 280) };
 }

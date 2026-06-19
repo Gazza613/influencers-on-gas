@@ -21,6 +21,17 @@ export async function GET() {
     const gen = tools.find((t) => t.name === "generate_image");
     const schema = gen?.inputSchema as { properties?: { params?: unknown } } | undefined;
     const paramsSchema = schema?.properties?.params ?? schema;
+    // generate_video: dump its FULL input schema so we can wire Kling image-to-video exactly
+    // (the param names/enums for the input image + model are not publicly documented).
+    const vid = tools.find((t) => t.name === "generate_video");
+    const vidSchema = vid?.inputSchema ?? null;
+    // The video model catalog (Kling/Veo/Seedance ids), if models_explore exposes it.
+    let videoModels: { id: string; name: string }[] = [];
+    try {
+      const r = await callMcp("models_explore", { action: "list", kind: "video" }) as { structuredContent?: { items?: Record<string, unknown>[] } };
+      const items = r?.structuredContent?.items;
+      if (Array.isArray(items)) videoModels = items.map((it) => ({ id: String(it.id ?? it.model ?? it.slug ?? ""), name: String(it.name ?? it.title ?? "") })).filter((m) => m.id || m.name);
+    } catch { /* optional */ }
     // model/aspect are free-form strings validated against a server catalog → query it.
     // Pull the full model catalog (list) — search returned empty. Collect all items.
     const items: Record<string, unknown>[] = [];
@@ -53,6 +64,9 @@ export async function GET() {
       multiframe_tools: multiFrameTools.map((t) => ({ name: t.name, description: t.description })),
       all_tools: tools.map((t) => ({ name: t.name, description: (t.description || "").slice(0, 120) })),
       all_models: allModels,
+      generate_video_found: !!vid,
+      generate_video_schema: vidSchema,
+      video_models: videoModels,
     });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 500 });
