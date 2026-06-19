@@ -9,7 +9,8 @@ type Scene = {
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string } | null;
+type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -39,6 +40,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
   const shots = production?.shots ?? [];
   const shooting = production?.shots_status === "running";
   const shotFor = (i: number) => shots.find((s) => s.scene === i);
+  const clips = production?.clips ?? [];
+  const rendering = production?.clips_status === "running";
+  const clipFor = (i: number) => clips.find((c) => c.scene === i);
+  const shotsReady = shots.some((s) => s.url);
+
+  async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status") {
+    for (let i = 0; i < 120; i++) {
+      await new Promise((res) => setTimeout(res, 6000));
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
+      if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
+    }
+  }
 
   async function shootShots() {
     if (shooting) return;
@@ -46,11 +59,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
     setProduction((p) => (p ? { ...p, shots: [], shots_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start shooting."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
-    for (let i = 0; i < 90; i++) {
-      await new Promise((res) => setTimeout(res, 6000));
-      const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
-      if (d?.production) { setProduction(d.production); if (d.production.shots_status !== "running") break; }
-    }
+    await poll(setProduction, "shots_status");
+  }
+
+  async function renderClips() {
+    if (rendering) return;
+    setErr("");
+    setProduction((p) => (p ? { ...p, clips: [], clips_status: "running" } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
+    await poll(setProduction, "clips_status");
   }
 
   async function generate() {
@@ -143,11 +161,21 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
             {sb.scenes.map((s, i) => {
               const role = ROLE[s.role] ?? ROLE["a-roll"];
               const shot = shotFor(i);
+              const clip = clipFor(i);
               return (
                 <div key={i} className="flex gap-4 rounded-xl border border-line bg-surface-1 p-4">
                   {s.role !== "graphic" && (
                     <div className="w-32 shrink-0">
-                      {shot?.url ? (
+                      {clip?.url ? (
+                        <div className="relative">
+                          <video src={clip.url} controls playsInline className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
+                          <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
+                        </div>
+                      ) : rendering && clip?.status !== "failed" ? (
+                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…</div>
+                      ) : clip?.status === "failed" ? (
+                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[9px] text-alert" title={clip.error || ""}>clip failed{shot?.url && <span className="text-ink-faint">(still ok)</span>}</div>
+                      ) : shot?.url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={shot.url} alt={`scene ${i + 1}`} className="aspect-[9/16] w-full rounded-lg border border-line object-cover" />
                       ) : shooting ? (
@@ -182,10 +210,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
 
           {sb.legal && <div className="rounded-xl border border-line bg-surface-2 p-3 text-[11px] text-ink-faint"><b>Legal (verbatim):</b> {sb.legal}</div>}
 
-          <div className="rounded-xl border border-ready/30 bg-ready/5 p-5">
-            <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Shoot the shots</div>
-            <p className="mt-1 text-sm text-ink-dim">Sami renders a coherent image for every scene from {name}&apos;s locked identity, holding one consistent world across the whole board (the frames anchor each other). These become the references for the a-roll and b-roll clips. A few minutes.</p>
-            <button onClick={shootShots} disabled={shooting} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Sami is shooting the board…" : shots.some((s) => s.url) ? "↻ Re-shoot the board" : "🎬 Shoot the shots"}</button>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/5 p-5">
+              <div className="tabular text-xs uppercase tracking-[0.2em] text-[#c79bff]">Step 1 · Shoot the board</div>
+              <p className="mt-1 text-sm text-ink-dim">A coherent still for every scene from {name}&apos;s locked identity, one consistent world across the board.</p>
+              <button onClick={shootShots} disabled={shooting} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Shooting the board…" : shotsReady ? "↻ Re-shoot the board" : "🎬 Shoot the shots"}</button>
+            </div>
+            <div className={`rounded-xl border p-5 ${shotsReady ? "border-ready/30 bg-ready/5" : "border-line bg-surface-1 opacity-60"}`}>
+              <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Step 2 · Render the clips</div>
+              <p className="mt-1 text-sm text-ink-dim">Sami brings every frame to life: a-roll scenes talk in {name}&apos;s voice (HeyGen), b-roll scenes get natural motion (Kling). A few minutes per scene.</p>
+              <button onClick={renderClips} disabled={rendering || !shotsReady} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering ? "🎞️ Rendering the clips…" : clips.some((c) => c.url) ? "↻ Re-render the clips" : "🎞️ Render the clips"}</button>
+              {!shotsReady && <p className="mt-2 text-[11px] text-ink-faint">Shoot the board first.</p>}
+            </div>
           </div>
         </div>
       ) : null}
