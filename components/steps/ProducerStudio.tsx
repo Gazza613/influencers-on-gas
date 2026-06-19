@@ -93,7 +93,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
   }
 
   async function generate() {
-    if (!brand.trim() || !offer.trim() || busy) { if (!brand.trim() || !offer.trim()) setErr("Sami needs at least the brand and the core offer."); return; }
+    if (!brand.trim() || !offer.trim() || busy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer."); return; }
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -101,20 +101,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); }
-    else setErr(r?.error || "Sami couldn't draft the storyboard. Try again.");
+    else setErr(r?.error || "Couldn't draft the storyboard. Try again.");
   }
 
   return (
     <div className="space-y-5">
-      {/* Sami */}
+      {/* The Producer */}
       <div className="flex items-start gap-3 rounded-xl border border-[#a855f7]/30 bg-gradient-to-r from-[#a855f7]/12 to-[#60a5fa]/8 p-5">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#a855f7]/20 text-2xl">🎬</div>
         <div>
-          <div className="text-sm font-extrabold text-white">Sami <span className="font-semibold text-[#c79bff]">· your AI Producer</span></div>
+          <div className="text-sm font-extrabold text-white">The Producer</div>
           <p className="mt-1 text-sm text-ink-dim">
             {editing
               ? `Tell me about the ad and I'll direct a full storyboard for ${name}, shot by shot, in our house style. Then we shoot it.`
-              : `Here's the storyboard I've directed for ${name}. Review the scenes, regenerate anything, and when you're happy we'll shoot the shots.`}
+              : `Here's the storyboard, directed for ${name}. Review the scenes, regenerate anything, and when you're happy we'll shoot the shots.`}
           </p>
         </div>
       </div>
@@ -159,7 +159,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
           </div>
           <Area label="Mandatory legal line (verbatim, optional)" v={legal} set={setLegal} placeholder="Used exactly as written on the end card." />
           {err && <p className="text-xs text-alert">{err}</p>}
-          <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Sami is directing the storyboard…" : "🎬 Direct the storyboard"}</button>
+          <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : "🎬 Direct the storyboard"}</button>
         </div>
       ) : sb ? (
         /* Storyboard */
@@ -239,7 +239,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
             </div>
             <div className={`rounded-xl border p-5 ${shotsReady ? "border-[#60a5fa]/30 bg-[#60a5fa]/5" : "border-line bg-surface-1 opacity-60"}`}>
               <div className="tabular text-xs uppercase tracking-[0.2em] text-[#93c5fd]">Step 2 · Render the clips</div>
-              <p className="mt-1 text-sm text-ink-dim">Sami brings every frame to life: a-roll scenes talk in {name}&apos;s voice (HeyGen), b-roll scenes get natural motion (Kling). A few minutes per scene.</p>
+              <p className="mt-1 text-sm text-ink-dim">Bring every frame to life: a-roll scenes talk in {name}&apos;s voice (HeyGen), b-roll scenes get natural motion (Kling). A few minutes per scene.</p>
               <button onClick={renderClips} disabled={rendering || !shotsReady} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering ? "🎞️ Rendering the clips…" : clipsReady ? "↻ Re-render the clips" : "🎞️ Render the clips"}</button>
               {!shotsReady && <p className="mt-2 text-[11px] text-ink-faint">Shoot the board first.</p>}
             </div>
@@ -248,7 +248,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
           {/* Step 3 · the stitch */}
           <div className={`rounded-xl border p-5 ${clipsReady ? "border-ready/30 bg-ready/5" : "border-line bg-surface-1 opacity-60"}`}>
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Step 3 · Stitch the cut</div>
-            <p className="mt-1 text-sm text-ink-dim">Sami edits it together: clips in order, a continuous voiceover, burned-in captions, the {production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and a music bed mixed underneath, into one finished {sb.format} ad.</p>
+            <p className="mt-1 text-sm text-ink-dim">Edit it together: clips in order, a continuous voiceover, burned-in captions, the {production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and a music bed mixed underneath, into one finished {sb.format} ad.</p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button onClick={stitchCut} disabled={assembling || !clipsReady} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
               {!clipsReady && <span className="text-[11px] text-ink-faint">Render the clips first.</span>}
@@ -269,7 +269,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
           {finalUrl && (
             <div className="rounded-xl border border-line bg-surface-1 p-5">
               <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Final step · the showreel</div>
-              <p className="mt-1 text-sm text-ink-dim">Sami&apos;s last call: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</p>
+              <p className="mt-1 text-sm text-ink-dim">The last call: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button onClick={() => decideShowreel("accept")} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>✓ Accept into showreel</button>
                 <button onClick={() => decideShowreel("decline")} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "declined" ? "border-active bg-active/15 text-active" : "border-active/40 text-active hover:bg-active/10"}`}>✕ Decline</button>
