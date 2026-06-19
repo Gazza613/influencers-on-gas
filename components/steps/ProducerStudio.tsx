@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Uploader from "@/components/Uploader";
 
 type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
@@ -35,6 +36,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
   const [tone, setTone] = useState(String((initialProduction?.brief as { tone?: string })?.tone || "warm, confident, effortless"));
   const [logo, setLogo] = useState(String((initialProduction?.brief as { logo?: string })?.logo || ""));
   const [legal, setLegal] = useState(String((initialProduction?.brief as { legal?: string })?.legal || ""));
+  const [clothingRef, setClothingRef] = useState<string | null>(String((initialProduction?.brief as { clothingRef?: string })?.clothingRef || "") || null);
+  const [locationRef, setLocationRef] = useState<string | null>(String((initialProduction?.brief as { locationRef?: string })?.locationRef || "") || null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(String((initialProduction?.brief as { logoUrl?: string })?.logoUrl || "") || null);
+  const [logoPosition, setLogoPosition] = useState<string>(String((initialProduction?.brief as { logoPosition?: string })?.logoPosition || "topLeft"));
 
   const sb = production?.storyboard;
   const shots = production?.shots ?? [];
@@ -97,7 +102,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal }),
+      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", logoPosition }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); }
@@ -157,7 +162,27 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
               </div>
             </div>
           </div>
-          <Area label="Mandatory legal line (verbatim, optional)" v={legal} set={setLegal} placeholder="Used exactly as written on the end card." />
+          {/* Optional reference uploads — steer the SHOOT's wardrobe + world */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Uploader kind="clothing" label="Clothing reference (optional)" current={clothingRef} onUploaded={setClothingRef} />
+            <Uploader kind="location" label="Scene / location reference (optional)" current={locationRef} onUploaded={setLocationRef} />
+          </div>
+
+          {/* Brand logo (transparent PNG) + where it sits on the video */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Uploader kind="logo" label="Brand logo — transparent PNG (optional)" current={logoUrl} onUploaded={setLogoUrl} />
+            <div>
+              <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Logo position</div>
+              <div className="grid grid-cols-2 gap-2">
+                {([["topLeft", "Top left"], ["topRight", "Top right"], ["bottomLeft", "Bottom left"], ["bottomRight", "Bottom right"]] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => setLogoPosition(k)} className={`rounded-lg border px-3 py-2 text-xs font-semibold ${logoPosition === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{label}</button>
+                ))}
+              </div>
+              <p className="mt-1 text-[10px] text-ink-faint">Burned onto the final cut. No logo? The brand name shows as small text instead.</p>
+            </div>
+          </div>
+
+          <Area label="Compliance / legal line (verbatim, optional)" v={legal} set={setLegal} placeholder="Used exactly as written on the end card. Optional." />
           {err && <p className="text-xs text-alert">{err}</p>}
           <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : "🎬 Direct the storyboard"}</button>
         </div>

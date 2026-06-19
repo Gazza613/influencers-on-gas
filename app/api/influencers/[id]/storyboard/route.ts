@@ -43,6 +43,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     tone: String(b.tone || "warm, confident, effortless").trim(),
     logo: String(b.logo || "").trim(),
     legal: String(b.legal || "").trim(),
+    // Optional uploads: a clothing ref + a location ref steer the SHOOT; a transparent PNG logo +
+    // its corner are burned onto the final cut at assembly.
+    clothingRef: typeof b.clothingRef === "string" ? b.clothingRef : "",
+    locationRef: typeof b.locationRef === "string" ? b.locationRef : "",
+    logoUrl: typeof b.logoUrl === "string" ? b.logoUrl : "",
+    logoPosition: ["topLeft", "topRight", "bottomLeft", "bottomRight"].includes(b.logoPosition) ? b.logoPosition : "topLeft",
   };
   if (!brief.brand || !brief.offer) return NextResponse.json({ error: "Add at least a brand/product and the core offer." }, { status: 400 });
 

@@ -771,6 +771,11 @@ export const generateShots = inngest.createFunction(
     const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
     const look = lookClause(persona);
 
+    // Optional producer uploads: a clothing reference (wardrobe) and a location reference (world).
+    const brief = (production?.brief ?? {}) as Record<string, string>;
+    const clothMedia = brief.clothingRef ? await step.run("import-cloth", () => importMediaUrl(brief.clothingRef).catch(() => null)) : null;
+    const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;
+
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running" } } }));
 
     const shots: ShotRow[] = [];
@@ -779,17 +784,24 @@ export const generateShots = inngest.createFunction(
       const sc = scenes[i] as Record<string, string>;
       const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
       if (role === "graphic") { shots.push({ scene: i, role, beat, url: null }); continue; }
+      // @image order: identity, [clothing], [location], [world anchor]. Tags must match that order.
+      let n = idMedias.length;
       const faceTags = idMedias.map((_, k) => `@image${k + 1}`);
-      const worldTag = worldRef ? `@image${idMedias.length + 1}` : "";
-      const refInstruction =
-        (faceTags.length ? ` IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. IGNORE their clothing, background and pose; take those from the scene.` : "") +
-        (worldTag ? ` ${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity.` : "");
+      const clothTag = clothMedia ? `@image${++n}` : "";
+      const locTag = locMedia ? `@image${++n}` : "";
+      const worldTag = worldRef ? `@image${++n}` : "";
+      const refInstruction = [
+        faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. IGNORE their clothing, background and pose; take those from the direction below.` : "",
+        clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
+        locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
+        worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity.` : "",
+      ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
         performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
         hasPeople: true, worldAnchored: !!worldRef,
       });
-      const medias = [...idMedias, ...(worldRef ? [worldRef] : [])].map((value) => ({ value, role: "image" }));
+      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : [])].map((value) => ({ value, role: "image" }));
       const url = await step.run(`shot-${i}`, () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null));
       let hosted: string | null = null;
       if (url) {
@@ -899,7 +911,7 @@ export const assembleVideo = inngest.createFunction(
     if (!inf) return { skipped: "not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const production = (persona.production ?? null) as {
-      brief?: { brand?: string; logo?: string };
+      brief?: { brand?: string; logo?: string; logoUrl?: string; logoPosition?: string };
       storyboard?: { scenes?: Record<string, string>[]; format?: string; music_bed?: string; tone?: string; duration_seconds?: number; legal?: string };
       clips?: { scene: number; role: string; url: string | null }[];
     } | null;
@@ -956,8 +968,14 @@ export const assembleVideo = inngest.createFunction(
       asset: { type: "title", text: p.caption, style: "subtitle", size: "small", position: "bottom" },
       start: p.start, length: p.len,
     }));
+    // Brand bug: a transparent-PNG logo (if uploaded) placed in the chosen corner, else the brand
+    // name as small text. Shotstack positions: topLeft / topRight / bottomLeft / bottomRight.
+    const logoUrl = (production?.brief?.logoUrl || "").trim();
+    const logoPos = ["topLeft", "topRight", "bottomLeft", "bottomRight"].includes(String(production?.brief?.logoPosition)) ? String(production?.brief?.logoPosition) : "topLeft";
     const brand = (production?.brief?.brand || "").trim();
-    const brandTrack = brand ? [{ asset: { type: "title", text: brand, style: "minimal", size: "x-small", position: "topLeft" }, start: 0, length: total }] : [];
+    const brandTrack = logoUrl
+      ? [{ asset: { type: "image", src: logoUrl }, start: 0, length: total, position: logoPos, scale: 0.18, offset: { x: logoPos.includes("Right") ? -0.04 : 0.04, y: logoPos.startsWith("top") ? -0.04 : 0.04 } }]
+      : (brand ? [{ asset: { type: "title", text: brand, style: "minimal", size: "x-small", position: logoPos }, start: 0, length: total }] : []);
 
     const tracks: Record<string, unknown>[] = [];
     if (brandTrack.length) tracks.push({ clips: brandTrack });
