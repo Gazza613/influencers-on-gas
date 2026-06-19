@@ -165,7 +165,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   }
 
   async function generate() {
-    if (!nFormats || running) return;
+    // No `running` guard: a new run (e.g. a 1:1 while a 9:16 renders) runs CONCURRENTLY, it does
+    // not cancel the one in progress. The server merges both runs' images.
+    if (!nFormats) return;
     setErr(""); setStatus("running");
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -346,11 +348,11 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Creatives · social outputs</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Creatives · social outputs <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[9px] font-semibold text-ink-faint">optional</span></div>
         <p className="mt-2 text-sm text-ink-dim">
           Render social-ready shots of this locked influencer. Pick platforms or formats, optionally steer the wardrobe
           and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
-          identity locked in. Backgrounds stay sharp and everyone stays fully clothed.
+          identity locked in, backgrounds sharp. This step is optional, for stills, you can skip straight to the <span className="text-[#c79bff]">Producer</span> to make a video.
         </p>
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[13px] leading-relaxed text-ink-dim">
           <span className="text-lg leading-none">🔎</span>
@@ -461,8 +463,8 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
 
         {/* Generate */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button onClick={generate} disabled={!nFormats || running} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">
-            {running ? "Rendering…" : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} creatives`}
+          <button onClick={generate} disabled={!nFormats} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">
+            {running ? `✨ Generate ${images} more (runs alongside)` : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} creatives`}
           </button>
           {running && (
             <button onClick={abort} className="rounded-lg border border-alert/60 px-4 py-2.5 text-sm font-bold text-alert hover:bg-alert/10">■ Abort</button>

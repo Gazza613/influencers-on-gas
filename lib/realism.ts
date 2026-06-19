@@ -150,8 +150,7 @@ export const REALISM_NEGATIVE =
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin, " +
   "nude, naked, partial nudity, topless, underwear only, lingerie, no trousers, no pants, missing bottoms, bare crotch, exposed groin, blurred background, heavy bokeh, " +
   "hand shielding the eyes, hand raised to the forehead or brow, hand-visor over the eyes, shielding the face, squinting into the sun, " +
-  "looking up, gazing upward, chin raised, head tilted back, looking at the sky, looking away from the camera, eyes off to the side, profile view, back to camera, " +
-  "recognisable city landmarks, branded public transport, red double-decker buses, London black cabs, yellow taxis, famous monuments, place-name street signage, foreign-city tells";
+  "looking up, gazing upward, chin raised, head tilted back, looking at the sky, looking away from the camera, eyes off to the side, profile view, back to camera";
 
 // Compose a rich subject line from a Character Bible when present (far more specific
 // than the simple persona fields), else fall back to the basic persona controls.

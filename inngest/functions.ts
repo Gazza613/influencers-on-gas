@@ -438,7 +438,12 @@ export const generateCreatives = inngest.createFunction(
     const genModel = IMAGE_MODEL;
     const cinematic = event.data.cinematic === true;
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "running", creatives_error: null } }));
+    // Re-read + a run COUNTER so concurrent renders (e.g. a 9:16 and a 1:1 at once) don't clobber
+    // each other's status or images. Status stays "running" until the LAST active run finishes.
+    await step.run("mark-running", async () => {
+      const fresh = ((await getInfluencer(influencerId))?.persona as Record<string, unknown>) || persona;
+      return updateInfluencer(influencerId, { persona: { ...fresh, creatives_status: "running", creatives_error: null, creatives_running: (Number(fresh.creatives_running) || 0) + 1 } });
+    });
 
     try {
       const lockMode = event.data.identityLock === "flexible" ? "flexible" : "strong";
@@ -609,10 +614,23 @@ export const generateCreatives = inngest.createFunction(
         }
       }
       const qa = { reviewed: qaReviewed, approved: qaApproved, rejected: qaRejected, failed_generation: generationFailed, at: Date.now() };
-      await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, creatives: [...made, ...existing].slice(0, 120), creatives_status: "done", creatives_qa: qa } }));
+      // Re-read the LATEST persona and append (dedupe by id) so a concurrent run's images are
+      // preserved, not overwritten by this run's stale snapshot. Status clears only when no run is left.
+      await step.run("done", async () => {
+        const fresh = ((await getInfluencer(influencerId))?.persona as Record<string, unknown>) || persona;
+        const cur = Array.isArray(fresh.creatives) ? (fresh.creatives as Creative[]) : existing;
+        const seen = new Set<string>();
+        const merged = [...made, ...cur].filter((c) => { const k = c.id || ""; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 120);
+        const left = Math.max(0, (Number(fresh.creatives_running) || 1) - 1);
+        return updateInfluencer(influencerId, { persona: { ...fresh, creatives: merged, creatives_status: left > 0 ? "running" : "done", creatives_qa: qa, creatives_running: left } });
+      });
       return { ok: true, made: made.length, qa };
     } catch (e) {
-      await step.run("fail", () => updateInfluencer(influencerId, { persona: { ...persona, creatives_status: "failed", creatives_error: String((e as Error)?.message || e).slice(0, 200) } }));
+      await step.run("fail", async () => {
+        const fresh = ((await getInfluencer(influencerId))?.persona as Record<string, unknown>) || persona;
+        const left = Math.max(0, (Number(fresh.creatives_running) || 1) - 1);
+        return updateInfluencer(influencerId, { persona: { ...fresh, creatives_status: left > 0 ? "running" : "failed", creatives_error: String((e as Error)?.message || e).slice(0, 200), creatives_running: left } });
+      });
       throw e;
     }
   },
