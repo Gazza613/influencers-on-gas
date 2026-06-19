@@ -206,7 +206,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   async function upscalePicked() {
     // Upscale ANY kept shot that produced an image (the producer chooses keepers regardless of
     // QA grade). Skip ones already at 4K and ones with no image.
-    const targets = creatives.filter((c) => picked.has(c.id || "") && !!c.url && !broken.has(c.url) && c.resolution !== "4k");
+    const targets = creatives.filter((c) => picked.has(c.id || "") && !!c.url && !broken.has(c.url) && (c.resolution || "").toLowerCase() !== "4k");
     const ids = targets.map((c) => c.id || "");
     if (!ids.length) return;
     setUpscaling((s) => new Set([...s, ...ids]));
@@ -234,7 +234,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         if (Array.isArray(d.videoSelects)) setVideoSelects(d.videoSelects);
         for (const cid of [...pending]) {
           const c = list.find((x) => (x.id || "") === cid);
-          if (!c || c.resolution === "4k" || c.upscale_error || !c.upscaling) {
+          if (!c || (c.resolution || "").toLowerCase() === "4k" || c.upscale_error || !c.upscaling) {
             pending.delete(cid);
             setUpscaling((s) => { const n = new Set(s); n.delete(cid); return n; });
             if (c?.upscale_error) setErr("A 4K upscale failed on a shot, please try it again.");
@@ -257,7 +257,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   }
   // Finish-based grade: 4K = green Excellent; 2K keeper = orange Good; QA-flagged = red Average.
   function gradeOf(c: Creative): { t: string; cls: string } {
-    if (c.resolution === "4k") return { t: "Excellent", cls: "bg-ready/85 shadow-[0_0_10px_rgba(52,199,89,0.6)]" };
+    if ((c.resolution || "").toLowerCase() === "4k") return { t: "Excellent", cls: "bg-ready/85 shadow-[0_0_10px_rgba(52,199,89,0.6)]" };
     const s = c.qa?.score10 ?? 7;
     if (c.status === "failed_qa" || s < 6) return { t: "Average", cls: "bg-alert/85" };
     return { t: "Good", cls: "bg-[#ff6a00] shadow-[0_0_10px_rgba(255,106,0,0.75)]" };
@@ -335,16 +335,16 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   };
 
   const visible = creatives.filter((c) => {
-    if (view === "excellent") return c.status === "approved" && c.resolution === "4k";
-    if (view === "good") return c.status === "approved" && c.resolution !== "4k" && gradeOf(c).t === "Good";
-    if (view === "average") return c.resolution !== "4k" && (c.status === "failed_qa" || (c.status === "approved" && gradeOf(c).t === "Average"));
+    if (view === "excellent") return c.status === "approved" && (c.resolution || "").toLowerCase() === "4k";
+    if (view === "good") return c.status === "approved" && (c.resolution || "").toLowerCase() !== "4k" && gradeOf(c).t === "Good";
+    if (view === "average") return (c.resolution || "").toLowerCase() !== "4k" && (c.status === "failed_qa" || (c.status === "approved" && gradeOf(c).t === "Average"));
     return true;
   });
   // Split into 2K previews (plus any failed shots, which keep their delete control) and 4K finals.
-  const isFourK = (c: Creative) => !!c.url && !broken.has(c.url) && c.resolution === "4k";
+  const isFourK = (c: Creative) => !!c.url && !broken.has(c.url) && (c.resolution || "").toLowerCase() === "4k";
   const fourK = visible.filter(isFourK);
   const twoK = visible.filter((c) => !isFourK(c));
-  const pickedTwoK = creatives.some((c) => picked.has(c.id || "") && !!c.url && c.resolution !== "4k");
+  const pickedTwoK = creatives.some((c) => picked.has(c.id || "") && !!c.url && (c.resolution || "").toLowerCase() !== "4k");
 
   return (
     <div className="space-y-5">
