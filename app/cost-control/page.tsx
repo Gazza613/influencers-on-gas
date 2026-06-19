@@ -110,13 +110,18 @@ export default function CostControlPage() {
   async function calibrate() {
     if (calibrating) return;
     setCalibrating(true); setCalMsg("");
+    // 1) Apply the latest static rate-card rows (Kling b-roll, ElevenLabs music, Shotstack render).
+    const seed = await fetch("/api/cost-control/seed-rates").then((r) => r.json()).catch(() => null);
+    const applied = Array.isArray(seed?.applied) ? seed.applied.length : 0;
+    // 2) True up Higgsfield's per-model credit costs via get_cost.
     const d = await fetch("/api/cost-control/calibrate", { method: "POST" }).then((r) => r.json()).catch(() => null);
     setCalibrating(false);
+    const seedMsg = applied ? `${applied} rate${applied === 1 ? "" : "s"} applied. ` : "";
     if (d?.results) {
       const ok = d.results.filter((r: { updated: boolean }) => r.updated).map((r: { model: string; credits: number }) => `${r.model}=${r.credits}cr`);
-      setCalMsg(ok.length ? `Updated: ${ok.join(", ")}` : "Couldn't read costs — check Higgsfield connection.");
-      load();
-    } else setCalMsg("Calibration failed.");
+      setCalMsg(seedMsg + (ok.length ? `Higgsfield trued up: ${ok.join(", ")}` : "Higgsfield get_cost unavailable — check connection."));
+    } else setCalMsg(seedMsg + (applied ? "Higgsfield calibration unavailable." : "Calibration failed."));
+    load();
   }
 
   function applyPreset(key: string) {
@@ -144,7 +149,7 @@ export default function CostControlPage() {
           </div>
           <div className="flex items-center gap-2">
             {isSuper && (
-              <button onClick={calibrate} disabled={calibrating} title="Read each model's real credit cost from Higgsfield and update the rate card"
+              <button onClick={calibrate} disabled={calibrating} title="Apply the latest rates (Kling b-roll, ElevenLabs music, Shotstack) and read each model's real credit cost from Higgsfield"
                 className="rounded-lg border border-[#a855f7]/30 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
                 {calibrating ? "Calibrating…" : "Recalibrate costs"}
               </button>
