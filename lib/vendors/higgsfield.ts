@@ -367,6 +367,28 @@ export async function upscaleUrlToDetailed(url: string, resolution: "2k" | "4k" 
   return { url: null, error: `upscale no image [src ${width}x${height} ${resolution}]: ${raw}`.slice(0, 300) };
 }
 
+// THE HUMANISER pass: re-render an image through Nano Banana Pro using ITSELF as the reference,
+// changing ONLY the skin so it reads real (kills the plastic/airbrushed look the upscaler bakes in).
+// Identity + composition are held by feeding the image as the @image1 reference. Best-effort.
+export async function humaniseUrl(url: string, opts: { prompt: string; ratio?: string; resolution?: "2k" | "4k" }): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null;
+  const imageId = await importMediaUrl(url);
+  if (!imageId) return null;
+  const { call } = await openSession();
+  const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : (opts.ratio || "9:16");
+  const params: AnyObj = {
+    ...baseParams("nano_banana_pro", ar),
+    prompt: `@image1 is the finished photograph. Reproduce it EXACTLY and identically: the same person and likeness, the same face, pose, framing and crop, the same wardrobe, lighting, colour and background, the same composition pixel-for-pixel. Change ONLY the skin so it reads as a real photograph and never plastic: ${opts.prompt} Do not restyle, recolour, reframe, beautify or move anything else.`,
+    medias: [{ value: imageId, role: "image" }],
+  };
+  if (opts.resolution) params.resolution = opts.resolution;
+  const r = await call("generate_image", { params });
+  let out: string | null = extractImageUrls(r)[0] ?? null;
+  const jobId = extractJobIds(r)[0] ?? null;
+  if (!out && jobId) out = await pollJob(call, jobId, 60);
+  return out;
+}
+
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
 export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
   const token = await getValidHFAccessToken();

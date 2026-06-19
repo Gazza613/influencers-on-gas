@@ -74,7 +74,11 @@ export function aspectFraming(ratio: string): string {
 const ANTI_AI = "No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow, no over-sharpening. No phone screen, social-media UI, app overlay, notification or status bar, captions or interface elements anywhere. A real, raw, un-retouched photograph.";
 // Subject scale + perspective relative to the scene (a common AI tell when wrong).
 const SCALE = "Scale and perspective: the subject is rendered at correct real-world scale and perspective for this exact setting; head height, body size and distance are believable against any doorways, windows, furniture, vehicles, architecture and other people in the scene; feet (or seat) make natural contact with the ground plane with matching contact shadows; one consistent camera height and lens perspective across subject and background; the subject is NEVER oversized, undersized, floating, leaning at an impossible angle or pasted-on, and never a giant against tiny background people or vice versa.";
-const SKIN_FACTS = "Skin as real photographic fact: visible pores on the nose, cheeks and forehead and on all exposed skin (neck, arms, hands), a couple of honest imperfections and gentle natural asymmetry, a satin sheen only at the high points with the rest matte and lived-in. Zero skin smoothing, zero airbrushing, no beauty filter.";
+// THE HUMANISER (ported from the archived gem): skin as concrete photographic FACT, not category
+// words. This is what stops the plastic/AI look and must ride on every render that shows skin.
+export const HUMANISER =
+  "Skin rendered as concrete photographic fact, never category words: visible individual pores across the T-zone, nose, cheeks and forehead AND on all exposed skin (neck, jaw, ears, arms, hands), the pores on the lit side casting tiny directional micro-shadows from the key light; a believable skin reaction to the environment adapted to their skin tone (a faint thermal flush at the cheeks indoors, or light sun-warmth with a touch of micro-sweat sheen outdoors); one or two HONEST imperfections (a faint healing blemish, a barely-there old scar, asymmetric freckles or light pigmentation, fine vellus hair at the hairline); genuine facial asymmetry (one brow marginally higher, one nostril slightly narrower, an uneven cupid's bow); a satin sheen ONLY at the high points (nose tip, cheekbones, brow) with the rest matte and lived-in; subtle sensor noise in the shadows like a real phone camera. ZERO skin smoothing, ZERO airbrushing, no beauty filter, no waxy or plastic CGI skin, no uncanny porcelain glow, no over-sharpening.";
+const SKIN_FACTS = HUMANISER;
 
 // Structured creative-image prompt (the archive's section format that gpt_image_2 follows
 // far better than a run-on sentence). Scene/wardrobe/pose come from the user's brief; we
@@ -146,7 +150,8 @@ export const REALISM_NEGATIVE =
   "uncanny symmetry, oversaturated, glossy plastic highlights, HDR halo, over-sharpened, excessive makeup, mannequin, " +
   "nude, naked, partial nudity, topless, underwear only, lingerie, no trousers, no pants, missing bottoms, bare crotch, exposed groin, blurred background, heavy bokeh, " +
   "hand shielding the eyes, hand raised to the forehead or brow, hand-visor over the eyes, shielding the face, squinting into the sun, " +
-  "looking up, gazing upward, chin raised, head tilted back, looking at the sky, looking away from the camera, eyes off to the side, profile view, back to camera";
+  "looking up, gazing upward, chin raised, head tilted back, looking at the sky, looking away from the camera, eyes off to the side, profile view, back to camera, " +
+  "recognisable city landmarks, branded public transport, red double-decker buses, London black cabs, yellow taxis, famous monuments, place-name street signage, foreign-city tells";
 
 // Compose a rich subject line from a Character Bible when present (far more specific
 // than the simple persona fields), else fall back to the basic persona controls.

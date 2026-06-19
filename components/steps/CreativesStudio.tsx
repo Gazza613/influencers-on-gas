@@ -199,12 +199,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
     setPicked((s) => { const n = new Set(s); n.delete(id); return n; });
     await patchPersona({ creatives: keep, video_selects: videoSelects.filter((u) => keep.some((c) => c.url === u)) });
   }
-  async function markForVideo() {
-    const add = creatives.filter((c) => picked.has(c.id || "") && !!c.url).map((c) => c.url as string);
-    const next = [...new Set([...videoSelects, ...add])];
-    setVideoSelects(next); setPicked(new Set());
-    await patchPersona({ video_selects: next });
-  }
   // Upscale the selected 2K keepers to 4K on demand (one paid upscale each, only on shots
   // the producer actually chose). Each upgraded shot moves to the 4K Finals section.
   async function upscalePicked() {
@@ -269,7 +263,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   const renderTile = (c: Creative, i: number) => {
     const id = c.id || `${c.url || "none"}-${i}`;
     const sel = picked.has(id);
-    const forVideo = !!c.url && videoSelects.includes(c.url);
     const canPick = !!c.url && !broken.has(c.url);
     const u = c.url || "";
     const busy = upscaling.has(id) || !!c.upscaling;
@@ -316,7 +309,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
           <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
           <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
         </div>
-        {forVideo && <span className="absolute bottom-1.5 left-1.5 rounded bg-ready/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">★ video</span>}
         {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (
           <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
             {g.t}
@@ -332,9 +324,9 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
             4K failed
           </span>
         )}
-        {c.url && !broken.has(c.url) && (
-          <button onClick={() => setZoom(c.url)} title="Review full size"
-            className="absolute inset-0 m-auto hidden h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/55 text-lg text-white backdrop-blur-sm transition group-hover:flex hover:bg-black/75">👁</button>
+        {c.url && !broken.has(c.url) && !busy && (
+          <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="Review full size"
+            className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/40 bg-black/55 text-lg text-white opacity-60 backdrop-blur-sm transition hover:scale-105 hover:bg-black/80 hover:opacity-100 active:scale-95">👁</button>
         )}
       </div>
     );
@@ -537,13 +529,12 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               <div className="flex items-center gap-2">
                 <span className="text-xs text-ink-dim">{picked.size} selected</span>
                 {pickedTwoK && <button onClick={upscalePicked} className="rounded-md border border-[#a855f7]/50 px-2.5 py-1 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">↑ Upscale to 4K</button>}
-                <button onClick={markForVideo} className="rounded-md border border-ready/40 px-2.5 py-1 text-xs font-semibold text-ready hover:bg-ready/10">★ For video</button>
                 <button onClick={removePicked} className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-alert/50 hover:text-alert">Remove</button>
                 <button onClick={() => setPicked(new Set())} className="text-xs text-ink-faint hover:text-ink">clear</button>
               </div>
             )}
           </div>
-          <p className="mb-3 text-[14px] leading-relaxed text-ink-dim">Shots render fast in 2K. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. ★ keep your best for video, or remove the rest. Click an image to view full size and download.</p>
+          <p className="mb-3 text-[14px] leading-relaxed text-ink-dim">Shots render fast in 2K. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
           {twoK.length > 0 && (
             <div className="mb-5">
               <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}</div>
@@ -556,17 +547,6 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">{fourK.map(renderTile)}</div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Video production hand-off */}
-      {videoSelects.length > 0 && (
-        <div className="rounded-xl border border-ready/30 bg-ready/5 p-5">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">★ Selected for video production · {videoSelects.length}</div>
-          <p className="mt-1 text-sm text-ink-dim">
-            These shots are earmarked for video production and b-roll (a mix of scenes and angles makes the video stronger).
-            The produce pipeline will pull them in when it arrives in the Studio.
-          </p>
         </div>
       )}
 
