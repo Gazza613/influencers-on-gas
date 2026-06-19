@@ -18,9 +18,10 @@ export const SCENE_PEOPLE =
   "the mix is balanced and natural: roughly 55% white, 25% black, 12% coloured and 8% indian people, with an even 50/50 split of men and women across a range of ages; each rendered realistically, in sharp focus and at correct scale; " +
   "every background person is in a complete, tasteful outfit with a top and bottoms, never bare-legged, in underwear or swimwear";
 
-// No extras: the subject is alone in the scene.
+// No extras: the subject is the ONLY person. Stated absolutely because image models love to
+// populate public settings (cafes, streets) with crowds unless this is forced hard.
 export const NO_EXTRAS =
-  "no other people anywhere in the scene, the subject is completely alone, clean and uncluttered background";
+  "CRITICAL: the influencer is the ONLY person anywhere in the entire image. Absolutely NO other people: no background people, no passersby, no bystanders, no crowd, no diners or staff, no silhouettes, no reflections of people, not even tiny, distant or blurred figures. The setting is genuinely empty and quiet, occupied by her alone; if the location would normally be busy, show it at a deserted, people-free moment";
 
 // Concise realism core for Soul generation (long stacked clauses confuse the model and
 // hurt quality, the Soul + reference handle identity, so keep the scene direction tight).
