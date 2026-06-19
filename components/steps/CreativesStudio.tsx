@@ -349,7 +349,7 @@ export default function CreativesStudio({ influencerId, initial }: { influencerI
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Creatives · social outputs <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[9px] font-semibold text-ink-faint">optional</span></div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Creatives · social outputs <span className="ml-2 rounded-full border border-[#a855f7]/60 bg-[#a855f7]/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-[#d8b4fe]">Optional</span></div>
         <p className="mt-2 text-sm text-ink-dim">
           Render social-ready shots of this locked influencer. Pick platforms or formats, optionally steer the wardrobe
           and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
