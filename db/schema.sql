@@ -346,5 +346,8 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('voyage','voyage-4-lite','embed', 0, 0, true),
   -- B-ROLL motion (Producer): Kling 3.0 image->video, ~5s. Face-safe. Estimate matches the
   -- supercomputer_video credit tier; recalibrate against get_cost / the live job billing.
-  ('higgsfield','kling3','video', 8, 615, true)
+  ('higgsfield','kling3','video', 8, 615, true),
+  -- Assembly (Producer): ElevenLabs Music bed per ad, Shotstack render per finished cut.
+  ('elevenlabs','music','music', 0, 200, true),
+  ('shotstack','edit','render', 0, 100, true)
 on conflict (provider, model, unit) do nothing;

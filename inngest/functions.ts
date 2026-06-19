@@ -3,7 +3,8 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, generateVideoFromImage } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
-import { tts } from "@/lib/vendors/elevenlabs";
+import { tts, generateMusic } from "@/lib/vendors/elevenlabs";
+import { renderEdit, pollRender } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -817,5 +818,110 @@ export const generateClips = inngest.createFunction(
     const prodDone = (done.production ?? production) as Record<string, unknown>;
     await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, clips, clips_status: "done", status: "clips" } } }));
     return { ok: true, clips: clips.length };
+  },
+);
+
+// THE PRODUCER — "stitch the cut": assemble the rendered clips into one finished ad with
+// Shotstack — clips in scene order, a continuous voiceover (a-roll VO is baked in; b-roll/
+// graphic scenes get a laid-in VO), burned-in captions, a brand bug, and a music bed mixed
+// underneath. Durable; music + render metered. Produces production.final_url.
+function tcSeconds(tc: string): number | null {
+  const m = String(tc || "").trim().match(/^(?:(\d+):)?(\d{1,2})(?:\.(\d+))?$/);
+  if (!m) return null;
+  return (m[1] ? parseInt(m[1], 10) * 60 : 0) + parseInt(m[2], 10) + (m[3] ? parseFloat(`0.${m[3]}`) : 0);
+}
+export const assembleVideo = inngest.createFunction(
+  { id: "assemble-video", retries: 1, triggers: [{ event: "influencer/assemble.video" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const inf = await step.run("load", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const production = (persona.production ?? null) as {
+      brief?: { brand?: string; logo?: string };
+      storyboard?: { scenes?: Record<string, string>[]; format?: string; music_bed?: string; tone?: string; duration_seconds?: number; legal?: string };
+      clips?: { scene: number; role: string; url: string | null }[];
+    } | null;
+    const sb = production?.storyboard;
+    const scenes = sb?.scenes ?? [];
+    const clips = production?.clips ?? [];
+    if (!scenes.length || !clips.some((c) => c.url)) return { error: "render the clips first" };
+    const voiceId = persona.voice_id as string | undefined;
+    const ratio = String(sb?.format || "").includes("1:1") ? "1:1" : "9:16";
+    const clipUrl = (i: number) => clips.find((c) => c.scene === i)?.url || null;
+
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, assembly_status: "running", final_url: null } } }));
+
+    // Lay scenes on the timeline using the storyboard timecodes; fall back to 5s sequential.
+    let cursor = 0;
+    const placed = scenes.map((sc, i) => {
+      const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
+      let start = a != null ? a : cursor;
+      let len = a != null && b != null && b > a ? b - a : 5;
+      if (a == null) start = cursor;
+      cursor = start + len;
+      return { i, start, len, role: String(sc.role || "a-roll"), vo: String(sc.vo_line || "").trim(), caption: String(sc.caption || "").trim() };
+    });
+    const total = Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30;
+
+    // Music bed (full length) → Blob.
+    let musicUrl: string | null = null;
+    try {
+      const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
+      musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg"));
+      await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
+    } catch { musicUrl = null; }
+
+    // Voiceover laid in for b-roll/graphic scenes (a-roll already speaks on camera).
+    const voTrack: Record<string, unknown>[] = [];
+    if (voiceId) {
+      for (const p of placed) {
+        if (p.role === "a-roll" || !p.vo) continue;
+        try {
+          const url = await step.run(`vo-${p.i}`, async () => putBytes(await tts(voiceId, p.vo, { expressive: true }), "vo", "mp3", "audio/mpeg"));
+          await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
+          voTrack.push({ asset: { type: "audio", src: url }, start: p.start, length: p.len });
+        } catch { /* skip this VO */ }
+      }
+    }
+
+    // Build the Shotstack timeline (top track renders on top).
+    const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
+      asset: { type: "video", src: clipUrl(p.i) as string, volume: p.role === "a-roll" ? 1 : 0 },
+      start: p.start, length: p.len, fit: "cover",
+      transition: { in: "fade", out: "fade" },
+    }));
+    const captionClips = placed.filter((p) => p.caption).map((p) => ({
+      asset: { type: "title", text: p.caption, style: "subtitle", size: "small", position: "bottom" },
+      start: p.start, length: p.len,
+    }));
+    const brand = (production?.brief?.brand || "").trim();
+    const brandTrack = brand ? [{ asset: { type: "title", text: brand, style: "minimal", size: "x-small", position: "topLeft" }, start: 0, length: total }] : [];
+
+    const tracks: Record<string, unknown>[] = [];
+    if (brandTrack.length) tracks.push({ clips: brandTrack });
+    if (captionClips.length) tracks.push({ clips: captionClips });
+    if (voTrack.length) tracks.push({ clips: voTrack });
+    tracks.push({ clips: videoClips });
+
+    const edit: Record<string, unknown> = {
+      timeline: { background: "#000000", ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeOut", volume: 0.18 } } : {}), tracks },
+      output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : "9:16", resolution: "1080", fps: 25 },
+    };
+
+    let finalUrl: string | null = null; let err: string | null = null;
+    try {
+      const renderId = await step.run("render", () => renderEdit(edit));
+      const out = await step.run("poll-render", () => pollRender(renderId, 100));
+      if (out.url) {
+        finalUrl = (await step.run("host-final", () => rehostToBlob(out.url as string, "finals").catch(() => null))) || out.url;
+        await step.run("u-stitch", () => recordUsage({ influencerId, provider: "shotstack", model: "edit", unit: "render", action: "stitch", count: 1 }).catch(() => {}));
+      } else err = out.error;
+    } catch (e) { err = String((e as Error)?.message || e).slice(0, 220); }
+
+    const done = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+    const prod = (done.production ?? production) as Record<string, unknown>;
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, final_url: finalUrl, music_url: musicUrl, assembly_status: "done", assembly_error: err, status: finalUrl ? "final" : "clips" } } }));
+    return { ok: !!finalUrl, error: err };
   },
 );

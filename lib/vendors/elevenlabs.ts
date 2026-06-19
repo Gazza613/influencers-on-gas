@@ -126,3 +126,37 @@ export async function createDesignedVoice(name: string, description: string, gen
   if (!data.voice_id) throw new Error(`Create designed voice failed (${res.status}): ${JSON.stringify(data.detail || data).slice(0, 200)}`);
   return data.voice_id;
 }
+
+// ── Music bed + ambient SFX (Producer assembly) ────────────────────────────
+// ElevenLabs Music: a full-length scored track from a text brief. Returns mp3 bytes.
+export async function generateMusic(prompt: string, lengthMs: number): Promise<Buffer> {
+  const k = await key();
+  const ms = Math.max(10000, Math.min(300000, Math.round(lengthMs)));
+  // Try the current Music endpoint, fall back to the compose alias if the route differs.
+  const bodies: [string, Record<string, unknown>][] = [
+    [`${BASE}/music`, { prompt, music_length_ms: ms }],
+    [`${BASE}/music/compose`, { prompt, music_length_ms: ms }],
+  ];
+  let lastErr = "";
+  for (const [url, body] of bodies) {
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify(body) });
+      if (res.ok) return Buffer.from(await res.arrayBuffer());
+      lastErr = `${res.status} ${(await res.text().catch(() => "")).slice(0, 160)}`;
+      if (res.status !== 404 && res.status !== 405) break;
+    } catch (e) { lastErr = String((e as Error)?.message || e).slice(0, 160); }
+  }
+  throw new Error(`Music generation failed: ${lastErr}`);
+}
+
+// ElevenLabs Sound Effects: a short ambient/foley bed from a text description.
+export async function generateSfx(prompt: string, durationSeconds = 5): Promise<Buffer> {
+  const k = await key();
+  const res = await fetch(`${BASE}/sound-generation`, {
+    method: "POST",
+    headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" },
+    body: JSON.stringify({ text: prompt, duration_seconds: Math.max(1, Math.min(22, durationSeconds)) }),
+  });
+  if (!res.ok) throw new Error(`SFX failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 160)}`);
+  return Buffer.from(await res.arrayBuffer());
+}

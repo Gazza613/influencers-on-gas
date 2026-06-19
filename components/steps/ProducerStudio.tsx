@@ -10,7 +10,7 @@ type Scene = {
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string } | null;
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -44,8 +44,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
   const rendering = production?.clips_status === "running";
   const clipFor = (i: number) => clips.find((c) => c.scene === i);
   const shotsReady = shots.some((s) => s.url);
+  const clipsReady = clips.some((c) => c.url);
+  const assembling = production?.assembly_status === "running";
+  const finalUrl = production?.final_url || null;
 
-  async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status") {
+  async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status") {
     for (let i = 0; i < 120; i++) {
       await new Promise((res) => setTimeout(res, 6000));
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
@@ -69,6 +72,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
     await poll(setProduction, "clips_status");
+  }
+
+  async function stitchCut() {
+    if (assembling) return;
+    setErr("");
+    setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
+    await poll(setProduction, "assembly_status");
   }
 
   async function generate() {
@@ -216,12 +228,32 @@ export default function ProducerStudio({ influencerId, name, initialProduction }
               <p className="mt-1 text-sm text-ink-dim">A coherent still for every scene from {name}&apos;s locked identity, one consistent world across the board.</p>
               <button onClick={shootShots} disabled={shooting} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Shooting the board…" : shotsReady ? "↻ Re-shoot the board" : "🎬 Shoot the shots"}</button>
             </div>
-            <div className={`rounded-xl border p-5 ${shotsReady ? "border-ready/30 bg-ready/5" : "border-line bg-surface-1 opacity-60"}`}>
-              <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Step 2 · Render the clips</div>
+            <div className={`rounded-xl border p-5 ${shotsReady ? "border-[#60a5fa]/30 bg-[#60a5fa]/5" : "border-line bg-surface-1 opacity-60"}`}>
+              <div className="tabular text-xs uppercase tracking-[0.2em] text-[#93c5fd]">Step 2 · Render the clips</div>
               <p className="mt-1 text-sm text-ink-dim">Sami brings every frame to life: a-roll scenes talk in {name}&apos;s voice (HeyGen), b-roll scenes get natural motion (Kling). A few minutes per scene.</p>
-              <button onClick={renderClips} disabled={rendering || !shotsReady} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering ? "🎞️ Rendering the clips…" : clips.some((c) => c.url) ? "↻ Re-render the clips" : "🎞️ Render the clips"}</button>
+              <button onClick={renderClips} disabled={rendering || !shotsReady} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering ? "🎞️ Rendering the clips…" : clipsReady ? "↻ Re-render the clips" : "🎞️ Render the clips"}</button>
               {!shotsReady && <p className="mt-2 text-[11px] text-ink-faint">Shoot the board first.</p>}
             </div>
+          </div>
+
+          {/* Step 3 · the stitch */}
+          <div className={`rounded-xl border p-5 ${clipsReady ? "border-ready/30 bg-ready/5" : "border-line bg-surface-1 opacity-60"}`}>
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Step 3 · Stitch the cut</div>
+            <p className="mt-1 text-sm text-ink-dim">Sami edits it together: clips in order, a continuous voiceover, burned-in captions, the {production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and a music bed mixed underneath, into one finished {sb.format} ad.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button onClick={stitchCut} disabled={assembling || !clipsReady} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
+              {!clipsReady && <span className="text-[11px] text-ink-faint">Render the clips first.</span>}
+              {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{production.assembly_error}</span>}
+            </div>
+            {finalUrl && (
+              <div className="mt-4">
+                <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut</div>
+                <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
+                <div className="mt-2">
+                  <a href={finalUrl} download className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">↓ Download</a>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
