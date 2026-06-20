@@ -874,48 +874,29 @@ export const generateClips = inngest.createFunction(
       const img = shotUrl(i);
       if (role === "graphic") return { scene: i, role, beat, kind: "graphic", url: null, status: "graphic" };
       if (!img) return { scene: i, role, beat, kind: role, url: null, status: "failed", error: "no shot frame" };
-      const line = String(sc.vo_line || "").trim();
-      const motion = String(sc.motion_prompt || sc.blocking || "natural movement");
-      if (role === "a-roll" && line && voiceId) {
-        try {
-          const audioUrl = await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-audio", "mp3", "audio/mpeg"));
-          await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-          // Avatar IV animates the WHOLE frame, so explicitly ask for a LIVING background (this is
-          // what makes the scene move, not just her face). She talks to camera with real micro-motion.
-          const arollMotion = `${motion}. The whole scene is alive and moving: background people walk past, traffic or ambient activity moves behind her, subtle environmental motion (leaves in the breeze, shifting light, passersby) — never a frozen backdrop. She talks to camera with natural head movement, genuine micro-expressions and easy, relaxed hand gestures.`;
-          const started = await step.run(`start-${i}`, () => startTalkingVideo({ imageUrl: img, audioUrl, ratio, motionPrompt: arollMotion }));
-          let out: { url: string | null; error: string | null } = { url: null, error: "render timed out" };
-          for (let n = 0; n < 45; n++) { // ~45 x 8s ≈ 6 min, across short durable steps
-            const s = await step.run(`apoll-${i}-${n}`, () => pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })));
-            if (s.url) { out = { url: s.url, error: null }; break; }
-            if (s.status === "failed") { out = { url: null, error: s.error }; break; }
-            await step.sleep(`await-a-${i}-${n}`, "8s");
-          }
-          if (out.url) {
-            await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "talking_photo", unit: "video", action: "presenter", count: 1 }).catch(() => {}));
-            const hosted = (await step.run(`host-${i}`, () => rehostToBlob(out.url as string, "clips").catch(() => null))) || (out.url as string);
-            return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready" };
-          }
-          return { scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: out.error };
-        } catch (e) { return { scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 180) }; }
-      }
-      // b-roll: SUBMIT the Kling job (fast), then poll it across short durable steps.
-      const sub = await step.run(`bsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
-      let burl: string | null = sub.url;
-      if (!burl && sub.jobId) {
+      // BOTH a-roll and b-roll animate the WHOLE frame via Kling (HeyGen Avatar IV could not move
+      // the background). The voiceover is laid over in the stitch. A-roll = she's front-on, talking
+      // to camera; b-roll = ambient scene motion. This is what makes the whole scene move.
+      const base = String(sc.motion_prompt || sc.blocking || "natural movement");
+      const motion = role === "a-roll"
+        ? `${base}. She is front-on, looking straight into the lens and talking to camera with natural micro-expressions, gentle head movement and easy hand gestures. The WHOLE scene is alive and moving: background people walk past, ambient activity behind her, leaves and light in motion — never a frozen backdrop.`
+        : `${base}. The whole scene is alive and moving: background people move naturally, gentle camera drift, water/leaves/light in motion — never a frozen backdrop.`;
+      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
+      let url: string | null = sub.url;
+      if (!url && sub.jobId) {
         for (let n = 0; n < 60; n++) { // ~60 x 8s ≈ 8 min (Kling is slow)
-          const s = await step.run(`bpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
-          if (s.url) { burl = s.url; break; }
+          const s = await step.run(`vpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
+          if (s.url) { url = s.url; break; }
           if (s.terminal) break;
-          await step.sleep(`await-b-${i}-${n}`, "8s");
+          await step.sleep(`vwait-${i}-${n}`, "8s");
         }
       }
-      if (burl) {
-        await step.run(`u-broll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: process.env.HF_VIDEO_MODEL || "kling3", unit: "video", action: "broll", count: 1 }).catch(() => {}));
-        const hosted = (await step.run(`hostb-${i}`, () => rehostToBlob(burl as string, "clips").catch(() => null))) || burl;
-        return { scene: i, role, beat, kind: "b-roll", url: hosted, status: "ready" };
+      if (url) {
+        await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: process.env.HF_VIDEO_MODEL || "kling3", unit: "video", action: role === "a-roll" ? "aroll" : "broll", count: 1 }).catch(() => {}));
+        const hosted = (await step.run(`vhost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
+        return { scene: i, role, beat, kind: role, url: hosted, status: "ready" };
       }
-      return { scene: i, role, beat, kind: "b-roll", url: null, status: "failed", error: sub.error || `render started (${sub.model}) but did not finish in time` };
+      return { scene: i, role, beat, kind: role, url: null, status: "failed", error: sub.error || `render started (${sub.model}) but did not finish in time` };
     };
 
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
@@ -993,7 +974,7 @@ export const assembleVideo = inngest.createFunction(
     const voTrack: Record<string, unknown>[] = [];
     if (voiceId) {
       for (const p of placed) {
-        if (p.role === "a-roll" || !p.vo) continue;
+        if (!p.vo) continue; // lay the VO over EVERY scene (a-roll clips are now silent Kling motion)
         try {
           const url = await step.run(`vo-${p.i}`, async () => putBytes(await tts(voiceId, p.vo, { expressive: true }), "vo", "mp3", "audio/mpeg"));
           await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
@@ -1004,7 +985,7 @@ export const assembleVideo = inngest.createFunction(
 
     // Build the Shotstack timeline (top track renders on top).
     const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
-      asset: { type: "video", src: clipUrl(p.i) as string, volume: p.role === "a-roll" ? 1 : 0 },
+      asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 }, // all clips silent; VO + music + ambient are mixed in
       start: p.start, length: p.len, fit: "cover",
       transition: { in: "fade", out: "fade" },
     }));
