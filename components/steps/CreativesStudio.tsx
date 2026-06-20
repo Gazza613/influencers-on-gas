@@ -556,6 +556,16 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         </div>
       )}
 
+      {creatives.some((c) => c.url) && !running && (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ready/40 bg-ready/8 p-4">
+          <div>
+            <div className="text-sm font-bold text-ready">Happy with your creatives?</div>
+            <div className="text-[13px] text-ink-dim">Your stills are saved. Next: make a video with this influencer in the Producer.</div>
+          </div>
+          <Link href={`/setup/influencers/${influencerId}/producer`} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold">🎬 Go to the Producer →</Link>
+        </div>
+      )}
+
       {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} />}
     </div>
   );

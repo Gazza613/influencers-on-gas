@@ -411,6 +411,14 @@ const FRAMING_VARIATIONS = [
   ", captured in a slightly wider framing",
 ];
 
+// Split a brief into distinct scenes when the user numbered them ("Image 1", "**Scene 2**",
+// "Shot 3:"). Returns [] for a single-scene brief (keeps the classic variations behaviour).
+function splitScenes(text: string): string[] {
+  if (!text) return [];
+  const parts = text.split(/\n(?=\s*\*{0,2}\s*(?:image|scene|shot)\s*\d+\b)/i).map((s) => s.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts.slice(0, 6) : [];
+}
+
 export const generateCreatives = inngest.createFunction(
   { id: "generate-creatives", retries: 1, triggers: [{ event: "influencer/generate.creatives" }] },
   async ({ event, step }) => {
@@ -505,19 +513,28 @@ export const generateCreatives = inngest.createFunction(
       // the reference is the source of truth, inventing marks puts a mole where there isn't one.
       const faceMarks = anchored ? "" : [bibleFace.distinct_features, bibleFace.skin].filter(Boolean).join(", ").slice(0, 220);
 
-      // TWO-STAGE writer: when the user gave a brief, let Claude expand it into a rich,
-      // art-directed scene (using the bible) before we wrap it in the structured prompt.
-      // Falls back to the raw brief if Claude is unavailable.
-      let richScene = sceneText;
-      if (scene) {
-        const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: (persona.bible as Record<string, unknown>) || {}, scene: sceneText, cinematic, extras: event.data.extras !== false, gender: String(persona.gender || "") }));
-        if (composed) {
-          richScene = composed;
-          await step.run("usage-compose", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "compose", count: 1 }));
+      // MULTI-SCENE brief: if the user pasted numbered scenes ("Image 1 / Scene 2 / Shot 3"),
+      // generate ONE distinct image per scene instead of N variations of the first. Otherwise the
+      // single scene becomes N art-directed variations (the classic behaviour).
+      const bibleObj = (persona.bible as Record<string, unknown>) || {};
+      const extrasOn = event.data.extras !== false;
+      const gender = String(persona.gender || "");
+      const segments = splitScenes(scene);
+      const multiScene = segments.length >= 2;
+      let richScenes: string[] = [];
+      if (multiScene) {
+        richScenes = await step.run("compose-multi", () => Promise.all(segments.map((seg) => composeCreativeScene({ bible: bibleObj, scene: seg, cinematic, extras: extrasOn, gender }).then((c) => c || seg))));
+        await step.run("usage-compose-multi", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "compose", count: segments.length }).catch(() => {}));
+      } else {
+        let rs = sceneText;
+        if (scene) {
+          const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: bibleObj, scene: sceneText, cinematic, extras: extrasOn, gender }));
+          if (composed) { rs = composed; await step.run("usage-compose", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "compose", count: 1 }).catch(() => {})); }
         }
+        richScenes = [rs];
       }
       const buildPrompt = (idx: number, ratio: string) =>
-        buildCreativeImagePrompt({ sceneText: richScene, variation: variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
+        buildCreativeImagePrompt({ sceneText: multiScene ? richScenes[idx] : richScenes[0], variation: multiScene ? "" : variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
 
       // Each format runs CONCURRENTLY and preserves one persisted record per requested
       // attempt. Failed generations and QA rejects are visible to producers, not dropped.
@@ -526,7 +543,8 @@ export const generateCreatives = inngest.createFunction(
       // returning no image).
       const perRatioResults = await Promise.all(ratios.map(async (ratio) => {
         const rid = ratio.replace(/:/g, "x"); // safe slug for Inngest step IDs (no colons)
-        const prompts = Array.from({ length: perRatio }, (_, i) => buildPrompt(i, ratio));
+        const shotCount = multiScene ? richScenes.length : perRatio;
+        const prompts = Array.from({ length: shotCount }, (_, i) => buildPrompt(i, ratio));
         // Detailed gen captures the failure REASON and the model ACTUALLY used per shot (it
         // also retries once internally and self-heals to the fallback model).
         const detailed = await step.run(`gen-${rid}`, () => generateBatchDetailed(prompts, genModel, ratio, extra, CREATIVE_FALLBACK));
