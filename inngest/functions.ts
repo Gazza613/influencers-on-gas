@@ -868,7 +868,7 @@ export const generateClips = inngest.createFunction(
     const inf = await step.run("load", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
-    const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[]; format?: string }; shots?: { scene: number; url: string | null }[] } | null;
+    const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[]; format?: string }; shots?: { scene: number; url: string | null }[]; clips?: ClipRow[] } | null;
     const scenes = production?.storyboard?.scenes ?? [];
     const shots = production?.shots ?? [];
     if (!scenes.length) return { error: "no storyboard" };
@@ -876,8 +876,12 @@ export const generateClips = inngest.createFunction(
     const voiceId = persona.voice_id as string | undefined;
     const ratio = String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16";
     const shotUrl = (i: number) => shots.find((s) => s.scene === i)?.url || null;
+    // Optional role filter: render only a-roll OR only b-roll (the 8-step wizard renders them as
+    // separate gated steps). When filtering, KEEP the clips already rendered for the other role.
+    const roleFilter: string[] | null = Array.isArray(event.data.roles) && event.data.roles.length ? (event.data.roles as unknown[]).map(String) : null;
+    const existingClips = Array.isArray(production?.clips) ? (production!.clips as ClipRow[]) : [];
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: [] } } }));
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: roleFilter ? existingClips : [] } } }));
 
     // Render ONE scene to a clip. CRITICAL: the render poll is split into many SHORT steps with
     // step.sleep between them, so no single step ever blocks for minutes (which was timing out the
@@ -950,7 +954,9 @@ export const generateClips = inngest.createFunction(
 
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
     // scene merge-saves its result as it lands so the UI fills in live; a final save is authoritative.
-    const clips = await Promise.all(scenes.map(async (sc, i) => {
+    // Only render the scenes in the role filter (all of them when no filter).
+    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc }) => !roleFilter || roleFilter.includes(String(sc.role || "a-roll")));
+    await Promise.all(targets.map(async ({ sc, i }) => {
       const row = await renderOne(i, sc);
       const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
       const prod = (fresh.production ?? production) as Record<string, unknown>;
@@ -960,11 +966,49 @@ export const generateClips = inngest.createFunction(
       return row;
     }));
 
-    const ordered = clips.slice().sort((a, b) => a.scene - b.scene);
+    // Re-sort the FULL merged list (this render's clips + any kept from the other role).
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prodDone = (done.production ?? production) as Record<string, unknown>;
+    const ordered = (Array.isArray(prodDone.clips) ? (prodDone.clips as ClipRow[]) : []).slice().sort((a, b) => a.scene - b.scene);
     await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, clips: ordered, clips_status: "done", status: "clips" } } }));
     return { ok: true, clips: ordered.length };
+  },
+);
+
+// THE PRODUCER — "music & ambient" (its own gated step): generate the music bed + ambient room
+// tone up front so the producer can hear them BEFORE the stitch. Saved to production.music_url /
+// ambient_url; the stitch reuses them instead of regenerating. Durable; both metered.
+export const generateAudio = inngest.createFunction(
+  { id: "generate-audio", retries: 1, triggers: [{ event: "influencer/generate.audio" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const inf = await step.run("load", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[]; duration_seconds?: number; tone?: string; music_bed?: string }; brief?: { setting?: string } } | null;
+    const sb = production?.storyboard;
+    if (!sb?.scenes?.length) return { error: "no storyboard" };
+    const total = Math.max(15, Number(sb.duration_seconds) || sb.scenes.length * 5);
+    await step.run("mark", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, audio_status: "running" } } }));
+
+    let musicUrl: string | null = null;
+    try {
+      const brief = sb.music_bed || `${sb.tone || "warm, modern"} background music bed for a social ad, no vocals`;
+      musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg"));
+      await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
+    } catch { musicUrl = null; }
+
+    let ambientUrl: string | null = null;
+    try {
+      const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
+      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`continuous ambient background sound of ${setting}: low natural room tone, distant murmur and movement, gentle environment, no music and no speech`, 22), "ambient", "mp3", "audio/mpeg"));
+      await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
+    } catch { ambientUrl = null; }
+
+    const done = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+    const prod = (done.production ?? production) as Record<string, unknown>;
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, music_url: musicUrl, ambient_url: ambientUrl, audio_status: "done" } } }));
+    return { ok: true, music: !!musicUrl, ambient: !!ambientUrl };
   },
 );
 
@@ -1013,18 +1057,18 @@ export const assembleVideo = inngest.createFunction(
     });
     const total = Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30;
 
-    // Music bed (full length) → Blob.
-    let musicUrl: string | null = null;
-    try {
+    // Music bed (full length) → Blob. REUSE the audio step's bed if it already produced one.
+    let musicUrl: string | null = (production as { music_url?: string })?.music_url || null;
+    if (!musicUrl) try {
       const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
       musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg"));
       await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     } catch { musicUrl = null; }
 
     // Ambient bed: a continuous low room/location tone under everything (ElevenLabs SFX). SFX clips
-    // max ~22s, so tile copies across the full duration. Mixed UNDER the VO + music.
-    let ambientUrl: string | null = null;
-    try {
+    // max ~22s, so tile copies across the full duration. Mixed UNDER the VO + music. Reuse if present.
+    let ambientUrl: string | null = (production as { ambient_url?: string })?.ambient_url || null;
+    if (!ambientUrl) try {
       const setting = String((production?.brief as { setting?: string })?.setting || scenes[0]?.location || "the location").slice(0, 120);
       ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`continuous ambient background sound of ${setting}: low natural room tone, distant murmur and movement, gentle environment, no music and no speech`, 22), "ambient", "mp3", "audio/mpeg"));
       await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
@@ -1099,7 +1143,7 @@ export const assembleVideo = inngest.createFunction(
 
     const done = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prod = (done.production ?? production) as Record<string, unknown>;
-    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, final_url: finalUrl, music_url: musicUrl, assembly_status: "done", assembly_error: err, status: finalUrl ? "final" : "clips" } } }));
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, final_url: finalUrl, music_url: musicUrl, ambient_url: ambientUrl, assembly_status: "done", assembly_error: err, status: finalUrl ? "final" : "clips" } } }));
     return { ok: !!finalUrl, error: err };
   },
 );

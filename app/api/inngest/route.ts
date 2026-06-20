@@ -1,6 +1,6 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
-import { generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, assembleVideo, reshootShot, videoSpike } from "@/inngest/functions";
+import { generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, generateAudio, assembleVideo, reshootShot, videoSpike } from "@/inngest/functions";
 
 // Image/video generation + polling can run several minutes; give the invocation headroom so a
 // long render poll can't time out the whole function (which left clip jobs spinning forever).
