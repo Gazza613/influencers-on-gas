@@ -82,7 +82,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // (so you can't approve a board/clip/audio/stitch mid-run, before it has finished).
   const ready: Record<string, boolean> = {
     concept: !!sb, voice: !voiceMissing && !!sb, keyframes: shotsReady && !shooting,
-    aroll: aRollReady && !rendering, broll: bRollReady && !rendering, audio: audioReady && !audioBusy, stitch: !!finalUrl && !assembling,
+    aroll: aRollReady && !rendering, broll: bRollReady && !rendering, audio: !audioBusy, stitch: !!finalUrl && !assembling,
     showreel: production?.showreel_status === "accepted" || production?.showreel_status === "declined",
   };
   const ORDER = ["concept", "voice", "keyframes", "aroll", "broll", "audio", "stitch", "showreel"] as const;
@@ -364,7 +364,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <div className="tabular mt-1 text-[11px] uppercase tracking-[0.15em] text-ink-faint">{sb.format} · {sb.duration_seconds}s · {sb.scenes.length} scenes · {sb.tone}</div>
               </div>
               <div className="flex gap-2">
-                {(shooting || rendering || assembling) && <button onClick={resetStuck} className="rounded-lg border border-alert/50 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10" title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>}
+                {(shooting || rendering || assembling || audioBusy) && <button onClick={resetStuck} className="rounded-lg border border-alert/50 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10" title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>}
                 <button onClick={() => setEditing(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">✎ New brief</button>
                 <button onClick={generate} disabled={busy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Re-directing…" : "↻ Regenerate"}</button>
               </div>
@@ -540,11 +540,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               {unlocked("audio") ? (
                 <>
                   <button onClick={genAudio} disabled={audioBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{audioBusy ? "🎵 Generating audio…" : audioReady ? "↻ Re-generate audio" : "🎵 Generate music & ambient"}</button>
-                  {audioReady && (
+                  {audioReady ? (
                     <div className="mt-3 space-y-2">
                       {production?.music_url && <div><div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Music bed</div><audio src={production.music_url} controls className="mt-1 h-8 w-full max-w-sm" /></div>}
                       {production?.ambient_url && <div><div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Ambient tone</div><audio src={production.ambient_url} controls className="mt-1 h-8 w-full max-w-sm" /></div>}
                     </div>
+                  ) : !audioBusy && (
+                    <p className="mt-2 text-[11px] text-ink-faint">Optional — generate to preview the beds, or just <b>Accept</b> to skip; the stitch will create the music + ambient for you automatically.</p>
                   )}
                 </>
               ) : <LockHint />}

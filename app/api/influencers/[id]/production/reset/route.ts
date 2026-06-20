@@ -17,6 +17,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!production) return NextResponse.json({ ok: true });
   // Also clear any per-scene re-shoot flags left mid-flight.
   const shots = Array.isArray(production.shots) ? (production.shots as Record<string, unknown>[]).map((s) => ({ ...s, reshooting: false })) : production.shots;
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, shots, shots_status: "idle", clips_status: "idle", assembly_status: "idle" } } });
+  await updateInfluencer(id, { persona: { ...persona, production: { ...production, shots, shots_status: "idle", clips_status: "idle", assembly_status: "idle", audio_status: "idle" } } });
   return NextResponse.json({ ok: true });
 }
