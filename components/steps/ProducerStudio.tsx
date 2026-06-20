@@ -364,7 +364,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <div className="tabular mt-1 text-[11px] uppercase tracking-[0.15em] text-ink-faint">{sb.format} · {sb.duration_seconds}s · {sb.scenes.length} scenes · {sb.tone}</div>
               </div>
               <div className="flex gap-2">
-                {(shooting || rendering || assembling || audioBusy) && <button onClick={resetStuck} className="rounded-lg border border-alert/50 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10" title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>}
+                <button onClick={resetStuck} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${(shooting || rendering || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>
                 <button onClick={() => setEditing(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">✎ New brief</button>
                 <button onClick={generate} disabled={busy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Re-directing…" : "↻ Regenerate"}</button>
               </div>
