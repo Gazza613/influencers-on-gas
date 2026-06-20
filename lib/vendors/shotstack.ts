@@ -42,3 +42,17 @@ export async function pollRender(id: string, rounds = 80): Promise<{ url: string
   }
   return { url: null, error: "render timed out" };
 }
+
+// ONE quick status check (returns fast) so the caller can poll across short durable steps with
+// step.sleep — never blocking a single serverless invocation for minutes.
+export async function pollRenderOnce(id: string): Promise<{ url: string | null; terminal: boolean; error: string | null }> {
+  try {
+    const res = await fetch(`${BASE}/render/${id}`, { headers: { "x-api-key": await key() }, cache: "no-store" });
+    if (!res.ok) return { url: null, terminal: false, error: null };
+    const data = (await res.json()) as { response?: { status?: string; url?: string; error?: string } };
+    const status = String(data?.response?.status || "").toLowerCase();
+    if (status === "done" && data.response?.url) return { url: data.response.url, terminal: true, error: null };
+    if (status === "failed") return { url: null, terminal: true, error: data.response?.error || "render failed" };
+    return { url: null, terminal: false, error: null };
+  } catch { return { url: null, terminal: false, error: null }; }
+}

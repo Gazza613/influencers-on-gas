@@ -4,7 +4,7 @@ import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_RE
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic } from "@/lib/vendors/elevenlabs";
-import { renderEdit, pollRender } from "@/lib/vendors/shotstack";
+import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -1048,7 +1048,15 @@ export const assembleVideo = inngest.createFunction(
     let finalUrl: string | null = null; let err: string | null = null;
     try {
       const renderId = await step.run("render", () => renderEdit(edit));
-      const out = await step.run("poll-render", () => pollRender(renderId, 100));
+      // DURABLE poll: short status checks with step.sleep between, so the Shotstack render (which
+      // can take minutes) never blocks one invocation long enough to time out + retry-loop.
+      let out: { url: string | null; error: string | null } = { url: null, error: "render timed out" };
+      for (let n = 0; n < 60; n++) { // ~60 x 6s ≈ 6 min
+        const s = await step.run(`renderpoll-${n}`, () => pollRenderOnce(renderId));
+        if (s.url) { out = { url: s.url, error: null }; break; }
+        if (s.terminal) { out = { url: null, error: s.error }; break; }
+        await step.sleep(`renderwait-${n}`, "6s");
+      }
       if (out.url) {
         finalUrl = (await step.run("host-final", () => rehostToBlob(out.url as string, "finals").catch(() => null))) || out.url;
         await step.run("u-stitch", () => recordUsage({ influencerId, provider: "shotstack", model: "edit", unit: "render", action: "stitch", count: 1 }).catch(() => {}));
