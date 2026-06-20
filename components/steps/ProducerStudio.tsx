@@ -512,29 +512,25 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 4 · A-roll */}
-            <StepShell n={4} title="A-roll — the talking scenes" desc={`I bring the talking scenes to life: ${name} speaks to camera, lip-synced to the voice, with a living, moving background.`} state={stepState("aroll")} gate={renderGate("aroll", "Re-shoot a scene above (it clears the stale clip) or re-render the a-roll, then Accept.")}>
+            <StepShell n={4} title="A-roll — the talking scenes" desc={`I bring the talking scenes to life: ${name} speaks to camera, lip-synced to the voice, with a living, moving background.`} state={stepState("aroll")} gate={renderGate("aroll", "Re-shoot a scene above (it clears the stale clip) or re-render the a-roll, then Accept.")}
+              preview={unlocked("aroll") && !aRollNone ? <ClipStrip clips={clips} role="a-roll" sceneIdx={aRollIdx.map((x) => x.i)} onExpand={setVzoom} /> : undefined}>
               {unlocked("aroll") ? (
                 aRollNone ? (
                   <p className="text-[12px] text-ink-faint">No talking (a-roll) scenes in this storyboard — nothing to render here.</p>
                 ) : (
-                  <>
-                    <button onClick={() => renderRole("a-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "a-roll" ? "🎞️ Rendering the a-roll…" : aRollReady ? "↻ Re-render the a-roll" : "🎞️ Render the a-roll"}</button>
-                    <ClipStrip clips={clips} role="a-roll" sceneIdx={aRollIdx.map((x) => x.i)} onExpand={setVzoom} />
-                  </>
+                  <button onClick={() => renderRole("a-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "a-roll" ? "🎞️ Rendering the a-roll…" : aRollReady ? "↻ Re-render the a-roll" : "🎞️ Render the a-roll"}</button>
                 )
               ) : <LockHint />}
             </StepShell>
 
             {/* 5 · B-roll */}
-            <StepShell n={5} title="B-roll — the scene shots" desc="The non-talking scenes get natural motion — moving backgrounds, people, light — and chain seamlessly into the next shot." state={stepState("broll")} gate={renderGate("broll", "Re-shoot a scene above or re-render the b-roll, then Accept.")}>
+            <StepShell n={5} title="B-roll — the scene shots" desc="The non-talking scenes get natural motion — moving backgrounds, people, light — and chain seamlessly into the next shot." state={stepState("broll")} gate={renderGate("broll", "Re-shoot a scene above or re-render the b-roll, then Accept.")}
+              preview={unlocked("broll") && !bRollNone ? <ClipStrip clips={clips} role="b-roll" sceneIdx={bRollIdx.map((x) => x.i)} onExpand={setVzoom} /> : undefined}>
               {unlocked("broll") ? (
                 bRollNone ? (
                   <p className="text-[12px] text-ink-faint">No b-roll scenes in this storyboard — nothing to render here.</p>
                 ) : (
-                  <>
-                    <button onClick={() => renderRole("b-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "b-roll" ? "🎞️ Rendering the b-roll…" : bRollReady ? "↻ Re-render the b-roll" : "🎞️ Render the b-roll"}</button>
-                    <ClipStrip clips={clips} role="b-roll" sceneIdx={bRollIdx.map((x) => x.i)} onExpand={setVzoom} />
-                  </>
+                  <button onClick={() => renderRole("b-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "b-roll" ? "🎞️ Rendering the b-roll…" : bRollReady ? "↻ Re-render the b-roll" : "🎞️ Render the b-roll"}</button>
                 )
               ) : <LockHint />}
             </StepShell>
@@ -602,7 +598,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 // `state` drives the chrome — active glows, done goes green, locked dims.
 // `state` drives the chrome — active glows, done goes green, locked dims. When done, the action
 // body is hidden (only the green tick + the gate's "Approved · undo" remain). `gate` always shows.
-function StepShell({ n, title, desc, state, gate, children }: { n: number; title: string; desc: ReactNode; state: "locked" | "active" | "done"; gate?: ReactNode; children?: ReactNode }) {
+function StepShell({ n, title, desc, state, gate, preview, children }: { n: number; title: string; desc: ReactNode; state: "locked" | "active" | "done"; gate?: ReactNode; preview?: ReactNode; children?: ReactNode }) {
   const ring = state === "active" ? "border-[#a855f7] ring-2 ring-[#a855f7]/50 shadow-[0_0_22px_rgba(168,85,247,0.35)]" : state === "done" ? "border-ready/40 bg-ready/[0.04]" : "border-line opacity-55";
   const badge = state === "done" ? "bg-ready text-black" : state === "active" ? "bg-[#a855f7] text-white" : "bg-surface-2 text-ink-faint";
   return (
@@ -613,7 +609,9 @@ function StepShell({ n, title, desc, state, gate, children }: { n: number; title
         {state === "done" && <span className="tabular ml-auto text-[10px] font-semibold uppercase tracking-wide text-ready">approved</span>}
       </div>
       <p className="mt-1.5 text-sm text-ink-dim">{desc}</p>
+      {/* action body hides once approved; preview (rendered clips/cut) stays visible always */}
       {state !== "done" && children && <div className="mt-3">{children}</div>}
+      {preview}
       {gate}
     </div>
   );
