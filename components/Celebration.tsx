@@ -5,11 +5,11 @@ import { useEffect, useState } from "react";
 // A one-shot confetti + streamers celebration that fills the screen when a cut is finished.
 const QUIRKS = [
   "{name} is LIVE! 🎉",
-  "And… that's a wrap on {name}! 🎬",
   "{name} just dropped a banger 🔥",
   "{name} is ready for her close-up ✨",
   "Cut! {name} absolutely nailed it 👏",
   "Lights, camera, {name}! 🌟",
+  "Take a bow, {name} 🙌",
 ];
 const COLORS = ["#a855f7", "#60a5fa", "#ec4899", "#f59e0b", "#34c759", "#ffffff"];
 
@@ -39,7 +39,8 @@ export default function Celebration({ name, onDone }: { name: string; onDone: ()
         return <span key={`s${i}`} style={{ position: "absolute", top: 0, left: `${left}%`, width: 4, height: "40vh", transformOrigin: "top", background: `linear-gradient(${COLORS[i % COLORS.length]}, transparent)`, animation: `gas-streamer ${3 + (i % 4) * 0.4}s ease-in ${(i % 6) * 0.1}s 1 both` }} />;
       })}
       <div className="relative rounded-2xl border border-[#a855f7]/40 bg-surface-1/90 px-10 py-7 text-center shadow-[0_0_60px_rgba(168,85,247,0.5)]" style={{ animation: "gas-pop 0.5s ease-out both" }}>
-        <div className="text-3xl font-extrabold brand-grad sm:text-4xl">{line}</div>
+        <div className="text-4xl font-extrabold brand-grad sm:text-5xl">It&apos;s a wrap! 🎬</div>
+        <div className="mt-2 text-lg font-bold text-ink">{line}</div>
         <div className="mt-2 text-sm text-ink-dim">Your cut is ready. Tap anywhere to continue →</div>
       </div>
     </div>
