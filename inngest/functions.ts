@@ -1166,7 +1166,10 @@ export const reshootShot = inngest.createFunction(
     const row = { scene: index, role, beat: String(sc.beat || ""), url: hosted || (list.find((s) => s.scene === index)?.url ?? null), error: hosted ? null : "no image", reshooting: false };
     const at = list.findIndex((s) => s.scene === index);
     if (at >= 0) list[at] = row; else list.push(row);
-    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list } } }));
+    // Re-shooting the still makes this scene's existing CLIP stale — drop it so it re-renders cleanly
+    // (the clip is a separate video render; the new frame won't appear in the cut until re-rendered).
+    const freshClips = Array.isArray(prod.clips) ? (prod.clips as { scene: number }[]).filter((c) => c.scene !== index) : prod.clips;
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, clips: freshClips } } }));
     return { ok: !!hosted };
   },
 );
