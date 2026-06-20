@@ -879,9 +879,11 @@ export const generateClips = inngest.createFunction(
     // Optional role filter: render only a-roll OR only b-roll (the 8-step wizard renders them as
     // separate gated steps). When filtering, KEEP the clips already rendered for the other role.
     const roleFilter: string[] | null = Array.isArray(event.data.roles) && event.data.roles.length ? (event.data.roles as unknown[]).map(String) : null;
+    const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
+    const keepExisting = !!(roleFilter || sceneFilter); // filtered render → keep the other clips
     const existingClips = Array.isArray(production?.clips) ? (production!.clips as ClipRow[]) : [];
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: roleFilter ? existingClips : [] } } }));
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: keepExisting ? existingClips : [] } } }));
 
     // Render ONE scene to a clip. CRITICAL: the render poll is split into many SHORT steps with
     // step.sleep between them, so no single step ever blocks for minutes (which was timing out the
@@ -962,7 +964,7 @@ export const generateClips = inngest.createFunction(
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
     // scene merge-saves its result as it lands so the UI fills in live; a final save is authoritative.
     // Only render the scenes in the role filter (all of them when no filter).
-    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc }) => !roleFilter || roleFilter.includes(String(sc.role || "a-roll")));
+    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)));
     await Promise.all(targets.map(async ({ sc, i }) => {
       const row = await renderOne(i, sc);
       const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
@@ -1229,10 +1231,13 @@ export const reshootShot = inngest.createFunction(
     const row = { scene: index, role, beat: String(sc.beat || ""), url: hosted || (list.find((s) => s.scene === index)?.url ?? null), error: hosted ? null : "no image", reshooting: false };
     const at = list.findIndex((s) => s.scene === index);
     if (at >= 0) list[at] = row; else list.push(row);
-    // Re-shooting the still makes this scene's existing CLIP stale — drop it so it re-renders cleanly
-    // (the clip is a separate video render; the new frame won't appear in the cut until re-rendered).
+    // Re-shooting the still drops this scene's stale clip, then immediately re-renders just this
+    // scene's clip (a-roll → fresh lip-synced video, b-roll → fresh motion) so the new clip drops
+    // straight back into the step preview — no separate "render" click needed.
     const freshClips = Array.isArray(prod.clips) ? (prod.clips as { scene: number }[]).filter((c) => c.scene !== index) : prod.clips;
-    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, clips: freshClips } } }));
+    const hasFrame = list.some((s) => Number(s.scene) === index && s.url);
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, clips: freshClips, ...(hasFrame ? { clips_status: "running" } : {}) } } }));
+    if (hasFrame) await step.run("queue-clip", () => inngest.send({ name: "influencer/generate.clips", data: { influencerId, scenes: [index] } }));
     return { ok: !!hosted };
   },
 );

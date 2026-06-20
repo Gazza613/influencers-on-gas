@@ -208,11 +208,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     }).then((x) => x.json()).catch(() => null);
     applyEditsLocally(i);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
+    const role: "a-roll" | "b-roll" = sb?.scenes?.[i]?.role === "b-roll" ? "b-roll" : "a-roll";
+    // 1) wait for the new keyframe
     for (let k = 0; k < 45; k++) {
       await new Promise((res) => setTimeout(res, 6000));
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
       if (d?.production) { setProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
     }
+    // 2) the re-shoot auto-renders this scene's clip too — wait for it and drop it into the preview
+    setRenderingRole(role);
+    await poll(setProduction, "clips_status");
+    setRenderingRole("");
   }
 
   async function resetStuck() {
@@ -496,7 +502,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   ) : (
                     <>
                       <button onClick={() => renderRole("a-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "a-roll" ? "🎞️ Rendering the a-roll…" : aRollReady ? "↻ Re-render the a-roll" : "🎞️ Render the a-roll"}</button>
-                      <ClipStrip clips={clips} role="a-roll" />
+                      <ClipStrip clips={clips} role="a-roll" sceneIdx={aRollIdx.map((x) => x.i)} />
                     </>
                   )}
                   {renderGate("aroll", "Re-shoot a scene above (it clears the stale clip) or re-render the a-roll, then Accept.")}
@@ -513,7 +519,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   ) : (
                     <>
                       <button onClick={() => renderRole("b-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "b-roll" ? "🎞️ Rendering the b-roll…" : bRollReady ? "↻ Re-render the b-roll" : "🎞️ Render the b-roll"}</button>
-                      <ClipStrip clips={clips} role="b-roll" />
+                      <ClipStrip clips={clips} role="b-roll" sceneIdx={bRollIdx.map((x) => x.i)} />
                     </>
                   )}
                   {renderGate("broll", "Re-shoot a scene above or re-render the b-roll, then Accept.")}
@@ -596,20 +602,27 @@ function StepShell({ n, title, desc, state, children }: { n: number; title: stri
 function LockHint() {
   return <p className="text-[11px] text-ink-faint">🔒 Approve the previous step to unlock this one.</p>;
 }
-// Playable previews of one role's rendered clips — review them before approving the step.
-function ClipStrip({ clips, role }: { clips: Clip[]; role: "a-roll" | "b-roll" }) {
-  const mine = clips.filter((c) => c.kind === role && c.url).sort((a, b) => a.scene - b.scene);
-  if (!mine.length) return null;
+// Playable previews for one role — one tile per scene IN ORDER, each either the rendered clip
+// (play before approving) or a "not rendered yet" tile (e.g. after a re-shoot clears it).
+function ClipStrip({ clips, role, sceneIdx }: { clips: Clip[]; role: "a-roll" | "b-roll"; sceneIdx: number[] }) {
+  if (!sceneIdx.length) return null;
   return (
     <div className="mt-3">
-      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Preview the {role} clips — play each before you approve</div>
+      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Preview the {role} clips, in order — play each before you approve</div>
       <div className="flex flex-wrap gap-3">
-        {mine.map((c) => (
-          <div key={c.scene} className="relative">
-            <video src={c.url!} controls playsInline className="aspect-[9/16] w-40 rounded-lg border border-ready/40 bg-black object-cover" />
-            <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">Scene {c.scene + 1}</span>
-          </div>
-        ))}
+        {sceneIdx.map((i) => {
+          const c = clips.find((x) => x.scene === i && x.url);
+          return (
+            <div key={i} className="relative">
+              {c?.url ? (
+                <video src={c.url} controls playsInline className="aspect-[9/16] w-40 rounded-lg border border-ready/40 bg-black object-cover" />
+              ) : (
+                <div className="flex aspect-[9/16] w-40 items-center justify-center rounded-lg border border-dashed border-line bg-surface-2 px-2 text-center text-[10px] text-ink-faint">not rendered yet</div>
+              )}
+              <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">Scene {i + 1}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
