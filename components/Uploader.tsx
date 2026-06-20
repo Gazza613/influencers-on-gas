@@ -5,16 +5,18 @@ import { upload as blobUpload } from "@vercel/blob/client";
 
 // Reusable image uploader → Vercel Blob (direct client upload, so large PNGs work).
 // Drag/drop or click; shows a preview and a quirky uploading state. Calls onUploaded(url).
-export default function Uploader({ kind = "ref", label, onUploaded, current, multiple = false }: { kind?: string; label: string; onUploaded: (url: string) => void; current?: string | null; multiple?: boolean }) {
+export default function Uploader({ kind = "ref", label, onUploaded, current, multiple = false, accept = "image" }: { kind?: string; label: string; onUploaded: (url: string) => void; current?: string | null; multiple?: boolean; accept?: "image" | "audio" }) {
   const [url, setUrl] = useState<string | null>(current ?? null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const ref = useRef<HTMLInputElement>(null);
+  const isAudio = accept === "audio";
+  const maxMb = isAudio ? 25 : 10;
 
   async function uploadOne(file: File): Promise<boolean> {
-    if (!file.type.startsWith("image/")) { setErr("That's not an image. Pop in a JPG, PNG or WebP."); return false; }
-    if (file.size > 10 * 1024 * 1024) { setErr(`"${file.name}" is over 10MB. Pop in a smaller one.`); return false; }
-    const safe = (file.name || "image").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-40);
+    if (!file.type.startsWith(isAudio ? "audio/" : "image/")) { setErr(isAudio ? "That's not audio. Pop in an MP3, WAV or M4A." : "That's not an image. Pop in a JPG, PNG or WebP."); return false; }
+    if (file.size > maxMb * 1024 * 1024) { setErr(`"${file.name}" is over ${maxMb}MB. Pop in a smaller one.`); return false; }
+    const safe = (file.name || (isAudio ? "audio" : "image")).replace(/[^a-zA-Z0-9._-]/g, "_").slice(-40);
     const blob = await blobUpload(`influencers/${kind}/${safe}`, file, {
       access: "public", handleUploadUrl: "/api/upload", clientPayload: kind,
     });
@@ -45,18 +47,21 @@ export default function Uploader({ kind = "ref", label, onUploaded, current, mul
       >
         {busy ? (
           <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-1 text-[#c79bff]"><span className="spinner-ring text-xl" /></div>
+        ) : showPreview && isAudio ? (
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-1 text-lg text-[#c79bff]">🎙️</div>
         ) : showPreview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url!} alt="reference" className="h-14 w-14 rounded-lg object-cover" />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-1 text-lg text-ink-faint">{multiple ? "＋" : "📷"}</div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-1 text-lg text-ink-faint">{multiple ? "＋" : isAudio ? "🎙️" : "📷"}</div>
         )}
         <div className="min-w-0 flex-1">
           <div className="text-sm text-ink">{busy ? "Beaming them up…" : showPreview ? `${label} ✓` : label}</div>
-          <div className="text-[11px] text-ink-faint">{busy ? "Hang tight, uploading." : showPreview ? "Tap to replace." : multiple ? "Tap to choose several, or drop images here (max 10MB each)." : "Tap or drop an image (max 10MB)."}</div>
+          <div className="text-[11px] text-ink-faint">{busy ? "Hang tight, uploading." : showPreview ? "Tap to replace." : isAudio ? `Tap or drop your VO file (MP3/WAV, max ${maxMb}MB).` : multiple ? "Tap to choose several, or drop images here (max 10MB each)." : "Tap or drop an image (max 10MB)."}</div>
+          {showPreview && isAudio && <audio src={url!} controls className="mt-1 h-7 w-full" onClick={(e) => e.stopPropagation()} />}
         </div>
       </div>
-      <input ref={ref} type="file" accept="image/*" multiple={multiple} className="hidden" onChange={(e) => handle(Array.from(e.target.files || []))} />
+      <input ref={ref} type="file" accept={isAudio ? "audio/*" : "image/*"} multiple={multiple} className="hidden" onChange={(e) => handle(Array.from(e.target.files || []))} />
       {err && <p className="mt-1 text-[11px] text-alert">{err}</p>}
     </div>
   );

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { listInfluencers, type Influencer } from "@/lib/influencers";
+import CastDeleteButton from "@/components/CastDeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,8 @@ function blurb(inf: Influencer): string {
 
 export default async function InfluencersIndex() {
   const influencers = await listInfluencers();
+  const session = await auth();
+  const isSuper = session?.user?.role === "super_admin";
 
   if (!influencers.length) {
     return (
@@ -62,6 +66,7 @@ export default async function InfluencersIndex() {
                 <span className={`tabular absolute right-2 top-2 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${locked ? "bg-ready/85 text-white" : "bg-black/60 text-ink-dim"}`}>
                   {locked ? "🔒 Ready" : "Building"}
                 </span>
+                {isSuper && <CastDeleteButton id={inf.id} name={inf.name} />}
               </div>
               <div className="p-3">
                 <div className="flex items-center gap-2">
