@@ -905,7 +905,9 @@ export const generateClips = inngest.createFunction(
         const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId as string, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null)) as string | null);
         if (audioUrl) {
           if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures; the WHOLE scene is alive — background people walk past, ambient motion, leaves and light moving.${MOTION_SAFE}`;
+          // A-ROLL camera MUST hold on her — Seedance was obeying storyboard "push in / pan up"
+          // directions and craning the camera off her (she slid out of frame, the building grew).
+          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. ONLY she and the background move (background people walk past, ambient motion, leaves and light) — never the camera.${MOTION_SAFE}`;
           const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
           let url: string | null = sub.url;
           if (!url && sub.jobId) {
@@ -927,7 +929,7 @@ export const generateClips = inngest.createFunction(
 
       // B-ROLL (and a-roll fallback): Kling whole-frame motion, silent. VO laid over in the stitch.
       const motion = (role === "a-roll"
-        ? `${base}. She is front-on, looking into the lens, talking to camera; the WHOLE scene is alive with moving background people and ambient motion.`
+        ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. Only she and the background move (background people, ambient motion).`
         : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`) + MOTION_SAFE;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
