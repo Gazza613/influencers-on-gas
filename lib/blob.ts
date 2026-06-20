@@ -19,7 +19,19 @@ export async function rehostToBlob(url: string, prefix = "creatives"): Promise<s
     const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
     if (!res.ok) return null;
     const ct = (res.headers.get("content-type") || "image/png").split(";")[0].trim();
-    const ext = ct.includes("jpeg") || ct.includes("jpg") ? "jpg" : ct.includes("webp") ? "webp" : ct.includes("avif") ? "avif" : "png";
+    // Pick the RIGHT extension — videos/audio re-hosted into clips/finals must NOT become ".png",
+    // or Shotstack rejects them ("Unsupported file extension .png for video asset").
+    const ext =
+      ct.includes("mp4") ? "mp4" :
+      ct.includes("webm") ? "webm" :
+      ct.includes("quicktime") || ct === "video/mov" ? "mov" :
+      ct.includes("matroska") || ct.includes("mkv") ? "mkv" :
+      ct.startsWith("video/") ? "mp4" :
+      ct.startsWith("audio/") ? (ct.includes("wav") ? "wav" : "mp3") :
+      ct.includes("jpeg") || ct.includes("jpg") ? "jpg" :
+      ct.includes("webp") ? "webp" :
+      ct.includes("avif") ? "avif" :
+      "png";
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length < 100) return null; // empty / error body
     const key = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;

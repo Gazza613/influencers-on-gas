@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import Uploader from "@/components/Uploader";
 import Lightbox from "@/components/Lightbox";
+import Celebration from "@/components/Celebration";
 
 type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
@@ -194,6 +195,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
   const [zoom, setZoom] = useState<string | null>(null);
   const [vzoom, setVzoom] = useState<string | null>(null);
+  // Fire a celebration the moment a finished cut first appears.
+  const [celebrate, setCelebrate] = useState(false);
+  const prevFinal = useRef<string | null>(initialProduction?.final_url || null);
+  useEffect(() => {
+    const f = production?.final_url || null;
+    if (f && !prevFinal.current) setCelebrate(true);
+    prevFinal.current = f;
+  }, [production?.final_url]);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [ed, setEd] = useState({ location: "", blocking: "", shot: "", motion: "", vo: "", caption: "", voAudio: "", phone: "" });
   const [aiInstr, setAiInstr] = useState("");
@@ -585,6 +594,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           </div>
         </div>
       ) : null}
+      {celebrate && <Celebration name={name} onDone={() => setCelebrate(false)} />}
       {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} />}
       {vzoom && (
         <div onClick={() => setVzoom(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
