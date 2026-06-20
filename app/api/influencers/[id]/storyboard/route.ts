@@ -47,7 +47,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // its corner are burned onto the final cut at assembly.
     clothingRef: typeof b.clothingRef === "string" ? b.clothingRef : "",
     locationRef: typeof b.locationRef === "string" ? b.locationRef : "",
-    logoUrl: typeof b.logoUrl === "string" ? b.logoUrl : "",
+    logoUrl: typeof b.logoUrl === "string" ? b.logoUrl : "", // burned top-left
+    promoUrl: typeof b.promoUrl === "string" ? b.promoUrl : "", // burned top-right
     logoPosition: ["topLeft", "topRight", "bottomLeft", "bottomRight"].includes(b.logoPosition) ? b.logoPosition : "topLeft",
     captions: b.captions !== false, // default on; burned-in VO subtitles
   };

@@ -955,7 +955,7 @@ export const assembleVideo = inngest.createFunction(
     if (!inf) return { skipped: "not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
     const production = (persona.production ?? null) as {
-      brief?: { brand?: string; logo?: string; logoUrl?: string; logoPosition?: string };
+      brief?: { brand?: string; logo?: string; logoUrl?: string; promoUrl?: string; logoPosition?: string };
       storyboard?: { scenes?: Record<string, string>[]; format?: string; music_bed?: string; tone?: string; duration_seconds?: number; legal?: string };
       clips?: { scene: number; role: string; url: string | null }[];
     } | null;
@@ -1014,14 +1014,15 @@ export const assembleVideo = inngest.createFunction(
       asset: { type: "title", text: p.caption, style: "subtitle", size: "small", position: "bottom" },
       start: p.start, length: p.len,
     })) : [];
-    // Brand bug: a transparent-PNG logo (if uploaded) placed in the chosen corner, else the brand
-    // name as small text. Shotstack positions: topLeft / topRight / bottomLeft / bottomRight.
+    // Brand overlays: logo TOP-LEFT + promo image TOP-RIGHT, both auto-sized + inset so they sit
+    // cleanly and stay legible. Logo falls back to the brand name as small text if no logo uploaded.
     const logoUrl = (production?.brief?.logoUrl || "").trim();
-    const logoPos = ["topLeft", "topRight", "bottomLeft", "bottomRight"].includes(String(production?.brief?.logoPosition)) ? String(production?.brief?.logoPosition) : "topLeft";
+    const promoUrl = (production?.brief?.promoUrl || "").trim();
     const brand = (production?.brief?.brand || "").trim();
-    const brandTrack = logoUrl
-      ? [{ asset: { type: "image", src: logoUrl }, start: 0, length: total, position: logoPos, scale: 0.18, offset: { x: logoPos.includes("Right") ? -0.04 : 0.04, y: logoPos.startsWith("top") ? -0.04 : 0.04 } }]
-      : (brand ? [{ asset: { type: "title", text: brand, style: "minimal", size: "x-small", position: logoPos }, start: 0, length: total }] : []);
+    const brandTrack: Record<string, unknown>[] = [];
+    if (logoUrl) brandTrack.push({ asset: { type: "image", src: logoUrl }, start: 0, length: total, position: "topLeft", scale: 0.16, offset: { x: 0.04, y: -0.04 } });
+    else if (brand) brandTrack.push({ asset: { type: "title", text: brand, style: "minimal", size: "x-small", position: "topLeft" }, start: 0, length: total });
+    if (promoUrl) brandTrack.push({ asset: { type: "image", src: promoUrl }, start: 0, length: total, position: "topRight", scale: 0.18, offset: { x: -0.04, y: -0.04 } });
 
     const tracks: Record<string, unknown>[] = [];
     if (brandTrack.length) tracks.push({ clips: brandTrack });

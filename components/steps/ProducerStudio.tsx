@@ -49,7 +49,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [clothingRef, setClothingRef] = useState<string | null>(String((initialProduction?.brief as { clothingRef?: string })?.clothingRef || "") || null);
   const [locationRef, setLocationRef] = useState<string | null>(String((initialProduction?.brief as { locationRef?: string })?.locationRef || "") || null);
   const [logoUrl, setLogoUrl] = useState<string | null>(String((initialProduction?.brief as { logoUrl?: string })?.logoUrl || "") || null);
-  const [logoPosition, setLogoPosition] = useState<string>(String((initialProduction?.brief as { logoPosition?: string })?.logoPosition || "topLeft"));
+  const [promoUrl, setPromoUrl] = useState<string | null>(String((initialProduction?.brief as { promoUrl?: string })?.promoUrl || "") || null);
   const [captions, setCaptions] = useState<boolean>((initialProduction?.brief as { captions?: boolean })?.captions !== false);
 
   const sb = production?.storyboard;
@@ -168,7 +168,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", logoPosition, captions }),
+      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); }
@@ -234,19 +234,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             <Uploader kind="location" label="Scene / location reference (optional)" current={locationRef} onUploaded={setLocationRef} />
           </div>
 
-          {/* Brand logo (transparent PNG) + where it sits on the video */}
+          {/* Brand overlays: logo TOP-LEFT + promo image TOP-RIGHT (both burned onto the cut, auto-sized) */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Uploader kind="logo" label="Brand logo — transparent PNG (optional)" current={logoUrl} onUploaded={setLogoUrl} />
-            <div>
-              <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Logo position</div>
-              <div className="grid grid-cols-2 gap-2">
-                {([["topLeft", "Top left"], ["topRight", "Top right"], ["bottomLeft", "Bottom left"], ["bottomRight", "Bottom right"]] as const).map(([k, label]) => (
-                  <button key={k} onClick={() => setLogoPosition(k)} className={`rounded-lg border px-3 py-2 text-xs font-semibold ${logoPosition === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{label}</button>
-                ))}
-              </div>
-              <p className="mt-1 text-[10px] text-ink-faint">Burned onto the final cut. No logo? The brand name shows as small text instead.</p>
-            </div>
+            <Uploader kind="logo" label="Brand logo — top-left (transparent PNG, optional)" current={logoUrl} onUploaded={setLogoUrl} />
+            <Uploader kind="promo" label="Promo image — top-right (optional)" current={promoUrl} onUploaded={setPromoUrl} />
           </div>
+          <p className="-mt-1 text-[10px] text-ink-faint">Both are placed and sized for you, top corners, so they sit cleanly and stay legible over the video. No logo? The brand name shows as small text instead.</p>
 
           {/* Captions on/off */}
           <div>
