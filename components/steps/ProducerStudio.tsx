@@ -378,7 +378,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </div>
             <div className={`rounded-xl border p-5 ${!shotsReady ? "border-line bg-surface-1 opacity-60" : shotsReady && !clipsReady && !rendering && !voiceMissing ? "border-[#60a5fa] bg-[#60a5fa]/5 ring-2 ring-[#60a5fa]/60 shadow-[0_0_22px_rgba(96,165,250,0.4)]" : "border-[#60a5fa]/30 bg-[#60a5fa]/5"}`}>
               <div className="tabular text-xs uppercase tracking-[0.2em] text-[#93c5fd]">Step 2 · Render the clips</div>
-              <p className="mt-1 text-sm text-ink-dim">I bring every frame to life: a-roll scenes talk in {name}&apos;s voice (HeyGen), b-roll scenes get natural motion (Kling). A few minutes per scene.</p>
+              <p className="mt-1 text-sm text-ink-dim">First pick {name}&apos;s voice (below), then I bring every frame to life: a-roll scenes talk, lip-synced in that voice; b-roll scenes get natural motion. A few minutes per scene.</p>
               {needsVoice && (voiceId ? (
                 <p className="mt-2 text-[11px] text-ink-faint">🎙️ Voice: <span className="text-ink-dim">{voiceName || "set"}</span> · <a href={`/setup/influencers/${influencerId}/video`} className="text-accent">change</a></p>
               ) : (
