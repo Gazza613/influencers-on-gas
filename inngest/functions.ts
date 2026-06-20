@@ -952,7 +952,11 @@ export const generateClips = inngest.createFunction(
       // a-roll — the presenter must stay in their own scene, not morph into the next backdrop.
       const next = scenes[i + 1] as Record<string, string> | undefined;
       const endImageUrl = role === "b-roll" && next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
-      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl }));
+      // Match the clip length to the scene's storyboard timecodes (Kling clamps to 3–15s), so the
+      // b-roll lines up with the cut instead of a fixed 5s.
+      const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
+      const sceneDur = a != null && b != null && b > a ? b - a : 5;
+      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: sceneDur }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
         for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Kling is slow on heavy scenes)

@@ -692,7 +692,7 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
 
 // SUBMIT a b-roll video job and return immediately with the jobId (no polling). The caller polls
 // with pollVideoJobOnce across short, durable steps so no single step blocks for minutes.
-export async function submitVideoFromImage(opts: { imageUrl: string; prompt: string; ratio?: string; endImageUrl?: string }): Promise<{ jobId: string | null; model: string | null; url: string | null; error: string | null }> {
+export async function submitVideoFromImage(opts: { imageUrl: string; prompt: string; ratio?: string; endImageUrl?: string; duration?: number }): Promise<{ jobId: string | null; model: string | null; url: string | null; error: string | null }> {
   if (!isSafePublicUrl(opts.imageUrl)) return { jobId: null, model: null, url: null, error: "unsafe or non-public image url" };
   const mediaId = await importMediaUrl(opts.imageUrl);
   if (!mediaId) return { jobId: null, model: null, url: null, error: "could not import the still into Higgsfield" };
@@ -705,7 +705,8 @@ export async function submitVideoFromImage(opts: { imageUrl: string; prompt: str
   // role}]. Kling 3.0 = model "kling3_0", roles start_image + end_image, sound on/off, duration 3-15.
   // B-roll is silent (sound off) — music + ambient are mixed in later (Higgsfield has no music/SFX).
   const medias = [{ value: mediaId, role: "start_image" }, ...(endId ? [{ value: endId, role: "end_image" }] : [])];
-  const start = (model: string, extra: AnyObj = {}): AnyObj => ({ model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, count: 1, medias, ...extra });
+  const dur = Math.max(3, Math.min(15, Math.round(opts.duration || 5))); // Kling 3.0 allows 3–15s
+  const start = (model: string, extra: AnyObj = {}): AnyObj => ({ model, prompt: opts.prompt, aspect_ratio: ar, duration: dur, count: 1, medias, ...extra });
   const shapes: AnyObj[] = [
     ...(process.env.HF_VIDEO_MODEL ? [start(process.env.HF_VIDEO_MODEL)] : []),
     start("kling3_0", { sound: "off" }),
