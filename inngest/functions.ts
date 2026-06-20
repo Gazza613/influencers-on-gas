@@ -3,7 +3,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
-import { tts, generateMusic } from "@/lib/vendors/elevenlabs";
+import { tts, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
@@ -999,6 +999,17 @@ export const assembleVideo = inngest.createFunction(
       await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     } catch { musicUrl = null; }
 
+    // Ambient bed: a continuous low room/location tone under everything (ElevenLabs SFX). SFX clips
+    // max ~22s, so tile copies across the full duration. Mixed UNDER the VO + music.
+    let ambientUrl: string | null = null;
+    try {
+      const setting = String((production?.brief as { setting?: string })?.setting || scenes[0]?.location || "the location").slice(0, 120);
+      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`continuous ambient background sound of ${setting}: low natural room tone, distant murmur and movement, gentle environment, no music and no speech`, 22), "ambient", "mp3", "audio/mpeg"));
+      await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
+    } catch { ambientUrl = null; }
+    const ambientTrack: Record<string, unknown>[] = [];
+    if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: 0.1 }, start: t, length: Math.min(22, total - t) });
+
     // Voiceover laid in for b-roll/graphic scenes (a-roll already speaks on camera).
     const voTrack: Record<string, unknown>[] = [];
     if (voiceId) {
@@ -1038,6 +1049,7 @@ export const assembleVideo = inngest.createFunction(
     if (brandTrack.length) tracks.push({ clips: brandTrack });
     if (captionClips.length) tracks.push({ clips: captionClips });
     if (voTrack.length) tracks.push({ clips: voTrack });
+    if (ambientTrack.length) tracks.push({ clips: ambientTrack });
     tracks.push({ clips: videoClips });
 
     const edit: Record<string, unknown> = {
