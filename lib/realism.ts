@@ -16,7 +16,7 @@ export const SCENE_PEOPLE =
   "a FEW other people are present in the background (roughly two to five, not a packed crowd), placed naturally for THIS specific setting the way real people occupy it (for a cafe: seated at different tables, queuing loosely, walking past) and NEVER arranged in a uniform row or tidy line; " +
   "each background person is CLEARLY DISTINCT from the others, with a different age, build, hairstyle and a DIFFERENT outfit in different colours, doing a different natural activity; NEVER duplicate or near-duplicate people, and NEVER dress several of them in the same or matching clothing; " +
   "the mix is balanced and natural: roughly 55% white, 25% black, 12% coloured and 8% indian people, with an even 50/50 split of men and women across a range of ages; each rendered realistically, in sharp focus and at correct scale; " +
-  "any couples or pairs are SAME-RACE (white with white, black with black, coloured with coloured, indian with indian) — never mixed-race couples; " +
+  "CRITICAL RULE ON COUPLES — any two people shown TOGETHER as a couple, pair, or walking/sitting side by side MUST be the SAME race as each other (white with white, black with black, coloured with coloured, indian with indian). NEVER pair two people of different races as a couple. A mixed-race / interracial couple in the background is FORBIDDEN. If unsure whether two people read as a pair, make them the same race; " +
   "every background person is in a complete, tasteful outfit with a top and bottoms, never bare-legged, in underwear or swimwear";
 
 // No extras: the subject is the ONLY person. Stated absolutely because image models love to
@@ -110,6 +110,16 @@ export function buildCreativeImagePrompt(o: {
   ].join("\n\n");
 }
 
+// Focused negative for PRODUCER shots/video keyframes. Deliberately omits the pose-specific
+// negatives in REALISM_NEGATIVE (looking away, profile, back-to-camera) because b-roll blocking
+// legitimately uses those — but hard-blocks the rules that kept slipping into the shots.
+export const SHOT_NEGATIVE =
+  "mixed-race couple, interracial couple, two people of different races shown together as a pair or walking side by side; " +
+  "a second copy, twin, clone or look-alike of the influencer; duplicated or identical background people; matching/uniform outfits on extras; " +
+  "moles, beauty marks, prominent facial moles, moles on the chest/neck/décolletage; " +
+  "plastic or waxy skin, airbrushed, beauty-filtered, doll-like, CGI or 3D-render look; " +
+  "nudity, underwear, swimwear, bare legs or missing clothing; split-screen, diptych, triptych, collage, grid or stacked panels";
+
 // ── THE PRODUCER: a directed shot from a storyboard scene, coherent across the board.
 // `worldAnchored` = a prior frame of the SAME world is supplied as an extra reference, so
 // location, lighting and style stay continuous shot-to-shot (the "Popcorn"-style coherence).
@@ -133,6 +143,7 @@ export function buildShotPrompt(o: {
     o.hasPeople ? SCENE_PEOPLE : NO_EXTRAS,
     `Wardrobe: ${CLOTHED}.`,
     `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
+    `Avoid entirely (do NOT depict any of these): ${SHOT_NEGATIVE}.`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -154,7 +165,8 @@ export const REALISM_NEGATIVE =
   "nude, naked, partial nudity, topless, underwear only, lingerie, no trousers, no pants, missing bottoms, bare crotch, exposed groin, blurred background, heavy bokeh, " +
   "hand shielding the eyes, hand raised to the forehead or brow, hand-visor over the eyes, shielding the face, squinting into the sun, " +
   "looking up, gazing upward, chin raised, head tilted back, looking at the sky, looking away from the camera, eyes off to the side, profile view, back to camera, " +
-  "moles, beauty marks, prominent or dark facial moles, raised moles, mole clusters, a mole on the nose, lip, cheek or forehead, large beauty spots, moles on the chest, neck or décolletage, exaggerated or distracting skin marks, blemishes on the chest";
+  "moles, beauty marks, prominent or dark facial moles, raised moles, mole clusters, a mole on the nose, lip, cheek or forehead, large beauty spots, moles on the chest, neck or décolletage, exaggerated or distracting skin marks, blemishes on the chest, " +
+  "mixed-race couple, interracial couple, mixed-race pair walking together, a couple of two different ethnicities, a couple of two different races";
 
 // Compose a rich subject line from a Character Bible when present (far more specific
 // than the simple persona fields), else fall back to the basic persona controls.
