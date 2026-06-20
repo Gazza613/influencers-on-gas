@@ -596,15 +596,21 @@ function StepShell({ n, title, desc, state, children }: { n: number; title: stri
 function LockHint() {
   return <p className="text-[11px] text-ink-faint">🔒 Approve the previous step to unlock this one.</p>;
 }
-// A row of small video previews for one role's rendered clips.
+// Playable previews of one role's rendered clips — review them before approving the step.
 function ClipStrip({ clips, role }: { clips: Clip[]; role: "a-roll" | "b-roll" }) {
   const mine = clips.filter((c) => c.kind === role && c.url).sort((a, b) => a.scene - b.scene);
   if (!mine.length) return null;
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {mine.map((c) => (
-        <video key={c.scene} src={c.url!} controls playsInline className="aspect-[9/16] w-20 rounded-lg border border-ready/40 bg-black object-cover" />
-      ))}
+    <div className="mt-3">
+      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Preview the {role} clips — play each before you approve</div>
+      <div className="flex flex-wrap gap-3">
+        {mine.map((c) => (
+          <div key={c.scene} className="relative">
+            <video src={c.url!} controls playsInline className="aspect-[9/16] w-40 rounded-lg border border-ready/40 bg-black object-cover" />
+            <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">Scene {c.scene + 1}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
