@@ -698,41 +698,28 @@ export async function submitVideoFromImage(opts: { imageUrl: string; prompt: str
   if (!mediaId) return { jobId: null, model: null, url: null, error: "could not import the still into Higgsfield" };
   const { call } = await openSession();
   const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : "9:16";
-  const discovered: string[] = [];
-  for (const args of [{ action: "list", kind: "video" }, { action: "list" }]) {
-    try {
-      const data = unwrapMCP(await call("models_explore", args)) as AnyObj | null;
-      const items = (Array.isArray((data as AnyObj)?.items) ? (data as AnyObj).items : (data as AnyObj)?.structuredContent && Array.isArray(((data as AnyObj).structuredContent as AnyObj).items) ? ((data as AnyObj).structuredContent as AnyObj).items : Array.isArray(data) ? data : []) as AnyObj[];
-      for (const it of items) {
-        const id = String(it?.id ?? it?.model ?? it?.slug ?? it?.key ?? "");
-        const name = String(it?.name ?? it?.title ?? "");
-        const kind = String(it?.kind ?? it?.type ?? "");
-        if (id && (/kling|veo|seedance|wan|hailuo|video|i2v|image.?to.?video/i.test(`${id} ${name} ${kind}`))) discovered.push(id);
-      }
-      if (discovered.length) break;
-    } catch { /* try next */ }
-  }
-  const kling = discovered.filter((m) => /kling/i.test(m));
-  const models = [...new Set([...kling, ...discovered, process.env.HF_VIDEO_MODEL, "kling3_0", "kling3", "kling-2.5"].filter(Boolean) as string[])];
-  const shapeFor = (model: string): AnyObj[] => [
-    { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, input_images: [{ type: "image", id: mediaId }] },
-    { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, medias: [{ value: mediaId, role: "image" }] },
-    { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, image_id: mediaId },
-    { model, prompt: opts.prompt, aspect_ratio: ar, start_image_id: mediaId },
+  // VERIFIED schemas (from models_explore, 2026-06-20): generate_video takes medias:[{value:media_id,
+  // role}]. Kling 3.0 = model "kling3_0", role "start_image", sound on/off, duration 3-15. The old
+  // failures were the wrong role ("image") + guessed fields. B-roll is silent (sound off) — music +
+  // ambient are mixed in later from ElevenLabs (Higgsfield has NO music/SFX, TTS only).
+  const start = (model: string, extra: AnyObj = {}): AnyObj => ({ model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, count: 1, medias: [{ value: mediaId, role: "start_image" }], ...extra });
+  const shapes: AnyObj[] = [
+    ...(process.env.HF_VIDEO_MODEL ? [start(process.env.HF_VIDEO_MODEL)] : []),
+    start("kling3_0", { sound: "off" }),
+    start("kling3_0_turbo", { resolution: "1080p" }),
+    start("cinematic_studio_video_v2", { sound: "off" }),
   ];
   let lastErr = "";
-  for (const model of models) {
-    for (const params of shapeFor(model)) {
-      try {
-        const r = await call("generate_video", { params });
-        const url = extractImageUrls(r)[0] ?? null; // immediate url (rare for video)
-        if (url) return { jobId: null, model, url, error: null };
-        const jobId = extractJobIds(r)[0] ?? null;
-        if (jobId) return { jobId, model, url: null, error: null }; // accepted → caller polls
-        const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
-        lastErr = `[${model}] ${raw}`.slice(0, 220);
-      } catch (e) { lastErr = `[${model}] ${String((e as Error)?.message || e)}`.slice(0, 220); }
-    }
+  for (const params of shapes) {
+    try {
+      const r = await call("generate_video", { params });
+      const url = extractImageUrls(r)[0] ?? null; // immediate url (rare for video)
+      if (url) return { jobId: null, model: String(params.model), url, error: null };
+      const jobId = extractJobIds(r)[0] ?? null;
+      if (jobId) return { jobId, model: String(params.model), url: null, error: null }; // accepted → caller polls
+      const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+      lastErr = `[${params.model}] ${raw}`.slice(0, 220);
+    } catch (e) { lastErr = `[${params.model}] ${String((e as Error)?.message || e)}`.slice(0, 220); }
   }
   return { jobId: null, model: null, url: null, error: `b-roll submit failed (${ar}): ${lastErr}`.slice(0, 280) };
 }
