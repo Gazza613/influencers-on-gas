@@ -16,6 +16,7 @@ export const SCENE_PEOPLE =
   "a FEW other people are present in the background (roughly two to five, not a packed crowd), placed naturally for THIS specific setting the way real people occupy it (for a cafe: seated at different tables, queuing loosely, walking past) and NEVER arranged in a uniform row or tidy line; " +
   "each background person is CLEARLY DISTINCT from the others, with a different age, build, hairstyle and a DIFFERENT outfit in different colours, doing a different natural activity; NEVER duplicate or near-duplicate people, and NEVER dress several of them in the same or matching clothing; " +
   "the mix is balanced and natural: roughly 55% white, 25% black, 12% coloured and 8% indian people, with an even 50/50 split of men and women across a range of ages; each rendered realistically, in sharp focus and at correct scale; " +
+  "any couples or pairs are SAME-RACE (white with white, black with black, coloured with coloured, indian with indian) — never mixed-race couples; " +
   "every background person is in a complete, tasteful outfit with a top and bottoms, never bare-legged, in underwear or swimwear";
 
 // No extras: the subject is the ONLY person. Stated absolutely because image models love to
