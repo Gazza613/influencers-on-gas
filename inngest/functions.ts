@@ -905,7 +905,7 @@ export const generateClips = inngest.createFunction(
           const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
           let url: string | null = sub.url;
           if (!url && sub.jobId) {
-            for (let n = 0; n < 60; n++) {
+            for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Seedance/Kling can be slow on heavy scenes)
               const s = await step.run(`apoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
               if (s.url) { url = s.url; break; }
               if (s.terminal) break;
@@ -933,7 +933,7 @@ export const generateClips = inngest.createFunction(
       const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
-        for (let n = 0; n < 60; n++) {
+        for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Kling is slow on heavy scenes)
           const s = await step.run(`vpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
           if (s.url) { url = s.url; break; }
           if (s.terminal) break;
@@ -1085,7 +1085,7 @@ export const assembleVideo = inngest.createFunction(
       // DURABLE poll: short status checks with step.sleep between, so the Shotstack render (which
       // can take minutes) never blocks one invocation long enough to time out + retry-loop.
       let out: { url: string | null; error: string | null } = { url: null, error: "render timed out" };
-      for (let n = 0; n < 60; n++) { // ~60 x 6s ≈ 6 min
+      for (let n = 0; n < 100; n++) { // ~100 x 6s ≈ 10 min (Shotstack render of a full cut)
         const s = await step.run(`renderpoll-${n}`, () => pollRenderOnce(renderId));
         if (s.url) { out = { url: s.url, error: null }; break; }
         if (s.terminal) { out = { url: null, error: s.error }; break; }
@@ -1207,7 +1207,7 @@ export const videoSpike = inngest.createFunction(
     const sub = await step.run("broll-submit", () => submitVideoFromImage({ imageUrl: img, prompt: "Cinematic b-roll: the scene is alive — background people walk past, gentle camera drift, leaves and light moving; natural ambient motion, photoreal.", ratio }));
     let brollUrl: string | null = sub.url;
     if (!brollUrl && sub.jobId) {
-      for (let n = 0; n < 60; n++) {
+      for (let n = 0; n < 120; n++) { // ~16 min (video spike: Kling can be slow)
         const s = await step.run(`bpoll-${n}`, () => pollVideoJobOnce(sub.jobId as string));
         if (s.url) { brollUrl = s.url; break; }
         if (s.terminal) break;
