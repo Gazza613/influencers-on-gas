@@ -862,7 +862,10 @@ export const generateClips = inngest.createFunction(
         try {
           const audioUrl = await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-audio", "mp3", "audio/mpeg"));
           await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-          const started = await step.run(`start-${i}`, () => startTalkingVideo({ imageUrl: img, audioUrl, ratio, motionPrompt: motion }));
+          // Avatar IV animates the WHOLE frame, so explicitly ask for a LIVING background (this is
+          // what makes the scene move, not just her face). She talks to camera with real micro-motion.
+          const arollMotion = `${motion}. The whole scene is alive and moving: background people walk past, traffic or ambient activity moves behind her, subtle environmental motion (leaves in the breeze, shifting light, passersby) — never a frozen backdrop. She talks to camera with natural head movement, genuine micro-expressions and easy, relaxed hand gestures.`;
+          const started = await step.run(`start-${i}`, () => startTalkingVideo({ imageUrl: img, audioUrl, ratio, motionPrompt: arollMotion }));
           let out: { url: string | null; error: string | null } = { url: null, error: "render timed out" };
           for (let n = 0; n < 45; n++) { // ~45 x 8s ≈ 6 min, across short durable steps
             const s = await step.run(`apoll-${i}-${n}`, () => pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })));
