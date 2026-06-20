@@ -376,13 +376,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
           {sb.legal && <div className="rounded-xl border border-line bg-surface-2 p-3 text-[11px] text-ink-faint"><b>Legal (verbatim):</b> {sb.legal}</div>}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/5 p-5">
+          <div className="space-y-3">
+            <div className={`rounded-xl border bg-[#a855f7]/5 p-5 ${!shotsReady && !shooting ? "border-[#a855f7] ring-2 ring-[#a855f7]/60 shadow-[0_0_22px_rgba(168,85,247,0.4)]" : "border-[#a855f7]/30"}`}>
               <div className="tabular text-xs uppercase tracking-[0.2em] text-[#c79bff]">Step 1 · Shoot the board</div>
               <p className="mt-1 text-sm text-ink-dim">I shoot a coherent still for every scene from {name}&apos;s locked identity, holding one consistent world across the board.</p>
               <button onClick={shootShots} disabled={shooting} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Shooting the board…" : shotsReady ? "↻ Re-shoot the board" : "🎬 Shoot the shots"}</button>
             </div>
-            <div className={`rounded-xl border p-5 ${shotsReady ? "border-[#60a5fa]/30 bg-[#60a5fa]/5" : "border-line bg-surface-1 opacity-60"}`}>
+            <div className={`rounded-xl border p-5 ${!shotsReady ? "border-line bg-surface-1 opacity-60" : shotsReady && !clipsReady && !rendering && !voiceMissing ? "border-[#60a5fa] bg-[#60a5fa]/5 ring-2 ring-[#60a5fa]/60 shadow-[0_0_22px_rgba(96,165,250,0.4)]" : "border-[#60a5fa]/30 bg-[#60a5fa]/5"}`}>
               <div className="tabular text-xs uppercase tracking-[0.2em] text-[#93c5fd]">Step 2 · Render the clips</div>
               <p className="mt-1 text-sm text-ink-dim">I bring every frame to life: a-roll scenes talk in {name}&apos;s voice (HeyGen), b-roll scenes get natural motion (Kling). A few minutes per scene.</p>
               {needsVoice && (voiceId ? (
@@ -402,7 +402,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           </div>
 
           {/* Step 3 · the stitch */}
-          <div className={`rounded-xl border p-5 ${clipsReady ? "border-ready/30 bg-ready/5" : "border-line bg-surface-1 opacity-60"}`}>
+          <div className={`rounded-xl border p-5 ${!clipsReady ? "border-line bg-surface-1 opacity-60" : !finalUrl && !assembling ? "border-ready bg-ready/5 ring-2 ring-ready/60 shadow-[0_0_22px_rgba(52,199,89,0.4)]" : "border-ready/30 bg-ready/5"}`}>
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Step 3 · Stitch the cut</div>
             <p className="mt-1 text-sm text-ink-dim">I edit it together: clips in order, a continuous voiceover, burned-in captions, the {production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and a music bed mixed underneath, into one finished {sb.format} ad.</p>
             <div className="mt-3 flex flex-wrap items-center gap-3">

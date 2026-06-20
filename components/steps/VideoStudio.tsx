@@ -30,6 +30,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
   // Voice picker
   const [vtab, setVtab] = useState<"library" | "design" | "auto" | "upload">("library");
   const [lib, setLib] = useState<LibVoice[]>([]);
+  const [voiceQuery, setVoiceQuery] = useState("");
   const [sel, setSel] = useState("");
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
@@ -190,18 +191,32 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           ))}
         </div>
 
-        {vtab === "library" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={sel} onChange={(e) => setSel(e.target.value)} className="min-w-[220px] rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]">
-              <option value="">{lib.length ? "Choose a voice…" : "Loading voices…"}</option>
-              {lib.map((v) => <option key={v.voice_id} value={v.voice_id}>{v.name}{v.labels?.gender ? ` · ${v.labels.gender}` : ""}{v.labels?.accent ? ` · ${v.labels.accent}` : ""}</option>)}
-            </select>
-            {sel && lib.find((v) => v.voice_id === sel)?.preview_url && (
-              <audio src={lib.find((v) => v.voice_id === sel)?.preview_url || undefined} controls className="h-8" />
-            )}
-            <button onClick={() => sel && setVoiceVia({ action: "select", voiceId: sel, voiceName: lib.find((v) => v.voice_id === sel)?.name })} disabled={!sel || voicing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voicing ? "Setting…" : "Use this voice"}</button>
-          </div>
-        )}
+        {vtab === "library" && (() => {
+          const q = voiceQuery.trim().toLowerCase();
+          const fv = q ? lib.filter((v) => `${v.name} ${Object.values(v.labels || {}).join(" ")}`.toLowerCase().includes(q)) : lib;
+          return (
+            <div className="space-y-2">
+              <input value={voiceQuery} onChange={(e) => setVoiceQuery(e.target.value)} placeholder="Search voices — name, accent (e.g. South African), gender, age…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]" />
+              <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+                {fv.length === 0 && <p className="px-1 py-2 text-[12px] text-ink-faint">{lib.length ? "No voices match that search." : "Loading your voices…"}</p>}
+                {fv.map((v) => {
+                  const on = sel === v.voice_id;
+                  const d = [v.labels?.gender, v.labels?.accent, v.labels?.age, v.labels?.description, v.labels?.use_case].filter(Boolean).join(" · ");
+                  return (
+                    <div key={v.voice_id} onClick={() => setSel(v.voice_id)} className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition ${on ? "border-[#a855f7] bg-[#a855f7]/10" : "border-line hover:border-line-strong"}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-ink">{v.name}{on && <span className="ml-2 text-[10px] font-bold text-[#c79bff]">✓ selected</span>}</div>
+                        {d && <div className="truncate text-[11px] text-ink-faint">{d}</div>}
+                      </div>
+                      {v.preview_url && <audio src={v.preview_url} controls className="h-8 w-40 shrink-0" onClick={(e) => e.stopPropagation()} />}
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={() => sel && setVoiceVia({ action: "select", voiceId: sel, voiceName: lib.find((v) => v.voice_id === sel)?.name })} disabled={!sel || voicing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voicing ? "Setting…" : "Use this voice"}</button>
+            </div>
+          );
+        })()}
 
         {vtab === "design" && (
           <div className="space-y-2">
