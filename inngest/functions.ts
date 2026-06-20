@@ -802,24 +802,28 @@ export const generateShots = inngest.createFunction(
       const sc = scenes[i] as Record<string, string>;
       const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
       if (role === "graphic") { shots.push({ scene: i, role, beat, url: null }); continue; }
-      // @image order: identity, [clothing], [location], [world anchor]. Tags must match that order.
+      // Optional PHONE-SCREEN image for THIS scene → composite onto the phone's screen.
+      const phoneMedia = sc.phone_screen_url ? await step.run(`phone-${i}`, () => importMediaUrl(String(sc.phone_screen_url)).catch(() => null)) : null;
+      // @image order: identity, [clothing], [location], [world anchor], [phone screen]. Tags must match.
       let n = idMedias.length;
       const faceTags = idMedias.map((_, k) => `@image${k + 1}`);
       const clothTag = clothMedia ? `@image${++n}` : "";
       const locTag = locMedia ? `@image${++n}` : "";
       const worldTag = worldRef ? `@image${++n}` : "";
+      const phoneTag = phoneMedia ? `@image${++n}` : "";
       const refInstruction = [
         faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. IGNORE their clothing, background and pose; take those from the direction below.` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity.` : "",
+        phoneTag ? `${phoneTag} is the PHONE SCREEN content: if the influencer is holding or showing a phone, render its screen displaying THIS exact image, crisp and legible, correctly perspective-fitted to the phone. Do NOT copy any person from it.` : "",
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
         performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
         hasPeople: true, worldAnchored: !!worldRef,
       });
-      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : [])].map((value) => ({ value, role: "image" }));
+      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : [])].map((value) => ({ value, role: "image" }));
       const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
       let url = await step.run(`shot-${i}`, gen);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
@@ -885,14 +889,15 @@ export const generateClips = inngest.createFunction(
       if (!img) return { scene: i, role, beat, kind: role, url: null, status: "failed", error: "no shot frame" };
       const base = String(sc.motion_prompt || sc.blocking || "natural movement");
       const line = String(sc.vo_line || "").trim();
+      const presetAudio = String(sc.vo_audio_url || "").trim(); // producer's own uploaded VO for this scene
 
-      // A-ROLL: Higgsfield Seedance 2.0 — feed the keyframe + our ElevenLabs VO audio → a moving
-      // scene with the avatar LIP-SYNCED to our voice (the audio is baked in). Falls back to Kling
-      // motion (silent, VO laid over in the stitch) if Seedance/audio isn't available.
-      if (role === "a-roll" && line && voiceId) {
-        const audioUrl = await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null)) as string | null;
+      // A-ROLL: Higgsfield Seedance 2.0 — feed the keyframe + a VO audio clip → a moving scene with
+      // the avatar LIP-SYNCED to that voice (baked in). Uses the producer's uploaded VO if present,
+      // else in-platform TTS. Falls back to silent Kling motion (VO laid over) if Seedance fails.
+      if (role === "a-roll" && (presetAudio || (line && voiceId))) {
+        const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId as string, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null)) as string | null);
         if (audioUrl) {
-          await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
+          if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
           const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures; the WHOLE scene is alive — background people walk past, ambient motion, leaves and light moving.`;
           const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
           let url: string | null = sub.url;
