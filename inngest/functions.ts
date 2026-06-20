@@ -890,6 +890,9 @@ export const generateClips = inngest.createFunction(
       const base = String(sc.motion_prompt || sc.blocking || "natural movement");
       const line = String(sc.vo_line || "").trim();
       const presetAudio = String(sc.vo_audio_url || "").trim(); // producer's own uploaded VO for this scene
+      // Steer the video model away from its two worst tells: shaky camera + people clipping through
+      // the world. Appended to every clip prompt.
+      const MOTION_SAFE = " Camera is SMOOTH and STABILISED (gimbal-steady), gentle and locked — absolutely no jittery or shaky handheld motion. Everyone and everything moves with real spatial awareness along physically believable paths: nobody walks into the pool, water, walls, furniture, plants or other people, and nobody clips through objects. All motion is grounded, natural and plausible.";
 
       // A-ROLL: Higgsfield Seedance 2.0 — feed the keyframe + a VO audio clip → a moving scene with
       // the avatar LIP-SYNCED to that voice (baked in). Uses the producer's uploaded VO if present,
@@ -898,7 +901,7 @@ export const generateClips = inngest.createFunction(
         const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId as string, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null)) as string | null);
         if (audioUrl) {
           if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures; the WHOLE scene is alive — background people walk past, ambient motion, leaves and light moving.`;
+          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures; the WHOLE scene is alive — background people walk past, ambient motion, leaves and light moving.${MOTION_SAFE}`;
           const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
           let url: string | null = sub.url;
           if (!url && sub.jobId) {
@@ -919,9 +922,9 @@ export const generateClips = inngest.createFunction(
       }
 
       // B-ROLL (and a-roll fallback): Kling whole-frame motion, silent. VO laid over in the stitch.
-      const motion = role === "a-roll"
+      const motion = (role === "a-roll"
         ? `${base}. She is front-on, looking into the lens, talking to camera; the WHOLE scene is alive with moving background people and ambient motion.`
-        : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`;
+        : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`) + MOTION_SAFE;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
       // the background can't drift/reverse (it's anchored to a defined end frame).
