@@ -123,7 +123,7 @@ export function buildShotPrompt(o: {
     "CRITICAL — ONE FRAME: output a SINGLE continuous photograph of ONE moment, filling the whole frame. If the direction below mentions multiple cuts or shots (e.g. 'three rapid cuts', 'Cut 1 / Cut 2 / Cut 3'), depict ONLY the first/primary moment and ignore the rest. NEVER a split-screen, diptych, triptych, grid, collage, stacked panels or side-by-side images.",
     `Scene: ${o.location}. ${o.blocking}. The background is real and in sharp focus (never blurred), so the shot is reusable for video.`,
     o.worldAnchored ? "CONTINUITY: an additional reference image shows the ESTABLISHED world of this production; match its exact location, set dressing, lighting, time of day and colour grade so this shot cuts seamlessly with the others." : "",
-    `Subject: ${o.subjectLine}. The influencer is physically IN the scene (${o.blocking}), never a floating head on a plain backdrop.`,
+    `Subject: ${o.subjectLine}. The influencer is physically IN the scene (${o.blocking}), never a floating head on a plain backdrop. She appears EXACTLY ONCE in the frame: there is only one of her. Every background person is a clearly DIFFERENT individual — NEVER a second copy, twin, reflection or look-alike of the influencer.`,
     `Identity:${o.refInstruction}`,
     `Framing: ${o.shot}.`,
     `Performance: ${o.performance}.`,

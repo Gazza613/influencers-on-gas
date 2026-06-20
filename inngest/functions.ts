@@ -820,15 +820,24 @@ export const generateShots = inngest.createFunction(
         hasPeople: true, worldAnchored: !!worldRef,
       });
       const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : [])].map((value) => ({ value, role: "image" }));
-      const url = await step.run(`shot-${i}`, () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null));
-      let hosted: string | null = null;
-      if (url) {
-        const ok = (await step.run(`valid-${i}`, () => filterLoadable([url]))).length > 0;
-        if (ok) {
-          hosted = (await step.run(`host-${i}`, () => rehostToBlob(url, "shots").catch(() => null))) || url;
-          await step.run(`usage-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
-          if (!worldRef && hosted) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(hosted as string).catch(() => null));
+      const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
+      let url = await step.run(`shot-${i}`, gen);
+      let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
+      // QA GATE: these frames BECOME the video, so reject waxy/malformed/identity-drift frames and
+      // re-roll ONCE before they go forward (the same Vision QA the creatives use).
+      if (usable) {
+        const verdict = await step.run(`qa-${i}`, () => qaCreative(usable as string).catch(() => ({ pass: true, score10: 7, issues: [] as string[] })));
+        await step.run(`uqa-${i}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: 1 }).catch(() => {}));
+        if (!verdict.pass) {
+          const reroll = await step.run(`reroll-${i}`, gen);
+          if (reroll && (await step.run(`valid2-${i}`, () => filterLoadable([reroll as string]))).length > 0) { usable = reroll; await step.run(`u2-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }).catch(() => {})); }
         }
+      }
+      let hosted: string | null = null;
+      if (usable) {
+        hosted = (await step.run(`host-${i}`, () => rehostToBlob(usable as string, "shots").catch(() => null))) || usable;
+        await step.run(`usage-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
+        if (!worldRef && hosted) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(hosted as string).catch(() => null));
       }
       shots.push({ scene: i, role, beat, url: hosted, error: hosted ? null : "no image" });
       // Persist progressively so the UI fills in live.
