@@ -19,8 +19,10 @@ export async function POST(req: Request) {
             "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/avif",
             // Voice samples (clone your own voice).
             "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/x-m4a", "audio/mp4", "audio/aac", "audio/ogg", "audio/webm",
+            // End-card clips (End Cards library).
+            "video/mp4", "video/quicktime", "video/webm",
           ],
-          maximumSizeInBytes: 25 * 1024 * 1024,
+          maximumSizeInBytes: 60 * 1024 * 1024,
           addRandomSuffix: true,
         };
       },

@@ -1,0 +1,27 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { listEndCards, addEndCard } from "@/lib/endcards";
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    return NextResponse.json({ endCards: await listEndCards() });
+  } catch (e) {
+    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const b = await req.json().catch(() => ({}));
+  const url = String(b?.url || "").trim();
+  if (!url) return NextResponse.json({ error: "An uploaded file is required." }, { status: 400 });
+  const kind = b?.kind === "video" ? "video" : "image";
+  try {
+    return NextResponse.json({ endCard: await addEndCard(String(b?.label || "").trim(), url, kind) });
+  } catch (e) {
+    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 });
+  }
+}
