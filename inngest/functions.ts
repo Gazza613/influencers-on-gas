@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
-import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRender } from "@/lib/vendors/shotstack";
@@ -847,7 +847,7 @@ export const generateShots = inngest.createFunction(
 // become HeyGen talking clips (the frame + our expressive VO); B-ROLL scenes become Kling
 // image->video motion clips (face-safe). Graphic scenes pass through to assembly. Durable +
 // progressive; every clip metered; one failed clip never blocks the rest.
-type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
+type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean };
 export const generateClips = inngest.createFunction(
   { id: "generate-clips", retries: 1, triggers: [{ event: "influencer/generate.clips" }] },
   async ({ event, step }) => {
@@ -874,17 +874,44 @@ export const generateClips = inngest.createFunction(
       const img = shotUrl(i);
       if (role === "graphic") return { scene: i, role, beat, kind: "graphic", url: null, status: "graphic" };
       if (!img) return { scene: i, role, beat, kind: role, url: null, status: "failed", error: "no shot frame" };
-      // BOTH a-roll and b-roll animate the WHOLE frame via Kling (HeyGen Avatar IV could not move
-      // the background). The voiceover is laid over in the stitch. A-roll = she's front-on, talking
-      // to camera; b-roll = ambient scene motion. This is what makes the whole scene move.
       const base = String(sc.motion_prompt || sc.blocking || "natural movement");
+      const line = String(sc.vo_line || "").trim();
+
+      // A-ROLL: Higgsfield Seedance 2.0 — feed the keyframe + our ElevenLabs VO audio → a moving
+      // scene with the avatar LIP-SYNCED to our voice (the audio is baked in). Falls back to Kling
+      // motion (silent, VO laid over in the stitch) if Seedance/audio isn't available.
+      if (role === "a-roll" && line && voiceId) {
+        const audioUrl = await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null)) as string | null;
+        if (audioUrl) {
+          await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
+          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures; the WHOLE scene is alive — background people walk past, ambient motion, leaves and light moving.`;
+          const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
+          let url: string | null = sub.url;
+          if (!url && sub.jobId) {
+            for (let n = 0; n < 60; n++) {
+              const s = await step.run(`apoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
+              if (s.url) { url = s.url; break; }
+              if (s.terminal) break;
+              await step.sleep(`await-a-${i}-${n}`, "8s");
+            }
+          }
+          if (url) {
+            await step.run(`u-aroll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "seedance_2_0", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+            const hosted = (await step.run(`ahost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
+            return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true };
+          }
+          // fall through to Kling motion (no sync) if Seedance failed
+        }
+      }
+
+      // B-ROLL (and a-roll fallback): Kling whole-frame motion, silent. VO laid over in the stitch.
       const motion = role === "a-roll"
-        ? `${base}. She is front-on, looking straight into the lens and talking to camera with natural micro-expressions, gentle head movement and easy hand gestures. The WHOLE scene is alive and moving: background people walk past, ambient activity behind her, leaves and light in motion — never a frozen backdrop.`
-        : `${base}. The whole scene is alive and moving: background people move naturally, gentle camera drift, water/leaves/light in motion — never a frozen backdrop.`;
+        ? `${base}. She is front-on, looking into the lens, talking to camera; the WHOLE scene is alive with moving background people and ambient motion.`
+        : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`;
       const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
-        for (let n = 0; n < 60; n++) { // ~60 x 8s ≈ 8 min (Kling is slow)
+        for (let n = 0; n < 60; n++) {
           const s = await step.run(`vpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
           if (s.url) { url = s.url; break; }
           if (s.terminal) break;
@@ -938,7 +965,7 @@ export const assembleVideo = inngest.createFunction(
     const production = (persona.production ?? null) as {
       brief?: { brand?: string; logo?: string; logoUrl?: string; promoUrl?: string; logoPosition?: string };
       storyboard?: { scenes?: Record<string, string>[]; format?: string; music_bed?: string; tone?: string; duration_seconds?: number; legal?: string };
-      clips?: { scene: number; role: string; url: string | null }[];
+      clips?: { scene: number; role: string; url: string | null; kind?: string; synced?: boolean }[];
     } | null;
     const sb = production?.storyboard;
     const scenes = sb?.scenes ?? [];
@@ -947,6 +974,8 @@ export const assembleVideo = inngest.createFunction(
     const voiceId = persona.voice_id as string | undefined;
     const ratio = String(sb?.format || "").includes("1:1") ? "1:1" : "9:16";
     const clipUrl = (i: number) => clips.find((c) => c.scene === i)?.url || null;
+    // A Seedance a-roll has the lip-synced VO BAKED IN — keep its own audio, don't lay VO over it.
+    const bakedAudio = (i: number) => { const c = clips.find((x) => x.scene === i); return c?.kind === "a-roll" && c?.synced === true; };
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, assembly_status: "running", final_url: null } } }));
 
@@ -974,7 +1003,7 @@ export const assembleVideo = inngest.createFunction(
     const voTrack: Record<string, unknown>[] = [];
     if (voiceId) {
       for (const p of placed) {
-        if (!p.vo) continue; // lay the VO over EVERY scene (a-roll clips are now silent Kling motion)
+        if (!p.vo || bakedAudio(p.i)) continue; // skip scenes whose clip already has baked lip-synced audio
         try {
           const url = await step.run(`vo-${p.i}`, async () => putBytes(await tts(voiceId, p.vo, { expressive: true }), "vo", "mp3", "audio/mpeg"));
           await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
@@ -985,7 +1014,7 @@ export const assembleVideo = inngest.createFunction(
 
     // Build the Shotstack timeline (top track renders on top).
     const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
-      asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 }, // all clips silent; VO + music + ambient are mixed in
+      asset: { type: "video", src: clipUrl(p.i) as string, volume: bakedAudio(p.i) ? 1 : 0 }, // keep baked lip-synced a-roll audio; others silent (VO mixed in)
       start: p.start, length: p.len, fit: "cover",
       transition: { in: "fade", out: "fade" },
     }));

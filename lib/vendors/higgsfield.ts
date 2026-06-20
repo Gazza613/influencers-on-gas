@@ -127,8 +127,8 @@ async function generateOneJob(call: Caller, base: AnyObj, prompt: string): Promi
 }
 
 // Import an HTTPS media URL into Higgsfield storage → media_id.
-async function importMedia(call: Caller, url: string): Promise<string | null> {
-  const data = unwrapMCP(await call("media_import_url", { url, type: "image" }));
+async function importMedia(call: Caller, url: string, type: "image" | "audio" | "video" = "image"): Promise<string | null> {
+  const data = unwrapMCP(await call("media_import_url", { url, type }));
   const str = typeof data === "string" ? data : JSON.stringify(data ?? "");
   const m = str.match(/"media_id"\s*:\s*"([^"]+)"/) || str.match(/"id"\s*:\s*"([0-9a-f-]{8,})"/i) || str.match(UUID_RE);
   return m ? m[1] || m[0] : null;
@@ -722,6 +722,37 @@ export async function submitVideoFromImage(opts: { imageUrl: string; prompt: str
     } catch (e) { lastErr = `[${params.model}] ${String((e as Error)?.message || e)}`.slice(0, 220); }
   }
   return { jobId: null, model: null, url: null, error: `b-roll submit failed (${ar}): ${lastErr}`.slice(0, 280) };
+}
+
+// A-ROLL talking video: Higgsfield Seedance 2.0 takes a start image + an AUDIO clip and lip-syncs
+// the avatar to it (our ElevenLabs VO), with a moving background — and works on a synthetic face
+// (no consent gate). Submits and returns the jobId; caller polls with pollVideoJobOnce.
+export async function submitTalkingVideo(opts: { imageUrl: string; audioUrl: string; ratio?: string; prompt?: string }): Promise<{ jobId: string | null; model: string | null; url: string | null; error: string | null }> {
+  if (!isSafePublicUrl(opts.imageUrl) || !isSafePublicUrl(opts.audioUrl)) return { jobId: null, model: null, url: null, error: "unsafe or non-public url" };
+  const { call } = await openSession();
+  const imageId = await importMedia(call, opts.imageUrl, "image").catch(() => null);
+  const audioId = await importMedia(call, opts.audioUrl, "audio").catch(() => null);
+  if (!imageId) return { jobId: null, model: null, url: null, error: "could not import the still" };
+  if (!audioId) return { jobId: null, model: null, url: null, error: "could not import the voiceover audio" };
+  const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : "9:16";
+  // Seedance 2.0 = lip-sync to the supplied audio. medias: start_image + audio (per the tool spec).
+  const shapes: AnyObj[] = [
+    { model: "seedance_2_0", prompt: opts.prompt || "The person talks to camera, natural micro-expressions and gentle gestures; the whole scene is alive with moving background people and ambient motion.", aspect_ratio: ar, count: 1, medias: [{ value: imageId, role: "start_image" }, { value: audioId, role: "audio" }] },
+    { model: "seedance_2_0", prompt: opts.prompt || "", aspect_ratio: ar, count: 1, medias: [{ value: imageId, role: "image" }, { value: audioId, role: "audio" }] },
+  ];
+  let lastErr = "";
+  for (const params of shapes) {
+    try {
+      const r = await call("generate_video", { params });
+      const url = extractImageUrls(r)[0] ?? null;
+      if (url) return { jobId: null, model: "seedance_2_0", url, error: null };
+      const jobId = extractJobIds(r)[0] ?? null;
+      if (jobId) return { jobId, model: "seedance_2_0", url: null, error: null };
+      const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+      lastErr = raw.slice(0, 220);
+    } catch (e) { lastErr = String((e as Error)?.message || e).slice(0, 220); }
+  }
+  return { jobId: null, model: null, url: null, error: `talking-video submit failed: ${lastErr}`.slice(0, 280) };
 }
 
 // ONE quick status check for a submitted video job (returns fast). terminal=true means stop polling.
