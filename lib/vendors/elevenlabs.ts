@@ -140,11 +140,16 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
   let lastErr = "";
   for (const [url, body] of bodies) {
     try {
-      const res = await fetch(url, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify(body) });
+      // Hard timeout so a hung/queued music request can't stall the whole audio step — the caller
+      // falls back to ambient-only instead of waiting indefinitely.
+      const res = await fetch(url, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify(body), signal: AbortSignal.timeout(150000) });
       if (res.ok) return Buffer.from(await res.arrayBuffer());
       lastErr = `${res.status} ${(await res.text().catch(() => "")).slice(0, 160)}`;
       if (res.status !== 404 && res.status !== 405) break;
-    } catch (e) { lastErr = String((e as Error)?.message || e).slice(0, 160); }
+    } catch (e) {
+      lastErr = String((e as Error)?.message || e).slice(0, 160);
+      if ((e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") break; // don't retry the fallback after a timeout
+    }
   }
   throw new Error(`Music generation failed: ${lastErr}`);
 }
@@ -156,6 +161,7 @@ export async function generateSfx(prompt: string, durationSeconds = 5): Promise<
     method: "POST",
     headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" },
     body: JSON.stringify({ text: prompt, duration_seconds: Math.max(1, Math.min(22, durationSeconds)) }),
+    signal: AbortSignal.timeout(90000),
   });
   if (!res.ok) throw new Error(`SFX failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 160)}`);
   return Buffer.from(await res.arrayBuffer());

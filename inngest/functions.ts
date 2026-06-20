@@ -1001,7 +1001,7 @@ export const generateClips = inngest.createFunction(
 // tone up front so the producer can hear them BEFORE the stitch. Saved to production.music_url /
 // ambient_url; the stitch reuses them instead of regenerating. Durable; both metered.
 export const generateAudio = inngest.createFunction(
-  { id: "generate-audio", retries: 1, triggers: [{ event: "influencer/generate.audio" }] },
+  { id: "generate-audio", retries: 0, triggers: [{ event: "influencer/generate.audio" }] }, // retries:0 so a timed-out music call falls back to ambient-only fast (no 2.5-min re-try)
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const inf = await step.run("load", () => getInfluencer(influencerId));
