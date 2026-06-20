@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
-import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, generateVideoFromImage } from "@/lib/vendors/higgsfield";
+import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRender } from "@/lib/vendors/shotstack";
@@ -848,7 +848,9 @@ export const generateClips = inngest.createFunction(
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: [] } } }));
 
-    // Render ONE scene to a clip (its own steps, keyed by scene index so they're unique).
+    // Render ONE scene to a clip. CRITICAL: the render poll is split into many SHORT steps with
+    // step.sleep between them, so no single step ever blocks for minutes (which was timing out the
+    // serverless function and looping forever). Each poll step is a quick status check.
     const renderOne = async (i: number, sc: Record<string, string>): Promise<ClipRow> => {
       const role = String(sc.role || "a-roll"); const beat = String(sc.beat || "");
       const img = shotUrl(i);
@@ -861,9 +863,13 @@ export const generateClips = inngest.createFunction(
           const audioUrl = await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId, line, { expressive: true }), "aroll-audio", "mp3", "audio/mpeg"));
           await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
           const started = await step.run(`start-${i}`, () => startTalkingVideo({ imageUrl: img, audioUrl, ratio, motionPrompt: motion }));
-          const out = await step.run(`poll-${i}`, async () => {
-            for (let n = 0; n < 52; n++) { if (n) await new Promise((r) => setTimeout(r, 5000)); const s = await pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })); if (s.url) return { url: s.url, error: null as string | null }; if (s.status === "failed") return { url: null as string | null, error: s.error }; } return { url: null as string | null, error: "render timed out" };
-          });
+          let out: { url: string | null; error: string | null } = { url: null, error: "render timed out" };
+          for (let n = 0; n < 45; n++) { // ~45 x 8s ≈ 6 min, across short durable steps
+            const s = await step.run(`apoll-${i}-${n}`, () => pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })));
+            if (s.url) { out = { url: s.url, error: null }; break; }
+            if (s.status === "failed") { out = { url: null, error: s.error }; break; }
+            await step.sleep(`await-a-${i}-${n}`, "8s");
+          }
           if (out.url) {
             await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "talking_photo", unit: "video", action: "presenter", count: 1 }).catch(() => {}));
             const hosted = (await step.run(`host-${i}`, () => rehostToBlob(out.url as string, "clips").catch(() => null))) || (out.url as string);
@@ -872,14 +878,23 @@ export const generateClips = inngest.createFunction(
           return { scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: out.error };
         } catch (e) { return { scene: i, role, beat, kind: "a-roll", url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 180) }; }
       }
-      // b-roll (or a-roll with no line / no voice): animate the frame with Kling.
-      const res = await step.run(`broll-${i}`, () => generateVideoFromImage({ imageUrl: img, prompt: motion, ratio, rounds: 150 }));
-      if (res.url) {
+      // b-roll: SUBMIT the Kling job (fast), then poll it across short durable steps.
+      const sub = await step.run(`bsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
+      let burl: string | null = sub.url;
+      if (!burl && sub.jobId) {
+        for (let n = 0; n < 60; n++) { // ~60 x 8s ≈ 8 min (Kling is slow)
+          const s = await step.run(`bpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
+          if (s.url) { burl = s.url; break; }
+          if (s.terminal) break;
+          await step.sleep(`await-b-${i}-${n}`, "8s");
+        }
+      }
+      if (burl) {
         await step.run(`u-broll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: process.env.HF_VIDEO_MODEL || "kling3", unit: "video", action: "broll", count: 1 }).catch(() => {}));
-        const hosted = (await step.run(`hostb-${i}`, () => rehostToBlob(res.url as string, "clips").catch(() => null))) || (res.url as string);
+        const hosted = (await step.run(`hostb-${i}`, () => rehostToBlob(burl as string, "clips").catch(() => null))) || burl;
         return { scene: i, role, beat, kind: "b-roll", url: hosted, status: "ready" };
       }
-      return { scene: i, role, beat, kind: "b-roll", url: null, status: "failed", error: res.error };
+      return { scene: i, role, beat, kind: "b-roll", url: null, status: "failed", error: sub.error || `render started (${sub.model}) but did not finish in time` };
     };
 
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each

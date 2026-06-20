@@ -689,3 +689,65 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
   }
   return { url: null, error: `b-roll video failed (${ar}): ${lastErr}`.slice(0, 280) };
 }
+
+// SUBMIT a b-roll video job and return immediately with the jobId (no polling). The caller polls
+// with pollVideoJobOnce across short, durable steps so no single step blocks for minutes.
+export async function submitVideoFromImage(opts: { imageUrl: string; prompt: string; ratio?: string }): Promise<{ jobId: string | null; model: string | null; url: string | null; error: string | null }> {
+  if (!isSafePublicUrl(opts.imageUrl)) return { jobId: null, model: null, url: null, error: "unsafe or non-public image url" };
+  const mediaId = await importMediaUrl(opts.imageUrl);
+  if (!mediaId) return { jobId: null, model: null, url: null, error: "could not import the still into Higgsfield" };
+  const { call } = await openSession();
+  const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : "9:16";
+  const discovered: string[] = [];
+  for (const args of [{ action: "list", kind: "video" }, { action: "list" }]) {
+    try {
+      const data = unwrapMCP(await call("models_explore", args)) as AnyObj | null;
+      const items = (Array.isArray((data as AnyObj)?.items) ? (data as AnyObj).items : (data as AnyObj)?.structuredContent && Array.isArray(((data as AnyObj).structuredContent as AnyObj).items) ? ((data as AnyObj).structuredContent as AnyObj).items : Array.isArray(data) ? data : []) as AnyObj[];
+      for (const it of items) {
+        const id = String(it?.id ?? it?.model ?? it?.slug ?? it?.key ?? "");
+        const name = String(it?.name ?? it?.title ?? "");
+        const kind = String(it?.kind ?? it?.type ?? "");
+        if (id && (/kling|veo|seedance|wan|hailuo|video|i2v|image.?to.?video/i.test(`${id} ${name} ${kind}`))) discovered.push(id);
+      }
+      if (discovered.length) break;
+    } catch { /* try next */ }
+  }
+  const kling = discovered.filter((m) => /kling/i.test(m));
+  const models = [...new Set([...kling, ...discovered, process.env.HF_VIDEO_MODEL, "kling3_0", "kling3", "kling-2.5"].filter(Boolean) as string[])];
+  const shapeFor = (model: string): AnyObj[] => [
+    { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, input_images: [{ type: "image", id: mediaId }] },
+    { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, medias: [{ value: mediaId, role: "image" }] },
+    { model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, image_id: mediaId },
+    { model, prompt: opts.prompt, aspect_ratio: ar, start_image_id: mediaId },
+  ];
+  let lastErr = "";
+  for (const model of models) {
+    for (const params of shapeFor(model)) {
+      try {
+        const r = await call("generate_video", { params });
+        const url = extractImageUrls(r)[0] ?? null; // immediate url (rare for video)
+        if (url) return { jobId: null, model, url, error: null };
+        const jobId = extractJobIds(r)[0] ?? null;
+        if (jobId) return { jobId, model, url: null, error: null }; // accepted → caller polls
+        const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+        lastErr = `[${model}] ${raw}`.slice(0, 220);
+      } catch (e) { lastErr = `[${model}] ${String((e as Error)?.message || e)}`.slice(0, 220); }
+    }
+  }
+  return { jobId: null, model: null, url: null, error: `b-roll submit failed (${ar}): ${lastErr}`.slice(0, 280) };
+}
+
+// ONE quick status check for a submitted video job (returns fast). terminal=true means stop polling.
+export async function pollVideoJobOnce(jobId: string): Promise<{ url: string | null; terminal: boolean }> {
+  try {
+    const { call } = await openSession();
+    const data = unwrapMCP(await call("job_status", { jobId })) as AnyObj;
+    const item = (Array.isArray(data?.results) ? (data.results as AnyObj[])[0] : data) as AnyObj;
+    const ro = (item?.results as AnyObj) || {};
+    const url = (ro.rawUrl || ro.minUrl || ro.videoUrl || item?.result_url || item?.video_url || item?.url || extractImageUrls(data)[0]) as string | undefined;
+    const status = String(item?.status || data?.status || "").toLowerCase();
+    if (url) return { url, terminal: true };
+    if (TERMINAL.has(status)) return { url: null, terminal: true };
+    return { url: null, terminal: false };
+  } catch { return { url: null, terminal: false }; }
+}
