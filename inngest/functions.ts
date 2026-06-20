@@ -1013,19 +1013,16 @@ export const generateAudio = inngest.createFunction(
     const total = Math.max(15, Number(sb.duration_seconds) || sb.scenes.length * 5);
     await step.run("mark", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, audio_status: "running" } } }));
 
-    let musicUrl: string | null = null;
-    try {
-      const brief = sb.music_bed || `${sb.tone || "warm, modern"} background music bed for a social ad, no vocals`;
-      musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg"));
-      await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
-    } catch { musicUrl = null; }
-
-    let ambientUrl: string | null = null;
-    try {
-      const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
-      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`continuous ambient background sound of ${setting}: low natural room tone, distant murmur and movement, gentle environment, no music and no speech`, 22), "ambient", "mp3", "audio/mpeg"));
-      await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
-    } catch { ambientUrl = null; }
+    // Generate music + ambient IN PARALLEL (they're independent) — this halves the wait vs running
+    // them back-to-back. Each is a single slow ElevenLabs request.
+    const brief = sb.music_bed || `${sb.tone || "warm, modern"} background music bed for a social ad, no vocals`;
+    const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
+    const [musicUrl, ambientUrl] = await Promise.all([
+      step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg")).catch(() => null),
+      step.run("ambient", async () => putBytes(await generateSfx(`continuous ambient background sound of ${setting}: low natural room tone, distant murmur and movement, gentle environment, no music and no speech`, 22), "ambient", "mp3", "audio/mpeg")).catch(() => null),
+    ]);
+    if (musicUrl) await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
+    if (ambientUrl) await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
 
     const done = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prod = (done.production ?? production) as Record<string, unknown>;
