@@ -14,10 +14,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const inf = await getInfluencer(id);
   if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
-  const production = persona.production as { storyboard?: { scenes?: unknown[] } } | undefined;
+  const production = persona.production as { storyboard?: { scenes?: unknown[] }; wizard_approved?: string[] } | undefined;
   if (!production?.storyboard?.scenes?.length) return NextResponse.json({ error: "Direct a storyboard first." }, { status: 400 });
 
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, shots: [], shots_status: "running" } } });
+  // Re-shooting the board invalidates everything downstream — clear the clips, audio and final cut
+  // (back to clean stills) and reset approvals past Voice, so stale videos can't linger.
+  const keptApprovals = (production.wizard_approved ?? []).filter((k) => k === "concept" || k === "voice");
+  await updateInfluencer(id, { persona: { ...persona, production: { ...production, shots: [], shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle", wizard_approved: keptApprovals } } });
   try {
     await inngest.send({ name: "influencer/generate.shots", data: { influencerId: id } });
   } catch {

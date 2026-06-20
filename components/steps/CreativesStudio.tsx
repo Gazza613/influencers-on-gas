@@ -48,7 +48,10 @@ const CREATIVE_NARRATION = [
   "Re-rolling anything that doesn't make the cut, no compromises…",
 ];
 
-export default function CreativesStudio({ influencerId, initial, multiRef = false }: { influencerId: string; initial: { creatives: Creative[]; status: string }; multiRef?: boolean }) {
+export default function CreativesStudio({ influencerId, initial, multiRef = false, arollRef = "", brollRef = "" }: { influencerId: string; initial: { creatives: Creative[]; status: string }; multiRef?: boolean; arollRef?: string; brollRef?: string }) {
+  // Producer references: a chosen creative becomes the wardrobe + world anchor for a-roll / b-roll
+  // keyframes (Phase 1 of Creatives → Producer).
+  const [refs, setRefs] = useState<{ aroll: string; broll: string }>({ aroll: arollRef, broll: brollRef });
     const [view, setView] = useState<"all" | "excellent" | "good" | "average">("all");
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
@@ -188,6 +191,15 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
 
   async function patchPersona(patch: Record<string, unknown>) {
     await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: patch }) }).catch(() => {});
+  }
+  async function setRoleRef(role: "aroll" | "broll", url: string) {
+    setRefs((r) => ({ ...r, [role]: url }));
+    await patchPersona(role === "aroll" ? { aroll_ref_url: url } : { broll_ref_url: url });
+    setPicked(new Set());
+  }
+  async function clearRoleRef(role: "aroll" | "broll") {
+    setRefs((r) => ({ ...r, [role]: "" }));
+    await patchPersona(role === "aroll" ? { aroll_ref_url: "" } : { broll_ref_url: "" });
   }
   async function removePicked() {
     const keep = creatives.filter((c) => !picked.has(c.id || ""));
@@ -345,6 +357,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const fourK = visible.filter(isFourK);
   const twoK = visible.filter((c) => !isFourK(c));
   const pickedTwoK = creatives.some((c) => picked.has(c.id || "") && !!c.url && (c.resolution || "").toLowerCase() !== "4k");
+  const onePickUrl = picked.size === 1 ? (creatives.find((c) => picked.has(c.id || ""))?.url || null) : null;
 
   return (
     <div className="space-y-5">
@@ -520,6 +533,24 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             </span>
           </div>
         )}
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-2 text-[11px]">
+          <span className="font-semibold text-[#c79bff]">🎬 Producer references</span>
+          <span className="text-ink-faint">Select one shot, then set it as the A-roll or B-roll reference — the Producer dresses + anchors those scenes to it.</span>
+          <div className="ml-auto flex items-center gap-4">
+            {(["aroll", "broll"] as const).map((role) => (
+              <span key={role} className="flex items-center gap-1.5">
+                <span className="tabular uppercase text-ink-dim">{role === "aroll" ? "A-roll" : "B-roll"}</span>
+                {refs[role] ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={refs[role]} alt="" className="h-7 w-7 rounded border border-line object-cover" />
+                    <button onClick={() => clearRoleRef(role)} className="text-ink-faint hover:text-alert">clear</button>
+                  </>
+                ) : <span className="text-ink-faint">— none</span>}
+              </span>
+            ))}
+          </div>
+        </div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Your creatives · {creatives.length}</div>
             <div className="flex items-center gap-1">
@@ -532,9 +563,15 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               ))}
             </div>
             {picked.size > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-ink-dim">{picked.size} selected</span>
                 {pickedTwoK && <button onClick={upscalePicked} className="rounded-md border border-[#a855f7]/50 px-2.5 py-1 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">↑ Upscale to 4K</button>}
+                {onePickUrl && (
+                  <>
+                    <button onClick={() => setRoleRef("aroll", onePickUrl)} title="Use this look as the A-roll (talking) reference in the Producer" className="rounded-md border border-[#a855f7]/50 px-2.5 py-1 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">★ A-roll reference</button>
+                    <button onClick={() => setRoleRef("broll", onePickUrl)} title="Use this look as the B-roll (scene) reference in the Producer" className="rounded-md border border-[#60a5fa]/50 px-2.5 py-1 text-xs font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10">★ B-roll reference</button>
+                  </>
+                )}
                 <button onClick={removePicked} className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-alert/50 hover:text-alert">Remove</button>
                 <button onClick={() => setPicked(new Set())} className="text-xs text-ink-faint hover:text-ink">clear</button>
               </div>

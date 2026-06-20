@@ -793,6 +793,9 @@ export const generateShots = inngest.createFunction(
     const brief = (production?.brief ?? {}) as Record<string, string>;
     const clothMedia = brief.clothingRef ? await step.run("import-cloth", () => importMediaUrl(brief.clothingRef).catch(() => null)) : null;
     const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;
+    // CREATIVE REFERENCES (Phase 1): a chosen creative becomes the wardrobe + world anchor per role.
+    const arollRefMedia = persona.aroll_ref_url ? await step.run("import-aroll-ref", () => importMediaUrl(String(persona.aroll_ref_url)).catch(() => null)) : null;
+    const brollRefMedia = persona.broll_ref_url ? await step.run("import-broll-ref", () => importMediaUrl(String(persona.broll_ref_url)).catch(() => null)) : null;
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running" } } }));
 
@@ -804,15 +807,19 @@ export const generateShots = inngest.createFunction(
       if (role === "graphic") { shots.push({ scene: i, role, beat, url: null }); continue; }
       // Optional PHONE-SCREEN image for THIS scene → composite onto the phone's screen.
       const phoneMedia = sc.phone_screen_url ? await step.run(`phone-${i}`, () => importMediaUrl(String(sc.phone_screen_url)).catch(() => null)) : null;
-      // @image order: identity, [clothing], [location], [world anchor], [phone screen]. Tags must match.
+      // Role-specific Creative reference (Phase 1): a-roll scenes anchor to the a-roll ref, b-roll to the b-roll ref.
+      const roleRefMedia = role === "a-roll" ? arollRefMedia : role === "b-roll" ? brollRefMedia : null;
+      // @image order: identity, [clothing], [location], [world anchor], [phone screen], [role ref]. Tags must match.
       let n = idMedias.length;
       const faceTags = idMedias.map((_, k) => `@image${k + 1}`);
       const clothTag = clothMedia ? `@image${++n}` : "";
       const locTag = locMedia ? `@image${++n}` : "";
       const worldTag = worldRef ? `@image${++n}` : "";
       const phoneTag = phoneMedia ? `@image${++n}` : "";
+      const roleRefTag = roleRefMedia ? `@image${++n}` : "";
       const refInstruction = [
         faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. IGNORE their clothing, background and pose; take those from the direction below.` : "",
+        roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its wardrobe, styling, grooming, lighting and overall mood/world closely for this scene. Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity.` : "",
@@ -823,7 +830,7 @@ export const generateShots = inngest.createFunction(
         performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
         hasPeople: true, worldAnchored: !!worldRef,
       });
-      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : [])].map((value) => ({ value, role: "image" }));
+      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : [])].map((value) => ({ value, role: "image" }));
       const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
       let url = await step.run(`shot-${i}`, gen);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
@@ -941,8 +948,10 @@ export const generateClips = inngest.createFunction(
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
       // the background can't drift/reverse (it's anchored to a defined end frame).
+      // Chain to the NEXT scene's frame ONLY for b-roll (seamless scene-to-scene flow). NEVER for
+      // a-roll — the presenter must stay in their own scene, not morph into the next backdrop.
       const next = scenes[i + 1] as Record<string, string> | undefined;
-      const endImageUrl = next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
+      const endImageUrl = role === "b-roll" && next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
       const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {

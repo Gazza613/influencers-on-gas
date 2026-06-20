@@ -78,9 +78,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const audioBusy = production?.audio_status === "running";
   const audioReady = production?.audio_status === "done" && !!(production?.music_url || production?.ambient_url);
   // Artifact-ready per step (the natural gate). "done" tick shows once approved.
+  // A step is "ready" to Accept only when its artifact exists AND nothing is still rendering for it
+  // (so you can't approve a board/clip/audio/stitch mid-run, before it has finished).
   const ready: Record<string, boolean> = {
-    concept: !!sb, voice: !voiceMissing && !!sb, keyframes: shotsReady,
-    aroll: aRollReady, broll: bRollReady, audio: audioReady, stitch: !!finalUrl,
+    concept: !!sb, voice: !voiceMissing && !!sb, keyframes: shotsReady && !shooting,
+    aroll: aRollReady && !rendering, broll: bRollReady && !rendering, audio: audioReady && !audioBusy, stitch: !!finalUrl && !assembling,
     showreel: production?.showreel_status === "accepted" || production?.showreel_status === "declined",
   };
   const ORDER = ["concept", "voice", "keyframes", "aroll", "broll", "audio", "stitch", "showreel"] as const;
@@ -152,7 +154,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   async function shootShots() {
     if (shooting) return;
     setErr("");
-    setProduction((p) => (p ? { ...p, shots: [], shots_status: "running" } : p));
+    // Re-shooting the board invalidates everything downstream — clear clips/audio/final + reset
+    // approvals past Voice so stale videos and ticks don't linger.
+    setProduction((p) => (p ? { ...p, shots: [], shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
+    setApproved((s) => new Set([...s].filter((k) => k === "concept" || k === "voice")));
+    setDenied(new Set());
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start shooting."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");

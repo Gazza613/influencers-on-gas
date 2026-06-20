@@ -29,6 +29,8 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
     <CreativesStudio
       influencerId={inf.id}
       multiRef={multiRef}
+      arollRef={String(persona.aroll_ref_url || "")}
+      brollRef={String(persona.broll_ref_url || "")}
       initial={{
         creatives: Array.isArray(persona.creatives)
           ? (persona.creatives as {
