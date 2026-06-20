@@ -98,7 +98,7 @@ Rules:
 
 Humanising (critical for believability):
 - Give this person a SMALL, UNIQUE set of natural imperfections that make them read as a real human, never an AI render. Bias toward the SUBTLE, skin-level tells that don't dominate a face: fine freckles, faint sun pigmentation, slightly uneven skin tone, a soft rosacea flush, fine lines, a faint old scar, uneven brows, a cowlick, light stubble shadow.
-- MOLES/BEAUTY MARKS: use sparingly and ONLY if genuinely fitting — AT MOST ONE, small, flat and natural, on the FACE only. NEVER multiple moles, never a prominent or dark raised mole, and NEVER any mole or mark on the chest, neck or décolletage. When in doubt, prefer freckles or skin texture over a mole.
+- MOLES/BEAUTY MARKS: DEFAULT TO NONE. Do not give this person moles or beauty marks unless it is genuinely characterful, and even then it reads odd in generation, so almost always choose freckles, faint pigmentation or skin texture INSTEAD. NEVER prominent, dark, raised, or multiple moles, NEVER a mole on the nose, lip, cheek-centre or forehead, and NEVER any mole/mark on the chest, neck or décolletage. If you mention skin marks at all, keep them to faint freckles or a barely-perceptible detail only.
 - Choose imperfections that suit THIS person's age, ethnicity and lifestyle, distinctive to them. No two characters share the same tells. Do NOT default to "a gap between the front teeth."
 - Keep imperfections SUBTLE, SPARING and believable, never caricatured. ONE understated tell is usually plenty. face.distinct_features should be brief and barely-there — it must never read as an odd or distracting mark.
 

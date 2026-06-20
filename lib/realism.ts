@@ -152,7 +152,7 @@ export const REALISM_NEGATIVE =
   "nude, naked, partial nudity, topless, underwear only, lingerie, no trousers, no pants, missing bottoms, bare crotch, exposed groin, blurred background, heavy bokeh, " +
   "hand shielding the eyes, hand raised to the forehead or brow, hand-visor over the eyes, shielding the face, squinting into the sun, " +
   "looking up, gazing upward, chin raised, head tilted back, looking at the sky, looking away from the camera, eyes off to the side, profile view, back to camera, " +
-  "prominent moles, multiple moles, mole clusters, large beauty spots, dark raised moles, moles on the chest, neck or décolletage, exaggerated or distracting skin marks, blemishes on the chest";
+  "moles, beauty marks, prominent or dark facial moles, raised moles, mole clusters, a mole on the nose, lip, cheek or forehead, large beauty spots, moles on the chest, neck or décolletage, exaggerated or distracting skin marks, blemishes on the chest";
 
 // Compose a rich subject line from a Character Bible when present (far more specific
 // than the simple persona fields), else fall back to the basic persona controls.
