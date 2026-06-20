@@ -471,7 +471,9 @@ ROLES — classify every scene: 'a-roll' = the influencer IN the scene talking t
 
 CAPTIONS — burned-in, match vo_line word-for-word, split into short beats (~6-14 words each) using ' | '. Empty when there is no VO.
 
-MOTION — for a-roll and b-roll give a short motion_prompt (natural, not robotic): for a-roll subtle head movement + hand gestures; for b-roll the scene action and that background people move naturally.
+MOTION — for a-roll and b-roll give a short motion_prompt (natural, not robotic): for a-roll subtle head movement + hand gestures; for b-roll the scene action and that background people move naturally. Describe ONE single continuous camera move per scene; never multiple cuts in one motion_prompt.
+
+ONE SHOT PER SCENE (critical) — every scene is EXACTLY ONE continuous shot/cut that renders as a single moving clip. NEVER pack multiple cuts into a scene: no "three rapid cuts", no "Cut 1 / Cut 2 / Cut 3", no in-scene montage. If an idea wants several cuts, make each its OWN consecutive scene in the SAME world (they get chained to flow seamlessly). Prefer MORE short single-shot scenes over one crammed montage. A "lifestyle montage" beat = a few separate single-shot b-roll scenes, not one multi-cut scene.
 
 BRANDING + LEGAL — persistent logo top-left every scene (note in graphics). The end card restates the offer, CTA mechanic and the legal line. Use the provided legal line VERBATIM, never paraphrased; if none provided, leave legal empty.
 
