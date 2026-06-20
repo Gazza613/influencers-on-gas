@@ -129,7 +129,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
 
   async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status" | "audio_status") {
-    for (let i = 0; i < 120; i++) {
+    // ~18 min: must OUTLAST the backend render window (~16 min) so the UI catches completion
+    // instead of giving up early and looking frozen.
+    for (let i = 0; i < 180; i++) {
       await new Promise((res) => setTimeout(res, 6000));
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
       if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
