@@ -1125,3 +1125,63 @@ export const reshootShot = inngest.createFunction(
     return { ok: !!hosted };
   },
 );
+
+// VIDEO SPIKE — isolate-and-verify the two video engines on ONE existing frame: a Kling b-roll
+// (verified schema) and a HeyGen Avatar IV a-roll (living background). Durable poll (step.sleep).
+// Writes persona.spike = { broll_url, aroll_url, errors }. Super-admin triggered.
+export const videoSpike = inngest.createFunction(
+  { id: "video-spike", retries: 0, triggers: [{ event: "producer/spike" }] },
+  async ({ event, step }) => {
+    const influencerId = String(event.data.influencerId);
+    const inf = await step.run("load", () => getInfluencer(influencerId));
+    if (!inf) return { skipped: "not found" };
+    const persona = (inf.persona ?? {}) as Record<string, unknown>;
+    const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string }[]) : [];
+    const creatives = Array.isArray(persona.creatives) ? (persona.creatives as { url?: string | null }[]) : [];
+    const img = (persona.hero_url as string) || (persona.face_card_url as string) || refs.find((r) => r.url)?.url || creatives.find((c) => c.url)?.url || (persona.reference_url as string) || (Array.isArray(persona.reference_images) ? (persona.reference_images as string[])[0] : "") || "";
+    const ratio = "9:16";
+    const save = async (tag: string, patch: Record<string, unknown>) => {
+      const fresh = (((await step.run(`reload-${tag}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+      await step.run(`save-${tag}`, () => updateInfluencer(influencerId, { persona: { ...fresh, spike: { ...((fresh.spike as Record<string, unknown>) || {}), ...patch } } }));
+    };
+    await save("init", { status: "running", source_image: img, broll_url: null, broll_error: null, aroll_url: null, aroll_error: null, at: event.data.at || null });
+    if (!img) { await save("noimg", { status: "done", broll_error: "no source image on this influencer" }); return { error: "no image" }; }
+
+    // B-ROLL — Kling, verified schema.
+    const sub = await step.run("broll-submit", () => submitVideoFromImage({ imageUrl: img, prompt: "Cinematic b-roll: the scene is alive — background people walk past, gentle camera drift, leaves and light moving; natural ambient motion, photoreal.", ratio }));
+    let brollUrl: string | null = sub.url;
+    if (!brollUrl && sub.jobId) {
+      for (let n = 0; n < 60; n++) {
+        const s = await step.run(`bpoll-${n}`, () => pollVideoJobOnce(sub.jobId as string));
+        if (s.url) { brollUrl = s.url; break; }
+        if (s.terminal) break;
+        await step.sleep(`bwait-${n}`, "8s");
+      }
+    }
+    if (brollUrl) { const h = (await step.run("broll-host", () => rehostToBlob(brollUrl as string, "spike").catch(() => null))) || brollUrl; await save("broll", { broll_url: h }); }
+    else await save("broll-fail", { broll_error: sub.error || `submitted (${sub.model}) but did not finish in time` });
+
+    // A-ROLL — HeyGen Avatar IV with a living background (needs a voice).
+    const voiceId = persona.voice_id as string | undefined;
+    if (voiceId) {
+      try {
+        const audioUrl = await step.run("aroll-tts", async () => putBytes(await tts(voiceId, "Hi, here is a quick look at what I have been loving lately.", { expressive: true }), "spike-vo", "mp3", "audio/mpeg"));
+        const started = await step.run("aroll-start", () => startTalkingVideo({ imageUrl: img, audioUrl, ratio, motionPrompt: "She talks to camera with natural head movement and easy gestures. The WHOLE scene is alive and moving: background people walk past, traffic or ambient activity behind her, leaves in the breeze, shifting light — never a frozen backdrop." }));
+        let arollUrl: string | null = null; let arollErr: string | null = null;
+        for (let n = 0; n < 45; n++) {
+          const s = await step.run(`apoll-${n}`, () => pollTalking(started.videoId, started.version).catch(() => ({ status: "unknown", url: null as string | null, error: null as string | null })));
+          if (s.url) { arollUrl = s.url; break; }
+          if (s.status === "failed") { arollErr = s.error; break; }
+          await step.sleep(`await-${n}`, "8s");
+        }
+        if (arollUrl) { const h = (await step.run("aroll-host", () => rehostToBlob(arollUrl as string, "spike").catch(() => null))) || arollUrl; await save("aroll", { aroll_url: h }); }
+        else await save("aroll-fail", { aroll_error: arollErr || "a-roll did not finish in time" });
+      } catch (e) { await save("aroll-err", { aroll_error: String((e as Error)?.message || e).slice(0, 200) }); }
+    } else {
+      await save("aroll-novoice", { aroll_error: "no voice set — set a voice (Video & Voice) to test a-roll" });
+    }
+
+    await save("done", { status: "done" });
+    return { ok: true };
+  },
+);

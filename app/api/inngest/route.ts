@@ -1,6 +1,6 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
-import { generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, assembleVideo, reshootShot } from "@/inngest/functions";
+import { generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, assembleVideo, reshootShot, videoSpike } from "@/inngest/functions";
 
 // Image/video generation + polling can run several minutes; give the invocation headroom so a
 // long render poll can't time out the whole function (which left clip jobs spinning forever).
@@ -14,7 +14,7 @@ export const maxDuration = 800;
 // build-time INNGEST_SIGNING_KEY points at the wrong Inngest environment.
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, assembleVideo, reshootShot],
+  functions: [generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, assembleVideo, reshootShot, videoSpike],
   serveOrigin: "https://influencers.gasmarketing.co.za",
   ...(process.env.INNGEST_PROD_SIGNING_KEY ? { signingKey: process.env.INNGEST_PROD_SIGNING_KEY } : {}),
 });
