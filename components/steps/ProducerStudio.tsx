@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Uploader from "@/components/Uploader";
 import Lightbox from "@/components/Lightbox";
 
@@ -13,7 +13,7 @@ type Scene = {
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string } | null;
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -61,13 +61,70 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const rendering = production?.clips_status === "running";
   const clipFor = (i: number) => clips.find((c) => c.scene === i);
   const shotsReady = shots.some((s) => s.url);
-  const clipsReady = clips.some((c) => c.url);
   const needsVoice = !!sb && sb.scenes.some((s) => s.role === "a-roll" && (s.vo_line || "").trim().length > 0);
   const voiceMissing = needsVoice && !voiceId;
   const assembling = production?.assembly_status === "running";
   const finalUrl = production?.final_url || null;
 
-  async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status") {
+  // ── 8-step wizard state ───────────────────────────────────────────────────
+  const sceneList = sb?.scenes ?? [];
+  const aRollIdx = sceneList.map((s, i) => ({ s, i })).filter((x) => x.s.role === "a-roll");
+  const bRollIdx = sceneList.map((s, i) => ({ s, i })).filter((x) => x.s.role === "b-roll");
+  const clipDone = (idx: number) => clips.some((c) => c.scene === idx && c.url);
+  const aRollNone = !!sb && aRollIdx.length === 0;
+  const bRollNone = !!sb && bRollIdx.length === 0;
+  const aRollReady = !!sb && (aRollNone || (aRollIdx.length > 0 && aRollIdx.every((x) => clipDone(x.i))));
+  const bRollReady = !!sb && (bRollNone || (bRollIdx.length > 0 && bRollIdx.every((x) => clipDone(x.i))));
+  const audioBusy = production?.audio_status === "running";
+  const audioReady = production?.audio_status === "done" && !!(production?.music_url || production?.ambient_url);
+  // Artifact-ready per step (the natural gate). "done" tick shows once approved.
+  const ready: Record<string, boolean> = {
+    concept: !!sb, voice: !voiceMissing && !!sb, keyframes: shotsReady,
+    aroll: aRollReady, broll: bRollReady, audio: audioReady, stitch: !!finalUrl,
+    showreel: production?.showreel_status === "accepted" || production?.showreel_status === "declined",
+  };
+  const ORDER = ["concept", "voice", "keyframes", "aroll", "broll", "audio", "stitch", "showreel"] as const;
+  // Seed approvals: any step whose SUCCESSOR already has its artifact is auto-approved (you moved
+  // past it); the frontier step waits for an explicit Accept. Recomputed when production changes.
+  const seedApproved = () => {
+    const set = new Set<string>();
+    ORDER.forEach((k, idx) => { const next = ORDER[idx + 1]; if (next && ready[next]) set.add(k); });
+    return set;
+  };
+  const [approved, setApproved] = useState<Set<string>>(seedApproved);
+  const [denied, setDenied] = useState<Set<string>>(new Set());
+  const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
+  function accept(k: string) { setApproved((s) => new Set(s).add(k)); setDenied((s) => { const n = new Set(s); n.delete(k); return n; }); }
+  function deny(k: string) { setDenied((s) => new Set(s).add(k)); setApproved((s) => { const n = new Set(s); n.delete(k); return n; }); }
+  // A step's visual state: done (approved), active (artifact ready or all prior approved), else locked.
+  function stepState(k: typeof ORDER[number]): "locked" | "active" | "done" {
+    if (approved.has(k)) return "done";
+    const idx = ORDER.indexOf(k);
+    const priorOk = idx === 0 || approved.has(ORDER[idx - 1]);
+    return priorOk ? "active" : "locked";
+  }
+  const unlocked = (k: typeof ORDER[number]) => stepState(k) !== "locked";
+  // Accept / Not-yet gate for a step. Shows once the step's artifact exists; Accept turns it green
+  // and unlocks the next step, Not-yet shows an edit hint and keeps the next step locked.
+  function renderGate(k: string, hint: string) {
+    if (!ready[k]) return null;
+    if (approved.has(k)) return (
+      <div className="mt-3 flex items-center gap-2 border-t border-line pt-3 text-[12px] font-semibold text-ready">✓ Approved
+        <button onClick={() => deny(k)} className="ml-1 rounded border border-line px-2 py-0.5 text-[10px] font-medium text-ink-faint hover:text-ink">undo</button>
+      </div>
+    );
+    return (
+      <div className="mt-3 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => accept(k)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">✓ Accept &amp; continue</button>
+          <button onClick={() => deny(k)} className="rounded-lg border border-active/40 px-3 py-1.5 text-xs font-bold text-active hover:bg-active/10">✕ Not yet</button>
+        </div>
+        {denied.has(k) && <p className="mt-2 text-[11px] text-active">{hint}</p>}
+      </div>
+    );
+  }
+
+  async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status" | "audio_status") {
     for (let i = 0; i < 120; i++) {
       await new Promise((res) => setTimeout(res, 6000));
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
@@ -84,13 +141,23 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     await poll(setProduction, "shots_status");
   }
 
-  async function renderClips() {
+  async function renderRole(role: "a-roll" | "b-roll") {
     if (rendering) return;
-    setErr("");
-    setProduction((p) => (p ? { ...p, clips: [], clips_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST" }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
+    setErr(""); setRenderingRole(role);
+    setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: [role] }) }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
     await poll(setProduction, "clips_status");
+    setRenderingRole("");
+  }
+
+  async function genAudio() {
+    if (audioBusy) return;
+    setErr("");
+    setProduction((p) => (p ? { ...p, audio_status: "running", music_url: null, ambient_url: null } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/audio`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the audio."); setProduction((p) => (p ? { ...p, audio_status: "idle" } : p)); return; }
+    await poll(setProduction, "audio_status");
   }
 
   async function stitchCut() {
@@ -172,7 +239,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
-    if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); }
+    if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); }
     else setErr(r?.error || "Couldn't draft the storyboard. Try again.");
   }
 
@@ -373,64 +440,127 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
           {sb.legal && <div className="rounded-xl border border-line bg-surface-2 p-3 text-[11px] text-ink-faint"><b>Legal (verbatim):</b> {sb.legal}</div>}
 
+          {/* ── The 8-step gated production wizard ── */}
           <div className="space-y-3">
-            <div className={`rounded-xl border bg-[#a855f7]/5 p-5 ${!shotsReady && !shooting ? "border-[#a855f7] ring-2 ring-[#a855f7]/60 shadow-[0_0_22px_rgba(168,85,247,0.4)]" : "border-[#a855f7]/30"}`}>
-              <div className="tabular text-xs uppercase tracking-[0.2em] text-[#c79bff]">Step 1 · Shoot the board</div>
-              <p className="mt-1 text-sm text-ink-dim">I shoot a coherent still for every scene from {name}&apos;s locked identity, holding one consistent world across the board.</p>
-              <button onClick={shootShots} disabled={shooting} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Shooting the board…" : shotsReady ? "↻ Re-shoot the board" : "🎬 Shoot the shots"}</button>
-            </div>
-            <div className={`rounded-xl border p-5 ${!shotsReady ? "border-line bg-surface-1 opacity-60" : shotsReady && !clipsReady && !rendering && !voiceMissing ? "border-[#60a5fa] bg-[#60a5fa]/5 ring-2 ring-[#60a5fa]/60 shadow-[0_0_22px_rgba(96,165,250,0.4)]" : "border-[#60a5fa]/30 bg-[#60a5fa]/5"}`}>
-              <div className="tabular text-xs uppercase tracking-[0.2em] text-[#93c5fd]">Step 2 · Render the clips</div>
-              <p className="mt-1 text-sm text-ink-dim">First pick {name}&apos;s voice (below), then I bring every frame to life: a-roll scenes talk, lip-synced in that voice; b-roll scenes get natural motion. A few minutes per scene.</p>
-              {needsVoice && (voiceId ? (
-                <p className="mt-2 text-[11px] text-ink-faint">🎙️ Voice: <span className="text-ink-dim">{voiceName || "set"}</span> · <a href={`/setup/influencers/${influencerId}/video`} className="text-accent">change</a></p>
-              ) : (
-                <div className="mt-2 rounded-lg border border-active/30 bg-active/5 p-3 text-[12px]">
-                  <p className="text-ink-dim">A-roll scenes talk in {name}&apos;s voice, so pick one before rendering.</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <button onClick={autoVoice} disabled={voiceBusy} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50">{voiceBusy ? "Matching…" : "✨ Auto-match a voice"}</button>
-                    <a href={`/setup/influencers/${influencerId}/video`} className="text-xs font-semibold text-accent">Choose / design a voice →</a>
+            {/* 1 · Concept & script */}
+            <StepShell n={1} title="Concept & script" desc={`The storyboard and script I've directed for ${name}, in our house style. Review the scenes above — edit any with ✎ Edit script, or ↻ Regenerate — then approve.`} state={stepState("concept")}>
+              {renderGate("concept", "No problem — tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")}
+            </StepShell>
+
+            {/* 2 · Voice */}
+            <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in — every talking (a-roll) scene is lip-synced to it.`} state={stepState("voice")}>
+              {unlocked("voice") ? (
+                <>
+                  {!needsVoice ? (
+                    <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
+                  ) : voiceId ? (
+                    <p className="text-[12px] text-ink-faint">🎙️ Voice: <span className="text-ink-dim">{voiceName || "set"}</span> · <a href={`/setup/influencers/${influencerId}/video`} className="text-accent">change</a></p>
+                  ) : (
+                    <div className="rounded-lg border border-active/30 bg-active/5 p-3 text-[12px]">
+                      <p className="text-ink-dim">Match a voice automatically, or open the full voice control to search the library, design or clone one.</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <button onClick={autoVoice} disabled={voiceBusy} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50">{voiceBusy ? "Matching…" : "✨ Auto-match a voice"}</button>
+                        <a href={`/setup/influencers/${influencerId}/video`} className="text-xs font-semibold text-accent">Choose / design a voice →</a>
+                      </div>
+                    </div>
+                  )}
+                  {renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}
+                </>
+              ) : <LockHint />}
+            </StepShell>
+
+            {/* 3 · Keyframes */}
+            <StepShell n={3} title="Keyframes — shoot the board" desc={`I shoot one coherent still for every scene from ${name}'s locked identity, holding a single consistent world across the board. Preview and re-shoot any scene above.`} state={stepState("keyframes")}>
+              {unlocked("keyframes") ? (
+                <>
+                  <button onClick={shootShots} disabled={shooting} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Shooting the board…" : shotsReady ? "↻ Re-shoot the board" : "🎬 Shoot the board"}</button>
+                  {renderGate("keyframes", "Re-shoot the board or any single scene above until the look is right, then Accept.")}
+                </>
+              ) : <LockHint />}
+            </StepShell>
+
+            {/* 4 · A-roll */}
+            <StepShell n={4} title="A-roll — the talking scenes" desc={`I bring the talking scenes to life: ${name} speaks to camera, lip-synced to the voice, with a living, moving background.`} state={stepState("aroll")}>
+              {unlocked("aroll") ? (
+                <>
+                  {aRollNone ? (
+                    <p className="text-[12px] text-ink-faint">No talking (a-roll) scenes in this storyboard — nothing to render here.</p>
+                  ) : (
+                    <>
+                      <button onClick={() => renderRole("a-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "a-roll" ? "🎞️ Rendering the a-roll…" : aRollReady ? "↻ Re-render the a-roll" : "🎞️ Render the a-roll"}</button>
+                      <ClipStrip clips={clips} role="a-roll" />
+                    </>
+                  )}
+                  {renderGate("aroll", "Re-shoot a scene above (it clears the stale clip) or re-render the a-roll, then Accept.")}
+                </>
+              ) : <LockHint />}
+            </StepShell>
+
+            {/* 5 · B-roll */}
+            <StepShell n={5} title="B-roll — the scene shots" desc="The non-talking scenes get natural motion — moving backgrounds, people, light — and chain seamlessly into the next shot." state={stepState("broll")}>
+              {unlocked("broll") ? (
+                <>
+                  {bRollNone ? (
+                    <p className="text-[12px] text-ink-faint">No b-roll scenes in this storyboard — nothing to render here.</p>
+                  ) : (
+                    <>
+                      <button onClick={() => renderRole("b-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "b-roll" ? "🎞️ Rendering the b-roll…" : bRollReady ? "↻ Re-render the b-roll" : "🎞️ Render the b-roll"}</button>
+                      <ClipStrip clips={clips} role="b-roll" />
+                    </>
+                  )}
+                  {renderGate("broll", "Re-shoot a scene above or re-render the b-roll, then Accept.")}
+                </>
+              ) : <LockHint />}
+            </StepShell>
+
+            {/* 6 · Music & ambient */}
+            <StepShell n={6} title="Music & ambient" desc="I generate the music bed and the ambient room tone for the world. Have a listen before we cut it together." state={stepState("audio")}>
+              {unlocked("audio") ? (
+                <>
+                  <button onClick={genAudio} disabled={audioBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{audioBusy ? "🎵 Generating audio…" : audioReady ? "↻ Re-generate audio" : "🎵 Generate music & ambient"}</button>
+                  {audioReady && (
+                    <div className="mt-3 space-y-2">
+                      {production?.music_url && <div><div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Music bed</div><audio src={production.music_url} controls className="mt-1 h-8 w-full max-w-sm" /></div>}
+                      {production?.ambient_url && <div><div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Ambient tone</div><audio src={production.ambient_url} controls className="mt-1 h-8 w-full max-w-sm" /></div>}
+                    </div>
+                  )}
+                  {renderGate("audio", "Re-generate the audio if it's not right, then Accept. The cut reuses exactly these beds.")}
+                </>
+              ) : <LockHint />}
+            </StepShell>
+
+            {/* 7 · Stitch */}
+            <StepShell n={7} title="Stitch the cut" desc={`I edit it together: clips in order, a continuous voiceover, burned-in captions, the ${production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and the music + ambient mixed underneath — one finished ${sb.format} ad.`} state={stepState("stitch")}>
+              {unlocked("stitch") ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button onClick={stitchCut} disabled={assembling} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
+                    {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{production.assembly_error}</span>}
                   </div>
-                </div>
-              ))}
-              <button onClick={renderClips} disabled={rendering || !shotsReady || voiceMissing} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering ? "🎞️ Rendering the clips…" : clipsReady ? "↻ Re-render the clips" : "🎞️ Render the clips"}</button>
-              {!shotsReady && <p className="mt-2 text-[11px] text-ink-faint">Shoot the board first.</p>}
-            </div>
-          </div>
+                  {finalUrl && (
+                    <div className="mt-4">
+                      <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut</div>
+                      <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
+                      <div className="mt-2"><a href={finalUrl} download className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">↓ Download</a></div>
+                    </div>
+                  )}
+                  {renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}
+                </>
+              ) : <LockHint />}
+            </StepShell>
 
-          {/* Step 3 · the stitch */}
-          <div className={`rounded-xl border p-5 ${!clipsReady ? "border-line bg-surface-1 opacity-60" : !finalUrl && !assembling ? "border-ready bg-ready/5 ring-2 ring-ready/60 shadow-[0_0_22px_rgba(52,199,89,0.4)]" : "border-ready/30 bg-ready/5"}`}>
-            <div className="tabular text-xs uppercase tracking-[0.2em] text-ready">Step 3 · Stitch the cut</div>
-            <p className="mt-1 text-sm text-ink-dim">I edit it together: clips in order, a continuous voiceover, burned-in captions, the {production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and a music bed mixed underneath, into one finished {sb.format} ad.</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button onClick={stitchCut} disabled={assembling || !clipsReady} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
-              {!clipsReady && <span className="text-[11px] text-ink-faint">Render the clips first.</span>}
-              {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{production.assembly_error}</span>}
-            </div>
-            {finalUrl && (
-              <div className="mt-4">
-                <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut</div>
-                <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
-                <div className="mt-2">
-                  <a href={finalUrl} download className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">↓ Download</a>
+            {/* 8 · Showreel */}
+            <StepShell n={8} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")}>
+              {unlocked("showreel") ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button onClick={() => { decideShowreel("accept"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>✓ Accept into showreel</button>
+                  <button onClick={() => { decideShowreel("decline"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "declined" ? "border-active bg-active/15 text-active" : "border-active/40 text-active hover:bg-active/10"}`}>✕ Decline</button>
+                  {production?.showreel_status === "accepted" && <span className="tabular text-[11px] font-semibold text-ready">● In the showreel</span>}
+                  {production?.showreel_status === "declined" && <span className="tabular text-[11px] font-semibold text-active">● Kept out</span>}
                 </div>
-              </div>
-            )}
+              ) : <LockHint />}
+            </StepShell>
           </div>
-
-          {/* Final step · the showreel gate */}
-          {finalUrl && (
-            <div className="rounded-xl border border-line bg-surface-1 p-5">
-              <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Final step · the showreel</div>
-              <p className="mt-1 text-sm text-ink-dim">My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button onClick={() => decideShowreel("accept")} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>✓ Accept into showreel</button>
-                <button onClick={() => decideShowreel("decline")} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "declined" ? "border-active bg-active/15 text-active" : "border-active/40 text-active hover:bg-active/10"}`}>✕ Decline</button>
-                {production?.showreel_status === "accepted" && <span className="tabular text-[11px] font-semibold text-ready">● In the showreel</span>}
-                {production?.showreel_status === "declined" && <span className="tabular text-[11px] font-semibold text-active">● Kept out</span>}
-              </div>
-            </div>
-          )}
         </div>
       ) : null}
       {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} />}
@@ -438,6 +568,38 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   );
 }
 
+// One wizard step: numbered badge (green tick when approved), title, description, body. The
+// `state` drives the chrome — active glows, done goes green, locked dims.
+function StepShell({ n, title, desc, state, children }: { n: number; title: string; desc: ReactNode; state: "locked" | "active" | "done"; children?: ReactNode }) {
+  const ring = state === "active" ? "border-[#a855f7] ring-2 ring-[#a855f7]/50 shadow-[0_0_22px_rgba(168,85,247,0.35)]" : state === "done" ? "border-ready/40 bg-ready/[0.04]" : "border-line opacity-55";
+  const badge = state === "done" ? "bg-ready text-black" : state === "active" ? "bg-[#a855f7] text-white" : "bg-surface-2 text-ink-faint";
+  return (
+    <div className={`rounded-xl border bg-surface-1 p-5 ${ring}`}>
+      <div className="flex items-center gap-3">
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${badge}`}>{state === "done" ? "✓" : n}</span>
+        <div className="text-sm font-extrabold text-ink">{title}</div>
+        {state === "done" && <span className="tabular ml-auto text-[10px] font-semibold uppercase tracking-wide text-ready">approved</span>}
+      </div>
+      <p className="mt-1.5 text-sm text-ink-dim">{desc}</p>
+      {children && <div className="mt-3">{children}</div>}
+    </div>
+  );
+}
+function LockHint() {
+  return <p className="text-[11px] text-ink-faint">🔒 Approve the previous step to unlock this one.</p>;
+}
+// A row of small video previews for one role's rendered clips.
+function ClipStrip({ clips, role }: { clips: Clip[]; role: "a-roll" | "b-roll" }) {
+  const mine = clips.filter((c) => c.kind === role && c.url).sort((a, b) => a.scene - b.scene);
+  if (!mine.length) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {mine.map((c) => (
+        <video key={c.scene} src={c.url!} controls playsInline className="aspect-[9/16] w-20 rounded-lg border border-ready/40 bg-black object-cover" />
+      ))}
+    </div>
+  );
+}
 function Field({ label, v, set, placeholder }: { label: string; v: string; set: (s: string) => void; placeholder?: string }) {
   return (
     <div>
