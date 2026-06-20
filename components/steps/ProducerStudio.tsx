@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import Uploader from "@/components/Uploader";
 import Lightbox from "@/components/Lightbox";
 
@@ -129,14 +129,25 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
 
   async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status" | "audio_status") {
-    // ~18 min: must OUTLAST the backend render window (~16 min) so the UI catches completion
-    // instead of giving up early and looking frozen.
-    for (let i = 0; i < 180; i++) {
+    // ~25 min: must comfortably OUTLAST the backend render window (~16 min of polling + Inngest
+    // scheduling overhead) so the UI catches completion instead of giving up early and looking frozen.
+    for (let i = 0; i < 250; i++) {
       await new Promise((res) => setTimeout(res, 6000));
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
       if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
     }
   }
+
+  // Resume polling on load if a render was still running when you navigated away — otherwise the
+  // spinner would sit frozen (the poll loop only lives while the page is mounted).
+  useEffect(() => {
+    const p = initialProduction;
+    if (p?.clips_status === "running") poll(setProduction, "clips_status");
+    else if (p?.shots_status === "running") poll(setProduction, "shots_status");
+    else if (p?.assembly_status === "running") poll(setProduction, "assembly_status");
+    else if (p?.audio_status === "running") poll(setProduction, "audio_status");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function shootShots() {
     if (shooting) return;
