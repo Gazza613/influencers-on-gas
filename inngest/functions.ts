@@ -908,7 +908,12 @@ export const generateClips = inngest.createFunction(
       const motion = role === "a-roll"
         ? `${base}. She is front-on, looking into the lens, talking to camera; the WHOLE scene is alive with moving background people and ambient motion.`
         : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`;
-      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio }));
+      // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
+      // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
+      // the background can't drift/reverse (it's anchored to a defined end frame).
+      const next = scenes[i + 1] as Record<string, string> | undefined;
+      const endImageUrl = next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
+      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
         for (let n = 0; n < 60; n++) {

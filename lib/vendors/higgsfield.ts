@@ -692,17 +692,20 @@ export async function generateVideoFromImage(opts: { imageUrl: string; prompt: s
 
 // SUBMIT a b-roll video job and return immediately with the jobId (no polling). The caller polls
 // with pollVideoJobOnce across short, durable steps so no single step blocks for minutes.
-export async function submitVideoFromImage(opts: { imageUrl: string; prompt: string; ratio?: string }): Promise<{ jobId: string | null; model: string | null; url: string | null; error: string | null }> {
+export async function submitVideoFromImage(opts: { imageUrl: string; prompt: string; ratio?: string; endImageUrl?: string }): Promise<{ jobId: string | null; model: string | null; url: string | null; error: string | null }> {
   if (!isSafePublicUrl(opts.imageUrl)) return { jobId: null, model: null, url: null, error: "unsafe or non-public image url" };
   const mediaId = await importMediaUrl(opts.imageUrl);
   if (!mediaId) return { jobId: null, model: null, url: null, error: "could not import the still into Higgsfield" };
+  // END frame (optional): anchors the motion to finish on this frame — prevents the "drifts/walks
+  // backwards" look and, when it's the NEXT scene's start frame, makes the cut seamless.
+  const endId = opts.endImageUrl && isSafePublicUrl(opts.endImageUrl) ? await importMediaUrl(opts.endImageUrl).catch(() => null) : null;
   const { call } = await openSession();
   const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : "9:16";
   // VERIFIED schemas (from models_explore, 2026-06-20): generate_video takes medias:[{value:media_id,
-  // role}]. Kling 3.0 = model "kling3_0", role "start_image", sound on/off, duration 3-15. The old
-  // failures were the wrong role ("image") + guessed fields. B-roll is silent (sound off) — music +
-  // ambient are mixed in later from ElevenLabs (Higgsfield has NO music/SFX, TTS only).
-  const start = (model: string, extra: AnyObj = {}): AnyObj => ({ model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, count: 1, medias: [{ value: mediaId, role: "start_image" }], ...extra });
+  // role}]. Kling 3.0 = model "kling3_0", roles start_image + end_image, sound on/off, duration 3-15.
+  // B-roll is silent (sound off) — music + ambient are mixed in later (Higgsfield has no music/SFX).
+  const medias = [{ value: mediaId, role: "start_image" }, ...(endId ? [{ value: endId, role: "end_image" }] : [])];
+  const start = (model: string, extra: AnyObj = {}): AnyObj => ({ model, prompt: opts.prompt, aspect_ratio: ar, duration: 5, count: 1, medias, ...extra });
   const shapes: AnyObj[] = [
     ...(process.env.HF_VIDEO_MODEL ? [start(process.env.HF_VIDEO_MODEL)] : []),
     start("kling3_0", { sound: "off" }),
