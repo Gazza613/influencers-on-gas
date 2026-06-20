@@ -13,7 +13,7 @@ type Scene = {
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string } | null;
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; wizard_approved?: string[] } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -91,11 +91,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     ORDER.forEach((k, idx) => { const next = ORDER[idx + 1]; if (next && ready[next]) set.add(k); });
     return set;
   };
-  const [approved, setApproved] = useState<Set<string>>(seedApproved);
+  // Prefer the SAVED approvals (so returning restores the exact step); else infer from artifacts.
+  const [approved, setApproved] = useState<Set<string>>(() => (initialProduction?.wizard_approved?.length ? new Set(initialProduction.wizard_approved) : seedApproved()));
   const [denied, setDenied] = useState<Set<string>>(new Set());
   const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
-  function accept(k: string) { setApproved((s) => new Set(s).add(k)); setDenied((s) => { const n = new Set(s); n.delete(k); return n; }); }
-  function deny(k: string) { setDenied((s) => new Set(s).add(k)); setApproved((s) => { const n = new Set(s); n.delete(k); return n; }); }
+  function persistApproved(s: Set<string>) {
+    fetch(`/api/influencers/${influencerId}/production/approvals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approved: [...s] }) }).catch(() => {});
+  }
+  function accept(k: string) { setApproved((s) => { const n = new Set(s).add(k); persistApproved(n); return n; }); setDenied((s) => { const n = new Set(s); n.delete(k); return n; }); }
+  function deny(k: string) { setDenied((s) => new Set(s).add(k)); setApproved((s) => { const n = new Set(s); n.delete(k); persistApproved(n); return n; }); }
   // A step's visual state: done (approved), active (artifact ready or all prior approved), else locked.
   function stepState(k: typeof ORDER[number]): "locked" | "active" | "done" {
     if (approved.has(k)) return "done";
@@ -246,7 +250,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
-    if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); }
+    if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); persistApproved(new Set()); }
     else setErr(r?.error || "Couldn't draft the storyboard. Try again.");
   }
 
