@@ -97,10 +97,10 @@ Rules:
 - Keep each field tight and vivid (one or two sentences), production-ready.
 
 Humanising (critical for believability):
-- Give this person a SMALL, UNIQUE set of natural imperfections that make them read as a real human, never an AI render. Draw from a WIDE range and vary it every time: freckles, sun spots, a beauty mark or mole, faint acne scarring, slightly uneven skin tone, a rosacea flush, a small scar, a chipped or slightly crooked tooth, an asymmetric smile, uneven brows, a crooked nose bridge, laugh lines, a cowlick, stubble shadow, and so on.
-- Choose imperfections that suit THIS person's age, ethnicity and lifestyle, and make the combination distinctive to them. No two characters should share the same tells.
-- Do NOT default to the same feature each time. In particular, do NOT reflexively write "a gap between the front teeth" unless it is genuinely the standout choice for this specific person (it rarely should be). Reach for different, fresh details.
-- Keep imperfections SUBTLE, SPARING and believable, never caricatured or over-used. One or two understated tells is plenty. Spread them lightly across face.skin, face.distinct_features and face.structure.
+- Give this person a SMALL, UNIQUE set of natural imperfections that make them read as a real human, never an AI render. Bias toward the SUBTLE, skin-level tells that don't dominate a face: fine freckles, faint sun pigmentation, slightly uneven skin tone, a soft rosacea flush, fine lines, a faint old scar, uneven brows, a cowlick, light stubble shadow.
+- MOLES/BEAUTY MARKS: use sparingly and ONLY if genuinely fitting — AT MOST ONE, small, flat and natural, on the FACE only. NEVER multiple moles, never a prominent or dark raised mole, and NEVER any mole or mark on the chest, neck or décolletage. When in doubt, prefer freckles or skin texture over a mole.
+- Choose imperfections that suit THIS person's age, ethnicity and lifestyle, distinctive to them. No two characters share the same tells. Do NOT default to "a gap between the front teeth."
+- Keep imperfections SUBTLE, SPARING and believable, never caricatured. ONE understated tell is usually plenty. face.distinct_features should be brief and barely-there — it must never read as an odd or distracting mark.
 
 Wardrobe (mandatory): always specify a COMPLETE outfit including BOTTOMS (trousers, jeans, a skirt or tailored shorts) and footwear. Never leave the lower body unspecified. Everything is tasteful and brand-safe, the subject is always fully clothed.
 
