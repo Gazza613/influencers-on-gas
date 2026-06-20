@@ -347,6 +347,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               const role = ROLE[s.role] ?? ROLE["a-roll"];
               const shot = shotFor(i);
               const clip = clipFor(i);
+              // Has the wizard step for THIS scene's role been reached? A clip only reads as
+              // "failed" once you're on/past its step — before that a stale clip shows as pending.
+              const stepReached = s.role === "a-roll" ? unlocked("aroll") : s.role === "b-roll" ? unlocked("broll") : true;
+              const clipFailed = clip?.status === "failed" && stepReached;
               return (
                 <div key={i} className="flex gap-4 rounded-xl border border-line bg-surface-1 p-4">
                   {s.role !== "graphic" && (
@@ -364,9 +368,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <video src={clip.url} controls playsInline className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
                           <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
                         </div>
-                      ) : rendering && clip?.status !== "failed" && (renderingRole === "" || renderingRole === s.role) ? (
+                      ) : rendering && !clip?.url && (renderingRole === "" || renderingRole === s.role) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…</div>
-                      ) : clip?.status === "failed" ? (
+                      ) : clipFailed ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[9px] text-alert" title={clip.error || ""}>clip failed{shot?.url && <span className="text-ink-faint">(still ok)</span>}</div>
                       ) : shot?.url ? (
                         <div className="relative">
@@ -404,7 +408,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   {s.motion_prompt && <div className="mt-1 text-[12px] text-ink-faint">↗ Motion: {s.motion_prompt}</div>}
                   {s.graphics?.length > 0 && <div className="mt-1 text-[12px] text-ink-faint">▣ {s.graphics.join(" · ")}</div>}
                   <div className="mt-1 text-[12px] text-ink-faint">🎵 {s.music_sfx} {s.transition ? `· ⟶ ${s.transition}` : ""}</div>
-                  {clip?.status === "failed" && clip.error && <div className="mt-2 break-words rounded-lg border border-alert/30 bg-alert/5 px-3 py-2 text-[11px] text-alert">⚠ Clip failed: {clip.error}</div>}
+                  {clipFailed && clip?.error && <div className="mt-2 break-words rounded-lg border border-alert/30 bg-alert/5 px-3 py-2 text-[11px] text-alert">⚠ Clip failed: {clip.error}</div>}
                   {editIdx === i && (
                     <div className="mt-3 space-y-3 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-3">
                       {/* Script */}
