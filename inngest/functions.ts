@@ -897,6 +897,11 @@ export const generateClips = inngest.createFunction(
       // Steer the video model away from its two worst tells: shaky camera + people clipping through
       // the world. Appended to every clip prompt.
       const MOTION_SAFE = " Camera is SMOOTH and STABILISED (gimbal-steady), gentle and locked — absolutely no jittery or shaky handheld motion. Everyone and everything moves with real spatial awareness along physically believable paths: nobody walks into the pool, water, walls, furniture, plants or other people, and nobody clips through objects. All motion is grounded, natural and plausible.";
+      // When a scene has water, the video model's worst tell is fake/jelly water — force real physics.
+      const sceneText = `${sc.location || ""} ${sc.blocking || ""} ${base}`.toLowerCase();
+      const WATER = /\b(water|pool|waves?|sea|ocean|beach|river|lake|splash|swim|swimming|fountain|rain|surf|wave pool)\b/.test(sceneText)
+        ? " WATER REALISM (critical): all water — pool, waves, sea, splashes — must move with HYPER-REALISTIC fluid physics: natural ripples and rolling wave motion, light refraction and caustics on the surface, sparkling sunlight highlights, believable splashes and foam. NEVER plastic, jelly-like, gelatinous, frozen, smeared, looping or fake-looking water."
+        : "";
 
       // A-ROLL: Higgsfield Seedance 2.0 — feed the keyframe + a VO audio clip → a moving scene with
       // the avatar LIP-SYNCED to that voice (baked in). Uses the producer's uploaded VO if present,
@@ -907,7 +912,7 @@ export const generateClips = inngest.createFunction(
           if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
           // A-ROLL camera MUST hold on her — Seedance was obeying storyboard "push in / pan up"
           // directions and craning the camera off her (she slid out of frame, the building grew).
-          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. ONLY she and the background move (background people walk past, ambient motion, leaves and light) — never the camera.${MOTION_SAFE}`;
+          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. ONLY she and the background move (background people walk past, ambient motion, leaves and light) — never the camera.${MOTION_SAFE}${WATER}`;
           const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
           let url: string | null = sub.url;
           if (!url && sub.jobId) {
@@ -930,7 +935,7 @@ export const generateClips = inngest.createFunction(
       // B-ROLL (and a-roll fallback): Kling whole-frame motion, silent. VO laid over in the stitch.
       const motion = (role === "a-roll"
         ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. Only she and the background move (background people, ambient motion).`
-        : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`) + MOTION_SAFE;
+        : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`) + MOTION_SAFE + WATER;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
       // the background can't drift/reverse (it's anchored to a defined end frame).
@@ -1057,7 +1062,11 @@ export const assembleVideo = inngest.createFunction(
       cursor = start + len;
       return { i, start, len, role: String(sc.role || "a-roll"), vo: String(sc.vo_line || "").trim(), caption: String(sc.caption || "").trim() };
     });
-    const total = Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30;
+    // A breath after the last word so the cut doesn't end abruptly: hold the final clip ~1.2s longer
+    // and extend the timeline (music fades out over it).
+    const TAIL = 1.2;
+    if (placed.length) placed[placed.length - 1].len += TAIL;
+    const total = (Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30) + TAIL;
 
     // Music bed (full length) → Blob. REUSE the audio step's bed if it already produced one.
     let musicUrl: string | null = (production as { music_url?: string })?.music_url || null;
