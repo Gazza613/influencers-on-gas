@@ -10,6 +10,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
 
   const body = await req.json().catch(() => ({}));
+
+  // Abort / reset a stuck photoshoot: flip the status out of "generating" so the UI unlocks and you
+  // can retry. (The durable job, if still alive, just finishes into look_refs harmlessly.)
+  if (body.reset) {
+    await updateInfluencer(id, { status: "cast_ready" });
+    return NextResponse.json({ ok: true, reset: true });
+  }
+
   const chosenUrl = typeof body.chosenUrl === "string" ? body.chosenUrl : "";
 
   // Validate the chosen URL is one of this influencer's casting candidates.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
 import WorkingPanel from "@/components/WorkingPanel";
@@ -43,8 +43,14 @@ export default function PhotoshootStep({
   const hasSet = frames.length > 1;
   const building = st === "generating" || busy;
 
+  const aborted = useRef(false);
+  async function abort() {
+    aborted.current = true;
+    setBusy(false); setSt("cast_ready");
+    await fetch(`/api/influencers/${influencerId}/build`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset: true }) }).catch(() => {});
+  }
   async function poll(tries = 0): Promise<void> {
-    if (tries > 200) { setBusy(false); return; }
+    if (aborted.current || tries > 200) { setBusy(false); return; }
     await new Promise((r) => setTimeout(r, 5000));
     const r = await fetch(`/api/influencers/${influencerId}`, { cache: "no-store" });
     if (r.ok) {
@@ -62,6 +68,7 @@ export default function PhotoshootStep({
 
   async function run() {
     if (!modelUrl || busy) return;
+    aborted.current = false;
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/build`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -115,9 +122,15 @@ export default function PhotoshootStep({
       )}
 
       {building && (
-        <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 2 min"
-          pct={frames.length > 1 ? pct : null} sub={`${frames.length}/${SET_TOTAL} frames`}
-          note="Angles, close-ups and your scene, frames appear as they land." />
+        <div>
+          <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 2 min"
+            pct={frames.length > 1 ? pct : null} sub={`${frames.length}/${SET_TOTAL} frames`}
+            note="Angles, close-ups and your scene, frames appear as they land." />
+          <div className="mt-2 flex items-center gap-3">
+            <button onClick={abort} className="rounded-lg border border-alert/50 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10">⟳ Abort / reset if stuck</button>
+            <span className="text-[11px] text-ink-faint">Frames already shot are kept.</span>
+          </div>
+        </div>
       )}
 
       {err && <p className="text-xs text-alert">{err}</p>}

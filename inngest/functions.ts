@@ -156,7 +156,9 @@ export const buildIdentity = inngest.createFunction(
           const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
           return `A real photograph of ${subjectLine}. ${idLock} ${l.frame}, ${l.light}, wearing ${l.wardrobe}, against a clean simple neutral background, ${look}. ${core}.`;
         });
-        const ex = { medias: refMedias.map((value) => ({ value, role: "image" })) };
+        // Reference frames at 1K — they feed the Soul + act as anchors (not 4K finals), so 1K halves
+        // the photoshoot time with no meaningful loss. Identity cards below stay 2K for fidelity.
+        const ex = { medias: refMedias.map((value) => ({ value, role: "image" })), resolution: "1k" };
         const urls = await step.run("anchored-shoot", () => generateBatch(prompts, IMAGE_MODEL, "9:16", ex, IMAGE_FALLBACK));
         const produced = urls.filter((u): u is string => !!u);
         if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
@@ -233,7 +235,7 @@ export const buildIdentity = inngest.createFunction(
           const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${constant}` : prompt;
           return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${core}.`;
         });
-        urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16", {}, IMAGE_FALLBACK));
+        urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16", { resolution: "1k" }, IMAGE_FALLBACK));
         const produced = urls.filter((u): u is string => !!u);
         if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
       }
