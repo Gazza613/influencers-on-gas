@@ -859,19 +859,15 @@ export const generateShots = inngest.createFunction(
       await step.run(`save-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, shots_status: "running" } } }));
     };
 
-    // Graphic scenes have no frame — record them up front.
+    // SEQUENTIAL render: each scene shoots, saves (merge), and the next reuses the first good frame
+    // as the world anchor. Sequential is RACE-FREE (parallel saves were overwriting each other and
+    // dropping shots) and still updates the board live as each frame lands.
     for (let i = 0; i < scenes.length; i++) {
-      if (String((scenes[i] as Record<string, string>).role || "a-roll") === "graphic") await saveShot(i, { scene: i, role: "graphic", beat: String((scenes[i] as Record<string, string>).beat || ""), url: null });
-    }
-    const nonGraphic = scenes.map((sc, i) => ({ sc: sc as Record<string, string>, i })).filter(({ sc }) => String(sc.role || "a-roll") !== "graphic");
-    // ANCHOR FIRST: render scene 1 to establish the shared world, then render the rest IN PARALLEL
-    // (each reuses the anchor for continuity). This cuts the board from sequential to ~one render deep.
-    if (nonGraphic.length) {
-      const a = nonGraphic[0];
-      const row0 = await renderShot(a.i, a.sc);
-      await saveShot(a.i, row0);
-      if (row0.url) worldRef = await step.run("worldref", () => importMediaUrl(row0.url as string).catch(() => null));
-      await Promise.all(nonGraphic.slice(1).map(async ({ sc, i }) => { await saveShot(i, await renderShot(i, sc)); }));
+      const sc = scenes[i] as Record<string, string>;
+      if (String(sc.role || "a-roll") === "graphic") { await saveShot(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); continue; }
+      const row = await renderShot(i, sc);
+      await saveShot(i, row);
+      if (!worldRef && row.url) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(row.url as string).catch(() => null));
     }
 
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
