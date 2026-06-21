@@ -43,7 +43,15 @@ export async function submitOmniHuman(opts: { imageUrl: string; audioUrl: string
     const res = await fetch(`${FAL_QUEUE}/${OMNIHUMAN_MODEL}`, {
       method: "POST",
       headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ image_url: opts.imageUrl, audio_url: opts.audioUrl, ...(opts.prompt ? { prompt: opts.prompt.slice(0, 1500) } : {}) }),
+      // 720p is faster AND higher quality than 1080p per fal's docs; turbo_mode trades a little
+      // fidelity for a big speed gain. Both env-tunable (FAL_OMNIHUMAN_RES / FAL_OMNIHUMAN_TURBO).
+      body: JSON.stringify({
+        image_url: opts.imageUrl,
+        audio_url: opts.audioUrl,
+        resolution: process.env.FAL_OMNIHUMAN_RES || "720p",
+        turbo_mode: process.env.FAL_OMNIHUMAN_TURBO !== "0",
+        ...(opts.prompt ? { prompt: opts.prompt.slice(0, 1500) } : {}),
+      }),
       signal: AbortSignal.timeout(30000),
     });
     const txt = await res.text();
