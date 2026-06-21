@@ -46,6 +46,7 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
           }[])
           : [],
         status: (persona.creatives_status as string) ?? "idle",
+        startedAt: typeof persona.creatives_started_at === "number" ? persona.creatives_started_at : null,
       }}
     />
   );

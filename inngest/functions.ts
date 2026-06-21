@@ -7,7 +7,7 @@ import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
-import { qaCreative, composeCreativeScene, moderateText } from "@/lib/vendors/anthropic";
+import { qaCreative, composeCreativeScene, moderateText, matchesIdentity } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
@@ -162,8 +162,11 @@ export const buildIdentity = inngest.createFunction(
         const urls = await step.run("anchored-shoot", () => generateBatch(prompts, IMAGE_MODEL, "9:16", ex, IMAGE_FALLBACK));
         const produced = urls.filter((u): u is string => !!u);
         if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
-        const validShoot = await step.run("validate-shoot", () => filterLoadable(produced));
-        // Real uploads first (identity truth), then the generated varied frames.
+        const loadedShoot = await step.run("validate-shoot", () => filterLoadable(produced));
+        // IDENTITY QA: drop any generated frame that isn't the same person as the anchor (wide /
+        // full-body shots sometimes render a different model). Checked against the chosen anchor.
+        const validShoot = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => ({ u, ok: await matchesIdentity(u, valid[0]) })))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
+        // Real uploads first (identity truth), then the identity-matched generated frames.
         const frames: { url: string; hero?: boolean; face?: boolean }[] = [{ url: valid[0], hero: true, face: true }];
         for (const url of valid.slice(1)) if (!frames.some((f) => f.url === url)) frames.push({ url });
         for (const url of validShoot) if (!frames.some((f) => f.url === url)) frames.push({ url });

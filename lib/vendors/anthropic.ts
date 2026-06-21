@@ -240,6 +240,44 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; score10:
   }
 }
 
+// IDENTITY-MATCH QA: is the person in `frameUrl` the SAME individual as the `refUrl` anchor? Used to
+// drop drifted photoshoot frames (a wide/full-body shot sometimes renders a different model). Fails
+// OPEN (returns true) on any error so a QA hiccup can never empty the set.
+const QA_MEDIA2 = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+export async function matchesIdentity(frameUrl: string, refUrl: string): Promise<boolean> {
+  const grab = async (u: string): Promise<{ mt: "image/jpeg"; data: string } | null> => {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) return null;
+      let mt = (r.headers.get("content-type") || "image/jpeg").split(";")[0];
+      if (!QA_MEDIA2.has(mt)) mt = "image/jpeg";
+      return { mt: mt as "image/jpeg", data: Buffer.from(await r.arrayBuffer()).toString("base64") };
+    } catch { return null; }
+  };
+  try {
+    const [ref, frame] = await Promise.all([grab(refUrl), grab(frameUrl)]);
+    if (!ref || !frame) return true; // can't verify → don't reject
+    const c = await client();
+    const res = await c.messages.create({
+      model: QA_MODEL,
+      max_tokens: 80,
+      tools: [{ name: "verdict", description: "Identity-match verdict.", input_schema: { type: "object" as const, properties: { same_person: { type: "boolean" } }, required: ["same_person"] } }],
+      tool_choice: { type: "tool", name: "verdict" },
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: "Image 1 is the REFERENCE person. Image 2 is a generated photo. Is the person in Image 2 unmistakably the SAME individual as the reference — same face, bone structure, ethnicity/skin tone, hair and distinctive features? Ignore pose, outfit, camera distance, lighting and expression. If it's clearly a different person (or a different ethnicity/face), answer false. Reply via the tool." },
+          { type: "image", source: { type: "base64", media_type: ref.mt, data: ref.data } },
+          { type: "image", source: { type: "base64", media_type: frame.mt, data: frame.data } },
+        ],
+      }],
+    });
+    const block = res.content.find((b) => b.type === "tool_use");
+    const out = block && block.type === "tool_use" ? (block.input as { same_person?: boolean }) : null;
+    return out?.same_person !== false; // default true (fail open)
+  } catch { return true; }
+}
+
 // Polish a producer's rough idea into a single vivid, art-directed image prompt for a
 // social creative of this influencer. Always clothed; diverse, in-focus backgrounds.
 export async function refineCreativePrompt(name: string, bible: Record<string, unknown>, scene: string): Promise<string> {

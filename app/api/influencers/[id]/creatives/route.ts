@@ -31,6 +31,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     videoSelects: Array.isArray(persona.video_selects) ? persona.video_selects : [],
     qa: persona.creatives_qa ?? null,
     status: persona.creatives_status ?? "idle",
+    started_at: typeof persona.creatives_started_at === "number" ? persona.creatives_started_at : null,
     error: persona.creatives_error ?? null,
     locked: !!persona.locked,
     rates: { soul_2: gpt, soul_cinematic: gpt, upscale }, // per-image (both styles render on gpt_image_2)
@@ -81,6 +82,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
-  await updateInfluencer(id, { persona: { ...persona, creatives_status: "running", creatives_error: null } });
+  await updateInfluencer(id, { persona: { ...persona, creatives_status: "running", creatives_error: null, creatives_started_at: Date.now() } });
   return NextResponse.json({ ok: true });
 }

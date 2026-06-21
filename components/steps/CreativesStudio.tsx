@@ -48,7 +48,8 @@ const CREATIVE_NARRATION = [
   "Re-rolling anything that doesn't make the cut, no compromises…",
 ];
 
-export default function CreativesStudio({ influencerId, initial, multiRef = false, arollRef = "", brollRef = "" }: { influencerId: string; initial: { creatives: Creative[]; status: string }; multiRef?: boolean; arollRef?: string; brollRef?: string }) {
+export default function CreativesStudio({ influencerId, initial, multiRef = false, arollRef = "", brollRef = "" }: { influencerId: string; initial: { creatives: Creative[]; status: string; startedAt?: number | null }; multiRef?: boolean; arollRef?: string; brollRef?: string }) {
+  const [startedAt, setStartedAt] = useState<number | null>(initial.startedAt ?? null);
   // Producer references: a chosen creative becomes the wardrobe + world anchor for a-roll / b-roll
   // keyframes (Phase 1 of Creatives → Producer).
   const [refs, setRefs] = useState<{ aroll: string; broll: string }>({ aroll: arollRef, broll: brollRef });
@@ -112,7 +113,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       }
       prevCount.current = list.length;
       prevStatus.current = d.status || "idle";
-      if (d.rates) setRates(d.rates); setCreatives(list); setVideoSelects(d.videoSelects || []); setQa(d.qa || null); setStatus(d.status || "idle");
+      if (d.rates) setRates(d.rates); setCreatives(list); setVideoSelects(d.videoSelects || []); setQa(d.qa || null); setStatus(d.status || "idle"); if (typeof d.started_at === "number") setStartedAt(d.started_at);
     }
     return d;
   }
@@ -171,7 +172,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     // No `running` guard: a new run (e.g. a 1:1 while a 9:16 renders) runs CONCURRENTLY, it does
     // not cancel the one in progress. The server merges both runs' images.
     if (!nFormats) return;
-    setErr(""); setStatus("running");
+    setErr(""); setStatus("running"); setStartedAt(Date.now());
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRef, extras, identityLock }),
@@ -501,7 +502,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
 
         {running && (
           <div className="mt-4">
-            <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null}
+            <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null} startedAt={startedAt}
               onAbort={abort}
               note={`Generating and quality checking each shot in 2K, they appear below as they pass review. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
           </div>
