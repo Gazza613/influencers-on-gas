@@ -1065,9 +1065,22 @@ export const assembleVideo = inngest.createFunction(
     if (!scenes.length || !clips.some((c) => c.url)) return { error: "render the clips first" };
     const voiceId = persona.voice_id as string | undefined;
     const ratio = String(sb?.format || "").includes("1:1") ? "1:1" : "9:16";
-    const clipUrl = (i: number) => clips.find((c) => c.scene === i)?.url || null;
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, assembly_status: "running", final_url: null } } }));
+
+    // SELF-HEAL: older clips were saved with a ".png" extension (a re-host bug), which Shotstack
+    // rejects as a video. Re-host any clip whose URL isn't a video extension to a proper .mp4 so the
+    // stitch works without forcing a re-render. (New clips already save correctly.)
+    const VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|avi|3gp|flv)(\?|$)/i;
+    let fixedAny = false;
+    for (const c of clips) {
+      if (c.url && !VIDEO_EXT.test(c.url)) {
+        const fixed = await step.run(`fixclip-${c.scene}`, () => rehostToBlob(c.url as string, "clips").catch(() => null));
+        if (fixed && VIDEO_EXT.test(fixed)) { c.url = fixed; fixedAny = true; }
+      }
+    }
+    if (fixedAny) await step.run("save-fixed-clips", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips } } }));
+    const clipUrl = (i: number) => clips.find((c) => c.scene === i)?.url || null;
 
     // Lay scenes on the timeline using the storyboard timecodes; fall back to 5s sequential.
     let cursor = 0;
