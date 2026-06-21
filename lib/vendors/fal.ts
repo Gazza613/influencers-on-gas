@@ -59,21 +59,23 @@ export async function submitOmniHuman(opts: { imageUrl: string; audioUrl: string
   }
 }
 
-// One quick status check for durable step.sleep polling. Returns the video url when COMPLETED.
-export async function pollOmniHumanOnce(statusUrl: string, responseUrl: string): Promise<{ url: string | null; terminal: boolean }> {
+// One quick status check for durable step.sleep polling. Returns the video url + billed duration
+// (seconds) when COMPLETED, so Cost Control can meter OmniHuman at its true per-second rate.
+export async function pollOmniHumanOnce(statusUrl: string, responseUrl: string): Promise<{ url: string | null; terminal: boolean; seconds: number | null }> {
   const k = await key();
-  if (!k) return { url: null, terminal: true };
+  if (!k) return { url: null, terminal: true, seconds: null };
   try {
     const sres = await fetch(statusUrl, { headers: { Authorization: `Key ${k}` }, cache: "no-store" });
-    if (!sres.ok) return { url: null, terminal: false };
+    if (!sres.ok) return { url: null, terminal: false, seconds: null };
     const status = String(((await sres.json()) as { status?: string }).status || "").toUpperCase();
     if (status === "COMPLETED") {
       const rres = await fetch(responseUrl, { headers: { Authorization: `Key ${k}` }, cache: "no-store" });
-      if (!rres.ok) return { url: null, terminal: true };
-      const r = (await rres.json()) as { video?: { url?: string }; url?: string; output?: { video?: { url?: string } } };
-      return { url: r.video?.url || r.output?.video?.url || r.url || null, terminal: true };
+      if (!rres.ok) return { url: null, terminal: true, seconds: null };
+      const r = (await rres.json()) as { video?: { url?: string; duration?: number }; url?: string; duration?: number; output?: { video?: { url?: string } } };
+      const seconds = Number(r.duration ?? r.video?.duration) || null;
+      return { url: r.video?.url || r.output?.video?.url || r.url || null, terminal: true, seconds };
     }
-    if (status === "FAILED" || status === "ERROR") return { url: null, terminal: true };
-    return { url: null, terminal: false };
-  } catch { return { url: null, terminal: false }; }
+    if (status === "FAILED" || status === "ERROR") return { url: null, terminal: true, seconds: null };
+    return { url: null, terminal: false, seconds: null };
+  } catch { return { url: null, terminal: false, seconds: null }; }
 }

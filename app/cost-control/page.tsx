@@ -18,7 +18,8 @@ type Audit = { taken_at: string; remaining: number | null; ledger_credits: numbe
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PROVIDER_LABEL: Record<string, string> = {
-  higgsfield: "Higgsfield · images & upscale",
+  higgsfield: "Higgsfield · images, b-roll & upscale",
+  fal: "fal.ai · a-roll (OmniHuman)",
   heygen: "HeyGen · presenter",
   anthropic: "Claude · co-pilot & QA",
   elevenlabs: "ElevenLabs · voice",

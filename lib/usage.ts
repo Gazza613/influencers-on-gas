@@ -85,7 +85,7 @@ export type CostReport = {
 
 // `case` expression that buckets an event into image / video / other.
 // (usage_events stores action/provider, not a unit column.)
-const KIND = `case when u.action in ('casting','photoshoot','humaniser','creative') then 'image' when u.provider='heygen' or u.action in ('presenter','video') then 'video' else 'other' end`;
+const KIND = `case when u.action in ('casting','photoshoot','humaniser','creative') then 'image' when u.provider in ('heygen','fal') or u.action in ('presenter','video','aroll','broll') then 'video' else 'other' end`;
 
 function whereClause(f: CostFilters): { sql: string; params: unknown[] } {
   const parts: string[] = [];

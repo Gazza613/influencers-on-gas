@@ -951,15 +951,17 @@ export const generateClips = inngest.createFunction(
           // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
           const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: img, audioUrl, prompt }));
           if (oh.statusUrl && oh.responseUrl) {
-            let ohUrl: string | null = null;
+            let ohUrl: string | null = null; let ohSeconds: number | null = null;
             for (let n = 0; n < 120; n++) {
               const s = await step.run(`oh-poll-${i}-${n}`, () => pollOmniHumanOnce(oh.statusUrl as string, oh.responseUrl as string));
-              if (s.url) { ohUrl = s.url; break; }
+              if (s.url) { ohUrl = s.url; ohSeconds = s.seconds; break; }
               if (s.terminal) break;
               await step.sleep(`oh-wait-${i}-${n}`, "6s");
             }
             if (ohUrl) {
-              await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+              // Meter at OmniHuman's true PER-SECOND rate using fal's returned duration (fallback ~8s).
+              const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
+              await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
               const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
               return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true, audio_url: audioUrl };
             }
