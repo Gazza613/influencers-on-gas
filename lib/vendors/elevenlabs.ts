@@ -1,4 +1,5 @@
 import { getSecret } from "../connections";
+import { isSafePublicUrl } from "../safe-url";
 
 const BASE = "https://api.elevenlabs.io/v1";
 
@@ -53,6 +54,7 @@ export async function cloneVoice(name: string, sampleUrls: string[]): Promise<st
   form.append("name", name);
   let i = 0;
   for (const url of sampleUrls.slice(0, 5)) {
+    if (!isSafePublicUrl(url)) continue; // SSRF guard on user-supplied sample URLs
     const r = await fetch(url, { signal: AbortSignal.timeout(20000) }).catch(() => null);
     if (!r?.ok) continue;
     const ct = (r.headers.get("content-type") || "audio/mpeg").split(";")[0];

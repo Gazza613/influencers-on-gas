@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { listEndCards, addEndCard } from "@/lib/endcards";
+import { isSafePublicUrl } from "@/lib/safe-url";
 
 export async function GET() {
   const session = await auth();
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
   const url = String(b?.url || "").trim();
   if (!url) return NextResponse.json({ error: "An uploaded file is required." }, { status: 400 });
+  if (!isSafePublicUrl(url)) return NextResponse.json({ error: "Invalid file URL." }, { status: 400 }); // SSRF guard
   const kind = b?.kind === "video" ? "video" : "image";
   try {
     return NextResponse.json({ endCard: await addEndCard(String(b?.label || "").trim(), url, kind) });
