@@ -137,7 +137,26 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
   // force an original, royalty-free, no-imitation instruction onto every request.
   const stripped = prompt.replace(/\b(like|reminiscent of|in the style of|styled after|inspired by|similar to|à la|sounds like|channel(?:ling|ing)?)\b[^.,;\n]*/gi, "").replace(/\s{2,}/g, " ").trim();
   const safePrompt = `${stripped || "warm modern background music"}. An ORIGINAL, royalty-free instrumental bed; no vocals; does NOT imitate, reference or reproduce any specific artist, band, song or copyrighted work.`;
-  // Try the current Music endpoint, fall back to the compose alias if the route differs.
+
+  // BEST-OF-BREED: try a music_v2 COMPOSITION PLAN first — structured styles with hard negatives
+  // (no vocals, no artist imitation), which gives more control AND auto-rejects copyrighted refs.
+  // Falls back to the prompt-based endpoint below if the plan shape isn't accepted.
+  try {
+    const styles = (stripped || "warm modern background").split(/[,.;\n]/).map((s) => s.trim()).filter(Boolean).slice(0, 12);
+    const composition_plan = {
+      positive_global_styles: styles.length ? styles : ["warm", "modern", "instrumental"],
+      negative_global_styles: ["vocals", "lyrics", "singing", "spoken word", "any specific real artist, band or song", "copyrighted melody"],
+      sections: [{ section_name: "bed", positive_local_styles: [], negative_local_styles: ["vocals"], duration_ms: ms, lines: [] }],
+    };
+    const res = await fetch(`${BASE}/music`, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify({ composition_plan, model_id: "music_v2" }), signal: AbortSignal.timeout(150000) });
+    if (res.ok) return Buffer.from(await res.arrayBuffer());
+    if (res.status === 401 || res.status === 402 || res.status === 429) throw new Error(`music_v2 ${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`); // auth/quota — don't bother with fallback
+  } catch (e) {
+    if ((e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") throw e; // genuine timeout → bubble up (caller falls back to ambient-only)
+    /* otherwise: plan shape not accepted → fall through to the prompt API */
+  }
+
+  // Fallback: prompt-based Music endpoint (the proven path).
   const bodies: [string, Record<string, unknown>][] = [
     [`${BASE}/music`, { prompt: safePrompt, music_length_ms: ms }],
     [`${BASE}/music/compose`, { prompt: safePrompt, music_length_ms: ms }],
