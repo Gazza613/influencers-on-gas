@@ -138,7 +138,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       // ~25 min: must comfortably OUTLAST the backend render window (~16 min) so the UI catches completion.
       for (let i = 0; i < 250; i++) {
         await new Promise((res) => setTimeout(res, 6000));
-        const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
+        const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
         if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
       }
     } finally { activePolls.current.delete(statusKey); }
@@ -153,7 +153,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     resume(initialProduction);
     function onVisible() {
       if (document.visibilityState !== "visible") return;
-      fetch(`/api/influencers/${influencerId}/storyboard`).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); resume(d.production); } }).catch(() => {});
+      fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); resume(d.production); } }).catch(() => {});
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -264,7 +264,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     // 1) wait for the new keyframe
     for (let k = 0; k < 45; k++) {
       await new Promise((res) => setTimeout(res, 6000));
-      const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
       if (d?.production) { setProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
     }
     // 2) the re-shoot auto-renders this scene's clip too — wait for it and drop it into the preview
@@ -276,7 +276,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   async function resetStuck() {
     setErr("");
     await fetch(`/api/influencers/${influencerId}/production/reset`, { method: "POST" }).catch(() => {});
-    const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
+    const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     if (d?.production) setProduction(d.production);
   }
 

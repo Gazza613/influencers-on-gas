@@ -7,6 +7,7 @@ import { recordUsage } from "@/lib/usage";
 // THE PRODUCER step 1: turn a brief into a directed 6-beat storyboard (house style), stored on
 // the influencer as the current production. The UI reviews/edits it, then drives shot + clip gen.
 export const maxDuration = 120;
+export const dynamic = "force-dynamic"; // never cache — the UI polls this live for shot/clip progress
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
