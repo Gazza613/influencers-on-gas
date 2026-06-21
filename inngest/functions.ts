@@ -799,17 +799,14 @@ export const generateShots = inngest.createFunction(
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running" } } }));
 
-    const shots: ShotRow[] = [];
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
-    for (let i = 0; i < scenes.length; i++) {
-      const sc = scenes[i] as Record<string, string>;
+
+    // Render ONE scene to a keyframe (pure — reads worldRef which is set by the anchor pass first).
+    const renderShot = async (i: number, sc: Record<string, string>): Promise<ShotRow> => {
       const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
-      if (role === "graphic") { shots.push({ scene: i, role, beat, url: null }); continue; }
-      // Optional PHONE-SCREEN image for THIS scene → composite onto the phone's screen.
       const phoneMedia = sc.phone_screen_url ? await step.run(`phone-${i}`, () => importMediaUrl(String(sc.phone_screen_url)).catch(() => null)) : null;
-      // Role-specific Creative reference (Phase 1): a-roll scenes anchor to the a-roll ref, b-roll to the b-roll ref.
       const roleRefMedia = role === "a-roll" ? arollRefMedia : role === "b-roll" ? brollRefMedia : null;
-      // @image order: identity, [clothing], [location], [world anchor], [phone screen], [role ref]. Tags must match.
+      // @image order: identity, [clothing], [location], [world anchor], [phone screen], [role ref].
       let n = idMedias.length;
       const faceTags = idMedias.map((_, k) => `@image${k + 1}`);
       const clothTag = clothMedia ? `@image${++n}` : "";
@@ -834,8 +831,7 @@ export const generateShots = inngest.createFunction(
       const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
       let url = await step.run(`shot-${i}`, gen);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
-      // QA GATE: these frames BECOME the video, so reject waxy/malformed/identity-drift frames and
-      // re-roll ONCE before they go forward (the same Vision QA the creatives use).
+      // QA GATE: these frames BECOME the video, so reject waxy/malformed/identity-drift frames and re-roll once.
       if (usable) {
         const verdict = await step.run(`qa-${i}`, () => qaCreative(usable as string).catch(() => ({ pass: true, score10: 7, issues: [] as string[] })));
         await step.run(`uqa-${i}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: 1 }).catch(() => {}));
@@ -848,18 +844,40 @@ export const generateShots = inngest.createFunction(
       if (usable) {
         hosted = (await step.run(`host-${i}`, () => rehostToBlob(usable as string, "shots").catch(() => null))) || usable;
         await step.run(`usage-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
-        if (!worldRef && hosted) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(hosted as string).catch(() => null));
       }
-      shots.push({ scene: i, role, beat, url: hosted, error: hosted ? null : "no image" });
-      // Persist progressively so the UI fills in live.
+      return { scene: i, role, beat, url: hosted, error: hosted ? null : "no image" };
+    };
+
+    // Persist one shot into the live list (merge, so parallel writes don't clobber each other).
+    const saveShot = async (i: number, row: ShotRow) => {
       const fresh = (((await step.run(`reload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
       const prod = (fresh.production ?? production) as Record<string, unknown>;
-      await step.run(`save-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots, shots_status: "running" } } }));
+      const list = Array.isArray(prod.shots) ? [...(prod.shots as ShotRow[])] : [];
+      const at = list.findIndex((s) => s.scene === i); if (at >= 0) list[at] = row; else list.push(row);
+      list.sort((a, b) => a.scene - b.scene);
+      await step.run(`save-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, shots_status: "running" } } }));
+    };
+
+    // Graphic scenes have no frame — record them up front.
+    for (let i = 0; i < scenes.length; i++) {
+      if (String((scenes[i] as Record<string, string>).role || "a-roll") === "graphic") await saveShot(i, { scene: i, role: "graphic", beat: String((scenes[i] as Record<string, string>).beat || ""), url: null });
     }
+    const nonGraphic = scenes.map((sc, i) => ({ sc: sc as Record<string, string>, i })).filter(({ sc }) => String(sc.role || "a-roll") !== "graphic");
+    // ANCHOR FIRST: render scene 1 to establish the shared world, then render the rest IN PARALLEL
+    // (each reuses the anchor for continuity). This cuts the board from sequential to ~one render deep.
+    if (nonGraphic.length) {
+      const a = nonGraphic[0];
+      const row0 = await renderShot(a.i, a.sc);
+      await saveShot(a.i, row0);
+      if (row0.url) worldRef = await step.run("worldref", () => importMediaUrl(row0.url as string).catch(() => null));
+      await Promise.all(nonGraphic.slice(1).map(async ({ sc, i }) => { await saveShot(i, await renderShot(i, sc)); }));
+    }
+
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prodDone = (done.production ?? production) as Record<string, unknown>;
-    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, shots, shots_status: "done", status: "shots" } } }));
-    return { ok: true, shots: shots.length };
+    const finalShots = (Array.isArray(prodDone.shots) ? (prodDone.shots as ShotRow[]) : []).slice().sort((a, b) => a.scene - b.scene);
+    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, shots: finalShots, shots_status: "done", status: "shots" } } }));
+    return { ok: true, shots: finalShots.length };
   },
 );
 

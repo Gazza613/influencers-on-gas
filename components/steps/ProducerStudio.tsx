@@ -165,6 +165,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     await poll(setProduction, "shots_status");
   }
 
+  // FAST PATH: render every scene (a-roll + b-roll) in ONE parallel job, so the two roles render
+  // concurrently instead of back-to-back (~halves the wait).
+  async function renderAll() {
+    if (rendering) return;
+    setErr(""); setRenderingRole("");
+    setProduction((p) => (p ? { ...p, clips: [], clips_status: "running" } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
+    await poll(setProduction, "clips_status");
+  }
+
   async function renderRole(role: "a-roll" | "b-roll") {
     if (rendering) return;
     setErr(""); setRenderingRole(role);
@@ -527,7 +538,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 aRollNone ? (
                   <p className="text-[12px] text-ink-faint">No talking (a-roll) scenes in this storyboard — nothing to render here.</p>
                 ) : (
-                  <button onClick={() => renderRole("a-roll")} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{renderingRole === "a-roll" ? "🎞️ Rendering the a-roll…" : aRollReady ? "↻ Re-render the a-roll" : "🎞️ Render the a-roll"}</button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={renderAll} disabled={rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering && renderingRole === "" ? "🎞️ Rendering all clips…" : "⚡ Render all clips (a-roll + b-roll)"}</button>
+                    <button onClick={() => renderRole("a-roll")} disabled={rendering} className="rounded-lg border border-[#a855f7]/40 px-3 py-2 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{renderingRole === "a-roll" ? "Rendering a-roll…" : aRollReady ? "↻ Re-render just a-roll" : "Just the a-roll"}</button>
+                    <span className="w-full text-[11px] text-ink-faint">⚡ renders both roles together (faster) — the b-roll fills in on step 5. Each is still reviewed + approved separately.</span>
+                  </div>
                 )
               ) : <LockHint />}
             </StepShell>
