@@ -12,6 +12,7 @@ export const PROVIDERS = [
   { id: "heygen",     label: "HeyGen",             role: "A-roll talking-head avatar",       required: true,  env: ["HEYGEN_API_KEY"] },
   { id: "higgsfield", label: "Higgsfield",         role: "Identity (Soul) + b-roll + 4K upscale", required: true, env: ["HIGGSFIELD_API_KEY", "HF_REFRESH_TOKEN"] },
   { id: "shotstack",  label: "Shotstack",          role: "Stitch · captions · mix",          required: true,  env: ["SHOTSTACK_API_KEY"] },
+  { id: "fal",        label: "fal.ai",             role: "A-roll lip-sync (OmniHuman 1.5)",  required: false, env: ["FAL_KEY", "FAL_API_KEY"] },
 ] as const;
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];

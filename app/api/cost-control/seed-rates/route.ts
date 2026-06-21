@@ -9,6 +9,9 @@ export const dynamic = "force-dynamic";
 // [provider, model, unit, credits_per_unit, price_cents_per_unit] — ZAR cents.
 const ROWS: [string, string, string, number, number][] = [
   ["higgsfield", "kling3", "video", 6, 462], // Kling 3.0 ~5s std, from the Ultra credit pool
+  ["higgsfield", "kling3_0", "video", 6, 462], // b-roll engine id used in metering
+  ["higgsfield", "seedance_2_0", "video", 6, 462], // a-roll fallback, from the Ultra credit pool
+  ["fal", "omnihuman_1_5", "video", 0, 2200], // OmniHuman 1.5 a-roll, fal PAYG ~$0.15/s × ~8s ≈ R22/clip
   ["elevenlabs", "music", "music", 0, 0], // covered by the ElevenLabs subscription quota
   ["shotstack", "edit", "render", 0, 450], // Shotstack PAYG ~$0.30/min, ~$0.24 per 45s render
 ];

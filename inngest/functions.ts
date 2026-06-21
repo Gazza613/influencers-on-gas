@@ -2,6 +2,7 @@ import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
+import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
@@ -945,6 +946,25 @@ export const generateClips = inngest.createFunction(
           // A-ROLL camera MUST hold on her — Seedance was obeying storyboard "push in / pan up"
           // directions and craning the camera off her (she slid out of frame, the building grew).
           const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably — walking at a real pace, gesturing with their hands, chatting, shifting their weight (each a real human, never a frozen mannequin). She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
+
+          // PRIMARY a-roll engine: OmniHuman 1.5 (best-in-class lip-sync, audio-driven so it uses OUR
+          // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
+          const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: img, audioUrl, prompt }));
+          if (oh.statusUrl && oh.responseUrl) {
+            let ohUrl: string | null = null;
+            for (let n = 0; n < 120; n++) {
+              const s = await step.run(`oh-poll-${i}-${n}`, () => pollOmniHumanOnce(oh.statusUrl as string, oh.responseUrl as string));
+              if (s.url) { ohUrl = s.url; break; }
+              if (s.terminal) break;
+              await step.sleep(`oh-wait-${i}-${n}`, "6s");
+            }
+            if (ohUrl) {
+              await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+              const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
+              return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true, audio_url: audioUrl };
+            }
+          }
+
           const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
           let url: string | null = sub.url;
           if (!url && sub.jobId) {
