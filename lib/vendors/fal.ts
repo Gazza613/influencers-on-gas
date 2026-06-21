@@ -20,10 +20,13 @@ export async function verifyFal(): Promise<{ connected: boolean; ok: boolean; st
   const k = await key();
   if (!k) return { connected: false, ok: false, status: null, detail: "fal.ai is not connected — paste your key under Connect Tools." };
   try {
-    const res = await fetch(`${FAL_QUEUE}/${OMNIHUMAN_MODEL}`, { method: "POST", headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" }, body: JSON.stringify({}), signal: AbortSignal.timeout(20000) });
-    const txt = (await res.text()).slice(0, 200);
+    // Send structurally-valid but unfetchable URLs — proves the route + auth without generating
+    // (fal can't fetch them, so it validation-fails for free; an empty body falsely 404s).
+    const res = await fetch(`${FAL_QUEUE}/${OMNIHUMAN_MODEL}`, { method: "POST", headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" }, body: JSON.stringify({ image_url: "https://example.com/_falcheck.jpg", audio_url: "https://example.com/_falcheck.mp3" }), signal: AbortSignal.timeout(20000) });
+    const txt = (await res.text()).slice(0, 220);
     if (res.status === 401 || res.status === 403) return { connected: true, ok: false, status: res.status, detail: "Key was REJECTED by fal.ai — double-check the key value." };
-    if (res.ok || res.status === 422 || res.status === 400) return { connected: true, ok: true, status: res.status, detail: res.ok ? "✅ Key valid + a test job queued (it'll expire harmlessly)." : `✅ Key valid + OmniHuman (${OMNIHUMAN_MODEL}) reachable (validation error expected for the empty test).` };
+    if (res.status === 404) return { connected: true, ok: false, status: 404, detail: `Model path not found: ${OMNIHUMAN_MODEL}. Set FAL_OMNIHUMAN_MODEL to the correct id.` };
+    if (res.ok || res.status === 422 || res.status === 400) return { connected: true, ok: true, status: res.status, detail: res.ok ? "✅ Key valid + OmniHuman reachable (a no-op test job was accepted and will fail validation harmlessly)." : `✅ Key valid + OmniHuman (${OMNIHUMAN_MODEL}) reachable.` };
     return { connected: true, ok: false, status: res.status, detail: `Unexpected response ${res.status}: ${txt}` };
   } catch (e) { return { connected: true, ok: false, status: null, detail: `Could not reach fal.ai: ${String((e as Error)?.message || e).slice(0, 160)}` }; }
 }
