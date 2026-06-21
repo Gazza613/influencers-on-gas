@@ -130,24 +130,33 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     );
   }
 
+  const activePolls = useRef<Set<string>>(new Set());
   async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status" | "audio_status") {
-    // ~25 min: must comfortably OUTLAST the backend render window (~16 min of polling + Inngest
-    // scheduling overhead) so the UI catches completion instead of giving up early and looking frozen.
-    for (let i = 0; i < 250; i++) {
-      await new Promise((res) => setTimeout(res, 6000));
-      const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
-      if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
-    }
+    if (activePolls.current.has(statusKey)) return; // already polling this — don't double up
+    activePolls.current.add(statusKey);
+    try {
+      // ~25 min: must comfortably OUTLAST the backend render window (~16 min) so the UI catches completion.
+      for (let i = 0; i < 250; i++) {
+        await new Promise((res) => setTimeout(res, 6000));
+        const d = await fetch(`/api/influencers/${influencerId}/storyboard`).then((x) => x.json()).catch(() => null);
+        if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
+      }
+    } finally { activePolls.current.delete(statusKey); }
   }
 
-  // Resume polling on load if a render was still running when you navigated away — otherwise the
-  // spinner would sit frozen (the poll loop only lives while the page is mounted).
+  // Resume polling whenever the page mounts OR the tab becomes visible again — the render runs
+  // server-side regardless, but background tabs throttle/stop the poll, so re-sync on return.
   useEffect(() => {
-    const p = initialProduction;
-    if (p?.clips_status === "running") poll(setProduction, "clips_status");
-    else if (p?.shots_status === "running") poll(setProduction, "shots_status");
-    else if (p?.assembly_status === "running") poll(setProduction, "assembly_status");
-    else if (p?.audio_status === "running") poll(setProduction, "audio_status");
+    const resume = (p: Production) => {
+      (["shots_status", "clips_status", "assembly_status", "audio_status"] as const).forEach((k) => { if (p?.[k] === "running") poll(setProduction, k); });
+    };
+    resume(initialProduction);
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      fetch(`/api/influencers/${influencerId}/storyboard`).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); resume(d.production); } }).catch(() => {});
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
