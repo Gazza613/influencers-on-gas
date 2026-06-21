@@ -14,7 +14,7 @@ export const maxDuration = 800;
 // build-time INNGEST_SIGNING_KEY points at the wrong Inngest environment.
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, assembleVideo, reshootShot, videoSpike],
+  functions: [generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, generateAudio, assembleVideo, reshootShot, videoSpike],
   serveOrigin: "https://influencers.gasmarketing.co.za",
   ...(process.env.INNGEST_PROD_SIGNING_KEY ? { signingKey: process.env.INNGEST_PROD_SIGNING_KEY } : {}),
 });
