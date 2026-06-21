@@ -1003,7 +1003,9 @@ export const generateClips = inngest.createFunction(
       // b-roll lines up with the cut instead of a fixed 5s.
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const sceneDur = a != null && b != null && b > a ? b - a : 5;
-      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: sceneDur }));
+      // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
+      const hero = role === "b-roll" && String(sc.hero) === "true";
+      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: sceneDur, hero }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
         for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Kling is slow on heavy scenes)
@@ -1014,7 +1016,8 @@ export const generateClips = inngest.createFunction(
         }
       }
       if (url) {
-        await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: process.env.HF_VIDEO_MODEL || "kling3", unit: "video", action: role === "a-roll" ? "aroll" : "broll", count: 1 }).catch(() => {}));
+        const usedModel = hero ? "veo3_1" : (process.env.HF_VIDEO_MODEL || "kling3");
+        await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: usedModel, unit: "video", action: role === "a-roll" ? "aroll" : "broll", count: 1 }).catch(() => {}));
         const hosted = (await step.run(`vhost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
         return { scene: i, role, beat, kind: role, url: hosted, status: "ready" };
       }

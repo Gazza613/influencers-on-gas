@@ -10,7 +10,7 @@ type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
   talent: string[]; shot: string; blocking: string; performance: string; graphics: string[];
   vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
-  vo_audio_url?: string; phone_screen_url?: string;
+  vo_audio_url?: string; phone_screen_url?: string; hero?: string;
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
@@ -214,16 +214,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     prevFinal.current = f;
   }, [production?.final_url]);
   const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", motion: "", vo: "", caption: "", voAudio: "", phone: "" });
+  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false" });
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { setEditIdx(null); return; }
     setEditIdx(i); setAiInstr("");
-    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "" });
+    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false" });
   }
   function applyEditsLocally(i: number) {
-    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone } : s)) } } : p));
+    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero } : s)) } } : p));
   }
   async function aiRewrite(i: number) {
     setAiBusy(true); setErr("");
@@ -238,7 +238,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone }),
+      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero }),
     }).then((x) => x.json()).catch(() => null);
     if (r?.saved) { applyEditsLocally(i); setEditIdx(null); } else setErr(r?.error || "Couldn't save.");
   }
@@ -247,7 +247,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone }),
+      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero }),
     }).then((x) => x.json()).catch(() => null);
     applyEditsLocally(i);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
@@ -502,6 +502,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <Area label="Action / blocking" v={ed.blocking} set={(x) => setEd((e) => ({ ...e, blocking: x }))} />
                         <Field label="Shot / framing" v={ed.shot} set={(x) => setEd((e) => ({ ...e, shot: x }))} />
                         <Field label="Motion" v={ed.motion} set={(x) => setEd((e) => ({ ...e, motion: x }))} />
+                        {/* HERO shot (b-roll only): render this scene in Veo 3.1 (4K + native audio) instead of Kling */}
+                        {s.role === "b-roll" && (
+                          <div>
+                            <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
+                            <button onClick={() => setEd((e) => ({ ...e, hero: e.hero === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.hero === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.hero === "true" ? "✨ Hero shot · Veo 4K ✓" : "✨ Make this a Hero shot (Veo 4K)"}</button>
+                            <p className="mt-1 text-[10px] text-ink-faint">Renders this b-roll in Veo 3.1 (4K, native ambient audio) — premium, slower + pricier. Needs a re-shoot.</p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button onClick={() => saveScene(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save changes</button>

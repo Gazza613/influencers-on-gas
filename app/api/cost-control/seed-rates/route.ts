@@ -11,6 +11,7 @@ const ROWS: [string, string, string, number, number][] = [
   ["higgsfield", "kling3", "video", 6, 462], // Kling 3.0 ~5s std, from the Ultra credit pool
   ["higgsfield", "kling3_0", "video", 6, 462], // b-roll engine id used in metering
   ["higgsfield", "seedance_2_0", "video", 6, 462], // a-roll fallback, from the Ultra credit pool
+  ["higgsfield", "veo3_1", "video", 40, 3080], // Veo 3.1 HERO b-roll (4K + native audio) — pricey; approx, recalibrate
   ["fal", "omnihuman_1_5", "second", 0, 296], // OmniHuman 1.5 a-roll — fal PAYG $0.16/s ≈ R2.96/s (metered per second)
   ["elevenlabs", "music", "music", 0, 0], // covered by the ElevenLabs subscription quota
   ["shotstack", "edit", "render", 0, 450], // Shotstack PAYG ~$0.30/min, ~$0.24 per 45s render
