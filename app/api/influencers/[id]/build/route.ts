@@ -42,6 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
-  await updateInfluencer(id, { status: "generating" });
+  // Stamp the start time so the photoshoot clock reflects TRUE elapsed even if you navigate away.
+  await updateInfluencer(id, { status: "generating", persona: { ...(inf?.persona ?? {}), photoshoot_started_at: Date.now() } });
   return NextResponse.json({ ok: true });
 }

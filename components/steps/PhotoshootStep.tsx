@@ -22,15 +22,17 @@ const PHOTO_NARRATION = [
 ];
 
 export default function PhotoshootStep({
-  influencerId, status: initialStatus, modelUrl, frames: initialFrames, selectedInit,
+  influencerId, status: initialStatus, modelUrl, frames: initialFrames, selectedInit, startedAtInit = null,
 }: {
   influencerId: string;
   status: string;
   modelUrl: string | null;
   frames: Ref[];
   selectedInit: string[];
+  startedAtInit?: number | null;
 }) {
   const [st, setSt] = useState(initialStatus);
+  const [startedAt, setStartedAt] = useState<number | null>(startedAtInit);
   const [frames, setFrames] = useState<Ref[]>(initialFrames || []);
   const [selected, setSelected] = useState<Set<string>>(
     new Set(selectedInit.length ? selectedInit : (initialFrames || []).map((f) => f.url)),
@@ -56,6 +58,7 @@ export default function PhotoshootStep({
     if (r.ok) {
       const inf = (await r.json()).influencer;
       setSt(inf.status);
+      if (inf.persona?.photoshoot_started_at) setStartedAt(inf.persona.photoshoot_started_at);
       if (Array.isArray(inf.look_refs) && inf.look_refs.length) {
         setFrames(inf.look_refs);
         setSelected((sel) => (sel.size ? sel : new Set(inf.look_refs.map((x: Ref) => x.url))));
@@ -69,7 +72,7 @@ export default function PhotoshootStep({
   async function run() {
     if (!modelUrl || busy) return;
     aborted.current = false;
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setStartedAt(Date.now());
     const r = await fetch(`/api/influencers/${influencerId}/build`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chosenUrl: modelUrl }),
@@ -123,7 +126,7 @@ export default function PhotoshootStep({
 
       {building && (
         <div>
-          <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 2 min"
+          <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 2 min" startedAt={startedAt}
             pct={frames.length > 1 ? pct : null} sub={`${frames.length}/${SET_TOTAL} frames`}
             note="Angles, close-ups and your scene, frames appear as they land." />
           <div className="mt-2 flex items-center gap-3">

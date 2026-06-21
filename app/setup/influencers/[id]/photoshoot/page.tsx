@@ -27,6 +27,7 @@ export default async function PhotoshootPage({ params }: { params: Promise<{ id:
       modelUrl={modelUrl}
       frames={refs}
       selectedInit={selectedInit}
+      startedAtInit={typeof persona.photoshoot_started_at === "number" ? persona.photoshoot_started_at : null}
     />
   );
 }
