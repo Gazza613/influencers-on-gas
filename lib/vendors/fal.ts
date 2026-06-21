@@ -4,7 +4,10 @@ import { getSecret } from "../connections";
 // SUPPLIED audio (so it uses OUR locked ElevenLabs voice, unlike Veo which makes its own voice).
 // Best-in-class lip-sync + character animation for a-roll. Uses fal's standard queue API.
 const FAL_QUEUE = "https://queue.fal.run";
-const OMNIHUMAN_MODEL = process.env.FAL_OMNIHUMAN_MODEL || "fal-ai/bytedance/omnihuman/v1.5";
+// Only honour the env override if it actually looks like a fal model id (contains "/"). Guards
+// against an API key being pasted into FAL_OMNIHUMAN_MODEL by mistake (keys are "id:secret").
+const _envModel = process.env.FAL_OMNIHUMAN_MODEL;
+const OMNIHUMAN_MODEL = _envModel && _envModel.includes("/") && !_envModel.includes(":") ? _envModel : "fal-ai/bytedance/omnihuman/v1.5";
 
 async function key(): Promise<string | null> {
   return (await getSecret("fal")) || process.env.FAL_KEY || process.env.FAL_API_KEY || null;
