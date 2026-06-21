@@ -96,6 +96,10 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   }
 
   const prevCount = useRef(initial.creatives?.length || 0);
+  // Show a placeholder tile for every shot SUBMITTED but not yet arrived (across concurrent runs),
+  // so you can see all of them — e.g. run 3 then 3 more = 6 placeholders, not just the latest batch.
+  const [pending, setPending] = useState(0);
+  const submitBaseline = useRef(0);
   const prevStatus = useRef(initial.status || "idle");
   async function refresh() {
     const d = await fetch(`/api/influencers/${influencerId}/creatives`).then((r) => r.json()).catch(() => null);
@@ -114,6 +118,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       prevCount.current = list.length;
       prevStatus.current = d.status || "idle";
       if (d.rates) setRates(d.rates); setCreatives(list); setVideoSelects(d.videoSelects || []); setQa(d.qa || null); setStatus(d.status || "idle"); if (typeof d.started_at === "number") setStartedAt(d.started_at);
+      if ((d.status || "idle") !== "running") setPending(0); // all runs finished → clear placeholders
     }
     return d;
   }
@@ -172,6 +177,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     // No `running` guard: a new run (e.g. a 1:1 while a 9:16 renders) runs CONCURRENTLY, it does
     // not cancel the one in progress. The server merges both runs' images.
     if (!nFormats) return;
+    setPending((p) => { if (p === 0) submitBaseline.current = creatives.length; return p + images; });
     setErr(""); setStatus("running"); setStartedAt(Date.now());
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -359,6 +365,8 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const twoK = visible.filter((c) => !isFourK(c));
   const pickedTwoK = creatives.some((c) => picked.has(c.id || "") && !!c.url && (c.resolution || "").toLowerCase() !== "4k");
   const onePickUrl = picked.size === 1 ? (creatives.find((c) => picked.has(c.id || ""))?.url || null) : null;
+  // In-flight shots still to arrive (submitted minus arrived since the first in-flight run).
+  const placeholders = Math.max(0, pending - Math.max(0, creatives.length - submitBaseline.current));
 
   return (
     <div className="space-y-5">
@@ -579,10 +587,17 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             )}
           </div>
           <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">Shots render fast in 2K. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
-          {twoK.length > 0 && (
+          {(twoK.length > 0 || placeholders > 0) && (
             <div className="mb-5">
-              <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}</div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">{twoK.map(renderTile)}</div>
+              <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}{placeholders > 0 ? ` · ${placeholders} generating` : ""}</div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {twoK.map(renderTile)}
+                {Array.from({ length: placeholders }).map((_, i) => (
+                  <div key={`ph${i}`} className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#a855f7]/30 bg-surface-2 text-center text-[10px] text-ink-faint">
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />generating…
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {fourK.length > 0 && (
