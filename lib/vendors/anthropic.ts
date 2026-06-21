@@ -479,7 +479,7 @@ ONE SHOT PER SCENE (critical) — every scene is EXACTLY ONE continuous shot/cut
 
 BRANDING + LEGAL — persistent logo top-left every scene (note in graphics). The end card restates the offer, CTA mechanic and the legal line. Use the provided legal line VERBATIM, never paraphrased; if none provided, leave legal empty.
 
-MUSIC — describe a single music bed that runs throughout, lifts under the CTA, breathes in the montage, resolves on the end card; add ambient SFX per scene where it helps.
+MUSIC — describe a single music bed that runs throughout, lifts under the CTA, breathes in the montage, resolves on the end card; add ambient SFX per scene where it helps. Describe the music ONLY by genre, mood, tempo and instruments — NEVER name a real artist, band or song, and never say "in the style of" / "like" a real act (this gets the music generator rejected). Original, royalty-free vibes only.
 
 UK spelling. No em dashes. Be specific and art-directed, never generic. Return the storyboard via the tool.`;
 

@@ -132,10 +132,15 @@ export async function createDesignedVoice(name: string, description: string, gen
 export async function generateMusic(prompt: string, lengthMs: number): Promise<Buffer> {
   const k = await key();
   const ms = Math.max(10000, Math.min(300000, Math.round(lengthMs)));
+  // SAFETY: ElevenLabs Music prohibits prompts that reference real artists/bands/songs/copyrighted
+  // works (a common violation trigger). Strip "like/in the style of/reminiscent of X" phrases and
+  // force an original, royalty-free, no-imitation instruction onto every request.
+  const stripped = prompt.replace(/\b(like|reminiscent of|in the style of|styled after|inspired by|similar to|à la|sounds like|channel(?:ling|ing)?)\b[^.,;\n]*/gi, "").replace(/\s{2,}/g, " ").trim();
+  const safePrompt = `${stripped || "warm modern background music"}. An ORIGINAL, royalty-free instrumental bed; no vocals; does NOT imitate, reference or reproduce any specific artist, band, song or copyrighted work.`;
   // Try the current Music endpoint, fall back to the compose alias if the route differs.
   const bodies: [string, Record<string, unknown>][] = [
-    [`${BASE}/music`, { prompt, music_length_ms: ms }],
-    [`${BASE}/music/compose`, { prompt, music_length_ms: ms }],
+    [`${BASE}/music`, { prompt: safePrompt, music_length_ms: ms }],
+    [`${BASE}/music/compose`, { prompt: safePrompt, music_length_ms: ms }],
   ];
   let lastErr = "";
   for (const [url, body] of bodies) {

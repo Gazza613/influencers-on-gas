@@ -867,7 +867,7 @@ export const generateShots = inngest.createFunction(
 // become HeyGen talking clips (the frame + our expressive VO); B-ROLL scenes become Kling
 // image->video motion clips (face-safe). Graphic scenes pass through to assembly. Durable +
 // progressive; every clip metered; one failed clip never blocks the rest.
-type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean };
+type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null };
 export const generateClips = inngest.createFunction(
   { id: "generate-clips", retries: 1, triggers: [{ event: "influencer/generate.clips" }] },
   async ({ event, step }) => {
@@ -935,7 +935,9 @@ export const generateClips = inngest.createFunction(
           if (url) {
             await step.run(`u-aroll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "seedance_2_0", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
             const hosted = (await step.run(`ahost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
-            return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true };
+            // Save the EXACT audio we lip-synced to — Seedance outputs a SILENT video (the audio
+            // only drives the lips), so the stitch lays this same clip back over it for sound.
+            return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true, audio_url: audioUrl };
           }
           // fall through to Kling motion (no sync) if Seedance failed
         }
@@ -1050,7 +1052,7 @@ export const assembleVideo = inngest.createFunction(
     const production = (persona.production ?? null) as {
       brief?: { brand?: string; logo?: string; logoUrl?: string; promoUrl?: string; logoPosition?: string };
       storyboard?: { scenes?: Record<string, string>[]; format?: string; music_bed?: string; tone?: string; duration_seconds?: number; legal?: string };
-      clips?: { scene: number; role: string; url: string | null; kind?: string; synced?: boolean }[];
+      clips?: { scene: number; role: string; url: string | null; kind?: string; synced?: boolean; audio_url?: string | null }[];
     } | null;
     const sb = production?.storyboard;
     const scenes = sb?.scenes ?? [];
@@ -1059,8 +1061,6 @@ export const assembleVideo = inngest.createFunction(
     const voiceId = persona.voice_id as string | undefined;
     const ratio = String(sb?.format || "").includes("1:1") ? "1:1" : "9:16";
     const clipUrl = (i: number) => clips.find((c) => c.scene === i)?.url || null;
-    // A Seedance a-roll has the lip-synced VO BAKED IN — keep its own audio, don't lay VO over it.
-    const bakedAudio = (i: number) => { const c = clips.find((x) => x.scene === i); return c?.kind === "a-roll" && c?.synced === true; };
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, assembly_status: "running", final_url: null } } }));
 
@@ -1099,11 +1099,14 @@ export const assembleVideo = inngest.createFunction(
     const ambientTrack: Record<string, unknown>[] = [];
     if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: 0.1 }, start: t, length: Math.min(22, total - t) });
 
-    // Voiceover laid in for b-roll/graphic scenes (a-roll already speaks on camera).
+    // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
+    // so the voice matches the lips perfectly. B-roll/graphic: generate the VO from the scene line.
     const voTrack: Record<string, unknown>[] = [];
-    if (voiceId) {
-      for (const p of placed) {
-        if (!p.vo || bakedAudio(p.i)) continue; // skip scenes whose clip already has baked lip-synced audio
+    for (const p of placed) {
+      const clip = clips.find((c) => c.scene === p.i);
+      const synced = clip?.audio_url as string | undefined;
+      if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len }); continue; }
+      if (voiceId && p.vo) {
         try {
           const url = await step.run(`vo-${p.i}`, async () => putBytes(await tts(voiceId, p.vo, { expressive: true }), "vo", "mp3", "audio/mpeg"));
           await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
@@ -1112,9 +1115,10 @@ export const assembleVideo = inngest.createFunction(
       }
     }
 
-    // Build the Shotstack timeline (top track renders on top).
+    // Build the Shotstack timeline (top track renders on top). All clips are silent; voice is the
+    // voTrack above (a-roll's exact synced audio + b-roll VO), so nothing doubles up.
     const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
-      asset: { type: "video", src: clipUrl(p.i) as string, volume: bakedAudio(p.i) ? 1 : 0 }, // keep baked lip-synced a-roll audio; others silent (VO mixed in)
+      asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 },
       start: p.start, length: p.len, fit: "cover",
       transition: { in: "fade", out: "fade" },
     }));
