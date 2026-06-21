@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, CLOTHED } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { rehostToBlob, putBytes } from "@/lib/blob";
@@ -32,17 +32,17 @@ const CREATIVE_FALLBACK = "gpt_image_2"; // previously-validated creatives ident
 // neutral backgrounds keep the training focused on identity (no scene to clone later).
 type TrainingLook = { frame: string; light: string; wardrobe: string; full?: boolean };
 const TRAINING_LOOKS: TrainingLook[] = [
-  { frame: "tight head-shot close-up, front on, neutral relaxed expression, sharp eye catchlights and natural skin pores", light: "soft even indoor light", wardrobe: "a plain crew-neck t-shirt" },
-  { frame: "head-and-shoulders portrait, three-quarter left angle, faint natural smile", light: "soft daylight from a window", wardrobe: "a casual button shirt" },
-  { frame: "head-and-shoulders portrait, three-quarter right angle, mid-conversation talking expression", light: "warm indoor light", wardrobe: "a relaxed knit top" },
-  { frame: "head-shot, chin slightly down looking up into the lens, calm", light: "soft diffused studio light", wardrobe: "a plain t-shirt" },
-  { frame: "head-shot, chin slightly raised, relaxed neutral", light: "bright natural daylight", wardrobe: "a simple casual top" },
-  { frame: "clean side profile of the face, neutral", light: "directional studio key light", wardrobe: "a plain top" },
-  { frame: "head-and-shoulders, straight on into the lens, warm genuine smile", light: "soft golden-hour light", wardrobe: "a smart-casual top" },
-  { frame: "head-and-shoulders, one hand raised naturally near the jaw, the hand and fingers clearly visible and correctly formed", light: "soft daylight", wardrobe: "a casual top" },
-  { frame: "three-quarter BACK view over the shoulder, face turned partly back to camera, showing the back of the head, hair and shoulders", light: "soft even light", wardrobe: "a plain top" },
-  { frame: "waist-up medium shot, front on, easy natural expression", light: "even soft daylight", wardrobe: "an everyday casual outfit", full: true },
-  { frame: "full-length head to toe, standing in a relaxed natural pose", light: "even studio light", wardrobe: "a simple casual outfit", full: true },
+  { frame: "tight head-shot close-up, front on, neutral relaxed expression, sharp eye catchlights and natural skin pores", light: "soft even indoor light", wardrobe: "a plain crew-neck t-shirt with jeans" },
+  { frame: "head-and-shoulders portrait, three-quarter left angle, faint natural smile", light: "soft daylight from a window", wardrobe: "a casual button shirt with trousers" },
+  { frame: "head-and-shoulders portrait, three-quarter right angle, mid-conversation talking expression", light: "warm indoor light", wardrobe: "a relaxed knit top with trousers" },
+  { frame: "head-shot, chin slightly down looking up into the lens, calm", light: "soft diffused studio light", wardrobe: "a plain t-shirt with jeans" },
+  { frame: "head-shot, chin slightly raised, relaxed neutral", light: "bright natural daylight", wardrobe: "a simple casual top with trousers" },
+  { frame: "clean side profile of the face, neutral", light: "directional studio key light", wardrobe: "a plain top with trousers" },
+  { frame: "head-and-shoulders, straight on into the lens, warm genuine smile", light: "soft golden-hour light", wardrobe: "a smart-casual top with tailored trousers" },
+  { frame: "head-and-shoulders, one hand raised naturally near the jaw, the hand and fingers clearly visible and correctly formed", light: "soft daylight", wardrobe: "a casual top with jeans" },
+  { frame: "three-quarter BACK view over the shoulder, face turned partly back to camera, showing the back of the head, hair and shoulders", light: "soft even light", wardrobe: "a plain top with trousers" },
+  { frame: "waist-up medium shot, front on, easy natural expression", light: "even soft daylight", wardrobe: "a complete everyday outfit — a top AND full-length trousers or jeans (legs fully covered)", full: true },
+  { frame: "full-length head to toe, standing in a relaxed natural pose, both feet and full legs visible and clothed", light: "even studio light", wardrobe: "a complete casual outfit — a top AND full-length trousers (legs fully covered, never bare)", full: true },
 ];
 
 // STAGE 1, Casting. Generate CANDIDATE_COUNT distinct looks from the brief so the
@@ -154,7 +154,7 @@ export const buildIdentity = inngest.createFunction(
         const idLock = `${faceTags} are the SAME real person — replicate their face EXACTLY (bone structure, eye shape and colour, nose, lips, real skin tone and texture, hair); unmistakably the same individual in every frame, zero drift. If they wear glasses or any signature eyewear in the reference photos, keep that EXACT eyewear on them in EVERY frame, unchanged — never remove, add or restyle their glasses. IGNORE their original clothing, background and pose; take those from the direction below.`;
         const prompts = looks.map((l) => {
           const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
-          return `A real photograph of ${subjectLine}. ${idLock} ${l.frame}, ${l.light}, wearing ${l.wardrobe}, against a clean simple neutral background, ${look}. ${core}.`;
+          return `A real photograph of ${subjectLine}. ${idLock} ${l.frame}, ${l.light}, wearing ${l.wardrobe}, against a clean simple neutral background, ${look}. She is ${CLOTHED}. ${core}.`;
         });
         // Reference frames at 1K — they feed the Soul + act as anchors (not 4K finals), so 1K halves
         // the photoshoot time with no meaningful loss. Identity cards below stay 2K for fidelity.
@@ -165,7 +165,12 @@ export const buildIdentity = inngest.createFunction(
         const loadedShoot = await step.run("validate-shoot", () => filterLoadable(produced));
         // IDENTITY QA: drop any generated frame that isn't the same person as the anchor (wide /
         // full-body shots sometimes render a different model). Checked against the chosen anchor.
-        const validShoot = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => ({ u, ok: await matchesIdentity(u, valid[0]) })))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
+        // QA each frame on TWO axes and drop failures: (1) identity match vs the anchor, (2) the
+        // clothing/coherence gate (catches bare legs / missing bottoms — a hard no). Fails open.
+        const validShoot = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => {
+          const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0]), qaCreative(u).catch(() => ({ pass: true }))]);
+          return { u, ok: idOk && qa.pass };
+        }))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
         // Real uploads first (identity truth), then the identity-matched generated frames.
         const frames: { url: string; hero?: boolean; face?: boolean }[] = [{ url: valid[0], hero: true, face: true }];
         for (const url of valid.slice(1)) if (!frames.some((f) => f.url === url)) frames.push({ url });
@@ -236,7 +241,7 @@ export const buildIdentity = inngest.createFunction(
           const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
           const wardrobePhrase = useCloth ? "wearing the same outfit as the clothing reference" : `wearing ${l.wardrobe}`;
           const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${constant}` : prompt;
-          return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${core}.`;
+          return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${CLOTHED}. ${core}.`;
         });
         urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16", { resolution: "1k" }, IMAGE_FALLBACK));
         const produced = urls.filter((u): u is string => !!u);
