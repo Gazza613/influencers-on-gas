@@ -29,6 +29,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const v = (await listVoices().catch(() => [])).find((x) => x.voice_id === voiceId);
       voiceName = typeof body.voiceName === "string" && body.voiceName ? body.voiceName : v?.name || "Selected voice";
     } else if (action === "clone") {
+      // GUARD: ElevenLabs requires THEIR OWN voice-captcha verification to clone a voice (to confirm
+      // the speaker consented). Our upload path bypasses that — a moderation/ToS risk — so instant
+      // cloning is disabled here. Use a library or designed voice instead. (Set ALLOW_VOICE_CLONE=1
+      // only once a verified-consent flow is in place.)
+      if (process.env.ALLOW_VOICE_CLONE !== "1") {
+        return NextResponse.json({ error: "Voice cloning is disabled: ElevenLabs requires their own voice verification to clone a voice. Pick a library voice or design one instead." }, { status: 403 });
+      }
       const samples = Array.isArray(body.sampleUrls) ? (body.sampleUrls as string[]).filter((u) => typeof u === "string") : [];
       if (samples.length < 1) return NextResponse.json({ error: "Add at least one clear voice sample (20 to 60 seconds is ideal)." }, { status: 400 });
       if (!body.consentId) return NextResponse.json({ error: "Voice consent is required to clone a real person's voice." }, { status: 400 });
