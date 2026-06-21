@@ -849,32 +849,31 @@ export const generateShots = inngest.createFunction(
       return { scene: i, role, beat, url: hosted, error: hosted ? null : "no image" };
     };
 
-    // Persist one shot into the live list (merge, so parallel writes don't clobber each other).
-    const saveShot = async (i: number, row: ShotRow) => {
-      const fresh = (((await step.run(`reload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
-      const prod = (fresh.production ?? production) as Record<string, unknown>;
-      const list = Array.isArray(prod.shots) ? [...(prod.shots as ShotRow[])] : [];
-      const at = list.findIndex((s) => s.scene === i); if (at >= 0) list[at] = row; else list.push(row);
-      list.sort((a, b) => a.scene - b.scene);
-      await step.run(`save-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, shots_status: "running" } } }));
-    };
+    // RACE-FREE PARALLEL: keep ALL shots in one in-memory map and always SAVE THE WHOLE SNAPSHOT
+    // (never reload+merge from the DB, which raced and dropped frames). Saves are serialised on a
+    // chain so concurrent renders can't clobber each other. Fast (parallel) + correct + live.
+    const shotsAcc = new Map<number, ShotRow>();
+    const snapshot = () => [...shotsAcc.values()].sort((a, b) => a.scene - b.scene);
+    let saveChain: Promise<unknown> = Promise.resolve();
+    const flush = (i: number) => { saveChain = saveChain.then(() => step.run(`save-${i}`, () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots: snapshot(), shots_status: "running" } } }))); return saveChain; };
 
-    // SEQUENTIAL render: each scene shoots, saves (merge), and the next reuses the first good frame
-    // as the world anchor. Sequential is RACE-FREE (parallel saves were overwriting each other and
-    // dropping shots) and still updates the board live as each frame lands.
+    // Graphic scenes have no frame — record up front.
     for (let i = 0; i < scenes.length; i++) {
       const sc = scenes[i] as Record<string, string>;
-      if (String(sc.role || "a-roll") === "graphic") { await saveShot(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); continue; }
-      const row = await renderShot(i, sc);
-      await saveShot(i, row);
-      if (!worldRef && row.url) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(row.url as string).catch(() => null));
+      if (String(sc.role || "a-roll") === "graphic") { shotsAcc.set(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); }
     }
-
-    const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
-    const prodDone = (done.production ?? production) as Record<string, unknown>;
-    const finalShots = (Array.isArray(prodDone.shots) ? (prodDone.shots as ShotRow[]) : []).slice().sort((a, b) => a.scene - b.scene);
-    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, shots: finalShots, shots_status: "done", status: "shots" } } }));
-    return { ok: true, shots: finalShots.length };
+    const nonGraphic = scenes.map((sc, i) => ({ sc: sc as Record<string, string>, i })).filter(({ sc }) => String(sc.role || "a-roll") !== "graphic");
+    // Anchor scene first (establishes the shared world), then render the rest CONCURRENTLY.
+    if (nonGraphic.length) {
+      const a = nonGraphic[0];
+      const row0 = await renderShot(a.i, a.sc); shotsAcc.set(a.i, row0); await flush(a.i);
+      if (row0.url) worldRef = await step.run("worldref", () => importMediaUrl(row0.url as string).catch(() => null));
+      await Promise.all(nonGraphic.slice(1).map(async ({ sc, i }) => { const row = await renderShot(i, sc); shotsAcc.set(i, row); await flush(i); }));
+    }
+    await saveChain; // let any in-flight saves settle
+    // Authoritative final write from the COMPLETE in-memory set (never partial).
+    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots: snapshot(), shots_status: "done", status: "shots" } } }));
+    return { ok: true, shots: snapshot().length };
   },
 );
 
