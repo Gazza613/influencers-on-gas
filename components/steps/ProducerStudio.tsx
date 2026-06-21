@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import Uploader from "@/components/Uploader";
 import Lightbox from "@/components/Lightbox";
 import Celebration from "@/components/Celebration";
+import VoicePicker from "@/components/VoicePicker";
 
 type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
@@ -26,13 +27,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [production, setProduction] = useState<Production>(initialProduction);
   const [voiceId, setVoiceId] = useState(initialVoiceId);
   const [voiceName, setVoiceName] = useState(initialVoiceName);
-  const [voiceBusy, setVoiceBusy] = useState(false);
-  async function autoVoice() {
-    setVoiceBusy(true); setErr("");
-    const r = await fetch(`/api/influencers/${influencerId}/voice`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto" }) }).then((x) => x.json()).catch(() => null);
-    setVoiceBusy(false);
-    if (r?.voice_id) { setVoiceId(r.voice_id); setVoiceName(r.voice_name || "Matched voice"); } else setErr(r?.error || "Couldn't auto-match a voice. Try Video & Voice.");
-  }
+  const [voicePreview, setVoicePreview] = useState("");
   const [editing, setEditing] = useState(!initialProduction?.storyboard);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -506,21 +501,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             {/* 2 · Voice */}
             <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in — every talking (a-roll) scene is lip-synced to it.`} state={stepState("voice")} gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
               {unlocked("voice") ? (
-                <>
-                  {!needsVoice ? (
-                    <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
-                  ) : voiceId ? (
-                    <p className="text-[12px] text-ink-faint">🎙️ Voice: <span className="text-ink-dim">{voiceName || "set"}</span> · <a href={`/setup/influencers/${influencerId}/video`} className="text-accent">change</a></p>
-                  ) : (
-                    <div className="rounded-lg border border-active/30 bg-active/5 p-3 text-[12px]">
-                      <p className="text-ink-dim">Match a voice automatically, or open the full voice control to search the library, design or clone one.</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <button onClick={autoVoice} disabled={voiceBusy} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50">{voiceBusy ? "Matching…" : "✨ Auto-match a voice"}</button>
-                        <a href={`/setup/influencers/${influencerId}/video`} className="text-xs font-semibold text-accent">Choose / design a voice →</a>
-                      </div>
-                    </div>
-                  )}
-                </>
+                !needsVoice ? (
+                  <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
+                ) : (
+                  <VoicePicker influencerId={influencerId} name={name} voiceId={voiceId} voiceName={voiceName} voicePreview={voicePreview}
+                    onSet={(v) => { setVoiceId(v.voice_id); setVoiceName(v.voice_name); setVoicePreview(v.preview_url || ""); }} />
+                )
               ) : <LockHint />}
             </StepShell>
 
