@@ -13,13 +13,14 @@ const LOCKDOWN_NARRATION = [
 ];
 
 export default function LockdownStep({
-  influencerId, name, status: initialStatus, lockedInit, selectedCount, realismUrl, soulStartedAt, refCards,
+  influencerId, name, status: initialStatus, lockedInit, selectedCount, frames = [], realismUrl, soulStartedAt, refCards,
 }: {
   influencerId: string;
   name: string;
   status: string;
   lockedInit: boolean;
   selectedCount: number;
+  frames?: string[];
   realismUrl: string | null;
   soulStartedAt?: string | null;
   refCards?: { faceCard: string | null; featureSheet: string | null; turnaround: string | null };
@@ -133,23 +134,40 @@ export default function LockdownStep({
           <li>🎬 Creatives and (later) video both build from this locked identity, so it unlocks them the moment you lock.</li>
         </ul>
 
-        {refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround) && !working && (
+        {(frames.length > 0 || (refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround))) && !working && (
           <div className="mt-4 rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/8 p-4">
             <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">This is what you are locking in</div>
-            <p className="mt-1 text-[13px] text-ink-faint">Her forensic identity set: a clean identity card, a macro feature sheet (eyes, brows, lips, skin, hair, hands) and a full turnaround. Every future creative is matched against these.</p>
-            <div className="mt-3 grid grid-cols-3 gap-3">
-              {([["faceCard", "Identity"], ["featureSheet", "Features"], ["turnaround", "Turnaround"]] as const).map(([k, label]) => {
-                const url = refCards[k];
-                if (!url) return null;
-                return (
-                  <a key={k} href={url} target="_blank" rel="noreferrer" className="group block">
+            <p className="mt-1 text-[13px] text-ink-faint">The full reference set — {frames.length} kept frame{frames.length === 1 ? "" : "s"} plus her forensic identity cards. Every future creative is matched against these.</p>
+            {/* The kept frames — the collage of the whole identity set being locked. */}
+            {frames.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                {frames.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer" className="group block">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={label} className="aspect-square w-full rounded-lg border border-line object-cover transition group-hover:border-[#a855f7]/60" />
-                    <div className="mt-1 text-center text-[11px] text-ink-faint">{label}</div>
+                    <img src={url} alt={`frame ${i + 1}`} className="aspect-[3/4] w-full rounded-lg border border-line object-cover transition group-hover:border-[#a855f7]/60" />
                   </a>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
+            {/* The forensic cards (identity / features / turnaround), when present. */}
+            {refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround) && (
+              <div className="mt-3 border-t border-line/60 pt-3">
+                <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Forensic cards</div>
+                <div className="grid grid-cols-3 gap-3">
+                  {([["faceCard", "Identity"], ["featureSheet", "Features"], ["turnaround", "Turnaround"]] as const).map(([k, label]) => {
+                    const url = refCards[k];
+                    if (!url) return null;
+                    return (
+                      <a key={k} href={url} target="_blank" rel="noreferrer" className="group block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={label} className="aspect-square w-full rounded-lg border border-line object-cover transition group-hover:border-[#a855f7]/60" />
+                        <div className="mt-1 text-center text-[11px] text-ink-faint">{label}</div>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

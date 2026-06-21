@@ -21,6 +21,7 @@ export default async function LockdownPage({ params }: { params: Promise<{ id: s
       status={inf.status}
       lockedInit={!!persona.locked}
       selectedCount={selectedCount}
+      frames={(sel.length >= 5 ? sel : refs.map((r) => r.url)).filter(Boolean)}
       realismUrl={(persona.hero_realism_url as string) ?? null}
       soulStartedAt={typeof persona.soul_started_at === "string" ? persona.soul_started_at : null}
       refCards={{

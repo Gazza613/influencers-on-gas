@@ -158,8 +158,8 @@ export default function PhotoshootStep({
                   )}
                   <span className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border text-sm transition ${sel ? "border-white bg-[#a855f7] text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]" : "border-white/60 bg-black/45 text-transparent"}`}>✓</span>
                   {f.hero && <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Chosen</span>}
-                  <button onClick={(e) => { e.stopPropagation(); setZoom(f.url); }} title="View full size"
-                    className="absolute bottom-1.5 right-1.5 hidden h-6 w-6 items-center justify-center rounded-md bg-black/60 text-xs text-white group-hover:flex">⤢</button>
+                  <button onClick={(e) => { e.stopPropagation(); setZoom(f.url); }} title="Preview full size"
+                    className="absolute bottom-1.5 right-1.5 flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/60 text-sm text-white backdrop-blur-sm transition hover:scale-105 hover:bg-black/85">👁</button>
                 </div>
               );
             })}
