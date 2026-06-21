@@ -538,11 +538,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
           {/* ── The 8-step gated production wizard ── */}
           <div className="space-y-3">
+            <WizardSpine
+              steps={([["concept", "Concept"], ["voice", "Voice"], ["keyframes", "Keyframes"], ["aroll", "A-roll"], ["broll", "B-roll"], ["audio", "Music"], ["stitch", "Stitch"], ["showreel", "Showreel"]] as const).map(([key, label], idx) => ({ key, label, n: idx + 1, state: stepState(key) }))}
+              onJump={(k) => document.getElementById(`step-${k}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            />
             {/* 1 · Concept & script */}
-            <StepShell n={1} title="Concept & script" desc={`The storyboard and script I've directed for ${name}, in our house style. Review the scenes above — edit any with ✎ Edit script, or ↻ Regenerate — then approve.`} state={stepState("concept")} gate={renderGate("concept", "No problem — tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
+            <StepShell n={1} title="Concept & script" desc={`The storyboard and script I've directed for ${name}, in our house style. Review the scenes above — edit any with ✎ Edit script, or ↻ Regenerate — then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem — tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
 
             {/* 2 · Voice */}
-            <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in — every talking (a-roll) scene is lip-synced to it.`} state={stepState("voice")} gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
+            <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in — every talking (a-roll) scene is lip-synced to it.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
               {unlocked("voice") ? (
                 !needsVoice ? (
                   <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
@@ -554,14 +558,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 3 · Keyframes */}
-            <StepShell n={3} title="Keyframes — shoot the board" desc={`I shoot one coherent still for every scene from ${name}'s locked identity, holding a single consistent world across the board. Preview and re-shoot any scene above.`} state={stepState("keyframes")} gate={renderGate("keyframes", "Re-shoot the board or any single scene above until the look is right, then Accept.")}>
+            <StepShell n={3} title="Keyframes — shoot the board" desc={`I shoot one coherent still for every scene from ${name}'s locked identity, holding a single consistent world across the board. Preview and re-shoot any scene above.`} state={stepState("keyframes")} anchor="step-keyframes" gate={renderGate("keyframes", "Re-shoot the board or any single scene above until the look is right, then Accept.")}>
               {unlocked("keyframes") ? (
                 <button onClick={shootShots} disabled={shooting} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "🎬 Shooting the board…" : shotsReady ? "↻ Re-shoot the board" : "🎬 Shoot the board"}</button>
               ) : <LockHint />}
             </StepShell>
 
             {/* 4 · A-roll */}
-            <StepShell n={4} title="A-roll — the talking scenes" desc={`I bring the talking scenes to life: ${name} speaks to camera, lip-synced to the voice, with a living, moving background.`} state={stepState("aroll")} gate={renderGate("aroll", "Re-shoot a scene above (it clears the stale clip) or re-render the a-roll, then Accept.")}
+            <StepShell n={4} title="A-roll — the talking scenes" desc={`I bring the talking scenes to life: ${name} speaks to camera, lip-synced to the voice, with a living, moving background.`} state={stepState("aroll")} anchor="step-aroll" gate={renderGate("aroll", "Re-shoot a scene above (it clears the stale clip) or re-render the a-roll, then Accept.")}
               preview={unlocked("aroll") && !aRollNone ? <ClipStrip clips={clips} role="a-roll" sceneIdx={aRollIdx.map((x) => x.i)} onExpand={setVzoom} /> : undefined}>
               {unlocked("aroll") ? (
                 aRollNone ? (
@@ -577,7 +581,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 5 · B-roll */}
-            <StepShell n={5} title="B-roll — the scene shots" desc="The non-talking scenes get natural motion — moving backgrounds, people, light — and chain seamlessly into the next shot." state={stepState("broll")} gate={renderGate("broll", "Re-shoot a scene above or re-render the b-roll, then Accept.")}
+            <StepShell n={5} title="B-roll — the scene shots" desc="The non-talking scenes get natural motion — moving backgrounds, people, light — and chain seamlessly into the next shot." state={stepState("broll")} anchor="step-broll" gate={renderGate("broll", "Re-shoot a scene above or re-render the b-roll, then Accept.")}
               preview={unlocked("broll") && !bRollNone ? <ClipStrip clips={clips} role="b-roll" sceneIdx={bRollIdx.map((x) => x.i)} onExpand={setVzoom} /> : undefined}>
               {unlocked("broll") ? (
                 bRollNone ? (
@@ -589,7 +593,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 6 · Music & ambient */}
-            <StepShell n={6} title="Music & ambient" desc="I generate the music bed and the ambient room tone for the world. Have a listen before we cut it together." state={stepState("audio")} gate={renderGate("audio", "Re-generate the audio if it's not right, then Accept. The cut reuses exactly these beds.")}>
+            <StepShell n={6} title="Music & ambient" desc="I generate the music bed and the ambient room tone for the world. Have a listen before we cut it together." state={stepState("audio")} anchor="step-audio" gate={renderGate("audio", "Re-generate the audio if it's not right, then Accept. The cut reuses exactly these beds.")}>
               {unlocked("audio") ? (
                 <>
                   <button onClick={genAudio} disabled={audioBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{audioBusy ? "🎵 Generating audio…" : audioReady ? "↻ Re-generate audio" : "🎵 Generate music & ambient"}</button>
@@ -606,7 +610,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 7 · Stitch */}
-            <StepShell n={7} title="Stitch the cut" desc={`I edit it together: clips in order, a continuous voiceover, burned-in captions, the ${production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and the music + ambient mixed underneath — one finished ${sb.format} ad.`} state={stepState("stitch")} gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
+            <StepShell n={7} title="Stitch the cut" desc={`I edit it together: clips in order, a continuous voiceover, burned-in captions, the ${production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and the music + ambient mixed underneath — one finished ${sb.format} ad.`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
               {unlocked("stitch") ? (
                 <>
                   <div className="flex flex-wrap items-center gap-3">
@@ -625,7 +629,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 8 · Showreel */}
-            <StepShell n={8} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")}>
+            <StepShell n={8} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")} anchor="step-showreel">
               {unlocked("showreel") ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <button onClick={() => { decideShowreel("accept"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>✓ Accept into showreel</button>
@@ -654,11 +658,34 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 // `state` drives the chrome — active glows, done goes green, locked dims.
 // `state` drives the chrome — active glows, done goes green, locked dims. When done, the action
 // body is hidden (only the green tick + the gate's "Approved · undo" remain). `gate` always shows.
-function StepShell({ n, title, desc, state, gate, preview, children }: { n: number; title: string; desc: ReactNode; state: "locked" | "active" | "done"; gate?: ReactNode; preview?: ReactNode; children?: ReactNode }) {
+// Persistent progress spine — all 8 stages always visible with state; click to jump. The hero of
+// the wizard: the journey IS the interface.
+function WizardSpine({ steps, onJump }: { steps: { key: string; label: string; n: number; state: "locked" | "active" | "done" }[]; onJump: (k: string) => void }) {
+  const doneCount = steps.filter((s) => s.state === "done").length;
+  return (
+    <div className="sticky top-0 z-20 mb-1 rounded-xl border border-line bg-surface-1/85 px-3 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Production · {doneCount}/{steps.length} approved</span>
+      </div>
+      <div className="flex items-center gap-0.5 overflow-x-auto">
+        {steps.map((s, i) => (
+          <div key={s.key} className="flex shrink-0 items-center gap-0.5">
+            <button onClick={() => onJump(s.key)} title={s.label} className="group flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-surface-2">
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition ${s.state === "done" ? "bg-ready text-black" : s.state === "active" ? "bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "bg-surface-2 text-ink-faint"}`}>{s.state === "done" ? "✓" : s.n}</span>
+              <span className={`hidden text-[12px] font-semibold sm:inline ${s.state === "active" ? "text-ink" : s.state === "done" ? "text-ready" : "text-ink-faint"}`}>{s.label}</span>
+            </button>
+            {i < steps.length - 1 && <span className={`h-px w-3 shrink-0 sm:w-5 ${s.state === "done" ? "bg-ready/50" : "bg-line"}`} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function StepShell({ n, title, desc, state, gate, preview, children, anchor }: { n: number; title: string; desc: ReactNode; state: "locked" | "active" | "done"; gate?: ReactNode; preview?: ReactNode; children?: ReactNode; anchor?: string }) {
   const ring = state === "active" ? "border-[#a855f7] ring-2 ring-[#a855f7]/50 shadow-[0_0_22px_rgba(168,85,247,0.35)]" : state === "done" ? "border-ready/40 bg-ready/[0.04]" : "border-line opacity-55";
   const badge = state === "done" ? "bg-ready text-black" : state === "active" ? "bg-[#a855f7] text-white" : "bg-surface-2 text-ink-faint";
   return (
-    <div className={`rounded-xl border bg-surface-1 p-5 ${ring}`}>
+    <div id={anchor} className={`scroll-mt-24 rounded-xl border bg-surface-1 p-5 ${ring}`}>
       <div className="flex items-center gap-3">
         <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${badge}`}>{state === "done" ? "✓" : n}</span>
         <div className="text-sm font-extrabold text-ink">{title}</div>
