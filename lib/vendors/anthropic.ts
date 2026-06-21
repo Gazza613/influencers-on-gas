@@ -13,6 +13,31 @@ async function client(): Promise<Anthropic> {
   return new Anthropic({ apiKey: key });
 }
 
+// CONTENT MODERATION GATE — ElevenLabs requires screening text before TTS (their "Fraudulent,
+// predatory or abusive" classifier flags scam-pattern copy). We run a fast Haiku safety check and
+// skip any genuinely-prohibited line so it never reaches ElevenLabs. Fail-open so a moderation
+// hiccup never blocks legitimate production.
+export async function moderateText(text: string): Promise<{ allowed: boolean; category: string; reason: string }> {
+  const t = (text || "").trim();
+  if (!t) return { allowed: true, category: "", reason: "" };
+  try {
+    const c = await client();
+    const r = await c.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 200,
+      system: "You are a content-safety classifier for advertising voiceover text that will be turned into a synthetic voice. Flag ONLY content that genuinely violates: fraud/scams (fake prizes, phishing, impersonating a bank/government/authority, deceptive get-rich schemes), predatory lending or abusive behaviour, harassment, hate, sexual content involving minors, or illegal activity. LEGITIMATE brand and product advertising — including real fintech products, promotions, free data/airtime offers, discounts and normal calls-to-action — is ALLOWED and must NOT be flagged. Only flag clearly deceptive or predatory content. Respond via the tool.",
+      tools: [{ name: "verdict", description: "Return the safety verdict", input_schema: { type: "object" as const, properties: { allowed: { type: "boolean" }, category: { type: "string" }, reason: { type: "string" } }, required: ["allowed"] } }],
+      tool_choice: { type: "tool", name: "verdict" },
+      messages: [{ role: "user", content: `Classify this advertising voiceover text:\n\n${t.slice(0, 4000)}` }],
+    });
+    const block = r.content.find((b) => b.type === "tool_use") as { input?: { allowed?: boolean; category?: string; reason?: string } } | undefined;
+    const v = block?.input || {};
+    return { allowed: v.allowed !== false, category: String(v.category || ""), reason: String(v.reason || "") };
+  } catch {
+    return { allowed: true, category: "", reason: "moderation-unavailable" };
+  }
+}
+
 // The Character Bible: a film-grade casting + costume + performance sheet, expanded
 // by Claude from a light brief. Drives casting, the photoshoot, voice and scripts.
 export type CharacterBible = {
@@ -466,6 +491,8 @@ STRUCTURE — an arc scaled to the target duration (pacing guide of total runtim
 NO GRAPHIC CARDS — NEVER use the 'graphic' role and never write a standalone CTA card, text slate or end card. Every scene must be a real filmed moment (a-roll or b-roll). The CTA and the offer are SPOKEN by the presenter and reinforced by the persistent on-screen logo/promo overlay and the burned-in captions — not a separate graphic frame. The closing beat is the presenter delivering the CTA in-scene, not a card.
 
 VOICE — ONE continuous voiceover across the whole film (never back-and-forth dialogue). Second person, warm, confident, effortless, optimistic, benefit-led, short active sentences, no jargon. Open with a hook in the first ~5s that names the product. Put the full continuous read in full_vo, and each scene's portion in vo_line (pure lifestyle b-roll moments may have empty vo_line, carried by music). The final scene carries the spoken CTA.
+
+COMPLIANCE — write LEGITIMATE, honest brand advertising. Do NOT use deceptive, predatory or scam-sounding phrasing: no fake-prize/"you've won" framing, no false urgency or pressure ("act now or lose it", countdowns to a fake deadline), no guaranteed-riches or get-rich-quick claims, no impersonating a bank, government or authority, no requests for passwords/PINs/personal details, no "free money". Real promotions (e.g. "register and get free data", a discount, a genuine offer) are fine — state them plainly and truthfully as a real brand would. Synthetic voices are heavily moderated for fraud, so keep every line clearly trustworthy and non-manipulative.
 
 WORLD + CONTINUITY (critical for a world-class feel) — set the ENTIRE ad in ONE coherent, specific location/world (e.g. a particular sunlit coffee shop), with the SAME wardrobe, lighting and look on the influencer across every scene, so scenes cut together as one seamless film, never disconnected shots. The presenter is physically PRESENT IN the scene doing something real (sitting at a table with a coffee, leaning at the counter, walking through the space), with believable background people moving naturally, NEVER a floating head on a plain backdrop. Every b-roll uses the SAME location/world as the a-roll (different angles, details and moments of that same place) so the film flows. State the shared world in each scene's location and keep wardrobe consistent in blocking.
 

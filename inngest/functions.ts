@@ -6,7 +6,7 @@ import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
-import { qaCreative, composeCreativeScene } from "@/lib/vendors/anthropic";
+import { qaCreative, composeCreativeScene, moderateText } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
@@ -916,7 +916,12 @@ export const generateClips = inngest.createFunction(
       // the avatar LIP-SYNCED to that voice (baked in). Uses the producer's uploaded VO if present,
       // else in-platform TTS. Falls back to silent Kling motion (VO laid over) if Seedance fails.
       if (role === "a-roll" && (presetAudio || (line && voiceId))) {
-        const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => putBytes(await tts(voiceId as string, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null)) as string | null);
+        // Moderate the line BEFORE any ElevenLabs TTS call (skip if it trips the safety classifier).
+        const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => {
+          const mod = await moderateText(line);
+          if (!mod.allowed) return null;
+          return putBytes(await tts(voiceId as string, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null);
+        }) as string | null);
         if (audioUrl) {
           if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
           // A-ROLL camera MUST hold on her — Seedance was obeying storyboard "push in / pan up"
@@ -1108,9 +1113,15 @@ export const assembleVideo = inngest.createFunction(
       if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len }); continue; }
       if (voiceId && p.vo) {
         try {
-          const url = await step.run(`vo-${p.i}`, async () => putBytes(await tts(voiceId, p.vo, { expressive: true }), "vo", "mp3", "audio/mpeg"));
-          await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-          voTrack.push({ asset: { type: "audio", src: url }, start: p.start, length: p.len });
+          const url = await step.run(`vo-${p.i}`, async () => {
+            const mod = await moderateText(p.vo); // screen before any ElevenLabs TTS call
+            if (!mod.allowed) return null;
+            return putBytes(await tts(voiceId, p.vo, { expressive: true }), "vo", "mp3", "audio/mpeg");
+          });
+          if (url) {
+            await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
+            voTrack.push({ asset: { type: "audio", src: url }, start: p.start, length: p.len });
+          }
         } catch { /* skip this VO */ }
       }
     }
