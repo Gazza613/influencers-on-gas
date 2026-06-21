@@ -186,7 +186,10 @@ export async function generateVariation(elementId: string | null, basePrompt: st
 // silently drops jobs under heavy concurrency). Module-level, per function invocation.
 let _active = 0;
 const _queue: (() => void)[] = [];
-const MAX_CONCURRENT = 4;
+// How many image generations run at once. Higher = faster photoshoots/boards/creatives; the
+// per-image retry + self-healing fallback covers the occasional dropped job at higher concurrency.
+// Env-tunable so we can dial it without a deploy if Higgsfield starts throttling.
+const MAX_CONCURRENT = Math.max(2, Math.min(10, Number(process.env.HF_MAX_CONCURRENT) || 7));
 async function acquireSlot(): Promise<void> {
   if (_active < MAX_CONCURRENT) { _active++; return; }
   await new Promise<void>((res) => _queue.push(res));
