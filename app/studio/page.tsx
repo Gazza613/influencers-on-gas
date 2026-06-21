@@ -25,7 +25,7 @@ export default async function StudioPage() {
   const missingRequired = conns.filter((c) => c.required && !c.connected).map((c) => c.label);
 
   return (
-    <div className="flex h-dvh flex-col bg-surface-0 text-ink">
+    <div className="flex h-dvh flex-col text-ink">
       {/* ── Top bar: wordmark · brain + influencer selectors · live cost readout */}
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface-1 px-4 py-2.5">
         <div className="flex items-center gap-4">
