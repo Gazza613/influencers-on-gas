@@ -151,7 +151,7 @@ export const buildIdentity = inngest.createFunction(
 
       if (refMedias.length) {
         const faceTags = refMedias.map((_, k) => `@image${k + 1}`).join(", ");
-        const idLock = `${faceTags} are the SAME real person — replicate their face EXACTLY (bone structure, eye shape and colour, nose, lips, real skin tone and texture, hair); unmistakably the same individual in every frame, zero drift. IGNORE their original clothing, background and pose; take those from the direction below.`;
+        const idLock = `${faceTags} are the SAME real person — replicate their face EXACTLY (bone structure, eye shape and colour, nose, lips, real skin tone and texture, hair); unmistakably the same individual in every frame, zero drift. If they wear glasses or any signature eyewear in the reference photos, keep that EXACT eyewear on them in EVERY frame, unchanged — never remove, add or restyle their glasses. IGNORE their original clothing, background and pose; take those from the direction below.`;
         const prompts = looks.map((l) => {
           const core = l.full ? SCENE_REALISM : REALISM_POSITIVE;
           return `A real photograph of ${subjectLine}. ${idLock} ${l.frame}, ${l.light}, wearing ${l.wardrobe}, against a clean simple neutral background, ${look}. ${core}.`;
@@ -821,7 +821,7 @@ export const generateShots = inngest.createFunction(
       const phoneTag = phoneMedia ? `@image${++n}` : "";
       const roleRefTag = roleRefMedia ? `@image${++n}` : "";
       const refInstruction = [
-        faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. IGNORE their clothing, background and pose; take those from the direction below.` : "",
+        faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. If they wear glasses or signature eyewear in the references, keep that EXACT eyewear on them, unchanged — never remove, add or restyle it. IGNORE their clothing, background and pose; take those from the direction below.` : "",
         roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its wardrobe, styling, grooming, lighting and overall mood/world closely for this scene. Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
