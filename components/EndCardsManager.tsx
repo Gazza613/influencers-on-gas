@@ -1,0 +1,69 @@
+"use client";
+
+import { useState } from "react";
+import Uploader from "@/components/Uploader";
+
+type EndCard = { id: string; label: string; url: string; kind: "image" | "video"; created_at: string };
+
+// Upload + manage a reusable library of closing frames/clips. The Producer brief can pick one to
+// append to any cut.
+export default function EndCardsManager({ initial }: { initial: EndCard[] }) {
+  const [cards, setCards] = useState<EndCard[]>(initial);
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState<string | null>(null);
+  const [kind, setKind] = useState<"image" | "video">("video");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function add() {
+    if (!url || busy) return;
+    setBusy(true); setErr("");
+    const r = await fetch("/api/end-cards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: label.trim(), url, kind }) }).then((x) => x.json()).catch(() => null);
+    setBusy(false);
+    if (r?.endCard) { setCards((c) => [r.endCard, ...c]); setUrl(null); setLabel(""); } else setErr(r?.error || "Couldn't save the end card.");
+  }
+  async function del(id: string) {
+    if (!confirm("Delete this end card? It can't be undone.")) return;
+    setCards((c) => c.filter((x) => x.id !== id));
+    await fetch(`/api/end-cards/${id}`, { method: "DELETE" }).catch(() => {});
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Upload a new end card */}
+      <div className="space-y-3 rounded-xl border border-line bg-surface-1 p-5">
+        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Add an end card</div>
+        <div className="flex gap-2">
+          {(["video", "image"] as const).map((k) => (
+            <button key={k} onClick={() => { setKind(k); setUrl(null); }} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold capitalize ${kind === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{k === "video" ? "🎬 Video" : "🖼 Image"}</button>
+          ))}
+        </div>
+        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (e.g. MoMo end card — yellow)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
+        <Uploader kind="endcard" accept={kind} label={`Upload your end ${kind}`} current={url} onUploaded={setUrl} />
+        {err && <p className="text-xs text-alert">{err}</p>}
+        <button onClick={add} disabled={!url || busy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? "Saving…" : "＋ Add to library"}</button>
+      </div>
+
+      {/* Library */}
+      <div>
+        <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Your end cards · {cards.length}</div>
+        {cards.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line bg-surface-1 p-6 text-center text-sm text-ink-faint">No end cards yet. Upload a closing clip or frame above — it&apos;ll be available to append to any cut in the Producer.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {cards.map((c) => (
+              <div key={c.id} className="group relative overflow-hidden rounded-xl border border-line bg-surface-1">
+                {c.kind === "video"
+                  ? <video src={c.url} controls playsInline className="aspect-[9/16] w-full bg-black object-cover" />
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  : <img src={c.url} alt={c.label} className="aspect-[9/16] w-full object-cover" />}
+                <button onClick={() => del(c.id)} title="Delete" className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-alert/60 bg-black/65 text-xs text-alert opacity-0 transition hover:bg-alert/25 group-hover:opacity-100">✕</button>
+                <div className="p-2.5"><div className="truncate text-[12px] font-semibold text-ink">{c.label || "End card"}</div><div className="tabular text-[10px] uppercase text-ink-faint">{c.kind}</div></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

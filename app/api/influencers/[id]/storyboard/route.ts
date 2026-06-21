@@ -51,6 +51,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     promoUrl: typeof b.promoUrl === "string" ? b.promoUrl : "", // burned top-right
     logoPosition: ["topLeft", "topRight", "bottomLeft", "bottomRight"].includes(b.logoPosition) ? b.logoPosition : "topLeft",
     captions: b.captions !== false, // default on; burned-in VO subtitles
+    endCardUrl: typeof b.endCardUrl === "string" ? b.endCardUrl : "", // optional closing clip/frame from the End Cards library
+    endCardKind: b.endCardKind === "image" ? "image" : "video",
   };
   if (!brief.brand || !brief.offer) return NextResponse.json({ error: "Add at least a brand/product and the core offer." }, { status: 400 });
 

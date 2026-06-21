@@ -14,6 +14,20 @@ export async function falConnected(): Promise<boolean> {
   return !!(await key());
 }
 
+// Verify the connected key + that the OmniHuman model is reachable, WITHOUT spending: an empty
+// submit returns a 422/400 validation error if auth is good, or 401/403 if the key is wrong.
+export async function verifyFal(): Promise<{ connected: boolean; ok: boolean; status: number | null; detail: string }> {
+  const k = await key();
+  if (!k) return { connected: false, ok: false, status: null, detail: "fal.ai is not connected — paste your key under Connect Tools." };
+  try {
+    const res = await fetch(`${FAL_QUEUE}/${OMNIHUMAN_MODEL}`, { method: "POST", headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" }, body: JSON.stringify({}), signal: AbortSignal.timeout(20000) });
+    const txt = (await res.text()).slice(0, 200);
+    if (res.status === 401 || res.status === 403) return { connected: true, ok: false, status: res.status, detail: "Key was REJECTED by fal.ai — double-check the key value." };
+    if (res.ok || res.status === 422 || res.status === 400) return { connected: true, ok: true, status: res.status, detail: res.ok ? "✅ Key valid + a test job queued (it'll expire harmlessly)." : `✅ Key valid + OmniHuman (${OMNIHUMAN_MODEL}) reachable (validation error expected for the empty test).` };
+    return { connected: true, ok: false, status: res.status, detail: `Unexpected response ${res.status}: ${txt}` };
+  } catch (e) { return { connected: true, ok: false, status: null, detail: `Could not reach fal.ai: ${String((e as Error)?.message || e).slice(0, 160)}` }; }
+}
+
 // Submit an OmniHuman job; returns the queue handles for durable polling (or an error if fal isn't
 // connected / the submit failed — caller can then fall back to another engine).
 export async function submitOmniHuman(opts: { imageUrl: string; audioUrl: string; prompt?: string }): Promise<{ statusUrl: string | null; responseUrl: string | null; error: string | null }> {

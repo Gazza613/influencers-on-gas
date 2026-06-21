@@ -1184,6 +1184,14 @@ export const assembleVideo = inngest.createFunction(
       start: p.start, length: p.len, fit: "cover",
       transition: { in: "fade", out: "fade" },
     }));
+    // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
+    // the last scene. Extends the timeline so the music bed carries under it.
+    const endCardUrl = String((production?.brief as { endCardUrl?: string })?.endCardUrl || "").trim();
+    const endCardKind = (production?.brief as { endCardKind?: string })?.endCardKind === "image" ? "image" : "video";
+    if (endCardUrl) {
+      const endLen = endCardKind === "image" ? 4 : 6;
+      videoClips.push({ asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) } as Record<string, unknown>, start: total, length: endLen, fit: "cover", transition: { in: "fade", out: "fade" } } as typeof videoClips[number]);
+    }
     // Captions on by default; producer can switch them off for a clean cut.
     const captionsOn = (production?.brief as { captions?: boolean })?.captions !== false;
     const captionClips = captionsOn ? placed.filter((p) => p.caption).map((p) => ({

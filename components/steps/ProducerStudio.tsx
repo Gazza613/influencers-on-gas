@@ -48,6 +48,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [logoUrl, setLogoUrl] = useState<string | null>(String((initialProduction?.brief as { logoUrl?: string })?.logoUrl || "") || null);
   const [promoUrl, setPromoUrl] = useState<string | null>(String((initialProduction?.brief as { promoUrl?: string })?.promoUrl || "") || null);
   const [captions, setCaptions] = useState<boolean>((initialProduction?.brief as { captions?: boolean })?.captions !== false);
+  const [endCardUrl, setEndCardUrl] = useState(String((initialProduction?.brief as { endCardUrl?: string })?.endCardUrl || ""));
+  const [endCardKind, setEndCardKind] = useState<"image" | "video">((initialProduction?.brief as { endCardKind?: string })?.endCardKind === "image" ? "image" : "video");
+  const [endCards, setEndCards] = useState<{ id: string; label: string; url: string; kind: "image" | "video" }[]>([]);
+  useEffect(() => { fetch("/api/end-cards").then((r) => r.json()).then((d) => { if (Array.isArray(d?.endCards)) setEndCards(d.endCards); }).catch(() => {}); }, []);
 
   const sb = production?.storyboard;
   const shots = production?.shots ?? [];
@@ -281,7 +285,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions }),
+      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); persistApproved(new Set()); }
@@ -363,6 +367,28 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               ))}
             </div>
             <p className="mt-1 text-[10px] text-ink-faint">On burns the VO subtitles onto the cut; off leaves it clean.</p>
+          </div>
+
+          {/* End card (from the End Cards library) — appended to the finished cut */}
+          <div>
+            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Closing / end card (optional)</div>
+            {endCards.length === 0 ? (
+              <p className="text-[11px] text-ink-faint">No end cards yet. Add reusable closing clips/frames in <a href="/end-cards" className="text-accent">End Cards</a>, then pick one here.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => { setEndCardUrl(""); }} className={`flex aspect-[9/16] w-16 items-center justify-center rounded-lg border text-[10px] ${!endCardUrl ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong"}`}>None</button>
+                {endCards.map((c) => (
+                  <button key={c.id} onClick={() => { setEndCardUrl(c.url); setEndCardKind(c.kind); }} title={c.label} className={`relative aspect-[9/16] w-16 overflow-hidden rounded-lg border ${endCardUrl === c.url ? "border-[#a855f7] ring-2 ring-[#a855f7]/50" : "border-line hover:border-line-strong"}`}>
+                    {c.kind === "video"
+                      ? <video src={c.url} muted playsInline className="h-full w-full object-cover" />
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      : <img src={c.url} alt={c.label} className="h-full w-full object-cover" />}
+                    {endCardUrl === c.url && <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#a855f7] text-[9px] text-white">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="mt-1 text-[10px] text-ink-faint">Appended to the end of the finished cut. Manage the library under <a href="/end-cards" className="text-accent">End Cards</a>.</p>
           </div>
 
           <Area label="Compliance / legal line (verbatim, optional)" v={legal} set={setLegal} placeholder="Used exactly as written on the end card. Optional." />
