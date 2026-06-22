@@ -613,3 +613,22 @@ export async function reflowContinuity(o: { brand: string; tone: string; cta?: s
   if (block && block.type === "tool_use") { const out = (block.input as { lines?: { scene: number; vo_line: string; caption: string }[] }).lines; if (Array.isArray(out)) return out; }
   return [];
 }
+
+// "Perfect with AI": take the user's rough one-line character idea and rewrite it into a single rich,
+// castable casting brief (age, heritage, profession/world, personality, a visual signature). Returns
+// improved prose the user can edit before casting. Fails open (returns the original on any problem).
+export async function perfectCharacterBrief(brief: string, gender?: string): Promise<string> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system:
+      "You are an expert casting director for AI influencers. Take the user's rough idea and rewrite it into ONE vivid, specific casting brief (2-4 sentences of natural prose) that a generator can cast a believable, distinctive, real-looking human from. Weave in: approximate age, ethnicity/heritage, profession or world they live in, a couple of personality traits, and a clear visual signature (something memorable about their look). Keep their core idea — enrich, don't replace it. UK spelling, no em dashes, no emojis, no quotes, no lists. Return only the improved brief via the tool.",
+    tools: [{ name: "brief", description: "The improved character casting brief.", input_schema: { type: "object", additionalProperties: false, properties: { brief: { type: "string" } }, required: ["brief"] } as unknown as Anthropic.Tool["input_schema"] }],
+    tool_choice: { type: "tool", name: "brief" },
+    messages: [{ role: "user", content: `${gender ? `Gender: ${gender}. ` : ""}Rough idea: ${brief}\n\nReturn a richer, castable character brief that keeps this idea but makes it vivid and specific.` }],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (block && block.type === "tool_use") { const out = (block.input as { brief?: string }).brief; if (out && out.trim()) return out.trim(); }
+  return brief;
+}

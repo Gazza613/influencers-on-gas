@@ -73,9 +73,12 @@ export const generateCandidates = inngest.createFunction(
     await step.run("save-prompt", () => updateInfluencer(influencerId, { persona }));
 
     try {
-      // gpt_image_2 is ~150s PER IMAGE, so generating all 6 CONCURRENTLY collapses casting
-      // to ~one image's wall-clock (~2.5 min) instead of 6× (~15 min).
-      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16", {}, IMAGE_FALLBACK));
+      // Generate all candidates CONCURRENTLY (collapses casting to ~one image's wall-clock). Render at
+      // 1K (env-tunable) — these are just for picking a face, and the photoshoot re-renders at full
+      // quality after. 1K candidates generate faster AND download to the gallery far quicker (the 2K
+      // PNGs were trickling in like a lazy-load).
+      const castRes = process.env.HF_CAST_RES || "1k";
+      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16", { resolution: castRes }, IMAGE_FALLBACK));
       const produced = [...new Set(urls.filter((u): u is string => !!u))];
       // Meter what Higgsfield produced (billed), BEFORE dropping any that fail to load.
       if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "casting", count: produced.length }));

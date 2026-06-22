@@ -52,6 +52,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
   const [bible, setBible] = useState<Bible | null>(initialBible);
   const [open, setOpen] = useState(!initialBible);
   const [busy, setBusy] = useState(false);
+  const [perfecting, setPerfecting] = useState(false);
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState<"idle" | "saving" | "saved">("idle");
   const [regen, setRegen] = useState<string | null>(null);
@@ -113,6 +114,18 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
     });
   }
 
+  // "Perfect with AI" — polish the rough brief into a richer, castable one (the user can still edit it).
+  async function perfect() {
+    if (perfecting || busy || brief.trim().length < 4) return;
+    setPerfecting(true); setErr("");
+    try {
+      const r = await fetch(`/api/influencers/${influencerId}/bible/perfect`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief }) });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.brief) setBrief(d.brief);
+      else setErr(d?.error || "Couldn't perfect that — try again.");
+    } finally { setPerfecting(false); }
+  }
+
   async function generate() {
     if (brief.trim().length < 10 || busy) return;
     setBusy(true); setErr("");
@@ -148,9 +161,15 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
           <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
             placeholder="e.g. 42, Indonesian-Dutch concert pianist, warm and intellectual, plays jazz in intimate clubs, calm confidence with flashes of humour."
             className="glow-accent w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink outline-none" />
-          <button onClick={generate} disabled={busy || brief.trim().length < 10} className="btn-brand mt-2 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
-            {busy && <span className="spinner-ring" />}{busy ? "Casting the character…" : bible ? "✨ Re-cast the character" : "✨ Bring them to life"}
-          </button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button onClick={generate} disabled={busy || perfecting || brief.trim().length < 10} className="btn-brand inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+              {busy && <span className="spinner-ring" />}{busy ? "Casting the character…" : bible ? "✨ Re-cast the character" : "✨ Bring them to life"}
+            </button>
+            <button onClick={perfect} disabled={perfecting || busy || brief.trim().length < 4} title="Let the co-pilot enrich your idea into a fuller casting brief"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 px-4 py-2 text-sm font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">
+              {perfecting ? <><span className="spinner-ring" />Perfecting…</> : "✨ Perfect with AI"}
+            </button>
+          </div>
           {brief.trim().length > 0 && brief.trim().length < 10 && <p className="mt-2 text-[11px] text-ink-faint">Give us a touch more to work with, a sentence or two.</p>}
           {busy && <p className="mt-2 text-[11px] text-ink-faint">Our co-pilot is in the casting room dreaming them up. About half a minute, worth the wait.</p>}
           {err && <p className="mt-2 text-xs text-alert">{err}</p>}
