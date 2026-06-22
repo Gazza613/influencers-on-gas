@@ -21,6 +21,16 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
     if (r?.ok) setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, showcased: on } : v)));
     setBusy(null);
   }
+  // Remove = delete the cut entirely so it disappears (re-publish from the Producer's showreel step).
+  async function remove(id: string) {
+    setBusy(id);
+    const r = await fetch("/api/showcase", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, remove: true }),
+    }).catch(() => null);
+    if (r?.ok) setVideos((vs) => vs.filter((v) => v.id !== id));
+    setBusy(null);
+  }
 
   async function copyLink() {
     try { await navigator.clipboard.writeText(publicUrl); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ }
@@ -63,14 +73,14 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
             <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ready">★ On the showreel · {onReel.length}</div>
             {onReel.length === 0
               ? <p className="text-sm text-ink-faint">Nothing on the showreel yet. Flag your best videos in from below.</p>
-              : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{onReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} reel />)}</div>}
+              : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{onReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} reel />)}</div>}
           </section>
 
           {/* Finished, not on the reel */}
           {offReel.length > 0 && (
             <section>
               <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Finished videos · {offReel.length}</div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{offReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} />)}</div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{offReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} />)}</div>
             </section>
           )}
         </>
@@ -79,16 +89,16 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
   );
 }
 
-function Card({ v, busy, onToggle, reel = false }: { v: ShowcaseVideo; busy: boolean; onToggle: (id: string, on: boolean) => void; reel?: boolean }) {
+function Card({ v, busy, onToggle, onRemove, reel = false }: { v: ShowcaseVideo; busy: boolean; onToggle: (id: string, on: boolean) => void; onRemove: (id: string) => void; reel?: boolean }) {
   return (
     <div className={`overflow-hidden rounded-xl border bg-surface-1 ${reel ? "border-ready/30" : "border-line"}`}>
       {v.final_video_url
-        ? <video src={v.final_video_url} controls playsInline className="aspect-video w-full bg-black object-cover" />
-        : <div className="flex aspect-video w-full items-center justify-center bg-surface-2 text-xs text-ink-faint">No video</div>}
+        ? <video src={v.final_video_url} controls playsInline className="aspect-[9/16] max-h-[60vh] w-full bg-black object-contain" />
+        : <div className="flex aspect-[9/16] w-full items-center justify-center bg-surface-2 text-xs text-ink-faint">No video</div>}
       <div className="flex items-center justify-between gap-2 p-3">
         <span className="truncate text-sm font-semibold text-ink">{v.title || "Untitled production"}</span>
         <button
-          onClick={() => onToggle(v.id, !reel)}
+          onClick={() => (reel ? onRemove(v.id) : onToggle(v.id, true))}
           disabled={busy}
           className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50 ${reel ? "border border-line text-ink-dim hover:border-alert/50 hover:text-alert" : "btn-brand"}`}
         >

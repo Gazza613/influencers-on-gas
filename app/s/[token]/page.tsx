@@ -36,7 +36,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
           <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {videos.map((v) => (
               <figure key={v.id} className="overflow-hidden rounded-xl border border-line bg-surface-1">
-                <video src={v.final_video_url ?? undefined} controls playsInline className="aspect-video w-full bg-black object-cover" />
+                <video src={v.final_video_url ?? undefined} controls playsInline className="aspect-[9/16] max-h-[70vh] w-full bg-black object-contain" />
                 <figcaption className="truncate p-3 text-sm font-semibold text-ink">{v.title || "Untitled production"}</figcaption>
               </figure>
             ))}

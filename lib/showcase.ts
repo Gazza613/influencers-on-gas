@@ -59,6 +59,11 @@ export async function setShowcased(id: string, on: boolean): Promise<void> {
   await db()`update productions set showcased = ${on} where id = ${id}`;
 }
 
+// Hard-remove a showcase cut so it disappears entirely (re-publish from the Producer's showreel step).
+export async function deleteShowcaseVideo(id: string): Promise<void> {
+  await db()`delete from productions where id = ${id}`;
+}
+
 // ── Showreel publishing for Producer cuts ──────────────────────────────────────
 // The finished Producer cut lives on the influencer persona; accepting it publishes a
 // row into productions so it flows into the existing showcase wall + public share link.
