@@ -840,6 +840,13 @@ export const generateShots = inngest.createFunction(
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running" } } }));
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
+    // CONTINUITY across separate role shoots: a-roll and b-roll references are now shot in separate
+    // passes, so when shooting ONE role, anchor it to a frame ALREADY shot for the other role — else
+    // the two galleries would render unrelated worlds. (Whole-board shoots set worldRef from frame 1.)
+    if (roleFilter) {
+      const prior = ((production as { shots?: { url?: string | null }[] } | null)?.shots ?? []).find((s) => s?.url);
+      if (prior?.url) worldRef = await step.run("worldref-anchor", () => importMediaUrl(prior.url as string).catch(() => null));
+    }
 
     // Render ONE scene to a keyframe (pure — reads worldRef which is set by the anchor pass first).
     const renderShot = async (i: number, sc: Record<string, string>): Promise<ShotRow> => {
@@ -1084,7 +1091,7 @@ export const generateClips = inngest.createFunction(
     // Re-sort the FULL merged list (this render's clips + any kept from the other role).
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prodDone = (done.production ?? production) as Record<string, unknown>;
-    const ordered = (Array.isArray(prodDone.clips) ? (prodDone.clips as ClipRow[]) : []).slice().sort((a, b) => a.scene - b.scene);
+    const ordered = (Array.isArray(prodDone.clips) ? (prodDone.clips as ClipRow[]) : []).filter((c) => !dropped.has(c.scene)).slice().sort((a, b) => a.scene - b.scene);
     await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, clips: ordered, clips_status: "done", status: "clips" } } }));
     return { ok: true, clips: ordered.length };
   },

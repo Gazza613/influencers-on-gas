@@ -112,8 +112,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [brollRatio, setBrollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   async function toggleDrop(scene: number) {
-    setDropped((s) => { const n = new Set(s); n.has(scene) ? n.delete(scene) : n.add(scene); return n; });
-    await fetch(`/api/influencers/${influencerId}/production/drop`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene }) }).catch(() => {});
+    setDropped((s) => { const n = new Set(s); n.has(scene) ? n.delete(scene) : n.add(scene); return n; }); // optimistic
+    // Confirm from the server so a later render/stitch can't race on a stale dropped list.
+    const r = await fetch(`/api/influencers/${influencerId}/production/drop`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene }) }).then((x) => x.json()).catch(() => null);
+    if (Array.isArray(r?.dropped)) setDropped(new Set(r.dropped.map(Number)));
   }
   function persistApproved(s: Set<string>) {
     fetch(`/api/influencers/${influencerId}/production/approvals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approved: [...s] }) }).catch(() => {});
@@ -453,6 +455,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <span className="rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-1 text-[#c79bff]"><b>A-roll</b> = talking shots — {name} speaking to camera, lip-synced</span>
               <span className="rounded-md border border-[#60a5fa]/30 bg-[#60a5fa]/10 px-2 py-1 text-[#93c5fd]"><b>B-roll</b> = scene shots — the world and movement around her, no talking</span>
             </div>
+            {dropped.size > 0 && (
+              <div className="mt-2 rounded-lg border border-active/30 bg-active/5 px-3 py-2 text-[11px] text-active">⚠ {dropped.size} reference{dropped.size === 1 ? "" : "s"} rejected — those scenes are left out of the final cut, so it&apos;ll be shorter. Re-flow the script in the Voice step so the voiceover still reads smoothly.</div>
+            )}
           </div>
 
           <div className="space-y-3">

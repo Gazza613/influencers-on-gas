@@ -3,6 +3,9 @@ import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { generateStoryboard } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
+import { isSafePublicUrl } from "@/lib/safe-url";
+
+const safeUrl = (v: unknown): string => (typeof v === "string" && isSafePublicUrl(v) ? v : "");
 
 // THE PRODUCER step 1: turn a brief into a directed 6-beat storyboard (house style), stored on
 // the influencer as the current production. The UI reviews/edits it, then drives shot + clip gen.
@@ -46,13 +49,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     legal: String(b.legal || "").trim(),
     // Optional uploads: a clothing ref + a location ref steer the SHOOT; a transparent PNG logo +
     // its corner are burned onto the final cut at assembly.
-    clothingRef: typeof b.clothingRef === "string" ? b.clothingRef : "",
-    locationRef: typeof b.locationRef === "string" ? b.locationRef : "",
-    logoUrl: typeof b.logoUrl === "string" ? b.logoUrl : "", // burned top-left
-    promoUrl: typeof b.promoUrl === "string" ? b.promoUrl : "", // burned top-right
+    // All URLs are SSRF-guarded (isSafePublicUrl) — they get fetched by Higgsfield/Shotstack, so an
+    // internal/metadata URL must never slip through.
+    clothingRef: safeUrl(b.clothingRef),
+    locationRef: safeUrl(b.locationRef),
+    logoUrl: safeUrl(b.logoUrl), // burned top-left
+    promoUrl: safeUrl(b.promoUrl), // burned top-right
     logoPosition: ["topLeft", "topRight", "bottomLeft", "bottomRight"].includes(b.logoPosition) ? b.logoPosition : "topLeft",
     captions: b.captions !== false, // default on; burned-in VO subtitles
-    endCardUrl: typeof b.endCardUrl === "string" ? b.endCardUrl : "", // optional closing clip/frame from the End Cards library
+    endCardUrl: safeUrl(b.endCardUrl), // optional closing clip/frame from the End Cards library
     endCardKind: b.endCardKind === "image" ? "image" : "video",
   };
   if (!brief.brand || !brief.offer) return NextResponse.json({ error: "Add at least a brand/product and the core offer." }, { status: 400 });

@@ -44,7 +44,7 @@ const CREATIVE_NARRATION = [
   "Posing your locked influencer, same face, every single frame…",
   "Framing each format: vertical for Reels, square for feed, wide for ads…",
   "Dialling in the light, the colour and the wardrobe…",
-  "🔎 AI Vision QA inspecting every shot, clothed, single frame, true proportions…",
+  "Holding the look steady, clothed, single clean frame, true proportions…",
   "Re-rolling anything that doesn't make the cut, no compromises…",
 ];
 
@@ -112,8 +112,8 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       }
       // Milestone burst when the run completes.
       if (prevStatus.current === "running" && d.status === "done") {
-        const approved = d.qa?.approved ?? list.length;
-        flex(`✨ ${approved} shot${approved === 1 ? "" : "s"} approved by AI Vision QA`, { milestone: true });
+        const ready = d.qa?.reviewed ? (d.qa?.approved ?? list.length) : list.filter((c) => c.url).length;
+        flex(`✨ ${ready} shot${ready === 1 ? "" : "s"} ready, pick your keepers`, { milestone: true });
       }
       prevCount.current = list.length;
       prevStatus.current = d.status || "idle";
@@ -379,7 +379,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         </p>
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[13px] leading-relaxed text-ink-dim">
           <span className="text-lg leading-none">🔎</span>
-          <span><span className="text-[#c79bff] font-semibold">AI Vision QA</span> reviews every single shot before you see it, wardrobe, composition, proportions and realism are all checked, and anything that doesn&apos;t pass is rejected and re-rolled automatically. You only ever get keepers.</span>
+          <span>Every shot is rendered with built-in guardrails baked into the prompt, <span className="text-[#c79bff] font-semibold">fully clothed, a single clean frame, true proportions and real skin</span>. Shots appear as they finish; pick your keepers and upscale those to 4K.</span>
         </div>
 
         {/* Platforms (toggle) */}

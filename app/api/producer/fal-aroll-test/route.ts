@@ -5,6 +5,7 @@ import { tts, pickVoiceForGender } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { getSecret } from "@/lib/connections";
 import { compressForFal } from "@/lib/image";
+import { recordUsage } from "@/lib/usage";
 
 async function byteSize(url: string): Promise<number | null> {
   try { const r = await fetch(url, { signal: AbortSignal.timeout(20000) }); if (!r.ok) return null; return (await r.arrayBuffer()).byteLength; } catch { return null; }
@@ -44,6 +45,7 @@ export async function GET(req: Request) {
     const voiceId = (persona.voice_id as string) || (await pickVoiceForGender(persona.gender as string))?.voice_id;
     if (!voiceId) return NextResponse.json({ error: "No voice available to test with" }, { status: 400 });
     const audioUrl = await putBytes(await tts(voiceId, "Hi, this is a quick a-roll test."), "fal-test", "mp3", "audio/mpeg");
+    await recordUsage({ influencerId: inf.id, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "request", action: "tts-diagnostic", count: 1 }).catch(() => {});
 
     // Compress the keyframe exactly as the real a-roll does, and report the sizes so we can SEE the
     // 5MB limit is respected (original vs what we actually send to fal).
@@ -61,6 +63,7 @@ export async function GET(req: Request) {
     try { submit = JSON.parse(submitText); } catch { /* keep text */ }
     if (!submitRes.ok) return NextResponse.json({ stage: "submit", httpStatus: submitRes.status, raw: submitText.slice(0, 500) });
     const requestId = submit.request_id as string | undefined;
+    if (requestId) await recordUsage({ influencerId: inf.id, provider: "fal", model: MODEL, unit: "video", action: "aroll-diagnostic", count: 1 }).catch(() => {});
     const statusUrl = (submit.status_url as string) || `https://queue.fal.run/${MODEL}/requests/${requestId}/status`;
     const responseUrl = (submit.response_url as string) || `https://queue.fal.run/${MODEL}/requests/${requestId}`;
 
