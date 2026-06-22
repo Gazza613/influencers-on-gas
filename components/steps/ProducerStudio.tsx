@@ -114,7 +114,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   useEffect(() => { setDropped(new Set(production?.dropped_scenes ?? [])); }, [production?.dropped_scenes]);
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [brollRatio, setBrollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
-  // Captions are opt-in at stitch (default OFF — they were appearing unrequested).
+  // Captions are opt-in at stitch (default OFF — they were appearing unrequested). The optional closing
+  // clip/image reuses the brief's endCardUrl/endCardKind state so there's one source of truth.
   const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
   async function toggleDrop(scene: number) {
     setDropped((s) => { const n = new Set(s); n.has(scene) ? n.delete(scene) : n.add(scene); return n; }); // optimistic
@@ -245,7 +246,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (assembling) return;
     setErr("");
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
   }
@@ -691,6 +692,29 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             <StepShell n={8} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order with clean cuts, a continuous voiceover, the music + ambient mixed underneath${(production?.brief as { logoUrl?: string })?.logoUrl ? " and your uploaded logo" : ""} — one finished ${sb.format} ad. Captions are optional (off by default).`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
               {unlocked("stitch") ? (
                 <>
+                  {/* Optional closing clip / end card — the LAST spot to upload the tail of the video. */}
+                  <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                    <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Closing clip / end card (optional)</div>
+                    {endCardUrl ? (
+                      <div className="flex flex-wrap items-center gap-3">
+                        {endCardKind === "video"
+                          ? <video src={endCardUrl} controls playsInline className="aspect-[9/16] w-24 rounded-lg border border-ready/40 bg-black object-cover" />
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          : <img src={endCardUrl} alt="end card" className="aspect-[9/16] w-24 rounded-lg border border-ready/40 object-cover" />}
+                        <div className="text-[12px] text-ink-dim">Appended to the end of the cut.<br /><button onClick={() => setEndCardUrl("")} className="mt-1 rounded border border-line px-2 py-0.5 text-[11px] text-ink-faint hover:text-ink">Remove</button></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          {(["video", "image"] as const).map((k) => (
+                            <button key={k} onClick={() => setEndCardKind(k)} className={`rounded-lg border px-3 py-1 text-xs font-semibold ${endCardKind === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{k === "video" ? "MP4 / video" : "Image"}</button>
+                          ))}
+                        </div>
+                        <Uploader kind="endcard" accept={endCardKind} label="Upload your closing clip / image" current={null} onUploaded={setEndCardUrl} />
+                        <p className="text-[10px] text-ink-faint">Optional. Your brand close (logo sting, offer card, sign-off) — appended after the last scene.</p>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <button onClick={stitchCut} disabled={assembling} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
                     <label className="flex cursor-pointer items-center gap-2 text-[12px] text-ink-dim"><input type="checkbox" checked={stitchCaptions} onChange={(e) => setStitchCaptions(e.target.checked)} className="h-4 w-4 accent-[#a855f7]" /> Burn in captions</label>

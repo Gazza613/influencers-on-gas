@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { inngest } from "@/lib/inngest";
+import { isSafePublicUrl } from "@/lib/safe-url";
 
 // THE PRODUCER step 4: "stitch the cut" — assemble the clips into one finished ad (music +
 // captions + brand + VO) via Shotstack. Durable; the UI polls the storyboard GET.
@@ -17,13 +18,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const production = persona.production as { clips?: { url?: string | null }[] } | undefined;
   if (!production?.clips?.some((c) => c.url)) return NextResponse.json({ error: "Render the clips first." }, { status: 400 });
 
-  // Captions are opt-in at stitch (default off — they were appearing unrequested). Remember the choice
-  // so a refresh-driven resume re-stitches the same way.
+  // Captions opt-in (default off); optional uploaded closing clip/image. Persist both so a refresh-driven
+  // resume re-stitches the same way. URL is SSRF-guarded (Shotstack fetches it).
   const body = await req.json().catch(() => ({}));
   const captions = body.captions === true;
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, assembly_status: "running", final_url: null, stitch_captions: captions } } });
+  const endCardUrl = typeof body.endCardUrl === "string" && isSafePublicUrl(body.endCardUrl) ? body.endCardUrl : "";
+  const endCardKind = body.endCardKind === "image" ? "image" : "video";
+  const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind };
+  await updateInfluencer(id, { persona: { ...persona, production: { ...production, brief: briefNext, assembly_status: "running", final_url: null, stitch_captions: captions } } });
   try {
-    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions } });
+    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, endCardUrl, endCardKind } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, assembly_status: "idle" } } });
     return NextResponse.json({ error: "Could not start the stitch (assembly engine not connected)." }, { status: 503 });
