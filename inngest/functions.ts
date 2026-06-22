@@ -23,6 +23,10 @@ const CANDIDATE_COUNT = 6;
 // PAID model by default for PRIORITY: the free nano_banana_pro gets deprioritised in Higgsfield's
 // queue (sits in a holding pattern), so we render on the paid nano_banana_2 (a couple credits) to
 // jump the queue. Env-tunable (HF_IMAGE_MODEL=nano_banana_pro to go back to free).
+// Auto Vision QA (Haiku) + re-roll add a vision call (and sometimes a full re-gen) per frame. Off by
+// default — the prompt-level guards (clothed, identity lock, glasses) stay on, and the producer QAs
+// the board/photoshoot manually. Set PRODUCER_QA=1 to re-enable automatic QA + re-roll.
+const QA_ON = process.env.PRODUCER_QA === "1";
 const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "nano_banana_2";
 const IMAGE_FALLBACK = "nano_banana_pro"; // free model as the safety fallback
 const CREATIVE_FALLBACK = "gpt_image_2"; // previously-validated creatives identity model
@@ -172,13 +176,15 @@ export const buildIdentity = inngest.createFunction(
         // clothing/coherence gate (bare legs / missing bottoms). Robust: if the QA step errors OR
         // filters everything out, KEEP all loadable frames — the photoshoot must never come back empty.
         let validShoot: string[] = loadedShoot;
-        try {
-          const filtered = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => {
-            const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0]).catch(() => true), qaCreative(u).catch(() => ({ pass: true }))]);
-            return { u, ok: idOk && qa.pass };
-          }))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
-          if (filtered.length) validShoot = filtered; // only apply the filter if it kept something
-        } catch { validShoot = loadedShoot; }
+        if (QA_ON) {
+          try {
+            const filtered = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => {
+              const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0]).catch(() => true), qaCreative(u).catch(() => ({ pass: true }))]);
+              return { u, ok: idOk && qa.pass };
+            }))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
+            if (filtered.length) validShoot = filtered;
+          } catch { validShoot = loadedShoot; }
+        }
         // Real uploads first (identity truth), then the identity-matched generated frames.
         const frames: { url: string; hero?: boolean; face?: boolean }[] = [{ url: valid[0], hero: true, face: true }];
         for (const url of valid.slice(1)) if (!frames.some((f) => f.url === url)) frames.push({ url });
@@ -597,7 +603,7 @@ export const generateCreatives = inngest.createFunction(
               return { id, url: sourceUrl, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: "image url failed to load" } as Creative;
             }
 
-            const verdict = await qaCreative(sourceUrl).catch(() => ({ pass: true, score10: 7, issues: ["qa-unavailable"] }));
+            const verdict = QA_ON ? await qaCreative(sourceUrl).catch(() => ({ pass: true, score10: 7, issues: ["qa-unavailable"] })) : { pass: true, score10: 0, issues: [] as string[] };
             const qa = { pass: verdict.pass, score10: verdict.score10, issues: verdict.issues || [] };
             if (!verdict.pass) {
               return {
@@ -856,8 +862,8 @@ export const generateShots = inngest.createFunction(
       const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, shotExtra, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
       let url = await step.run(`shot-${i}`, gen);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
-      // QA GATE: these frames BECOME the video, so reject waxy/malformed/identity-drift frames and re-roll once.
-      if (usable) {
+      // QA GATE (opt-in): reject waxy/malformed/drift frames and re-roll once. Off by default for speed.
+      if (usable && QA_ON) {
         const verdict = await step.run(`qa-${i}`, () => qaCreative(usable as string).catch(() => ({ pass: true, score10: 7, issues: [] as string[] })));
         await step.run(`uqa-${i}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: 1 }).catch(() => {}));
         if (!verdict.pass) {
