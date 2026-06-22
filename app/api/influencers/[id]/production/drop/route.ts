@@ -16,11 +16,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const production = (persona.production ?? null) as Record<string, unknown> | null;
   if (!production) return NextResponse.json({ error: "No production." }, { status: 400 });
   const b = await req.json().catch(() => ({}));
+  // Scene indices must be real storyboard scenes (a valid integer in range) — guards against junk
+  // indices bloating the dropped list.
+  const sceneCount = Array.isArray((production.storyboard as { scenes?: unknown[] })?.scenes) ? (production.storyboard as { scenes: unknown[] }).scenes.length : 0;
+  const valid = (n: unknown) => Number.isInteger(n) && (n as number) >= 0 && (n as number) < sceneCount;
   // Either set the whole list, or toggle a single scene.
-  let dropped = new Set((Array.isArray(production.dropped_scenes) ? (production.dropped_scenes as number[]) : []).map(Number));
+  let dropped = new Set((Array.isArray(production.dropped_scenes) ? (production.dropped_scenes as number[]) : []).map(Number).filter(valid));
   if (Array.isArray(b?.dropped)) {
-    dropped = new Set(b.dropped.map(Number).filter((n: number) => Number.isInteger(n)));
-  } else if (typeof b?.scene === "number") {
+    dropped = new Set(b.dropped.map(Number).filter(valid));
+  } else if (valid(b?.scene)) {
     if (b.drop === false) dropped.delete(b.scene);
     else if (b.drop === true) dropped.add(b.scene);
     else dropped.has(b.scene) ? dropped.delete(b.scene) : dropped.add(b.scene); // toggle

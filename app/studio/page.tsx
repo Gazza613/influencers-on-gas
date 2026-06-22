@@ -1,8 +1,5 @@
 import Link from "next/link";
-import { auth } from "@/auth";
-import SignOutButton from "@/components/SignOutButton";
-import StudioSelectors from "@/components/StudioSelectors";
-import CostReadout from "@/components/CostReadout";
+import AppHeader from "@/components/AppHeader";
 import { listConnections } from "@/lib/connections";
 import { listInfluencers, type Influencer } from "@/lib/influencers";
 
@@ -14,8 +11,6 @@ function thumb(inf: Influencer): string | null {
 }
 
 export default async function StudioPage() {
-  const session = await auth();
-  const email = session?.user?.email ?? "";
   const [conns, influencers] = await Promise.all([listConnections(), listInfluencers().catch(() => [] as Influencer[])]);
   const missingRequired = conns.filter((c) => c.required && !c.connected).map((c) => c.label);
   const locked = influencers.filter((i) => ((i.persona ?? {}) as Persona).locked);
@@ -23,24 +18,7 @@ export default async function StudioPage() {
 
   return (
     <div className="flex h-dvh flex-col text-ink">
-      {/* ── Top bar */}
-      <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface-1/80 px-4 py-2.5 backdrop-blur">
-        <div className="flex items-center gap-4">
-          <Link href="/studio" className="flex items-center gap-2 font-extrabold tracking-tight">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/gas-logo.png" alt="GAS" className="h-7 w-7 rounded-full" />
-            <span>Influencers <span className="brand-grad">on</span> GAS</span>
-          </Link>
-          <StudioSelectors />
-        </div>
-        <div className="flex items-center gap-3">
-          <CostReadout />
-          <Link href="/cost-control" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">Cost Control</Link>
-          <Link href="/setup/connect" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink">Setup</Link>
-          <span className="hidden text-xs text-ink-dim sm:inline">{email}</span>
-          <SignOutButton />
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl space-y-14 px-6 py-12">

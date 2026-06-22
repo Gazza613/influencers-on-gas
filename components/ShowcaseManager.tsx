@@ -23,6 +23,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
   }
   // Remove = delete the cut entirely so it disappears (re-publish from the Producer's showreel step).
   async function remove(id: string) {
+    if (typeof window !== "undefined" && !window.confirm("Remove this cut from the showcase? It'll disappear from the reel. You can re-publish it from the Producer's showreel step.")) return;
     setBusy(id);
     const r = await fetch("/api/showcase", {
       method: "POST", headers: { "Content-Type": "application/json" },

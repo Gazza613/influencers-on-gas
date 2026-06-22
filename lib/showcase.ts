@@ -60,8 +60,9 @@ export async function setShowcased(id: string, on: boolean): Promise<void> {
 }
 
 // Hard-remove a showcase cut so it disappears entirely (re-publish from the Producer's showreel step).
+// Scoped to FINISHED cuts only, so a stray/old id can never delete an in-progress production.
 export async function deleteShowcaseVideo(id: string): Promise<void> {
-  await db()`delete from productions where id = ${id}`;
+  await db()`delete from productions where id = ${id} and status = 'complete'`;
 }
 
 // ── Showreel publishing for Producer cuts ──────────────────────────────────────
