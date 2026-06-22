@@ -244,4 +244,6 @@ body {
   .glow-accent, .next-pulse, .live-building, .shimmer::after, .spinner-ring { animation: none; }
   .toast-in-pop, .toast-in-slide, .toast-in-flip, .confetti i { animation: none; }
   .working-orb .core, .working-orb .ring, .bar-sweep::after, .narrate-line, .live-pill, .step-active { animation: none; }
+  .rise { animation: none; }
+  .lift { transition: none; }
 }

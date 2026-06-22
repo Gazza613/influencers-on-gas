@@ -43,16 +43,27 @@ export default async function StudioPage() {
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl space-y-12 px-6 py-10">
+        <div className="mx-auto max-w-6xl space-y-14 px-6 py-12">
           {/* Hero */}
-          <section>
-            <div className="tabular text-[11px] uppercase tracking-[0.25em] text-ink-faint">GAS Studio</div>
-            <h1 className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">Brief to <span className="brand-grad">publish-ready</span> ad.</h1>
-            <p className="mt-3 max-w-xl text-sm text-ink-dim">Direct a hyper-real AI influencer through the over-the-shoulder Producer — keyframes, lip-synced a-roll, cinematic b-roll, voice, music and the final cut.</p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link href={locked.length > 0 ? "/setup/influencers" : "/start"} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold">🎬 Start a production</Link>
-              <Link href="/start" className="rounded-lg border border-line px-5 py-3 text-sm font-semibold text-ink-dim hover:border-line-strong hover:text-ink">+ New influencer</Link>
+          <section className="rise">
+            <div className="eyebrow">GAS Studio</div>
+            <h1 className="display mt-3 text-5xl font-extrabold sm:text-6xl">Brief to <span className="brand-grad">publish-ready</span> ad.</h1>
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-dim">Direct a hyper-real AI influencer through the over-the-shoulder Producer — keyframes, lip-synced a-roll, cinematic b-roll, voice, music and the final cut.</p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Link href={locked.length > 0 ? "/setup/influencers" : "/start"} className="btn-brand rounded-xl px-6 py-3.5 text-sm font-bold">🎬 Start a production</Link>
+              <Link href="/start" className="rounded-xl border border-line-strong bg-surface-1/60 px-6 py-3.5 text-sm font-semibold text-ink-dim transition hover:border-[#a855f7]/50 hover:text-ink">+ New influencer</Link>
             </div>
+            {/* Stat strip */}
+            {influencers.length > 0 && (
+              <div className="mt-7 flex flex-wrap gap-3">
+                {[["Cast", influencers.length], ["Ready to produce", locked.length], ["Cuts made", cuts.length]].map(([label, n]) => (
+                  <div key={label as string} className="card rounded-xl px-4 py-3">
+                    <div className="tabular text-2xl font-extrabold leading-none text-ink">{n as number}</div>
+                    <div className="eyebrow mt-1.5">{label as string}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Missing tools */}
@@ -65,13 +76,13 @@ export default async function StudioPage() {
           )}
 
           {/* Your cast — reel */}
-          <section>
-            <div className="mb-4 flex items-end justify-between">
+          <section className="rise">
+            <div className="mb-5 flex items-end justify-between">
               <div>
-                <h2 className="text-lg font-extrabold">Your cast {influencers.length > 0 && <span className="text-ink-faint">· {influencers.length}</span>}</h2>
-                <p className="text-[12px] text-ink-dim">Identity-locked stars, ready to deploy. {locked.length} ready to produce.</p>
+                <h2 className="text-xl font-extrabold tracking-tight">Your cast {influencers.length > 0 && <span className="text-ink-faint">· {influencers.length}</span>}</h2>
+                <p className="mt-0.5 text-[13px] text-ink-dim">Identity-locked stars, ready to deploy. {locked.length} ready to produce.</p>
               </div>
-              <Link href="/setup/influencers" className="text-xs font-semibold text-accent">View all →</Link>
+              <Link href="/setup/influencers" className="text-xs font-semibold text-accent hover:underline">View all →</Link>
             </div>
             {influencers.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-surface-1 p-8 text-center">
@@ -96,17 +107,19 @@ export default async function StudioPage() {
                   const isLocked = ((inf.persona ?? {}) as Persona).locked;
                   const href = isLocked ? `/setup/influencers/${inf.id}/producer` : `/setup/influencers/${inf.id}`;
                   return (
-                    <Link key={inf.id} href={href} className="group overflow-hidden rounded-2xl border border-line bg-surface-1 transition hover:border-[#a855f7]/50 hover:shadow-[0_0_28px_rgba(168,85,247,0.18)]">
-                      <div className="relative aspect-[3/4] w-full overflow-hidden bg-surface-2">
+                    <Link key={inf.id} href={href} className="card lift group relative block overflow-hidden rounded-2xl">
+                      <div className="relative aspect-[3/4] w-full overflow-hidden">
                         {src
                           // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={src} alt={inf.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
-                          : <div className="flex h-full w-full items-center justify-center text-3xl text-ink-faint">🎭</div>}
-                        <span className={`tabular absolute right-2 top-2 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${isLocked ? "bg-ready/85 text-white" : "bg-black/60 text-ink-dim"}`}>{isLocked ? "● Ready" : "Building"}</span>
-                      </div>
-                      <div className="p-3">
-                        <div className="truncate text-sm font-bold">{inf.name}</div>
-                        <div className="mt-0.5 text-[11px] text-accent opacity-0 transition group-hover:opacity-100">{isLocked ? "Produce →" : "Continue build →"}</div>
+                          ? <img src={src} alt={inf.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.06]" />
+                          : <div className="flex h-full w-full items-center justify-center bg-surface-2 text-3xl text-ink-faint">🎭</div>}
+                        {/* gradient scrim so the name/status read cleanly over any image */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                        <span className={`tabular absolute right-2 top-2 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide backdrop-blur-sm ${isLocked ? "bg-ready/85 text-white" : "bg-black/55 text-ink-dim"}`}>{isLocked ? "● Ready" : "Building"}</span>
+                        <div className="absolute inset-x-0 bottom-0 p-3">
+                          <div className="truncate text-sm font-bold text-white drop-shadow">{inf.name}</div>
+                          <div className="mt-0.5 translate-y-1 text-[11px] font-semibold text-[#c79bff] opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">{isLocked ? "Produce →" : "Continue build →"}</div>
+                        </div>
                       </div>
                     </Link>
                   );
@@ -117,14 +130,14 @@ export default async function StudioPage() {
 
           {/* Latest cuts */}
           {cuts.length > 0 && (
-            <section>
-              <div className="mb-4 flex items-end justify-between">
-                <h2 className="text-lg font-extrabold">Latest cuts <span className="text-ink-faint">· {cuts.length}</span></h2>
-                <Link href="/showcase" className="text-xs font-semibold text-accent">Showcase →</Link>
+            <section className="rise">
+              <div className="mb-5 flex items-end justify-between">
+                <h2 className="text-xl font-extrabold tracking-tight">Latest cuts <span className="text-ink-faint">· {cuts.length}</span></h2>
+                <Link href="/showcase" className="text-xs font-semibold text-accent hover:underline">Showcase →</Link>
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {cuts.slice(0, 8).map(({ inf, url, title }) => (
-                  <div key={inf.id} className="overflow-hidden rounded-2xl border border-line bg-surface-1">
+                  <div key={inf.id} className="card lift overflow-hidden rounded-2xl">
                     <video src={url as string} controls playsInline className="aspect-[9/16] w-full bg-black object-cover" />
                     <div className="p-3"><div className="truncate text-sm font-bold">{title || inf.name}</div><div className="text-[11px] text-ink-faint">{inf.name}</div></div>
                   </div>
