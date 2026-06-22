@@ -66,6 +66,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const assembling = production?.assembly_status === "running";
   const finalUrl = production?.final_url || null;
 
+  // Dropped (rejected) reference scenes — declared BEFORE the wizard derivations below, which filter
+  // on it (a const used before its declaration is a temporal-dead-zone crash at render).
+  const [dropped, setDropped] = useState<Set<number>>(() => new Set((initialProduction?.dropped_scenes as number[] | undefined) ?? []));
+
   // ── 8-step wizard state ───────────────────────────────────────────────────
   const sceneList = sb?.scenes ?? [];
   const aRollIdx = sceneList.map((s, i) => ({ s, i })).filter((x) => x.s.role === "a-roll");
@@ -106,8 +110,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [approved, setApproved] = useState<Set<string>>(() => (initialProduction?.wizard_approved?.length ? new Set(initialProduction.wizard_approved) : seedApproved()));
   const [denied, setDenied] = useState<Set<string>>(new Set());
   const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
-  // Curated reference galleries: dropped (rejected) scenes + the chosen aspect ratio per role.
-  const [dropped, setDropped] = useState<Set<number>>(() => new Set((initialProduction?.dropped_scenes as number[] | undefined) ?? []));
+  // Curated reference galleries: keep the dropped set in sync with the server + chosen aspect ratio per role.
   useEffect(() => { setDropped(new Set(production?.dropped_scenes ?? [])); }, [production?.dropped_scenes]);
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [brollRatio, setBrollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");

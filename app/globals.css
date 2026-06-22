@@ -50,6 +50,38 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Premium primitives (visual uplift) ─────────────────────────────────────── */
+/* Slim, on-brand scrollbar */
+* { scrollbar-width: thin; scrollbar-color: rgba(168,85,247,0.32) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.26); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.5); background-clip: padding-box; }
+
+/* Card surface — a subtle top-light gradient + inset highlight + depth, so panels read as lit glass
+   rather than flat boxes. Pair with .lift for an interactive hover. */
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0) 42%), var(--color-surface-1);
+  border: 1px solid var(--color-line);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 12px 32px rgba(0,0,0,0.38);
+}
+.lift { transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s, border-color .22s; }
+.lift:hover {
+  transform: translateY(-3px);
+  border-color: rgba(168,85,247,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 22px 48px rgba(0,0,0,0.55), 0 0 34px rgba(168,85,247,0.2);
+}
+
+/* Section eyebrow label */
+.eyebrow { font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--color-ink-faint); }
+
+/* Gentle staggered entrance for content sections */
+.rise { animation: rise .55s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* Display heading — tighter tracking, optical weight for hero titles */
+.display { letter-spacing: -0.02em; line-height: 1.02; }
+
 /* ── Brand accent (pink → purple → blue) — shared across login, landing, build.
    Orange stays the GAS mark only. */
 .brand-grad {
