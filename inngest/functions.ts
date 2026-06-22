@@ -842,7 +842,10 @@ export const generateShots = inngest.createFunction(
         hasPeople: true, worldAnchored: !!worldRef,
       });
       const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : [])].map((value) => ({ value, role: "image" }));
-      const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
+      // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
+      // no quality but ~double the render time. 1K ~halves the board with no visible loss.
+      const shotExtra = { ...(medias.length ? { medias } : {}), resolution: process.env.HF_BOARD_RES || "1k" };
+      const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, shotExtra, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
       let url = await step.run(`shot-${i}`, gen);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
       // QA GATE: these frames BECOME the video, so reject waxy/malformed/identity-drift frames and re-roll once.
