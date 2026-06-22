@@ -20,8 +20,11 @@ const CANDIDATE_COUNT = 6;
 // consistency (blends many refs, native square) AND is UNLIMITED on our Ultra plan, so it is
 // free and should fix the gpt_image_2 1:1 failure. Env-overridable in case the live model id
 // differs; generation falls back to a known-good model per call so a wrong id never hard-breaks.
-const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "nano_banana_pro";
-const IMAGE_FALLBACK = "nano_banana_2"; // known-good casting/photoshoot model
+// PAID model by default for PRIORITY: the free nano_banana_pro gets deprioritised in Higgsfield's
+// queue (sits in a holding pattern), so we render on the paid nano_banana_2 (a couple credits) to
+// jump the queue. Env-tunable (HF_IMAGE_MODEL=nano_banana_pro to go back to free).
+const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "nano_banana_2";
+const IMAGE_FALLBACK = "nano_banana_pro"; // free model as the safety fallback
 const CREATIVE_FALLBACK = "gpt_image_2"; // previously-validated creatives identity model
 
 // Stage 2 (Photoshoot) builds the Soul TRAINING SET from the chosen face. Recipe follows
