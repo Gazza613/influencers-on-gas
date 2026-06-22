@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getInfluencer } from "@/lib/influencers";
+import { getInfluencer, listInfluencers } from "@/lib/influencers";
 import { tts, pickVoiceForGender } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { getSecret } from "@/lib/connections";
@@ -14,11 +14,19 @@ const MODEL = process.env.FAL_OMNIHUMAN_MODEL?.includes("/") && !process.env.FAL
 export async function GET(req: Request) {
   const session = await auth();
   if (session?.user?.role !== "super_admin") return NextResponse.json({ error: "Super admin only" }, { status: 403 });
-  const id = new URL(req.url).searchParams.get("id") || "";
+  const sp = new URL(req.url).searchParams;
+  const id = sp.get("id") || "";
+  const nameQ = (sp.get("name") || "").trim().toLowerCase();
   const k = (await getSecret("fal")) || process.env.FAL_KEY || process.env.FAL_API_KEY;
   if (!k) return NextResponse.json({ error: "fal not connected" }, { status: 400 });
-  const inf = id ? await getInfluencer(id) : null;
-  if (!inf) return NextResponse.json({ error: "Pass ?id=<influencerId> of a built influencer" }, { status: 400 });
+  // No id needed: match by ?name=, else auto-pick a built influencer that has a hero + voice.
+  let inf = id ? await getInfluencer(id) : null;
+  if (!inf) {
+    const all = await listInfluencers().catch(() => []);
+    const hasHeroVoice = (x: typeof all[number]) => { const p = (x.persona ?? {}) as Record<string, unknown>; return (!!p.hero_realism_url || !!p.reference_url || (Array.isArray(x.look_refs) && x.look_refs.length > 0)) && !!x.voice_id; };
+    inf = (nameQ ? all.find((x) => x.name.toLowerCase().includes(nameQ)) : null) || all.find(hasHeroVoice) || all[0] || null;
+  }
+  if (!inf) return NextResponse.json({ error: "No influencer found. Build one (with a voice) first." }, { status: 400 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
   const refs = (inf.look_refs as { url: string }[] | undefined) ?? [];
   const hero = (persona.hero_realism_url as string) || refs[0]?.url || (persona.reference_url as string) || "";
@@ -64,7 +72,7 @@ export async function GET(req: Request) {
       if (status === "FAILED" || status === "ERROR") { done = true; }
     }
     return NextResponse.json({
-      model: MODEL, submit: { request_id: requestId, status_url: statusUrl, response_url: responseUrl, keys: Object.keys(submit) },
+      influencer: inf.name, model: MODEL, submit: { request_id: requestId, status_url: statusUrl, response_url: responseUrl, keys: Object.keys(submit) },
       samples, videoUrl, elapsedSec: Math.round((Date.now() - t0) / 1000), done, finalResponse,
     });
   } catch (e) {
