@@ -510,7 +510,10 @@ export const generateCreatives = inngest.createFunction(
       });
       const idMedias = imported.ids;
       const medias = [...idMedias, imported.feat, imported.cloth, ...imported.locs].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
-      const extra = medias.length ? { medias } : {};
+      // Render the preview pass at 1K (env-tunable) — these are for SELECTION; the keepers upscale to
+      // 4K after. 1K generates much faster and the tiles stop trickling in. Explicit-4K requests keep a
+      // 2K working base for the upscale.
+      const extra = { ...(medias.length ? { medias } : {}), resolution: fourK ? "2k" : (process.env.HF_CREATIVE_RES || "1k") };
       // @image tags follow the medias order. Identity refs come first.
       let n = 0;
       const faceTags = idMedias.map(() => `@image${++n}`);

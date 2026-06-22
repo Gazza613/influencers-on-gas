@@ -526,7 +526,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <div className="mt-4">
             <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null} startedAt={startedAt}
               onAbort={abort}
-              note={`Generating and quality checking each shot in 2K, they appear below as they pass review. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
+              note={`Generating each shot — they appear below as they finish. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
           </div>
         )}
       </div>
@@ -534,11 +534,11 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       {/* In-progress placeholders so it's clear shots are rendering + being QA'd (not ready to click). */}
       {running && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Rendering &amp; reviewing · {images} shots</div>
+          <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Rendering · {images} shots</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {Array.from({ length: images }).map((_, i) => (
               <div key={i} className="shimmer flex aspect-square items-center justify-center rounded-lg border border-line">
-                <span className="flex flex-col items-center gap-1.5 text-[10px] text-ink-faint"><span className="spinner-ring text-base text-[#c79bff]" /> reviewing…</span>
+                <span className="flex flex-col items-center gap-1.5 text-[10px] text-ink-faint"><span className="spinner-ring text-base text-[#c79bff]" /> rendering…</span>
               </div>
             ))}
           </div>
@@ -600,7 +600,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               </div>
             )}
           </div>
-          <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">Shots render fast in 2K. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
+          <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">Shots render fast as previews. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
           {(twoK.length > 0 || placeholders > 0) && (
             <div className="mb-5">
               <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}{placeholders > 0 ? ` · ${placeholders} generating` : ""}</div>
