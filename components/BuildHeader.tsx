@@ -85,14 +85,13 @@ export default function BuildHeader({
     { href: `${base}/photoshoot`, label: "Photoshoot", icon: "②", done: step2Done, match: (p: string) => p.endsWith("/photoshoot") },
     { href: `${base}/lockdown`, label: "Lock down", icon: "③", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
   ];
-  // Creatives + Video unlock once the identity is locked. Creatives turns green once any shot
-  // is rendered; if you skip it and move to Video, it flags orange with a "?" (not done).
+  // Creatives unlocks once the identity is locked; it turns green once any shot is rendered. Voice is
+  // NOT a separate tab — it lives inside the Producer flow (step 4), where you set it in context.
   const creativesDone = s.creatives > 0;
   if (s.locked) {
-    const onVideo = pathname.endsWith("/video");
-    tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: creativesDone, warn: !creativesDone && onVideo, match: (p: string) => p.endsWith("/creatives") });
+    const onProducer = pathname.endsWith("/producer");
+    tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: creativesDone, warn: !creativesDone && onProducer, match: (p: string) => p.endsWith("/creatives") });
     tabs.push({ href: `${base}/producer`, label: "Producer", icon: "🎬", done: false, match: (p: string) => p.endsWith("/producer") });
-    tabs.push({ href: `${base}/video`, label: "Voice", icon: "🔊", done: false, match: (p: string) => p.endsWith("/video") });
   }
 
   return (
