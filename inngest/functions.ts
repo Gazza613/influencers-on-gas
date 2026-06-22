@@ -1079,7 +1079,12 @@ export const generateClips = inngest.createFunction(
     // Only render the scenes in the role filter (all of them when no filter).
     const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)));
     await Promise.all(targets.map(async ({ sc, i }) => {
-      const row = await renderOne(i, sc);
+      // Contain a single scene's failure: if renderOne throws (a vendor error after retries), save a
+      // "failed" clip instead of rejecting the whole batch — otherwise the final "done" step never
+      // runs and clips_status is stuck on "running" forever.
+      let row: ClipRow;
+      try { row = await renderOne(i, sc); }
+      catch (e) { row = { scene: i, role: String(sc.role || "a-roll"), beat: String(sc.beat || ""), kind: String(sc.role || "a-roll"), url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 160) }; }
       const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
       const prod = (fresh.production ?? production) as Record<string, unknown>;
       const list = Array.isArray(prod.clips) ? [...(prod.clips as ClipRow[])] : [];
