@@ -986,7 +986,10 @@ export const generateClips = inngest.createFunction(
         const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => {
           const mod = await moderateText(line);
           if (!mod.allowed) return null;
-          return putBytes(await tts(voiceId as string, line, { expressive: true }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null);
+          // WYSIWYG voice: use the SAME (stable) TTS model the producer previewed when picking the
+          // voice. Expressive (eleven_v3) renders the same voice_id noticeably differently, so it read
+          // as "a different voice". Opt back in with AROLL_EXPRESSIVE=1 if you want v3 delivery.
+          return putBytes(await tts(voiceId as string, line, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null);
         }) as string | null);
         if (audioUrl) {
           if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
@@ -1198,7 +1201,10 @@ export const assembleVideo = inngest.createFunction(
     // and extend the timeline (music fades out over it).
     const TAIL = 1.2;
     if (placed.length) placed[placed.length - 1].len += TAIL;
-    const total = (Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30) + TAIL;
+    // The storyboard timecodes are ESTIMATES; the real spoken line can run longer, so the a-roll VO was
+    // being chopped off at p.len. Give the voiceover a ~1s tail so the last words always finish.
+    const AROLL_VO_TAIL = 1.0;
+    const total = (Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30) + TAIL + AROLL_VO_TAIL;
 
     // Music bed (full length) → Blob. REUSE the audio step's bed if it already produced one.
     let musicUrl: string | null = (production as { music_url?: string })?.music_url || null;
@@ -1217,7 +1223,10 @@ export const assembleVideo = inngest.createFunction(
       await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
     } catch { ambientUrl = null; }
     const ambientTrack: Record<string, unknown>[] = [];
-    if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: 0.1 }, start: t, length: Math.min(22, total - t) });
+    // Ambient sits UNDER the VO + music but must be audible — 0.1 was inaudible. ~0.3 reads as real
+    // room tone without competing. Env-tunable (AMBIENT_VOLUME).
+    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.3));
+    if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: ambientVol }, start: t, length: Math.min(22, total - t) });
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
     // so the voice matches the lips perfectly. B-roll/graphic: generate the VO from the scene line.
@@ -1225,13 +1234,13 @@ export const assembleVideo = inngest.createFunction(
     for (const p of placed) {
       const clip = clips.find((c) => c.scene === p.i);
       const synced = clip?.audio_url as string | undefined;
-      if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len }); continue; }
+      if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len + AROLL_VO_TAIL }); continue; }
       if (voiceId && p.vo) {
         try {
           const url = await step.run(`vo-${p.i}`, async () => {
             const mod = await moderateText(p.vo); // screen before any ElevenLabs TTS call
             if (!mod.allowed) return null;
-            return putBytes(await tts(voiceId, p.vo, { expressive: true }), "vo", "mp3", "audio/mpeg");
+            return putBytes(await tts(voiceId, p.vo, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "vo", "mp3", "audio/mpeg");
           });
           if (url) {
             await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
