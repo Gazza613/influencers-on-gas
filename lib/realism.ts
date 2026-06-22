@@ -19,10 +19,11 @@ export const SCENE_PEOPLE =
   "ABSOLUTE RULE ON COUPLES — background couples and pairs are welcome and natural, BUT any couple or pair (two people walking, sitting or standing together) MUST be the SAME race as each other (white+white, black+black, coloured+coloured, indian+indian). A mixed-race / interracial couple is STRICTLY FORBIDDEN — never pair two people of different races together as a couple. Same-race couples are encouraged; mixed-race couples are never allowed; " +
   "every background person is in a complete, tasteful outfit with a top and bottoms, never bare-legged, in underwear or swimwear";
 
-// No extras: the subject is the ONLY person. Stated absolutely because image models love to
-// populate public settings (cafes, streets) with crowds unless this is forced hard.
+// No EXTRAS = no incidental/background crowd. It must NOT delete people the scene explicitly asks
+// for (e.g. "with her son"): "extras off" means no random bystanders, not "the influencer totally
+// alone". Stated hard because image models love to populate public settings with crowds.
 export const NO_EXTRAS =
-  "CRITICAL: the influencer is the ONLY person anywhere in the entire image. Absolutely NO other people: no background people, no passersby, no bystanders, no crowd, no diners or staff, no silhouettes, no reflections of people, not even tiny, distant or blurred figures. The setting is genuinely empty and quiet, occupied by her alone; if the location would normally be busy, show it at a deserted, people-free moment";
+  "No incidental or background people: no passersby, bystanders, crowd, diners, staff, silhouettes, reflections of strangers, or tiny/distant/blurred figures. ONLY the people explicitly named in the scene are present — if the scene names just the influencer, she is alone; if the scene names a companion (for example a child, son, daughter, partner, friend or colleague), include exactly those named people and NO others. If the location would normally be busy, show it quiet and free of strangers apart from the named subjects";
 
 // Concise realism core for Soul generation (long stacked clauses confuse the model and
 // hurt quality, the Soul + reference handle identity, so keep the scene direction tight).
