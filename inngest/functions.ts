@@ -3,6 +3,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, CLOTHED } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
+import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
@@ -982,7 +983,10 @@ export const generateClips = inngest.createFunction(
 
           // PRIMARY a-roll engine: OmniHuman 1.5 (best-in-class lip-sync, audio-driven so it uses OUR
           // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
-          const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: img, audioUrl, prompt }));
+          // fal rejects inputs >5MB, and our keyframes (1-2K PNGs) blow past that — so re-encode to a
+          // capped JPEG first, or OmniHuman silently fails on EVERY submit and we never leave Seedance.
+          const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
+          const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: ohImg, audioUrl, prompt }));
           if (oh.statusUrl && oh.responseUrl) {
             let ohUrl: string | null = null; let ohSeconds: number | null = null;
             for (let n = 0; n < 220; n++) { // ~22 min — OmniHuman is ~45s gen per 1s of speech, so a full a-roll line needs room to FINISH on OmniHuman rather than bail to the slower Seedance fallback
