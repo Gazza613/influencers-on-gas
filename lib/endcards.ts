@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 // End Cards library: reusable closing frames/clips (image or short video) the team uploads once
 // and appends to any cut. Single-org for now (no client scoping yet). The table is created lazily
 // on first use so no manual migration is needed.
-export type EndCard = { id: string; label: string; url: string; kind: "image" | "video"; created_at: string };
+export type EndCard = { id: string; label: string; url: string; kind: "image" | "video"; ratio: "9:16" | "1:1"; created_at: string };
 
 let _ensured = false;
 async function ensure() {
@@ -16,20 +16,22 @@ async function ensure() {
       kind text not null default 'image',
       created_at timestamptz not null default now()
     )`;
+  // Lazy column add for aspect ratio so an existing library keeps working (existing rows default to 9:16).
+  await db()`alter table end_cards add column if not exists ratio text not null default '9:16'`;
   _ensured = true;
 }
 
 export async function listEndCards(): Promise<EndCard[]> {
   await ensure();
-  const rows = await db()`select id, label, url, kind, created_at from end_cards order by created_at desc`;
+  const rows = await db()`select id, label, url, kind, ratio, created_at from end_cards order by created_at desc`;
   return rows as EndCard[];
 }
 
-export async function addEndCard(label: string, url: string, kind: "image" | "video"): Promise<EndCard> {
+export async function addEndCard(label: string, url: string, kind: "image" | "video", ratio: "9:16" | "1:1"): Promise<EndCard> {
   await ensure();
   const rows = await db()`
-    insert into end_cards (label, url, kind) values (${label || "End card"}, ${url}, ${kind})
-    returning id, label, url, kind, created_at`;
+    insert into end_cards (label, url, kind, ratio) values (${label || "End card"}, ${url}, ${kind}, ${ratio})
+    returning id, label, url, kind, ratio, created_at`;
   return rows[0] as EndCard;
 }
 

@@ -21,8 +21,9 @@ export async function POST(req: Request) {
   if (!url) return NextResponse.json({ error: "An uploaded file is required." }, { status: 400 });
   if (!isSafePublicUrl(url)) return NextResponse.json({ error: "Invalid file URL." }, { status: 400 }); // SSRF guard
   const kind = b?.kind === "video" ? "video" : "image";
+  const ratio = b?.ratio === "1:1" ? "1:1" : "9:16";
   try {
-    return NextResponse.json({ endCard: await addEndCard(String(b?.label || "").trim(), url, kind) });
+    return NextResponse.json({ endCard: await addEndCard(String(b?.label || "").trim(), url, kind, ratio) });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 });
   }
