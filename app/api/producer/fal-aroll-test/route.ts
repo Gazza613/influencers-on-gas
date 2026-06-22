@@ -4,6 +4,11 @@ import { getInfluencer, listInfluencers } from "@/lib/influencers";
 import { tts, pickVoiceForGender } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { getSecret } from "@/lib/connections";
+import { compressForFal } from "@/lib/image";
+
+async function byteSize(url: string): Promise<number | null> {
+  try { const r = await fetch(url, { signal: AbortSignal.timeout(20000) }); if (!r.ok) return null; return (await r.arrayBuffer()).byteLength; } catch { return null; }
+}
 
 // DIAGNOSTIC (super-admin): submit ONE real OmniHuman job (hero + short TTS) and report EXACTLY what
 // fal returns + the true timing, so we can see whether the poll detects completion. Costs ~1 short
@@ -40,9 +45,15 @@ export async function GET(req: Request) {
     if (!voiceId) return NextResponse.json({ error: "No voice available to test with" }, { status: 400 });
     const audioUrl = await putBytes(await tts(voiceId, "Hi, this is a quick a-roll test."), "fal-test", "mp3", "audio/mpeg");
 
+    // Compress the keyframe exactly as the real a-roll does, and report the sizes so we can SEE the
+    // 5MB limit is respected (original vs what we actually send to fal).
+    const originalBytes = await byteSize(hero);
+    const ohImg = await compressForFal(hero);
+    const compressedBytes = await byteSize(ohImg);
+
     const submitRes = await fetch(`https://queue.fal.run/${MODEL}`, {
       method: "POST", headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ image_url: hero, audio_url: audioUrl, resolution: "720p", turbo_mode: true }),
+      body: JSON.stringify({ image_url: ohImg, audio_url: audioUrl, resolution: "720p", turbo_mode: true }),
       signal: AbortSignal.timeout(30000),
     });
     const submitText = await submitRes.text();
@@ -72,7 +83,9 @@ export async function GET(req: Request) {
       if (status === "FAILED" || status === "ERROR") { done = true; }
     }
     return NextResponse.json({
-      influencer: inf.name, model: MODEL, submit: { request_id: requestId, status_url: statusUrl, response_url: responseUrl, keys: Object.keys(submit) },
+      influencer: inf.name, model: MODEL,
+      image: { originalBytes, compressedBytes, underFalLimit: typeof compressedBytes === "number" ? compressedBytes <= 5242880 : null, usedProxy: ohImg.includes("weserv.nl"), reencoded: ohImg !== hero },
+      submit: { request_id: requestId, status_url: statusUrl, response_url: responseUrl, keys: Object.keys(submit) },
       samples, videoUrl, elapsedSec: Math.round((Date.now() - t0) / 1000), done, finalResponse,
     });
   } catch (e) {
