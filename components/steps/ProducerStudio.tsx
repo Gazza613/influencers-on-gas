@@ -358,88 +358,102 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       {editing ? (
         /* Brief */
         <div className="space-y-4 rounded-xl border border-line bg-surface-1 p-5">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">The brief</div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Brand / product" v={brand} set={setBrand} placeholder="e.g. MTN MoMo App" />
-            <Field label="Core offer / hook" v={offer} set={setOffer} placeholder="e.g. register and get 1GB free" />
+          <div className="flex items-center justify-between">
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">The brief</div>
+            <span className="text-[10px] text-ink-faint"><span className="text-alert">*</span> required — the rest is optional</span>
           </div>
-          <Area label="Key benefits (comma separated)" v={benefits} set={setBenefits} placeholder="airtime, data, payments, vouchers, all in one app" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Primary CTA" v={cta} set={setCta} placeholder="Download the MTN MoMo App, register today" />
-            <Field label="CTA mechanic / code" v={ctaCode} set={setCtaCode} placeholder="dial *120*151#" />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Setting / world (one place, used throughout)" v={setting} set={setSetting} placeholder="upscale sunlit coffee shop, daytime" />
-            <Field label="Tone words" v={tone} set={setTone} placeholder="warm, confident, effortless" />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Persistent branding / logo" v={logo} set={setLogo} placeholder='"MoMo from MTN" logo top-left' />
-            <div>
-              <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Duration</div>
-              <div className="flex gap-2">
-                {[15, 30, 45, 60].map((d) => (
-                  <button key={d} onClick={() => setDuration(d)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${duration === d ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{d}s</button>
-                ))}
+
+          {/* ── Core (required) ── */}
+          <div className="space-y-3">
+            <div className="eyebrow">Core</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Brand / product *" v={brand} set={setBrand} placeholder="e.g. MTN MoMo App" />
+              <Field label="Core offer / hook *" v={offer} set={setOffer} placeholder="e.g. register and get 1GB free" />
+            </div>
+            <div className="flex flex-wrap items-end gap-6">
+              <div>
+                <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Duration</div>
+                <div className="flex gap-2">
+                  {[15, 30, 45, 60].map((d) => (
+                    <button key={d} onClick={() => setDuration(d)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${duration === d ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{d}s</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Format</div>
+                <div className="flex gap-2">
+                  {(["9:16", "1:1"] as const).map((f) => (
+                    <button key={f} onClick={() => setFormat(f)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${format === f ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{f}</button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Format</div>
-              <div className="flex gap-2">
-                {(["9:16", "1:1"] as const).map((f) => (
-                  <button key={f} onClick={() => setFormat(f)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${format === f ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{f}</button>
-                ))}
-              </div>
+
+          {/* ── Story & messaging ── */}
+          <div className="space-y-3 border-t border-line pt-4">
+            <div className="eyebrow">Story &amp; messaging</div>
+            <Area label="Key benefits (comma separated)" v={benefits} set={setBenefits} placeholder="airtime, data, payments, vouchers, all in one app" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Primary CTA" v={cta} set={setCta} placeholder="Download the MTN MoMo App, register today" />
+              <Field label="CTA mechanic / code" v={ctaCode} set={setCtaCode} placeholder="dial *120*151#" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Setting / world (one place, used throughout)" v={setting} set={setSetting} placeholder="upscale sunlit coffee shop, daytime" />
+              <Field label="Tone words" v={tone} set={setTone} placeholder="warm, confident, effortless" />
             </div>
           </div>
-          {/* Optional reference uploads — steer the SHOOT's wardrobe + world */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Uploader kind="clothing" label="Clothing reference (optional)" current={clothingRef} onUploaded={setClothingRef} />
-            <Uploader kind="location" label="Scene / location reference (optional)" current={locationRef} onUploaded={setLocationRef} />
-          </div>
 
-          {/* Brand overlays: logo TOP-LEFT + promo image TOP-RIGHT (both burned onto the cut, auto-sized) */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Uploader kind="logo" label="Brand logo — top-left (transparent PNG, optional)" current={logoUrl} onUploaded={setLogoUrl} />
-            <Uploader kind="promo" label="Promo image — top-right (optional)" current={promoUrl} onUploaded={setPromoUrl} />
-          </div>
-          <p className="-mt-1 text-[10px] text-ink-faint">Both are placed and sized for you, top corners, so they sit cleanly and stay legible over the video. No logo? The brand name shows as small text instead.</p>
-
-          {/* Captions on/off */}
-          <div>
-            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Captions</div>
-            <div className="flex gap-2">
-              {([[true, "Captions on"], [false, "Captions off"]] as const).map(([v, label]) => (
-                <button key={label} onClick={() => setCaptions(v)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${captions === v ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{label}</button>
-              ))}
-            </div>
-            <p className="mt-1 text-[10px] text-ink-faint">On burns the VO subtitles onto the cut; off leaves it clean.</p>
-          </div>
-
-          {/* End card (from the End Cards library) — appended to the finished cut */}
-          <div>
-            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Closing / end card (optional)</div>
-            {endCards.length === 0 ? (
-              <p className="text-[11px] text-ink-faint">No end cards yet. Add reusable closing clips/frames in <a href="/end-cards" className="text-accent">End Cards</a>, then pick one here.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => { setEndCardUrl(""); }} className={`flex aspect-[9/16] w-16 items-center justify-center rounded-lg border text-[10px] ${!endCardUrl ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong"}`}>None</button>
-                {endCards.map((c) => (
-                  <button key={c.id} onClick={() => { setEndCardUrl(c.url); setEndCardKind(c.kind); }} title={c.label} className={`relative aspect-[9/16] w-16 overflow-hidden rounded-lg border ${endCardUrl === c.url ? "border-[#a855f7] ring-2 ring-[#a855f7]/50" : "border-line hover:border-line-strong"}`}>
-                    {c.kind === "video"
-                      ? <video src={c.url} muted playsInline className="h-full w-full object-cover" />
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      : <img src={c.url} alt={c.label} className="h-full w-full object-cover" />}
-                    {endCardUrl === c.url && <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#a855f7] text-[9px] text-white">✓</span>}
-                  </button>
-                ))}
+          {/* ── Look & assets (optional, collapsed) ── */}
+          <details className="group border-t border-line pt-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between">
+              <span className="eyebrow">Look &amp; assets <span className="normal-case tracking-normal text-ink-faint">· optional</span></span>
+              <span className="text-ink-faint transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Uploader kind="clothing" label="Clothing reference" current={clothingRef} onUploaded={setClothingRef} />
+                <Uploader kind="location" label="Scene / location reference" current={locationRef} onUploaded={setLocationRef} />
               </div>
-            )}
-            <p className="mt-1 text-[10px] text-ink-faint">Appended to the end of the finished cut. Manage the library under <a href="/end-cards" className="text-accent">End Cards</a>.</p>
-          </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Uploader kind="logo" label="Brand logo — top-left (transparent PNG)" current={logoUrl} onUploaded={setLogoUrl} />
+                <Uploader kind="promo" label="Promo image — top-right" current={promoUrl} onUploaded={setPromoUrl} />
+              </div>
+              <p className="-mt-1 text-[10px] text-ink-faint">Logo + promo are placed and sized for you in the top corners, over the whole video. A logo only shows if you upload one.</p>
+              <Field label="Brand-name text (shown only if no logo is uploaded)" v={logo} set={setLogo} placeholder='"MoMo from MTN"' />
+            </div>
+          </details>
 
-          <Area label="Compliance / legal line (verbatim, optional)" v={legal} set={setLegal} placeholder="Used exactly as written on the end card. Optional." />
+          {/* ── Finishing (optional, collapsed) ── */}
+          <details className="group border-t border-line pt-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between">
+              <span className="eyebrow">Finishing <span className="normal-case tracking-normal text-ink-faint">· optional</span></span>
+              <span className="text-ink-faint transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div>
+                <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Closing / end card</div>
+                {endCards.length === 0 ? (
+                  <p className="text-[11px] text-ink-faint">Pick a reusable close from <a href="/end-cards" className="text-accent">End Cards</a>, or just upload one at the final <b>Stitch</b> step.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => { setEndCardUrl(""); }} className={`flex aspect-[9/16] w-16 items-center justify-center rounded-lg border text-[10px] ${!endCardUrl ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong"}`}>None</button>
+                    {endCards.map((c) => (
+                      <button key={c.id} onClick={() => { setEndCardUrl(c.url); setEndCardKind(c.kind); }} title={c.label} className={`relative aspect-[9/16] w-16 overflow-hidden rounded-lg border ${endCardUrl === c.url ? "border-[#a855f7] ring-2 ring-[#a855f7]/50" : "border-line hover:border-line-strong"}`}>
+                        {c.kind === "video"
+                          ? <video src={c.url} muted playsInline className="h-full w-full object-cover" />
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          : <img src={c.url} alt={c.label} className="h-full w-full object-cover" />}
+                        {endCardUrl === c.url && <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#a855f7] text-[9px] text-white">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Area label="Compliance / legal line (verbatim)" v={legal} set={setLegal} placeholder="Used exactly as written. Optional." />
+              <p className="text-[10px] text-ink-faint">Captions and the closing clip are also controlled at the final <b>Stitch</b> step.</p>
+            </div>
+          </details>
           {err && <p className="text-xs text-alert">{err}</p>}
           <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : "🎬 Direct the storyboard"}</button>
         </div>
