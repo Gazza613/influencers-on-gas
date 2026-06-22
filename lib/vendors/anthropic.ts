@@ -592,3 +592,24 @@ export async function rewriteSceneScript(o: { brand: string; tone: string; beat:
   if (block && block.type === "tool_use") return block.input as { vo_line: string; caption: string };
   return { vo_line: o.currentVo, caption: o.currentCaption };
 }
+
+// Continuity pass: after the producer curates (keeps/rejects) the reference shots, re-flow the VO so
+// the KEPT scenes read as ONE coherent narrative (no gaps from dropped scenes). Returns one rewritten
+// vo_line + caption per kept scene (keyed by its scene index). Fails open (callers keep originals).
+export async function reflowContinuity(o: { brand: string; tone: string; cta?: string; scenes: { scene: number; role: string; beat: string; vo_line: string }[] }): Promise<{ scene: number; vo_line: string; caption: string }[]> {
+  const talking = o.scenes.filter((s) => s.role === "a-roll");
+  if (!talking.length) return [];
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 1200,
+    system:
+      "You are a sharp social-ad copy producer doing a CONTINUITY pass. You are given the FINAL ordered list of talking (a-roll) scenes the producer kept (others were dropped). Rewrite the spoken VOICEOVER so the kept scenes flow as ONE seamless narrative start-to-finish — no references to dropped/missing beats, smooth connective phrasing, a clear arc that lands the CTA last. House style: single continuous second-person voiceover, warm and confident, short punchy active sentences, benefit-led, no hard sell. UK spelling, no em dashes, no emojis, no quotes. For each scene also give a burned-in CAPTION matching its VO almost word-for-word (14 words max). Keep each line the right length for its beat. Return EVERY scene via the tool, keyed by its scene number.",
+    tools: [{ name: "reflow", description: "The re-flowed VO line + caption for each kept talking scene.", input_schema: { type: "object", additionalProperties: false, properties: { lines: { type: "array", items: { type: "object", additionalProperties: false, properties: { scene: { type: "number" }, vo_line: { type: "string" }, caption: { type: "string" } }, required: ["scene", "vo_line", "caption"] } } }, required: ["lines"] } as unknown as Anthropic.Tool["input_schema"] }],
+    tool_choice: { type: "tool", name: "reflow" },
+    messages: [{ role: "user", content: `Brand: ${o.brand || "the brand"}. Tone: ${o.tone || "warm, confident"}.${o.cta ? ` CTA to land last: ${o.cta}.` : ""}\n\nKept talking scenes, IN ORDER:\n${talking.map((s) => `Scene ${s.scene} — beat "${s.beat}". Current VO: "${s.vo_line}"`).join("\n")}\n\nRewrite the VO + caption for each so they read as one continuous, gap-free script.` }],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (block && block.type === "tool_use") { const out = (block.input as { lines?: { scene: number; vo_line: string; caption: string }[] }).lines; if (Array.isArray(out)) return out; }
+  return [];
+}

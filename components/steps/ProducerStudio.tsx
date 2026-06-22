@@ -77,11 +77,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // one kept scene of that role has a shot (so there's something to approve) and nothing's shooting.
   const aRollKept = aRollIdx.filter((x) => !dropped.has(x.i));
   const bRollKept = bRollIdx.filter((x) => !dropped.has(x.i));
-  const aRollRefsReady = !!sb && (aRollNone || (aRollKept.some((x) => shotFor(x.i)?.url) && !shooting));
-  const bRollRefsReady = !!sb && (bRollNone || (bRollKept.some((x) => shotFor(x.i)?.url) && !shooting));
-  // Animation steps: every KEPT scene of the role has a rendered clip.
-  const aRollReady = !!sb && (aRollNone || (aRollKept.length > 0 && aRollKept.every((x) => clipDone(x.i))));
-  const bRollReady = !!sb && (bRollNone || (bRollKept.length > 0 && bRollKept.every((x) => clipDone(x.i))));
+  // Refs ready once a kept scene of that role is shot (or there's nothing to curate — no scenes of
+  // that role, or every one rejected) and nothing's shooting.
+  const aRollRefsReady = !!sb && (aRollNone || aRollKept.length === 0 || (aRollKept.some((x) => shotFor(x.i)?.url) && !shooting));
+  const bRollRefsReady = !!sb && (bRollNone || bRollKept.length === 0 || (bRollKept.some((x) => shotFor(x.i)?.url) && !shooting));
+  // Animation steps ready when every KEPT scene of the role has a clip (or nothing to animate).
+  const aRollReady = !!sb && (aRollNone || aRollKept.length === 0 || aRollKept.every((x) => clipDone(x.i)));
+  const bRollReady = !!sb && (bRollNone || bRollKept.length === 0 || bRollKept.every((x) => clipDone(x.i)));
   const audioBusy = production?.audio_status === "running";
   const audioReady = production?.audio_status === "done" && !!(production?.music_url || production?.ambient_url);
   // Artifact-ready per step (the natural gate). "done" tick shows once approved.
@@ -208,6 +210,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
     await poll(setProduction, "clips_status");
     setRenderingRole("");
+  }
+
+  const [reflowBusy, setReflowBusy] = useState(false);
+  // Continuity pass: re-flow the VO across the KEPT scenes so the script reads seamlessly after drops.
+  async function reflowScript() {
+    setReflowBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/production/reflow`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    setReflowBusy(false);
+    if (r?.ok) { const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null); if (d?.production) setProduction(d.production); }
+    else setErr(r?.error || "Couldn't re-flow the script.");
   }
 
   async function genAudio() {
@@ -599,8 +611,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 !needsVoice ? (
                   <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
                 ) : (
-                  <VoicePicker influencerId={influencerId} name={name} voiceId={voiceId} voiceName={voiceName} voicePreview={voicePreview}
-                    onSet={(v) => { setVoiceId(v.voice_id); setVoiceName(v.voice_name); setVoicePreview(v.preview_url || ""); }} />
+                  <>
+                    {/* Continuity pass: re-flow the script across kept scenes before voicing it */}
+                    <div className="mb-3 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
+                      <p className="text-[12px] text-ink-dim">Final producer pass: re-flow the voiceover so the scenes you kept read as one seamless script (it smooths over any rejected shots), then voice it.</p>
+                      <button onClick={reflowScript} disabled={reflowBusy} className="mt-2 rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reflowBusy ? "✨ Re-flowing the script…" : "✨ Re-flow script for continuity"}</button>
+                    </div>
+                    <VoicePicker influencerId={influencerId} name={name} voiceId={voiceId} voiceName={voiceName} voicePreview={voicePreview}
+                      onSet={(v) => { setVoiceId(v.voice_id); setVoiceName(v.voice_name); setVoicePreview(v.preview_url || ""); }} />
+                  </>
                 )
               ) : <LockHint />}
             </StepShell>
