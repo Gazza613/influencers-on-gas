@@ -960,7 +960,7 @@ export const generateClips = inngest.createFunction(
           const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: img, audioUrl, prompt }));
           if (oh.statusUrl && oh.responseUrl) {
             let ohUrl: string | null = null; let ohSeconds: number | null = null;
-            for (let n = 0; n < 80; n++) { // ~8 min cap (turbo+720p finishes in ~2-4 min); fall back fast if it hangs
+            for (let n = 0; n < 220; n++) { // ~22 min — OmniHuman is ~45s gen per 1s of speech, so a full a-roll line needs room to FINISH on OmniHuman rather than bail to the slower Seedance fallback
               const s = await step.run(`oh-poll-${i}-${n}`, () => pollOmniHumanOnce(oh.statusUrl as string, oh.responseUrl as string));
               if (s.url) { ohUrl = s.url; ohSeconds = s.seconds; break; }
               if (s.terminal) break;

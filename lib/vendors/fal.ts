@@ -57,7 +57,10 @@ export async function submitOmniHuman(opts: { imageUrl: string; audioUrl: string
     const txt = await res.text();
     if (!res.ok) return { statusUrl: null, responseUrl: null, error: `omnihuman submit ${res.status}: ${txt.slice(0, 180)}` };
     const data = JSON.parse(txt) as { status_url?: string; response_url?: string; request_id?: string };
-    const base = `${FAL_QUEUE}/${OMNIHUMAN_MODEL}/requests/${data.request_id || ""}`;
+    // fal's queue request URLs use the APP namespace ("fal-ai/bytedance"), not the full model path —
+    // so build the fallback from the first two id segments. (We prefer fal's returned URLs anyway.)
+    const appNs = OMNIHUMAN_MODEL.split("/").slice(0, 2).join("/");
+    const base = `${FAL_QUEUE}/${appNs}/requests/${data.request_id || ""}`;
     const statusUrl = data.status_url || (data.request_id ? `${base}/status` : null);
     const responseUrl = data.response_url || (data.request_id ? base : null);
     if (!statusUrl || !responseUrl) return { statusUrl: null, responseUrl: null, error: `omnihuman: no request handle: ${txt.slice(0, 160)}` };
