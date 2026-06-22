@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     benefits: String(b.benefits || "").trim(),
     cta: String(b.cta || "").trim(),
     ctaCode: String(b.ctaCode || "").trim(),
-    durationSeconds: [15, 30, 45, 60].includes(Number(b.durationSeconds)) ? Number(b.durationSeconds) : 45,
+    durationSeconds: [15, 30, 45, 60].includes(Number(b.durationSeconds)) ? Number(b.durationSeconds) : 60,
     format: b.format === "1:1" ? "1:1 (1080x1080)" : "9:16 (1080x1920)",
     talent: String(b.talent || "").trim(),
     setting: String(b.setting || "").trim(),

@@ -37,7 +37,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [benefits, setBenefits] = useState(String((initialProduction?.brief as { benefits?: string })?.benefits || ""));
   const [cta, setCta] = useState(String((initialProduction?.brief as { cta?: string })?.cta || ""));
   const [ctaCode, setCtaCode] = useState(String((initialProduction?.brief as { ctaCode?: string })?.ctaCode || ""));
-  const [duration, setDuration] = useState<number>(Number((initialProduction?.brief as { durationSeconds?: number })?.durationSeconds) || 45);
+  const [duration, setDuration] = useState<number>(Number((initialProduction?.brief as { durationSeconds?: number })?.durationSeconds) || 60);
   const [format, setFormat] = useState<"9:16" | "1:1">("9:16");
   const [setting, setSetting] = useState(String((initialProduction?.brief as { setting?: string })?.setting || ""));
   const [tone, setTone] = useState(String((initialProduction?.brief as { tone?: string })?.tone || "warm, confident, effortless"));
