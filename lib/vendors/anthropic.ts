@@ -206,7 +206,7 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; score10:
   // Fetch + inspect as base64 (works on any SDK version; also validates the image loads).
   let b64: string, mt: string;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) }); // timeout so a hung fetch can't stall the job
     if (!res.ok) return { pass: false, score10: 0, issues: ["image did not load"] }; // broken → reject
     mt = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
     if (!QA_MEDIA.has(mt)) mt = "image/jpeg";
@@ -247,7 +247,7 @@ const QA_MEDIA2 = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]
 export async function matchesIdentity(frameUrl: string, refUrl: string): Promise<boolean> {
   const grab = async (u: string): Promise<{ mt: "image/jpeg"; data: string } | null> => {
     try {
-      const r = await fetch(u);
+      const r = await fetch(u, { signal: AbortSignal.timeout(15000) }); // timeout: a hung image fetch must NOT stall the photoshoot
       if (!r.ok) return null;
       let mt = (r.headers.get("content-type") || "image/jpeg").split(";")[0];
       if (!QA_MEDIA2.has(mt)) mt = "image/jpeg";

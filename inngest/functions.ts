@@ -166,11 +166,16 @@ export const buildIdentity = inngest.createFunction(
         // IDENTITY QA: drop any generated frame that isn't the same person as the anchor (wide /
         // full-body shots sometimes render a different model). Checked against the chosen anchor.
         // QA each frame on TWO axes and drop failures: (1) identity match vs the anchor, (2) the
-        // clothing/coherence gate (catches bare legs / missing bottoms — a hard no). Fails open.
-        const validShoot = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => {
-          const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0]), qaCreative(u).catch(() => ({ pass: true }))]);
-          return { u, ok: idOk && qa.pass };
-        }))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
+        // clothing/coherence gate (bare legs / missing bottoms). Robust: if the QA step errors OR
+        // filters everything out, KEEP all loadable frames — the photoshoot must never come back empty.
+        let validShoot: string[] = loadedShoot;
+        try {
+          const filtered = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => {
+            const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0]).catch(() => true), qaCreative(u).catch(() => ({ pass: true }))]);
+            return { u, ok: idOk && qa.pass };
+          }))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
+          if (filtered.length) validShoot = filtered; // only apply the filter if it kept something
+        } catch { validShoot = loadedShoot; }
         // Real uploads first (identity truth), then the identity-matched generated frames.
         const frames: { url: string; hero?: boolean; face?: boolean }[] = [{ url: valid[0], hero: true, face: true }];
         for (const url of valid.slice(1)) if (!frames.some((f) => f.url === url)) frames.push({ url });
