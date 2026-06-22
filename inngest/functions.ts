@@ -1252,10 +1252,11 @@ export const assembleVideo = inngest.createFunction(
 
     // Build the Shotstack timeline (top track renders on top). All clips are silent; voice is the
     // voTrack above (a-roll's exact synced audio + b-roll VO), so nothing doubles up.
+    // HARD CUTS between scenes — quick + clean (the per-clip fade in/out read as slow/muddy). The end
+    // card keeps a quick fade. (FaaS ad style: snappy cuts.)
     const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
       asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 },
       start: p.start, length: p.len, fit: "cover",
-      transition: { in: "fade", out: "fade" },
     }));
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
@@ -1263,22 +1264,21 @@ export const assembleVideo = inngest.createFunction(
     const endCardKind = (production?.brief as { endCardKind?: string })?.endCardKind === "image" ? "image" : "video";
     if (endCardUrl) {
       const endLen = endCardKind === "image" ? 4 : 6;
-      videoClips.push({ asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) } as Record<string, unknown>, start: total, length: endLen, fit: "cover", transition: { in: "fade", out: "fade" } } as typeof videoClips[number]);
+      videoClips.push({ asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) } as Record<string, unknown>, start: total, length: endLen, fit: "cover", transition: { in: "fade" } } as unknown as typeof videoClips[number]);
     }
-    // Captions on by default; producer can switch them off for a clean cut.
-    const captionsOn = (production?.brief as { captions?: boolean })?.captions !== false;
+    // Captions are OPT-IN at stitch time (the producer ticks "Burn captions"). Default OFF — they were
+    // appearing unrequested. Sized for the 9:16 frame: smaller text, lifted off the very bottom edge.
+    const captionsOn = event.data.captions === true;
     const captionClips = captionsOn ? placed.filter((p) => p.caption).map((p) => ({
-      asset: { type: "title", text: p.caption, style: "subtitle", size: "small", position: "bottom" },
+      asset: { type: "title", text: p.caption, style: "subtitle", size: "small", position: "bottom", offset: { y: 0.12 } },
       start: p.start, length: p.len,
     })) : [];
-    // Brand overlays: logo TOP-LEFT + promo image TOP-RIGHT, both auto-sized + inset so they sit
-    // cleanly and stay legible. Logo falls back to the brand name as small text if no logo uploaded.
+    // Brand overlay: ONLY an uploaded logo (top-left) / promo (top-right) — both explicit. No auto
+    // "brand name as text" bug (it was burning the brand name on cuts nobody asked to brand).
     const logoUrl = (production?.brief?.logoUrl || "").trim();
     const promoUrl = (production?.brief?.promoUrl || "").trim();
-    const brand = (production?.brief?.brand || "").trim();
     const brandTrack: Record<string, unknown>[] = [];
     if (logoUrl) brandTrack.push({ asset: { type: "image", src: logoUrl }, start: 0, length: total, position: "topLeft", scale: 0.16, offset: { x: 0.04, y: -0.04 } });
-    else if (brand) brandTrack.push({ asset: { type: "title", text: brand, style: "minimal", size: "x-small", position: "topLeft" }, start: 0, length: total });
     if (promoUrl) brandTrack.push({ asset: { type: "image", src: promoUrl }, start: 0, length: total, position: "topRight", scale: 0.18, offset: { x: -0.04, y: -0.04 } });
 
     const tracks: Record<string, unknown>[] = [];

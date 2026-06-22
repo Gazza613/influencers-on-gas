@@ -114,6 +114,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   useEffect(() => { setDropped(new Set(production?.dropped_scenes ?? [])); }, [production?.dropped_scenes]);
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [brollRatio, setBrollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
+  // Captions are opt-in at stitch (default OFF — they were appearing unrequested).
+  const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
   async function toggleDrop(scene: number) {
     setDropped((s) => { const n = new Set(s); n.has(scene) ? n.delete(scene) : n.add(scene); return n; }); // optimistic
     // Confirm from the server so a later render/stitch can't race on a stale dropped list.
@@ -174,6 +176,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       (["shots_status", "clips_status", "assembly_status", "audio_status"] as const).forEach((k) => { if (p?.[k] === "running") poll(setProduction, k); });
     };
     resume(initialProduction);
+    // Also re-sync from the LIVE production on mount (the SSR snapshot can be a beat stale on a hard
+    // refresh) so an in-flight stitch/render resumes its progress instead of looking stalled.
+    fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); resume(d.production); } }).catch(() => {});
     function onVisible() {
       if (document.visibilityState !== "visible") return;
       fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); resume(d.production); } }).catch(() => {});
@@ -240,7 +245,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (assembling) return;
     setErr("");
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
   }
@@ -683,11 +688,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 8 · Stitch */}
-            <StepShell n={8} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order, a continuous voiceover, burned-in captions, the ${production?.brief?.brand ? `${production.brief.brand} ` : ""}brand bug, and the music + ambient mixed underneath — one finished ${sb.format} ad.`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
+            <StepShell n={8} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order with clean cuts, a continuous voiceover, the music + ambient mixed underneath${(production?.brief as { logoUrl?: string })?.logoUrl ? " and your uploaded logo" : ""} — one finished ${sb.format} ad. Captions are optional (off by default).`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
               {unlocked("stitch") ? (
                 <>
                   <div className="flex flex-wrap items-center gap-3">
                     <button onClick={stitchCut} disabled={assembling} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
+                    <label className="flex cursor-pointer items-center gap-2 text-[12px] text-ink-dim"><input type="checkbox" checked={stitchCaptions} onChange={(e) => setStitchCaptions(e.target.checked)} className="h-4 w-4 accent-[#a855f7]" /> Burn in captions</label>
                     {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{production.assembly_error}</span>}
                   </div>
                   {finalUrl && (
