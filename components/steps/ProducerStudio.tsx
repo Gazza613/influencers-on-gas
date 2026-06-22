@@ -187,7 +187,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setApproved((s) => new Set([...s].filter((k) => k === "concept")));
     setDenied(new Set());
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roleFilter: role, aspectRatio: ratio }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start shooting."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot — give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
   }
 
@@ -198,7 +198,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(""); setRenderingRole("");
     setProduction((p) => (p ? { ...p, clips: [], clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the render — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
     await poll(setProduction, "clips_status");
   }
 
@@ -207,7 +207,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(""); setRenderingRole(role);
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: [role] }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start rendering."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the render — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
     await poll(setProduction, "clips_status");
     setRenderingRole("");
   }
@@ -227,7 +227,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     setProduction((p) => (p ? { ...p, audio_status: "running", music_url: null, ambient_url: null } : p));
     const r = await fetch(`/api/influencers/${influencerId}/audio`, { method: "POST" }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the audio."); setProduction((p) => (p ? { ...p, audio_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the audio — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, audio_status: "idle" } : p)); return; }
     await poll(setProduction, "audio_status");
   }
 
@@ -236,7 +236,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST" }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
   }
 
@@ -448,6 +448,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               </div>
             </div>
             {sb.music_bed && <p className="mt-2 text-[12px] text-ink-faint">🎵 {sb.music_bed}</p>}
+            {/* Plain-English glossary — define the two shot types once, up front */}
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+              <span className="rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-1 text-[#c79bff]"><b>A-roll</b> = talking shots — {name} speaking to camera, lip-synced</span>
+              <span className="rounded-md border border-[#60a5fa]/30 bg-[#60a5fa]/10 px-2 py-1 text-[#93c5fd]"><b>B-roll</b> = scene shots — the world and movement around her, no talking</span>
+            </div>
           </div>
 
           <div className="space-y-3">

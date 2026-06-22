@@ -50,8 +50,8 @@ export default async function StudioPage() {
             <h1 className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">Brief to <span className="brand-grad">publish-ready</span> ad.</h1>
             <p className="mt-3 max-w-xl text-sm text-ink-dim">Direct a hyper-real AI influencer through the over-the-shoulder Producer — keyframes, lip-synced a-roll, cinematic b-roll, voice, music and the final cut.</p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/setup/influencers" className="btn-brand rounded-lg px-5 py-3 text-sm font-bold">🎬 Start a production</Link>
-              <Link href="/setup/influencers" className="rounded-lg border border-line px-5 py-3 text-sm font-semibold text-ink-dim hover:border-line-strong hover:text-ink">+ New influencer</Link>
+              <Link href={locked.length > 0 ? "/setup/influencers" : "/start"} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold">🎬 Start a production</Link>
+              <Link href="/start" className="rounded-lg border border-line px-5 py-3 text-sm font-semibold text-ink-dim hover:border-line-strong hover:text-ink">+ New influencer</Link>
             </div>
           </section>
 
@@ -74,7 +74,21 @@ export default async function StudioPage() {
               <Link href="/setup/influencers" className="text-xs font-semibold text-accent">View all →</Link>
             </div>
             {influencers.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-surface-1 p-8 text-center text-sm text-ink-faint">No influencers yet. Hit <span className="brand-grad font-semibold">+ New influencer</span> to build your first one.</div>
+              <div className="rounded-2xl border border-dashed border-line bg-surface-1 p-8 text-center">
+                <div className="text-3xl">🎬</div>
+                <h3 className="mt-2 text-base font-bold text-ink">Build your first influencer</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-ink-dim">Three steps from here to a finished ad:</p>
+                <div className="mx-auto mt-5 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+                  {[["1", "Cast & shoot", "Build the influencer and shoot a varied identity set."], ["2", "Lock the identity", "Lock the face so every shot stays consistent."], ["3", "Produce the video", "Brief the Producer and it directs the full ad."]].map(([n, t, d]) => (
+                    <div key={n} className="rounded-xl border border-line bg-surface-2/50 p-4">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#a855f7]/20 text-[13px] font-bold text-[#c79bff]">{n}</div>
+                      <div className="mt-2 text-sm font-bold text-ink">{t}</div>
+                      <div className="mt-0.5 text-[12px] text-ink-dim">{d}</div>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/start" className="btn-brand mt-6 inline-block rounded-lg px-5 py-2.5 text-sm font-bold">+ Build an influencer</Link>
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                 {influencers.slice(0, 10).map((inf) => {

@@ -33,10 +33,20 @@ export default async function InfluencersIndex() {
   if (!influencers.length) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="max-w-md text-center">
-          <h1 className="text-xl font-bold">Influencers</h1>
-          <p className="mt-2 text-sm text-ink-dim">Reusable identities, built once and used across every video, creative and campaign.</p>
-          <p className="mt-4 text-sm text-ink-faint">Hit <span className="font-semibold brand-grad">+ New</span> to build your first one.</p>
+        <div className="max-w-xl text-center">
+          <div className="text-4xl">🎭</div>
+          <h1 className="mt-2 text-xl font-bold">Build your first influencer</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-dim">Reusable, identity-locked stars — built once, then used across every video, creative and campaign.</p>
+          <div className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-3">
+            {[["1", "Cast & shoot", "Build the look and shoot a varied identity set."], ["2", "Lock the identity", "Lock the face so every shot stays the same person."], ["3", "Produce", "Brief the Producer to direct a full ad."]].map(([n, t, d]) => (
+              <div key={n} className="rounded-xl border border-line bg-surface-1 p-4">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#a855f7]/20 text-[13px] font-bold text-[#c79bff]">{n}</div>
+                <div className="mt-2 text-sm font-bold text-ink">{t}</div>
+                <div className="mt-0.5 text-[12px] text-ink-dim">{d}</div>
+              </div>
+            ))}
+          </div>
+          <Link href="/start" className="btn-brand mt-6 inline-block rounded-lg px-5 py-2.5 text-sm font-bold">+ Build an influencer</Link>
         </div>
       </div>
     );

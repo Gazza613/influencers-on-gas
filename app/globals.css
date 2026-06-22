@@ -9,8 +9,8 @@
   --color-line: rgba(255, 255, 255, 0.08);
   --color-line-strong: rgba(255, 255, 255, 0.14);
   --color-ink: #e6e8eb;       /* primary text */
-  --color-ink-dim: rgba(230, 232, 235, 0.68);
-  --color-ink-faint: rgba(230, 232, 235, 0.5);
+  --color-ink-dim: rgba(230, 232, 235, 0.72);
+  --color-ink-faint: rgba(230, 232, 235, 0.62); /* lifted for legibility (was 0.5 ≈ 2.8:1, failed AA) */
   --color-accent: #f96203;    /* GAS orange */
   --color-active: #ffb020;    /* in-progress / warm */
   --color-ready: #34c759;     /* ready / ok */
@@ -22,6 +22,14 @@
 
 html, body {
   height: 100%;
+}
+/* Keyboard focus: a clear, on-brand ring on ANY focused control. Many inputs/buttons use
+   `outline-none` (for a clean mouse look) which left keyboard users with no focus indicator —
+   :focus-visible only shows for keyboard/AT navigation, so mouse clicks stay clean. */
+:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 body {
   /* Cinematic ambient backdrop: subtle pink→purple→blue haze over the deep base, fixed so it reads
