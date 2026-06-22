@@ -61,7 +61,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
-  const [locationRef, setLocationRef] = useState<string | null>(null);
+  const [locationRefs, setLocationRefs] = useState<string[]>([]); // multiple scene/location references — shots rotate through them for varied backdrops
   const [identityLock, setIdentityLock] = useState<"strong" | "flexible">("strong");
 
   const [rates, setRates] = useState<Rates | null>(null);
@@ -181,7 +181,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     setErr(""); setStatus("running"); setStartedAt(Date.now());
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRef, extras, identityLock }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRefs, extras, identityLock }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);
@@ -484,7 +484,21 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         {/* Optional clothing + location */}
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Uploader kind="clothing" label="Clothing reference (optional)" current={clothingRef} onUploaded={setClothingRef} />
-          <Uploader kind="location" label="Scene / location reference (optional)" current={locationRef} onUploaded={setLocationRef} />
+          <div>
+            <Uploader kind="location" label="Scene / location references (optional, upload several)" multiple onUploaded={(u) => setLocationRefs((p) => (p.includes(u) ? p : [...p, u]))} />
+            {locationRefs.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {locationRefs.map((u) => (
+                  <span key={u} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="location" className="h-10 w-10 rounded border border-line object-cover" />
+                    <button onClick={() => setLocationRefs((p) => p.filter((x) => x !== u))} className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-[9px] text-white">✕</button>
+                  </span>
+                ))}
+                <span className="ml-1 text-[10px] text-ink-faint">{locationRefs.length} location{locationRefs.length === 1 ? "" : "s"} — shots rotate through them</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Generate */}

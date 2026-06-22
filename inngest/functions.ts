@@ -439,7 +439,8 @@ export const generateCreatives = inngest.createFunction(
     const scene = String(event.data.scene || "").trim();
     const perRatio = Math.max(1, Math.min(6, Number(event.data.count) || 3));
     const clothingRef = (event.data.clothingRef as string) || "";
-    const locationRef = (event.data.locationRef as string) || "";
+    // Multiple location references — shots are spread across them for varied backdrops. Back-compat single.
+    const locationRefs = ((Array.isArray(event.data.locationRefs) ? event.data.locationRefs : [event.data.locationRef]) as unknown[]).filter((u): u is string => typeof u === "string" && !!u).slice(0, 8);
     const peopleClause = event.data.extras === false ? NO_EXTRAS : SCENE_PEOPLE;
 
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
@@ -482,15 +483,15 @@ export const generateCreatives = inngest.createFunction(
       const featureUrl = twinPhotos.length ? "" : ((persona.feature_sheet_url as string) || "");
       const imported = await step.run("import-refs", async () => {
         const ids = (await Promise.all(idRefUrls.map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v);
-        const [feat, cloth, loc] = await Promise.all([
+        const [feat, cloth, locs] = await Promise.all([
           featureUrl ? importMediaUrl(featureUrl).catch(() => null) : Promise.resolve(null),
           clothingRef ? importMediaUrl(clothingRef).catch(() => null) : Promise.resolve(null),
-          locationRef ? importMediaUrl(locationRef).catch(() => null) : Promise.resolve(null),
+          Promise.all(locationRefs.map((u) => importMediaUrl(u).catch(() => null))).then((a) => a.filter((v): v is string => !!v)),
         ]);
-        return { ids, feat, cloth, loc };
+        return { ids, feat, cloth, locs };
       });
       const idMedias = imported.ids;
-      const medias = [...idMedias, imported.feat, imported.cloth, imported.loc].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
+      const medias = [...idMedias, imported.feat, imported.cloth, ...imported.locs].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
       const extra = medias.length ? { medias } : {};
       // @image tags follow the medias order. Identity refs come first.
       let n = 0;
@@ -498,7 +499,8 @@ export const generateCreatives = inngest.createFunction(
       const faceRange = faceTags.length > 1 ? `${faceTags[0]} to ${faceTags[faceTags.length - 1]}` : faceTags[0];
       const featTag = imported.feat ? `@image${++n}` : null;
       const clothTag = imported.cloth ? `@image${++n}` : null;
-      const locTag = imported.loc ? `@image${++n}` : null;
+      const locTags = imported.locs.map(() => `@image${++n}`);
+      const locRange = locTags.length > 1 ? `${locTags[0]} to ${locTags[locTags.length - 1]}` : locTags[0];
       const refInstruction = [
         faceTags.length && (faceTags.length > 1
           ? `IDENTITY LOCK: ${faceRange} are photos of the SAME real person from different angles, lighting and expressions. Replicate this exact person faithfully, the same face, bone structure, eyes, nose, lips, skin tone and hair across all of them. Zero facial drift, unmistakably the same individual. Use them ONLY for the face and identity; IGNORE their clothing, backgrounds, poses and lighting.`
@@ -509,7 +511,8 @@ export const generateCreatives = inngest.createFunction(
         anchored && "The reference photos are the ONLY source of truth for their skin: do NOT add any moles, freckles, scars, beauty spots or skin marks that are not clearly visible in those photos.",
         featTag && `${featTag} is a forensic FEATURE reference: match the exact eyes, brows, lips, skin texture and hair shown in it. Do NOT copy its panel layout, labels or white background.`,
         clothTag && `${clothTag} is a WARDROBE reference: match its outfit (silhouette, fabric, styling). Do NOT copy any face or person from ${clothTag}.`,
-        locTag && `${locTag} is a SCENE reference: match its location and setting. Do NOT copy any face or person from ${locTag}.`,
+        locTags.length === 1 && `${locTags[0]} is a SCENE reference: match its location and setting. Do NOT copy any face or person from it.`,
+        locTags.length > 1 && `${locRange} are ${locTags.length} DIFFERENT location/scene references. Set each shot in a DIFFERENT one of these locations and VARY the backdrop across the set — never repeat the same backdrop twice. Do NOT copy any face or person from them.`,
       ].filter(Boolean).join(" ");
 
       const userScene = !!scene;

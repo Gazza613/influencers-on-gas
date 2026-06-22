@@ -70,7 +70,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // legacy soul_cinematic model name too so older clients keep working.
   const cinematic = body.cinematic === true || body.model === "soul_cinematic";
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
-  const locationRef = typeof body.locationRef === "string" ? body.locationRef : "";
+  // Multiple location references (shots rotate through them for varied backdrops). Back-compat with the old single locationRef.
+  const locationRefs = (Array.isArray(body.locationRefs) ? body.locationRefs : [body.locationRef]).filter((u: unknown): u is string => typeof u === "string" && !!u).slice(0, 8);
   const extras = body.extras !== false; // default: include diverse background extras
   const identityLock = body.identityLock === "flexible" ? "flexible" : "strong"; // default: max likeness
   if (!ratios.length) return NextResponse.json({ error: "Pick at least one format." }, { status: 400 });
@@ -78,7 +79,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Send first; only flip to "running" once accepted, so a send failure can't strand the
   // gallery showing "Rendering" forever with no job running.
   try {
-    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, cinematic, clothingRef, locationRef, extras, identityLock } });
+    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, cinematic, clothingRef, locationRefs, extras, identityLock } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
