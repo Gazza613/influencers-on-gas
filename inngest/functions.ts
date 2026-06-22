@@ -931,7 +931,7 @@ export const generateShots = inngest.createFunction(
 // become HeyGen talking clips (the frame + our expressive VO); B-ROLL scenes become Kling
 // image->video motion clips (face-safe). Graphic scenes pass through to assembly. Durable +
 // progressive; every clip metered; one failed clip never blocks the rest.
-type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null };
+type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number };
 export const generateClips = inngest.createFunction(
   { id: "generate-clips", retries: 1, triggers: [{ event: "influencer/generate.clips" }] },
   async ({ event, step }) => {
@@ -971,7 +971,7 @@ export const generateClips = inngest.createFunction(
       const presetAudio = String(sc.vo_audio_url || "").trim(); // producer's own uploaded VO for this scene
       // Steer the video model away from its two worst tells: shaky camera + people clipping through
       // the world. Appended to every clip prompt.
-      const MOTION_SAFE = " Camera is SMOOTH and STABILISED (gimbal-steady), gentle and locked — absolutely no jittery or shaky handheld motion. Everyone and everything moves with real spatial awareness along physically believable paths: nobody walks into the pool, water, walls, furniture, plants or other people, and nobody clips through objects. All motion is grounded, natural and plausible.";
+      const MOTION_SAFE = " Camera is SMOOTH and STABILISED (gimbal-steady), gentle and locked — absolutely no jittery or shaky handheld motion. Everyone and everything moves with real spatial awareness along physically believable paths: nobody walks into the pool, water, walls, furniture, plants or other people, and nobody clips through objects. All motion is grounded, natural and plausible. CRITICAL ON SPEED + SMOOTHNESS: background people move SLOWLY and calmly at an unhurried, natural real-world walking pace — NEVER fast, sped-up, hurried, frantic, marching or robotic. Every motion is smooth, fluid and continuous at real-time speed — NO stutter, judder, jitter, strobing, speed-ramping, fast-forward or time-lapse feel, and no jumpy or skipped frames.";
       // When a scene has water, the video model's worst tell is fake/jelly water — force real physics.
       const sceneText = `${sc.location || ""} ${sc.blocking || ""} ${base}`.toLowerCase();
       const WATER = /\b(water|pool|waves?|sea|ocean|beach|river|lake|splash|swim|swimming|fountain|rain|surf|wave pool)\b/.test(sceneText)
@@ -1016,7 +1016,7 @@ export const generateClips = inngest.createFunction(
               const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
               await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
               const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
-              return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true, audio_url: audioUrl };
+              return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
             }
           }
 
@@ -1072,7 +1072,7 @@ export const generateClips = inngest.createFunction(
         const usedModel = hero ? "veo3_1" : (process.env.HF_VIDEO_MODEL || "kling3");
         await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: usedModel, unit: "video", action: role === "a-roll" ? "aroll" : "broll", count: 1 }).catch(() => {}));
         const hosted = (await step.run(`vhost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
-        return { scene: i, role, beat, kind: role, url: hosted, status: "ready" };
+        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: sceneDur };
       }
       return { scene: i, role, beat, kind: role, url: null, status: "failed", error: sub.error || `render started (${sub.model}) but did not finish in time` };
     };
@@ -1158,7 +1158,7 @@ export const assembleVideo = inngest.createFunction(
     const production = (persona.production ?? null) as {
       brief?: { brand?: string; logo?: string; logoUrl?: string; promoUrl?: string; logoPosition?: string };
       storyboard?: { scenes?: Record<string, string>[]; format?: string; music_bed?: string; tone?: string; duration_seconds?: number; legal?: string };
-      clips?: { scene: number; role: string; url: string | null; kind?: string; synced?: boolean; audio_url?: string | null }[];
+      clips?: { scene: number; role: string; url: string | null; kind?: string; synced?: boolean; audio_url?: string | null; duration?: number }[];
     } | null;
     const sb = production?.storyboard;
     const scenes = sb?.scenes ?? [];
@@ -1186,14 +1186,18 @@ export const assembleVideo = inngest.createFunction(
     // Rejected references: scenes the producer dropped from the galleries — leave them out of the cut.
     const dropped = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
     const kept = scenes.map((sc, i) => ({ sc, i })).filter(({ i }) => !dropped.has(i));
-    const hasDropped = kept.length !== scenes.length;
-    // Lay scenes on the timeline using the storyboard timecodes; when scenes were dropped, lay the kept
-    // clips back-to-back (sequential) so there are no gaps. Fall back to 5s where there are no timecodes.
+    // Lay the kept clips BACK-TO-BACK at each clip's REAL rendered duration. This is the fix for the
+    // "pause" between scenes: the storyboard timecodes are estimates, so a clip shorter than its slot
+    // used to FREEZE on its last frame to fill the gap. Using the actual clip length (a-roll = the
+    // OmniHuman/VO length, b-roll = the duration we rendered) means every clip plays fully then cuts —
+    // no freeze, no gap. Falls back to the timecode (then 5s) when a clip duration is unknown.
+    const clipDur = (i: number) => { const c = clips.find((x) => x.scene === i); return typeof c?.duration === "number" && c.duration > 0 ? c.duration : null; };
     let cursor = 0;
     const placed = kept.map(({ sc, i }) => {
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
-      const len = a != null && b != null && b > a ? b - a : 5;
-      const start = (!hasDropped && a != null) ? a : cursor;
+      const tcLen = a != null && b != null && b > a ? b - a : 5;
+      const len = clipDur(i) ?? tcLen;
+      const start = cursor;
       cursor = start + len;
       return { i, start, len, role: String(sc.role || "a-roll"), vo: String(sc.vo_line || "").trim(), caption: String(sc.caption || "").trim() };
     });
@@ -1252,11 +1256,13 @@ export const assembleVideo = inngest.createFunction(
 
     // Build the Shotstack timeline (top track renders on top). All clips are silent; voice is the
     // voTrack above (a-roll's exact synced audio + b-roll VO), so nothing doubles up.
-    // HARD CUTS between scenes — quick + clean (the per-clip fade in/out read as slow/muddy). The end
-    // card keeps a quick fade. (FaaS ad style: snappy cuts.)
+    // QUICK fade between scenes — clean and smooth without being muddy (fadeFast ≈ a short crossfade,
+    // not the slow default fade and not a jarring hard cut). Each clip now plays its full length first
+    // (see placed above), so the fade lands on a real cut, not a frozen frame.
     const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
       asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 },
       start: p.start, length: p.len, fit: "cover",
+      transition: { in: "fadeFast", out: "fadeFast" },
     }));
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
