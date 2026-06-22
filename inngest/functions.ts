@@ -798,7 +798,12 @@ export const generateShots = inngest.createFunction(
     const production = (persona.production ?? null) as { brief?: Record<string, unknown>; storyboard?: { scenes?: Record<string, unknown>[]; format?: string } } | null;
     const scenes = production?.storyboard?.scenes ?? [];
     if (!scenes.length) return { error: "no storyboard" };
-    const ratio = String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16";
+    // Role filter: shoot only the a-roll (talking) references, or only the b-roll (scene) references —
+    // the producer curates each gallery separately. Empty = the whole board (back-compat).
+    const roleFilter = event.data.roleFilter === "a-roll" || event.data.roleFilter === "b-roll" ? String(event.data.roleFilter) : "";
+    // Aspect ratio is producer-chosen per shoot (9:16 reels / 1:1 feed / 16:9 youtube); falls back to the storyboard format.
+    const allowedRatios = ["9:16", "1:1", "16:9"];
+    const ratio = allowedRatios.includes(String(event.data.aspectRatio)) ? String(event.data.aspectRatio) : (String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16");
 
     // Identity references (same recipe as creatives): uploaded photos, else the canonical cards.
     const uploadedRefs = Array.isArray(persona.reference_images) ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
@@ -892,7 +897,10 @@ export const generateShots = inngest.createFunction(
     };
     for (let i = 0; i < scenes.length; i++) {
       const sc = scenes[i] as Record<string, string>;
-      if (String(sc.role || "a-roll") === "graphic") { await saveShot(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); continue; }
+      const scRole = String(sc.role || "a-roll");
+      // When filtering by role, leave the other role's existing shots untouched (don't re-render them).
+      if (roleFilter && scRole !== roleFilter) continue;
+      if (scRole === "graphic") { await saveShot(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); continue; }
       const row = await renderShot(i, sc);
       await saveShot(i, row);
       if (!worldRef && row.url) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(row.url as string).catch(() => null));
@@ -931,6 +939,8 @@ export const generateClips = inngest.createFunction(
     const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
     const keepExisting = !!(roleFilter || sceneFilter); // filtered render → keep the other clips
     const existingClips = Array.isArray(production?.clips) ? (production!.clips as ClipRow[]) : [];
+    // Rejected references: scenes the producer dropped from the galleries — never animate them.
+    const dropped = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: keepExisting ? existingClips : [] } } }));
 
@@ -1050,7 +1060,7 @@ export const generateClips = inngest.createFunction(
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
     // scene merge-saves its result as it lands so the UI fills in live; a final save is authoritative.
     // Only render the scenes in the role filter (all of them when no filter).
-    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)));
+    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)));
     await Promise.all(targets.map(async ({ sc, i }) => {
       const row = await renderOne(i, sc);
       const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
@@ -1148,13 +1158,17 @@ export const assembleVideo = inngest.createFunction(
     if (fixedAny) await step.run("save-fixed-clips", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips } } }));
     const clipUrl = (i: number) => clips.find((c) => c.scene === i)?.url || null;
 
-    // Lay scenes on the timeline using the storyboard timecodes; fall back to 5s sequential.
+    // Rejected references: scenes the producer dropped from the galleries — leave them out of the cut.
+    const dropped = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
+    const kept = scenes.map((sc, i) => ({ sc, i })).filter(({ i }) => !dropped.has(i));
+    const hasDropped = kept.length !== scenes.length;
+    // Lay scenes on the timeline using the storyboard timecodes; when scenes were dropped, lay the kept
+    // clips back-to-back (sequential) so there are no gaps. Fall back to 5s where there are no timecodes.
     let cursor = 0;
-    const placed = scenes.map((sc, i) => {
+    const placed = kept.map(({ sc, i }) => {
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
-      let start = a != null ? a : cursor;
-      let len = a != null && b != null && b > a ? b - a : 5;
-      if (a == null) start = cursor;
+      const len = a != null && b != null && b > a ? b - a : 5;
+      const start = (!hasDropped && a != null) ? a : cursor;
       cursor = start + len;
       return { i, start, len, role: String(sc.role || "a-roll"), vo: String(sc.vo_line || "").trim(), caption: String(sc.caption || "").trim() };
     });
