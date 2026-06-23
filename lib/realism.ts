@@ -137,11 +137,14 @@ export function buildShotPrompt(o: {
     "Photograph style: a real, candid documentary-style photo of the influencer living this exact moment in a real place, shot like a high-end social ad. Not a studio portrait, not a posed shot.",
     "CRITICAL — ONE FRAME: output a SINGLE continuous photograph of ONE moment, filling the whole frame. If the direction below mentions multiple cuts or shots (e.g. 'three rapid cuts', 'Cut 1 / Cut 2 / Cut 3'), depict ONLY the first/primary moment and ignore the rest. NEVER a split-screen, diptych, triptych, grid, collage, stacked panels or side-by-side images.",
     "CRITICAL — EVERYONE FULLY CLOTHED: the influencer AND every other person in the frame (including seated, partial and background people) wears a COMPLETE everyday outfit — a top covering the torso PLUS proper bottoms (full-length trousers, jeans, a skirt or tailored shorts) covering the legs, and footwear. NObody is bare-legged, in underwear or a towel, half-dressed, or missing their trousers/bottoms. If a person's lower half is in frame, it is properly clothed. This is non-negotiable.",
+    "CRITICAL — DISTINCT EXTRAS: every background/other person wears a clearly DIFFERENT outfit in different colours and a different style — no two people are dressed alike, in matching, similar or near-identical clothing (not all in white/beige tees, not a uniform look). Vary their ages, builds, hairstyles and what they are doing, so they read as real, individual strangers, never a styled set.",
     `Scene: ${o.location}. ${o.blocking}. The background is real and in sharp focus (never blurred), so the shot is reusable for video.`,
     o.worldAnchored ? "CONTINUITY: an additional reference image shows the ESTABLISHED world of this production; match its exact location, set dressing, lighting, time of day and colour grade so this shot cuts seamlessly with the others." : "",
     `Subject: ${o.subjectLine}. The influencer is physically IN the scene (${o.blocking}), never a floating head on a plain backdrop. She appears EXACTLY ONCE in the frame: there is only one of her. Every background person is a clearly DIFFERENT individual — NEVER a second copy, twin, reflection or look-alike of the influencer.`,
     `Identity:${o.refInstruction}`,
-    `Framing: ${o.shot}.`,
+    o.role === "a-roll"
+      ? `Framing: ${o.shot}. CRITICAL A-ROLL FRAMING — this is a TIGHT presenter shot: frame her from roughly mid-chest up (a medium close-up), with her FACE LARGE and dominant in the frame (filling a good portion of it) so her exact identity from the reference images is unmistakable and holds. Do NOT render a full-body, full-length, wide or long shot; her legs and feet are NOT in frame and she is never small or distant.`
+      : `Framing: ${o.shot}.`,
     `Performance: ${o.performance}.`,
     `Grooming/wardrobe: ${o.look}. Keep the same outfit and styling as the established world for continuity.`,
     SKIN_FACTS,
