@@ -23,8 +23,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const aspectRatio = ["9:16", "1:1", "16:9"].includes(body.aspectRatio) ? String(body.aspectRatio) : "";
 
   // Re-shooting invalidates everything downstream — clear clips, audio and final cut + reset approvals
-  // past Voice. Shooting ONE role keeps the OTHER role's existing stills; the whole board clears all.
-  const keptApprovals = (production.wizard_approved ?? []).filter((k) => k === "concept" || k === "voice");
+  // past Voice. Shooting ONE role keeps the OTHER role's existing stills AND its approval (so approving
+  // a-roll then shooting b-roll doesn't throw you back to a-roll). The whole board clears all.
+  const otherRoleApproval = roleFilter === "a-roll" ? "brollRefs" : roleFilter === "b-roll" ? "arollRefs" : "";
+  const keptApprovals = (production.wizard_approved ?? []).filter((k) => k === "concept" || k === "voice" || (!!otherRoleApproval && k === otherRoleApproval));
   const keptShots = roleFilter ? (production.shots ?? []).filter((s) => String(s.role || "a-roll") !== roleFilter) : [];
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, shots: keptShots, shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle", wizard_approved: keptApprovals } } });
   try {
