@@ -508,7 +508,7 @@ const STORYBOARD_SCHEMA = {
           start: { type: "string" }, end: { type: "string" },
           location: { type: "string" },
           talent: { type: "array", items: { type: "string" } },
-          shot: { type: "string", description: "type, angle, movement, lens feel in one line" },
+          shot: { type: "string", description: "ONE single framing/angle in one line (type, angle, movement, lens feel). Describe ONLY ONE shot — never list or combine multiple framings (no 'close-up of hands AND a wider shot', no 'over-the-shoulder and coffee-table shots'); that causes split-screen renders. For b-roll keep her a clearly visible, prominent subject (medium shot), not a tiny distant figure." },
           blocking: { type: "string" },
           performance: { type: "string" },
           graphics: { type: "array", items: { type: "string" } },
