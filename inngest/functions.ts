@@ -986,7 +986,7 @@ export const generateShots = inngest.createFunction(
 // become HeyGen talking clips (the frame + our expressive VO); B-ROLL scenes become Kling
 // image->video motion clips (face-safe). Graphic scenes pass through to assembly. Durable +
 // progressive; every clip metered; one failed clip never blocks the rest.
-type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number };
+type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number; engine?: string };
 export const generateClips = inngest.createFunction(
   { id: "generate-clips", retries: 1, triggers: [{ event: "influencer/generate.clips" }] },
   async ({ event, step }) => {
@@ -1061,27 +1061,30 @@ export const generateClips = inngest.createFunction(
       if (role === "a-roll" && audioUrl) {
         const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. She FINISHES her sentence completely and then SETTLES naturally — mouth closing, a calm composed beat, holding her relaxed expression to the end. She does NOT inhale, part her lips or look as if she is about to speak again, and the clip never cuts mid-word or mid-breath. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
 
-        // PRIMARY a-roll engine: HeyGen. It is purpose-built for talking-photo lip-sync, far CHEAPER
-        // than fal OmniHuman (subscription, not per-second), and it animates OUR photo so it preserves
-        // the real skin texture (less waxy). Falls back to Seedance, then silent Kling. Set
-        // AROLL_ENGINE=omnihuman to use the old fal OmniHuman path instead.
+        // PRIMARY a-roll engine: HeyGen Avatar IV (v3) — purpose-built talking-photo lip-sync, cheap
+        // (subscription), and it animates OUR photo so skin texture is preserved. It is the ONLY a-roll
+        // engine in heygen mode: if it fails we FAIL LOUD with the real reason (no silent drop to a worse
+        // engine, which hid the "static photo, weak motion" problem). Set AROLL_ENGINE=omnihuman to opt out.
         const AROLL_ENGINE = process.env.AROLL_ENGINE || "heygen";
         if (AROLL_ENGINE === "heygen") {
-          const hg = await step.run(`hg-submit-${i}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).catch(() => null));
-          if (hg?.videoId) {
-            let hgUrl: string | null = null;
+          const hg = await step.run(`hg-submit-${i}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
+          if (hg.ok) {
+            let hgUrl: string | null = null; let hgErr: string | null = null;
             for (let n = 0; n < 100; n++) { // ~100 x 6s ≈ 10 min
               const s = await step.run(`hg-poll-${i}-${n}`, () => pollTalking(hg.videoId, hg.version));
               if (s.url) { hgUrl = s.url; break; }
-              if (s.error || s.status === "failed") break;
+              if (s.error || s.status === "failed") { hgErr = s.error || "render failed"; break; }
               await step.sleep(`hg-wait-${i}-${n}`, "6s");
             }
             if (hgUrl) {
-              await step.run(`u-hg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: hg.version === "v3" ? "avatar_iv" : "talking_photo", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+              // model=avatar_iv always (no legacy path); the VARIANT records whether full motion+expressiveness applied.
+              await step.run(`u-hg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "avatar_iv", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
               const hosted = (await step.run(`hghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
-              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl };
+              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, engine: `heygen:avatar_iv:${hg.variant}` };
             }
+            return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV did not finish: ${hgErr || "timed out after ~10 min"}`, engine: "heygen:avatar_iv" };
           }
+          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV submit failed: ${hg.error}`, engine: "heygen:failed" };
         } else {
           // OPT-IN fal OmniHuman path (expensive, per-second). fal rejects inputs >5MB so re-encode first.
           const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
