@@ -850,16 +850,16 @@ function GuidePicker({ role, creatives, selected, onPick, onZoom }: {
     <div className="mb-3 rounded-lg border border-line bg-surface-2 p-3">
       <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Guide from your creatives (optional)</div>
       <p className="mb-2 text-[11px] text-ink-faint">Pick a {role} shot you made in Creatives to steer the look, wardrobe and world. Her locked face stays the same. Tap again to clear.</p>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2.5 overflow-x-auto pb-1">
         {mine.map((c) => {
           const on = selected === c.url;
           return (
             <div key={c.url} className="relative shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={c.url} alt="creative guide" onClick={() => onPick(role, c.url)}
-                className={`h-24 w-16 cursor-pointer rounded-md border-2 object-cover transition ${on ? "border-[#a855f7] shadow-[0_0_14px_rgba(168,85,247,0.5)]" : "border-line opacity-70 hover:opacity-100"}`} />
-              {on && <span className="absolute left-1 top-1 rounded bg-[#a855f7] px-1 py-0.5 text-[8px] font-bold uppercase text-white">Guide</span>}
-              <button onClick={(e) => { e.stopPropagation(); onZoom(c.url); }} className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/40 bg-black/60 text-[10px] text-white">👁</button>
+                className={`h-44 w-28 cursor-pointer rounded-md border-2 object-cover transition ${on ? "border-[#a855f7] shadow-[0_0_14px_rgba(168,85,247,0.5)]" : "border-line opacity-70 hover:opacity-100"}`} />
+              {on && <span className="absolute left-1 top-1 rounded bg-[#a855f7] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Guide</span>}
+              <button onClick={(e) => { e.stopPropagation(); onZoom(c.url); }} title="Preview" className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/40 bg-black/55 text-[9px] text-white backdrop-blur-sm hover:bg-black/80">👁</button>
             </div>
           );
         })}
