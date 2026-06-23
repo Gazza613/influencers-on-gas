@@ -862,8 +862,15 @@ export const generateShots = inngest.createFunction(
       if (featureUrl) { const f = await importMediaUrl(featureUrl).catch(() => null); if (f) ids.push(f); }
       return ids;
     });
-    const bibleId = ((persona.bible as { identity?: { age?: string; build?: string; ethnicity_design?: string } })?.identity) ?? {};
-    const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
+    const bible = (persona.bible as { identity?: Record<string, string>; face?: Record<string, string> }) ?? {};
+    const bibleId = bible.identity ?? {};
+    const bibleFace = bible.face ?? {};
+    // Re-thread the LOCKED physical description into the subject line on EVERY shot (v1's anti-drift
+    // recipe) so the text reinforces the face reference images, not just generic age/build/ethnicity.
+    // Skin + hair always; invented distinctive features only for a SYNTHETIC — when anchored to uploaded
+    // photos the photo is the truth and we must not describe marks that could fight it.
+    const faceDesc = [bibleFace.skin, bibleFace.hair, anchored.length ? "" : bibleFace.distinct_features].filter(Boolean).join(", ");
+    const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design, faceDesc].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
     const look = lookClause(persona);
 
     // Optional producer uploads: a clothing reference (wardrobe) and a location reference (world).
@@ -1054,36 +1061,56 @@ export const generateClips = inngest.createFunction(
       if (role === "a-roll" && audioUrl) {
         const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. She FINISHES her sentence completely and then SETTLES naturally — mouth closing, a calm composed beat, holding her relaxed expression to the end. She does NOT inhale, part her lips or look as if she is about to speak again, and the clip never cuts mid-word or mid-breath. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
 
-        // PRIMARY a-roll engine: OmniHuman 1.5 (best-in-class lip-sync, audio-driven so it uses OUR
-        // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
-        // fal rejects inputs >5MB, and our keyframes (1-2K PNGs) blow past that — so re-encode to a
-        // capped JPEG first, or OmniHuman silently fails on EVERY submit and we never leave Seedance.
-        const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
-        const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: ohImg, audioUrl, prompt }));
-        if (oh.statusUrl && oh.responseUrl) {
-          let ohUrl: string | null = null; let ohSeconds: number | null = null;
-          for (let n = 0; n < 220; n++) { // ~22 min — OmniHuman is ~45s gen per 1s of speech, so a full a-roll line needs room to FINISH on OmniHuman rather than bail to the slower Seedance fallback
-            const s = await step.run(`oh-poll-${i}-${n}`, () => pollOmniHumanOnce(oh.statusUrl as string, oh.responseUrl as string));
-            if (s.url) { ohUrl = s.url; ohSeconds = s.seconds; break; }
-            if (s.terminal) break;
-            await step.sleep(`oh-wait-${i}-${n}`, "6s");
+        // PRIMARY a-roll engine: HeyGen. It is purpose-built for talking-photo lip-sync, far CHEAPER
+        // than fal OmniHuman (subscription, not per-second), and it animates OUR photo so it preserves
+        // the real skin texture (less waxy). Falls back to Seedance, then silent Kling. Set
+        // AROLL_ENGINE=omnihuman to use the old fal OmniHuman path instead.
+        const AROLL_ENGINE = process.env.AROLL_ENGINE || "heygen";
+        if (AROLL_ENGINE === "heygen") {
+          const hg = await step.run(`hg-submit-${i}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).catch(() => null));
+          if (hg?.videoId) {
+            let hgUrl: string | null = null;
+            for (let n = 0; n < 100; n++) { // ~100 x 6s ≈ 10 min
+              const s = await step.run(`hg-poll-${i}-${n}`, () => pollTalking(hg.videoId, hg.version));
+              if (s.url) { hgUrl = s.url; break; }
+              if (s.error || s.status === "failed") break;
+              await step.sleep(`hg-wait-${i}-${n}`, "6s");
+            }
+            if (hgUrl) {
+              await step.run(`u-hg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: hg.version === "v3" ? "avatar_iv" : "talking_photo", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+              const hosted = (await step.run(`hghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
+              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl };
+            }
           }
-          if (ohUrl) {
-            // Meter at OmniHuman's true PER-SECOND rate using fal's returned duration (fallback ~8s).
-            const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
-            await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
-            const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
-            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
+        } else {
+          // OPT-IN fal OmniHuman path (expensive, per-second). fal rejects inputs >5MB so re-encode first.
+          const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
+          const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: ohImg, audioUrl, prompt }));
+          if (oh.statusUrl && oh.responseUrl) {
+            let ohUrl: string | null = null; let ohSeconds: number | null = null;
+            for (let n = 0; n < 220; n++) { // ~22 min
+              const s = await step.run(`oh-poll-${i}-${n}`, () => pollOmniHumanOnce(oh.statusUrl as string, oh.responseUrl as string));
+              if (s.url) { ohUrl = s.url; ohSeconds = s.seconds; break; }
+              if (s.terminal) break;
+              await step.sleep(`oh-wait-${i}-${n}`, "6s");
+            }
+            if (ohUrl) {
+              const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
+              await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
+              const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
+              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
+            }
           }
         }
 
         const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
         let url: string | null = sub.url;
         if (!url && sub.jobId) {
+          let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
           for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Seedance/Kling can be slow on heavy scenes)
             const s = await step.run(`apoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
             if (s.url) { url = s.url; break; }
-            if (s.terminal) break;
+            if (s.terminal && grace-- <= 0) break;
             await step.sleep(`await-a-${i}-${n}`, "8s");
           }
         }
@@ -1118,10 +1145,11 @@ export const generateClips = inngest.createFunction(
       const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: sceneDur, hero }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
+        let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
         for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Kling is slow on heavy scenes)
           const s = await step.run(`vpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
           if (s.url) { url = s.url; break; }
-          if (s.terminal) break;
+          if (s.terminal && grace-- <= 0) break;
           await step.sleep(`vwait-${i}-${n}`, "8s");
         }
       }
@@ -1420,8 +1448,15 @@ export const reshootShot = inngest.createFunction(
       if (featureUrl) { const f = await importMediaUrl(featureUrl).catch(() => null); if (f) ids.push(f); }
       return ids;
     });
-    const bibleId = ((persona.bible as { identity?: { age?: string; build?: string; ethnicity_design?: string } })?.identity) ?? {};
-    const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
+    const bible = (persona.bible as { identity?: Record<string, string>; face?: Record<string, string> }) ?? {};
+    const bibleId = bible.identity ?? {};
+    const bibleFace = bible.face ?? {};
+    // Re-thread the LOCKED physical description into the subject line on EVERY shot (v1's anti-drift
+    // recipe) so the text reinforces the face reference images, not just generic age/build/ethnicity.
+    // Skin + hair always; invented distinctive features only for a SYNTHETIC — when anchored to uploaded
+    // photos the photo is the truth and we must not describe marks that could fight it.
+    const faceDesc = [bibleFace.skin, bibleFace.hair, anchored.length ? "" : bibleFace.distinct_features].filter(Boolean).join(", ");
+    const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design, faceDesc].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
     const look = lookClause(persona);
     const brief = (production?.brief ?? {}) as Record<string, string>;
     const clothMedia = brief.clothingRef ? await step.run("import-cloth", () => importMediaUrl(brief.clothingRef).catch(() => null)) : null;

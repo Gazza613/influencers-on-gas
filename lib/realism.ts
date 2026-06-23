@@ -122,6 +122,7 @@ export const SHOT_NEGATIVE =
   "a second copy, twin, clone or look-alike of the influencer; duplicated or identical background people; matching/uniform outfits on extras; " +
   "moles, beauty marks, prominent facial moles, moles on the chest/neck/décolletage; " +
   "plastic or waxy skin, airbrushed, beauty-filtered, doll-like, CGI or 3D-render look; " +
+  "editorial fashion-shoot look, studio portrait, professional model headshot, glamour shot, magazine cover, polished commercial advert, 8K, ultra-detailed, hyper-detailed, flawless, perfectly symmetrical face, glossy beauty render; " +
   "nudity, underwear, swimwear, bare legs or missing clothing; split-screen, diptych, triptych, collage, grid or stacked panels; " +
   "brand logos, company names, sponsor marks, slogans or printed text on her clothing or garments (a real brand such as MTN must never appear on what she wears)";
 
@@ -134,7 +135,7 @@ export function buildShotPrompt(o: {
   hasPeople: boolean; worldAnchored: boolean;
 }): string {
   return [
-    "Photograph style: a real, candid documentary-style photo of the influencer living this exact moment in a real place, shot like a high-end social ad. Not a studio portrait, not a posed shot.",
+    "Photograph style: a real, candid photo of the influencer living this exact moment, CAPTURED ON A PHONE — iPhone 16 Pro main lens, handheld at a natural height, automatic exposure and focus, faint natural sensor noise in the shadows and a touch of lens distortion at the edges. NOT a studio camera, NOT studio lighting, NOT a posed studio portrait — it reads like a real moment a friend caught on their phone, never a glossy AI render.",
     "CRITICAL — ONE FRAME, ONE ANGLE: output a SINGLE continuous photograph from ONE camera angle of ONE moment, filling the whole frame edge to edge. It is ONE framing only — do NOT combine a close-up with a wider shot, and do NOT stack or place two views together top-and-bottom or side-by-side. If the direction below lists several shots, cuts, framings or moments (e.g. 'close-up of hands… then a wider shot', 'three rapid cuts', 'over-the-shoulder and coffee-table shots'), choose ONLY the single most important one and render that alone. ABSOLUTELY NEVER a split-screen, diptych, triptych, grid, collage, stacked panels, top/bottom halves or side-by-side images.",
     "CRITICAL — EVERYONE FULLY CLOTHED: the influencer AND every other person in the frame (including seated, partial and background people) wears a COMPLETE everyday outfit — a top covering the torso PLUS proper bottoms (full-length trousers, jeans, a skirt or tailored shorts) covering the legs, and footwear. NObody is bare-legged, in underwear or a towel, half-dressed, or missing their trousers/bottoms. If a person's lower half is in frame, it is properly clothed. This is non-negotiable.",
     "CRITICAL — DISTINCT EXTRAS: every background/other person wears a clearly DIFFERENT outfit in different colours and a different style — no two people are dressed alike, in matching, similar or near-identical clothing (not all in white/beige tees, not a uniform look). Vary their ages, builds, hairstyles and what they are doing, so they read as real, individual strangers, never a styled set.",
