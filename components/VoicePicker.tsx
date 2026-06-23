@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type LibVoice = { voice_id: string; name: string; labels?: Record<string, string>; preview_url?: string | null };
+type LibVoice = { voice_id: string; name: string; labels?: Record<string, string>; preview_url?: string | null; category?: string | null };
 
 // Self-contained voice chooser used inside the Producer wizard's Voice step: pick from the library
 // (searchable + previewable), design a new voice from a description, or auto-match. Calls onSet with
@@ -50,8 +50,13 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
   }
 
   const fq = q.trim().toLowerCase();
-  const byAccent = accent ? lib.filter((v) => `${v.labels?.accent || ""} ${v.labels?.description || ""} ${v.name}`.toLowerCase().includes(accent.toLowerCase())) : lib;
-  const fv = fq ? byAccent.filter((v) => `${v.name} ${Object.values(v.labels || {}).join(" ")}`.toLowerCase().includes(fq)) : byAccent;
+  // Voices YOU made (cloned / generated / professional — not "premade" stock) always show and sort
+  // first; the accent chip only narrows the STOCK library (your designed voices have no accent label,
+  // so they must never be filtered out by it).
+  const isMine = (v: LibVoice) => !!v.category && v.category !== "premade";
+  const byAccent = accent ? lib.filter((v) => isMine(v) || `${v.labels?.accent || ""} ${v.labels?.description || ""} ${v.name}`.toLowerCase().includes(accent.toLowerCase())) : lib;
+  const matched = fq ? byAccent.filter((v) => `${v.name} ${Object.values(v.labels || {}).join(" ")}`.toLowerCase().includes(fq)) : byAccent;
+  const fv = [...matched].sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
 
   return (
     <div className="rounded-lg border border-line bg-surface-2/40 p-3">
@@ -88,7 +93,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
               return (
                 <div key={v.voice_id} onClick={() => setSel(v.voice_id)} className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${on ? "border-[#a855f7] bg-[#a855f7]/10" : "border-line hover:border-line-strong"}`}>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-ink">{v.name}{on && <span className="ml-2 text-[10px] font-bold text-[#c79bff]">✓ selected</span>}</div>
+                    <div className="text-sm font-semibold text-ink">{v.name}{isMine(v) && <span className="ml-2 rounded bg-[#a855f7]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#c79bff]">Yours</span>}{on && <span className="ml-2 text-[10px] font-bold text-[#c79bff]">✓ selected</span>}</div>
                     {d && <div className="truncate text-[11px] text-ink-faint">{d}</div>}
                   </div>
                   {v.preview_url && <audio src={v.preview_url} controls className="h-8 w-40 shrink-0" onClick={(e) => e.stopPropagation()} />}
