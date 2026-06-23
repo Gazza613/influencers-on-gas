@@ -651,7 +651,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       <button onClick={reflowScript} disabled={reflowBusy} className="mt-2 rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reflowBusy ? "✨ Re-flowing the script…" : "✨ Re-flow script for continuity"}</button>
                     </div>
                     <VoicePicker influencerId={influencerId} name={name} voiceId={voiceId} voiceName={voiceName} voicePreview={voicePreview}
-                      onSet={(v) => { setVoiceId(v.voice_id); setVoiceName(v.voice_name); setVoicePreview(v.preview_url || ""); }} />
+                      onSet={(v) => {
+                        setVoiceId(v.voice_id); setVoiceName(v.voice_name); setVoicePreview(v.preview_url || "");
+                        // The server clears stale (old-voice) clips on a voice change — pull the fresh
+                        // production so the wizard shows the animate steps need re-rendering with the new voice.
+                        fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
+                      }} />
                   </>
                 )
               ) : <LockHint />}

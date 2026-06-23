@@ -55,7 +55,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
     } catch { /* preview is best-effort */ }
 
-    await updateInfluencer(id, { persona: { ...persona, voice_id: voiceId, voice_name: voiceName, voice_preview_url: previewUrl } });
+    // Changing the voice INVALIDATES any rendered clips: the a-roll/b-roll lips were synced to the OLD
+    // voice (and the stitch replays each clip's baked-in audio), so reusing them would play the old
+    // voice. Clear the clips + the cut so the producer re-animates with the NEW voice, and drop the
+    // animate/stitch approvals so the wizard reflects that those steps need redoing.
+    const production = (persona.production ?? null) as Record<string, unknown> | null;
+    const personaNext: Record<string, unknown> = { ...persona, voice_id: voiceId, voice_name: voiceName, voice_preview_url: previewUrl };
+    if (production && Array.isArray(production.clips) && (production.clips as unknown[]).length) {
+      const keptApprovals = (Array.isArray(production.wizard_approved) ? (production.wizard_approved as string[]) : []).filter((k) => !["aroll", "broll", "audio", "stitch", "showreel"].includes(k));
+      personaNext.production = { ...production, clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle", wizard_approved: keptApprovals };
+    }
+    await updateInfluencer(id, { persona: personaNext });
     return NextResponse.json({ voice_id: voiceId, voice_name: voiceName, preview_url: previewUrl });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
