@@ -34,6 +34,7 @@ export default function StartPage() {
   const [twinPhotos, setTwinPhotos] = useState<string[]>([]);
   // existing
   const [list, setList] = useState<Inf[] | null>(null);
+  const [navId, setNavId] = useState<string | null>(null); // which existing influencer is being opened (instant feedback)
 
   useEffect(() => {
     if (view === "existing" && list === null) {
@@ -155,8 +156,11 @@ export default function StartPage() {
                 {list.map((inf) => {
                   const { pct } = buildProgress(inf);
                   const face = (inf.persona as { hero_url?: string })?.hero_url || (inf.persona as { reference_url?: string })?.reference_url || inf.look_refs?.find?.((r) => r.hero)?.url || null;
+                  const locked = !!(inf.persona as { locked?: boolean })?.locked;
+                  const opening = navId === inf.id;
+                  const open = () => { if (navId) return; setNavId(inf.id); router.push(locked ? `/setup/influencers/${inf.id}/producer` : `/setup/influencers/${inf.id}`); };
                   return (
-                    <button key={inf.id} onClick={() => router.push(`/setup/influencers/${inf.id}`)} className="group rounded-xl border border-line bg-surface-2 p-3 text-left transition hover:border-line-strong">
+                    <button key={inf.id} onClick={open} disabled={!!navId} className={`group relative rounded-xl border bg-surface-2 p-3 text-left transition ${opening ? "border-[#a855f7] ring-2 ring-[#a855f7]/40" : "border-line hover:border-[#a855f7]/50 hover:bg-surface-1"} disabled:cursor-wait`}>
                       <div className="flex items-center gap-2">
                         <svg width="30" height="30" className="-rotate-90"><circle cx="15" cy="15" r="12" fill="none" stroke="var(--color-line,#ffffff14)" strokeWidth="3" /><circle cx="15" cy="15" r="12" fill="none" stroke={ringColour(pct)} strokeWidth="3" strokeLinecap="round" strokeDasharray={2 * Math.PI * 12} strokeDashoffset={2 * Math.PI * 12 * (1 - pct / 100)} /></svg>
                         {face && (
@@ -165,7 +169,7 @@ export default function StartPage() {
                         )}
                       </div>
                       <div className="mt-2 truncate text-sm font-semibold text-white">{inf.name}</div>
-                      <div className="tabular text-[10px] uppercase tracking-wide text-ink-faint">{inf.mode === "twin" ? "digital twin" : "synthetic"} · {pct}%</div>
+                      <div className="tabular text-[10px] uppercase tracking-wide text-ink-faint">{opening ? "Opening…" : `${inf.mode === "twin" ? "digital twin" : "synthetic"} · ${locked ? "ready" : `${pct}%`}`}</div>
                     </button>
                   );
                 })}
