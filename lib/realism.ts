@@ -151,6 +151,7 @@ export function buildShotPrompt(o: {
     SKIN_FACTS,
     SCALE,
     o.hasPeople ? SCENE_PEOPLE : NO_EXTRAS,
+    o.role === "a-roll" ? "SOLO PRESENTER SHOT: the influencer is the ONLY person anywhere in the frame — no friends, companions, bystanders, reflections or background people of ANY kind, even distant or blurred. Just her talking to camera against a simple, softly out-of-focus background. NEVER add anyone the direction did not explicitly request." : "",
     `Wardrobe: ${CLOTHED}.`,
     `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
     `Avoid entirely (do NOT depict any of these): ${SHOT_NEGATIVE}.`,
