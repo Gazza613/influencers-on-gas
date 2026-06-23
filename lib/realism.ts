@@ -106,7 +106,7 @@ export function buildCreativeImagePrompt(o: {
     camera,
     SKIN_FACTS,
     SCALE,
-    `Wardrobe: ${CLOTHED}.`,
+    `Wardrobe: ${CLOTHED}. Her clothing is PLAIN with NO branding: absolutely no brand logos, company names, sponsor marks, slogans or printed text on any garment (never put a real brand such as MTN on what she wears). Any brand appears only as a separate overlay added later, never printed on her clothes.`,
     `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
   ].join("\n\n");
 }
@@ -119,7 +119,8 @@ export const SHOT_NEGATIVE =
   "a second copy, twin, clone or look-alike of the influencer; duplicated or identical background people; matching/uniform outfits on extras; " +
   "moles, beauty marks, prominent facial moles, moles on the chest/neck/décolletage; " +
   "plastic or waxy skin, airbrushed, beauty-filtered, doll-like, CGI or 3D-render look; " +
-  "nudity, underwear, swimwear, bare legs or missing clothing; split-screen, diptych, triptych, collage, grid or stacked panels";
+  "nudity, underwear, swimwear, bare legs or missing clothing; split-screen, diptych, triptych, collage, grid or stacked panels; " +
+  "brand logos, company names, sponsor marks, slogans or printed text on her clothing or garments (a real brand such as MTN must never appear on what she wears)";
 
 // ── THE PRODUCER: a directed shot from a storyboard scene, coherent across the board.
 // `worldAnchored` = a prior frame of the SAME world is supplied as an extra reference, so
