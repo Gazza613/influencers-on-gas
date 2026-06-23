@@ -107,10 +107,16 @@ async function uploadAssetV3(url: string): Promise<string> {
   if (!r.ok) throw new Error(`fetch asset ${r.status}`);
   const ct = (r.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
   const bytes = Buffer.from(await r.arrayBuffer());
-  const res = await fetch(`${V3}/assets`, { method: "POST", headers: { "x-api-key": k, "Content-Type": ct }, body: bytes });
-  const data = (await res.json().catch(() => ({}))) as { data?: { asset_id?: string; id?: string }; asset_id?: string; id?: string; message?: string };
+  // HeyGen /v3/assets requires MULTIPART/FORM-DATA with a `file` field (NOT raw bytes — that 400s with
+  // "File is required. Send a multipart/form-data"). Give the part a filename with the right extension
+  // so HeyGen detects the type. Do NOT set Content-Type — fetch adds the multipart boundary itself.
+  const ext = ct.includes("png") ? "png" : ct.includes("jpeg") || ct.includes("jpg") ? "jpg" : ct.includes("mpeg") || ct.includes("mp3") ? "mp3" : ct.includes("wav") ? "wav" : ct.includes("mp4") ? "mp4" : "bin";
+  const form = new FormData();
+  form.append("file", new Blob([new Uint8Array(bytes)], { type: ct }), `asset.${ext}`);
+  const res = await fetch(`${V3}/assets`, { method: "POST", headers: { "x-api-key": k }, body: form });
+  const data = (await res.json().catch(() => ({}))) as { data?: { asset_id?: string; id?: string }; asset_id?: string; id?: string; message?: string; error?: unknown };
   const id = data?.data?.asset_id || data?.data?.id || data?.asset_id || data?.id;
-  if (!id) throw new Error(`no asset_id (${res.status}): ${(data.message || JSON.stringify(data)).slice(0, 160)}`);
+  if (!id) throw new Error(`no asset_id (${res.status}): ${(data.message || JSON.stringify((data as { error?: unknown }).error || data)).slice(0, 160)}`);
   return id;
 }
 

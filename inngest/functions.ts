@@ -28,9 +28,9 @@ const CANDIDATE_COUNT = 6;
 // default — the prompt-level guards (clothed, identity lock, glasses) stay on, and the producer QAs
 // the board/photoshoot manually. Set PRODUCER_QA=1 to re-enable automatic QA + re-roll.
 const QA_ON = process.env.PRODUCER_QA === "1";
-const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "nano_banana_2";
-const IMAGE_FALLBACK = "nano_banana_pro"; // free model as the safety fallback
-const CREATIVE_FALLBACK = "gpt_image_2"; // previously-validated creatives identity model
+const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "gpt_image_2";
+const IMAGE_FALLBACK = "nano_banana_pro"; // free fallback (also covers gpt_image_2's only weak spot: 1:1/square)
+const CREATIVE_FALLBACK = "nano_banana_pro"; // free fallback for creatives/producer (gpt_image_2 is now primary)
 
 // Stage 2 (Photoshoot) builds the Soul TRAINING SET from the chosen face. Recipe follows
 // the Higgsfield Soul photo guide: 8 to 12 sharp, single-person frames that vary ANGLE,
