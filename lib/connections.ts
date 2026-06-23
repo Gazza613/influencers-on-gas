@@ -67,6 +67,24 @@ export async function listConnections(): Promise<ConnectionStatus[]> {
   });
 }
 
+// Live-verify a submitted key against the vendor BEFORE we store it, so "connected" means
+// "verified working", not just "a key was saved". Vendors without a cheap auth-check pass through.
+export async function verifyVendorKey(provider: ProviderId, secret: string): Promise<{ ok: boolean; detail?: string }> {
+  try {
+    if (provider === "heygen") {
+      const r = await fetch("https://api.heygen.com/v2/user/remaining_quota", { headers: { "x-api-key": secret }, cache: "no-store" });
+      return r.ok ? { ok: true } : { ok: false, detail: `HeyGen rejected the key (HTTP ${r.status}). Check you pasted the full key from Settings → API.` };
+    }
+    if (provider === "elevenlabs") {
+      const r = await fetch("https://api.elevenlabs.io/v1/user", { headers: { "xi-api-key": secret }, cache: "no-store" });
+      return r.ok ? { ok: true } : { ok: false, detail: `ElevenLabs rejected the key (HTTP ${r.status}).` };
+    }
+    return { ok: true }; // no verifier for this vendor — accept as before
+  } catch (e) {
+    return { ok: false, detail: `Could not reach ${provider} to verify the key: ${String((e as Error)?.message || e).slice(0, 120)}` };
+  }
+}
+
 export async function saveConnection(provider: ProviderId, secret: string): Promise<void> {
   const enc = encryptSecret(secret);
   await db().query(

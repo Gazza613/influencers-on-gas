@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { listConnections, saveConnection, isProvider } from "@/lib/connections";
+import { listConnections, saveConnection, isProvider, verifyVendorKey } from "@/lib/connections";
 
 export async function GET() {
   const session = await auth();
@@ -17,6 +17,9 @@ export async function POST(req: Request) {
   if (!isProvider(provider) || typeof secret !== "string" || !secret.trim()) {
     return NextResponse.json({ error: "Invalid provider or secret" }, { status: 400 });
   }
+  // Live-verify the key against the vendor before storing, so "connected" means verified-working.
+  const check = await verifyVendorKey(provider, secret.trim());
+  if (!check.ok) return NextResponse.json({ error: check.detail || "The key could not be verified." }, { status: 400 });
   await saveConnection(provider, secret.trim());
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, verified: true });
 }
