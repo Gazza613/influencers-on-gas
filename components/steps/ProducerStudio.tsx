@@ -90,10 +90,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // one kept scene of that role has a shot (so there's something to approve) and nothing's shooting.
   const aRollKept = aRollIdx.filter((x) => !dropped.has(x.i));
   const bRollKept = bRollIdx.filter((x) => !dropped.has(x.i));
-  // Refs ready once a kept scene of that role is shot (or there's nothing to curate — no scenes of
-  // that role, or every one rejected) and nothing's shooting.
-  const aRollRefsReady = !!sb && (aRollNone || aRollKept.length === 0 || (aRollKept.some((x) => shotFor(x.i)?.url) && !shooting));
-  const bRollRefsReady = !!sb && (bRollNone || bRollKept.length === 0 || (bRollKept.some((x) => shotFor(x.i)?.url) && !shooting));
+  // Refs ready once EVERY kept scene of that role has a shot frame (or there's nothing to curate) and
+  // nothing's shooting. EVERY (not some) so you can't advance to Animate with a missing keyframe —
+  // that was the "Clip failed: no shot frame" trap. Re-shoot or reject the offending scene to proceed.
+  const aRollRefsReady = !!sb && (aRollNone || aRollKept.length === 0 || (aRollKept.every((x) => shotFor(x.i)?.url) && !shooting));
+  const bRollRefsReady = !!sb && (bRollNone || bRollKept.length === 0 || (bRollKept.every((x) => shotFor(x.i)?.url) && !shooting));
   // Animation steps ready when every KEPT scene of the role has a clip (or nothing to animate).
   const aRollReady = !!sb && (aRollNone || aRollKept.length === 0 || aRollKept.every((x) => clipDone(x.i)));
   const bRollReady = !!sb && (bRollNone || bRollKept.length === 0 || bRollKept.every((x) => clipDone(x.i)));
@@ -618,7 +619,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
             {/* 2 · A-roll references */}
             <StepShell n={2} title="A-roll references — the talking shots" desc={`I shoot the talking-shot stills from ${name}'s locked identity, in the size you choose. Keep the ones you love, reject the rest — only kept shots get animated and reach the cut.`} state={stepState("arollRefs")} anchor="step-arollRefs"
-              gate={renderGate("arollRefs", "Shoot (or re-shoot) the a-roll references and keep at least one, then Accept.")}>
+              gate={renderGate("arollRefs", "Every kept a-roll scene needs a frame before Accept. If one shows 'not shot yet' or failed, re-shoot the references — or reject (✗) that scene — then Accept.")}>
               {unlocked("arollRefs") ? (
                 aRollNone ? (
                   <p className="text-[12px] text-ink-faint">No talking (a-roll) scenes in this storyboard — nothing to shoot here.</p>
@@ -635,7 +636,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
             {/* 3 · B-roll references */}
             <StepShell n={3} title="B-roll references — the scene shots" desc="Now the scene (non-talking) shots — these are more about the world and motion than talking. Same idea: keep the ones you want, reject the rest." state={stepState("brollRefs")} anchor="step-brollRefs"
-              gate={renderGate("brollRefs", "Shoot (or re-shoot) the b-roll references and keep at least one, then Accept.")}>
+              gate={renderGate("brollRefs", "Every kept b-roll scene needs a frame before Accept. If one shows 'not shot yet' or failed, re-shoot the references — or reject (✗) that scene — then Accept.")}>
               {unlocked("brollRefs") ? (
                 bRollNone ? (
                   <p className="text-[12px] text-ink-faint">No scene (b-roll) shots in this storyboard — nothing to shoot here.</p>
