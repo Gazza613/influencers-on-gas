@@ -70,7 +70,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const rendering = production?.clips_status === "running";
   const clipFor = (i: number) => clips.find((c) => c.scene === i);
   const shotsReady = shots.some((s) => s.url);
-  const needsVoice = !!sb && sb.scenes.some((s) => s.role === "a-roll" && (s.vo_line || "").trim().length > 0);
+  const needsVoice = !!sb && sb.scenes.some((s) => (s.vo_line || "").trim().length > 0); // a-roll lip-sync AND b-roll VO-over both need the voice
   const voiceMissing = needsVoice && !voiceId;
   const assembling = production?.assembly_status === "running";
   const finalUrl = production?.final_url || null;

@@ -21,6 +21,8 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
   const [designing, setDesigning] = useState(false);
   const [designDesc, setDesignDesc] = useState("");
   const [previews, setPreviews] = useState<{ generatedVoiceId: string; url: string }[]>([]);
+  const [accent, setAccent] = useState(""); // quick accent filter / design seed (South African first — our market)
+  const ACCENTS = ["South African", "British", "American", "Australian", "Nigerian", "Irish"];
 
   useEffect(() => { fetch("/api/voices").then((r) => r.json()).then((d) => { if (Array.isArray(d?.voices)) setLib(d.voices); }).catch(() => {}); }, []);
 
@@ -48,7 +50,8 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
   }
 
   const fq = q.trim().toLowerCase();
-  const fv = fq ? lib.filter((v) => `${v.name} ${Object.values(v.labels || {}).join(" ")}`.toLowerCase().includes(fq)) : lib;
+  const byAccent = accent ? lib.filter((v) => `${v.labels?.accent || ""} ${v.labels?.description || ""} ${v.name}`.toLowerCase().includes(accent.toLowerCase())) : lib;
+  const fv = fq ? byAccent.filter((v) => `${v.name} ${Object.values(v.labels || {}).join(" ")}`.toLowerCase().includes(fq)) : byAccent;
 
   return (
     <div className="rounded-lg border border-line bg-surface-2/40 p-3">
@@ -67,6 +70,15 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
 
       {vtab === "library" && (
         <div className="space-y-2">
+          <div>
+            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Accent</div>
+            <div className="flex flex-wrap gap-1.5">
+              {ACCENTS.map((a) => (
+                <button key={a} onClick={() => setAccent(accent === a ? "" : a)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${accent === a ? "border-[#a855f7] bg-[#a855f7]/15 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{a}</button>
+              ))}
+              {accent && <button onClick={() => setAccent("")} className="rounded-full px-2 py-1 text-[11px] text-ink-faint hover:text-ink">clear</button>}
+            </div>
+          </div>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search voices — name, accent (e.g. South African), gender, age…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]" />
           <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
             {fv.length === 0 && <p className="px-1 py-2 text-[12px] text-ink-faint">{lib.length ? "No voices match that search." : "Loading your voices…"}</p>}
@@ -91,6 +103,11 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
       {vtab === "design" && (
         <div className="space-y-2">
           <p className="text-[13px] text-ink-faint">Describe the voice and we design it. Be specific, e.g. &quot;South African female, late twenties, warm and chatty, soft Afrikaans twang.&quot;</p>
+          <div className="flex flex-wrap gap-1.5">
+            {ACCENTS.map((a) => (
+              <button key={a} onClick={() => setDesc((d) => (d.toLowerCase().includes(a.toLowerCase()) ? d : `${a} accent. ${d}`.trim()))} className="rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-ink-dim transition hover:border-[#a855f7] hover:text-[#c79bff]">+ {a}</button>
+            ))}
+          </div>
           <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="Describe the voice…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
           <button onClick={designVoice} disabled={!desc.trim() || designing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{designing ? "Designing voice options…" : "✨ Design voice options"}</button>
           {previews.length > 0 && (

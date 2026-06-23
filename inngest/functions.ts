@@ -1026,75 +1026,78 @@ export const generateClips = inngest.createFunction(
         ? " WATER REALISM (critical): all water — pool, waves, sea, splashes — must move with HYPER-REALISTIC fluid physics: natural ripples and rolling wave motion, light refraction and caustics on the surface, sparkling sunlight highlights, believable splashes and foam. NEVER plastic, jelly-like, gelatinous, frozen, smeared, looping or fake-looking water."
         : "";
 
-      // LIP-SYNC any scene where she SPEAKS — a-roll (head-on to camera) AND b-roll (talking in-situ
-      // in the scene). OmniHuman drives her lips from our VO. Only pure-scenery b-roll (no line) and
-      // graphics skip this. Falls back to Seedance then silent Kling if OmniHuman is unavailable/fails.
+      // VO AUDIO for this scene — her ONE continuous voiceover. On A-ROLL it drives the lip-sync (she
+      // talks DIRECT to camera). On B-ROLL it is laid OVER the silent scene in the stitch as narration,
+      // so the audio flows unbroken across the cut (a-roll talking → VO over b-roll → a-roll → …) and
+      // the film never goes silent. Computed ONCE here for both paths.
+      let audioUrl: string | null = null;
       if (role !== "graphic" && (presetAudio || (line && voiceId))) {
         // Moderate the line BEFORE any ElevenLabs TTS call (skip if it trips the safety classifier).
-        const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => {
+        audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => {
           const mod = await moderateText(line);
           if (!mod.allowed) return null;
           // WYSIWYG voice: use the SAME (stable) TTS model the producer previewed when picking the
           // voice. Expressive (eleven_v3) renders the same voice_id noticeably differently, so it read
           // as "a different voice". Opt back in with AROLL_EXPRESSIVE=1 if you want v3 delivery.
-          return putBytes(await tts(voiceId as string, line, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "aroll-vo", "mp3", "audio/mpeg").catch(() => null);
+          return putBytes(await tts(voiceId as string, line, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
         }) as string | null);
-        if (audioUrl) {
-          if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-          // Framing depends on role: A-ROLL = head-on, locked frame, direct to camera. B-ROLL = she
-          // speaks IN-SITU (in the scene, doing something) — relaxed framing, gentle moves allowed.
-          const prompt = role === "a-roll"
-            ? `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`
-            : `${base}. She is IN the scene speaking naturally as she goes about it — a medium-to-wider shot showing her in the environment doing something real (walking through the space, sitting, using the product, turning to camera). She talks while in-situ: she does NOT need to be locked dead-centre or stare into the lens the whole time — relaxed, lifelike framing, glancing to camera and around the scene as a real person would. A gentle, smooth camera move is fine (a slow drift or soft follow) — never fast, shaky or whip-pans. The whole scene is alive and hyper-real around her, and she has natural gestures and lifelike micro-movements as she speaks.${MOTION_SAFE}${WATER}`;
-
-          // PRIMARY a-roll engine: OmniHuman 1.5 (best-in-class lip-sync, audio-driven so it uses OUR
-          // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
-          // fal rejects inputs >5MB, and our keyframes (1-2K PNGs) blow past that — so re-encode to a
-          // capped JPEG first, or OmniHuman silently fails on EVERY submit and we never leave Seedance.
-          const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
-          const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: ohImg, audioUrl, prompt }));
-          if (oh.statusUrl && oh.responseUrl) {
-            let ohUrl: string | null = null; let ohSeconds: number | null = null;
-            for (let n = 0; n < 220; n++) { // ~22 min — OmniHuman is ~45s gen per 1s of speech, so a full a-roll line needs room to FINISH on OmniHuman rather than bail to the slower Seedance fallback
-              const s = await step.run(`oh-poll-${i}-${n}`, () => pollOmniHumanOnce(oh.statusUrl as string, oh.responseUrl as string));
-              if (s.url) { ohUrl = s.url; ohSeconds = s.seconds; break; }
-              if (s.terminal) break;
-              await step.sleep(`oh-wait-${i}-${n}`, "6s");
-            }
-            if (ohUrl) {
-              // Meter at OmniHuman's true PER-SECOND rate using fal's returned duration (fallback ~8s).
-              const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
-              await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
-              const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
-              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
-            }
-          }
-
-          const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
-          let url: string | null = sub.url;
-          if (!url && sub.jobId) {
-            for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Seedance/Kling can be slow on heavy scenes)
-              const s = await step.run(`apoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
-              if (s.url) { url = s.url; break; }
-              if (s.terminal) break;
-              await step.sleep(`await-a-${i}-${n}`, "8s");
-            }
-          }
-          if (url) {
-            await step.run(`u-aroll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "seedance_2_0", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
-            const hosted = (await step.run(`ahost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
-            // Save the EXACT audio we lip-synced to — Seedance outputs a SILENT video (the audio
-            // only drives the lips), so the stitch lays this same clip back over it for sound.
-            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl };
-          }
-          // fall through to Kling motion (no sync) if Seedance failed
-        }
+        if (audioUrl && !presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
       }
 
-      // B-ROLL (and a-roll fallback): Kling whole-frame motion, silent. VO laid over in the stitch.
+      // A-ROLL ONLY = she speaks DIRECT TO CAMERA, lip-synced (OmniHuman drives her lips from our VO).
+      // B-ROLL is a video SCENE: NEVER lip-synced — its VO narrates OVER the silent motion (laid in the
+      // stitch via audio_url below). This is the standard a-roll/b-roll split.
+      if (role === "a-roll" && audioUrl) {
+        const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
+
+        // PRIMARY a-roll engine: OmniHuman 1.5 (best-in-class lip-sync, audio-driven so it uses OUR
+        // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
+        // fal rejects inputs >5MB, and our keyframes (1-2K PNGs) blow past that — so re-encode to a
+        // capped JPEG first, or OmniHuman silently fails on EVERY submit and we never leave Seedance.
+        const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
+        const oh = await step.run(`oh-submit-${i}`, () => submitOmniHuman({ imageUrl: ohImg, audioUrl, prompt }));
+        if (oh.statusUrl && oh.responseUrl) {
+          let ohUrl: string | null = null; let ohSeconds: number | null = null;
+          for (let n = 0; n < 220; n++) { // ~22 min — OmniHuman is ~45s gen per 1s of speech, so a full a-roll line needs room to FINISH on OmniHuman rather than bail to the slower Seedance fallback
+            const s = await step.run(`oh-poll-${i}-${n}`, () => pollOmniHumanOnce(oh.statusUrl as string, oh.responseUrl as string));
+            if (s.url) { ohUrl = s.url; ohSeconds = s.seconds; break; }
+            if (s.terminal) break;
+            await step.sleep(`oh-wait-${i}-${n}`, "6s");
+          }
+          if (ohUrl) {
+            // Meter at OmniHuman's true PER-SECOND rate using fal's returned duration (fallback ~8s).
+            const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
+            await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
+            const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
+          }
+        }
+
+        const sub = await step.run(`asubmit-${i}`, () => submitTalkingVideo({ imageUrl: img, audioUrl, ratio, prompt }));
+        let url: string | null = sub.url;
+        if (!url && sub.jobId) {
+          for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Seedance/Kling can be slow on heavy scenes)
+            const s = await step.run(`apoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
+            if (s.url) { url = s.url; break; }
+            if (s.terminal) break;
+            await step.sleep(`await-a-${i}-${n}`, "8s");
+          }
+        }
+        if (url) {
+          await step.run(`u-aroll-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "seedance_2_0", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+          const hosted = (await step.run(`ahost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
+          // Save the EXACT audio we lip-synced to — Seedance outputs a SILENT video (the audio
+          // only drives the lips), so the stitch lays this same clip back over it for sound.
+          return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl };
+        }
+        // fall through to Kling motion (no sync) if both OmniHuman and Seedance failed
+      }
+
+      // B-ROLL = a video SCENE (silent; the VO narrates OVER it in the stitch). A-ROLL fallback keeps
+      // her front-on. B-ROLL: she is naturally absorbed in the scene and does NOT address the camera.
       const motion = (role === "a-roll"
         ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. Only she and the background move (background people, ambient motion).`
-        : `${base}. The whole scene is alive and moving: background people move, gentle camera drift, water/leaves/light in motion — never frozen.`) + MOTION_SAFE + WATER;
+        : `${base}. A natural, candid video SCENE: she is IN the environment doing something real (walking through the space, sitting, using or showing the product, glancing around) and is NOT looking at or talking to the camera — observed b-roll, not a piece to camera. The whole scene is alive and moving: she moves naturally, background people move, gentle camera drift, water/leaves/light in motion — never frozen.`) + MOTION_SAFE + WATER;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
       // the background can't drift/reverse (it's anchored to a defined end frame).
@@ -1122,7 +1125,9 @@ export const generateClips = inngest.createFunction(
         const usedModel = hero ? "veo3_1" : (process.env.HF_VIDEO_MODEL || "kling3");
         await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: usedModel, unit: "video", action: role === "a-roll" ? "aroll" : "broll", count: 1 }).catch(() => {}));
         const hosted = (await step.run(`vhost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
-        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: sceneDur };
+        // B-ROLL (and silent a-roll fallback) carries its VO as audio_url so the stitch lays the
+        // narration OVER the silent scene — the continuous voiceover never drops out across the cut.
+        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: sceneDur, audio_url: audioUrl || undefined, synced: false };
       }
       return { scene: i, role, beat, kind: role, url: null, status: "failed", error: sub.error || `render started (${sub.model}) but did not finish in time` };
     };
