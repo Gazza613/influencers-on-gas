@@ -32,8 +32,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!persona.locked) return NextResponse.json({ error: "Lock the influencer's identity first." }, { status: 400 });
 
   const b = await req.json().catch(() => ({}));
+  // Influencer profile from the locked bible — so the director casts an age/demographic-suited world,
+  // wardrobe and background extras (even when the producer doesn't stipulate a setting).
+  const bibleId = ((persona.bible as { identity?: Record<string, string> })?.identity) ?? {};
+  const influencerProfile = [bibleId.age && `age ${bibleId.age}`, bibleId.profession, bibleId.ethnicity_design, bibleId.build]
+    .filter(Boolean).join(", ") || String((persona.bible as { signature_line?: string })?.signature_line || "");
   const brief = {
     influencerName: inf.name,
+    influencerProfile,
     brand: String(b.brand || "").trim(),
     goal: String(b.goal || "drive awareness and action").trim(),
     offer: String(b.offer || "").trim(),

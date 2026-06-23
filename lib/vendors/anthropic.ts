@@ -554,6 +554,8 @@ ONE SHOT PER SCENE (critical) — every scene is EXACTLY ONE continuous shot/cut
 
 BRANDING + LEGAL — if a logo is provided it sits as a persistent overlay (handled at assembly, not a scene). Do NOT write an end-card / closing card / text slate scene — the closing clip or image is uploaded by the producer and appended automatically at the stitch. The film's last scene is the presenter delivering the spoken CTA in-scene. Use the provided legal line VERBATIM, never paraphrased; if none provided, leave legal empty.
 
+CASTING THE WORLD (demographic fit — critical for a world-class feel) — the location, the influencer's wardrobe and the background extras must all be BELIEVABLE for THIS specific influencer's age, profession and life (given in the influencer profile). If the producer stipulated a setting/world, honour it exactly. If they did NOT, choose an age- and demographic-appropriate world yourself: e.g. a 20-something student → campus, lecture courtyard, study cafe; a young professional → modern office, co-working space, city street; a parent → home, kitchen, school run, park; a fitness creator → gym, studio, track. Dress her naturally and age-appropriately for that world (and keep that ONE outfit consistent), and make the background extras the kind of people who would genuinely be in that place (right ages, right context). Never place her somewhere that doesn't fit her age, profession or story.
+
 MUSIC — describe a single music bed that runs throughout, lifts under the CTA, breathes in the montage, resolves on the end card; add ambient SFX per scene where it helps. Describe the music ONLY by genre, mood, tempo and instruments — NEVER name a real artist, band or song, and never say "in the style of" / "like" a real act (this gets the music generator rejected). Original, royalty-free vibes only.
 
 UK spelling. No em dashes. Be specific and art-directed, never generic. Return the storyboard via the tool.`;
@@ -561,7 +563,7 @@ UK spelling. No em dashes. Be specific and art-directed, never generic. Return t
 export async function generateStoryboard(brief: {
   influencerName: string; brand: string; goal: string; offer: string; benefits: string;
   cta: string; ctaCode?: string; durationSeconds: number; format: string; talent: string;
-  setting: string; tone: string; logo?: string; legal?: string;
+  setting: string; tone: string; logo?: string; legal?: string; influencerProfile?: string;
 }): Promise<Storyboard> {
   const c = await client();
   const input =
@@ -569,7 +571,8 @@ export async function generateStoryboard(brief: {
     `Key benefits: ${brief.benefits}\nPrimary CTA: ${brief.cta}\nCTA mechanic / code: ${brief.ctaCode || "(none)"}\n` +
     `Target duration: ${brief.durationSeconds} seconds\nFormat: ${brief.format}\n` +
     `Talent (the locked influencer is the main presenter): ${brief.influencerName}. ${brief.talent}\n` +
-    `Setting / world: ${brief.setting}\nTone words: ${brief.tone}\n` +
+    `Influencer profile — cast the WORLD, wardrobe and background extras to suit THIS person's age, profession and life: ${brief.influencerProfile || "(infer from the talent description)"}\n` +
+    `Setting / world: ${brief.setting || "(not stipulated — choose an age- and demographic-appropriate world for this influencer)"}\nTone words: ${brief.tone}\n` +
     `Persistent branding: ${brief.logo || `"${brief.brand}" logo top-left throughout`}\n` +
     `Mandatory legal line (verbatim, or none): ${brief.legal || "(none)"}\n\nWrite the directed storyboard now.`;
   const res = await c.messages.create({
