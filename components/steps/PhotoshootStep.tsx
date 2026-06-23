@@ -10,7 +10,7 @@ import { flex, pick, PHOTO_LINES } from "@/lib/flex";
 
 type Ref = { url: string; hero?: boolean };
 
-const SET_TOTAL = 12; // chosen hero + 11 varied training frames (angle/light/expression/distance/hands/back)
+const SET_TOTAL = 9; // chosen hero + 8 varied training frames (angle/light/expression/distance/hands/back)
 const PHOTO_NARRATION = [
   "On set, locking the chosen face as the one true identity…",
   "Shooting the full turnaround: front, three-quarter, profile and back…",

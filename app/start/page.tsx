@@ -89,7 +89,7 @@ export default function StartPage() {
             <GenderToggle value={gender} onChange={setGender} />
             {gender && <LookToggle value={look} onChange={setLook} female={gender === "female"} />}
             <div>
-              <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Reference images (optional)</div>
+              <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Reference images (optional · max 4)</div>
               {refPhotos.length > 0 && (
                 <div className="mb-2 grid grid-cols-4 gap-2">
                   {refPhotos.map((u, i) => (
@@ -101,8 +101,10 @@ export default function StartPage() {
                   ))}
                 </div>
               )}
-              <Uploader kind="reference" multiple label={refPhotos.length ? "Add more references" : "Add reference images"} current={null} onUploaded={(u) => setRefPhotos((p) => (u && !p.includes(u) ? [...p, u] : p))} />
-              <p className="mt-1 text-[11px] text-ink-faint">{refPhotos.length ? `${refPhotos.length} added · identity will lock to these (more varied angles = better likeness)` : "Leave empty to cast a fresh face from a brief, or add a few to lock the look."}</p>
+              {refPhotos.length < 4
+                ? <Uploader kind="reference" multiple label={refPhotos.length ? "Add more references" : "Add reference images"} current={null} onUploaded={(u) => setRefPhotos((p) => (u && !p.includes(u) && p.length < 4 ? [...p, u] : p))} />
+                : <p className="rounded-lg border border-line bg-surface-2/40 px-3 py-2 text-[11px] text-ink-faint">Maximum of 4 reference images added. Remove one to swap it.</p>}
+              <p className="mt-1 text-[11px] text-ink-faint">{refPhotos.length ? `${refPhotos.length}/4 added · identity locks to these (a few varied angles = better likeness)` : "Leave empty to cast a fresh face from a brief, or add up to 4 to lock the look."}</p>
             </div>
             <button onClick={() => create({ name: name.trim(), mode: "synthetic", persona: { ...(refPhotos.length ? { reference_url: refPhotos[0], reference_images: refPhotos } : {}), gender, look } })} disabled={!name.trim() || !gender || busy}
               className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : !gender ? "Pick a gender to continue" : "Create influencer →"}</button>
@@ -121,7 +123,7 @@ export default function StartPage() {
             {consenting && !twinConsentId && <ConsentGate dataType="image" onCancel={() => setConsenting(false)} onConfirm={(id) => setTwinConsentId(id)} />}
             {twinConsentId && (
               <>
-                <p className="text-sm text-ink-dim">Upload <span className="text-ink">at least 3</span> clear photos (5 to 10 is ideal): different angles, lighting and expressions, one face per photo, no sunglasses or hats. More varied photos means a far more accurate twin.</p>
+                <p className="text-sm text-ink-dim">Upload <span className="text-ink">3 to 4</span> clear photos: different angles, lighting and expressions, one face per photo, no sunglasses or hats. Varied angles make a more accurate twin.</p>
                 {twinPhotos.length > 0 && (
                   <div className="grid grid-cols-4 gap-2">
                     {twinPhotos.map((u, i) => (
@@ -133,8 +135,10 @@ export default function StartPage() {
                     ))}
                   </div>
                 )}
-                <Uploader kind="twin" multiple label={twinPhotos.length ? "Add more photos" : "Add photos"} current={null} onUploaded={(u) => setTwinPhotos((p) => (u && !p.includes(u) ? [...p, u] : p))} />
-                <p className="text-[11px] text-ink-faint">{twinPhotos.length} added{twinPhotos.length > 0 && twinPhotos.length < 3 ? ` · ${3 - twinPhotos.length} more needed` : ""}</p>
+                {twinPhotos.length < 4
+                  ? <Uploader kind="twin" multiple label={twinPhotos.length ? "Add more photos" : "Add photos"} current={null} onUploaded={(u) => setTwinPhotos((p) => (u && !p.includes(u) && p.length < 4 ? [...p, u] : p))} />
+                  : <p className="rounded-lg border border-line bg-surface-2/40 px-3 py-2 text-[11px] text-ink-faint">Maximum of 4 photos added. Remove one to swap it.</p>}
+                <p className="text-[11px] text-ink-faint">{twinPhotos.length}/4 added{twinPhotos.length > 0 && twinPhotos.length < 3 ? ` · ${3 - twinPhotos.length} more needed (min 3)` : ""}</p>
                 <button onClick={() => create({ name: twinName.trim(), mode: "twin", consentId: twinConsentId, persona: { reference_url: twinPhotos[0], reference_images: twinPhotos } })} disabled={twinPhotos.length < 3 || busy}
                   className="btn-brand w-full rounded-lg py-3 text-sm font-bold disabled:opacity-50">{busy ? "Creating…" : "Create my twin →"}</button>
               </>

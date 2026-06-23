@@ -39,17 +39,16 @@ const CREATIVE_FALLBACK = "gpt_image_2"; // previously-validated creatives ident
 // FACE, and wardrobe + location are then driven by the prompt at generation time. Clean,
 // neutral backgrounds keep the training focused on identity (no scene to clone later).
 type TrainingLook = { frame: string; light: string; wardrobe: string; full?: boolean };
+// Trimmed to 8 (from 11) — keeps the full forensic coverage (front/3-4 both sides/profile/back, neutral
+// + smile + talking, close-up → full-length, a clean hands frame) while cutting ~25% of the render time.
 const TRAINING_LOOKS: TrainingLook[] = [
   { frame: "tight head-shot close-up, front on, neutral relaxed expression, sharp eye catchlights and natural skin pores", light: "soft even indoor light", wardrobe: "a plain crew-neck t-shirt with jeans" },
   { frame: "head-and-shoulders portrait, three-quarter left angle, faint natural smile", light: "soft daylight from a window", wardrobe: "a casual button shirt with trousers" },
   { frame: "head-and-shoulders portrait, three-quarter right angle, mid-conversation talking expression", light: "warm indoor light", wardrobe: "a relaxed knit top with trousers" },
-  { frame: "head-shot, chin slightly down looking up into the lens, calm", light: "soft diffused studio light", wardrobe: "a plain t-shirt with jeans" },
-  { frame: "head-shot, chin slightly raised, relaxed neutral", light: "bright natural daylight", wardrobe: "a simple casual top with trousers" },
   { frame: "clean side profile of the face, neutral", light: "directional studio key light", wardrobe: "a plain top with trousers" },
   { frame: "head-and-shoulders, straight on into the lens, warm genuine smile", light: "soft golden-hour light", wardrobe: "a smart-casual top with tailored trousers" },
   { frame: "head-and-shoulders, one hand raised naturally near the jaw, the hand and fingers clearly visible and correctly formed", light: "soft daylight", wardrobe: "a casual top with jeans" },
   { frame: "three-quarter BACK view over the shoulder, face turned partly back to camera, showing the back of the head, hair and shoulders", light: "soft even light", wardrobe: "a plain top with trousers" },
-  { frame: "waist-up medium shot, front on, easy natural expression", light: "even soft daylight", wardrobe: "a complete everyday outfit — a top AND full-length trousers or jeans (legs fully covered)", full: true },
   { frame: "full-length head to toe, standing in a relaxed natural pose, both feet and full legs visible and clothed", light: "even studio light", wardrobe: "a complete casual outfit — a top AND full-length trousers (legs fully covered, never bare)", full: true },
 ];
 
@@ -152,8 +151,10 @@ export const buildIdentity = inngest.createFunction(
       // photoshoot locked to them AND driven by the bible (build, complexion, age, styling).
       // The uploaded photos stay as the identity truth (hero + face card); the generated frames
       // give the angle/light/expression/distance variety a Soul + creatives need.
+      // Use the 2 strongest uploads as per-frame identity anchors (was 4) — fewer @image refs renders
+      // noticeably faster and still holds the likeness. All uploads still appear as real frames below.
       const refMedias = await step.run("anchor-import", async () =>
-        (await Promise.all(valid.slice(0, 4).map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v),
+        (await Promise.all(valid.slice(0, 2).map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v),
       );
       const g = genderWord(persona.gender);
       const bibleId = ((persona.bible as { identity?: { age?: string; build?: string; ethnicity_design?: string } })?.identity) ?? {};
