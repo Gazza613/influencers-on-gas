@@ -1136,7 +1136,7 @@ export const generateClips = inngest.createFunction(
     // scene merge-saves its result as it lands so the UI fills in live; a final save is authoritative.
     // Only render the scenes in the role filter (all of them when no filter).
     const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)));
-    await Promise.all(targets.map(async ({ sc, i }) => {
+    const renderAndSave = async ({ sc, i }: { sc: Record<string, string>; i: number }) => {
       // Contain a single scene's failure: if renderOne throws (a vendor error after retries), save a
       // "failed" clip instead of rejecting the whole batch — otherwise the final "done" step never
       // runs and clips_status is stuck on "running" forever.
@@ -1149,7 +1149,15 @@ export const generateClips = inngest.createFunction(
       const at = list.findIndex((c) => c.scene === i); if (at >= 0) list[at] = row; else list.push(row);
       await step.run(`csave-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips: list } } }));
       return row;
-    }));
+    };
+    // Render in CONCURRENCY-LIMITED waves (default 3) instead of all at once: the video vendors
+    // (OmniHuman/Seedance/Kling) get overwhelmed when every scene submits together, so the slower
+    // jobs run past their poll window and fail with "did not finish in time". Smaller waves = shorter
+    // vendor queues = each job finishes. Still fills in live as each clip lands.
+    const CLIP_CONCURRENCY = Math.max(1, Number(process.env.CLIP_CONCURRENCY) || 3);
+    for (let c = 0; c < targets.length; c += CLIP_CONCURRENCY) {
+      await Promise.all(targets.slice(c, c + CLIP_CONCURRENCY).map(renderAndSave));
+    }
 
     // Re-sort the FULL merged list (this render's clips + any kept from the other role).
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
