@@ -540,7 +540,9 @@ REFERENCE TIMINGS for 60s (scale proportionally for 15/30/45s): Hook 0:00-0:04 �
 
 PACING — change shot (a new scene) every ~4-6s as a pattern interrupt, and land a micro-payoff (a useful or satisfying beat) every ~10-15s; momentum must never sag. ~7-9 short single-shot scenes for 60s, ~5-6 for 45s, ~4 for 30s, ~3 for 15s (more short scenes beat fewer long ones). For 30s and under, compress PROOF and fold PROBLEM into the hook. Put the HUMAN/emotional beats (hook, problem, CTA) on a-roll and the SOLUTION/PROOF/demo beats on b-roll.
 
-NO GRAPHIC CARDS — NEVER use the 'graphic' role and never write a standalone CTA card, text slate or end card. Every scene must be a real filmed moment (a-roll or b-roll). The CTA and the offer are SPOKEN by the presenter and reinforced by the persistent on-screen logo/promo overlay and the burned-in captions — not a separate graphic frame. The closing beat is the presenter delivering the CTA in-scene, not a card.
+NO GRAPHIC CARDS — NEVER use the 'graphic' role and never write a standalone CTA card, text slate or end card. Every scene must be a real filmed moment (a-roll or b-roll). The CTA and the offer are SPOKEN by the presenter and the burned-in captions — not a separate graphic frame. The closing beat is the presenter delivering the CTA in-scene, not a card.
+
+GRAPHICS FIELD — leave 'graphics' EMPTY ([]) for every scene. NEVER list the brand logo, a "logo bug", captions or any overlay as a graphic: the logo/promo is overlaid automatically at assembly and captions are burned in there too, so writing them as a scene graphic risks them being rendered INTO the shot. Only ever use 'graphics' for a genuine in-world object, which is almost never needed.
 
 VOICE — ONE continuous voiceover across the whole film (never back-and-forth dialogue). Second person, warm, confident, effortless, optimistic, benefit-led, short active sentences, no jargon. Open with a hook in the first ~5s that names the product. Put the full continuous read in full_vo, and each scene's portion in vo_line — she speaks across BOTH a-roll and b-roll, so nearly every scene has a vo_line (only an occasional pure-scenery cutaway is empty, carried by music). The final scene carries the spoken CTA.
 
@@ -577,7 +579,7 @@ export async function generateStoryboard(brief: {
     `Talent (the locked influencer is the main presenter): ${brief.influencerName}. ${brief.talent}\n` +
     `Influencer profile — cast the WORLD, wardrobe and background extras to suit THIS person's age, profession and life: ${brief.influencerProfile || "(infer from the talent description)"}\n` +
     `Setting / world: ${brief.setting || "(not stipulated — choose an age- and demographic-appropriate world for this influencer)"}\nTone words: ${brief.tone}\n` +
-    `Persistent branding: ${brief.logo || `"${brief.brand}" logo top-left throughout`}\n` +
+    `Brand overlay: the logo/promo is applied AUTOMATICALLY as an overlay at assembly — do NOT write the logo into any scene's graphics or render it in any shot.\n` +
     `Mandatory legal line (verbatim, or none): ${brief.legal || "(none)"}\n\nWrite the directed storyboard now.`;
   const res = await c.messages.create({
     model: MODEL,

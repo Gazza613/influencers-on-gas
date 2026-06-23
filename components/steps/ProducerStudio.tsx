@@ -262,16 +262,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     prevFinal.current = f;
   }, [production?.final_url]);
   const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false" });
+  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false" });
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { setEditIdx(null); return; }
     setEditIdx(i); setAiInstr("");
-    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false" });
+    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false" });
   }
   function applyEditsLocally(i: number) {
-    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero } : s)) } } : p));
+    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero } : s)) } } : p));
   }
   async function aiRewrite(i: number) {
     setAiBusy(true); setErr("");
@@ -286,7 +286,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero }),
+      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero }),
     }).then((x) => x.json()).catch(() => null);
     if (r?.saved) { applyEditsLocally(i); setEditIdx(null); } else setErr(r?.error || "Couldn't save.");
   }
@@ -295,7 +295,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero }),
+      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero }),
     }).then((x) => x.json()).catch(() => null);
     applyEditsLocally(i);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
@@ -539,7 +539,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}–{s.end}</span>
                     <span className="text-[11px] font-semibold text-ink-dim">{s.beat}</span>
                     <span className={`tabular rounded border px-1.5 py-0.5 text-[9px] font-bold ${role.cls}`}>{role.label}</span>
-                    {s.role !== "graphic" && <button onClick={() => openEdit(i, s)} className="ml-auto rounded-md border border-[#a855f7]/40 px-2 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">{editIdx === i ? "Close" : "✎ Edit script"}</button>}
+                    {s.role !== "graphic" && <button onClick={() => openEdit(i, s)} className="ml-auto rounded-md border border-[#a855f7]/40 px-2 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">{editIdx === i ? "Close" : "✎ Edit scene"}</button>}
                   </div>
                   <div className="text-[13px] text-ink-dim"><span className="text-ink-faint">📍 {s.location}</span></div>
                   <div className="mt-1 text-[13px] text-ink-dim"><span className="text-ink-faint">🎥</span> {s.shot}</div>
@@ -564,13 +564,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <Uploader kind="vo" accept="audio" label="Upload my own VO (ElevenLabs file) — recommended" current={ed.voAudio || null} onUploaded={(u) => setEd((e) => ({ ...e, voAudio: u }))} />
                         <p className="text-[10px] text-ink-faint">Optional. If you drop your own read here, I lip-sync the clip to it; otherwise I generate the voice in-platform.</p>
                       </div>
-                      {/* Image direction */}
+                      {/* Scene direction (the prompt) */}
                       <div className="space-y-2 border-t border-line pt-3">
-                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Image direction (changing these needs a re-shoot)</div>
-                        <Field label="Location" v={ed.location} set={(x) => setEd((e) => ({ ...e, location: x }))} />
+                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Scene direction — the full prompt (changing these needs a re-shoot)</div>
+                        <Field label="Location / world" v={ed.location} set={(x) => setEd((e) => ({ ...e, location: x }))} />
                         <Uploader kind="phone" accept="image" label="Phone screen image (optional) — shown on the phone if she holds one" current={ed.phone || null} onUploaded={(u) => setEd((e) => ({ ...e, phone: u }))} />
                         <Area label="Action / blocking" v={ed.blocking} set={(x) => setEd((e) => ({ ...e, blocking: x }))} />
                         <Field label="Shot / framing" v={ed.shot} set={(x) => setEd((e) => ({ ...e, shot: x }))} />
+                        <Area label="Performance / expression" v={ed.performance} set={(x) => setEd((e) => ({ ...e, performance: x }))} />
                         <Field label="Motion" v={ed.motion} set={(x) => setEd((e) => ({ ...e, motion: x }))} />
                         {/* HERO shot (b-roll only): render this scene in Veo 3.1 (4K + native audio) instead of Kling */}
                         {s.role === "b-roll" && (
@@ -604,7 +605,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               onJump={(k) => document.getElementById(`step-${k}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
             {/* 1 · Brief & concept */}
-            <StepShell n={1} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} — talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit script, or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem — tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
+            <StepShell n={1} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} — talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt — location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem — tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
 
             {/* 2 · A-roll references */}
             <StepShell n={2} title="A-roll references — the talking shots" desc={`I shoot the talking-shot stills from ${name}'s locked identity, in the size you choose. Keep the ones you love, reject the rest — only kept shots get animated and reach the cut.`} state={stepState("arollRefs")} anchor="step-arollRefs"
