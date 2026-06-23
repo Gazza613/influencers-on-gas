@@ -76,7 +76,18 @@ const STABLE_MODEL = "eleven_multilingual_v2";
 
 // Text to speech → MP3 bytes. `expressive` uses the audio-tag model + livelier settings
 // (lower stability = more emotional range), and falls back to the stable model if it errors.
+// ElevenLabs mispronounces some tech/unit words (e.g. "gigabyte" → "giji byte" with a soft g).
+// Respell the worst offenders phonetically just before TTS. Word-boundary, case-insensitive.
+const SAYABLE: [RegExp, string][] = [
+  [/\bgigabytes\b/gi, "gigga-bytes"],
+  [/\bgigabyte\b/gi, "gigga-byte"],
+  [/\bmegabytes\b/gi, "megga-bytes"],
+  [/\bmegabyte\b/gi, "megga-byte"],
+];
+function sayable(t: string): string { return SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t); }
+
 export async function tts(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<Buffer> {
+  text = sayable(text);
   const k = await key();
   const expressive = opts.expressive ?? false;
   const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
