@@ -916,7 +916,9 @@ export const generateShots = inngest.createFunction(
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
         performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
-        hasPeople: true, worldAnchored: !!worldRef,
+        // A-ROLL = clean presenter shot (no background crowd — HeyGen Avatar IV can't animate a crowd
+        // from a still and warps them). B-ROLL = the scene with people. So only b-roll gets extras.
+        hasPeople: role === "b-roll", worldAnchored: !!worldRef,
       });
       const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
@@ -1059,7 +1061,11 @@ export const generateClips = inngest.createFunction(
       // B-ROLL is a video SCENE: NEVER lip-synced — its VO narrates OVER the silent motion (laid in the
       // stitch via audio_url below). This is the standard a-roll/b-roll split.
       if (role === "a-roll" && audioUrl) {
-        const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. She FINISHES her sentence completely and then SETTLES naturally — mouth closing, a calm composed beat, holding her relaxed expression to the end. She does NOT inhale, part her lips or look as if she is about to speak again, and the clip never cuts mid-word or mid-breath. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
+        // A-ROLL prompt for HeyGen Avatar IV: it animates the PERSON, not the scene. Asking it to move
+        // "background people" makes it WARP/fast-forward the crowd in the still (the hallucination we saw).
+        // So this is SUBJECT-ONLY motion + an explicitly CALM, still background. No MOTION_SAFE/WATER here
+        // (that crowd-motion language is for the b-roll video model, not a talking-photo engine).
+        const prompt = `Natural, lifelike talking-to-camera delivery: ${base}. She FINISHES her sentence completely and then SETTLES calmly — mouth closing, a composed beat, holding her relaxed expression — never inhaling, never looking about to speak again, never cut mid-word. Her movement is entirely SUBJECT-driven and human: easy natural head movement, subtle shoulder and posture shifts, relaxed natural hand gestures, natural blinking and warm micro-expressions as she speaks. The camera holds a steady, gentle, essentially locked frame on her — no pan, tilt, zoom, push or crane — and she stays centred and fully in frame throughout. The BACKGROUND is a real room behind her with shallow depth of field, but it stays CALM and naturally STILL: do NOT animate, move, warp, duplicate or fast-forward any background people or objects — nobody in the background moves unnaturally. ONLY she moves, naturally and at real-life speed.`;
 
         // PRIMARY a-roll engine: HeyGen Avatar IV (v3) — purpose-built talking-photo lip-sync, cheap
         // (subscription), and it animates OUR photo so skin texture is preserved. It is the ONLY a-roll
