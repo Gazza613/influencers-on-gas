@@ -1039,7 +1039,11 @@ export const generateClips = inngest.createFunction(
           // WYSIWYG voice: use the SAME (stable) TTS model the producer previewed when picking the
           // voice. Expressive (eleven_v3) renders the same voice_id noticeably differently, so it read
           // as "a different voice". Opt back in with AROLL_EXPRESSIVE=1 if you want v3 delivery.
-          return putBytes(await tts(voiceId as string, line, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
+          // A-ROLL: append a short trailing pause so she FINISHES her sentence and settles. OmniHuman is
+          // audio-driven, so without trailing silence the clip ends on the last phoneme and she looks cut
+          // off mid-inhale; the extra ~0.6s lets the lip-sync resolve to a calm, composed close.
+          const ttsText = role === "a-roll" ? `${line} <break time="0.6s" />` : line;
+          return putBytes(await tts(voiceId as string, ttsText, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
         }) as string | null);
         if (audioUrl && !presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
       }
@@ -1048,7 +1052,7 @@ export const generateClips = inngest.createFunction(
       // B-ROLL is a video SCENE: NEVER lip-synced — its VO narrates OVER the silent motion (laid in the
       // stitch via audio_url below). This is the standard a-roll/b-roll split.
       if (role === "a-roll" && audioUrl) {
-        const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
+        const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. She FINISHES her sentence completely and then SETTLES naturally — mouth closing, a calm composed beat, holding her relaxed expression to the end. She does NOT inhale, part her lips or look as if she is about to speak again, and the clip never cuts mid-word or mid-breath. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
 
         // PRIMARY a-roll engine: OmniHuman 1.5 (best-in-class lip-sync, audio-driven so it uses OUR
         // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
