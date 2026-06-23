@@ -845,14 +845,18 @@ export const generateShots = inngest.createFunction(
     const allowedRatios = ["9:16", "1:1", "16:9"];
     const ratio = allowedRatios.includes(String(event.data.aspectRatio)) ? String(event.data.aspectRatio) : (String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16");
 
-    // Identity references (same recipe as creatives): uploaded photos, else the canonical cards.
+    // Identity references — EXACT same recipe as creatives. Uploaded photos win; else fall back through
+    // the canonical identity cards AND the photoshoot frames (look_refs). A synthetic with no card still
+    // anchors to its shot identity set, so the producer can NEVER silently render a stranger.
+    const refs = Array.isArray(inf.look_refs) ? (inf.look_refs as { url: string; hero?: boolean; face?: boolean }[]) : [];
     const uploadedRefs = Array.isArray(persona.reference_images) ? (persona.reference_images as string[]).filter((u) => typeof u === "string") : [];
     const refFromUrl = typeof persona.reference_url === "string" && persona.reference_url ? [persona.reference_url] : [];
-    const anchored = uploadedRefs.length ? uploadedRefs.slice(0, 4) : refFromUrl;
-    const idRefUrls = anchored.length
-      ? anchored
-      : [(persona.face_card_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || ""].filter(Boolean);
-    const featureUrl = anchored.length ? "" : ((persona.feature_sheet_url as string) || "");
+    const twinPhotos = (uploadedRefs.length ? uploadedRefs : refFromUrl).slice(0, 4);
+    const anchored = twinPhotos;
+    const idRefUrls = twinPhotos.length
+      ? twinPhotos
+      : [(persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || ""].filter(Boolean);
+    const featureUrl = twinPhotos.length ? "" : ((persona.feature_sheet_url as string) || "");
     const idMedias = await step.run("import-identity", async () => {
       const ids = (await Promise.all(idRefUrls.map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v);
       if (featureUrl) { const f = await importMediaUrl(featureUrl).catch(() => null); if (f) ids.push(f); }
@@ -895,11 +899,11 @@ export const generateShots = inngest.createFunction(
       const phoneTag = phoneMedia ? `@image${++n}` : "";
       const roleRefTag = roleRefMedia ? `@image${++n}` : "";
       const refInstruction = [
-        faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below.` : "",
+        faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. These face references are the ONLY source of her face and identity — take NOTHING about her face from any wardrobe, world, location or reference-look image. EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer). Every OTHER person in the scene — friends, companions, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling. NEVER duplicate her face, hair or look onto anyone else: absolutely no twins, clones or look-alikes.` : "",
         roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its wardrobe, styling, grooming, lighting and overall mood/world closely for this scene. Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
-        worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity. LOCKED WARDROBE: the influencer wears the EXACT SAME outfit as in ${worldTag} — identical garments, colours, fabric and styling — in every single scene. Never change, swap or restyle her clothing; one consistent outfit across the whole shoot (only her pose, action and the framing change).` : "",
+        worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. LOCKED WARDROBE: the influencer wears the EXACT SAME outfit as in ${worldTag} — identical garments, colours, fabric and styling — in every single scene. Never change, swap or restyle her clothing; one consistent outfit across the whole shoot (only her pose, action and the framing change). SUPPORTING CAST CONTINUITY: if ${worldTag} shows any friends or companions, the same people recur here — the SAME individuals (same faces, ages, hair and outfits), not different-looking people swapped in scene to scene.` : "",
         phoneTag ? `${phoneTag} is the PHONE SCREEN content: if the influencer is holding or showing a phone, render its screen displaying THIS exact image, crisp and legible, correctly perspective-fitted to the phone. Do NOT copy any person from it.` : "",
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({

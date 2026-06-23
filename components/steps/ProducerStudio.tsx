@@ -23,8 +23,17 @@ const ROLE = {
   graphic: { label: "GRAPHIC", cls: "bg-active/15 text-active border-active/30" },
 } as const;
 
-export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string }) {
+type CreativeGuide = { url: string; role: string; ratio: string; scene: string; resolution: string };
+export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string }) {
   const [production, setProduction] = useState<Production>(initialProduction);
+  // Guide = a creative (made in the Creative section) the shoot anchors to (wardrobe/look/world). Persisted as aroll_ref_url/broll_ref_url.
+  const [arollGuide, setArollGuide] = useState(arollRef);
+  const [brollGuide, setBrollGuide] = useState(brollRef);
+  async function setGuide(role: "a-roll" | "b-roll", url: string) {
+    const next = (role === "a-roll" ? arollGuide : brollGuide) === url ? "" : url; // tap again to clear
+    if (role === "a-roll") setArollGuide(next); else setBrollGuide(next);
+    await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: role === "a-roll" ? { aroll_ref_url: next } : { broll_ref_url: next } }) }).catch(() => {});
+  }
   const [voiceId, setVoiceId] = useState(initialVoiceId);
   const [voiceName, setVoiceName] = useState(initialVoiceName);
   const [voicePreview, setVoicePreview] = useState("");
@@ -615,6 +624,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <p className="text-[12px] text-ink-faint">No talking (a-roll) scenes in this storyboard — nothing to shoot here.</p>
                 ) : (
                   <>
+                    <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
                     <RatioPicker value={arollRatio} onChange={setArollRatio} />
                     <button onClick={() => shootRole("a-roll", arollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting a-roll references…" : aRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot a-roll references" : "📸 Shoot a-roll references"}</button>
                     <RefGallery role="a-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
@@ -631,6 +641,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <p className="text-[12px] text-ink-faint">No scene (b-roll) shots in this storyboard — nothing to shoot here.</p>
                 ) : (
                   <>
+                    <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
                     <RatioPicker value={brollRatio} onChange={setBrollRatio} />
                     <button onClick={() => shootRole("b-roll", brollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting b-roll references…" : bRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot b-roll references" : "📸 Shoot b-roll references"}</button>
                     <RefGallery role="b-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
@@ -826,6 +837,36 @@ function LockHint() {
   return <p className="text-[11px] text-ink-faint">🔒 Approve the previous step to unlock this one.</p>;
 }
 // Aspect-ratio chooser for a reference shoot (output format of the final video).
+// Pick a creative (made in the Creative section, tagged this role) as the GUIDE the shoot anchors to:
+// the references will match its wardrobe, styling, lighting and world. Tap again to clear. Identity
+// always stays the locked face — the guide only steers look/world, never who she is.
+function GuidePicker({ role, creatives, selected, onPick, onZoom }: {
+  role: "a-roll" | "b-roll"; creatives: { url: string; role: string; scene: string }[]; selected: string;
+  onPick: (role: "a-roll" | "b-roll", url: string) => void; onZoom: (url: string) => void;
+}) {
+  const mine = creatives.filter((c) => c.role === role);
+  if (!mine.length) return null;
+  return (
+    <div className="mb-3 rounded-lg border border-line bg-surface-2 p-3">
+      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Guide from your creatives (optional)</div>
+      <p className="mb-2 text-[11px] text-ink-faint">Pick a {role} shot you made in Creatives to steer the look, wardrobe and world. Her locked face stays the same. Tap again to clear.</p>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {mine.map((c) => {
+          const on = selected === c.url;
+          return (
+            <div key={c.url} className="relative shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={c.url} alt="creative guide" onClick={() => onPick(role, c.url)}
+                className={`h-24 w-16 cursor-pointer rounded-md border-2 object-cover transition ${on ? "border-[#a855f7] shadow-[0_0_14px_rgba(168,85,247,0.5)]" : "border-line opacity-70 hover:opacity-100"}`} />
+              {on && <span className="absolute left-1 top-1 rounded bg-[#a855f7] px-1 py-0.5 text-[8px] font-bold uppercase text-white">Guide</span>}
+              <button onClick={(e) => { e.stopPropagation(); onZoom(c.url); }} className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/40 bg-black/60 text-[10px] text-white">👁</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 function RatioPicker({ value, onChange }: { value: "9:16" | "1:1" | "16:9"; onChange: (v: "9:16" | "1:1" | "16:9") => void }) {
   const opts: { v: "9:16" | "1:1" | "16:9"; label: string }[] = [{ v: "9:16", label: "9:16 · reels" }, { v: "1:1", label: "1:1 · feed" }, { v: "16:9", label: "16:9 · youtube" }];
   return (

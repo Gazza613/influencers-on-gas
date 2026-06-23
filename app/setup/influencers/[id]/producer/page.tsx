@@ -20,5 +20,11 @@ export default async function ProducerPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  return <ProducerStudio influencerId={inf.id} name={inf.name} initialVoiceId={String(persona.voice_id || "")} initialVoiceName={String(persona.voice_name || "")} initialProduction={(persona.production as Record<string, unknown>) ?? null} />;
+  // Creatives made in the Creative section, slimmed to what the Producer's guide-picker needs.
+  const creatives = (Array.isArray(persona.creatives) ? persona.creatives : [])
+    .map((c) => c as { url?: string | null; role?: string; ratio?: string; scene?: string; resolution?: string })
+    .filter((c) => typeof c.url === "string" && c.url)
+    .map((c) => ({ url: c.url as string, role: c.role === "b-roll" ? "b-roll" : "a-roll", ratio: String(c.ratio || ""), scene: String(c.scene || ""), resolution: String(c.resolution || "") }));
+
+  return <ProducerStudio influencerId={inf.id} name={inf.name} initialVoiceId={String(persona.voice_id || "")} initialVoiceName={String(persona.voice_name || "")} initialProduction={(persona.production as Record<string, unknown>) ?? null} creatives={creatives} arollRef={String(persona.aroll_ref_url || "")} brollRef={String(persona.broll_ref_url || "")} />;
 }
