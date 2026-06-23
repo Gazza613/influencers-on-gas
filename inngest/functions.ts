@@ -978,10 +978,10 @@ export const generateClips = inngest.createFunction(
         ? " WATER REALISM (critical): all water — pool, waves, sea, splashes — must move with HYPER-REALISTIC fluid physics: natural ripples and rolling wave motion, light refraction and caustics on the surface, sparkling sunlight highlights, believable splashes and foam. NEVER plastic, jelly-like, gelatinous, frozen, smeared, looping or fake-looking water."
         : "";
 
-      // A-ROLL: Higgsfield Seedance 2.0 — feed the keyframe + a VO audio clip → a moving scene with
-      // the avatar LIP-SYNCED to that voice (baked in). Uses the producer's uploaded VO if present,
-      // else in-platform TTS. Falls back to silent Kling motion (VO laid over) if Seedance fails.
-      if (role === "a-roll" && (presetAudio || (line && voiceId))) {
+      // LIP-SYNC any scene where she SPEAKS — a-roll (head-on to camera) AND b-roll (talking in-situ
+      // in the scene). OmniHuman drives her lips from our VO. Only pure-scenery b-roll (no line) and
+      // graphics skip this. Falls back to Seedance then silent Kling if OmniHuman is unavailable/fails.
+      if (role !== "graphic" && (presetAudio || (line && voiceId))) {
         // Moderate the line BEFORE any ElevenLabs TTS call (skip if it trips the safety classifier).
         const audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => {
           const mod = await moderateText(line);
@@ -993,9 +993,11 @@ export const generateClips = inngest.createFunction(
         }) as string | null);
         if (audioUrl) {
           if (!presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-          // A-ROLL camera MUST hold on her — Seedance was obeying storyboard "push in / pan up"
-          // directions and craning the camera off her (she slid out of frame, the building grew).
-          const prompt = `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably — walking at a real pace, gesturing with their hands, chatting, shifting their weight (each a real human, never a frozen mannequin). She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`;
+          // Framing depends on role: A-ROLL = head-on, locked frame, direct to camera. B-ROLL = she
+          // speaks IN-SITU (in the scene, doing something) — relaxed framing, gentle moves allowed.
+          const prompt = role === "a-roll"
+            ? `${base}. She talks to camera with natural micro-expressions and gentle gestures. CAMERA — CRITICAL: hold a steady, locked, essentially static frame on her. The camera does NOT pan, tilt, push in, zoom, crane, rise or drift. She stays CENTRED and fully in frame for the entire clip — she never slides toward the edge or bottom, never shrinks, and the framing never reveals new architecture. The camera never moves, but the SCENE is fully ALIVE and hyper-real: trees, leaves and plants sway in a gentle breeze, her hair and clothing stir subtly in the air, light shifts softly, and background people move naturally and believably. She gestures naturally with her hands and has lifelike micro-movements as she speaks. Nothing is a still photo; every element has subtle, realistic motion — only the camera stays locked.${MOTION_SAFE}${WATER}`
+            : `${base}. She is IN the scene speaking naturally as she goes about it — a medium-to-wider shot showing her in the environment doing something real (walking through the space, sitting, using the product, turning to camera). She talks while in-situ: she does NOT need to be locked dead-centre or stare into the lens the whole time — relaxed, lifelike framing, glancing to camera and around the scene as a real person would. A gentle, smooth camera move is fine (a slow drift or soft follow) — never fast, shaky or whip-pans. The whole scene is alive and hyper-real around her, and she has natural gestures and lifelike micro-movements as she speaks.${MOTION_SAFE}${WATER}`;
 
           // PRIMARY a-roll engine: OmniHuman 1.5 (best-in-class lip-sync, audio-driven so it uses OUR
           // ElevenLabs voice). Falls back to Seedance, then silent Kling, if fal isn't connected or fails.
@@ -1016,7 +1018,7 @@ export const generateClips = inngest.createFunction(
               const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
               await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
               const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
-              return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
+              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
             }
           }
 
@@ -1035,7 +1037,7 @@ export const generateClips = inngest.createFunction(
             const hosted = (await step.run(`ahost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
             // Save the EXACT audio we lip-synced to — Seedance outputs a SILENT video (the audio
             // only drives the lips), so the stitch lays this same clip back over it for sound.
-            return { scene: i, role, beat, kind: "a-roll", url: hosted, status: "ready", synced: true, audio_url: audioUrl };
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl };
           }
           // fall through to Kling motion (no sync) if Seedance failed
         }
@@ -1256,13 +1258,14 @@ export const assembleVideo = inngest.createFunction(
 
     // Build the Shotstack timeline (top track renders on top). All clips are silent; voice is the
     // voTrack above (a-roll's exact synced audio + b-roll VO), so nothing doubles up.
-    // QUICK fade between scenes — clean and smooth without being muddy (fadeFast ≈ a short crossfade,
-    // not the slow default fade and not a jarring hard cut). Each clip now plays its full length first
-    // (see placed above), so the fade lands on a real cut, not a frozen frame.
+    // CLEAN HARD CUTS between scenes. Fades made the screen DIP TO BLACK between clips (clips are
+    // back-to-back on one track, so a fade-out/in fades through black) — that black flash read as the
+    // "pause". With each clip now playing its full real duration (no freeze) and one continuous
+    // voiceover carrying across the cuts, hard cuts are clean and seamless — the world-class look for a
+    // fast ad. (A true crossfade needs overlapping clips on separate tracks — a later refinement.)
     const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
       asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 },
       start: p.start, length: p.len, fit: "cover",
-      transition: { in: "fadeFast", out: "fadeFast" },
     }));
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
@@ -1270,7 +1273,7 @@ export const assembleVideo = inngest.createFunction(
     const endCardKind = (production?.brief as { endCardKind?: string })?.endCardKind === "image" ? "image" : "video";
     if (endCardUrl) {
       const endLen = endCardKind === "image" ? 4 : 6;
-      videoClips.push({ asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) } as Record<string, unknown>, start: total, length: endLen, fit: "cover", transition: { in: "fade" } } as unknown as typeof videoClips[number]);
+      videoClips.push({ asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) } as Record<string, unknown>, start: total, length: endLen, fit: "cover" } as unknown as typeof videoClips[number]);
     }
     // Captions are OPT-IN at stitch time (the producer ticks "Burn captions"). Default OFF — they were
     // appearing unrequested. Sized for the 9:16 frame: smaller text, lifted off the very bottom edge.
