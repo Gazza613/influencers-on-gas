@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, CLOTHED } from "@/lib/realism";
-import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce } from "@/lib/vendors/higgsfield";
+import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, CLOTHED, HUMANISER } from "@/lib/realism";
+import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
@@ -866,7 +866,7 @@ export const generateShots = inngest.createFunction(
         roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its wardrobe, styling, grooming, lighting and overall mood/world closely for this scene. Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
-        worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity.` : "",
+        worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity. LOCKED WARDROBE: the influencer wears the EXACT SAME outfit as in ${worldTag} — identical garments, colours, fabric and styling — in every single scene. Never change, swap or restyle her clothing; one consistent outfit across the whole shoot (only her pose, action and the framing change).` : "",
         phoneTag ? `${phoneTag} is the PHONE SCREEN content: if the influencer is holding or showing a phone, render its screen displaying THIS exact image, crisp and legible, correctly perspective-fitted to the phone. Do NOT copy any person from it.` : "",
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
@@ -888,6 +888,17 @@ export const generateShots = inngest.createFunction(
         if (!verdict.pass) {
           const reroll = await step.run(`reroll-${i}`, gen);
           if (reroll && (await step.run(`valid2-${i}`, () => filterLoadable([reroll as string]))).length > 0) { usable = reroll; await step.run(`u2-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }).catch(() => {})); }
+        }
+      }
+      // THE HUMANISER (realism pass): re-render the keyframe through Nano Banana Pro using itself as
+      // the reference — holds identity/pose/wardrobe/framing, fixes ONLY the skin so it reads as a real
+      // photo (kills the plastic/AI sheen). This is the world-class-scene finish. Default ON; set
+      // HF_HUMANISE=0 to skip it for speed.
+      if (usable && process.env.HF_HUMANISE !== "0") {
+        const human = await step.run(`humanise-${i}`, () => humaniseUrl(usable as string, { prompt: HUMANISER, ratio }).catch(() => null));
+        if (human && (await step.run(`vhuman-${i}`, () => filterLoadable([human]))).length > 0) {
+          usable = human;
+          await step.run(`uhuman-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
         }
       }
       let hosted: string | null = null;
