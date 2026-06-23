@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { deleteInfluencer, updateInfluencer, getInfluencer } from "@/lib/influencers";
+import { isSafePublicUrl } from "@/lib/safe-url";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -19,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   // Merge a small persona patch (step hand-off only). Allow-listed so a client can't
   // overwrite gates like `locked` or identity fields (element_id / soul references).
-  const ALLOWED_PATCH = new Set(["chosen_url", "selected_frames", "video_selects", "creatives"]);
+  const ALLOWED_PATCH = new Set(["chosen_url", "selected_frames", "video_selects", "creatives", "aroll_ref_url", "broll_ref_url"]);
   let persona: Record<string, unknown> | undefined;
   if (body.personaPatch && typeof body.personaPatch === "object") {
     const inf = await getInfluencer(id);
@@ -50,6 +51,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             seen.add(key);
             return true;
           });
+      } else if (k === "aroll_ref_url" || k === "broll_ref_url") {
+        // Guide reference = a URL of one of the influencer's OWN creatives (or "" to clear). The engine
+        // fetches it, so SSRF-guard: accept only an empty string or a safe public URL.
+        const v = body.personaPatch[k];
+        if (v === "" || (typeof v === "string" && isSafePublicUrl(v))) patch[k] = v;
       } else {
         patch[k] = body.personaPatch[k];
       }

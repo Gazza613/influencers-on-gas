@@ -142,7 +142,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   function stepState(k: typeof ORDER[number]): "locked" | "active" | "done" {
     if (approved.has(k)) return "done";
     const idx = ORDER.indexOf(k);
-    const priorOk = idx === 0 || approved.has(ORDER[idx - 1]);
+    // The a-roll and b-roll REFERENCE shoots are independent (different scenes) — both open in
+    // PARALLEL once Concept is approved, so each gallery pops previews in the same way. Voice then
+    // waits for BOTH reference sets to be approved.
+    let priorOk: boolean;
+    if (k === "brollRefs") priorOk = approved.has("concept");
+    else if (k === "voice") priorOk = approved.has("arollRefs") && approved.has("brollRefs");
+    else priorOk = idx === 0 || approved.has(ORDER[idx - 1]);
     return priorOk ? "active" : "locked";
   }
   const unlocked = (k: typeof ORDER[number]) => stepState(k) !== "locked";
