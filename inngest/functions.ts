@@ -170,37 +170,45 @@ export const buildIdentity = inngest.createFunction(
         // Reference frames at 1K — they feed the Soul + act as anchors (not 4K finals), so 1K halves
         // the photoshoot time with no meaningful loss. Identity cards below stay 2K for fidelity.
         const ex = { medias: refMedias.map((value) => ({ value, role: "image" })), resolution: "1k" };
-        const urls = await step.run("anchored-shoot", () => generateBatch(prompts, IMAGE_MODEL, "9:16", ex, IMAGE_FALLBACK));
-        const produced = urls.filter((u): u is string => !!u);
-        if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
-        const loadedShoot = await step.run("validate-shoot", () => filterLoadable(produced));
-        // IDENTITY QA: drop any generated frame that isn't the same person as the anchor (wide /
-        // full-body shots sometimes render a different model). Checked against the chosen anchor.
-        // QA each frame on TWO axes and drop failures: (1) identity match vs the anchor, (2) the
-        // clothing/coherence gate (bare legs / missing bottoms). Robust: if the QA step errors OR
-        // filters everything out, KEEP all loadable frames — the photoshoot must never come back empty.
-        let validShoot: string[] = loadedShoot;
-        if (QA_ON) {
+        // LAND FRAMES IN LIVE WAVES: the old single batch generated all ~11 frames then saved ONCE at
+        // the end — so the gallery sat on 1/12 for minutes and a single slow frame stalled everything.
+        // Now we generate in small concurrent chunks and SAVE after each (durable reload-merge), so
+        // frames appear as they land and a late hang can't lose the earlier waves. Chunk size tunable.
+        const heroFrame = { url: valid[0], hero: true, face: true } as { url: string; hero?: boolean; face?: boolean };
+        const extraReal = valid.slice(1).map((url) => ({ url }) as { url: string });
+        const framesExpected = looks.length + valid.length;
+        const CHUNK = Math.max(1, Number(process.env.HF_SHOOT_CHUNK) || 6); // ~2 waves for the full set — same speed as before, but frames land mid-way instead of all at the end
+        let collected: string[] = [];
+        const saveProgress = async (tag: string | number, done: boolean) => {
+          const fresh = (((await step.run(`shoot-reload-${tag}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+          const out: { url: string; hero?: boolean; face?: boolean }[] = [heroFrame, ...extraReal];
+          for (const url of collected) if (!out.some((f) => f.url === url)) out.push({ url });
+          await step.run(`shoot-save-${tag}`, () => updateInfluencer(influencerId, {
+            look_refs: out, status: done ? "frames_ready" : "generating",
+            persona: { ...fresh, hero_url: valid[0], frames_expected: framesExpected, face_card_url: valid[0], feature_sheet_url: null, turnaround_url: null },
+          }));
+        };
+        for (let c = 0; c < prompts.length; c += CHUNK) {
+          const urls = await step.run(`anchored-shoot-${c}`, () => generateBatch(prompts.slice(c, c + CHUNK), IMAGE_MODEL, "9:16", ex, IMAGE_FALLBACK));
+          const got = await step.run(`valid-shoot-${c}`, () => filterLoadable(urls.filter((u): u is string => !!u)));
+          if (got.length) {
+            await step.run(`u-shoot-${c}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: got.length }).catch(() => {}));
+            collected = [...collected, ...got];
+            await saveProgress(c, false); // land this wave live
+          }
+        }
+        // Optional identity/clothing QA (off by default) — drop any drifted/bare-legged frames, never empty.
+        if (QA_ON && collected.length) {
           try {
-            const filtered = await step.run("identity-qa", () => Promise.all(loadedShoot.map(async (u) => {
+            const filtered = await step.run("identity-qa", () => Promise.all(collected.map(async (u) => {
               const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0]).catch(() => true), qaCreative(u).catch(() => ({ pass: true }))]);
               return { u, ok: idOk && qa.pass };
             }))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
-            if (filtered.length) validShoot = filtered;
-          } catch { validShoot = loadedShoot; }
+            if (filtered.length) collected = filtered;
+          } catch { /* keep all */ }
         }
-        // Real uploads first (identity truth), then the identity-matched generated frames.
-        const frames: { url: string; hero?: boolean; face?: boolean }[] = [{ url: valid[0], hero: true, face: true }];
-        for (const url of valid.slice(1)) if (!frames.some((f) => f.url === url)) frames.push({ url });
-        for (const url of validShoot) if (!frames.some((f) => f.url === url)) frames.push({ url });
-        await step.run("save-anchored-frames", () =>
-          updateInfluencer(influencerId, {
-            look_refs: frames,
-            status: "frames_ready",
-            persona: { ...persona, hero_url: valid[0], frames_expected: frames.length, face_card_url: valid[0], feature_sheet_url: null, turnaround_url: null },
-          }),
-        );
-        return { ok: true, frames: frames.length, anchored: true, generated: validShoot.length };
+        await saveProgress("done", true);
+        return { ok: true, frames: collected.length + valid.length, anchored: true, generated: collected.length };
       }
 
       // Fallback: uploads could not be imported for reference → keep them as the frame set.
