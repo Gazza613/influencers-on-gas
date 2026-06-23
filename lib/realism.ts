@@ -89,6 +89,7 @@ const SKIN_FACTS = HUMANISER;
 export function buildCreativeImagePrompt(o: {
   sceneText: string; variation: string; refInstruction: string; subjectLine: string;
   faceMarks: string; look: string; peopleClause: string; cinematic: boolean; ratio: string;
+  role?: "a-roll" | "b-roll";
 }): string {
   const style = o.cinematic
     ? "Photograph style: a cinematic film still, rich filmic colour grade, dramatic but natural directional light, the background still clearly readable (not heavily blurred)."
@@ -101,7 +102,9 @@ export function buildCreativeImagePrompt(o: {
     `Scene: ${o.sceneText}${o.variation}. ${o.peopleClause}. The background is real and in sharp focus (never blurred), so the shot is reusable for video.`,
     `Subject: ${o.subjectLine}. A real person living their life, NOT a model on a shoot, relaxed lived-in energy.${o.faceMarks ? ` Distinctive features to keep: ${o.faceMarks}.` : ""}`,
     `Identity:${o.refInstruction}`,
-    `Pose and expression: front-on to the camera, face and eyes looking straight into the lens, head level and upright. NOT looking up, NOT tilting the chin or head up, NOT gazing at the sky or off into the distance, NOT looking away from camera. A natural, un-posed candid moment. Hands relaxed at the sides or naturally occupied with the scene; NEVER a hand raised to the forehead, brow or face, never shielding or shading the eyes, never a hand-visor, never squinting into the sun.`,
+    o.role === "b-roll"
+      ? `Pose and expression (B-ROLL — lifestyle/scene): a CANDID, un-posed moment — she is genuinely DOING something in the scene (walking through it, using her phone, sipping a coffee, browsing, glancing around), NOT posing and NOT staring into the lens. She may look at what she's doing, to the side, or mid-action; relaxed, lived-in body language as if unaware of the camera. Hands naturally occupied with the activity; never a hand-visor or shielding the eyes.`
+      : `Pose and expression (A-ROLL — presenter): front-on to the camera, face and eyes looking straight into the lens, head level and upright, a warm natural talking-to-camera moment (as if speaking to the viewer). NOT looking up, NOT tilting the chin up, NOT gazing off into the distance, NOT looking away. Hands relaxed or gesturing naturally; NEVER a hand raised to the forehead/brow/face, never shielding or shading the eyes, never a hand-visor, never squinting into the sun.`,
     `Grooming: ${o.look}.`,
     camera,
     SKIN_FACTS,

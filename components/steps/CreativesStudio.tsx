@@ -18,6 +18,7 @@ type Creative = {
   status?: "approved" | "failed_qa" | "failed_generation";
   qa?: { pass: boolean; score10: number; issues: string[] } | null;
   error?: string | null;
+  role?: "a-roll" | "b-roll";
   upscaling?: boolean;
   upscale_error?: string | null;
 };
@@ -57,7 +58,11 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
-  const [extras, setExtras] = useState(true);
+  // A-roll (presenter, front-on, no extras) vs B-roll (lifestyle/scene, candid, extras on). Switching
+  // sets a sensible extras default for that style (still overridable below).
+  const [creativeRole, setCreativeRole] = useState<"a-roll" | "b-roll">("a-roll");
+  const [extras, setExtras] = useState(false);
+  const pickRole = (r: "a-roll" | "b-roll") => { setCreativeRole(r); setExtras(r === "b-roll"); };
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
@@ -181,7 +186,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     setErr(""); setStatus("running"); setStartedAt(Date.now());
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRefs, extras, identityLock }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRefs, extras, identityLock, role: creativeRole }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);
@@ -413,6 +418,20 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           </div>
         </div>
 
+        {/* Shot type — A-roll (presenter) vs B-roll (lifestyle/scene) */}
+        <div className="mt-4">
+          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Shot type</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {([["a-roll", "A-roll · presenter", "Front-on, talking to camera — clean presenter shots"], ["b-roll", "B-roll · lifestyle", "Candid in-scene moments, extras + life around her"]] as const).map(([k, label, hint]) => (
+              <button key={k} onClick={() => pickRole(k)} className={`rounded-lg border px-3 py-2 text-left transition ${creativeRole === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
+                <div className={`text-sm font-bold ${creativeRole === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
+                <div className="text-[10px] text-ink-faint">{hint}</div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-ink-faint">These tag your shots so you can pick A-roll or B-roll references in the Producer. Switching sets a sensible extras default below.</p>
+        </div>
+
         {/* Quality tier (Soul model) */}
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
@@ -449,7 +468,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["true", "Include extras", "A diverse crowd in the background, in focus"], ["false", "No extras", "Just the influencer, clean background"]] as const).map(([k, label, hint]) => {
+            {([["true", "Add background extras", "A diverse crowd around her, in focus"], ["false", "No extras", "Only the people you name in the scene (e.g. 2 friends) — no random crowd"]] as const).map(([k, label, hint]) => {
               const on = (k === "true") === extras;
               return (
                 <button key={k} onClick={() => setExtras(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
@@ -602,16 +621,25 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           </div>
           <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">Shots render fast as previews. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
           {(twoK.length > 0 || placeholders > 0) && (
-            <div className="mb-5">
-              <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">2K previews · {twoK.length}{placeholders > 0 ? ` · ${placeholders} generating` : ""}</div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {twoK.map(renderTile)}
-                {Array.from({ length: placeholders }).map((_, i) => (
-                  <div key={`ph${i}`} className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#a855f7]/30 bg-surface-2 text-center text-[10px] text-ink-faint">
-                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />generating…
+            <div className="mb-5 space-y-5">
+              {([["a-roll", "A-roll · presenter"], ["b-roll", "B-roll · lifestyle"]] as const).map(([r, label]) => {
+                const group = twoK.filter((c) => (c.role === "b-roll" ? "b-roll" : "a-roll") === r);
+                const ph = creativeRole === r ? placeholders : 0;
+                if (group.length === 0 && ph === 0) return null;
+                return (
+                  <div key={r}>
+                    <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-[#ff8a3c]">{label} · {group.length}{ph > 0 ? ` · ${ph} generating` : ""}</div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                      {group.map(renderTile)}
+                      {Array.from({ length: ph }).map((_, i) => (
+                        <div key={`ph${r}${i}`} className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#a855f7]/30 bg-surface-2 text-center text-[10px] text-ink-faint">
+                          <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />generating…
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
           {fourK.length > 0 && (

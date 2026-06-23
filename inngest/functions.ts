@@ -451,6 +451,7 @@ type Creative = {
   status: CreativeStatus;
   qa: CreativeQa | null;
   error: string | null;
+  role?: "a-roll" | "b-roll";
 };
 
 // Used for the DEFAULT brief (no user scene), these dictate pose/gaze for variety.
@@ -486,7 +487,11 @@ export const generateCreatives = inngest.createFunction(
     const clothingRef = (event.data.clothingRef as string) || "";
     // Multiple location references — shots are spread across them for varied backdrops. Back-compat single.
     const locationRefs = ((Array.isArray(event.data.locationRefs) ? event.data.locationRefs : [event.data.locationRef]) as unknown[]).filter((u): u is string => typeof u === "string" && !!u).slice(0, 8);
-    const peopleClause = event.data.extras === false ? NO_EXTRAS : SCENE_PEOPLE;
+    // A-ROLL = presenter (front-on, talking to camera, no extras by default). B-ROLL = lifestyle/scene
+    // (candid, in-situ, extras on by default). Either default is overridable by the explicit extras flag.
+    const role: "a-roll" | "b-roll" = event.data.role === "b-roll" ? "b-roll" : "a-roll";
+    const extrasOn = role === "b-roll" ? event.data.extras !== false : event.data.extras === true;
+    const peopleClause = extrasOn ? SCENE_PEOPLE : NO_EXTRAS;
 
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "influencer not found" };
@@ -579,7 +584,6 @@ export const generateCreatives = inngest.createFunction(
       // generate ONE distinct image per scene instead of N variations of the first. Otherwise the
       // single scene becomes N art-directed variations (the classic behaviour).
       const bibleObj = (persona.bible as Record<string, unknown>) || {};
-      const extrasOn = event.data.extras !== false;
       const gender = String(persona.gender || "");
       const segments = splitScenes(scene);
       const multiScene = segments.length >= 2;
@@ -596,7 +600,7 @@ export const generateCreatives = inngest.createFunction(
         richScenes = [rs];
       }
       const buildPrompt = (idx: number, ratio: string) =>
-        buildCreativeImagePrompt({ sceneText: multiScene ? richScenes[idx] : richScenes[0], variation: multiScene ? "" : variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio });
+        buildCreativeImagePrompt({ sceneText: multiScene ? richScenes[idx] : richScenes[0], variation: multiScene ? "" : variations[idx % variations.length], refInstruction, subjectLine, faceMarks, look, peopleClause, cinematic, ratio, role });
 
       // Each format runs CONCURRENTLY and preserves one persisted record per requested
       // attempt. Failed generations and QA rejects are visible to producers, not dropped.
@@ -630,11 +634,11 @@ export const generateCreatives = inngest.createFunction(
           step.run(`finalize-${rid}-${k}`, async () => {
             const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
             if (!sourceUrl) {
-              return { id, url: null, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: genErrors[k] || "generation returned no image" } as Creative;
+              return { id, url: null, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: genErrors[k] || "generation returned no image", role } as Creative;
             }
 
             if (!validSet.has(sourceUrl)) {
-              return { id, url: sourceUrl, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: "image url failed to load" } as Creative;
+              return { id, url: sourceUrl, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: "image url failed to load", role } as Creative;
             }
 
             const verdict = QA_ON ? await qaCreative(sourceUrl).catch(() => ({ pass: true, score10: 7, issues: ["qa-unavailable"] })) : { pass: true, score10: 0, issues: [] as string[] };
@@ -650,6 +654,7 @@ export const generateCreatives = inngest.createFunction(
                 status: "failed_qa",
                 qa,
                 error: qa.issues[0] || "failed quality review",
+                role,
               } as Creative;
             }
 
@@ -671,6 +676,7 @@ export const generateCreatives = inngest.createFunction(
               status: "approved",
               qa,
               error: null,
+              role,
             } as Creative;
           }),
         ));

@@ -72,14 +72,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
   // Multiple location references (shots rotate through them for varied backdrops). Back-compat with the old single locationRef.
   const locationRefs = (Array.isArray(body.locationRefs) ? body.locationRefs : [body.locationRef]).filter((u: unknown): u is string => typeof u === "string" && !!u).slice(0, 8);
-  const extras = body.extras !== false; // default: include diverse background extras
+  // A-roll (presenter) vs B-roll (lifestyle/scene). Drives pose + extras default in the engine.
+  const role = body.role === "b-roll" ? "b-roll" : "a-roll";
+  // Pass extras as the RAW user choice (true/false/undefined) so the engine can apply the role default
+  // when unset (b-roll → extras on, a-roll → off).
+  const extras = typeof body.extras === "boolean" ? body.extras : undefined;
   const identityLock = body.identityLock === "flexible" ? "flexible" : "strong"; // default: max likeness
   if (!ratios.length) return NextResponse.json({ error: "Pick at least one format." }, { status: 400 });
 
   // Send first; only flip to "running" once accepted, so a send failure can't strand the
   // gallery showing "Rendering" forever with no job running.
   try {
-    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, cinematic, clothingRef, locationRefs, extras, identityLock } });
+    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, cinematic, clothingRef, locationRefs, extras, identityLock, role } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
