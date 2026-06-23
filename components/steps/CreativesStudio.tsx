@@ -54,7 +54,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   // Producer references: a chosen creative becomes the wardrobe + world anchor for a-roll / b-roll
   // keyframes (Phase 1 of Creatives → Producer).
   const [refs, setRefs] = useState<{ aroll: string; broll: string }>({ aroll: arollRef, broll: brollRef });
-    const [view, setView] = useState<"all" | "excellent" | "good" | "average">("all");
+    const [view, setView] = useState<"all" | "excellent" | "good">("all");
   const [platforms, setPlatforms] = useState<Set<string>>(new Set());
   const [ratios, setRatios] = useState<Set<string>>(new Set(["9:16", "1:1"]));
   const [tier, setTier] = useState<"soul_2" | "soul_cinematic">("soul_2");
@@ -279,11 +279,9 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     };
     setTimeout(tick, 4000);
   }
-  // Finish-based grade: 4K = green Excellent; 2K keeper = orange Good; QA-flagged = red Average.
+  // Finish-based grade (no QA now): 4K upscale = green Excellent; everything else = orange Good.
   function gradeOf(c: Creative): { t: string; cls: string } {
     if ((c.resolution || "").toLowerCase() === "4k") return { t: "Excellent", cls: "bg-ready/85 shadow-[0_0_10px_rgba(52,199,89,0.6)]" };
-    const s = c.qa?.score10 ?? 7;
-    if (c.status === "failed_qa" || s < 6) return { t: "Average", cls: "bg-alert/85" };
     return { t: "Good", cls: "bg-[#ff6a00] shadow-[0_0_10px_rgba(255,106,0,0.75)]" };
   }
   const renderTile = (c: Creative, i: number) => {
@@ -359,9 +357,8 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   };
 
   const visible = creatives.filter((c) => {
-    if (view === "excellent") return c.status === "approved" && (c.resolution || "").toLowerCase() === "4k";
-    if (view === "good") return c.status === "approved" && (c.resolution || "").toLowerCase() !== "4k" && gradeOf(c).t === "Good";
-    if (view === "average") return (c.resolution || "").toLowerCase() !== "4k" && (c.status === "failed_qa" || (c.status === "approved" && gradeOf(c).t === "Average"));
+    if (view === "excellent") return c.status !== "failed_generation" && (c.resolution || "").toLowerCase() === "4k";
+    if (view === "good") return c.status !== "failed_generation" && (c.resolution || "").toLowerCase() !== "4k";
     return true;
   });
   // Split into 2K previews (plus any failed shots, which keep their delete control) and 4K finals.
@@ -596,7 +593,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Your creatives · {creatives.length}</div>
             <div className="flex items-center gap-1">
-              {([ ["all", "All"], ["excellent", "Excellent"], ["good", "Good"], ["average", "Average"] ] as const).map(([k, label]) => (
+              {([ ["all", "All"], ["excellent", "Excellent · 4K"], ["good", "Good"] ] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setView(k)}
