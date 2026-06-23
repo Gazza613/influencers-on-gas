@@ -208,6 +208,15 @@ export const buildIdentity = inngest.createFunction(
             if (filtered.length) collected = filtered;
           } catch { /* keep all */ }
         }
+        // HUMANISER on the primary generated FACE frame (always) — a real-skin foundation. The hero is
+        // the real upload (already real, left untouched); we polish the lead generated close-up only.
+        if (collected.length) {
+          const h = await step.run("humanise-face", () => humaniseUrl(collected[0], { prompt: HUMANISER, ratio: "9:16" }).catch(() => null));
+          if (h && (await step.run("vhuman-face", () => filterLoadable([h]))).length) {
+            collected = [h, ...collected.slice(1)];
+            await step.run("u-humanise-face", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
+          }
+        }
         await saveProgress("done", true);
         return { ok: true, frames: collected.length + valid.length, anchored: true, generated: collected.length };
       }
@@ -278,8 +287,17 @@ export const buildIdentity = inngest.createFunction(
       const produced = urls.filter((u): u is string => !!u);
       // looks[0] is the tight face close-up; tag it as the clean identity anchor for
       // creatives (a face reference clones far less wardrobe/scene than a full photo).
-      const closeUpUrl = produced[0] || null;
+      let closeUpUrl = produced[0] || null;
       const validFrames = await step.run("validate-frames", () => filterLoadable(produced));
+      // HUMANISER on the FACE anchor (always) — this AI close-up is the identity reference the creatives
+      // + the board clone from, so a real-skin pass here propagates the realism everywhere downstream.
+      if (closeUpUrl && validFrames.includes(closeUpUrl)) {
+        const h = await step.run("humanise-face", () => humaniseUrl(closeUpUrl as string, { prompt: HUMANISER, ratio: "9:16" }).catch(() => null));
+        if (h && (await step.run("vhuman-face", () => filterLoadable([h]))).length) {
+          validFrames[validFrames.indexOf(closeUpUrl)] = h; closeUpUrl = h;
+          await step.run("u-humanise-face", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
+        }
+      }
       for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url, ...(url === closeUpUrl ? { face: true } : {}) });
 
       await step.run("save-frames", () =>
