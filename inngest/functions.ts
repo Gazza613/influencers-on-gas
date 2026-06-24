@@ -925,7 +925,7 @@ export const generateShots = inngest.createFunction(
       // no quality but ~double the render time. 1K ~halves the board with no visible loss.
       const shotExtra = { ...(medias.length ? { medias } : {}), resolution: process.env.HF_BOARD_RES || "1k" };
       const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, shotExtra, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
-      let url = await step.run(`shot-${i}`, gen);
+      const url = await step.run(`shot-${i}`, gen);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
       // QA GATE (opt-in): reject waxy/malformed/drift frames and re-roll once. Off by default for speed.
       if (usable && QA_ON) {
@@ -989,6 +989,8 @@ export const generateShots = inngest.createFunction(
 // image->video motion clips (face-safe). Graphic scenes pass through to assembly. Durable +
 // progressive; every clip metered; one failed clip never blocks the rest.
 type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number; engine?: string };
+// Keep at least the old ~16 minute floor even when env-tuned lower; default to ~24 minutes for slow vendor queues.
+const CLIP_POLL_ROUNDS = Math.max(120, Number(process.env.CLIP_POLL_ROUNDS) || 180);
 export const generateClips = inngest.createFunction(
   { id: "generate-clips", retries: 1, triggers: [{ event: "influencer/generate.clips" }] },
   async ({ event, step }) => {
@@ -1116,7 +1118,7 @@ export const generateClips = inngest.createFunction(
         let url: string | null = sub.url;
         if (!url && sub.jobId) {
           let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
-          for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Seedance/Kling can be slow on heavy scenes)
+          for (let n = 0; n < CLIP_POLL_ROUNDS; n++) { // default ~180 x 8s ≈ 24 min; env-tunable for slow vendor queues
             const s = await step.run(`apoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
             if (s.url) { url = s.url; break; }
             if (s.terminal && grace-- <= 0) break;
@@ -1155,7 +1157,7 @@ export const generateClips = inngest.createFunction(
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
         let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
-        for (let n = 0; n < 120; n++) { // ~120 x 8s ≈ 16 min (Kling is slow on heavy scenes)
+        for (let n = 0; n < CLIP_POLL_ROUNDS; n++) { // default ~180 x 8s ≈ 24 min; env-tunable for slow vendor queues
           const s = await step.run(`vpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
           if (s.url) { url = s.url; break; }
           if (s.terminal && grace-- <= 0) break;
