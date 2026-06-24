@@ -714,11 +714,15 @@ export async function submitVideoFromImage(opts: { imageUrl: string; prompt: str
   // nearest. Tried FIRST; Kling fallback below if Veo errors.
   const veoDur = [4, 6, 8].reduce((p, c) => (Math.abs(c - dur) < Math.abs(p - dur) ? c : p), 8);
   const heroShape: AnyObj = { model: "veo3_1", prompt: opts.prompt, aspect_ratio: ar, duration: veoDur, count: 1, medias, sound: "on" };
+  // kling3_0_turbo is PRIMARY for b-roll: standard kling3_0 renders slowly and was running past our poll
+  // window ("did not finish in time"). Turbo is built for speed and finishes far more reliably; standard
+  // kling3_0 stays as the fallback. The shapes list is a SUBMIT fallback, so the faster model must be
+  // FIRST — a slow render never trips the next shape, it just times out.
   const shapes: AnyObj[] = [
     ...(opts.hero ? [heroShape] : []),
     ...(process.env.HF_VIDEO_MODEL ? [start(process.env.HF_VIDEO_MODEL)] : []),
+    start("kling3_0_turbo", { sound: "off", resolution: "1080p" }),
     start("kling3_0", { sound: "off" }),
-    start("kling3_0_turbo", { resolution: "1080p" }),
     start("cinematic_studio_video_v2", { sound: "off" }),
   ];
   let lastErr = "";
