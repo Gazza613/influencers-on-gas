@@ -989,6 +989,7 @@ export const generateShots = inngest.createFunction(
 // image->video motion clips (face-safe). Graphic scenes pass through to assembly. Durable +
 // progressive; every clip metered; one failed clip never blocks the rest.
 type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number; engine?: string };
+// Keep at least the old ~16 minute floor even when env-tuned lower; default to ~24 minutes for slow vendor queues.
 const CLIP_POLL_ROUNDS = Math.max(120, Number(process.env.CLIP_POLL_ROUNDS) || 180);
 export const generateClips = inngest.createFunction(
   { id: "generate-clips", retries: 1, triggers: [{ event: "influencer/generate.clips" }] },
