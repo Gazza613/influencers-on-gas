@@ -1146,7 +1146,11 @@ export const generateClips = inngest.createFunction(
       // Chain to the NEXT scene's frame ONLY for b-roll (seamless scene-to-scene flow). NEVER for
       // a-roll — the presenter must stay in their own scene, not morph into the next backdrop.
       const next = scenes[i + 1] as Record<string, string> | undefined;
-      const endImageUrl = role === "b-roll" && next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
+      // END-FRAME CHAINING (seamless cut) makes Kling render a start→end INTERPOLATION — much heavier,
+      // and it was hanging past the poll window (b-roll spinning for ages, then failing). OFF by default
+      // for reliability: b-roll now renders a simple start-frame motion clip that finishes fast. Re-enable
+      // the seamless-cut chaining with BROLL_END_FRAME=1 once Kling render times are healthy.
+      const endImageUrl = process.env.BROLL_END_FRAME === "1" && role === "b-roll" && next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
       // Match the clip length to the scene's storyboard timecodes (Kling clamps to 3–15s), so the
       // b-roll lines up with the cut instead of a fixed 5s.
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
