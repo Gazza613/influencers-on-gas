@@ -26,8 +26,13 @@ export async function submitDopVideo(opts: { imageUrl: string; prompt: string; s
   const client = dopClient();
   if (!client) return { jobSetId: null, error: "Higgsfield first-party API not configured (HIGGSFIELD_KEY_ID / HIGGSFIELD_KEY_SECRET)" };
   try {
+    // Tier is env-tunable. DEFAULT = dop-turbo: it's the SPEED-optimal tier (2x faster generation AND
+    // PRIORITY QUEUE, and ~30% cheaper than Standard). dop-lite is cheaper but has NO priority queue, so
+    // it sits in the queue LONGER and at lower quality — only choose it if cost > speed. dop-standard is
+    // best quality but pricier + slower. Set DOP_MODEL=dop-lite / dop-standard to A/B.
+    const model = process.env.DOP_MODEL || DoPModel.TURBO;
     const params: Record<string, unknown> = {
-      model: DoPModel.TURBO, // 2x speed + priority queue
+      model,
       prompt: opts.prompt,
       input_images: [InputImage.fromUrl(opts.imageUrl)],
     };
