@@ -3,6 +3,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, CLOTHED, HUMANISER } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
+import { submitDopVideo, dopConfigured } from "@/lib/vendors/higgsfield-dop";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
@@ -1155,6 +1156,20 @@ export const generateClips = inngest.createFunction(
       const sceneDur = a != null && b != null && b > a ? b - a : 5;
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
       const hero = role === "b-roll" && String(sc.hero) === "true";
+
+      // DoP (first-party Higgsfield SDK) — opt-in for b-roll via BROLL_ENGINE=dop. The dedicated
+      // image-to-video REST API, used instead of the flaky MCP-Kling path that keeps timing out.
+      // Falls through to MCP-Kling below if DoP isn't configured, errors, or returns no url.
+      if (role === "b-roll" && !hero && process.env.BROLL_ENGINE === "dop" && dopConfigured()) {
+        const dop = await step.run(`dop-${i}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: sceneDur }));
+        if (dop.url) {
+          await step.run(`u-dop-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "dop_turbo", unit: "video", action: "broll", count: 1 }).catch(() => {}));
+          const hosted = (await step.run(`dophost-${i}`, () => rehostToBlob(dop.url as string, "clips").catch(() => null))) || dop.url;
+          return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: sceneDur, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo" };
+        }
+        // DoP failed/unconfigured → fall through to MCP-Kling (logged on the clip via engine note below).
+      }
+
       const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: sceneDur, hero }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {

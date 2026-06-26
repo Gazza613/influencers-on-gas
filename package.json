@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
+    "@higgsfield/client": "^0.2.1",
     "@neondatabase/serverless": "^1.1.0",
     "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.4.0",
