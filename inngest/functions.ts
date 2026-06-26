@@ -1165,7 +1165,10 @@ export const generateClips = inngest.createFunction(
         const dop = await step.run(`dop-submit-${i}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: sceneDur }));
         if (dop.jobSetId) {
           let dopUrl: string | null = null;
-          for (let n = 0; n < 90; n++) { // ~90 x 8s ≈ 12 min
+          // DoP turbo can sit in the queue ~20-30 min under load, so poll for ~40 min (env-tunable)
+          // before giving up — a too-short window abandons a render that would have completed.
+          const DOP_POLL_ROUNDS = Math.max(60, Number(process.env.DOP_POLL_ROUNDS) || 300); // ~300 x 8s ≈ 40 min
+          for (let n = 0; n < DOP_POLL_ROUNDS; n++) {
             const s = await step.run(`dop-poll-${i}-${n}`, () => pollDopOnce(dop.jobSetId as string));
             if (s.url) { dopUrl = s.url; break; }
             if (s.terminal) break; // failed/nsfw/canceled → fall through to Kling
