@@ -1050,11 +1050,9 @@ export const generateClips = inngest.createFunction(
           // WYSIWYG voice: use the SAME (stable) TTS model the producer previewed when picking the
           // voice. Expressive (eleven_v3) renders the same voice_id noticeably differently, so it read
           // as "a different voice". Opt back in with AROLL_EXPRESSIVE=1 if you want v3 delivery.
-          // A-ROLL: append a short trailing pause so she FINISHES her sentence and settles. OmniHuman is
-          // audio-driven, so without trailing silence the clip ends on the last phoneme and she looks cut
-          // off mid-inhale; the extra ~0.6s lets the lip-sync resolve to a calm, composed close.
-          const ttsText = role === "a-roll" ? `${line} <break time="0.6s" />` : line;
-          return putBytes(await tts(voiceId as string, ttsText, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
+          // NOTE: we send the line VERBATIM — no <break> tags. eleven_multilingual_v2 does NOT honour
+          // SSML breaks; it SPEAKS them, which injected stray words into the a-roll ("adds in words").
+          return putBytes(await tts(voiceId as string, line, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
         }) as string | null);
         if (audioUrl && !presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
       }
