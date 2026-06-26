@@ -1223,11 +1223,12 @@ export const generateClips = inngest.createFunction(
       await step.run(`csave-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips: list } } }));
       return row;
     };
-    // Render in CONCURRENCY-LIMITED waves (default 3) instead of all at once: the video vendors
-    // (OmniHuman/Seedance/Kling) get overwhelmed when every scene submits together, so the slower
-    // jobs run past their poll window and fail with "did not finish in time". Smaller waves = shorter
-    // vendor queues = each job finishes. Still fills in live as each clip lands.
-    const CLIP_CONCURRENCY = Math.max(1, Number(process.env.CLIP_CONCURRENCY) || 3);
+    // Render ALL scenes in PARALLEL (high default) so every clip queues at its vendor SIMULTANEOUSLY —
+    // total wall-clock ≈ the SLOWEST single clip, not the SUM. DoP (a real REST queue) and HeyGen both
+    // handle parallel submits fine; the old wave-of-3 throttle existed only for the flaky MCP-Kling path
+    // we've replaced, and it was serialising the slow renders (paying the queue wait once PER wave).
+    // Cap via CLIP_CONCURRENCY only if a vendor starts rate-limiting.
+    const CLIP_CONCURRENCY = Math.max(1, Number(process.env.CLIP_CONCURRENCY) || 12);
     for (let c = 0; c < targets.length; c += CLIP_CONCURRENCY) {
       await Promise.all(targets.slice(c, c + CLIP_CONCURRENCY).map(renderAndSave));
     }
