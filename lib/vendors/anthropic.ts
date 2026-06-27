@@ -485,10 +485,13 @@ export type StoryScene = {
   start: string; end: string; location: string; talent: string[];
   shot: string; blocking: string; performance: string; graphics: string[];
   vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
+  crowd_extras: boolean;
 };
+export type SupportingCast = { name: string; look: string };
 export type Storyboard = {
   title: string; format: string; duration_seconds: number; tone: string;
   music_bed: string; full_vo: string; legal: string; scenes: StoryScene[];
+  supporting_cast: SupportingCast[];
 };
 
 const STORYBOARD_SCHEMA = {
@@ -517,12 +520,25 @@ const STORYBOARD_SCHEMA = {
           motion_prompt: { type: "string", description: "for b-roll/a-roll: short natural movement direction for the video engine" },
           music_sfx: { type: "string" },
           transition: { type: "string" },
+          crowd_extras: { type: "boolean", description: "true ONLY if this specific scene is set in a naturally BUSY PUBLIC place (cafe, street, shop, gym, market, station) where background strangers genuinely belong. false for any private/intimate setting (home, kitchen, bedroom, car, office, garden) — there only the influencer and the named talent are present, no random extras. Default to false when unsure." },
         },
-        required: ["beat", "role", "start", "end", "location", "talent", "shot", "blocking", "performance", "graphics", "vo_line", "caption", "motion_prompt", "music_sfx", "transition"],
+        required: ["beat", "role", "start", "end", "location", "talent", "shot", "blocking", "performance", "graphics", "vo_line", "caption", "motion_prompt", "music_sfx", "transition", "crowd_extras"],
+      },
+    },
+    supporting_cast: {
+      type: "array",
+      description: "Every RECURRING non-influencer character who appears in more than one scene (a child, partner, friend, colleague), locked ONCE so they look identical in every scene. Empty if the influencer is always alone.",
+      items: {
+        type: "object", additionalProperties: false,
+        properties: {
+          name: { type: "string", description: "how this character is referred to in scenes' talent (e.g. 'her daughter Mia', 'the barista', 'her friend Thabo') — must match the talent entries" },
+          look: { type: "string", description: "the LOCKED appearance + wardrobe: age, ethnicity, build, hairstyle, face notes, AND one specific everyday outfit (garments + colours, full-length bottoms). This exact look is reused in every scene they appear in — never changing." },
+        },
+        required: ["name", "look"],
       },
     },
   },
-  required: ["title", "format", "duration_seconds", "tone", "music_bed", "full_vo", "legal", "scenes"],
+  required: ["title", "format", "duration_seconds", "tone", "music_bed", "full_vo", "legal", "scenes", "supporting_cast"],
 };
 
 const PRODUCER_SYSTEM =
@@ -548,7 +564,13 @@ VOICE — ONE continuous voiceover across the whole film (never back-and-forth d
 
 COMPLIANCE — write LEGITIMATE, honest brand advertising. Do NOT use deceptive, predatory or scam-sounding phrasing: no fake-prize/"you've won" framing, no false urgency or pressure ("act now or lose it", countdowns to a fake deadline), no guaranteed-riches or get-rich-quick claims, no impersonating a bank, government or authority, no requests for passwords/PINs/personal details, no "free money". Real promotions (e.g. "register and get free data", a discount, a genuine offer) are fine — state them plainly and truthfully as a real brand would. Synthetic voices are heavily moderated for fraud, so keep every line clearly trustworthy and non-manipulative.
 
-WORLD + CONTINUITY (critical for a world-class feel) — set the ENTIRE ad in ONE coherent, specific location/world (e.g. a particular sunlit coffee shop), with the SAME wardrobe, lighting and look on the influencer across every scene, so scenes cut together as one seamless film, never disconnected shots. The presenter is physically PRESENT IN the scene doing something real (sitting at a table with a coffee, leaning at the counter, walking through the space), with believable background people moving naturally, NEVER a floating head on a plain backdrop. Every b-roll uses the SAME location/world as the a-roll (different angles, details and moments of that same place) so the film flows. State the shared world in each scene's location and keep wardrobe consistent in blocking.
+WORLD + CONTINUITY (critical for a world-class feel) — set the ENTIRE ad in ONE coherent, specific location/world (e.g. a particular sunlit coffee shop), with the SAME wardrobe, lighting and look on the influencer across every scene, so scenes cut together as one seamless film, never disconnected shots. The presenter is physically PRESENT IN the scene doing something real (sitting at a table with a coffee, leaning at the counter, walking through the space), NEVER a floating head on a plain backdrop — and background strangers appear ONLY where the setting is a genuinely busy public place (see CAST DISCIPLINE), not forced into every shot. Every b-roll uses the SAME location/world as the a-roll (different angles, details and moments of that same place) so the film flows. State the shared world in each scene's location and keep wardrobe consistent in blocking.
+
+CAST DISCIPLINE (critical — viewers instantly notice extra or shape-shifting people):
+• Keep the cast TIGHT. Most ads need only the influencer, or the influencer plus ONE named person. Do NOT pad scenes with friends or a crowd unless the concept truly calls for it.
+• Each scene's 'talent' lists EXACTLY who is in that scene — the influencer and any named companions, nobody else. If a scene is just her, talent contains only her.
+• RECURRING CHARACTERS: any non-influencer appearing in more than one scene (a child, partner, friend, colleague) MUST be defined ONCE in 'supporting_cast' with a fully locked look (age, ethnicity, build, hair, face, and ONE specific outfit with colours, full-length bottoms). Refer to them by the SAME name in every scene's talent so they render as the SAME person in the SAME clothes throughout — never a different-looking or re-dressed double. If nobody recurs, supporting_cast is [].
+• BACKGROUND STRANGERS are OPT-IN per scene via 'crowd_extras': true ONLY for a genuinely busy PUBLIC place (cafe, street, shop, gym, market) where strangers belong; false for any private/intimate setting (home, car, kitchen, bedroom, office, garden) — just the named cast, no random bystanders. When unsure, choose false: a clean intimate scene beats a crowd of distracting AI extras.
 
 ROLES (get this exactly right) — classify every scene as ONLY 'a-roll' or 'b-roll' (never 'graphic'). 'a-roll' = she speaks DIRECT TO CAMERA: head-on, tighter framing, looking into the lens and delivering her line (this is lip-synced). 'b-roll' = a VIDEO SCENE / cutaway: a medium-to-wider shot of her IN the location doing something real (walking through the space, sitting, using or showing the product, glancing around) — she does NOT look at or talk to the camera. The voiceover NARRATES OVER b-roll (her same continuous voice), so b-roll is never silent, but she is not addressing the lens and is NOT lip-synced. Use a-roll for the direct, human beats (hook, key message, CTA) and b-roll for the demo / proof / lifestyle beats. The film cuts between a-roll and b-roll under ONE unbroken voiceover. A-ROLL BACKGROUND (important): keep a-roll a CLEAN presenter framing — a simple, uncluttered background with shallow depth of field and NO background crowd or moving extras behind her. Friends, companions, background people and lifestyle action belong ONLY in b-roll scenes, never behind an a-roll talking shot (the talking-photo engine animates her, not a crowd, so background people in an a-roll shot come out warped). Motion_prompts: for a-roll, only her own natural movement; for b-roll, the scene action and that background people move.
 

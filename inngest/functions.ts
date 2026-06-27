@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, CLOTHED, HUMANISER } from "@/lib/realism";
+import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, castLockClause, CLOTHED, HUMANISER } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { submitDopVideo, pollDopOnce, dopConfigured } from "@/lib/vendors/higgsfield-dop";
@@ -836,8 +836,9 @@ export const generateShots = inngest.createFunction(
     const inf = await step.run("load", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
-    const production = (persona.production ?? null) as { brief?: Record<string, unknown>; storyboard?: { scenes?: Record<string, unknown>[]; format?: string } } | null;
+    const production = (persona.production ?? null) as { brief?: Record<string, unknown>; storyboard?: { scenes?: Record<string, unknown>[]; format?: string; supporting_cast?: { name: string; look: string }[] } } | null;
     const scenes = production?.storyboard?.scenes ?? [];
+    const supportingCast = production?.storyboard?.supporting_cast ?? [];
     if (!scenes.length) return { error: "no storyboard" };
     // Role filter: shoot only the a-roll (talking) references, or only the b-roll (scene) references —
     // the producer curates each gallery separately. Empty = the whole board (back-compat).
@@ -913,13 +914,16 @@ export const generateShots = inngest.createFunction(
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. LOCKED WARDROBE: the influencer wears the EXACT SAME outfit as in ${worldTag} — identical garments, colours, fabric and styling — in every single scene. Never change, swap or restyle her clothing; one consistent outfit across the whole shoot (only her pose, action and the framing change). SUPPORTING CAST CONTINUITY: if ${worldTag} shows any friends or companions, the same people recur here — the SAME individuals (same faces, ages, hair and outfits), not different-looking people swapped in scene to scene.` : "",
         phoneTag ? `${phoneTag} is the PHONE SCREEN content: if the influencer is holding or showing a phone, render its screen displaying THIS exact image, crisp and legible, correctly perspective-fitted to the phone. Do NOT copy any person from it.` : "",
+        // Lock recurring companions to a fixed look + outfit so they don't change scene to scene.
+        castLockClause(supportingCast, (Array.isArray((sc as Record<string, unknown>).talent) ? (sc as unknown as { talent: string[] }).talent : [])),
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
         performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
-        // A-ROLL = clean presenter shot (no background crowd — HeyGen Avatar IV can't animate a crowd
-        // from a still and warps them). B-ROLL = the scene with people. So only b-roll gets extras.
-        hasPeople: role === "b-roll", worldAnchored: !!worldRef,
+        // A-ROLL = clean presenter shot (no crowd — HeyGen Avatar IV warps animated background people).
+        // B-ROLL gets background strangers ONLY when the director flagged this scene a busy public place
+        // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
+        hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: !!worldRef,
       });
       const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
@@ -1073,7 +1077,7 @@ export const generateClips = inngest.createFunction(
       const presetAudio = String(sc.vo_audio_url || "").trim(); // producer's own uploaded VO for this scene
       // Steer the video model away from its two worst tells: shaky camera + people clipping through
       // the world. Appended to every clip prompt.
-      const MOTION_SAFE = " Camera is SMOOTH and STABILISED (gimbal-steady), gentle and locked — absolutely no jittery or shaky handheld motion. Everyone and everything moves with real spatial awareness along physically believable paths: nobody walks into the pool, water, walls, furniture, plants or other people, and nobody clips through objects. All motion is grounded, natural and plausible. CRITICAL ON SPEED: everyone moves at EXACTLY NORMAL REAL-TIME speed, as if filmed live — never sped-up or hurried, but equally NEVER slow-motion, dreamy, floaty or drifting; real-world walking and gesture pace. Motion is smooth, fluid and continuous — NO stutter, judder, jitter, strobing, speed-ramping, fast-forward, slow-motion or time-lapse feel, and no jumpy or skipped frames. OBJECT PERMANENCE: anything held (a phone, cup, product) stays in the SAME hand for the ENTIRE clip — it never disappears, fades, morphs, multiplies, swaps hands or changes; hands and fingers stay anatomically correct and consistent throughout. SKIN REALISM: preserve the REAL skin texture, visible pores and natural imperfections of the source image — do NOT smooth, wax, plastic-ify, airbrush, beautify or porcelain-glaze the skin; keep a believable matte, lived-in complexion.";
+      const MOTION_SAFE = " Camera is SMOOTH and STABILISED (gimbal-steady), gentle and locked — absolutely no jittery or shaky handheld motion. Everyone and everything moves with real spatial awareness along physically believable paths: nobody walks into the pool, water, walls, furniture, plants or other people, and nobody clips through objects. All motion is grounded, natural and plausible. CRITICAL ON SPEED: everyone moves at EXACTLY NORMAL REAL-TIME speed, as if filmed live — never sped-up or hurried, but equally NEVER slow-motion, dreamy, floaty or drifting; real-world walking and gesture pace. Motion is smooth, fluid and continuous — NO stutter, judder, jitter, strobing, speed-ramping, fast-forward, slow-motion or time-lapse feel, and no jumpy or skipped frames. OBJECT PERMANENCE: anything held (a phone, cup, product) stays in the SAME hand for the ENTIRE clip — it never disappears, fades, morphs, multiplies, swaps hands or changes; hands and fingers stay anatomically correct and consistent throughout. SKIN REALISM: preserve the REAL skin texture, visible pores and natural imperfections of the source image — do NOT smooth, wax, plastic-ify, airbrush, beautify or porcelain-glaze the skin; keep a believable matte, lived-in complexion. WORLD STABILITY (critical): the built environment is SOLID and RIGID — walls, floors, ceilings, doorways, windows, counters, tables, chairs, sofas, shelves, lamps, plants and every fixed object keep their EXACT shape, straight edges, size and position for the entire clip; they NEVER bend, warp, morph, ripple, melt, breathe, sway, stretch, wobble, slide or drift. ONLY living things (the people, their hair and clothing, water, leaves, steam) move; furniture and architecture stay perfectly still as in real footage. MOTION RESTRAINT: keep overall motion SUBTLE and minimal — small, natural, real-life movements, not big sweeping action; when in doubt, less movement.";
       // When a scene has water, the video model's worst tell is fake/jelly water — force real physics.
       const sceneText = `${sc.location || ""} ${sc.blocking || ""} ${base}`.toLowerCase();
       const WATER = /\b(water|pool|waves?|sea|ocean|beach|river|lake|splash|swim|swimming|fountain|rain|surf|wave pool)\b/.test(sceneText)
@@ -1194,7 +1198,7 @@ export const generateClips = inngest.createFunction(
       // her front-on. B-ROLL: she is naturally absorbed in the scene and does NOT address the camera.
       const motion = (role === "a-roll"
         ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. Only she and the background move (background people, ambient motion).`
-        : `${base}. A natural, candid video SCENE: she is IN the environment doing something real (walking through the space, sitting, using or showing the product, glancing around) and is NOT looking at or talking to the camera — observed b-roll, not a piece to camera. NOBODY in the scene looks at, mouths words to, or addresses the camera; her mouth is NOT moving as if speaking to camera (her voice is a voiceover laid over the top). The whole scene is alive and moving: she moves naturally, background people move, gentle camera drift, water/leaves/light in motion — never frozen.`) + MOTION_SAFE + WATER;
+        : `${base}. A natural, candid video SCENE: she is IN the environment doing something real (sitting, using or showing the product, a relaxed glance or small gesture) and is NOT looking at or talking to the camera — observed b-roll, not a piece to camera. NOBODY in the scene looks at, mouths words to, or addresses the camera; her mouth is NOT moving as if speaking to camera (her voice is a voiceover laid over the top). The scene has GENTLE, restrained life: she moves naturally at a calm real-life pace with only SUBTLE ambient motion (a soft breeze, light shifting, any water or leaves). The CAMERA is essentially LOCKED on a tripod — at most a very slow, barely-perceptible drift; NO fast pans, swoops, zooms, push-ins, whip moves or crane. Calm, observational, minimal motion — never busy, never sweeping, and never warping the room.`) + MOTION_SAFE + WATER;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
       // the background can't drift/reverse (it's anchored to a defined end frame).
@@ -1539,8 +1543,9 @@ export const reshootShot = inngest.createFunction(
     const inf = await step.run("load", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
-    const production = (persona.production ?? null) as { brief?: Record<string, string>; storyboard?: { scenes?: Record<string, string>[]; format?: string }; shots?: ShotRow[] } | null;
+    const production = (persona.production ?? null) as { brief?: Record<string, string>; storyboard?: { scenes?: Record<string, string>[]; format?: string; supporting_cast?: { name: string; look: string }[] }; shots?: ShotRow[] } | null;
     const scenes = production?.storyboard?.scenes ?? [];
+    const supportingCast = production?.storyboard?.supporting_cast ?? [];
     const sc = scenes[index] as Record<string, string> | undefined;
     if (!sc) return { error: "no such scene" };
     const role = String(sc.role || "a-roll");
@@ -1584,11 +1589,13 @@ export const reshootShot = inngest.createFunction(
       clothTag ? `${clothTag} is a WARDROBE reference: dress them in this exact outfit. Do NOT copy any face or person from it.` : "",
       locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place. Do NOT copy any face or person from it.` : "",
       worldTag ? `${worldTag} is the ESTABLISHED world: match its location, lighting and colour grade for continuity.` : "",
+      castLockClause(supportingCast, (Array.isArray((sc as Record<string, unknown>).talent) ? (sc as unknown as { talent: string[] }).talent : [])),
     ].filter(Boolean).join(" ");
     const prompt = buildShotPrompt({
       location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
       performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
-      hasPeople: true, worldAnchored: !!worldRef,
+      // Background strangers only when the director flagged this scene a busy public place.
+      hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: !!worldRef,
     });
     const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : [])].map((value) => ({ value, role: "image" }));
     const url = await step.run("shot", () => generateBatch([prompt], IMAGE_MODEL, ratio, medias.length ? { medias } : {}, CREATIVE_FALLBACK).then((a) => a[0] ?? null));

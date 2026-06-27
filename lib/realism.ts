@@ -25,6 +25,22 @@ export const SCENE_PEOPLE =
 export const NO_EXTRAS =
   "No incidental or background people: no passersby, bystanders, crowd, diners, staff, silhouettes, reflections of strangers, or tiny/distant/blurred figures. ONLY the people explicitly named in the scene are present — if the scene names just the influencer, she is alone; if the scene names a companion (for example a child, son, daughter, partner, friend or colleague), include exactly those named people and NO others. If the location would normally be busy, show it quiet and free of strangers apart from the named subjects";
 
+// Lock recurring supporting characters (a daughter, friend, colleague) to ONE fixed look + outfit so
+// they don't shape-shift or change clothes between scenes. Matches the scene's `talent` names against
+// the storyboard's supporting_cast and returns a clause naming exactly who is in THIS scene.
+export function castLockClause(cast: { name: string; look: string }[], talent: string[]): string {
+  if (!cast?.length || !talent?.length) return "";
+  const norm = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const tnorm = talent.map(norm).filter(Boolean);
+  const inScene = cast.filter((c) => {
+    const cn = norm(c.name);
+    return cn && tnorm.some((t) => t.includes(cn) || cn.includes(t));
+  });
+  if (!inScene.length) return "";
+  return "LOCKED SUPPORTING CAST — render these named companions with a FIXED, identical look in every scene they appear in (the same face, age, build and hair AND the exact same outfit and colours; never restyled, re-dressed, swapped, duplicated, and NEVER given the influencer's face): " +
+    inScene.map((c) => `${c.name} — ${c.look}`).join("; ") + ". No people other than the influencer and these named companions.";
+}
+
 // Concise realism core for Soul generation (long stacked clauses confuse the model and
 // hurt quality, the Soul + reference handle identity, so keep the scene direction tight).
 export const SOUL_SCENE =
