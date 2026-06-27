@@ -4,6 +4,7 @@ import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_RE
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { submitDopVideo, pollDopOnce, dopConfigured } from "@/lib/vendors/higgsfield-dop";
+import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
@@ -60,7 +61,7 @@ export const generateCandidates = inngest.createFunction(
   {
     id: "generate-references",
     name: "Generate casting looks",
-    retries: 1,
+    retries: 1, onFailure: onProductionFailure,
     triggers: [{ event: "influencer/generate.references" }],
   },
   async ({ event, step }) => {
@@ -105,7 +106,7 @@ export const buildIdentity = inngest.createFunction(
   {
     id: "build-identity",
     name: "Build identity set from chosen look",
-    retries: 1,
+    retries: 1, onFailure: onProductionFailure,
     triggers: [{ event: "influencer/build.identity" }],
   },
   async ({ event, step }) => {
@@ -354,7 +355,7 @@ export const buildIdentity = inngest.createFunction(
 // pasted text, chunk it, embed + store (all scoped to client_id). Durable; survives the
 // slow free-tier embedding limit.
 export const ingestSource = inngest.createFunction(
-  { id: "ingest-source", retries: 1, triggers: [{ event: "brain/ingest.source" }] },
+  { id: "ingest-source", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "brain/ingest.source" }] },
   async ({ event, step }) => {
     const sourceId = String(event.data.sourceId);
     const clientId = String(event.data.clientId);
@@ -389,7 +390,7 @@ export const ingestSource = inngest.createFunction(
 // PRESENTER, turn the chosen hero into a HeyGen Talking Photo (the talking a-roll
 // avatar). Fast; stored as heygen_avatar_id for the produce pipeline to drive later.
 export const createPresenter = inngest.createFunction(
-  { id: "create-presenter", retries: 1, triggers: [{ event: "influencer/create.presenter" }] },
+  { id: "create-presenter", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/create.presenter" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const inf = await step.run("load-influencer", () => getInfluencer(influencerId));
@@ -420,7 +421,7 @@ export const createPresenter = inngest.createFunction(
 // (A trained Soul is no longer needed for image creatives; if the future video pipeline
 // needs one, train it there.)
 export const trainSoulJob = inngest.createFunction(
-  { id: "train-soul", retries: 0, triggers: [{ event: "influencer/train.soul" }] },
+  { id: "train-soul", retries: 0, onFailure: onProductionFailure, triggers: [{ event: "influencer/train.soul" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const images = (event.data.images as string[]) || [];
@@ -478,7 +479,7 @@ function splitScenes(text: string): string[] {
 }
 
 export const generateCreatives = inngest.createFunction(
-  { id: "generate-creatives", retries: 1, triggers: [{ event: "influencer/generate.creatives" }] },
+  { id: "generate-creatives", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/generate.creatives" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const ratios = (Array.isArray(event.data.ratios) ? event.data.ratios : ["9:16"]) as string[];
@@ -728,7 +729,7 @@ export const generateCreatives = inngest.createFunction(
 // spinner, and polls the creatives list until the shot's resolution flips to 4k (or errors).
 type UpCreative = { id?: string; url?: string | null; resolution?: string; upscaling?: boolean; upscale_error?: string | null; [k: string]: unknown };
 export const upscaleCreative = inngest.createFunction(
-  { id: "upscale-creative", retries: 1, triggers: [{ event: "influencer/upscale.creative" }] },
+  { id: "upscale-creative", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/upscale.creative" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const creativeId = String(event.data.creativeId);
@@ -771,7 +772,7 @@ export const upscaleCreative = inngest.createFunction(
 // The route pre-creates the clip {status:"running"}; this updates it to ready/failed by id.
 type ArollClip = { id?: string; url?: string | null; line?: string; ratio?: string; status?: string; error?: string | null; at?: number; [k: string]: unknown };
 export const generateAroll = inngest.createFunction(
-  { id: "generate-aroll", retries: 1, triggers: [{ event: "influencer/generate.aroll" }] },
+  { id: "generate-aroll", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/generate.aroll" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const clipId = String(event.data.clipId || "");
@@ -830,7 +831,7 @@ export const generateAroll = inngest.createFunction(
 // keep location/lighting/identity continuous across the board (the API equivalent of Popcorn).
 type ShotRow = { scene: number; role: string; beat: string; url: string | null; error?: string | null };
 export const generateShots = inngest.createFunction(
-  { id: "generate-shots", retries: 1, triggers: [{ event: "influencer/generate.shots" }] },
+  { id: "generate-shots", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/generate.shots" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const inf = await step.run("load", () => getInfluencer(influencerId));
@@ -997,7 +998,7 @@ type ClipRow = { scene: number; role: string; beat: string; kind: string; url: s
 // Keep at least the old ~16 minute floor even when env-tuned lower; default to ~24 minutes for slow vendor queues.
 const CLIP_POLL_ROUNDS = Math.max(120, Number(process.env.CLIP_POLL_ROUNDS) || 180);
 export const generateClips = inngest.createFunction(
-  { id: "generate-clips", retries: 1, triggers: [{ event: "influencer/generate.clips" }] },
+  { id: "generate-clips", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/generate.clips" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const inf = await step.run("load", () => getInfluencer(influencerId));
@@ -1240,7 +1241,10 @@ export const generateClips = inngest.createFunction(
             return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: sceneDur, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo" };
           }
         }
-        // DoP submit failed / render not done / errored → fall through to MCP-Kling below.
+        // DoP submit failed / render not done / errored → fall through to MCP-Kling below. But if the
+        // submit error was CRITICAL (out of credits, bad key, vendor down) email the admin — otherwise
+        // this silently degrades to Kling and the real cause (e.g. "Not enough credits") stays hidden.
+        if (dop.error) await step.run(`dop-alert-${i}`, async () => { await alertIfCritical("Higgsfield DoP (b-roll video)", dop.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
       }
 
       const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: sceneDur, hero }));
@@ -1306,7 +1310,7 @@ export const generateClips = inngest.createFunction(
 // tone up front so the producer can hear them BEFORE the stitch. Saved to production.music_url /
 // ambient_url; the stitch reuses them instead of regenerating. Durable; both metered.
 export const generateAudio = inngest.createFunction(
-  { id: "generate-audio", retries: 0, triggers: [{ event: "influencer/generate.audio" }] }, // retries:0 so a timed-out music call falls back to ambient-only fast (no 2.5-min re-try)
+  { id: "generate-audio", retries: 0, onFailure: onProductionFailure, triggers: [{ event: "influencer/generate.audio" }] }, // retries:0 so a timed-out music call falls back to ambient-only fast (no 2.5-min re-try)
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const inf = await step.run("load", () => getInfluencer(influencerId));
@@ -1346,7 +1350,7 @@ function tcSeconds(tc: string): number | null {
   return (m[1] ? parseInt(m[1], 10) * 60 : 0) + parseInt(m[2], 10) + (m[3] ? parseFloat(`0.${m[3]}`) : 0);
 }
 export const assembleVideo = inngest.createFunction(
-  { id: "assemble-video", retries: 1, triggers: [{ event: "influencer/assemble.video" }] },
+  { id: "assemble-video", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/assemble.video" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const inf = await step.run("load", () => getInfluencer(influencerId));
@@ -1536,7 +1540,7 @@ export const assembleVideo = inngest.createFunction(
 // THE PRODUCER — re-shoot ONE scene (keep the rest). Same identity + clothing/location refs as the
 // full board; anchors to an existing good frame for continuity; honours the scene's (edited) direction.
 export const reshootShot = inngest.createFunction(
-  { id: "reshoot-shot", retries: 1, triggers: [{ event: "influencer/reshoot.shot" }] },
+  { id: "reshoot-shot", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/reshoot.shot" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const index = Number(event.data.scene);
@@ -1628,7 +1632,7 @@ export const reshootShot = inngest.createFunction(
 // (verified schema) and a HeyGen Avatar IV a-roll (living background). Durable poll (step.sleep).
 // Writes persona.spike = { broll_url, aroll_url, errors }. Super-admin triggered.
 export const videoSpike = inngest.createFunction(
-  { id: "video-spike", retries: 0, triggers: [{ event: "producer/spike" }] },
+  { id: "video-spike", retries: 0, onFailure: onProductionFailure, triggers: [{ event: "producer/spike" }] },
   async ({ event, step }) => {
     const influencerId = String(event.data.influencerId);
     const inf = await step.run("load", () => getInfluencer(influencerId));
