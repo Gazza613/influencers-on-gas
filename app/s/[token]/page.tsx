@@ -12,10 +12,19 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
   const videos = await listShowcaseVideos();
 
   return (
-    <div className="min-h-screen bg-[#08080c] text-white">
+    <div
+      className="min-h-screen text-white"
+      style={{
+        background:
+          "radial-gradient(1100px 620px at 50% -8%, rgba(236,72,153,0.22), transparent 60%)," +
+          "radial-gradient(1000px 760px at 100% 18%, rgba(96,165,250,0.18), transparent 58%)," +
+          "radial-gradient(950px 760px at 0% 78%, rgba(168,85,247,0.20), transparent 58%)," +
+          "radial-gradient(900px 700px at 80% 100%, rgba(96,165,250,0.16), transparent 55%)," +
+          "linear-gradient(180deg, #0a0712, #0c0816 55%, #0a0712)",
+      }}
+    >
       {/* Hero with an accent glow */}
       <div className="relative overflow-hidden border-b border-white/5">
-        <div className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[880px] -translate-x-1/2 rounded-full bg-gradient-to-r from-[#ec4899]/25 via-[#a855f7]/25 to-[#60a5fa]/25 blur-[130px]" />
         <header className="relative mx-auto flex max-w-6xl items-center gap-2.5 px-6 py-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/gas-logo.png" alt="GAS" className="h-7 w-7 rounded-full ring-1 ring-white/15" />
@@ -53,8 +62,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
       </main>
 
       {/* CTA — this is a sales tool, so close with a clear next step */}
-      <section className="relative overflow-hidden border-t border-white/5">
-        <div className="pointer-events-none absolute -bottom-40 left-1/2 h-[360px] w-[700px] -translate-x-1/2 rounded-full bg-gradient-to-r from-[#a855f7]/20 to-[#60a5fa]/20 blur-[120px]" />
+      <section className="relative overflow-hidden border-t border-white/10">
         <div className="relative mx-auto max-w-3xl px-6 py-16 text-center">
           <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Want this for your brand?</h3>
           <p className="mx-auto mt-3 max-w-lg text-sm text-white/60">
