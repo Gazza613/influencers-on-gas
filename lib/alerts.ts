@@ -92,7 +92,7 @@ export async function alertOps(opts: { title: string; detail: string; context?: 
 // or a hard outage — so silent fallbacks (e.g. DoP→Kling) still surface the real cause. No-op otherwise.
 export async function alertIfCritical(provider: string, errorMessage: string, context?: Record<string, string | number | undefined>): Promise<void> {
   const { tag } = classifyError(errorMessage);
-  if (tag === "OUT OF CREDITS" || tag === "API KEY" || tag === "VENDOR DOWN / TIMEOUT") {
+  if (tag === "OUT OF CREDITS" || tag === "API KEY" || tag === "VENDOR DOWN / TIMEOUT" || tag === "RATE LIMITED") {
     await alertOps({ title: `${provider} problem during a build`, detail: errorMessage, context: { Provider: provider, ...context } });
   }
 }

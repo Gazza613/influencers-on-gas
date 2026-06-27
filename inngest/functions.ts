@@ -1242,7 +1242,15 @@ export const generateClips = inngest.createFunction(
       // Falls through to MCP-Kling below if DoP isn't configured, errors, or returns no url.
       if (role === "b-roll" && !hero && process.env.BROLL_ENGINE === "dop" && dopConfigured()) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
-        const dop = await step.run(`dop-submit-${i}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: sceneDur }));
+        // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
+        // anyway (same backstop as HeyGen) so a 429 waits-and-lands instead of silently dropping to Kling.
+        let dop: { jobSetId: string | null; error: string | null } = { jobSetId: null, error: "not attempted" };
+        const DOP_TRIES = Math.max(1, Number(process.env.DOP_SUBMIT_RETRIES) || 5);
+        for (let attempt = 0; attempt < DOP_TRIES; attempt++) {
+          dop = await step.run(`dop-submit-${i}-${attempt}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: sceneDur }));
+          if (dop.jobSetId || !/429|rate.?limit/i.test(dop.error || "")) break;
+          await step.sleep(`dop-rl-${i}-${attempt}`, `${Math.min(120, 20 * (attempt + 1))}s`);
+        }
         if (dop.jobSetId) {
           let dopUrl: string | null = null;
           // DoP turbo can sit in the queue ~20-30 min under load, so poll for ~40 min (env-tunable)
