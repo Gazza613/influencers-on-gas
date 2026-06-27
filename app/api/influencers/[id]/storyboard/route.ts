@@ -53,6 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     tone: String(b.tone || "warm, confident, effortless").trim(),
     logo: String(b.logo || "").trim(),
     legal: String(b.legal || "").trim(),
+    script: String(b.script || "").trim().slice(0, 6000), // approved script-first read: built into the scenes verbatim
     // Optional uploads: a clothing ref + a location ref steer the SHOOT; a transparent PNG logo +
     // its corner are burned onto the final cut at assembly.
     // All URLs are SSRF-guarded (isSafePublicUrl) — they get fetched by Higgsfield/Shotstack, so an

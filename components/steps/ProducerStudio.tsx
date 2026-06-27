@@ -50,6 +50,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
   const [editing, setEditing] = useState(!initialProduction?.storyboard);
   const [busy, setBusy] = useState(false);
+  // Script-first: write + edit the spoken script before building the scenes.
+  const [draftScript, setDraftScript] = useState<string>(String((initialProduction?.brief as { script?: string })?.script || ""));
+  const [scriptBusy, setScriptBusy] = useState(false);
   const [err, setErr] = useState("");
 
   const [brand, setBrand] = useState(String((initialProduction?.brief as { brand?: string })?.brand || ""));
@@ -346,12 +349,22 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     else setErr(r?.error || "Couldn't record the decision.");
   }
 
+  async function writeScript() {
+    if (!brand.trim() || !offer.trim() || scriptBusy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer to write the script."); return; }
+    setScriptBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/script`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, tone, setting }),
+    }).then((x) => x.json()).catch(() => null);
+    setScriptBusy(false);
+    if (r?.script) setDraftScript(r.script); else setErr(r?.error || "Couldn't write the script. Try again.");
+  }
   async function generate() {
     if (!brand.trim() || !offer.trim() || busy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer."); return; }
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
+      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, script: draftScript || "", clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); persistApproved(new Set()); }
@@ -472,8 +485,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <p className="text-[10px] text-ink-faint">Captions and the closing clip are also controlled at the final <b>Stitch</b> step.</p>
             </div>
           </details>
+          {/* SCRIPT-FIRST: the producer writes the spoken script from your concept; edit it, then build the scenes around it. */}
+          <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
+            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Script</div>
+            <p className="mb-2 text-[12px] text-ink-dim">Have the producer write the {duration}s script from your concept, then edit it until it reads right — the scenes (a-roll + b-roll) get built around these exact words. (Optional: skip it and the storyboard will write its own.)</p>
+            <button onClick={writeScript} disabled={scriptBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{scriptBusy ? "✍️ Writing the script…" : draftScript ? "↻ Re-write the script" : "✍️ Write the script"}</button>
+            {draftScript && <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={6} className="mt-2 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#a855f7]" placeholder="The spoken script…" />}
+          </div>
           {err && <p className="text-xs text-alert">{err}</p>}
-          <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : "🎬 Direct the storyboard"}</button>
+          <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : draftScript ? "🎬 Build the scenes from this script" : "🎬 Direct the storyboard"}</button>
         </div>
       ) : sb ? (
         /* Storyboard */
