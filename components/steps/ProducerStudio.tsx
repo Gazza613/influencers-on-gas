@@ -128,7 +128,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     aroll: aRollReady && !rendering, broll: bRollReady && !rendering, audio: !audioBusy, stitch: !!finalUrl && !assembling,
     showreel: production?.showreel_status === "accepted" || production?.showreel_status === "declined",
   };
-  const ORDER = ["concept", "arollRefs", "brollRefs", "voice", "aroll", "broll", "audio", "stitch", "showreel"] as const;
+  const ORDER = ["concept", "voice", "arollRefs", "brollRefs", "aroll", "broll", "audio", "stitch", "showreel"] as const;
   // Seed approvals: any step whose SUCCESSOR already has its artifact is auto-approved (you moved
   // past it); the frontier step waits for an explicit Accept. Recomputed when production changes.
   const seedApproved = () => {
@@ -163,11 +163,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (approved.has(k)) return "done";
     const idx = ORDER.indexOf(k);
     // The a-roll and b-roll REFERENCE shoots are independent (different scenes) — both open in
-    // PARALLEL once Concept is approved, so each gallery pops previews in the same way. Voice then
-    // waits for BOTH reference sets to be approved.
+    // Script-first flow: Concept (script + scenes) → Voice → reference shoots → animate. The two
+    // reference shoots run in PARALLEL once Voice is approved; each animate waits on its own ref set.
     let priorOk: boolean;
-    if (k === "brollRefs") priorOk = approved.has("concept");
-    else if (k === "voice") priorOk = approved.has("arollRefs") && approved.has("brollRefs");
+    if (k === "voice") priorOk = approved.has("concept");
+    else if (k === "arollRefs" || k === "brollRefs") priorOk = approved.has("voice");
+    else if (k === "aroll") priorOk = approved.has("arollRefs");
+    else if (k === "broll") priorOk = approved.has("brollRefs");
     else priorOk = idx === 0 || approved.has(ORDER[idx - 1]);
     return priorOk ? "active" : "locked";
   }
@@ -645,56 +647,22 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {/* ── The 8-step gated production wizard ── */}
           <div className="space-y-3">
             <WizardSpine
-              steps={([["concept", "Concept"], ["arollRefs", "A-roll refs"], ["brollRefs", "B-roll refs"], ["voice", "Voice"], ["aroll", "Animate A"], ["broll", "Animate B"], ["audio", "Music"], ["stitch", "Stitch"], ["showreel", "Showreel"]] as const).map(([key, label], idx) => ({ key, label, n: idx + 1, state: stepState(key) }))}
+              steps={([["concept", "Concept"], ["voice", "Voice"], ["arollRefs", "A-roll refs"], ["brollRefs", "B-roll refs"], ["aroll", "Animate A"], ["broll", "Animate B"], ["audio", "Music"], ["stitch", "Stitch"], ["showreel", "Showreel"]] as const).map(([key, label], idx) => ({ key, label, n: idx + 1, state: stepState(key) }))}
               onJump={(k) => document.getElementById(`step-${k}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
             {/* 1 · Brief & concept */}
             <StepShell n={1} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} — talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt — location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem — tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
 
-            {/* 2 · A-roll references */}
-            <StepShell n={2} title="A-roll references — the talking shots" desc={`I shoot the talking-shot stills from ${name}'s locked identity, in the size you choose. Keep the ones you love, reject the rest — only kept shots get animated and reach the cut.`} state={stepState("arollRefs")} anchor="step-arollRefs"
-              gate={renderGate("arollRefs", "Every kept a-roll scene needs a frame before Accept. If one shows 'not shot yet' or failed, re-shoot the references — or reject (✗) that scene — then Accept.")}>
-              {unlocked("arollRefs") ? (
-                aRollNone ? (
-                  <p className="text-[12px] text-ink-faint">No talking (a-roll) scenes in this storyboard — nothing to shoot here.</p>
-                ) : (
-                  <>
-                    <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
-                    <RatioPicker value={arollRatio} onChange={setArollRatio} />
-                    <button onClick={() => shootRole("a-roll", arollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting a-roll references…" : aRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot a-roll references" : "📸 Shoot a-roll references"}</button>
-                    <RefGallery role="a-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
-                  </>
-                )
-              ) : <LockHint />}
-            </StepShell>
-
-            {/* 3 · B-roll references */}
-            <StepShell n={3} title="B-roll references — the scene shots" desc="Now the scene (non-talking) shots — these are more about the world and motion than talking. Same idea: keep the ones you want, reject the rest." state={stepState("brollRefs")} anchor="step-brollRefs"
-              gate={renderGate("brollRefs", "Every kept b-roll scene needs a frame before Accept. If one shows 'not shot yet' or failed, re-shoot the references — or reject (✗) that scene — then Accept.")}>
-              {unlocked("brollRefs") ? (
-                bRollNone ? (
-                  <p className="text-[12px] text-ink-faint">No scene (b-roll) shots in this storyboard — nothing to shoot here.</p>
-                ) : (
-                  <>
-                    <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
-                    <RatioPicker value={brollRatio} onChange={setBrollRatio} />
-                    <button onClick={() => shootRole("b-roll", brollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting b-roll references…" : bRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot b-roll references" : "📸 Shoot b-roll references"}</button>
-                    <RefGallery role="b-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
-                  </>
-                )
-              ) : <LockHint />}
-            </StepShell>
-
-            {/* 4 · Voice */}
-            <StepShell n={4} title="Voice" desc={`Pick the voice ${name} speaks in — every talking (a-roll) scene is lip-synced to it.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
+            {/* 2 · Voice */}
+            <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in, then generate the full voiceover — every talking (a-roll) scene is lip-synced to it and the scenes are built to its real timing.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
               {unlocked("voice") ? (
                 !needsVoice ? (
                   <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
                 ) : (
                   <>
-                    {/* Continuity pass: re-flow the script across kept scenes before voicing it */}
+                    {/* Continuity pass: re-flow the script so the kept scenes read as one seamless script */}
                     <div className="mb-3 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
-                      <p className="text-[12px] text-ink-dim">Final producer pass: re-flow the voiceover so the scenes you kept read as one seamless script (it smooths over any rejected shots), then voice it.</p>
+                      <p className="text-[12px] text-ink-dim">Optional producer pass: re-flow the voiceover so it reads as one seamless script before you voice it.</p>
                       <button onClick={reflowScript} disabled={reflowBusy} className="mt-2 rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reflowBusy ? "✨ Re-flowing the script…" : "✨ Re-flow script for continuity"}</button>
                     </div>
                     <VoicePicker influencerId={influencerId} name={name} voiceId={voiceId} voiceName={voiceName} voicePreview={voicePreview}
@@ -731,6 +699,40 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ This take is locked in — every a-roll scene lip-syncs to it; b-roll narrates over it. The voice is now identical across all scenes.</p>}
                       </div>
                     )}
+                  </>
+                )
+              ) : <LockHint />}
+            </StepShell>
+
+            {/* 3 · A-roll references */}
+            <StepShell n={3} title="A-roll references — the talking shots" desc={`I shoot the talking-shot stills from ${name}'s locked identity, in the size you choose. Keep the ones you love, reject the rest — only kept shots get animated and reach the cut.`} state={stepState("arollRefs")} anchor="step-arollRefs"
+              gate={renderGate("arollRefs", "Every kept a-roll scene needs a frame before Accept. If one shows 'not shot yet' or failed, re-shoot the references — or reject (✗) that scene — then Accept.")}>
+              {unlocked("arollRefs") ? (
+                aRollNone ? (
+                  <p className="text-[12px] text-ink-faint">No talking (a-roll) scenes in this storyboard — nothing to shoot here.</p>
+                ) : (
+                  <>
+                    <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
+                    <RatioPicker value={arollRatio} onChange={setArollRatio} />
+                    <button onClick={() => shootRole("a-roll", arollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting a-roll references…" : aRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot a-roll references" : "📸 Shoot a-roll references"}</button>
+                    <RefGallery role="a-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
+                  </>
+                )
+              ) : <LockHint />}
+            </StepShell>
+
+            {/* 4 · B-roll references */}
+            <StepShell n={4} title="B-roll references — the scene shots" desc="Now the scene (non-talking) shots — these are more about the world and motion than talking. Same idea: keep the ones you want, reject the rest." state={stepState("brollRefs")} anchor="step-brollRefs"
+              gate={renderGate("brollRefs", "Every kept b-roll scene needs a frame before Accept. If one shows 'not shot yet' or failed, re-shoot the references — or reject (✗) that scene — then Accept.")}>
+              {unlocked("brollRefs") ? (
+                bRollNone ? (
+                  <p className="text-[12px] text-ink-faint">No scene (b-roll) shots in this storyboard — nothing to shoot here.</p>
+                ) : (
+                  <>
+                    <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
+                    <RatioPicker value={brollRatio} onChange={setBrollRatio} />
+                    <button onClick={() => shootRole("b-roll", brollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting b-roll references…" : bRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot b-roll references" : "📸 Shoot b-roll references"}</button>
+                    <RefGallery role="b-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
                   </>
                 )
               ) : <LockHint />}
