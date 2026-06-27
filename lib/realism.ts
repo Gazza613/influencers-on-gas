@@ -136,6 +136,7 @@ export function buildCreativeImagePrompt(o: {
 export const SHOT_NEGATIVE =
   "mixed-race couple, interracial couple, two people of different races shown together as a pair or walking side by side; " +
   "a second copy, twin, clone or look-alike of the influencer; duplicated or identical background people; matching/uniform outfits on extras; " +
+  "a third arm or third hand, extra or duplicated hands, extra or duplicated arms, a floating or disembodied hand, more than two hands, more than five fingers on a hand, six fingers, fewer than five fingers, fused, melted, twisted, bent-backwards, extra, missing or malformed fingers, deformed or distorted hands, mangled knuckles, claw hands; " +
   "moles, beauty marks, prominent facial moles, moles on the chest/neck/décolletage; " +
   "plastic or waxy skin, airbrushed, beauty-filtered, doll-like, CGI or 3D-render look; " +
   "editorial fashion-shoot look, studio portrait, professional model headshot, glamour shot, magazine cover, polished commercial advert, 8K, ultra-detailed, hyper-detailed, flawless, perfectly symmetrical face, glossy beauty render; " +
@@ -163,6 +164,7 @@ export function buildShotPrompt(o: {
       ? `Framing: ${o.shot}. CRITICAL A-ROLL FRAMING — this is a TIGHT presenter shot: frame her from roughly mid-chest up (a medium close-up), with her FACE LARGE and dominant in the frame (filling a good portion of it) so her exact identity from the reference images is unmistakable and holds. Do NOT render a full-body, full-length, wide or long shot; her legs and feet are NOT in frame and she is never small or distant. ONE single framing of ONE camera angle only.`
       : `Framing: ${o.shot}. B-ROLL FRAMING — a CANDID, OBSERVED scene (not a piece to camera): she is a clear, PROMINENT subject (a medium shot, her face plainly visible and identifiable in a natural three-quarter angle so her locked identity holds), BUT she is NOT looking at or talking to the camera — her attention is on her activity, her phone or her companions, with NO eye-contact with the lens and never mid-speech to camera. NO other person in the frame looks at or addresses the camera either; everyone is naturally absorbed in the moment as if unaware of it. ONE single framing of ONE camera angle only — never a close-up combined with a wider shot, and never two views stacked together.`,
     `Performance: ${o.performance}.`,
+    "HANDS (render carefully — this is where AI fails): she has EXACTLY TWO hands and TWO arms, each hand with EXACTLY FIVE correctly-formed fingers in natural human proportion and a believable pose; fingers are separate and correctly jointed; no third hand, no extra or duplicated hands or arms, no floating hand, no extra/missing/fused/bent-back fingers. If a gesture is unclear, prefer relaxed, partly-hidden or naturally resting hands over a complex finger pose. Keep any held object in one consistent hand.",
     `Grooming/wardrobe: ${o.look}. Keep the same outfit and styling as the established world for continuity.`,
     SKIN_FACTS,
     SCALE,

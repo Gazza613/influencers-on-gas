@@ -572,7 +572,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           {/* The keyframe is shot but its clip hasn't been rendered yet — that's a later step. */}
                           <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">⏳ {s.role} clip pending</span>
                         </div>
-                      ) : shooting ? (
+                      ) : (shooting && (shootingRole === "" || shootingRole === s.role)) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />shooting…</div>
                       ) : shot?.error ? (
                         <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-alert/30 bg-surface-2 text-center text-[10px] text-alert">shot failed</div>
