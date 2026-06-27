@@ -107,6 +107,32 @@ export async function tts(voiceId: string, text: string, opts: { expressive?: bo
   catch (e) { if (expressive && modelId !== STABLE_MODEL) return call(STABLE_MODEL); throw e; }
 }
 
+// Same synthesis as tts(), but via the WITH-TIMESTAMPS endpoint so we also get the EXACT audio
+// duration (last character end time). The a-roll timeline uses this real length instead of estimated
+// storyboard timecodes — that estimate mismatch was the root of the scene-switch pause + the audio
+// overlapping into the next scene. Returns the same voice/model audio + the measured duration.
+export async function ttsWithDuration(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ buffer: Buffer; durationSeconds: number | null }> {
+  text = sayable(text);
+  const k = await key();
+  const expressive = opts.expressive ?? false;
+  const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
+  const voice_settings = expressive
+    ? { stability: 0.35, similarity_boost: 0.8, style: 0.6, use_speaker_boost: true }
+    : { stability: 0.5, similarity_boost: 0.75 };
+  const res = await fetch(`${BASE}/text-to-speech/${voiceId}/with-timestamps`, {
+    method: "POST",
+    headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ text, model_id: modelId, voice_settings, output_format: "mp3_44100_128" }),
+  });
+  if (!res.ok) throw new Error(`TTS+timestamps failed (${res.status} ${modelId})`);
+  const data = (await res.json()) as { audio_base64?: string; alignment?: { character_end_times_seconds?: number[] } };
+  if (!data.audio_base64) throw new Error("TTS+timestamps: no audio");
+  const buffer = Buffer.from(data.audio_base64, "base64");
+  const ends = data.alignment?.character_end_times_seconds ?? [];
+  const durationSeconds = ends.length ? ends[ends.length - 1] : null;
+  return { buffer, durationSeconds };
+}
+
 // Short preview line so the producer can hear a voice before locking it.
 export async function previewVoice(voiceId: string, line = "Hi, this is how I will sound in your videos."): Promise<Buffer> {
   return tts(voiceId, line);

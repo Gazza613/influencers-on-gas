@@ -6,7 +6,7 @@ import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { submitDopVideo, pollDopOnce, dopConfigured } from "@/lib/vendors/higgsfield-dop";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
-import { tts, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
+import { tts, ttsWithDuration, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity } from "@/lib/vendors/anthropic";
@@ -1043,18 +1043,30 @@ export const generateClips = inngest.createFunction(
       // so the audio flows unbroken across the cut (a-roll talking → VO over b-roll → a-roll → …) and
       // the film never goes silent. Computed ONCE here for both paths.
       let audioUrl: string | null = null;
+      let audioDur: number | null = null; // EXACT spoken length — drives the a-roll scene slot (no more timecode-estimate pause/overlap)
       if (role !== "graphic" && (presetAudio || (line && voiceId))) {
-        // Moderate the line BEFORE any ElevenLabs TTS call (skip if it trips the safety classifier).
-        audioUrl = presetAudio || (await step.run(`tts-${i}`, async () => {
-          const mod = await moderateText(line);
-          if (!mod.allowed) return null;
-          // WYSIWYG voice: use the SAME (stable) TTS model the producer previewed when picking the
-          // voice. Expressive (eleven_v3) renders the same voice_id noticeably differently, so it read
-          // as "a different voice". Opt back in with AROLL_EXPRESSIVE=1 if you want v3 delivery.
-          // NOTE: we send the line VERBATIM — no <break> tags. eleven_multilingual_v2 does NOT honour
-          // SSML breaks; it SPEAKS them, which injected stray words into the a-roll ("adds in words").
-          return putBytes(await tts(voiceId as string, line, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
-        }) as string | null);
+        if (presetAudio) { audioUrl = presetAudio; }
+        else {
+          // Moderate the line BEFORE any ElevenLabs TTS call (skip if it trips the safety classifier).
+          // Use the WITH-TIMESTAMPS endpoint to also get the exact audio duration. WYSIWYG: same stable
+          // model the producer previewed (eleven_v3 renders the voice differently; opt in via
+          // AROLL_EXPRESSIVE=1). Verbatim line — no <break> tags (v2 speaks them).
+          const r = await step.run(`tts-${i}`, async () => {
+            const mod = await moderateText(line);
+            if (!mod.allowed) return null;
+            const exp = process.env.AROLL_EXPRESSIVE === "1";
+            try {
+              const { buffer, durationSeconds } = await ttsWithDuration(voiceId as string, line, { expressive: exp });
+              const url = await putBytes(buffer, "scene-vo", "mp3", "audio/mpeg");
+              return { url, duration: durationSeconds };
+            } catch {
+              // Fallback: plain TTS (no duration) so a-roll never hard-fails on the timestamps endpoint.
+              const url = await putBytes(await tts(voiceId as string, line, { expressive: exp }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
+              return url ? { url, duration: null as number | null } : null;
+            }
+          });
+          if (r) { audioUrl = r.url; audioDur = r.duration; }
+        }
         if (audioUrl && !presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
       }
 
@@ -1087,7 +1099,7 @@ export const generateClips = inngest.createFunction(
               // model=avatar_iv always (no legacy path); the VARIANT records whether full motion+expressiveness applied.
               await step.run(`u-hg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "avatar_iv", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
               const hosted = (await step.run(`hghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
-              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, engine: `heygen:avatar_iv:${hg.variant}` };
+              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: `heygen:avatar_iv:${hg.variant}` };
             }
             return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV did not finish: ${hgErr || "timed out after ~10 min"}`, engine: "heygen:avatar_iv" };
           }
@@ -1129,7 +1141,7 @@ export const generateClips = inngest.createFunction(
           const hosted = (await step.run(`ahost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
           // Save the EXACT audio we lip-synced to — Seedance outputs a SILENT video (the audio
           // only drives the lips), so the stitch lays this same clip back over it for sound.
-          return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl };
+          return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined };
         }
         // fall through to Kling motion (no sync) if both OmniHuman and Seedance failed
       }
@@ -1375,7 +1387,9 @@ export const assembleVideo = inngest.createFunction(
     for (const p of placed) {
       const clip = clips.find((c) => c.scene === p.i);
       const synced = clip?.audio_url as string | undefined;
-      if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len + AROLL_VO_TAIL }); continue; }
+      // A-roll: the scene slot (p.len) now equals the EXACT audio duration, so play the voice to its
+      // precise length — NO +tail bleeding into the next scene (that bleed was the "two audios at once").
+      if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len }); continue; }
       if (voiceId && p.vo) {
         try {
           const url = await step.run(`vo-${p.i}`, async () => {
