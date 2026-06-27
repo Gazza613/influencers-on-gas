@@ -1146,7 +1146,15 @@ export const generateClips = inngest.createFunction(
         // engine, which hid the "static photo, weak motion" problem). Set AROLL_ENGINE=omnihuman to opt out.
         const AROLL_ENGINE = process.env.AROLL_ENGINE || "heygen";
         if (AROLL_ENGINE === "heygen") {
-          const hg = await step.run(`hg-submit-${i}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
+          // HeyGen RATE-LIMITS concurrent submits (429). Retry the submit with exponential back-off so a
+          // burst of a-roll scenes all land instead of failing — each waits out the limiter and gets in.
+          let hg: { ok: true; videoId: string; version: string; variant?: string } | { ok: false; error: string } = { ok: false, error: "not attempted" };
+          const HG_TRIES = Math.max(1, Number(process.env.HEYGEN_SUBMIT_RETRIES) || 6);
+          for (let attempt = 0; attempt < HG_TRIES; attempt++) {
+            hg = await step.run(`hg-submit-${i}-${attempt}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
+            if (hg.ok || !/429|rate.?limit/i.test((hg as { error: string }).error)) break;
+            await step.sleep(`hg-rl-${i}-${attempt}`, `${Math.min(120, 20 * (attempt + 1))}s`); // 20s,40s,60s,80s,100s,120s
+          }
           if (hg.ok) {
             let hgUrl: string | null = null; let hgErr: string | null = null;
             for (let n = 0; n < 100; n++) { // ~100 x 6s ≈ 10 min
@@ -1298,15 +1306,18 @@ export const generateClips = inngest.createFunction(
       await step.run(`csave-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips: list } } }));
       return row;
     };
-    // Render ALL scenes in PARALLEL (high default) so every clip queues at its vendor SIMULTANEOUSLY —
-    // total wall-clock ≈ the SLOWEST single clip, not the SUM. DoP (a real REST queue) and HeyGen both
-    // handle parallel submits fine; the old wave-of-3 throttle existed only for the flaky MCP-Kling path
-    // we've replaced, and it was serialising the slow renders (paying the queue wait once PER wave).
-    // Cap via CLIP_CONCURRENCY only if a vendor starts rate-limiting.
+    // Render scenes in PARALLEL so clips queue at their vendor simultaneously (wall-clock ≈ slowest clip,
+    // not the sum). BUT split by role: HeyGen (a-roll) RATE-LIMITS concurrent submits (429), so the
+    // talking clips run at a LOW concurrency; b-roll (DoP — a real REST queue) runs wide. The two pools
+    // run concurrently. The HeyGen 429 back-off above is the backstop if the limiter still bites.
     const CLIP_CONCURRENCY = Math.max(1, Number(process.env.CLIP_CONCURRENCY) || 12);
-    for (let c = 0; c < targets.length; c += CLIP_CONCURRENCY) {
-      await Promise.all(targets.slice(c, c + CLIP_CONCURRENCY).map(renderAndSave));
-    }
+    const AROLL_CONCURRENCY = Math.max(1, Number(process.env.AROLL_CONCURRENCY) || 2);
+    const runPool = async (items: typeof targets, conc: number) => {
+      for (let c = 0; c < items.length; c += conc) await Promise.all(items.slice(c, c + conc).map(renderAndSave));
+    };
+    const arollTargets = targets.filter((t) => String(t.sc.role || "a-roll") === "a-roll");
+    const otherTargets = targets.filter((t) => String(t.sc.role || "a-roll") !== "a-roll");
+    await Promise.all([runPool(arollTargets, AROLL_CONCURRENCY), runPool(otherTargets, CLIP_CONCURRENCY)]);
 
     // Re-sort the FULL merged list (this render's clips + any kept from the other role).
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
