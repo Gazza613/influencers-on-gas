@@ -1148,7 +1148,7 @@ export const generateClips = inngest.createFunction(
         if (AROLL_ENGINE === "heygen") {
           // HeyGen RATE-LIMITS concurrent submits (429). Retry the submit with exponential back-off so a
           // burst of a-roll scenes all land instead of failing — each waits out the limiter and gets in.
-          let hg: { ok: true; videoId: string; version: string; variant?: string } | { ok: false; error: string } = { ok: false, error: "not attempted" };
+          let hg: { ok: true; videoId: string; version: "v2" | "v3"; variant?: string } | { ok: false; error: string } = { ok: false, error: "not attempted" };
           const HG_TRIES = Math.max(1, Number(process.env.HEYGEN_SUBMIT_RETRIES) || 6);
           for (let attempt = 0; attempt < HG_TRIES; attempt++) {
             hg = await step.run(`hg-submit-${i}-${attempt}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
