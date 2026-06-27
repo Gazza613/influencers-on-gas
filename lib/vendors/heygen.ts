@@ -3,6 +3,9 @@ import { getSecret } from "../connections";
 // HeyGen client — the "Presenter" (talking a-roll) vendor. Vendor-neutral in the UI.
 const API = "https://api.heygen.com";
 const UPLOAD = "https://upload.heygen.com";
+// Avatar IV gesture intensity. "high" drove the EXAGGERATED, unrealistic hand movements the owner
+// flagged; "normal" keeps natural, calm gestures while still moving. Env-tunable (low|normal|high).
+const HEYGEN_EXP = (process.env.HEYGEN_EXPRESSIVENESS || "normal").toLowerCase();
 
 async function key(): Promise<string> {
   const k = await getSecret("heygen");
@@ -70,7 +73,7 @@ export async function generateAvatarVideo(opts: { talkingPhotoId: string; audioA
   // prompt. Field placement isn't publicly schema'd, so try richest first and fall back on a 400
   // so a render never hard-fails on an unknown field.
   const variants = [
-    { video_inputs: [{ character, voice, use_avatar_iv_model: true, motion_prompt: motion, expressiveness: "high" }], dimension },
+    { video_inputs: [{ character, voice, use_avatar_iv_model: true, motion_prompt: motion, expressiveness: HEYGEN_EXP }], dimension },
     { video_inputs: [{ character, voice, use_avatar_iv_model: true }], dimension },
     { video_inputs: [{ character, voice }], dimension },
   ];
@@ -131,8 +134,8 @@ async function generateV3(opts: { imageAssetId: string; audioAssetId: string; ra
   const motion = opts.motionPrompt || "natural, lively delivery: relaxed posture, easy head movement and subtle hand gestures while talking to camera";
   // Richest (expressiveness HIGH + motion) first; fall back ONLY if a field is rejected with a 400.
   const variants: { label: string; body: Record<string, unknown> }[] = [
-    { label: "full(motion+expressiveness)", body: { type: "image", image, audio_asset_id: opts.audioAssetId, motion_prompt: motion, expressiveness: "high", resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
-    { label: "expressiveness-only", body: { type: "image", image, audio_asset_id: opts.audioAssetId, expressiveness: "high", resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
+    { label: "full(motion+expressiveness)", body: { type: "image", image, audio_asset_id: opts.audioAssetId, motion_prompt: motion, expressiveness: HEYGEN_EXP, resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
+    { label: "expressiveness-only", body: { type: "image", image, audio_asset_id: opts.audioAssetId, expressiveness: HEYGEN_EXP, resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
     { label: "bare(no-motion/expressiveness)", body: { type: "image", image, audio_asset_id: opts.audioAssetId, resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
   ];
   let lastErr = "";

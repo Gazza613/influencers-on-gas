@@ -1366,7 +1366,7 @@ export const assembleVideo = inngest.createFunction(
     const ambientTrack: Record<string, unknown>[] = [];
     // Ambient sits UNDER the VO + music but must be audible — 0.1 was inaudible. ~0.3 reads as real
     // room tone without competing. Env-tunable (AMBIENT_VOLUME).
-    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.3));
+    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.4));
     if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: ambientVol }, start: t, length: Math.min(22, total - t) });
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
@@ -1433,7 +1433,7 @@ export const assembleVideo = inngest.createFunction(
     tracks.push({ clips: videoClips });
 
     const edit: Record<string, unknown> = {
-      timeline: { background: "#000000", ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeOut", volume: 0.18 } } : {}), tracks },
+      timeline: { background: "#000000", ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.28)) } } : {}), tracks },
       output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : "9:16", resolution: "1080", fps: 25 },
     };
 
