@@ -146,11 +146,25 @@ export const SHOT_NEGATIVE =
 // ── THE PRODUCER: a directed shot from a storyboard scene, coherent across the board.
 // `worldAnchored` = a prior frame of the SAME world is supplied as an extra reference, so
 // location, lighting and style stay continuous shot-to-shot (the "Popcorn"-style coherence).
+// Neutralise hand poses that wreck AI renders (finger-counting, peace signs, raised fingers) — applied
+// to EXISTING storyboards at render time, so a scene that was directed to "hold up three fingers" still
+// renders hand-safe without re-generating the board.
+function deHandRisk(s: string): string {
+  return String(s || "")
+    .replace(/\b(holds?|holding|raises?|raising|puts?|putting|lifts?|lifting|throws?|throwing) up (one|two|three|four|five|six|a|an|her|his|their|some|\d+)?[\s-]*fingers?\b/gi, "gestures naturally with a relaxed open hand")
+    .replace(/\bcount(s|ing)?(\s+\w+){0,3}?\s+on (her|his|their|the)?\s*fingers?\b/gi, "gestures naturally")
+    .replace(/\bcount(s|ing)?\b(?=[^.]*\bfingers?\b)/gi, "gestures")
+    .replace(/\b(a |the )?(peace sign|v[\s-]?sign|thumbs[\s-]?up|finger[\s-]?guns?|ok(ay)?[\s-]?sign|crossed fingers|interlaced fingers|interlocking fingers)\b/gi, "a relaxed natural hand")
+    .replace(/\b(holds?|holding|raises?|raising) up (a|her|his|their)? ?hand\b/gi, "rests a relaxed hand")
+    .replace(/\bfinger[\s-]?counting\b/gi, "natural gesturing")
+    .replace(/\bnumber of fingers\b/gi, "a natural gesture");
+}
 export function buildShotPrompt(o: {
   location: string; blocking: string; shot: string; performance: string; role: string;
   subjectLine: string; look: string; refInstruction: string; ratio: string;
   hasPeople: boolean; worldAnchored: boolean;
 }): string {
+  o = { ...o, blocking: deHandRisk(o.blocking), performance: deHandRisk(o.performance), shot: deHandRisk(o.shot) };
   return [
     "Photograph style: a real, candid photo of the influencer living this exact moment, CAPTURED ON A PHONE — iPhone 16 Pro main lens, handheld at a natural height, automatic exposure and focus, faint natural sensor noise in the shadows and a touch of lens distortion at the edges. NOT a studio camera, NOT studio lighting, NOT a posed studio portrait — it reads like a real moment a friend caught on their phone, never a glossy AI render.",
     "CRITICAL — ONE FRAME, ONE ANGLE: output a SINGLE continuous photograph from ONE camera angle of ONE moment, filling the whole frame edge to edge. It is ONE framing only — do NOT combine a close-up with a wider shot, and do NOT stack or place two views together top-and-bottom or side-by-side. If the direction below lists several shots, cuts, framings or moments (e.g. 'close-up of hands… then a wider shot', 'three rapid cuts', 'over-the-shoulder and coffee-table shots'), choose ONLY the single most important one and render that alone. ABSOLUTELY NEVER a split-screen, diptych, triptych, grid, collage, stacked panels, top/bottom halves or side-by-side images.",

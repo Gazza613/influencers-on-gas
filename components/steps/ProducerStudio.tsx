@@ -165,15 +165,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   function stepState(k: typeof ORDER[number]): "locked" | "active" | "done" {
     if (approved.has(k)) return "done";
     const idx = ORDER.indexOf(k);
-    // The a-roll and b-roll REFERENCE shoots are independent (different scenes) — both open in
-    // Script-first flow: Concept (script + scenes) → Voice → reference shoots → animate. The two
-    // reference shoots run in PARALLEL once Voice is approved; each animate waits on its own ref set.
-    let priorOk: boolean;
-    if (k === "voice") priorOk = approved.has("concept");
-    else if (k === "arollRefs" || k === "brollRefs") priorOk = approved.has("voice");
-    else if (k === "aroll") priorOk = approved.has("arollRefs");
-    else if (k === "broll") priorOk = approved.has("brollRefs");
-    else priorOk = idx === 0 || approved.has(ORDER[idx - 1]);
+    // STRICTLY LINEAR flow: each step opens only once the one before it (in ORDER) is approved —
+    // Concept → Voice → A-roll refs → B-roll refs → Animate A → Animate B → Music → Stitch → Showreel.
+    // Predictable: you can't skip B-roll refs into Animate, and nothing un-approved jumps the queue.
+    const priorOk = idx === 0 || approved.has(ORDER[idx - 1]);
     return priorOk ? "active" : "locked";
   }
   const unlocked = (k: typeof ORDER[number]) => stepState(k) !== "locked";
@@ -236,9 +231,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (shooting) return;
     setErr(""); setShootingRole(role);
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).filter((s) => s.role !== role), shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
-    // Re-shooting refs invalidates the downstream (animate/audio/stitch) — but keep the UPSTREAM
-    // Concept and Voice approvals (Voice now comes before the shoots; don't wipe it).
-    setApproved((s) => new Set([...s].filter((k) => k === "concept" || k === "voice")));
+    // Re-shooting THIS role's refs invalidates only its own approval + everything downstream
+    // (animate/audio/stitch/showreel). Keep Concept, Voice AND the OTHER role's refs intact — and
+    // persist, so a refresh restores the same place. (Fixes "shooting b-roll asks to re-approve voice".)
+    const drop = new Set([role === "a-roll" ? "arollRefs" : "brollRefs", "aroll", "broll", "audio", "stitch", "showreel"]);
+    setApproved((s) => { const n = new Set([...s].filter((k) => !drop.has(k))); persistApproved(n); return n; });
     setDenied(new Set());
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roleFilter: role, aspectRatio: ratio }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot — give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); setShootingRole(""); return; }
@@ -678,6 +675,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         // production so the wizard shows the animate steps need re-rendering with the new voice.
                         fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
                         setVoiceoverUrl(""); // voice changed → the old full take no longer applies; re-generate
+                        accept("voice"); // choosing a voice IS the approval — never block the next step asking to "approve voice"
                       }} />
                     {/* Voice model: v2 stable vs v3 expressive. */}
                     {voiceId && (
