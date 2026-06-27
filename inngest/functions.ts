@@ -1234,6 +1234,10 @@ export const generateClips = inngest.createFunction(
       // b-roll lines up with the cut instead of a fixed 5s.
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const sceneDur = a != null && b != null && b > a ? b - a : 5;
+      // The video vendors render WHOLE seconds (clamped 3-15). Store this EXACT figure as the clip's
+      // duration so the stitch slot equals the real video length — otherwise the slot (e.g. 5.4s) runs
+      // longer than the rendered clip (5s) and the last frame FREEZES = the "pause at the end" of b-roll.
+      const clipSeconds = Math.max(3, Math.min(15, Math.round(sceneDur)));
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
       const hero = role === "b-roll" && String(sc.hero) === "true";
 
@@ -1247,7 +1251,7 @@ export const generateClips = inngest.createFunction(
         let dop: { jobSetId: string | null; error: string | null } = { jobSetId: null, error: "not attempted" };
         const DOP_TRIES = Math.max(1, Number(process.env.DOP_SUBMIT_RETRIES) || 5);
         for (let attempt = 0; attempt < DOP_TRIES; attempt++) {
-          dop = await step.run(`dop-submit-${i}-${attempt}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: sceneDur }));
+          dop = await step.run(`dop-submit-${i}-${attempt}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: clipSeconds }));
           if (dop.jobSetId || !/429|rate.?limit/i.test(dop.error || "")) break;
           await step.sleep(`dop-rl-${i}-${attempt}`, `${Math.min(120, 20 * (attempt + 1))}s`);
         }
@@ -1265,7 +1269,7 @@ export const generateClips = inngest.createFunction(
           if (dopUrl) {
             await step.run(`u-dop-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "dop_turbo", unit: "video", action: "broll", count: 1 }).catch(() => {}));
             const hosted = (await step.run(`dophost-${i}`, () => rehostToBlob(dopUrl as string, "clips").catch(() => null))) || dopUrl;
-            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: sceneDur, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo" };
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: clipSeconds, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo" };
           }
         }
         // DoP submit failed / render not done / errored → fall through to MCP-Kling below. But if the
@@ -1274,7 +1278,7 @@ export const generateClips = inngest.createFunction(
         if (dop.error) await step.run(`dop-alert-${i}`, async () => { await alertIfCritical("Higgsfield DoP (b-roll video)", dop.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
       }
 
-      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: sceneDur, hero }));
+      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: clipSeconds, hero }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
         let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
@@ -1291,7 +1295,7 @@ export const generateClips = inngest.createFunction(
         const hosted = (await step.run(`vhost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
         // B-ROLL (and silent a-roll fallback) carries its VO as audio_url so the stitch lays the
         // narration OVER the silent scene — the continuous voiceover never drops out across the cut.
-        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: sceneDur, audio_url: audioUrl || undefined, synced: false };
+        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: clipSeconds, audio_url: audioUrl || undefined, synced: false };
       }
       return { scene: i, role, beat, kind: role, url: null, status: "failed", error: sub.error || `render started (${sub.model}) but did not finish in time` };
     };
@@ -1494,9 +1498,12 @@ export const assembleVideo = inngest.createFunction(
     // "pause". With each clip now playing its full real duration (no freeze) and one continuous
     // voiceover carrying across the cuts, hard cuts are clean and seamless — the world-class look for a
     // fast ad. (A true crossfade needs overlapping clips on separate tracks — a later refinement.)
+    // fit:cover + a hair of OVERSCAN so the clip always fully covers the 1080×1920 frame — kills the thin
+    // white/edge lines left & right when a source video is a pixel or two off the exact 9:16 ratio.
+    const VIDEO_OVERSCAN = Math.max(1, Number(process.env.VIDEO_OVERSCAN) || 1.04);
     const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
       asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 },
-      start: p.start, length: p.len, fit: "cover",
+      start: p.start, length: p.len, fit: "cover", scale: VIDEO_OVERSCAN,
     }));
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
