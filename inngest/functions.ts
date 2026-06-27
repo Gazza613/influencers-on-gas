@@ -1023,7 +1023,13 @@ export const generateClips = inngest.createFunction(
     // cached step results, so in-memory maps don't survive — we rebuild the map outside). Best-effort:
     // any failure leaves the map empty and each scene falls back to per-scene TTS. Disable VOICE_ONCE=0.
     const sceneAudio = new Map<number, { url: string; duration: number | null }>();
-    if (voiceId && process.env.VOICE_ONCE !== "0") {
+    // PREFER the full voiceover the producer generated + LISTENED TO in the Voice step (stored slices) —
+    // animate then ships the exact audio they approved (WYSIWYG). Only generate here if they didn't.
+    const storedVO = (Array.isArray((production as { scene_audio?: { scene: number; url: string; duration: number }[] } | null)?.scene_audio)
+      ? (production as { scene_audio: { scene: number; url: string; duration: number }[] }).scene_audio : []);
+    if (storedVO.length) {
+      for (const e of storedVO) sceneAudio.set(e.scene, { url: e.url, duration: e.duration });
+    } else if (voiceId && process.env.VOICE_ONCE !== "0") {
       const slices = await step.run("voice-once", async () => {
         const parts: { i: number; start: number; end: number }[] = [];
         let full = "";

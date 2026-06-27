@@ -37,6 +37,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [voiceId, setVoiceId] = useState(initialVoiceId);
   const [voiceName, setVoiceName] = useState(initialVoiceName);
   const [voicePreview, setVoicePreview] = useState("");
+  // The full voiceover (one continuous take) the producer generates + listens to before animating.
+  const [voiceoverUrl, setVoiceoverUrl] = useState<string>(String((initialProduction as { voiceover_url?: string })?.voiceover_url || ""));
+  const [voBusy, setVoBusy] = useState(false);
+  async function genVoiceover() {
+    if (voBusy) return;
+    setVoBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/voiceover`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    setVoBusy(false);
+    if (r?.voiceover_url) setVoiceoverUrl(`${r.voiceover_url}?t=${Date.now()}`); // cache-bust so re-runs reload the player
+    else setErr(r?.error || "Could not generate the voiceover.");
+  }
   const [editing, setEditing] = useState(!initialProduction?.storyboard);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -666,7 +677,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         // The server clears stale (old-voice) clips on a voice change — pull the fresh
                         // production so the wizard shows the animate steps need re-rendering with the new voice.
                         fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
+                        setVoiceoverUrl(""); // voice changed → the old full take no longer applies; re-generate
                       }} />
+                    {/* THE FULL VOICEOVER: one continuous take the producer listens to before animating. */}
+                    {voiceId && (
+                      <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                        <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Full voiceover</div>
+                        <p className="mb-2 text-[12px] text-ink-dim">Generate the ENTIRE script as one continuous take and listen to it — this exact audio is what ships, and every scene is sliced from it, so the voice stays identical throughout. Re-run until it sounds right.</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button onClick={genVoiceover} disabled={voBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voBusy ? "🎙️ Generating the full voiceover…" : voiceoverUrl ? "↻ Re-run the voiceover" : "🎙️ Generate the full voiceover"}</button>
+                          {voiceoverUrl && <audio src={voiceoverUrl} controls className="h-9" />}
+                        </div>
+                        {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ This take is locked in — every a-roll scene lip-syncs to it; b-roll narrates over it. The voice is now identical across all scenes.</p>}
+                      </div>
+                    )}
                   </>
                 )
               ) : <LockHint />}

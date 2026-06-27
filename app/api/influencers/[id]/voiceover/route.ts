@@ -1,0 +1,71 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { getInfluencer, updateInfluencer } from "@/lib/influencers";
+import { ttsPcm, pcmSliceToWav } from "@/lib/vendors/elevenlabs";
+import { putBytes } from "@/lib/blob";
+import { recordUsage } from "@/lib/usage";
+
+// THE FULL VOICEOVER step: synthesize the WHOLE approved script as ONE continuous take, so the voice is
+// identical across every scene, and the producer can LISTEN to the exact audio that will ship (WYSIWYG).
+// We slice it per scene by ElevenLabs timestamps and store both the full file + per-scene slices on the
+// production; Animate reuses those slices (no re-generation, no drift).
+export const maxDuration = 120;
+export const dynamic = "force-dynamic";
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const inf = await getInfluencer(id);
+  const prod = ((inf?.persona as Record<string, unknown>)?.production ?? {}) as Record<string, unknown>;
+  return NextResponse.json({ voiceover_url: prod.voiceover_url ?? null, scenes: Array.isArray(prod.scene_audio) ? (prod.scene_audio as unknown[]).length : 0 });
+}
+
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const inf = await getInfluencer(id);
+  if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const persona = (inf.persona ?? {}) as Record<string, unknown>;
+  const voiceId = String(persona.voice_id || "");
+  if (!voiceId) return NextResponse.json({ error: "Set a voice first." }, { status: 400 });
+  const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[] } } | null;
+  const scenes = production?.storyboard?.scenes;
+  if (!Array.isArray(scenes) || !scenes.length) return NextResponse.json({ error: "Direct a storyboard first." }, { status: 400 });
+
+  // Build the full read from every scene's line, in order; remember each scene's char span.
+  const parts: { i: number; start: number; end: number }[] = [];
+  let full = "";
+  scenes.forEach((sc, i) => {
+    const ln = String(sc.vo_line || "").trim();
+    if (!ln) return;
+    const start = full.length ? full.length + 1 : 0;
+    full += (full.length ? " " : "") + ln;
+    parts.push({ i, start, end: full.length });
+  });
+  if (!full.trim() || !parts.length) return NextResponse.json({ error: "No spoken lines in the storyboard." }, { status: 400 });
+
+  try {
+    const { pcm, charEndTimes } = await ttsPcm(voiceId, full, { expressive: process.env.AROLL_EXPRESSIVE === "1" });
+    if (!charEndTimes.length) throw new Error("no timestamps");
+    const timeAt = (c: number) => charEndTimes[Math.min(charEndTimes.length - 1, Math.max(0, c))] || 0;
+    const totalSec = pcm.length / (44100 * 2);
+    // Whole take → one WAV the producer can listen to.
+    const voiceover_url = await putBytes(pcmSliceToWav(pcm, 0, totalSec), "voiceover", "wav", "audio/wav");
+    // Per-scene slices → Animate reuses these (consistent + WYSIWYG).
+    const scene_audio: { scene: number; url: string; duration: number }[] = [];
+    for (const p of parts) {
+      const startSec = p.start > 0 ? timeAt(p.start - 1) : 0;
+      const endSec = timeAt(p.end - 1);
+      if (!(endSec > startSec)) continue;
+      const url = await putBytes(pcmSliceToWav(pcm, startSec, endSec), "scene-vo", "wav", "audio/wav").catch(() => null);
+      if (url) scene_audio.push({ scene: p.i, url, duration: endSec - startSec });
+    }
+    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
+    await updateInfluencer(id, { persona: { ...persona, production: { ...production, voiceover_url, scene_audio, voiceover_at: Date.now() } } });
+    return NextResponse.json({ voiceover_url, scenes: scene_audio.length, total_seconds: Math.round(totalSec) });
+  } catch (e) {
+    return NextResponse.json({ error: `Could not generate the voiceover: ${String((e as Error)?.message || e).slice(0, 160)}` }, { status: 502 });
+  }
+}
