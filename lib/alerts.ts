@@ -1,5 +1,6 @@
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { db } from "@/lib/db";
+import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 
 // Ops alerting: when the platform hits a real problem (a vendor out of credits, a rejected/expired API
 // key, a vendor down/timing out, or a build step that failed outright), email the admin a branded,
@@ -96,15 +97,35 @@ export async function alertIfCritical(provider: string, errorMessage: string, co
   }
 }
 
+// Which production status field a failed function should RESET, so a dead job never leaves the UI
+// stuck "running" (phantom spinning / "rendering" tiles). Keyed by Inngest function id.
+const STATUS_FIELD: Record<string, string> = {
+  "generate-shots": "shots_status",
+  "generate-clips": "clips_status",
+  "generate-audio": "audio_status",
+  "assemble-video": "assembly_status",
+};
+
 // Inngest onFailure hook: a build step exhausted its retries. Wire onto the user-facing pipeline.
+// Alerts the admin AND self-heals the stuck status so the producer UI stops showing a phantom job.
 export async function onProductionFailure(ctx: { event?: { data?: { event?: { name?: string; data?: Record<string, unknown> }; function_id?: string; error?: { message?: string } } }; error?: { message?: string } }): Promise<void> {
   const failed = ctx?.event?.data;
   const orig = failed?.event;
   const fnId = String(failed?.function_id || "unknown");
+  const influencerId = String(orig?.data?.influencerId ?? "");
   const detail = String(ctx?.error?.message || failed?.error?.message || "unknown error");
+  const field = STATUS_FIELD[fnId.replace(/^[^/]*\//, "")] || STATUS_FIELD[fnId];
+  if (field && influencerId) {
+    try {
+      const inf = await getInfluencer(influencerId);
+      const persona = (inf?.persona ?? {}) as Record<string, unknown>;
+      const prod = (persona.production ?? {}) as Record<string, unknown>;
+      if (prod[field] === "running") await updateInfluencer(influencerId, { persona: { ...persona, production: { ...prod, [field]: "idle" } } });
+    } catch { /* best-effort */ }
+  }
   await alertOps({
     title: `Build step failed: ${fnId}`,
     detail,
-    context: { Step: fnId, Influencer: String(orig?.data?.influencerId ?? ""), Trigger: String(orig?.name ?? "") },
+    context: { Step: fnId, Influencer: influencerId, Trigger: String(orig?.name ?? "") },
   });
 }
