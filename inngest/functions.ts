@@ -1468,12 +1468,20 @@ export const assembleVideo = inngest.createFunction(
       const endLen = endCardKind === "image" ? 4 : 6;
       videoClips.push({ asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) } as Record<string, unknown>, start: total, length: endLen, fit: "cover" } as unknown as typeof videoClips[number]);
     }
-    // Captions are OPT-IN at stitch time (the producer ticks "Burn captions"). Default OFF — they were
-    // appearing unrequested. Sized for the 9:16 frame: smaller text, lifted off the very bottom edge.
+    // Captions are OPT-IN at stitch time (the producer ticks "Burn captions"). Default OFF.
+    // Rendered as an HTML asset (NOT the basic "title" asset, which mis-sized and rendered unreliably) —
+    // this gives controlled font size, wrapping, and a legible rounded background pill, sized for 9:16.
     const captionsOn = event.data.captions === true;
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const capW = ratio === "1:1" ? 920 : 940; // box width within the 1080 frame (leaves side margins)
     const captionClips = captionsOn ? placed.filter((p) => p.caption).map((p) => ({
-      asset: { type: "title", text: p.caption, style: "subtitle", size: "small", position: "bottom", offset: { y: 0.12 } },
-      start: p.start, length: p.len,
+      asset: {
+        type: "html",
+        html: `<div class="cap"><span>${esc(p.caption)}</span></div>`,
+        css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:36px;line-height:1.3;padding:10px 20px;background:rgba(0,0,0,0.6);border-radius:12px;-webkit-box-decoration-break:clone;box-decoration-break:clone}",
+        width: capW, height: 260, background: "transparent",
+      },
+      start: p.start, length: p.len, position: "bottom", offset: { y: 0.10 },
     })) : [];
     // Brand overlay: ONLY an uploaded logo (top-left) / promo (top-right) — both explicit. No auto
     // "brand name as text" bug (it was burning the brand name on cuts nobody asked to brand).
