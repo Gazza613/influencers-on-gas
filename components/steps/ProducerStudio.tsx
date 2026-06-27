@@ -51,7 +51,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setVoBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/voiceover`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     setVoBusy(false);
-    if (r?.voiceover_url) setVoiceoverUrl(`${r.voiceover_url}?t=${Date.now()}`); // cache-bust so re-runs reload the player
+    if (r?.voiceover_url) { setVoiceoverUrl(`${r.voiceover_url}?t=${Date.now()}`); accept("voice"); } // cache-bust + auto-approve voice (generating the full take IS the confirm — no separate Accept needed)
     else setErr(r?.error || "Could not generate the voiceover.");
   }
   const [editing, setEditing] = useState(!initialProduction?.storyboard);
@@ -85,6 +85,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const sb = production?.storyboard;
   const shots = production?.shots ?? [];
   const shooting = production?.shots_status === "running";
+  // WHICH role is being shot — so only that gallery shows the shooting state (a-roll and b-roll are
+  // shot step by step, never both at once).
+  const [shootingRole, setShootingRole] = useState<"a-roll" | "b-roll" | "">("");
   const shotFor = (i: number) => shots.find((s) => s.scene === i);
   const clips = production?.clips ?? [];
   const rendering = production?.clips_status === "running";
@@ -231,13 +234,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // invalidates downstream clips/audio/final (board changed) and resets approvals back to concept.
   async function shootRole(role: "a-roll" | "b-roll", ratio: string) {
     if (shooting) return;
-    setErr("");
+    setErr(""); setShootingRole(role);
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).filter((s) => s.role !== role), shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
-    setApproved((s) => new Set([...s].filter((k) => k === "concept")));
+    // Re-shooting refs invalidates the downstream (animate/audio/stitch) — but keep the UPSTREAM
+    // Concept and Voice approvals (Voice now comes before the shoots; don't wipe it).
+    setApproved((s) => new Set([...s].filter((k) => k === "concept" || k === "voice")));
     setDenied(new Set());
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roleFilter: role, aspectRatio: ratio }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot — give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot — give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); setShootingRole(""); return; }
     await poll(setProduction, "shots_status");
+    setShootingRole("");
   }
 
   // FAST PATH: render every scene (a-roll + b-roll) in ONE parallel job, so the two roles render
@@ -714,8 +720,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <>
                     <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
                     <RatioPicker value={arollRatio} onChange={setArollRatio} />
-                    <button onClick={() => shootRole("a-roll", arollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting a-roll references…" : aRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot a-roll references" : "📸 Shoot a-roll references"}</button>
-                    <RefGallery role="a-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
+                    <button onClick={() => shootRole("a-roll", arollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shootingRole === "a-roll" ? "📸 Shooting a-roll references…" : aRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot a-roll references" : "📸 Shoot a-roll references"}</button>
+                    <RefGallery role="a-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting && shootingRole === "a-roll"} onToggleDrop={toggleDrop} onZoom={setZoom} />
                   </>
                 )
               ) : <LockHint />}
@@ -731,8 +737,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <>
                     <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
                     <RatioPicker value={brollRatio} onChange={setBrollRatio} />
-                    <button onClick={() => shootRole("b-roll", brollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting ? "📸 Shooting b-roll references…" : bRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot b-roll references" : "📸 Shoot b-roll references"}</button>
-                    <RefGallery role="b-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting} onToggleDrop={toggleDrop} onZoom={setZoom} />
+                    <button onClick={() => shootRole("b-roll", brollRatio)} disabled={shooting} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shootingRole === "b-roll" ? "📸 Shooting b-roll references…" : bRollKept.some((x) => shotFor(x.i)?.url) ? "↻ Re-shoot b-roll references" : "📸 Shoot b-roll references"}</button>
+                    <RefGallery role="b-roll" scenes={sb.scenes} shots={shots} dropped={dropped} shooting={shooting && shootingRole === "b-roll"} onToggleDrop={toggleDrop} onZoom={setZoom} />
                   </>
                 )
               ) : <LockHint />}

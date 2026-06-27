@@ -602,7 +602,23 @@ export async function generateScript(brief: {
   const tagRule = brief.expressive
     ? `This script is voiced on ElevenLabs Eleven v3, so add a FEW inline AUDIO TAGS for natural, expressive delivery — bracketed lowercase tags such as [warm], [excited], [curious], [reassuring], [laughs softly], [whispers], [pause], [emphasis]. Use at most 1-2 per sentence, matched to the meaning and a ${brief.tone} tone; do NOT over-tag. Keep every spoken word.`
     : `Output ONLY the words she speaks — no audio tags, no scene labels, no stage directions, no quotation marks, no headings.`;
-  const system = `You are an elite short-form ad scriptwriter. Write the SPOKEN VOICEOVER for a ${brief.durationSeconds}-second vertical social ad delivered by an AI-influencer presenter. ONE continuous, natural read in her voice: warm, confident, effortless, benefit-led, short active sentences, second person, no jargon. Open with a HOOK in the first ~5s that names the product, then the problem, the product as the answer, a quick proof/benefit, and a clear spoken CTA to close. About ${words} words (~2.5 words/second for ${brief.durationSeconds}s) — pace it to fill the time with no dead air. UK spelling, NO em dashes. NEVER name a real artist, band or song. ${tagRule}`;
+  const system = `You are a world-class DIRECT-RESPONSE copywriter — the calibre that writes top-performing short-form ads for the best DTC brands. You write for PERFORMANCE: stop the scroll, hold attention to the end, and drive ONE action. You are judged on retention and conversion, never on sounding clever or "salesy".
+
+Write the SPOKEN VOICEOVER for a ${brief.durationSeconds}-second vertical social ad — ${brief.influencerName} speaking to camera and over b-roll, as one continuous read.
+
+CRAFT (non-negotiable):
+- Write like ONE real person talking to ONE real person. Conversational, specific, human — never brochure or "marketing voice".
+- HOOK (first ~3 seconds decide 80% of performance): open on tension, a sharp specific, a curiosity gap, a bold honest truth, or the exact problem they feel — NOT a product boast or a greeting. Earn the next line.
+- Earn the pitch: name the real problem or desire FIRST so the product lands as the obvious answer, not an interruption.
+- Be concrete and sensory. Specifics persuade; adjectives don't. Show the moment, not the claim ("still awake at 1am, scrolling" beats "saves you time").
+- One idea. Tight rhythm, short lines, varied cadence. It must sound like real speech read aloud, not written copy.
+- Close on ONE clear, low-friction CTA that feels like the natural next step, not a hard sell.
+
+BANNED — these instantly read as cheap, AI, or salesy; NEVER use: "Introducing", "Say goodbye to", "Look no further", "Imagine a world/Imagine if", "In today's world", "fast-paced world", "game-changer", "revolutionary", "unlock", "elevate", "supercharge", "next level", "you deserve", "what if I told you", "that's right", "but wait, there's more", "tired of...?", exclamation-mark spam, stacked rhetorical questions, and hype adjectives (amazing, incredible, ultimate, seamless, effortless). If a line could appear in a hundred other ads, rewrite it.
+
+TONE: ${brief.tone}. Confident but real, persuasive without pressure, warm without cheese.
+LENGTH: about ${words} words (~2.5/second for ${brief.durationSeconds}s) — fill the runtime at a natural speaking pace, no dead air, no padding.
+RULES: UK spelling. NO em dashes. NEVER name a real artist, band or song. ${tagRule}`;
   const input = `Influencer: ${brief.influencerName}. ${brief.influencerProfile || ""}\nBrand / product: ${brief.brand}\nGoal: ${brief.goal}\nCore offer / hook: ${brief.offer}\nKey benefits: ${brief.benefits}\nCTA: ${brief.cta}${brief.ctaCode ? ` (code: ${brief.ctaCode})` : ""}\nTone: ${brief.tone}\nSetting: ${brief.setting || "(her natural world)"}\n\nWrite the ${brief.durationSeconds}-second voiceover script now.`;
   const res = await c.messages.create({ model: MODEL, max_tokens: 1200, system, messages: [{ role: "user", content: input }] });
   const b = res.content.find((x) => x.type === "text");
