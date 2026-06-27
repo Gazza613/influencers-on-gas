@@ -972,15 +972,26 @@ export const generateShots = inngest.createFunction(
       list.sort((a, b) => a.scene - b.scene);
       await step.run(`save-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, shots_status: "running" } } }));
     };
+    // Collect the role-matching scenes (graphics pass straight through).
+    const targets: { i: number; sc: Record<string, string> }[] = [];
     for (let i = 0; i < scenes.length; i++) {
       const sc = scenes[i] as Record<string, string>;
       const scRole = String(sc.role || "a-roll");
       // When filtering by role, leave the other role's existing shots untouched (don't re-render them).
       if (roleFilter && scRole !== roleFilter) continue;
       if (scRole === "graphic") { await saveShot(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); continue; }
-      const row = await renderShot(i, sc);
-      await saveShot(i, row);
-      if (!worldRef && row.url) worldRef = await step.run(`worldref-${i}`, () => importMediaUrl(row.url as string).catch(() => null));
+      targets.push({ i, sc });
+    }
+    // Shoot the FIRST frame to establish the world (continuity anchor), then render the REST CONCURRENTLY
+    // so one slow image can never stall the whole board — each failed frame just comes back as an error to
+    // re-shoot. Saves stay sequential (in scene order) so the DB merge can't race; frames still land live.
+    if (targets.length) {
+      const first = targets[0];
+      const firstRow = await renderShot(first.i, first.sc);
+      await saveShot(first.i, firstRow);
+      if (!worldRef && firstRow.url) worldRef = await step.run(`worldref-${first.i}`, () => importMediaUrl(firstRow.url as string).catch(() => null));
+      const pending = targets.slice(1).map((t) => ({ i: t.i, p: renderShot(t.i, t.sc) }));
+      for (const { i, p } of pending) await saveShot(i, await p);
     }
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prodDone = (done.production ?? production) as Record<string, unknown>;
