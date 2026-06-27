@@ -133,6 +133,46 @@ export async function ttsWithDuration(voiceId: string, text: string, opts: { exp
   return { buffer, durationSeconds };
 }
 
+// VOICE-ONCE: synthesize the WHOLE approved script in ONE call (raw PCM + per-character timestamps),
+// so the voice is a single continuous take. We then slice it per scene by the timestamps — that is
+// what makes the voice IDENTICAL across every scene (per-scene generation is why it drifts), and what
+// makes "what we hear" literally "what we get". Returns 16-bit/44.1kHz/mono PCM + char end times.
+export async function ttsPcm(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ pcm: Buffer; charEndTimes: number[] }> {
+  text = sayable(text);
+  const k = await key();
+  const expressive = opts.expressive ?? false;
+  const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
+  // Higher stability + similarity = more consistent, faithful delivery (avoid Creative). This is the
+  // owner's "voice doesn't stay consistent" lever, on the WYSIWYG stable model.
+  const voice_settings = expressive
+    ? { stability: 0.5, similarity_boost: 0.85, style: 0.4, use_speaker_boost: true }
+    : { stability: 0.7, similarity_boost: 0.85 };
+  const res = await fetch(`${BASE}/text-to-speech/${voiceId}/with-timestamps?output_format=pcm_44100`, {
+    method: "POST",
+    headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ text, model_id: modelId, voice_settings }),
+  });
+  if (!res.ok) throw new Error(`ttsPcm failed (${res.status} ${modelId})`);
+  const data = (await res.json()) as { audio_base64?: string; alignment?: { character_end_times_seconds?: number[] } };
+  if (!data.audio_base64) throw new Error("ttsPcm: no audio");
+  return { pcm: Buffer.from(data.audio_base64, "base64"), charEndTimes: data.alignment?.character_end_times_seconds ?? [] };
+}
+
+// Slice a span out of a 16-bit/44.1kHz/mono PCM buffer and wrap it as a playable WAV (HeyGen + Shotstack
+// both accept WAV). No ffmpeg needed — PCM is one sample per 2 bytes, so a time slice is a byte slice.
+export function pcmSliceToWav(pcm: Buffer, startSec: number, endSec: number): Buffer {
+  const SR = 44100, CH = 1, BPS = 2;
+  const startByte = Math.min(pcm.length, Math.max(0, Math.floor(startSec * SR) * BPS));
+  const endByte = Math.min(pcm.length, Math.max(startByte, Math.floor(endSec * SR) * BPS));
+  const data = pcm.subarray(startByte, endByte);
+  const h = Buffer.alloc(44);
+  h.write("RIFF", 0); h.writeUInt32LE(36 + data.length, 4); h.write("WAVE", 8);
+  h.write("fmt ", 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(CH, 22);
+  h.writeUInt32LE(SR, 24); h.writeUInt32LE(SR * CH * BPS, 28); h.writeUInt16LE(CH * BPS, 32); h.writeUInt16LE(16, 34);
+  h.write("data", 36); h.writeUInt32LE(data.length, 40);
+  return Buffer.concat([h, data]);
+}
+
 // Short preview line so the producer can hear a voice before locking it.
 export async function previewVoice(voiceId: string, line = "Hi, this is how I will sound in your videos."): Promise<Buffer> {
   return tts(voiceId, line);

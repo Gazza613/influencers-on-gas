@@ -6,7 +6,7 @@ import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { submitDopVideo, pollDopOnce, dopConfigured } from "@/lib/vendors/higgsfield-dop";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
-import { tts, ttsWithDuration, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
+import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity } from "@/lib/vendors/anthropic";
@@ -1018,6 +1018,42 @@ export const generateClips = inngest.createFunction(
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: keepExisting ? existingClips : [] } } }));
 
+    // VOICE-ONCE: synthesize the WHOLE script as one continuous take, slice per scene by the timestamps
+    // → identical voice across every scene + WYSIWYG. Returns the slices FROM the step (Inngest replays
+    // cached step results, so in-memory maps don't survive — we rebuild the map outside). Best-effort:
+    // any failure leaves the map empty and each scene falls back to per-scene TTS. Disable VOICE_ONCE=0.
+    const sceneAudio = new Map<number, { url: string; duration: number | null }>();
+    if (voiceId && process.env.VOICE_ONCE !== "0") {
+      const slices = await step.run("voice-once", async () => {
+        const parts: { i: number; start: number; end: number }[] = [];
+        let full = "";
+        for (let s = 0; s < scenes.length; s++) {
+          const ln = String((scenes[s] as Record<string, string>).vo_line || "").trim();
+          if (!ln) continue;
+          const start = full.length ? full.length + 1 : 0; // +1 for the joining space
+          full += (full.length ? " " : "") + ln;
+          parts.push({ i: s, start, end: full.length });
+        }
+        if (!full.trim() || !parts.length) return [];
+        let pcm: Buffer; let charEndTimes: number[];
+        try { ({ pcm, charEndTimes } = await ttsPcm(voiceId as string, full, { expressive: process.env.AROLL_EXPRESSIVE === "1" })); }
+        catch { return []; }
+        if (!charEndTimes.length) return [];
+        const timeAt = (c: number) => charEndTimes[Math.min(charEndTimes.length - 1, Math.max(0, c))] || 0;
+        const out: { i: number; url: string; duration: number }[] = [];
+        for (const p of parts) {
+          const startSec = p.start > 0 ? timeAt(p.start - 1) : 0;
+          const endSec = timeAt(p.end - 1);
+          if (!(endSec > startSec)) continue;
+          const url = await putBytes(pcmSliceToWav(pcm, startSec, endSec), "scene-vo", "wav", "audio/wav").catch(() => null);
+          if (url) out.push({ i: p.i, url, duration: endSec - startSec });
+        }
+        if (out.length) await recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
+        return out;
+      });
+      for (const e of slices || []) sceneAudio.set(e.i, { url: e.url, duration: e.duration });
+    }
+
     // Render ONE scene to a clip. CRITICAL: the render poll is split into many SHORT steps with
     // step.sleep between them, so no single step ever blocks for minutes (which was timing out the
     // serverless function and looping forever). Each poll step is a quick status check.
@@ -1044,8 +1080,10 @@ export const generateClips = inngest.createFunction(
       // the film never goes silent. Computed ONCE here for both paths.
       let audioUrl: string | null = null;
       let audioDur: number | null = null; // EXACT spoken length — drives the a-roll scene slot (no more timecode-estimate pause/overlap)
-      if (role !== "graphic" && (presetAudio || (line && voiceId))) {
+      const preSlice = sceneAudio.get(i); // voice-once slice (one continuous take) for this scene, if available
+      if (role !== "graphic" && (presetAudio || preSlice || (line && voiceId))) {
         if (presetAudio) { audioUrl = presetAudio; }
+        else if (preSlice) { audioUrl = preSlice.url; audioDur = preSlice.duration; } // consistent voice-once slice
         else {
           // Moderate the line BEFORE any ElevenLabs TTS call (skip if it trips the safety classifier).
           // Use the WITH-TIMESTAMPS endpoint to also get the exact audio duration. WYSIWYG: same stable
@@ -1067,7 +1105,7 @@ export const generateClips = inngest.createFunction(
           });
           if (r) { audioUrl = r.url; audioDur = r.duration; }
         }
-        if (audioUrl && !presetAudio) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
+        if (audioUrl && !presetAudio && !preSlice) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
       }
 
       // A-ROLL ONLY = she speaks DIRECT TO CAMERA, lip-synced (OmniHuman drives her lips from our VO).
