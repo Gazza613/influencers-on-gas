@@ -2,11 +2,26 @@
 
 import { useState } from "react";
 import type { ShowcaseVideo } from "@/lib/showcase";
+import Uploader from "@/components/Uploader";
 
 export default function ShowcaseManager({ token, initial }: { token: string; initial: ShowcaseVideo[] }) {
   const [videos, setVideos] = useState<ShowcaseVideo[]>(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [upTitle, setUpTitle] = useState("");
+  const [upBusy, setUpBusy] = useState(false);
+
+  // Add a manually-uploaded external reel (brag work not produced on the platform). It goes straight
+  // onto the wall, tagged "Uploaded".
+  async function addExternal(url: string) {
+    setUpBusy(true);
+    const r = await fetch("/api/showcase/upload", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, title: upTitle.trim() }),
+    }).then((x) => x.json()).catch(() => null);
+    setUpBusy(false);
+    if (r?.video) { setVideos((vs) => [r.video, ...vs]); setUpTitle(""); }
+  }
 
   const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/s/${token}` : `/s/${token}`;
   const onReel = videos.filter((v) => v.showcased);
@@ -58,6 +73,18 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
         <p className="mt-2 text-[11px] text-ink-faint">Anyone with this link can view the showcase. Only videos you flag in are shown.</p>
       </div>
 
+      {/* Upload an external brag reel (made elsewhere) straight onto the wall */}
+      <div className="rounded-xl border border-line bg-surface-1 p-4">
+        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Upload a showreel</div>
+        <p className="mt-1 text-[12px] text-ink-dim">Add your best work made elsewhere — it goes onto the wall alongside platform cuts, tagged <span className="rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#60a5fa]">Uploaded</span>.</p>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <label className="flex-1 min-w-[200px] text-[11px] text-ink-faint">Title / brand
+            <input value={upTitle} onChange={(e) => setUpTitle(e.target.value)} placeholder="e.g. MTN MoMo — Launch reel" className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#a855f7]" />
+          </label>
+          <div className={upBusy ? "pointer-events-none opacity-60" : ""}><Uploader kind="showreel" accept="video" label={upBusy ? "Adding…" : "Choose video"} onUploaded={addExternal} /></div>
+        </div>
+      </div>
+
       {videos.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface-1 p-8 text-center">
           <div className="text-3xl">🎬</div>
@@ -97,7 +124,10 @@ function Card({ v, busy, onToggle, onRemove, reel = false }: { v: ShowcaseVideo;
         ? <video src={v.final_video_url} controls playsInline className="aspect-[9/16] max-h-[60vh] w-full bg-black object-contain" />
         : <div className="flex aspect-[9/16] w-full items-center justify-center bg-surface-2 text-xs text-ink-faint">No video</div>}
       <div className="flex items-center justify-between gap-2 p-3">
-        <span className="truncate text-sm font-semibold text-ink">{v.title || "Untitled production"}</span>
+        <span className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-ink">
+          {v.external && <span className="shrink-0 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#60a5fa]">Uploaded</span>}
+          <span className="truncate">{v.title || "Untitled production"}</span>
+        </span>
         <button
           onClick={() => (reel ? onRemove(v.id) : onToggle(v.id, true))}
           disabled={busy}

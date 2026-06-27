@@ -1,50 +1,72 @@
 import { notFound } from "next/navigation";
 import { isValidShowcaseToken, listShowcaseVideos } from "@/lib/showcase";
+import ShowcaseReel from "@/components/ShowcaseReel";
 
 export const dynamic = "force-dynamic";
 
-// Public, unauthenticated brag wall. The only gate is the unguessable token in the URL.
-// (Excluded from the auth proxy matcher so prospects can open it without a login.)
+// Public, unauthenticated brag wall — a SALES TOOL prospects open. The only gate is the unguessable
+// token in the URL. (Excluded from the auth proxy matcher so prospects can open it without a login.)
 export default async function PublicShowcase({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   if (!(await isValidShowcaseToken(token))) notFound();
   const videos = await listShowcaseVideos();
 
   return (
-    <div className="min-h-screen bg-surface-0 text-ink">
-      <header className="flex items-center gap-2 border-b border-line px-5 py-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/gas-logo.png" alt="GAS" className="h-6 w-6 rounded-full" />
-        <span className="font-extrabold tracking-tight">Influencers <span className="brand-grad">on</span> GAS</span>
-        <span className="ml-2 text-sm text-ink-faint">Showcase</span>
-      </header>
+    <div className="min-h-screen bg-[#08080c] text-white">
+      {/* Hero with an accent glow */}
+      <div className="relative overflow-hidden border-b border-white/5">
+        <div className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[880px] -translate-x-1/2 rounded-full bg-gradient-to-r from-[#ec4899]/25 via-[#a855f7]/25 to-[#60a5fa]/25 blur-[130px]" />
+        <header className="relative mx-auto flex max-w-6xl items-center gap-2.5 px-6 py-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/gas-logo.png" alt="GAS" className="h-7 w-7 rounded-full ring-1 ring-white/15" />
+          <span className="font-extrabold tracking-tight">Influencers <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">on</span> GAS</span>
+        </header>
+        <div className="relative mx-auto max-w-3xl px-6 pb-14 pt-8 text-center sm:pt-12">
+          <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">AI Influencer Studio</span>
+          <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
+            AI influencers,<br />
+            <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">brought to life.</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-base text-white/60 sm:text-lg">
+            Scroll-stopping, publish-ready video ads — fronted by consistent, fully-owned AI faces.
+            Concept to final cut, produced end-to-end by GAS.
+          </p>
+        </div>
+      </div>
 
-      <main className="mx-auto max-w-6xl px-5 py-10">
-        <h1 className="text-3xl font-extrabold tracking-tight">AI influencers, brought to life.</h1>
-        <p className="mt-2 max-w-2xl text-sm text-ink-dim">
-          A selection of finished videos produced on the GAS platform. Every face is a consistent, owned AI
-          identity, rendered and ready to publish.
-        </p>
-
+      <main className="mx-auto max-w-6xl px-6 py-12">
         {videos.length === 0 ? (
-          <div className="mt-10 rounded-xl border border-line bg-surface-1 p-10 text-center">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center">
             <div className="text-3xl">🎬</div>
-            <p className="mt-3 text-sm text-ink">Fresh work landing soon.</p>
-            <p className="mt-1 text-sm text-ink-faint">Check back shortly to see the latest productions.</p>
+            <p className="mt-3 text-sm text-white/80">Fresh work landing soon.</p>
+            <p className="mt-1 text-sm text-white/40">Check back shortly to see the latest productions.</p>
           </div>
         ) : (
-          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {videos.map((v) => (
-              <figure key={v.id} className="overflow-hidden rounded-xl border border-line bg-surface-1">
-                <video src={v.final_video_url ?? undefined} controls playsInline className="aspect-[9/16] max-h-[70vh] w-full bg-black object-contain" />
-                <figcaption className="truncate p-3 text-sm font-semibold text-ink">{v.title || "Untitled production"}</figcaption>
-              </figure>
-            ))}
-          </div>
+          <>
+            <div className="mb-6 flex items-baseline justify-between">
+              <h2 className="text-lg font-bold tracking-tight">Selected work</h2>
+              <span className="text-xs text-white/40">{videos.length} {videos.length === 1 ? "film" : "films"} · hover to play</span>
+            </div>
+            <ShowcaseReel videos={videos} />
+          </>
         )}
       </main>
 
-      <footer className="border-t border-line px-5 py-6 text-center text-xs text-ink-faint">
+      {/* CTA — this is a sales tool, so close with a clear next step */}
+      <section className="relative overflow-hidden border-t border-white/5">
+        <div className="pointer-events-none absolute -bottom-40 left-1/2 h-[360px] w-[700px] -translate-x-1/2 rounded-full bg-gradient-to-r from-[#a855f7]/20 to-[#60a5fa]/20 blur-[120px]" />
+        <div className="relative mx-auto max-w-3xl px-6 py-16 text-center">
+          <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Want this for your brand?</h3>
+          <p className="mx-auto mt-3 max-w-lg text-sm text-white/60">
+            We build you a bespoke AI influencer and turn briefs into finished, on-brand video ads — fast.
+          </p>
+          <a href="mailto:gary@gasmarketing.co.za?subject=AI%20influencer%20video%20enquiry" className="mt-6 inline-block rounded-xl bg-gradient-to-r from-[#a855f7] to-[#60a5fa] px-6 py-3 text-sm font-bold text-white shadow-[0_10px_40px_rgba(168,85,247,0.4)] transition hover:brightness-110">
+            Start a project →
+          </a>
+        </div>
+      </section>
+
+      <footer className="border-t border-white/5 px-5 py-6 text-center text-xs text-white/35">
         Produced with Influencers on GAS · GAS Marketing
       </footer>
     </div>

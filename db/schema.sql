@@ -321,6 +321,8 @@ on conflict (provider, model, unit) do nothing;
 -- Producers flag a complete production into the showcase; a single unguessable
 -- public token serves the wall to prospects without a login.
 alter table productions add column if not exists showcased boolean not null default false;
+-- Manually-uploaded external showreels (brag work not produced on the platform) are tagged external.
+alter table productions add column if not exists external boolean not null default false;
 
 create table if not exists app_settings (
   key        text primary key,
