@@ -47,7 +47,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!full.trim() || !parts.length) return NextResponse.json({ error: "No spoken lines in the storyboard." }, { status: 400 });
 
   try {
-    const { pcm, charEndTimes } = await ttsPcm(voiceId, full, { expressive: process.env.AROLL_EXPRESSIVE === "1" });
+    // v3 (Expressive) when the producer chose it — more realistic, dynamic delivery + audio-tag support.
+    const expressive = persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1";
+    const { pcm, charEndTimes } = await ttsPcm(voiceId, full, { expressive });
     if (!charEndTimes.length) throw new Error("no timestamps");
     const timeAt = (c: number) => charEndTimes[Math.min(charEndTimes.length - 1, Math.max(0, c))] || 0;
     const totalSec = pcm.length / (44100 * 2);

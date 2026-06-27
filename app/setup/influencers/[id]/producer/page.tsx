@@ -26,5 +26,5 @@ export default async function ProducerPage({ params }: { params: Promise<{ id: s
     .filter((c) => typeof c.url === "string" && c.url)
     .map((c) => ({ url: c.url as string, role: c.role === "b-roll" ? "b-roll" : "a-roll", ratio: String(c.ratio || ""), scene: String(c.scene || ""), resolution: String(c.resolution || "") }));
 
-  return <ProducerStudio influencerId={inf.id} name={inf.name} initialVoiceId={String(persona.voice_id || "")} initialVoiceName={String(persona.voice_name || "")} initialProduction={(persona.production as Record<string, unknown>) ?? null} creatives={creatives} arollRef={String(persona.aroll_ref_url || "")} brollRef={String(persona.broll_ref_url || "")} />;
+  return <ProducerStudio influencerId={inf.id} name={inf.name} initialVoiceId={String(persona.voice_id || "")} initialVoiceName={String(persona.voice_name || "")} initialProduction={(persona.production as Record<string, unknown>) ?? null} creatives={creatives} arollRef={String(persona.aroll_ref_url || "")} brollRef={String(persona.broll_ref_url || "")} voiceModel={persona.voice_model === "v3" ? "v3" : "v2"} />;
 }

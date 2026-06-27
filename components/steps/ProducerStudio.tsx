@@ -24,7 +24,7 @@ const ROLE = {
 } as const;
 
 type CreativeGuide = { url: string; role: string; ratio: string; scene: string; resolution: string };
-export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string }) {
+export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3" }) {
   const [production, setProduction] = useState<Production>(initialProduction);
   // Guide = a creative (made in the Creative section) the shoot anchors to (wardrobe/look/world). Persisted as aroll_ref_url/broll_ref_url.
   const [arollGuide, setArollGuide] = useState(arollRef);
@@ -40,6 +40,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // The full voiceover (one continuous take) the producer generates + listens to before animating.
   const [voiceoverUrl, setVoiceoverUrl] = useState<string>(String((initialProduction as { voiceover_url?: string })?.voiceover_url || ""));
   const [voBusy, setVoBusy] = useState(false);
+  // v2 (Stable, WYSIWYG) vs v3 (Expressive, more realistic) ElevenLabs model — persisted on the influencer.
+  const [voiceModel, setVoiceModelState] = useState<"v2" | "v3">(initialVoiceModel);
+  async function setVoiceModel(m: "v2" | "v3") {
+    setVoiceModelState(m); setVoiceoverUrl(""); // model changed → re-generate to hear the new delivery
+    await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: { voice_model: m } }) }).catch(() => {});
+  }
   async function genVoiceover() {
     if (voBusy) return;
     setVoBusy(true); setErr("");
@@ -699,6 +705,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
                         setVoiceoverUrl(""); // voice changed → the old full take no longer applies; re-generate
                       }} />
+                    {/* Voice model: v2 stable vs v3 expressive. */}
+                    {voiceId && (
+                      <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                        <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Voice model</div>
+                        <div className="flex gap-2">
+                          {([["v2", "Stable", "Rock-solid + consistent. What you hear is exactly what ships."], ["v3", "Expressive", "More realistic, dynamic delivery + audio tags. Best on Designed/Instant voices (not a PVC)."]] as const).map(([m, label, desc]) => (
+                            <button key={m} onClick={() => setVoiceModel(m)} className={`flex-1 rounded-lg border px-3 py-2 text-left text-xs ${voiceModel === m ? "border-[#a855f7] bg-[#a855f7]/10 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>
+                              <div className="font-bold">{label} <span className="text-ink-faint">({m})</span></div>
+                              <div className="mt-0.5 text-[10px] leading-tight text-ink-faint">{desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {/* THE FULL VOICEOVER: one continuous take the producer listens to before animating. */}
                     {voiceId && (
                       <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">

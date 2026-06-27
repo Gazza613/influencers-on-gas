@@ -572,11 +572,15 @@ UK spelling. No em dashes. Be specific and art-directed, never generic. Return t
 // producer can review/edit it BEFORE the scenes are built. Returns plain script text (the words spoken).
 export async function generateScript(brief: {
   influencerName: string; brand: string; goal: string; offer: string; benefits: string;
-  cta: string; ctaCode?: string; durationSeconds: number; tone: string; setting?: string; influencerProfile?: string;
+  cta: string; ctaCode?: string; durationSeconds: number; tone: string; setting?: string; influencerProfile?: string; expressive?: boolean;
 }): Promise<string> {
   const c = await client();
   const words = Math.round(brief.durationSeconds * 2.5);
-  const system = `You are an elite short-form ad scriptwriter. Write the SPOKEN VOICEOVER for a ${brief.durationSeconds}-second vertical social ad delivered by an AI-influencer presenter. ONE continuous, natural read in her voice: warm, confident, effortless, benefit-led, short active sentences, second person, no jargon. Open with a HOOK in the first ~5s that names the product, then the problem, the product as the answer, a quick proof/benefit, and a clear spoken CTA to close. About ${words} words (~2.5 words/second for ${brief.durationSeconds}s) — pace it to fill the time with no dead air. UK spelling, NO em dashes. NEVER name a real artist, band or song. Output ONLY the words she speaks — no scene labels, no stage directions, no quotation marks, no headings.`;
+  // v3 (Expressive) reads ElevenLabs audio tags; v2 (Stable) would speak them aloud, so only tag for v3.
+  const tagRule = brief.expressive
+    ? `This script is voiced on ElevenLabs Eleven v3, so add a FEW inline AUDIO TAGS for natural, expressive delivery — bracketed lowercase tags such as [warm], [excited], [curious], [reassuring], [laughs softly], [whispers], [pause], [emphasis]. Use at most 1-2 per sentence, matched to the meaning and a ${brief.tone} tone; do NOT over-tag. Keep every spoken word.`
+    : `Output ONLY the words she speaks — no audio tags, no scene labels, no stage directions, no quotation marks, no headings.`;
+  const system = `You are an elite short-form ad scriptwriter. Write the SPOKEN VOICEOVER for a ${brief.durationSeconds}-second vertical social ad delivered by an AI-influencer presenter. ONE continuous, natural read in her voice: warm, confident, effortless, benefit-led, short active sentences, second person, no jargon. Open with a HOOK in the first ~5s that names the product, then the problem, the product as the answer, a quick proof/benefit, and a clear spoken CTA to close. About ${words} words (~2.5 words/second for ${brief.durationSeconds}s) — pace it to fill the time with no dead air. UK spelling, NO em dashes. NEVER name a real artist, band or song. ${tagRule}`;
   const input = `Influencer: ${brief.influencerName}. ${brief.influencerProfile || ""}\nBrand / product: ${brief.brand}\nGoal: ${brief.goal}\nCore offer / hook: ${brief.offer}\nKey benefits: ${brief.benefits}\nCTA: ${brief.cta}${brief.ctaCode ? ` (code: ${brief.ctaCode})` : ""}\nTone: ${brief.tone}\nSetting: ${brief.setting || "(her natural world)"}\n\nWrite the ${brief.durationSeconds}-second voiceover script now.`;
   const res = await c.messages.create({ model: MODEL, max_tokens: 1200, system, messages: [{ role: "user", content: input }] });
   const b = res.content.find((x) => x.type === "text");

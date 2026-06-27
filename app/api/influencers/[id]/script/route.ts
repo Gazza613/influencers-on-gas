@@ -37,6 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       durationSeconds: [15, 30, 45, 60].includes(Number(b.durationSeconds)) ? Number(b.durationSeconds) : 60,
       tone: String(b.tone || "warm, confident, effortless").trim(),
       setting: String(b.setting || "").trim(),
+      expressive: persona.voice_model === "v3", // v3 → write with audio tags; v2 → clean words only
     });
     if (!script) return NextResponse.json({ error: "The writer returned an empty script. Try again." }, { status: 502 });
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "script", count: 1 }).catch(() => {});

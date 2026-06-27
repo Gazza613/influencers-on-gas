@@ -1042,7 +1042,7 @@ export const generateClips = inngest.createFunction(
         }
         if (!full.trim() || !parts.length) return [];
         let pcm: Buffer; let charEndTimes: number[];
-        try { ({ pcm, charEndTimes } = await ttsPcm(voiceId as string, full, { expressive: process.env.AROLL_EXPRESSIVE === "1" })); }
+        try { ({ pcm, charEndTimes } = await ttsPcm(voiceId as string, full, { expressive: (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1") })); }
         catch { return []; }
         if (!charEndTimes.length) return [];
         const timeAt = (c: number) => charEndTimes[Math.min(charEndTimes.length - 1, Math.max(0, c))] || 0;
@@ -1098,7 +1098,7 @@ export const generateClips = inngest.createFunction(
           const r = await step.run(`tts-${i}`, async () => {
             const mod = await moderateText(line);
             if (!mod.allowed) return null;
-            const exp = process.env.AROLL_EXPRESSIVE === "1";
+            const exp = (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1");
             try {
               const { buffer, durationSeconds } = await ttsWithDuration(voiceId as string, line, { expressive: exp });
               const url = await putBytes(buffer, "scene-vo", "mp3", "audio/mpeg");
@@ -1439,7 +1439,7 @@ export const assembleVideo = inngest.createFunction(
           const url = await step.run(`vo-${p.i}`, async () => {
             const mod = await moderateText(p.vo); // screen before any ElevenLabs TTS call
             if (!mod.allowed) return null;
-            return putBytes(await tts(voiceId, p.vo, { expressive: process.env.AROLL_EXPRESSIVE === "1" }), "vo", "mp3", "audio/mpeg");
+            return putBytes(await tts(voiceId, p.vo, { expressive: (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1") }), "vo", "mp3", "audio/mpeg");
           });
           if (url) {
             await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
@@ -1472,7 +1472,8 @@ export const assembleVideo = inngest.createFunction(
     // Rendered as an HTML asset (NOT the basic "title" asset, which mis-sized and rendered unreliably) —
     // this gives controlled font size, wrapping, and a legible rounded background pill, sized for 9:16.
     const captionsOn = event.data.captions === true;
-    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // Strip any v3 audio tags ([excited] etc.) so they never render on screen, then HTML-escape.
+    const esc = (s: string) => s.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const capW = ratio === "1:1" ? 920 : 940; // box width within the 1080 frame (leaves side margins)
     const captionClips = captionsOn ? placed.filter((p) => p.caption).map((p) => ({
       asset: {

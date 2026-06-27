@@ -88,6 +88,8 @@ function sayable(t: string): string { return SAYABLE.reduce((s, [re, rep]) => s.
 
 export async function tts(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<Buffer> {
   text = sayable(text);
+  // v2 (Stable) would SPEAK bracketed audio tags aloud; strip them. v3 (Expressive) reads them as direction.
+  if (!opts.expressive) text = text.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim();
   const k = await key();
   const expressive = opts.expressive ?? false;
   const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
@@ -113,6 +115,8 @@ export async function tts(voiceId: string, text: string, opts: { expressive?: bo
 // overlapping into the next scene. Returns the same voice/model audio + the measured duration.
 export async function ttsWithDuration(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ buffer: Buffer; durationSeconds: number | null }> {
   text = sayable(text);
+  // v2 (Stable) would SPEAK bracketed audio tags aloud; strip them. v3 (Expressive) reads them as direction.
+  if (!opts.expressive) text = text.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim();
   const k = await key();
   const expressive = opts.expressive ?? false;
   const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
@@ -139,6 +143,8 @@ export async function ttsWithDuration(voiceId: string, text: string, opts: { exp
 // makes "what we hear" literally "what we get". Returns 16-bit/44.1kHz/mono PCM + char end times.
 export async function ttsPcm(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ pcm: Buffer; charEndTimes: number[] }> {
   text = sayable(text);
+  // v2 (Stable) would SPEAK bracketed audio tags aloud; strip them. v3 (Expressive) reads them as direction.
+  if (!opts.expressive) text = text.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim();
   const k = await key();
   const expressive = opts.expressive ?? false;
   const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
