@@ -1033,12 +1033,14 @@ export const generateClips = inngest.createFunction(
     // separate gated steps). When filtering, KEEP the clips already rendered for the other role.
     const roleFilter: string[] | null = Array.isArray(event.data.roles) && event.data.roles.length ? (event.data.roles as unknown[]).map(String) : null;
     const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
-    const keepExisting = !!(roleFilter || sceneFilter); // filtered render → keep the other clips
     const existingClips = Array.isArray(production?.clips) ? (production!.clips as ClipRow[]) : [];
     // INCREMENTAL by default: a whole-board "animate" only renders scenes that DON'T already have a good
     // clip (so a partial 6/8 run finishes the last 2 instead of re-rendering all 8 - that was pointless +
     // costly). force=true re-animates everything; an explicit scene filter always re-renders those scenes.
     const force = event.data.force === true;
+    // reanimate = an EXPLICIT per-scene redo (the card's ↻ Re-animate). Only force or reanimate may
+    // re-render a scene that already has a good clip; a bulk/role animate NEVER re-renders a good clip.
+    const reanimate = event.data.reanimate === true;
     const hasGoodClip = (i: number) => existingClips.some((c) => Number(c.scene) === i && c.url && c.status !== "failed");
     // Rejected references: scenes the producer dropped from the galleries — never animate them.
     const dropped = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
@@ -1314,7 +1316,14 @@ export const generateClips = inngest.createFunction(
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
     // scene merge-saves its result as it lands so the UI fills in live; a final save is authoritative.
     // Only render the scenes in the role filter (all of them when no filter).
-    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)) && (sceneFilter || force ? true : !hasGoodClip(i)));
+    // FINAL COST GUARD: never re-render a scene that already has a good clip unless this is a forced full
+    // redo or an explicit per-scene re-animate - even if the caller's scene list mistakenly includes it.
+    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)) && (force || reanimate || !hasGoodClip(i)));
+    // SERIALIZE the reload-merge-save critical section: clips render in PARALLEL (expensive) but their
+    // saves run one-at-a-time through this lock. updateInfluencer overwrites the whole persona blob, so
+    // two parallel reload-merge-saves would clobber each other and silently drop a just-saved clip - that
+    // was the "I animated 8 but only 7 stuck" bug that forced costly re-animates.
+    let saveLock: Promise<unknown> = Promise.resolve();
     const renderAndSave = async ({ sc, i }: { sc: Record<string, string>; i: number }) => {
       // Contain a single scene's failure: if renderOne throws (a vendor error after retries), save a
       // "failed" clip instead of rejecting the whole batch — otherwise the final "done" step never
@@ -1322,11 +1331,14 @@ export const generateClips = inngest.createFunction(
       let row: ClipRow;
       try { row = await renderOne(i, sc); }
       catch (e) { row = { scene: i, role: String(sc.role || "a-roll"), beat: String(sc.beat || ""), kind: String(sc.role || "a-roll"), url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 160) }; }
-      const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
-      const prod = (fresh.production ?? production) as Record<string, unknown>;
-      const list = Array.isArray(prod.clips) ? [...(prod.clips as ClipRow[])] : [];
-      const at = list.findIndex((c) => c.scene === i); if (at >= 0) list[at] = row; else list.push(row);
-      await step.run(`csave-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips: list } } }));
+      saveLock = saveLock.then(async () => {
+        const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
+        const prod = (fresh.production ?? production) as Record<string, unknown>;
+        const list = Array.isArray(prod.clips) ? [...(prod.clips as ClipRow[])] : [];
+        const at = list.findIndex((c) => c.scene === i); if (at >= 0) list[at] = row; else list.push(row);
+        await step.run(`csave-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips: list } } }));
+      });
+      await saveLock;
       return row;
     };
     // Render scenes in PARALLEL so clips queue at their vendor simultaneously (wall-clock ≈ slowest clip,

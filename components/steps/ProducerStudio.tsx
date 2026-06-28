@@ -6,6 +6,7 @@ import Lightbox from "@/components/Lightbox";
 import Celebration from "@/components/Celebration";
 import VoicePicker from "@/components/VoicePicker";
 import VoiceoverUpload from "@/components/VoiceoverUpload";
+import { flex } from "@/lib/flex";
 
 type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
@@ -385,7 +386,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (rendering) return;
     setErr(""); setRenderingRole(sb?.scenes?.[i]?.role === "b-roll" ? "b-roll" : "a-roll");
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i] }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], reanimate: true }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't animate that scene."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
     await poll(setProduction, "clips_status"); setRenderingRole("");
   }
@@ -410,6 +411,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(force ? { force: true } : {}) }).then((x) => x.json()).catch(() => null);
     if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; } // every scene already has a clip
     if (!r?.queued) { setErr(r?.error || "Couldn't start animating."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
+    // Ground truth: show exactly how many scenes the server decided to render (not perceived spinners).
+    if (typeof r.animating === "number") flex(`🎞️ Animating ${r.animating} scene${r.animating === 1 ? "" : "s"}${force ? " (full redo)" : ""}`, { milestone: true });
     await poll(setProduction, "clips_status"); setRenderingRole("");
   }
 
