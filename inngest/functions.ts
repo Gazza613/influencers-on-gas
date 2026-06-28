@@ -1505,14 +1505,24 @@ export const assembleVideo = inngest.createFunction(
     // OmniHuman/VO length, b-roll = the duration we rendered) means every clip plays fully then cuts —
     // no freeze, no gap. Falls back to the timecode (then 5s) when a clip duration is unknown.
     const clipDur = (i: number) => { const c = clips.find((x) => x.scene === i); return typeof c?.duration === "number" && c.duration > 0 ? c.duration : null; };
+    // b-roll is a SILENT clip with the voiceover laid over it, and the video engine (DoP) typically HOLDS
+    // (freezes) its final frame — playing the full requested length runs into that freeze = the "pause"
+    // before the next scene. So for b-roll, lay the scene to its NARRATION length (the approved VO slice):
+    // the continuous voiceover stays seamless AND we cut just before the frozen tail. a-roll already plays
+    // to its exact synced length, so it's untouched.
+    const sceneAudioDur = new Map<number, number>();
+    (Array.isArray((production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; duration?: number }[] }).scene_audio : []).forEach((e) => { if (typeof e?.duration === "number" && e.duration > 0) sceneAudioDur.set(Number(e.scene), e.duration); });
     let cursor = 0;
     const placed = kept.map(({ sc, i }) => {
+      const role = String(sc.role || "a-roll");
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const tcLen = a != null && b != null && b > a ? b - a : 5;
-      const len = clipDur(i) ?? tcLen;
+      let len = clipDur(i) ?? tcLen;
+      // b-roll → narration length (cuts the engine's frozen tail; keeps the VO continuous).
+      if (role === "b-roll" && sceneAudioDur.has(i)) len = sceneAudioDur.get(i)!;
       const start = cursor;
       cursor = start + len;
-      return { i, start, len, role: String(sc.role || "a-roll"), vo: String(sc.vo_line || "").trim(), caption: String(sc.caption || "").trim() };
+      return { i, start, len, role, vo: String(sc.vo_line || "").trim(), caption: String(sc.caption || "").trim() };
     });
     // A breath after the last word so the cut doesn't end abruptly: hold the final clip ~1.2s longer
     // and extend the timeline (music fades out over it).
