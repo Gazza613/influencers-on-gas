@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { inngest } from "@/lib/inngest";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 
-// Stage 2 — build the consistent identity set (angles + close-ups) from a chosen look.
+// Stage 2 - build the consistent identity set (angles + close-ups) from a chosen look.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

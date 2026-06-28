@@ -7,7 +7,7 @@ import { isSafePublicUrl } from "@/lib/safe-url";
 
 // VOICE-FIRST scripting: the producer uploads a real voice recording; Scribe transcribes it and the
 // transcript BECOMES the script. The recording is remembered (production.my_vo_url) so the Voice step
-// can slice that exact audio per scene — your real voice, perfectly aligned (the script IS the transcript).
+// can slice that exact audio per scene - your real voice, perfectly aligned (the script IS the transcript).
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 

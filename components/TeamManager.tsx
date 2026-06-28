@@ -31,7 +31,7 @@ export default function TeamManager() {
     setBusy(false);
     if (!r.ok) { setMsg({ kind: "err", text: d?.error || "Could not send invite" }); return; }
     if (d.emailed) setMsg({ kind: "ok", text: `Invite emailed to ${email.trim()}.` });
-    else setMsg({ kind: "ok", text: `User added. Email not configured — share this link: ${d.link}` });
+    else setMsg({ kind: "ok", text: `User added. Email not configured - share this link: ${d.link}` });
     setEmail(""); setName(""); load();
   }
 

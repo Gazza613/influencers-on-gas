@@ -4,7 +4,7 @@ import ShowcaseReel from "@/components/ShowcaseReel";
 
 export const dynamic = "force-dynamic";
 
-// Public, unauthenticated brag wall — a SALES TOOL prospects open. The only gate is the unguessable
+// Public, unauthenticated brag wall - a SALES TOOL prospects open. The only gate is the unguessable
 // token in the URL. (Excluded from the auth proxy matcher so prospects can open it without a login.)
 export default async function PublicShowcase({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -64,7 +64,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
         )}
       </main>
 
-      {/* CTA — this is a sales tool, so close with a clear next step */}
+      {/* CTA - this is a sales tool, so close with a clear next step */}
       <section className="relative overflow-hidden border-t border-white/10">
         <div className="relative mx-auto max-w-3xl px-6 py-16 text-center">
           <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Influence that converts.</h3>

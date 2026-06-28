@@ -1,7 +1,7 @@
 import { Redis } from "@upstash/redis";
 
 // Centralized Higgsfield OAuth token manager (ported from the proven Vite app).
-// The team never authenticates Higgsfield — the owner authorized once (HF_REFRESH_TOKEN
+// The team never authenticates Higgsfield - the owner authorized once (HF_REFRESH_TOKEN
 // / HF_CLIENT_ID seed) and the live, ROTATING tokens are kept in KV (Upstash). Access
 // tokens last ~24h; refresh tokens rotate, so KV is the source of truth.
 const HF_BASE = "https://mcp.higgsfield.ai";

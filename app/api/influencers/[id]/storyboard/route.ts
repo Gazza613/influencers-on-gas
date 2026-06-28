@@ -11,7 +11,7 @@ const safeUrl = (v: unknown): string => (typeof v === "string" && isSafePublicUr
 // THE PRODUCER step 1: turn a brief into a directed 6-beat storyboard (house style), stored on
 // the influencer as the current production. The UI reviews/edits it, then drives shot + clip gen.
 export const maxDuration = 120;
-export const dynamic = "force-dynamic"; // never cache — the UI polls this live for shot/clip progress
+export const dynamic = "force-dynamic"; // never cache - the UI polls this live for shot/clip progress
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!persona.locked) return NextResponse.json({ error: "Lock the influencer's identity first." }, { status: 400 });
 
   const b = await req.json().catch(() => ({}));
-  // Influencer profile from the locked bible — so the director casts an age/demographic-suited world,
+  // Influencer profile from the locked bible - so the director casts an age/demographic-suited world,
   // wardrobe and background extras (even when the producer doesn't stipulate a setting).
   const bibleId = ((persona.bible as { identity?: Record<string, string> })?.identity) ?? {};
   // The FULL character bible (identity + performance + psychology + signature wardrobe/palette + tone)
@@ -59,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     script: String(b.script || "").trim().slice(0, 6000), // approved script-first read: built into the scenes verbatim
     // Optional uploads: a clothing ref + a location ref steer the SHOOT; a transparent PNG logo +
     // its corner are burned onto the final cut at assembly.
-    // All URLs are SSRF-guarded (isSafePublicUrl) — they get fetched by Higgsfield/Shotstack, so an
+    // All URLs are SSRF-guarded (isSafePublicUrl) - they get fetched by Higgsfield/Shotstack, so an
     // internal/metadata URL must never slip through.
     clothingRef: safeUrl(b.clothingRef),
     locationRef: safeUrl(b.locationRef),

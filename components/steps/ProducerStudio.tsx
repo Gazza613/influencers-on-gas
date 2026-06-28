@@ -41,7 +41,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // The full voiceover (one continuous take) the producer generates + listens to before animating.
   const [voiceoverUrl, setVoiceoverUrl] = useState<string>(String((initialProduction as { voiceover_url?: string })?.voiceover_url || ""));
   const [voBusy, setVoBusy] = useState(false);
-  // v2 (Stable, WYSIWYG) vs v3 (Expressive, more realistic) ElevenLabs model — persisted on the influencer.
+  // v2 (Stable, WYSIWYG) vs v3 (Expressive, more realistic) ElevenLabs model - persisted on the influencer.
   const [voiceModel, setVoiceModelState] = useState<"v2" | "v3">(initialVoiceModel);
   async function setVoiceModel(m: "v2" | "v3") {
     setVoiceModelState(m); setVoiceoverUrl(""); // model changed → re-generate to hear the new delivery
@@ -52,7 +52,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setVoBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/voiceover`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     setVoBusy(false);
-    if (r?.voiceover_url) { setVoiceoverUrl(`${r.voiceover_url}?t=${Date.now()}`); accept("voice"); } // cache-bust + auto-approve voice (generating the full take IS the confirm — no separate Accept needed)
+    if (r?.voiceover_url) { setVoiceoverUrl(`${r.voiceover_url}?t=${Date.now()}`); accept("voice"); } // cache-bust + auto-approve voice (generating the full take IS the confirm - no separate Accept needed)
     else setErr(r?.error || "Could not generate the voiceover.");
   }
   const [editing, setEditing] = useState(!initialProduction?.storyboard);
@@ -86,7 +86,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const sb = production?.storyboard;
   const shots = production?.shots ?? [];
   const shooting = production?.shots_status === "running";
-  // WHICH role is being shot — so only that gallery shows the shooting state (a-roll and b-roll are
+  // WHICH role is being shot - so only that gallery shows the shooting state (a-roll and b-roll are
   // shot step by step, never both at once).
   const [shootingRole, setShootingRole] = useState<"a-roll" | "b-roll" | "">("");
   const shotFor = (i: number) => shots.find((s) => s.scene === i);
@@ -99,7 +99,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const assembling = production?.assembly_status === "running";
   const finalUrl = production?.final_url || null;
 
-  // Dropped (rejected) reference scenes — declared BEFORE the wizard derivations below, which filter
+  // Dropped (rejected) reference scenes - declared BEFORE the wizard derivations below, which filter
   // on it (a const used before its declaration is a temporal-dead-zone crash at render).
   const [dropped, setDropped] = useState<Set<number>>(() => new Set((initialProduction?.dropped_scenes as number[] | undefined) ?? []));
 
@@ -115,7 +115,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const aRollKept = aRollIdx.filter((x) => !dropped.has(x.i));
   const bRollKept = bRollIdx.filter((x) => !dropped.has(x.i));
   // Refs ready once EVERY kept scene of that role has a shot frame (or there's nothing to curate) and
-  // nothing's shooting. EVERY (not some) so you can't advance to Animate with a missing keyframe —
+  // nothing's shooting. EVERY (not some) so you can't advance to Animate with a missing keyframe -
   // that was the "Clip failed: no shot frame" trap. Re-shoot or reject the offending scene to proceed.
   const aRollRefsReady = !!sb && (aRollNone || aRollKept.length === 0 || (aRollKept.every((x) => shotFor(x.i)?.url) && !shooting));
   const bRollRefsReady = !!sb && (bRollNone || bRollKept.length === 0 || (bRollKept.every((x) => shotFor(x.i)?.url) && !shooting));
@@ -154,7 +154,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [brollRatio, setBrollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [boardRatio, setBoardRatio] = useState<"9:16" | "1:1" | "16:9">("9:16"); // one ratio for the whole scene board
-  // Captions are opt-in at stitch (default OFF — they were appearing unrequested). The optional closing
+  // Captions are opt-in at stitch (default OFF - they were appearing unrequested). The optional closing
   // clip/image reuses the brief's endCardUrl/endCardKind state so there's one source of truth.
   const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
   async function toggleDrop(scene: number) {
@@ -172,7 +172,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   function stepState(k: typeof ORDER[number]): "locked" | "active" | "done" {
     if (approved.has(k)) return "done";
     const idx = ORDER.indexOf(k);
-    // STRICTLY LINEAR flow: each step opens only once the one before it (in ORDER) is approved —
+    // STRICTLY LINEAR flow: each step opens only once the one before it (in ORDER) is approved -
     // Concept → Voice → A-roll refs → B-roll refs → Animate A → Animate B → Music → Stitch → Showreel.
     // Predictable: you can't skip B-roll refs into Animate, and nothing un-approved jumps the queue.
     const priorOk = idx === 0 || approved.has(ORDER[idx - 1]);
@@ -201,7 +201,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
   const activePolls = useRef<Set<string>>(new Set());
   async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status" | "audio_status") {
-    if (activePolls.current.has(statusKey)) return; // already polling this — don't double up
+    if (activePolls.current.has(statusKey)) return; // already polling this - don't double up
     activePolls.current.add(statusKey);
     try {
       // ~25 min: must comfortably OUTLAST the backend render window (~16 min) so the UI catches completion.
@@ -213,7 +213,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     } finally { activePolls.current.delete(statusKey); }
   }
 
-  // Resume polling whenever the page mounts OR the tab becomes visible again — the render runs
+  // Resume polling whenever the page mounts OR the tab becomes visible again - the render runs
   // server-side regardless, but background tabs throttle/stop the poll, so re-sync on return.
   useEffect(() => {
     const resume = (p: Production) => {
@@ -239,13 +239,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(""); setShootingRole(role);
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).filter((s) => s.role !== role), shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
     // Re-shooting THIS role's refs invalidates only its own approval + everything downstream
-    // (animate/audio/stitch/showreel). Keep Concept, Voice AND the OTHER role's refs intact — and
+    // (animate/audio/stitch/showreel). Keep Concept, Voice AND the OTHER role's refs intact - and
     // persist, so a refresh restores the same place. (Fixes "shooting b-roll asks to re-approve voice".)
     const drop = new Set([role === "a-roll" ? "arollRefs" : "brollRefs", "aroll", "broll", "audio", "stitch", "showreel"]);
     setApproved((s) => { const n = new Set([...s].filter((k) => !drop.has(k))); persistApproved(n); return n; });
     setDenied(new Set());
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roleFilter: role, aspectRatio: ratio }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot — give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); setShootingRole(""); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot - give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); setShootingRole(""); return; }
     await poll(setProduction, "shots_status");
     setShootingRole("");
   }
@@ -257,7 +257,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(""); setRenderingRole(role);
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: [role] }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the render — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the render - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
     await poll(setProduction, "clips_status");
     setRenderingRole("");
   }
@@ -277,7 +277,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     setProduction((p) => (p ? { ...p, audio_status: "running", music_url: null, ambient_url: null } : p));
     const r = await fetch(`/api/influencers/${influencerId}/audio`, { method: "POST" }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the audio — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, audio_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the audio - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, audio_status: "idle" } : p)); return; }
     await poll(setProduction, "audio_status");
   }
 
@@ -286,7 +286,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch — try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
   }
 
@@ -345,14 +345,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
       if (d?.production) { setProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
     }
-    // 2) the re-shoot auto-renders this scene's clip too — wait for it and drop it into the preview
+    // 2) the re-shoot auto-renders this scene's clip too - wait for it and drop it into the preview
     setRenderingRole(role);
     await poll(setProduction, "clips_status");
     setRenderingRole("");
   }
 
   // SCENE-BY-SCENE: build ONE scene (shoot its keyframe AND animate its clip) using its STORED direction
-  // (no edit form) — the reshoot job renders the keyframe then the clip.
+  // (no edit form) - the reshoot job renders the keyframe then the clip.
   async function buildScene(i: number) {
     if (shooting) return;
     setErr("");
@@ -475,7 +475,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
         <div className="space-y-4 rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex items-center justify-between">
             <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">The brief</div>
-            <span className="text-[10px] text-ink-faint"><span className="text-alert">*</span> required — the rest is optional</span>
+            <span className="text-[10px] text-ink-faint"><span className="text-alert">*</span> required - the rest is optional</span>
           </div>
 
           {/* ── Core (required) ── */}
@@ -531,8 +531,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <Uploader kind="location" label="Scene / location reference" current={locationRef} onUploaded={setLocationRef} />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Uploader kind="logo" label="Brand logo — top-left (transparent PNG)" current={logoUrl} onUploaded={setLogoUrl} />
-                <Uploader kind="promo" label="Promo image — top-right" current={promoUrl} onUploaded={setPromoUrl} />
+                <Uploader kind="logo" label="Brand logo - top-left (transparent PNG)" current={logoUrl} onUploaded={setLogoUrl} />
+                <Uploader kind="promo" label="Promo image - top-right" current={promoUrl} onUploaded={setPromoUrl} />
               </div>
               <p className="-mt-1 text-[10px] text-ink-faint">Logo + promo are placed and sized for you in the top corners, over the whole video. A logo only shows if you upload one.</p>
               <Field label="Brand-name text (shown only if no logo is uploaded)" v={logo} set={setLogo} placeholder='"MoMo from MTN"' />
@@ -572,12 +572,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {/* SCRIPT-FIRST: the producer writes the spoken script from your concept; edit it, then build the scenes around it. */}
           <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
             <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Script</div>
-            <p className="mb-2 text-[12px] text-ink-dim">Have the producer write the {duration}s script from your concept, then edit it until it reads right — the scenes (a-roll + b-roll) get built around these exact words. (Optional: skip it and the storyboard will write its own.)</p>
+            <p className="mb-2 text-[12px] text-ink-dim">Have the producer write the {duration}s script from your concept, then edit it until it reads right - the scenes (a-roll + b-roll) get built around these exact words. (Optional: skip it and the storyboard will write its own.)</p>
             <button onClick={writeScript} disabled={scriptBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{scriptBusy ? "✍️ Working…" : draftScript ? "↻ Re-write the script" : "✍️ Write the script"}</button>
             {draftScript && <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={6} className="mt-2 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#a855f7]" placeholder="The spoken script…" />}
             {/* VOICE-FIRST: record naturally, we transcribe → that's the script, and your real voice is used in the video. */}
             <div className="mt-2 border-t border-line/60 pt-2">
-              <p className="mb-1.5 text-[11px] text-ink-faint">…or <b>upload a voice recording</b> and we&apos;ll script from it — your real voice is transcribed into the script, then used in the video (sliced per scene at the Voice step). Just speak naturally.</p>
+              <p className="mb-1.5 text-[11px] text-ink-faint">…or <b>upload a voice recording</b> and we&apos;ll script from it - your real voice is transcribed into the script, then used in the video (sliced per scene at the Voice step). Just speak naturally.</p>
               <Uploader kind="my-vo" accept="audio" label="🎙️ Upload a voice recording → script from it" onUploaded={scriptFromVoice} />
             </div>
           </div>
@@ -600,13 +600,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               </div>
             </div>
             {sb.music_bed && <p className="mt-2 text-[12px] text-ink-faint">🎵 {sb.music_bed}</p>}
-            {/* Plain-English glossary — define the two shot types once, up front */}
+            {/* Plain-English glossary - define the two shot types once, up front */}
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-              <span className="rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-1 text-[#c79bff]"><b>A-roll</b> = talking shots — {name} speaking to camera, lip-synced</span>
-              <span className="rounded-md border border-[#60a5fa]/30 bg-[#60a5fa]/10 px-2 py-1 text-[#93c5fd]"><b>B-roll</b> = scene shots — the world and movement around her, no talking</span>
+              <span className="rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-1 text-[#c79bff]"><b>A-roll</b> = talking shots - {name} speaking to camera, lip-synced</span>
+              <span className="rounded-md border border-[#60a5fa]/30 bg-[#60a5fa]/10 px-2 py-1 text-[#93c5fd]"><b>B-roll</b> = scene shots - the world and movement around her, no talking</span>
             </div>
             {dropped.size > 0 && (
-              <div className="mt-2 rounded-lg border border-active/30 bg-active/5 px-3 py-2 text-[11px] text-active">⚠ {dropped.size} reference{dropped.size === 1 ? "" : "s"} rejected — those scenes are left out of the final cut, so it&apos;ll be shorter. Re-flow the script in the Voice step so the voiceover still reads smoothly.</div>
+              <div className="mt-2 rounded-lg border border-active/30 bg-active/5 px-3 py-2 text-[11px] text-active">⚠ {dropped.size} reference{dropped.size === 1 ? "" : "s"} rejected - those scenes are left out of the final cut, so it&apos;ll be shorter. Re-flow the script in the Voice step so the voiceover still reads smoothly.</div>
             )}
           </div>
 
@@ -616,7 +616,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               const shot = shotFor(i);
               const clip = clipFor(i);
               // Has the wizard step for THIS scene's role been reached? A clip only reads as
-              // "failed" once you're on/past its step — before that a stale clip shows as pending.
+              // "failed" once you're on/past its step - before that a stale clip shows as pending.
               const stepReached = unlocked("scenes");
               const clipFailed = clip?.status === "failed" && stepReached;
               return (
@@ -644,7 +644,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <div className="relative">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={shot.url} alt={`scene ${i + 1}`} onClick={() => setZoom(shot.url!)} className="aspect-[9/16] w-full cursor-zoom-in rounded-lg border border-line object-cover transition hover:brightness-110" title="Click to preview full size" />
-                          {/* The keyframe is shot but its clip hasn't been rendered yet — that's a later step. */}
+                          {/* The keyframe is shot but its clip hasn't been rendered yet - that's a later step. */}
                           <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">⏳ {s.role} clip pending</span>
                         </div>
                       ) : (shooting && (shootingRole === "" || shootingRole === s.role)) ? (
@@ -664,7 +664,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           >{clip?.url ? "↻ Re-animate" : shot?.url ? "🎞️ Animate scene" : "🎬 Build scene"}</button>
                           <div className="flex gap-1">
                             <button onClick={() => openEdit(i, s)} className="flex-1 rounded-md border border-[#a855f7]/40 px-1.5 py-1 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
-                            <button onClick={() => toggleDrop(i)} title={dropped.has(i) ? "Rejected — tap to keep" : "Kept — tap to reject"} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold ${dropped.has(i) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-dim hover:text-ink"}`}>{dropped.has(i) ? "✗ Rejected" : "✓ Keep"}</button>
+                            <button onClick={() => toggleDrop(i)} title={dropped.has(i) ? "Rejected - tap to keep" : "Kept - tap to reject"} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold ${dropped.has(i) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-dim hover:text-ink"}`}>{dropped.has(i) ? "✗ Rejected" : "✓ Keep"}</button>
                           </div>
                         </div>
                       )}
@@ -673,7 +673,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="tabular text-xs font-bold text-ink">Scene {i + 1}</span>
-                    <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}–{s.end}</span>
+                    <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}-{s.end}</span>
                     <span className="text-[11px] font-semibold text-ink-dim">{s.beat}</span>
                     <span className={`tabular rounded border px-1.5 py-0.5 text-[9px] font-bold ${role.cls}`}>{role.label}</span>
                     {s.role !== "graphic" && <button onClick={() => openEdit(i, s)} className="ml-auto rounded-md border border-[#a855f7]/40 px-2 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">{editIdx === i ? "Close" : "✎ Edit scene"}</button>}
@@ -698,14 +698,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <div className="min-w-[150px] flex-1"><Field label="Ask the producer to rewrite (optional)" v={aiInstr} set={setAiInstr} placeholder="e.g. punchier, lead with the free data" /></div>
                           <button onClick={() => aiRewrite(i)} disabled={aiBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-2 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{aiBusy ? "✨ Writing…" : "✨ Rewrite with AI"}</button>
                         </div>
-                        <Uploader kind="vo" accept="audio" label="Upload my own VO (ElevenLabs file) — recommended" current={ed.voAudio || null} onUploaded={(u) => setEd((e) => ({ ...e, voAudio: u }))} />
+                        <Uploader kind="vo" accept="audio" label="Upload my own VO (ElevenLabs file) - recommended" current={ed.voAudio || null} onUploaded={(u) => setEd((e) => ({ ...e, voAudio: u }))} />
                         <p className="text-[10px] text-ink-faint">Optional. If you drop your own read here, I lip-sync the clip to it; otherwise I generate the voice in-platform.</p>
                       </div>
                       {/* Scene direction (the prompt) */}
                       <div className="space-y-2 border-t border-line pt-3">
-                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Scene direction — the full prompt (changing these needs a re-shoot)</div>
+                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Scene direction - the full prompt (changing these needs a re-shoot)</div>
                         <Field label="Location / world" v={ed.location} set={(x) => setEd((e) => ({ ...e, location: x }))} />
-                        <Uploader kind="phone" accept="image" label="Phone screen image (optional) — shown on the phone if she holds one" current={ed.phone || null} onUploaded={(u) => setEd((e) => ({ ...e, phone: u }))} />
+                        <Uploader kind="phone" accept="image" label="Phone screen image (optional) - shown on the phone if she holds one" current={ed.phone || null} onUploaded={(u) => setEd((e) => ({ ...e, phone: u }))} />
                         <Area label="Action / blocking" v={ed.blocking} set={(x) => setEd((e) => ({ ...e, blocking: x }))} />
                         <Field label="Shot / framing" v={ed.shot} set={(x) => setEd((e) => ({ ...e, shot: x }))} />
                         <Area label="Performance / expression" v={ed.performance} set={(x) => setEd((e) => ({ ...e, performance: x }))} />
@@ -715,7 +715,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <div>
                             <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
                             <button onClick={() => setEd((e) => ({ ...e, hero: e.hero === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.hero === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.hero === "true" ? "✨ Hero shot · Veo 4K ✓" : "✨ Make this a Hero shot (Veo 4K)"}</button>
-                            <p className="mt-1 text-[10px] text-ink-faint">Renders this b-roll in Veo 3.1 (4K, native ambient audio) — premium, slower + pricier. Needs a re-shoot.</p>
+                            <p className="mt-1 text-[10px] text-ink-faint">Renders this b-roll in Veo 3.1 (4K, native ambient audio) - premium, slower + pricier. Needs a re-shoot.</p>
                           </div>
                         )}
                       </div>
@@ -742,10 +742,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               onJump={(k) => document.getElementById(`step-${k}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
             {/* 1 · Brief & concept */}
-            <StepShell n={1} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} — talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt — location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem — tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
+            <StepShell n={1} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} - talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt - location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem - tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
 
             {/* 2 · Voice */}
-            <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in, then generate the full voiceover — every talking (a-roll) scene is lip-synced to it and the scenes are built to its real timing.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
+            <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in, then generate the full voiceover - every talking (a-roll) scene is lip-synced to it and the scenes are built to its real timing.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
               {unlocked("voice") ? (
                 !needsVoice ? (
                   <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
@@ -759,11 +759,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <VoicePicker influencerId={influencerId} name={name} voiceId={voiceId} voiceName={voiceName} voicePreview={voicePreview}
                       onSet={(v) => {
                         setVoiceId(v.voice_id); setVoiceName(v.voice_name); setVoicePreview(v.preview_url || "");
-                        // The server clears stale (old-voice) clips on a voice change — pull the fresh
+                        // The server clears stale (old-voice) clips on a voice change - pull the fresh
                         // production so the wizard shows the animate steps need re-rendering with the new voice.
                         fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
                         setVoiceoverUrl(""); // voice changed → the old full take no longer applies; re-generate
-                        accept("voice"); // choosing a voice IS the approval — never block the next step asking to "approve voice"
+                        accept("voice"); // choosing a voice IS the approval - never block the next step asking to "approve voice"
                       }} />
                     {/* Voice model: v2 stable vs v3 expressive. */}
                     {voiceId && (
@@ -783,15 +783,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     {voiceId && (
                       <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
                         <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Full voiceover</div>
-                        <p className="mb-2 text-[12px] text-ink-dim">Generate the ENTIRE script as one continuous take and listen to it — this exact audio is what ships, and every scene is sliced from it, so the voice stays identical throughout. Re-run until it sounds right.</p>
+                        <p className="mb-2 text-[12px] text-ink-dim">Generate the ENTIRE script as one continuous take and listen to it - this exact audio is what ships, and every scene is sliced from it, so the voice stays identical throughout. Re-run until it sounds right.</p>
                         <div className="flex flex-wrap items-center gap-2">
                           <button onClick={genVoiceover} disabled={voBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voBusy ? "🎙️ Generating the full voiceover…" : voiceoverUrl ? "↻ Re-run the voiceover" : "🎙️ Generate the full voiceover"}</button>
                           {voiceoverUrl && <audio src={voiceoverUrl} controls className="h-9" />}
                         </div>
-                        {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ This take is locked in — every a-roll scene lip-syncs to it; b-roll narrates over it. The voice is now identical across all scenes.</p>}
+                        {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ This take is locked in - every a-roll scene lip-syncs to it; b-roll narrates over it. The voice is now identical across all scenes.</p>}
                       </div>
                     )}
-                    {/* Use your OWN recorded voice instead — Scribe aligns + we slice it per scene. */}
+                    {/* Use your OWN recorded voice instead - Scribe aligns + we slice it per scene. */}
                     <VoiceoverUpload influencerId={influencerId} presetUrl={String((production as { my_vo_url?: string })?.my_vo_url || "")} onDone={() => {
                       fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); setVoiceoverUrl(`${d.production.voiceover_url || ""}${d.production.voiceover_url ? `?t=${Date.now()}` : ""}`); } }).catch(() => {});
                       accept("voice");
@@ -801,7 +801,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               ) : <LockHint />}
             </StepShell>
 
-            {/* 3 · Scenes — the scene-by-scene build board (per-scene controls live on the cards above) */}
+            {/* 3 · Scenes - the scene-by-scene build board (per-scene controls live on the cards above) */}
             <StepShell n={3} title="Build the scenes" desc={`Shoot each scene's keyframe and animate it. Work scene by scene on the cards above (🎬 build · 🎞️ animate · ✎ edit · ✓ keep / ✗ reject), or build the whole board at once here. Talking (a-roll) scenes lip-sync to the voice; scene (b-roll) shots get natural motion.`} state={stepState("scenes")} anchor="step-scenes" gate={renderGate("scenes", "Every kept scene needs a finished clip. Build any that are still missing (or reject a scene), then Accept.")}>
               {unlocked("scenes") ? (
                 <div className="space-y-3">
@@ -816,7 +816,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. Build or fix any individually with the buttons on the cards above.</p>
                   {/* Optional: steer the shoot with one of your own creatives as a reference look. */}
                   <details className="rounded-lg border border-line bg-surface-2/40 p-2">
-                    <summary className="cursor-pointer text-[11px] font-semibold text-ink-dim">Reference look (optional) — steer the shoot with one of your creatives</summary>
+                    <summary className="cursor-pointer text-[11px] font-semibold text-ink-dim">Reference look (optional) - steer the shoot with one of your creatives</summary>
                     <div className="mt-2 space-y-2">
                       <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
                       <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
@@ -837,17 +837,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       {production?.ambient_url && <div><div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Ambient tone</div><audio src={production.ambient_url} controls className="mt-1 h-8 w-full max-w-sm" /></div>}
                     </div>
                   ) : !audioBusy && (
-                    <p className="mt-2 text-[11px] text-ink-faint">Optional — generate to preview the beds, or just <b>Accept</b> to skip; the stitch will create the music + ambient for you automatically.</p>
+                    <p className="mt-2 text-[11px] text-ink-faint">Optional - generate to preview the beds, or just <b>Accept</b> to skip; the stitch will create the music + ambient for you automatically.</p>
                   )}
                 </>
               ) : <LockHint />}
             </StepShell>
 
             {/* 5 · Stitch */}
-            <StepShell n={5} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order with clean cuts, a continuous voiceover, the music + ambient mixed underneath${(production?.brief as { logoUrl?: string })?.logoUrl ? " and your uploaded logo" : ""} — one finished ${sb.format} ad. Captions are optional (off by default).`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
+            <StepShell n={5} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order with clean cuts, a continuous voiceover, the music + ambient mixed underneath${(production?.brief as { logoUrl?: string })?.logoUrl ? " and your uploaded logo" : ""} - one finished ${sb.format} ad. Captions are optional (off by default).`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
               {unlocked("stitch") ? (
                 <>
-                  {/* Optional closing clip / end card — the LAST spot to upload the tail of the video. */}
+                  {/* Optional closing clip / end card - the LAST spot to upload the tail of the video. */}
                   <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
                     <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Closing clip / end card (optional)</div>
                     {endCardUrl ? (
@@ -866,7 +866,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           ))}
                         </div>
                         <Uploader kind="endcard" accept={endCardKind} label="Upload your closing clip / image" current={null} onUploaded={setEndCardUrl} />
-                        <p className="text-[10px] text-ink-faint">Optional. Your brand close (logo sting, offer card, sign-off) — appended after the last scene.</p>
+                        <p className="text-[10px] text-ink-faint">Optional. Your brand close (logo sting, offer card, sign-off) - appended after the last scene.</p>
                       </div>
                     )}
                   </div>
@@ -913,10 +913,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 }
 
 // One wizard step: numbered badge (green tick when approved), title, description, body. The
-// `state` drives the chrome — active glows, done goes green, locked dims.
-// `state` drives the chrome — active glows, done goes green, locked dims. When done, the action
+// `state` drives the chrome - active glows, done goes green, locked dims.
+// `state` drives the chrome - active glows, done goes green, locked dims. When done, the action
 // body is hidden (only the green tick + the gate's "Approved · undo" remain). `gate` always shows.
-// Persistent progress spine — all 8 stages always visible with state; click to jump. The hero of
+// Persistent progress spine - all 8 stages always visible with state; click to jump. The hero of
 // the wizard: the journey IS the interface.
 function WizardSpine({ steps, onJump }: { steps: { key: string; label: string; n: number; state: "locked" | "active" | "done" }[]; onJump: (k: string) => void }) {
   const doneCount = steps.filter((s) => s.state === "done").length;
@@ -963,7 +963,7 @@ function LockHint() {
 // Aspect-ratio chooser for a reference shoot (output format of the final video).
 // Pick a creative (made in the Creative section, tagged this role) as the GUIDE the shoot anchors to:
 // the references will match its wardrobe, styling, lighting and world. Tap again to clear. Identity
-// always stays the locked face — the guide only steers look/world, never who she is.
+// always stays the locked face - the guide only steers look/world, never who she is.
 function GuidePicker({ role, creatives, selected, onPick, onZoom }: {
   role: "a-roll" | "b-roll"; creatives: { url: string; role: string; scene: string }[]; selected: string;
   onPick: (role: "a-roll" | "b-roll", url: string) => void; onZoom: (url: string) => void;
@@ -1017,7 +1017,7 @@ function RefGallery({ role, scenes, shots, dropped, shooting, onToggleDrop, onZo
   return (
     <div className="mt-3">
       <div className="tabular mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-ink-faint">
-        <span>{role === "a-roll" ? "Talking" : "Scene"} references — keep the ones you want</span>
+        <span>{role === "a-roll" ? "Talking" : "Scene"} references - keep the ones you want</span>
         <span className="rounded-full border border-ready/40 bg-ready/10 px-2 py-0.5 text-ready">{kept} kept</span>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -1037,7 +1037,7 @@ function RefGallery({ role, scenes, shots, dropped, shooting, onToggleDrop, onZo
               {shot?.url && <button onClick={() => onZoom(shot.url!)} title="Expand full size" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-xs text-white/90 hover:bg-black/85">👁</button>}
               {shot?.url && (
                 <button onClick={() => onToggleDrop(i)} className={`absolute inset-x-1 bottom-1 rounded-md px-2 py-1 text-[10px] font-bold transition ${isDropped ? "bg-alert/80 text-white hover:bg-alert" : "bg-ready/85 text-black hover:bg-ready"}`}>
-                  {isDropped ? "✕ Rejected — tap to keep" : "✓ Keep"}
+                  {isDropped ? "✕ Rejected - tap to keep" : "✓ Keep"}
                 </button>
               )}
             </div>
@@ -1048,13 +1048,13 @@ function RefGallery({ role, scenes, shots, dropped, shooting, onToggleDrop, onZo
     </div>
   );
 }
-// Playable previews for one role — one tile per scene IN ORDER, each either the rendered clip
+// Playable previews for one role - one tile per scene IN ORDER, each either the rendered clip
 // (play before approving) or a "not rendered yet" tile (e.g. after a re-shoot clears it).
 function ClipStrip({ clips, role, sceneIdx, onExpand }: { clips: Clip[]; role: "a-roll" | "b-roll"; sceneIdx: number[]; onExpand: (url: string) => void }) {
   if (!sceneIdx.length) return null;
   return (
     <div className="mt-3">
-      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Preview the {role} clips, in order — play, or tap 👁 to expand full size</div>
+      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Preview the {role} clips, in order - play, or tap 👁 to expand full size</div>
       <div className="flex flex-wrap gap-3">
         {sceneIdx.map((i) => {
           const c = clips.find((x) => x.scene === i && x.url);

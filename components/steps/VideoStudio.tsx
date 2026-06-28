@@ -196,7 +196,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           const fv = q ? lib.filter((v) => `${v.name} ${Object.values(v.labels || {}).join(" ")}`.toLowerCase().includes(q)) : lib;
           return (
             <div className="space-y-2">
-              <input value={voiceQuery} onChange={(e) => setVoiceQuery(e.target.value)} placeholder="Search voices — name, accent (e.g. South African), gender, age…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]" />
+              <input value={voiceQuery} onChange={(e) => setVoiceQuery(e.target.value)} placeholder="Search voices - name, accent (e.g. South African), gender, age…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]" />
               <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
                 {fv.length === 0 && <p className="px-1 py-2 text-[12px] text-ink-faint">{lib.length ? "No voices match that search." : "Loading your voices…"}</p>}
                 {fv.map((v) => {
@@ -293,7 +293,7 @@ export default function VideoStudio({ influencerId, name, mode, initial }: {
           {previewUrl && <audio src={previewUrl} controls className="h-9" />}
         </div>
 
-        {/* Source shot — we animate THIS exact frame, so scene + aspect come from it */}
+        {/* Source shot - we animate THIS exact frame, so scene + aspect come from it */}
         <div className="mt-4 border-t border-line pt-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Choose any shot to animate (1:1 or 9:16) {sourceUrl ? `· selected ${ratio}` : ""}</span>

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { inngest } from "@/lib/inngest";
 
-// THE PRODUCER step 3: "render the clips" — every board frame becomes a moving clip (a-roll
+// THE PRODUCER step 3: "render the clips" - every board frame becomes a moving clip (a-roll
 // talking via HeyGen, b-roll motion via Kling). Durable; the UI polls the storyboard GET.
 export const maxDuration = 30;
 

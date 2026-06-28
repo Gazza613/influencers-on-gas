@@ -52,7 +52,7 @@ export async function listConnections(): Promise<ConnectionStatus[]> {
         verified = false;
       }
     } else if (connected && envSet) {
-      verified = true; // env-backed keys are present/readable — shown as verified too
+      verified = true; // env-backed keys are present/readable - shown as verified too
     }
     return {
       id: p.id,
@@ -79,7 +79,7 @@ export async function verifyVendorKey(provider: ProviderId, secret: string): Pro
       const r = await fetch("https://api.elevenlabs.io/v1/user", { headers: { "xi-api-key": secret }, cache: "no-store" });
       return r.ok ? { ok: true } : { ok: false, detail: `ElevenLabs rejected the key (HTTP ${r.status}).` };
     }
-    return { ok: true }; // no verifier for this vendor — accept as before
+    return { ok: true }; // no verifier for this vendor - accept as before
   } catch (e) {
     return { ok: false, detail: `Could not reach ${provider} to verify the key: ${String((e as Error)?.message || e).slice(0, 120)}` };
   }

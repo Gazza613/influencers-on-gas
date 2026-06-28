@@ -137,8 +137,8 @@ export default function LockdownStep({
         {(frames.length > 0 || (refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround))) && !working && (
           <div className="mt-4 rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/8 p-4">
             <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">This is what you are locking in</div>
-            <p className="mt-1 text-[13px] text-ink-faint">The full reference set — {frames.length} kept frame{frames.length === 1 ? "" : "s"} plus her forensic identity cards. Every future creative is matched against these.</p>
-            {/* The kept frames — the collage of the whole identity set being locked. */}
+            <p className="mt-1 text-[13px] text-ink-faint">The full reference set - {frames.length} kept frame{frames.length === 1 ? "" : "s"} plus her forensic identity cards. Every future creative is matched against these.</p>
+            {/* The kept frames - the collage of the whole identity set being locked. */}
             {frames.length > 0 && (
               <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {frames.map((url, i) => (

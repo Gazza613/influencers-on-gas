@@ -66,7 +66,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
-  const [locationRefs, setLocationRefs] = useState<string[]>([]); // multiple scene/location references — shots rotate through them for varied backdrops
+  const [locationRefs, setLocationRefs] = useState<string[]>([]); // multiple scene/location references - shots rotate through them for varied backdrops
   const [identityLock, setIdentityLock] = useState<"strong" | "flexible">("strong");
 
   const [rates, setRates] = useState<Rates | null>(null);
@@ -102,7 +102,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
 
   const prevCount = useRef(initial.creatives?.length || 0);
   // Show a placeholder tile for every shot SUBMITTED but not yet arrived (across concurrent runs),
-  // so you can see all of them — e.g. run 3 then 3 more = 6 placeholders, not just the latest batch.
+  // so you can see all of them - e.g. run 3 then 3 more = 6 placeholders, not just the latest batch.
   const [pending, setPending] = useState(0);
   const submitBaseline = useRef(0);
   const prevStatus = useRef(initial.status || "idle");
@@ -415,11 +415,11 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           </div>
         </div>
 
-        {/* Shot type — A-roll (presenter) vs B-roll (lifestyle/scene) */}
+        {/* Shot type - A-roll (presenter) vs B-roll (lifestyle/scene) */}
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Shot type</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["a-roll", "A-roll · presenter", "Front-on, talking to camera — clean presenter shots"], ["b-roll", "B-roll · lifestyle", "Candid in-scene moments, extras + life around her"]] as const).map(([k, label, hint]) => (
+            {([["a-roll", "A-roll · presenter", "Front-on, talking to camera - clean presenter shots"], ["b-roll", "B-roll · lifestyle", "Candid in-scene moments, extras + life around her"]] as const).map(([k, label, hint]) => (
               <button key={k} onClick={() => pickRole(k)} className={`rounded-lg border px-3 py-2 text-left transition ${creativeRole === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
                 <div className={`text-sm font-bold ${creativeRole === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
                 <div className="text-[10px] text-ink-faint">{hint}</div>
@@ -465,7 +465,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["true", "Add background extras", "A diverse crowd around her, in focus"], ["false", "No extras", "Only the people you name in the scene (e.g. 2 friends) — no random crowd"]] as const).map(([k, label, hint]) => {
+            {([["true", "Add background extras", "A diverse crowd around her, in focus"], ["false", "No extras", "Only the people you name in the scene (e.g. 2 friends) - no random crowd"]] as const).map(([k, label, hint]) => {
               const on = (k === "true") === extras;
               return (
                 <button key={k} onClick={() => setExtras(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
@@ -477,7 +477,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           </div>
         </div>
 
-        {/* Identity lock — only shown when it actually changes the result (single-reference /
+        {/* Identity lock - only shown when it actually changes the result (single-reference /
             Soul-only builds). Multi-photo influencers always use the strong multi-image lock. */}
         {!multiRef && (
         <div className="mt-4">
@@ -511,7 +511,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
                     <button onClick={() => setLocationRefs((p) => p.filter((x) => x !== u))} className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-[9px] text-white">✕</button>
                   </span>
                 ))}
-                <span className="ml-1 text-[10px] text-ink-faint">{locationRefs.length} location{locationRefs.length === 1 ? "" : "s"} — shots rotate through them</span>
+                <span className="ml-1 text-[10px] text-ink-faint">{locationRefs.length} location{locationRefs.length === 1 ? "" : "s"} - shots rotate through them</span>
               </div>
             )}
           </div>
@@ -542,7 +542,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <div className="mt-4">
             <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null} startedAt={startedAt}
               onAbort={abort}
-              note={`Generating each shot — they appear below as they finish. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
+              note={`Generating each shot - they appear below as they finish. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
           </div>
         )}
       </div>
@@ -574,7 +574,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         )}
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-2 text-[11px]">
           <span className="font-semibold text-[#c79bff]">🎬 Producer references</span>
-          <span className="text-ink-faint">Select one shot, then set it as the A-roll or B-roll reference — the Producer dresses + anchors those scenes to it.</span>
+          <span className="text-ink-faint">Select one shot, then set it as the A-roll or B-roll reference - the Producer dresses + anchors those scenes to it.</span>
           <div className="ml-auto flex items-center gap-4">
             {(["aroll", "broll"] as const).map((role) => (
               <span key={role} className="flex items-center gap-1.5">
@@ -585,7 +585,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
                     <img src={refs[role]} alt="" className="h-7 w-7 rounded border border-line object-cover" />
                     <button onClick={() => clearRoleRef(role)} className="text-ink-faint hover:text-alert">clear</button>
                   </>
-                ) : <span className="text-ink-faint">— none</span>}
+                ) : <span className="text-ink-faint">- none</span>}
               </span>
             ))}
           </div>

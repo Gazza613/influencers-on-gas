@@ -86,7 +86,7 @@ export default function BuildHeader({
     { href: `${base}/lockdown`, label: "Lock down", icon: "③", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
   ];
   // Creatives unlocks once the identity is locked; it turns green once any shot is rendered. Voice is
-  // NOT a separate tab — it lives inside the Producer flow (step 4), where you set it in context.
+  // NOT a separate tab - it lives inside the Producer flow (step 4), where you set it in context.
   const creativesDone = s.creatives > 0;
   if (s.locked) {
     const onProducer = pathname.endsWith("/producer");
@@ -121,11 +121,11 @@ export default function BuildHeader({
           </span>
         ) : null}
 
-        {/* Running build cost for THIS influencer — green < R500, orange < R1000, red beyond (pulsing). */}
+        {/* Running build cost for THIS influencer - green < R500, orange < R1000, red beyond (pulsing). */}
         {spendCents != null && <RunningCost name={name} cents={spendCents} />}
       </div>
 
-      {/* Step tabs — real pages */}
+      {/* Step tabs - real pages */}
       <div className="mt-4 -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
         {tabs.map((t) => {
           const active = t.match(pathname);

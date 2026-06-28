@@ -1,6 +1,6 @@
 import { getSecret } from "../connections";
 
-// Firecrawl — turn a web page into clean markdown for the knowledge base.
+// Firecrawl - turn a web page into clean markdown for the knowledge base.
 const BASE = "https://api.firecrawl.dev/v1";
 
 async function key(): Promise<string> {

@@ -112,7 +112,7 @@ async function pollJob(call: Caller, jobId: string, rounds = 60): Promise<string
       const status = String(item?.status || data?.status || "").toLowerCase();
       if (url) return url;
       if (TERMINAL.has(status)) return null;
-    } catch { /* transient — retry */ }
+    } catch { /* transient - retry */ }
   }
   return null;
 }
@@ -152,7 +152,7 @@ async function createElement(call: Caller, jobId: string | null, url: string, na
 function baseParams(model: string, aspectRatio: string): AnyObj {
   const base = { model, aspect_ratio: aspectRatio, count: 1 };
   // Each model takes a different quality param. Nano Banana (pro/2/base) use `resolution`
-  // (1k/2k/4k, default 1k!) — sending `quality` is ignored and leaves them at 1k. GPT Image
+  // (1k/2k/4k, default 1k!) - sending `quality` is ignored and leaves them at 1k. GPT Image
   // uses `quality`. Default everything else to a 2k quality.
   if (model.startsWith("nano_banana")) return { ...base, resolution: "2k" };
   if (model === "gpt_image_2" || model === "gpt_image") return { ...base, quality: "high" };
@@ -240,7 +240,7 @@ export async function previewImageCost(model: string, prompt = "portrait of a wo
   return unwrapMCP(await call("generate_image", { params: { ...base, prompt, get_cost: true } }));
 }
 
-// Train a reusable Soul identity from 5–20 reference images. Returns the soul_id
+// Train a reusable Soul identity from 5-20 reference images. Returns the soul_id
 // (training runs ~10 min server-side; poll soulStatus). show_characters action=train.
 export async function trainSoul(opts: { name: string; images: string[]; type?: string }): Promise<string> {
   const { name, images, type = "soul_2" } = opts;
@@ -449,7 +449,7 @@ export async function generateImages(opts: { prompt: string; count?: number; mod
         if (url) { pending.delete(jobId); if (!urls.includes(url)) urls.push(url); }
         else if (TERMINAL.has(status)) pending.delete(jobId);
       } catch {
-        /* transient — retry next round */
+        /* transient - retry next round */
       }
     }
   }
@@ -502,7 +502,7 @@ export async function generateAngles2_0(opts: { heroUrl: string; elementId: stri
           if (url) { pending.delete(jobId); if (!collected.includes(url)) collected.push(url); }
           else if (TERMINAL.has(status)) pending.delete(jobId);
         } catch {
-          /* transient — retry next round */
+          /* transient - retry next round */
         }
       }
     }
@@ -561,7 +561,7 @@ export async function generateWithSupercomputer(opts: { prompts: string[]; aspec
           if (url) { pending.delete(jobId); if (!urls.includes(url)) urls.push(url); }
           else if (TERMINAL.has(status)) pending.delete(jobId);
         } catch {
-          /* transient — retry next round */
+          /* transient - retry next round */
         }
       }
     }
@@ -602,7 +602,7 @@ export async function generateWithSupercomputerVideo(opts: { prompt: string; ima
     const urls = extractImageUrls(r); // Video may return as file URL
     const jobIds = extractJobIds(r);
     
-    // Direct result (rare — most vendor video is async).
+    // Direct result (rare - most vendor video is async).
     if (urls.length > 0) return urls[0];
     if (!jobIds.length) throw new Error("Supercomputer video returned no job IDs");
 
@@ -621,7 +621,7 @@ export async function generateWithSupercomputerVideo(opts: { prompt: string; ima
           if (videoUrl) { pending.delete(jobId); url = videoUrl; }
           else if (TERMINAL.has(status)) pending.delete(jobId);
         } catch {
-          /* transient — retry next round */
+          /* transient - retry next round */
         }
       }
     }
@@ -699,25 +699,25 @@ export async function submitVideoFromImage(opts: { imageUrl: string; prompt: str
   if (!isSafePublicUrl(opts.imageUrl)) return { jobId: null, model: null, url: null, error: "unsafe or non-public image url" };
   const mediaId = await importMediaUrl(opts.imageUrl);
   if (!mediaId) return { jobId: null, model: null, url: null, error: "could not import the still into Higgsfield" };
-  // END frame (optional): anchors the motion to finish on this frame — prevents the "drifts/walks
+  // END frame (optional): anchors the motion to finish on this frame - prevents the "drifts/walks
   // backwards" look and, when it's the NEXT scene's start frame, makes the cut seamless.
   const endId = opts.endImageUrl && isSafePublicUrl(opts.endImageUrl) ? await importMediaUrl(opts.endImageUrl).catch(() => null) : null;
   const { call } = await openSession();
   const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : "9:16";
   // VERIFIED schemas (from models_explore, 2026-06-20): generate_video takes medias:[{value:media_id,
   // role}]. Kling 3.0 = model "kling3_0", roles start_image + end_image, sound on/off, duration 3-15.
-  // B-roll is silent (sound off) — music + ambient are mixed in later (Higgsfield has no music/SFX).
+  // B-roll is silent (sound off) - music + ambient are mixed in later (Higgsfield has no music/SFX).
   const medias = [{ value: mediaId, role: "start_image" }, ...(endId ? [{ value: endId, role: "end_image" }] : [])];
-  const dur = Math.max(3, Math.min(15, Math.round(opts.duration || 5))); // Kling 3.0 allows 3–15s
+  const dur = Math.max(3, Math.min(15, Math.round(opts.duration || 5))); // Kling 3.0 allows 3-15s
   const start = (model: string, extra: AnyObj = {}): AnyObj => ({ model, prompt: opts.prompt, aspect_ratio: ar, duration: dur, count: 1, medias, ...extra });
-  // HERO shot: route to Veo 3.1 (4K, native ambient audio). Veo durations are 4/6/8 — snap to the
+  // HERO shot: route to Veo 3.1 (4K, native ambient audio). Veo durations are 4/6/8 - snap to the
   // nearest. Tried FIRST; Kling fallback below if Veo errors.
   const veoDur = [4, 6, 8].reduce((p, c) => (Math.abs(c - dur) < Math.abs(p - dur) ? c : p), 8);
   const heroShape: AnyObj = { model: "veo3_1", prompt: opts.prompt, aspect_ratio: ar, duration: veoDur, count: 1, medias, sound: "on" };
   // kling3_0_turbo is PRIMARY for b-roll: standard kling3_0 renders slowly and was running past our poll
   // window ("did not finish in time"). Turbo is built for speed and finishes far more reliably; standard
   // kling3_0 stays as the fallback. The shapes list is a SUBMIT fallback, so the faster model must be
-  // FIRST — a slow render never trips the next shape, it just times out.
+  // FIRST - a slow render never trips the next shape, it just times out.
   const shapes: AnyObj[] = [
     ...(opts.hero ? [heroShape] : []),
     ...(process.env.HF_VIDEO_MODEL ? [start(process.env.HF_VIDEO_MODEL)] : []),
@@ -741,7 +741,7 @@ export async function submitVideoFromImage(opts: { imageUrl: string; prompt: str
 }
 
 // A-ROLL talking video: Higgsfield Seedance 2.0 takes a start image + an AUDIO clip and lip-syncs
-// the avatar to it (our ElevenLabs VO), with a moving background — and works on a synthetic face
+// the avatar to it (our ElevenLabs VO), with a moving background - and works on a synthetic face
 // (no consent gate). Submits and returns the jobId; caller polls with pollVideoJobOnce.
 export async function submitTalkingVideo(opts: { imageUrl: string; audioUrl: string; ratio?: string; prompt?: string }): Promise<{ jobId: string | null; model: string | null; url: string | null; error: string | null }> {
   if (!isSafePublicUrl(opts.imageUrl) || !isSafePublicUrl(opts.audioUrl)) return { jobId: null, model: null, url: null, error: "unsafe or non-public url" };

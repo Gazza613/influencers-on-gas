@@ -110,7 +110,7 @@ export default function CastingStep({
               change the vibe, tweak the character (or re-brief) first, then cast.
             </p>
             <p className="mt-1 text-[11px] text-ink-faint">
-              💸 On your Higgsfield <span className="text-ink-dim">Ultra</span> plan these casting images are <span className="text-ink-dim">included</span> (no credit cost) — re-cast as much as you like. Still worth getting the character right first, so the looks land. Live spend is always in <span className="text-ink-dim">Cost Control</span>.
+              💸 On your Higgsfield <span className="text-ink-dim">Ultra</span> plan these casting images are <span className="text-ink-dim">included</span> (no credit cost) - re-cast as much as you like. Still worth getting the character right first, so the looks land. Live spend is always in <span className="text-ink-dim">Cost Control</span>.
             </p>
 
             {!casting && (

@@ -78,7 +78,7 @@ function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () =>
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/10" />
 
-      {/* Sound toggle — play with audio right in the grid, no need to open it */}
+      {/* Sound toggle - play with audio right in the grid, no need to open it */}
       <button
         onClick={(e) => { e.stopPropagation(); onSound(!soundOn); }}
         aria-label={soundOn ? "Mute" : "Play with sound"}
@@ -87,7 +87,7 @@ function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () =>
         {soundOn ? "🔊" : "🔇"}
       </button>
 
-      {/* Expand affordance — small eye, always visible */}
+      {/* Expand affordance - small eye, always visible */}
       <button onClick={onOpen} aria-label="Expand" className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-xs text-white/90 backdrop-blur transition hover:bg-black/70">👁</button>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 pr-12 text-left">

@@ -46,7 +46,7 @@ export async function POST() {
     }
   }
 
-  // Upscale (bytedance) — get_cost with a placeholder source.
+  // Upscale (bytedance) - get_cost with a placeholder source.
   try {
     const raw = await callMcp("upscale_image", { params: { provider: "bytedance", image_id: "00000000-0000-0000-0000-000000000000", width: 2048, height: 2048, resolution: "4k", get_cost: true } });
     const credits = parseCost(raw);

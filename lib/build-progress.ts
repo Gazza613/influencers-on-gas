@@ -1,4 +1,4 @@
-// Pure build-stage progress for an influencer (no DB imports — safe in client + server).
+// Pure build-stage progress for an influencer (no DB imports - safe in client + server).
 export type BuildStage = { key: string; label: string; done: boolean };
 
 type ProgressInput = {

@@ -4,7 +4,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { inngest } from "@/lib/inngest";
 import { isSafePublicUrl } from "@/lib/safe-url";
 
-// THE PRODUCER step 4: "stitch the cut" — assemble the clips into one finished ad (music +
+// THE PRODUCER step 4: "stitch the cut" - assemble the clips into one finished ad (music +
 // captions + brand + VO) via Shotstack. Durable; the UI polls the storyboard GET.
 export const maxDuration = 30;
 

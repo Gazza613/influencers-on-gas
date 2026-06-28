@@ -25,7 +25,7 @@ export default function SetupNav({ isSuperAdmin = false }: { isSuperAdmin?: bool
 
   return (
     <nav className="flex items-center gap-1">
-      {/* The core action — create a new influencer — always discoverable */}
+      {/* The core action - create a new influencer - always discoverable */}
       <Link href="/start" className="mr-1 rounded-md border border-[#a855f7]/40 bg-[#a855f7]/15 px-3 py-1.5 text-[13px] font-bold text-[#c79bff] transition hover:bg-[#a855f7]/25">+ New</Link>
 
       {/* Inline links on desktop */}

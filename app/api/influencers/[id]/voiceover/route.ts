@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = await req.json().catch(() => ({}));
 
   // MANUAL path: the producer uploaded their OWN voice recording; the client already sliced it per scene
-  // (Web Audio, using the Scribe alignment) and uploaded the pieces. Store them as the scene audio — the
+  // (Web Audio, using the Scribe alignment) and uploaded the pieces. Store them as the scene audio - the
   // animate/stitch pipeline reuses these exactly like the generated voice-once slices.
   if (Array.isArray(body.scene_audio)) {
     const clean = (body.scene_audio as { scene?: number; url?: string; duration?: number }[])
@@ -64,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!full.trim() || !parts.length) return NextResponse.json({ error: "No spoken lines in the storyboard." }, { status: 400 });
 
   try {
-    // v3 (Expressive) when the producer chose it — more realistic, dynamic delivery + audio-tag support.
+    // v3 (Expressive) when the producer chose it - more realistic, dynamic delivery + audio-tag support.
     const expressive = persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1";
     const { pcm, charEndTimes } = await ttsPcm(voiceId, full, { expressive });
     if (!charEndTimes.length) throw new Error("no timestamps");

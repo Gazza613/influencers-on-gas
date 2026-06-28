@@ -1,11 +1,11 @@
 // Turn the Character Bible into production-ready text, so the deep work on the casting page actually
-// drives the video — the bible becomes the single source of truth for the producer + the shots + voice.
+// drives the video - the bible becomes the single source of truth for the producer + the shots + voice.
 type Dict = Record<string, unknown>;
 const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const arr = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) as string[] : []);
 
 // A rich influencer profile for the storyboard director: who she is, how she carries herself, her
-// signature wardrobe + palette, and her tone — so the cast world, wardrobe, performance and VO align.
+// signature wardrobe + palette, and her tone - so the cast world, wardrobe, performance and VO align.
 export function bibleProfile(bible: Dict | undefined | null): string {
   if (!bible || typeof bible !== "object") return "";
   const id = (bible.identity ?? {}) as Dict;
@@ -34,7 +34,7 @@ export function bibleWardrobe(bible: Dict | undefined | null): string {
   const w = (bible.wardrobe ?? {}) as Dict;
   const pal = (bible.palette ?? {}) as Dict;
   const garments = (Array.isArray(w.garments) ? w.garments : [])
-    .map((g) => [s((g as Dict)?.item), s((g as Dict)?.fabric), s((g as Dict)?.detail)].filter(Boolean).join(" — "))
+    .map((g) => [s((g as Dict)?.item), s((g as Dict)?.fabric), s((g as Dict)?.detail)].filter(Boolean).join(" - "))
     .filter(Boolean).join("; ");
   const colours = arr(pal.wardrobe_colours).join(", ");
   const acc = arr(w.accessories).join(", ");

@@ -1,6 +1,6 @@
 import { getSecret } from "../connections";
 
-// fal.ai — OmniHuman 1.5: image + audio → a fully-animated talking influencer, lip-synced to the
+// fal.ai - OmniHuman 1.5: image + audio → a fully-animated talking influencer, lip-synced to the
 // SUPPLIED audio (so it uses OUR locked ElevenLabs voice, unlike Veo which makes its own voice).
 // Best-in-class lip-sync + character animation for a-roll. Uses fal's standard queue API.
 const FAL_QUEUE = "https://queue.fal.run";
@@ -21,9 +21,9 @@ export async function falConnected(): Promise<boolean> {
 // submit returns a 422/400 validation error if auth is good, or 401/403 if the key is wrong.
 export async function verifyFal(): Promise<{ connected: boolean; ok: boolean; status: number | null; detail: string }> {
   const k = await key();
-  if (!k) return { connected: false, ok: false, status: null, detail: "fal.ai is not connected — paste your key under Connect Tools." };
+  if (!k) return { connected: false, ok: false, status: null, detail: "fal.ai is not connected - paste your key under Connect Tools." };
   try {
-    // Send structurally-valid but unfetchable URLs — proves the route + auth without generating
+    // Send structurally-valid but unfetchable URLs - proves the route + auth without generating
     // (fal can't fetch them, so it validation-fails for free; an empty body falsely 404s).
     const res = await fetch(`${FAL_QUEUE}/${OMNIHUMAN_MODEL}`, { method: "POST", headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" }, body: JSON.stringify({ image_url: "https://example.com/_falcheck.jpg", audio_url: "https://example.com/_falcheck.mp3" }), signal: AbortSignal.timeout(20000) });
     const txt = (await res.text()).slice(0, 220);
@@ -35,7 +35,7 @@ export async function verifyFal(): Promise<{ connected: boolean; ok: boolean; st
 }
 
 // Submit an OmniHuman job; returns the queue handles for durable polling (or an error if fal isn't
-// connected / the submit failed — caller can then fall back to another engine).
+// connected / the submit failed - caller can then fall back to another engine).
 export async function submitOmniHuman(opts: { imageUrl: string; audioUrl: string; prompt?: string }): Promise<{ statusUrl: string | null; responseUrl: string | null; error: string | null }> {
   const k = await key();
   if (!k) return { statusUrl: null, responseUrl: null, error: "fal.ai not connected" };
@@ -44,7 +44,7 @@ export async function submitOmniHuman(opts: { imageUrl: string; audioUrl: string
       method: "POST",
       headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" },
       // 720p is faster AND higher quality than 1080p per fal's docs. turbo_mode trades fidelity for
-      // speed — DEFAULT OFF now (the producer wants hyper-realism over speed). Set FAL_OMNIHUMAN_TURBO=1
+      // speed - DEFAULT OFF now (the producer wants hyper-realism over speed). Set FAL_OMNIHUMAN_TURBO=1
       // to trade back for speed. Both env-tunable (FAL_OMNIHUMAN_RES / FAL_OMNIHUMAN_TURBO).
       body: JSON.stringify({
         image_url: opts.imageUrl,
@@ -58,7 +58,7 @@ export async function submitOmniHuman(opts: { imageUrl: string; audioUrl: string
     const txt = await res.text();
     if (!res.ok) return { statusUrl: null, responseUrl: null, error: `omnihuman submit ${res.status}: ${txt.slice(0, 180)}` };
     const data = JSON.parse(txt) as { status_url?: string; response_url?: string; request_id?: string };
-    // fal's queue request URLs use the APP namespace ("fal-ai/bytedance"), not the full model path —
+    // fal's queue request URLs use the APP namespace ("fal-ai/bytedance"), not the full model path -
     // so build the fallback from the first two id segments. (We prefer fal's returned URLs anyway.)
     const appNs = OMNIHUMAN_MODEL.split("/").slice(0, 2).join("/");
     const base = `${FAL_QUEUE}/${appNs}/requests/${data.request_id || ""}`;

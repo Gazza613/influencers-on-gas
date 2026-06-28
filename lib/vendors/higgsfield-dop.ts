@@ -5,7 +5,7 @@
 //
 // CRITICAL: we SUBMIT non-blocking (withPolling:false) and poll the job-set in SHORT steps from the
 // caller. The SDK's withPolling blocks one call for the whole render, which outlasts the serverless
-// function window and makes the clip spin forever — never use it inside an Inngest step.
+// function window and makes the clip spin forever - never use it inside an Inngest step.
 import { HiggsfieldClient, DoPModel, InputImage } from "@higgsfield/client";
 
 const BASE = "https://platform.higgsfield.ai";
@@ -21,14 +21,14 @@ function dopClient(): HiggsfieldClient | null {
   return _client;
 }
 
-// Submit ONLY — returns the job-set id to poll (no blocking).
+// Submit ONLY - returns the job-set id to poll (no blocking).
 export async function submitDopVideo(opts: { imageUrl: string; prompt: string; seconds?: number; seed?: number }): Promise<{ jobSetId: string | null; error: string | null }> {
   const client = dopClient();
   if (!client) return { jobSetId: null, error: "Higgsfield first-party API not configured (HIGGSFIELD_KEY_ID / HIGGSFIELD_KEY_SECRET)" };
   try {
     // Tier is env-tunable. DEFAULT = dop-turbo: it's the SPEED-optimal tier (2x faster generation AND
     // PRIORITY QUEUE, and ~30% cheaper than Standard). dop-lite is cheaper but has NO priority queue, so
-    // it sits in the queue LONGER and at lower quality — only choose it if cost > speed. dop-standard is
+    // it sits in the queue LONGER and at lower quality - only choose it if cost > speed. dop-standard is
     // best quality but pricier + slower. Set DOP_MODEL=dop-lite / dop-standard to A/B.
     const model = process.env.DOP_MODEL || DoPModel.TURBO;
     const params: Record<string, unknown> = {
@@ -59,6 +59,6 @@ export async function pollDopOnce(jobSetId: string): Promise<{ url: string | nul
     const terminal = !!url || ["completed", "failed", "nsfw", "canceled"].includes(status);
     return { url, terminal, status };
   } catch {
-    return { url: null, terminal: false, status: "error" }; // transient — keep polling
+    return { url: null, terminal: false, status: "error" }; // transient - keep polling
   }
 }

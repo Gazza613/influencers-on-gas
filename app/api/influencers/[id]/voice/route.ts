@@ -6,8 +6,8 @@ import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 
 // Create / set the influencer's voice (Phase 2 foundation).
-//  - "auto"  : synthetic — pick a library voice matching the gender.
-//  - "clone" : twin — clone from uploaded voice samples (consent-gated).
+//  - "auto"  : synthetic - pick a library voice matching the gender.
+//  - "clone" : twin - clone from uploaded voice samples (consent-gated).
 // Stores voice_id + voice_name on the persona and returns a short preview clip.
 export const maxDuration = 120;
 
@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       voiceName = typeof body.voiceName === "string" && body.voiceName ? body.voiceName : v?.name || "Selected voice";
     } else if (action === "clone") {
       // GUARD: ElevenLabs requires THEIR OWN voice-captcha verification to clone a voice (to confirm
-      // the speaker consented). Our upload path bypasses that — a moderation/ToS risk — so instant
+      // the speaker consented). Our upload path bypasses that - a moderation/ToS risk - so instant
       // cloning is disabled here. Use a library or designed voice instead. (Set ALLOW_VOICE_CLONE=1
       // only once a verified-consent flow is in place.)
       if (process.env.ALLOW_VOICE_CLONE !== "1") {

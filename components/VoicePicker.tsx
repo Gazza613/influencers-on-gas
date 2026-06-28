@@ -24,7 +24,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
   const [designing, setDesigning] = useState(false);
   const [designDesc, setDesignDesc] = useState("");
   const [previews, setPreviews] = useState<{ generatedVoiceId: string; url: string }[]>([]);
-  const [accent, setAccent] = useState(""); // quick accent filter / design seed (South African first — our market)
+  const [accent, setAccent] = useState(""); // quick accent filter / design seed (South African first - our market)
   const ACCENTS = ["South African", "British", "American", "Australian", "Nigerian", "Irish"];
 
   useEffect(() => { fetch("/api/voices").then((r) => r.json()).then((d) => { if (Array.isArray(d?.voices)) setLib(d.voices); }).catch(() => {}); }, []);
@@ -53,7 +53,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
   }
 
   const fq = q.trim().toLowerCase();
-  // Voices YOU made (cloned / generated / professional — not "premade" stock) always show and sort
+  // Voices YOU made (cloned / generated / professional - not "premade" stock) always show and sort
   // first; the accent chip only narrows the STOCK library (your designed voices have no accent label,
   // so they must never be filtered out by it).
   const isMine = (v: LibVoice) => !!v.category && v.category !== "premade";
@@ -87,7 +87,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
               {accent && <button onClick={() => setAccent("")} className="rounded-full px-2 py-1 text-[11px] text-ink-faint hover:text-ink">clear</button>}
             </div>
           </div>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search voices — name, accent (e.g. South African), gender, age…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search voices - name, accent (e.g. South African), gender, age…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-[#a855f7]" />
           <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
             {fv.length === 0 && <p className="px-1 py-2 text-[12px] text-ink-faint">{lib.length ? "No voices match that search." : "Loading your voices…"}</p>}
             {fv.map((v) => {
@@ -135,9 +135,9 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
 
       {vtab === "upload" && (
         <div className="space-y-3">
-          <p className="text-[13px] text-ink-faint">Upload <b>one clear recording</b> of the voice — about 1–2 minutes of natural speaking with minimal background noise (one good file clones better than several short ones). We clone it once, then the producer generates {name}&apos;s lines in that exact voice and slices them per scene, just like a library voice. Your recording is only used to train the clone — it doesn&apos;t need to be the script.</p>
+          <p className="text-[13px] text-ink-faint">Upload <b>one clear recording</b> of the voice - about 1-2 minutes of natural speaking with minimal background noise (one good file clones better than several short ones). We clone it once, then the producer generates {name}&apos;s lines in that exact voice and slices them per scene, just like a library voice. Your recording is only used to train the clone - it doesn&apos;t need to be the script.</p>
           <Uploader kind="voice-sample" accept="audio" multiple label="Upload your voice recording" onUploaded={(url) => setSamples((s) => [...s, url])} />
-          {samples.length > 0 && <p className="text-[12px] text-ready">✓ {samples.length} recording{samples.length > 1 ? "s" : ""} added{samples.length === 1 ? " — that&apos;s enough" : ""}</p>}
+          {samples.length > 0 && <p className="text-[12px] text-ready">✓ {samples.length} recording{samples.length > 1 ? "s" : ""} added{samples.length === 1 ? " - that&apos;s enough" : ""}</p>}
           <label className="flex items-start gap-2 text-[12px] text-ink-dim">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#a855f7]" />
             <span>I confirm the person whose voice this is has consented to it being cloned and used in these videos.</span>

@@ -33,7 +33,7 @@ export async function GET() {
       if (Array.isArray(items)) videoModels = items.map((it) => ({ id: String(it.id ?? it.model ?? it.slug ?? ""), name: String(it.name ?? it.title ?? "") })).filter((m) => m.id || m.name);
     } catch { /* optional */ }
     // model/aspect are free-form strings validated against a server catalog → query it.
-    // Pull the full model catalog (list) — search returned empty. Collect all items.
+    // Pull the full model catalog (list) - search returned empty. Collect all items.
     const items: Record<string, unknown>[] = [];
     for (const args of [{ action: "list", limit: 500 }, { action: "list" }, { action: "list", kind: "image" }]) {
       try {

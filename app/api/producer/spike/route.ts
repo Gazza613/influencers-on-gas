@@ -38,5 +38,5 @@ export async function GET(req: Request) {
     catch { return NextResponse.json({ error: "Engine not connected" }, { status: 503 }); }
     return NextResponse.json({ influencer: inf.name, status: "running", note: "Spike started. Refresh this URL (without ?go=1) in a few minutes to see broll_url + aroll_url." });
   }
-  return NextResponse.json({ influencer: inf.name, voice_set: !!persona.voice_id, spike: spike ?? "not run yet — hit this URL with ?go=1 to start" });
+  return NextResponse.json({ influencer: inf.name, voice_set: !!persona.voice_id, spike: spike ?? "not run yet - hit this URL with ?go=1 to start" });
 }

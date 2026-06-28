@@ -7,7 +7,7 @@ import { recordUsage } from "@/lib/usage";
 // Claude expands a short brief into the full Character Bible (one-off, ~20-40s).
 export const maxDuration = 120;
 
-// Save an edited bible (no regeneration) — autosave from the document-style editor.
+// Save an edited bible (no regeneration) - autosave from the document-style editor.
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,10 +42,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const refUrl = typeof p.reference_url === "string" && p.reference_url ? [p.reference_url] : [];
     const referenceImages = refImgs.length ? refImgs : refUrl;
     const bible = await generateBible(inf.name, brief, gender, look, inf.mode === "twin", referenceImages);
-    // Save the bible and return it IMMEDIATELY — the producer can proceed to the photoshoot now.
+    // Save the bible and return it IMMEDIATELY - the producer can proceed to the photoshoot now.
     await updateInfluencer(id, { persona: { ...inf.persona, brief, bible } });
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "bible", action: "bible", count: 1 }).catch(() => {});
-    // The marketing tagline is catalogue copy, not needed to proceed — generate + save it AFTER
+    // The marketing tagline is catalogue copy, not needed to proceed - generate + save it AFTER
     // the response so it never adds to the casting wait. (Metered like any paid call.)
     const userEmail = session.user.email ?? null;
     after(async () => {

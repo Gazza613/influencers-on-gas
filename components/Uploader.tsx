@@ -7,8 +7,8 @@ import { upload as blobUpload } from "@vercel/blob/client";
 // Drag/drop or click; shows a preview and a quirky uploading state. Calls onUploaded(url).
 // Capture a real, NON-BLACK still from a video FILE (locally, before upload) so a tile never sits on a
 // black intro frame. Same-origin blob: URL → canvas isn't tainted → we can read pixels + export a JPEG.
-// Robust to two failure modes: (1) drawing before the seeked frame is painted — we wait for the actual
-// frame via requestVideoFrameCallback; (2) the sampled point being dark — we measure brightness and try
+// Robust to two failure modes: (1) drawing before the seeked frame is painted - we wait for the actual
+// frame via requestVideoFrameCallback; (2) the sampled point being dark - we measure brightness and try
 // several timestamps, keeping the brightest.
 export async function capturePoster(file: File): Promise<Blob | null> {
   return new Promise((resolve) => {

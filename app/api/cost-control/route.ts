@@ -4,7 +4,7 @@ import { getReport, getAuditTrail, getCreditsSince, type CostFilters } from "@/l
 import { getZarPerUsd } from "@/lib/fx";
 import { cycleStartIso } from "@/lib/cron";
 
-// Filtered Cost Control report (DB only — fast). Live balance comes from /api/balance.
+// Filtered Cost Control report (DB only - fast). Live balance comes from /api/balance.
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

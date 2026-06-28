@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!isProvider(provider) || typeof secret !== "string" || !secret.trim()) {
     return NextResponse.json({ error: "Invalid provider or secret" }, { status: 400 });
   }
-  // Live-verify against the vendor, but ADVISORY ONLY — always save the key (never block on our own
+  // Live-verify against the vendor, but ADVISORY ONLY - always save the key (never block on our own
   // verify call being strict/flaky); surface verified true/false + a warning so the UI can show it.
   const check = await verifyVendorKey(provider, secret.trim());
   await saveConnection(provider, secret.trim());

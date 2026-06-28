@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 
-// VERIFICATION SPIKE — prove the ElevenLabs MUSIC bed + ambient SFX endpoints actually work on the
+// VERIFICATION SPIKE - prove the ElevenLabs MUSIC bed + ambient SFX endpoints actually work on the
 // live account (this is the "music doesn't add / no ambient" bug). Returns playable urls or the
 // exact error per call. Super-admin only. Spends a little (one short music + one sfx generation).
 export const dynamic = "force-dynamic";

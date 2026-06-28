@@ -125,10 +125,10 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
       {/* Upload an external brag reel (made elsewhere) straight onto the wall */}
       <div className="rounded-xl border border-line bg-surface-1 p-4">
         <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Upload a showreel</div>
-        <p className="mt-1 text-[12px] text-ink-dim">Add your best work made elsewhere — it goes onto the wall alongside platform cuts, tagged <span className="rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#60a5fa]">Uploaded</span>.</p>
+        <p className="mt-1 text-[12px] text-ink-dim">Add your best work made elsewhere - it goes onto the wall alongside platform cuts, tagged <span className="rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#60a5fa]">Uploaded</span>.</p>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="flex-1 min-w-[200px] text-[11px] text-ink-faint">Title / brand
-            <input value={upTitle} onChange={(e) => setUpTitle(e.target.value)} placeholder="e.g. MTN MoMo — Launch reel" className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#a855f7]" />
+            <input value={upTitle} onChange={(e) => setUpTitle(e.target.value)} placeholder="e.g. MTN MoMo - Launch reel" className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#a855f7]" />
           </label>
           <div className={upBusy ? "pointer-events-none opacity-60" : ""}><Uploader kind="showreel" accept="video" withPoster label={upBusy ? "Adding…" : "Choose video"} onUploaded={addExternal} /></div>
         </div>
@@ -162,7 +162,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
                     onDrop={(e) => { e.preventDefault(); const from = dragIdx.current ?? Number(e.dataTransfer.getData("text/plain")); if (!Number.isNaN(from)) reorder(from, i); dragIdx.current = null; setDragging(null); }}
                     className={`group/drag relative cursor-grab rounded-xl transition active:cursor-grabbing ${dragging === i ? "opacity-50 ring-2 ring-[#a855f7]" : ""}`}
                   >
-                    {/* Reorder controls — drag the card, OR use the arrows (always work, incl. touch) */}
+                    {/* Reorder controls - drag the card, OR use the arrows (always work, incl. touch) */}
                     <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
                       <button onClick={() => reorder(i, i - 1)} disabled={i === 0} title="Move earlier" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">◀</button>
                       <button onClick={() => reorder(i, i + 1)} disabled={i === onReel.length - 1} title="Move later" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">▶</button>

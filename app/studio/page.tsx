@@ -26,7 +26,7 @@ export default async function StudioPage() {
           <section className="rise">
             <div className="eyebrow">GAS Studio</div>
             <h1 className="display mt-3 text-5xl font-extrabold sm:text-6xl">Brief to <span className="brand-grad">publish-ready</span> ad.</h1>
-            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-dim">Direct a hyper-real AI influencer through the over-the-shoulder Producer — keyframes, lip-synced a-roll, cinematic b-roll, voice, music and the final cut.</p>
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-dim">Direct a hyper-real AI influencer through the over-the-shoulder Producer - keyframes, lip-synced a-roll, cinematic b-roll, voice, music and the final cut.</p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <Link href={locked.length > 0 ? "/setup/influencers" : "/start"} className="btn-brand rounded-xl px-6 py-3.5 text-sm font-bold">🎬 Start a production</Link>
               <Link href="/start" className="rounded-xl border border-line-strong bg-surface-1/60 px-6 py-3.5 text-sm font-semibold text-ink-dim transition hover:border-[#a855f7]/50 hover:text-ink">+ New influencer</Link>
@@ -53,7 +53,7 @@ export default async function StudioPage() {
             </div>
           )}
 
-          {/* Your cast — reel */}
+          {/* Your cast - reel */}
           <section className="rise">
             <div className="mb-5 flex items-end justify-between">
               <div>

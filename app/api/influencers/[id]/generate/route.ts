@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { inngest } from "@/lib/inngest";
 import { updateInfluencer } from "@/lib/influencers";
 
-// Stage 1 — kicks off casting: generate distinct candidate looks to choose from.
+// Stage 1 - kicks off casting: generate distinct candidate looks to choose from.
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

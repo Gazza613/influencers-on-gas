@@ -45,7 +45,7 @@ export async function pickVoiceForGender(gender?: string, descriptor?: string): 
   const pool = want ? voices.filter((v) => (v.labels?.gender || "").toLowerCase() === want) : voices;
   const candidates = pool.length ? pool : voices;
   // Score by how well the bible's voice descriptor matches each voice's labels (accent, age, tone, use
-  // case, description) — so the auto-match reflects the character, not just gender.
+  // case, description) - so the auto-match reflects the character, not just gender.
   const tokens = String(descriptor || "").toLowerCase().match(/[a-z]{3,}/g) || [];
   const STOP = new Set(["the", "and", "her", "his", "with", "voice", "for", "that", "she", "speaks", "sounds", "very", "has", "tone", "who"]);
   const keys = tokens.filter((t) => !STOP.has(t));
@@ -79,7 +79,7 @@ export async function cloneVoice(name: string, sampleUrls: string[]): Promise<st
   return data.voice_id;
 }
 
-// Scribe (speech-to-text) with WORD-LEVEL timestamps — used to align an uploaded real-voice recording
+// Scribe (speech-to-text) with WORD-LEVEL timestamps - used to align an uploaded real-voice recording
 // to the script so we can slice it per scene (not for generating a voice).
 export async function scribeTranscribe(audioUrl: string): Promise<{ text: string; words: { text: string; start: number; end: number }[] }> {
   const k = await key();
@@ -143,7 +143,7 @@ export async function tts(voiceId: string, text: string, opts: { expressive?: bo
 
 // Same synthesis as tts(), but via the WITH-TIMESTAMPS endpoint so we also get the EXACT audio
 // duration (last character end time). The a-roll timeline uses this real length instead of estimated
-// storyboard timecodes — that estimate mismatch was the root of the scene-switch pause + the audio
+// storyboard timecodes - that estimate mismatch was the root of the scene-switch pause + the audio
 // overlapping into the next scene. Returns the same voice/model audio + the measured duration.
 export async function ttsWithDuration(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ buffer: Buffer; durationSeconds: number | null }> {
   text = sayable(text);
@@ -170,7 +170,7 @@ export async function ttsWithDuration(voiceId: string, text: string, opts: { exp
 }
 
 // VOICE-ONCE: synthesize the WHOLE approved script in ONE call (raw PCM + per-character timestamps),
-// so the voice is a single continuous take. We then slice it per scene by the timestamps — that is
+// so the voice is a single continuous take. We then slice it per scene by the timestamps - that is
 // what makes the voice IDENTICAL across every scene (per-scene generation is why it drifts), and what
 // makes "what we hear" literally "what we get". Returns 16-bit/44.1kHz/mono PCM + char end times.
 export async function ttsPcm(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ pcm: Buffer; charEndTimes: number[] }> {
@@ -197,7 +197,7 @@ export async function ttsPcm(voiceId: string, text: string, opts: { expressive?:
 }
 
 // Slice a span out of a 16-bit/44.1kHz/mono PCM buffer and wrap it as a playable WAV (HeyGen + Shotstack
-// both accept WAV). No ffmpeg needed — PCM is one sample per 2 bytes, so a time slice is a byte slice.
+// both accept WAV). No ffmpeg needed - PCM is one sample per 2 bytes, so a time slice is a byte slice.
 export function pcmSliceToWav(pcm: Buffer, startSec: number, endSec: number): Buffer {
   const SR = 44100, CH = 1, BPS = 2;
   const startByte = Math.min(pcm.length, Math.max(0, Math.floor(startSec * SR) * BPS));
@@ -255,7 +255,7 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
   const stripped = prompt.replace(/\b(like|reminiscent of|in the style of|styled after|inspired by|similar to|à la|sounds like|channel(?:ling|ing)?)\b[^.,;\n]*/gi, "").replace(/\s{2,}/g, " ").trim();
   const safePrompt = `${stripped || "warm modern background music"}. An ORIGINAL, royalty-free instrumental bed; no vocals; does NOT imitate, reference or reproduce any specific artist, band, song or copyrighted work.`;
 
-  // BEST-OF-BREED: try a music_v2 COMPOSITION PLAN first — structured styles with hard negatives
+  // BEST-OF-BREED: try a music_v2 COMPOSITION PLAN first - structured styles with hard negatives
   // (no vocals, no artist imitation), which gives more control AND auto-rejects copyrighted refs.
   // Falls back to the prompt-based endpoint below if the plan shape isn't accepted.
   try {
@@ -267,7 +267,7 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
     };
     const res = await fetch(`${BASE}/music`, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify({ composition_plan, model_id: "music_v2" }), signal: AbortSignal.timeout(150000) });
     if (res.ok) return Buffer.from(await res.arrayBuffer());
-    if (res.status === 401 || res.status === 402 || res.status === 429) throw new Error(`music_v2 ${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`); // auth/quota — don't bother with fallback
+    if (res.status === 401 || res.status === 402 || res.status === 429) throw new Error(`music_v2 ${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`); // auth/quota - don't bother with fallback
   } catch (e) {
     if ((e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") throw e; // genuine timeout → bubble up (caller falls back to ambient-only)
     /* otherwise: plan shape not accepted → fall through to the prompt API */
@@ -281,7 +281,7 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
   let lastErr = "";
   for (const [url, body] of bodies) {
     try {
-      // Hard timeout so a hung/queued music request can't stall the whole audio step — the caller
+      // Hard timeout so a hung/queued music request can't stall the whole audio step - the caller
       // falls back to ambient-only instead of waiting indefinitely.
       const res = await fetch(url, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify(body), signal: AbortSignal.timeout(150000) });
       if (res.ok) return Buffer.from(await res.arrayBuffer());

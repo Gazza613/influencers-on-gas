@@ -3,7 +3,7 @@ import { isSafePublicUrl } from "./safe-url";
 
 // Re-host a remote image onto Vercel Blob so the stored URL is permanent, public and
 // always loadable in an <img> tag. Vendor CDNs (Higgsfield, upscale outputs) can expire,
-// require auth, or serve as attachments — re-hosting once at generation time fixes that
+// require auth, or serve as attachments - re-hosting once at generation time fixes that
 // for good. Returns the Blob URL, or null if the source couldn't be fetched.
 // Upload raw bytes to public Blob and return the URL (e.g. a generated TTS mp3 that another
 // vendor, like HeyGen, then needs to fetch by URL).
@@ -19,7 +19,7 @@ export async function rehostToBlob(url: string, prefix = "creatives"): Promise<s
     const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
     if (!res.ok) return null;
     const ct = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    // Pick the RIGHT extension — videos/audio re-hosted into clips/finals must NOT become ".png",
+    // Pick the RIGHT extension - videos/audio re-hosted into clips/finals must NOT become ".png",
     // or Shotstack rejects them ("Unsupported file extension .png for video asset"). Robust:
     // (1) content-type, (2) the source URL's own extension, (3) default video for clip/final prefixes.
     const urlExt = (url.split("?")[0].match(/\.(mp4|m4v|mov|webm|mkv|avi|3gp|flv|mp3|wav|m4a|jpe?g|png|webp|avif)$/i)?.[1] || "").toLowerCase();

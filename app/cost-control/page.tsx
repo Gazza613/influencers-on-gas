@@ -120,7 +120,7 @@ export default function CostControlPage() {
     const seedMsg = applied ? `${applied} rate${applied === 1 ? "" : "s"} applied. ` : "";
     if (d?.results) {
       const ok = d.results.filter((r: { updated: boolean }) => r.updated).map((r: { model: string; credits: number }) => `${r.model}=${r.credits}cr`);
-      setCalMsg(seedMsg + (ok.length ? `Higgsfield trued up: ${ok.join(", ")}` : "Higgsfield get_cost unavailable — check connection."));
+      setCalMsg(seedMsg + (ok.length ? `Higgsfield trued up: ${ok.join(", ")}` : "Higgsfield get_cost unavailable - check connection."));
     } else setCalMsg(seedMsg + (applied ? "Higgsfield calibration unavailable." : "Calibration failed."));
     load();
   }
@@ -226,7 +226,7 @@ export default function CostControlPage() {
               </div>
               <p className="mt-2 text-[11px] text-ink-faint">
                 {direct >= 0
-                  ? "“Direct” = credits spent straight on Higgsfield (manual generations) or beyond what we metered — so nothing is hidden."
+                  ? "“Direct” = credits spent straight on Higgsfield (manual generations) or beyond what we metered - so nothing is hidden."
                   : "Our per-model estimates are running higher than Higgsfield's actual burn. Hit “Recalibrate costs” to true them up via get_cost."}
               </p>
             </section>
@@ -320,13 +320,13 @@ export default function CostControlPage() {
               <tbody>{audit.map((a, i) => (
                 <tr key={i} className="border-t border-line">
                   <td className="tabular px-4 py-2 text-ink-dim">{a.taken_at}</td>
-                  <td className="tabular px-4 py-2 text-right text-ink">{a.remaining != null ? Math.round(a.remaining).toLocaleString() : "—"}</td>
+                  <td className="tabular px-4 py-2 text-right text-ink">{a.remaining != null ? Math.round(a.remaining).toLocaleString() : "-"}</td>
                   <td className="tabular px-4 py-2 text-right text-ink-dim">{Math.round(a.ledger_credits).toLocaleString()}</td>
                   <td className="tabular px-4 py-2 text-right text-ink-dim">{rand(a.ledger_cents)}</td>
                 </tr>
               ))}</tbody>
             </table>
-          ) : <div className="px-4 py-5 text-center text-xs text-ink-faint">No audits yet — the first daily snapshot will appear here.</div>}
+          ) : <div className="px-4 py-5 text-center text-xs text-ink-faint">No audits yet - the first daily snapshot will appear here.</div>}
         </Section>
 
         <div className="mt-8 text-xs text-ink-faint">

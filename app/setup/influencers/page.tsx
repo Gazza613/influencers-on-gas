@@ -36,7 +36,7 @@ export default async function InfluencersIndex() {
         <div className="max-w-xl text-center">
           <div className="text-4xl">🎭</div>
           <h1 className="mt-2 text-xl font-bold">Build your first influencer</h1>
-          <p className="mx-auto mt-2 max-w-md text-sm text-ink-dim">Reusable, identity-locked stars — built once, then used across every video, creative and campaign.</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-dim">Reusable, identity-locked stars - built once, then used across every video, creative and campaign.</p>
           <div className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-3">
             {[["1", "Cast & shoot", "Build the look and shoot a varied identity set."], ["2", "Lock the identity", "Lock the face so every shot stays the same person."], ["3", "Produce", "Brief the Producer to direct a full ad."]].map(([n, t, d]) => (
               <div key={n} className="rounded-xl border border-line bg-surface-1 p-4">

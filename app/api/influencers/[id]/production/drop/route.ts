@@ -16,7 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const production = (persona.production ?? null) as Record<string, unknown> | null;
   if (!production) return NextResponse.json({ error: "No production." }, { status: 400 });
   const b = await req.json().catch(() => ({}));
-  // Scene indices must be real storyboard scenes (a valid integer in range) — guards against junk
+  // Scene indices must be real storyboard scenes (a valid integer in range) - guards against junk
   // indices bloating the dropped list.
   const sceneCount = Array.isArray((production.storyboard as { scenes?: unknown[] })?.scenes) ? (production.storyboard as { scenes: unknown[] }).scenes.length : 0;
   const valid = (n: unknown) => Number.isInteger(n) && (n as number) >= 0 && (n as number) < sceneCount;

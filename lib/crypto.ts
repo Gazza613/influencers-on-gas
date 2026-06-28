@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from "node:crypto";
 
 // AES-256-GCM secret encryption for the credential vault. The key is derived
-// from CREDENTIALS_SECRET (or AUTH_SECRET) — rotating that secret invalidates
+// from CREDENTIALS_SECRET (or AUTH_SECRET) - rotating that secret invalidates
 // stored vault secrets (re-enter them), which is acceptable for v1.
 function key(): Buffer {
   const secret = process.env.CREDENTIALS_SECRET || process.env.AUTH_SECRET;

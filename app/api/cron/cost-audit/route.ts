@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const session = await auth();
   if (!cronAuthed(req) && session?.user?.role !== "super_admin") return NextResponse.json({ error: "forbidden" }, { status: 401 }); // manual trigger: super-admin only (these can spend money)
   let remaining: number | null = null;
-  try { remaining = (await getBalance()).remaining; } catch { /* balance unreadable — store null */ }
+  try { remaining = (await getBalance()).remaining; } catch { /* balance unreadable - store null */ }
   await recordBalanceSnapshot(remaining, "daily auto-audit");
   return NextResponse.json({ ok: true, remaining });
 }

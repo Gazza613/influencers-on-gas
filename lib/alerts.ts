@@ -18,12 +18,12 @@ export function classifyError(raw: string): { tag: string; cause: string; fix: s
   if (/\b(429|rate limit|too many requests|quota)\b/.test(m))
     return { tag: "RATE LIMITED", cause: "A vendor is rate-limiting or quota-capping requests.", fix: "Wait a few minutes and re-run. If frequent, lower concurrency (CLIP_CONCURRENCY)." };
   if (/\b(timeout|timed out|econnreset|enotfound|network|fetch failed|socket|503|502|504|unavailable|gateway)\b/.test(m))
-    return { tag: "VENDOR DOWN / TIMEOUT", cause: "A vendor API was non-responsive or timed out.", fix: "Usually transient — re-run shortly. If it persists, check that vendor's status page." };
+    return { tag: "VENDOR DOWN / TIMEOUT", cause: "A vendor API was non-responsive or timed out.", fix: "Usually transient - re-run shortly. If it persists, check that vendor's status page." };
   return { tag: "ERROR", cause: "An unexpected error stopped a step.", fix: "Re-run the step. If it repeats, check the build logs for this influencer." };
 }
 
 // Throttle per error-kind so a vendor outage can't trigger an email storm. Atomic + serverless-safe via
-// a single upsert (self-provisions its tiny table; falls open — if the check fails we still alert).
+// a single upsert (self-provisions its tiny table; falls open - if the check fails we still alert).
 async function throttleOk(tag: string, minutes: number): Promise<boolean> {
   try {
     const sql = db();
@@ -81,15 +81,15 @@ export async function alertOps(opts: { title: string; detail: string; context?: 
     const tag = `${c.tag}:${opts.title}`.slice(0, 200);
     if (!(await throttleOk(tag, opts.throttleMinutes ?? 15))) return { sent: false };
     const html = brandedHtml(opts.title, opts.detail, c, opts.context || {});
-    await sendEmail({ to: ALERT_TO(), subject: `⚠️ Influencers on GAS — [${c.tag}] ${opts.title}`.slice(0, 150), html });
+    await sendEmail({ to: ALERT_TO(), subject: `⚠️ Influencers on GAS - [${c.tag}] ${opts.title}`.slice(0, 150), html });
     return { sent: true };
   } catch {
     return { sent: false };
   }
 }
 
-// Alert only when a (possibly swallowed) vendor error is genuinely CRITICAL — out of credits, a bad key
-// or a hard outage — so silent fallbacks (e.g. DoP→Kling) still surface the real cause. No-op otherwise.
+// Alert only when a (possibly swallowed) vendor error is genuinely CRITICAL - out of credits, a bad key
+// or a hard outage - so silent fallbacks (e.g. DoP→Kling) still surface the real cause. No-op otherwise.
 export async function alertIfCritical(provider: string, errorMessage: string, context?: Record<string, string | number | undefined>): Promise<void> {
   const { tag } = classifyError(errorMessage);
   if (tag === "OUT OF CREDITS" || tag === "API KEY" || tag === "VENDOR DOWN / TIMEOUT" || tag === "RATE LIMITED") {

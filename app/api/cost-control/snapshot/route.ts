@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { getBalance } from "@/lib/vendors/higgsfield";
 import { recordBalanceSnapshot } from "@/lib/usage";
 
-// Take a fresh balance snapshot (ledger vs live balance) on demand — keeps the daily
+// Take a fresh balance snapshot (ledger vs live balance) on demand - keeps the daily
 // audit current even if the cron hasn't fired. Any signed-in user can trigger it.
 export const maxDuration = 30;
 

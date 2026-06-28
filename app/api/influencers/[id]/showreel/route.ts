@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const production = persona.production as { final_url?: string | null; storyboard?: { title?: string }; showcase_id?: string | null } | undefined;
   if (!production?.final_url) return NextResponse.json({ error: "Stitch the cut first." }, { status: 400 });
 
-  const title = production.storyboard?.title || `${inf.name} — ad`;
+  const title = production.storyboard?.title || `${inf.name} - ad`;
   const clientId = await resolveClientId(inf.client_id);
   const showcaseId = await upsertProducerCut({
     showcaseId: production.showcase_id ?? null,

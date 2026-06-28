@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { inngest } from "@/lib/inngest";
 
-// THE PRODUCER step 2: "shoot the shots" — render a coherent image for every storyboard scene
+// THE PRODUCER step 2: "shoot the shots" - render a coherent image for every storyboard scene
 // (durable; the UI polls the storyboard GET for production.shots). Fire-and-poll, never hangs.
 export const maxDuration = 30;
 
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const roleFilter = body.roleFilter === "a-roll" || body.roleFilter === "b-roll" ? String(body.roleFilter) : "";
   const aspectRatio = ["9:16", "1:1", "16:9"].includes(body.aspectRatio) ? String(body.aspectRatio) : "";
 
-  // Re-shooting invalidates everything downstream — clear clips, audio and final cut + reset approvals
+  // Re-shooting invalidates everything downstream - clear clips, audio and final cut + reset approvals
   // past Voice. Shooting ONE role keeps the OTHER role's existing stills AND its approval (so approving
   // a-roll then shooting b-roll doesn't throw you back to a-roll). The whole board clears all.
   const otherRoleApproval = roleFilter === "a-roll" ? "brollRefs" : roleFilter === "b-roll" ? "arollRefs" : "";

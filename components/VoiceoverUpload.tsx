@@ -6,7 +6,7 @@ import Uploader from "@/components/Uploader";
 
 // Use the producer's OWN recorded voice as the voiceover: upload one recording of the script, Scribe
 // aligns it to the scenes (server), then we slice the recording per scene in the browser (Web Audio)
-// and save the pieces — so the real voice drives a-roll lip-sync + b-roll narration, no cloning.
+// and save the pieces - so the real voice drives a-roll lip-sync + b-roll narration, no cloning.
 function sliceToWav(buffer: AudioBuffer, start: number, end: number): Blob {
   const sr = buffer.sampleRate;
   const s0 = Math.max(0, Math.floor(start * sr));
@@ -66,8 +66,8 @@ export default function VoiceoverUpload({ influencerId, presetUrl, onDone }: { i
     <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
       <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Or upload your own voiceover</div>
       {presetUrl
-        ? <p className="mb-2 text-[12px] text-ink-dim">We&apos;ll use <b>the recording you scripted from</b> — slicing your real voice into each scene now (no AI voice, no cloning). Or upload a different recording below.</p>
-        : <p className="mb-2 text-[12px] text-ink-dim">Record yourself reading the script and upload it — we transcribe it (Scribe), slice it per scene, and use <b>your real voice</b> for every scene (no AI voice, no cloning). What you record is what ships.</p>}
+        ? <p className="mb-2 text-[12px] text-ink-dim">We&apos;ll use <b>the recording you scripted from</b> - slicing your real voice into each scene now (no AI voice, no cloning). Or upload a different recording below.</p>
+        : <p className="mb-2 text-[12px] text-ink-dim">Record yourself reading the script and upload it - we transcribe it (Scribe), slice it per scene, and use <b>your real voice</b> for every scene (no AI voice, no cloning). What you record is what ships.</p>}
       {url && <p className="mb-2 text-[11px] text-ready">✓ Recording ready{presetUrl && url === presetUrl ? " (from the script step)" : ""}.</p>}
       <Uploader kind="my-vo" accept="audio" label={url ? "Upload a different recording" : "Upload your voiceover recording"} onUploaded={(u) => { setUrl(u); setErr(""); }} />
       {url && (

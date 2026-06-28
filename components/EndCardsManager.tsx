@@ -66,15 +66,15 @@ export default function EndCardsManager({ initial }: { initial: EndCard[] }) {
             </div>
           </div>
         </div>
-        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Name it (e.g. MoMo end card — yellow)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
+        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Name it (e.g. MoMo end card - yellow)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
         <Uploader kind="endcard" accept={kind} label={`Upload your ${ratio} end ${kind}`} current={url} onUploaded={setUrl} />
         {err && <p className="text-xs text-alert">{err}</p>}
         <button onClick={add} disabled={!url || busy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? "Saving…" : "＋ Add to library"}</button>
       </div>
 
-      {/* Library — grouped by shape so each shows at its correct size */}
+      {/* Library - grouped by shape so each shows at its correct size */}
       {cards.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line bg-surface-1 p-6 text-center text-sm text-ink-faint">No end cards yet. Upload a closing clip or frame above — it&apos;ll be available to append to any cut in the Producer.</p>
+        <p className="rounded-xl border border-dashed border-line bg-surface-1 p-6 text-center text-sm text-ink-faint">No end cards yet. Upload a closing clip or frame above - it&apos;ll be available to append to any cut in the Producer.</p>
       ) : (
         <>
           {vertical.length > 0 && (

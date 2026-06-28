@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { listTools, callMcp } from "@/lib/vendors/higgsfield";
 
-// VERIFICATION SPIKE, step 1 — PRE-FLIGHT (read-only, no spend). Pull the REAL Higgsfield video
+// VERIFICATION SPIKE, step 1 - PRE-FLIGHT (read-only, no spend). Pull the REAL Higgsfield video
 // model ids + each model's accepted params (media roles, durations, ratios, soul_id, audio) so we
 // can wire Veo / Kling / Cinema Studio exactly instead of guessing. Super-admin only.
 export const dynamic = "force-dynamic";

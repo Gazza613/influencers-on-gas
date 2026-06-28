@@ -27,7 +27,7 @@ export type UsageInput = {
 // Control. `metered()` runs the vendor call and records its cost together, so a
 // new production step can't ship untracked. `count` may be a number or derived
 // from the result (e.g. number of images / chunks returned). Recording never
-// throws into the caller — cost logging must not break a generation.
+// throws into the caller - cost logging must not break a generation.
 export async function metered<T>(
   meta: Omit<UsageInput, "count"> & { count?: number | ((r: T) => number) },
   fn: () => Promise<T>,

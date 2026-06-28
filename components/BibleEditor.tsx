@@ -14,7 +14,7 @@ function Bare({ value, onChange, multiline, placeholder }: { value: string; onCh
   return <textarea value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} rows={rows} className={cls} />;
 }
 
-// One labelled field — label sits ABOVE the value so long text gets the full width.
+// One labelled field - label sits ABOVE the value so long text gets the full width.
 function Field({ label, value, onChange, multiline }: { label: string; value: unknown; onChange: (v: string) => void; multiline?: boolean }) {
   return (
     <div className="py-1.5">
@@ -114,7 +114,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
     });
   }
 
-  // "Perfect with AI" — polish the rough brief into a richer, castable one (the user can still edit it).
+  // "Perfect with AI" - polish the rough brief into a richer, castable one (the user can still edit it).
   async function perfect() {
     if (perfecting || busy || brief.trim().length < 4) return;
     setPerfecting(true); setErr("");
@@ -122,7 +122,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
       const r = await fetch(`/api/influencers/${influencerId}/bible/perfect`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief }) });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.brief) setBrief(d.brief);
-      else setErr(d?.error || "Couldn't perfect that — try again.");
+      else setErr(d?.error || "Couldn't perfect that - try again.");
     } finally { setPerfecting(false); }
   }
 
@@ -152,7 +152,7 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
       </div>
       <p className="mt-2 text-sm text-ink-dim">
         {bible
-          ? <>Your character is <b className="text-ink">cast</b>. Everything below is yours — click any line to edit it (it saves as you type), hit <span className="text-[#c79bff]">↻ Reimagine</span> on a section to re-roll just that part, or <span className="text-[#c79bff]">↻ Re-brief</span> up top to start a whole new character.</>
+          ? <>Your character is <b className="text-ink">cast</b>. Everything below is yours - click any line to edit it (it saves as you type), hit <span className="text-[#c79bff]">↻ Reimagine</span> on a section to re-roll just that part, or <span className="text-[#c79bff]">↻ Re-brief</span> up top to start a whole new character.</>
           : <>This is where your influencer is born. Tell us a line or two about who they are, and our co-pilot casts a full film-grade character: their face, their story, the way they move, even their wardrobe. Think of it as the audition before the photoshoot. The richer the brief, the more alive they feel.</>}
       </p>
 

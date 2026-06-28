@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { isSafePublicUrl } from "@/lib/safe-url";
 
 // Same-origin proxy for a media file (e.g. an uploaded voice recording), so the browser can read its
-// bytes into Web Audio for slicing — cross-origin blob fetches are otherwise CORS-blocked. SSRF-guarded.
+// bytes into Web Audio for slicing - cross-origin blob fetches are otherwise CORS-blocked. SSRF-guarded.
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
