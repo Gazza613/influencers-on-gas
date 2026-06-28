@@ -518,7 +518,7 @@ const STORYBOARD_SCHEMA = {
           blocking: { type: "string" },
           performance: { type: "string" },
           graphics: { type: "array", items: { type: "string" } },
-          vo_line: { type: "string", description: "the spoken line for this scene, or empty if none" },
+          vo_line: { type: "string", description: "the spoken line for this scene - REQUIRED for EVERY scene, never empty. The continuous voiceover covers ALL scenes (a-roll AND b-roll) so the audio is never silent; each scene carries a contiguous chunk of full_vo, sized to roughly match its on-screen seconds." },
           caption: { type: "string", description: "burned-in caption, matches vo_line, short beats split with |" },
           motion_prompt: { type: "string", description: "for b-roll/a-roll: short natural movement direction for the video engine" },
           music_sfx: { type: "string" },
