@@ -216,9 +216,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (activePolls.current.has(statusKey)) return; // already polling this - don't double up
     activePolls.current.add(statusKey);
     try {
-      // ~25 min: must comfortably OUTLAST the backend render window (~16 min) so the UI catches completion.
-      for (let i = 0; i < 250; i++) {
-        await new Promise((res) => setTimeout(res, 6000));
+      // ~58 min with a gentle back-off: must comfortably OUTLAST the SLOWEST render. b-roll (Higgsfield
+      // DoP) can legitimately sit 20-40 min in its queue, so a shorter poll made a healthy render LOOK
+      // stuck and pushed you to "Reset if stuck". 6s for the first ~6 min (frames land fast), then 12s.
+      for (let i = 0; i < 320; i++) {
+        await new Promise((res) => setTimeout(res, i < 60 ? 6000 : 12000));
         const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
         if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
       }

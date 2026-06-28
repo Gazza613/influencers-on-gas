@@ -1,6 +1,6 @@
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { db } from "@/lib/db";
-import { getInfluencer, updateInfluencer } from "@/lib/influencers";
+import { getInfluencer, updateProductionFields } from "@/lib/influencers";
 
 // Ops alerting: when the platform hits a real problem (a vendor out of credits, a rejected/expired API
 // key, a vendor down/timing out, or a build step that failed outright), email the admin a branded,
@@ -101,6 +101,7 @@ export async function alertIfCritical(provider: string, errorMessage: string, co
 // stuck "running" (phantom spinning / "rendering" tiles). Keyed by Inngest function id.
 const STATUS_FIELD: Record<string, string> = {
   "generate-shots": "shots_status",
+  "reshoot-shot": "shots_status",
   "generate-clips": "clips_status",
   "generate-audio": "audio_status",
   "assemble-video": "assembly_status",
@@ -118,9 +119,9 @@ export async function onProductionFailure(ctx: { event?: { data?: { event?: { na
   if (field && influencerId) {
     try {
       const inf = await getInfluencer(influencerId);
-      const persona = (inf?.persona ?? {}) as Record<string, unknown>;
-      const prod = (persona.production ?? {}) as Record<string, unknown>;
-      if (prod[field] === "running") await updateInfluencer(influencerId, { persona: { ...persona, production: { ...prod, [field]: "idle" } } });
+      const prod = ((inf?.persona ?? {}) as Record<string, unknown>).production as Record<string, unknown> | undefined;
+      // SCOPED reset: only clears the stuck status flag - can't clobber a concurrent save's clips/shots/audio.
+      if (prod?.[field] === "running") await updateProductionFields(influencerId, { [field]: "idle" });
     } catch { /* best-effort */ }
   }
   await alertOps({

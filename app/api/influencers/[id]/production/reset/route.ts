@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getInfluencer, updateInfluencer } from "@/lib/influencers";
+import { getInfluencer, updateProductionFields } from "@/lib/influencers";
 
 // Clear stuck "running" flags on a production (shoot / clips / assembly) so the UI unlocks if a job
 // died mid-way. Keeps all the shots/clips/final already produced; only resets the status.
@@ -19,9 +19,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Optional: drop ALL existing clips + the final cut (leftover videos from earlier testing) so the board
   // is clean keyframes again. Keeps the storyboard, shots, voice and approvals - just the videos go.
   const clearClips = body?.clearClips === true;
-  // Also clear any per-scene re-shoot flags left mid-flight.
+  // Also clear any per-scene re-shoot flags left mid-flight. SCOPED write so a genuinely-live concurrent
+  // render's clips/shots aren't clobbered - we only touch the status flags (+ optional clip clear).
   const shots = Array.isArray(production.shots) ? (production.shots as Record<string, unknown>[]).map((s) => ({ ...s, reshooting: false })) : production.shots;
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, shots, shots_status: "idle",
-    ...(clearClips ? { clips: [], final_url: null } : {}), clips_status: "idle", assembly_status: "idle", audio_status: "idle" } } });
+  await updateProductionFields(id, { shots, shots_status: "idle",
+    ...(clearClips ? { clips: [], final_url: null } : {}), clips_status: "idle", assembly_status: "idle", audio_status: "idle" });
   return NextResponse.json({ ok: true });
 }
