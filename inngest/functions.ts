@@ -1662,13 +1662,11 @@ export const reshootShot = inngest.createFunction(
     const row = { scene: index, role, beat: String(sc.beat || ""), url: hosted || (list.find((s) => s.scene === index)?.url ?? null), error: hosted ? null : "no image", reshooting: false };
     const at = list.findIndex((s) => s.scene === index);
     if (at >= 0) list[at] = row; else list.push(row);
-    // Re-shooting the still drops this scene's stale clip, then immediately re-renders just this
-    // scene's clip (a-roll → fresh lip-synced video, b-roll → fresh motion) so the new clip drops
-    // straight back into the step preview — no separate "render" click needed.
+    // KEYFRAME ONLY: re-shooting the still drops this scene's stale clip but does NOT render a new video.
+    // Animation is a separate, later step (after the voice is set) — the storyboard only produces
+    // reference images, never final production.
     const freshClips = Array.isArray(prod.clips) ? (prod.clips as { scene: number }[]).filter((c) => c.scene !== index) : prod.clips;
-    const hasFrame = list.some((s) => Number(s.scene) === index && s.url);
-    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, clips: freshClips, ...(hasFrame ? { clips_status: "running" } : {}) } } }));
-    if (hasFrame) await step.run("queue-clip", () => inngest.send({ name: "influencer/generate.clips", data: { influencerId, scenes: [index] } }));
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, shots: list, clips: freshClips } } }));
     return { ok: !!hosted };
   },
 );

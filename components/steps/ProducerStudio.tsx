@@ -783,7 +783,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         // production so the wizard shows the animate steps need re-rendering with the new voice.
                         fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
                         setVoiceoverUrl(""); // voice changed → the old full take no longer applies; re-generate
-                        accept("voice"); // choosing a voice IS the approval - never block the next step asking to "approve voice"
+                        // Do NOT auto-approve on selection - it jumped past the test. You test (v2/v3,
+                        // generate + listen) and then Accept (or generating the full voiceover approves it).
                       }} />
                     {/* Voice model: v2 stable vs v3 expressive. Always visible in the Voice step. */}
                     <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
