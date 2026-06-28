@@ -493,9 +493,12 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {([["false", "Standard", "Free, but can sit in a slow queue"], ["true", "⚡ Priority", "Jumps the queue - a few credits per image, metered in Cost Control"]] as const).map(([k, label, hint]) => {
               const on = (k === "true") === priority;
+              const isPriority = k === "true";
+              // The Priority option glows so it can't be missed: a breathing glow when not chosen, a steady glow when on.
+              const glow = isPriority ? (on ? "priority-on border-[#60a5fa]" : "priority-pulse border-[#60a5fa]/60") : (on ? "border-[#60a5fa]" : "border-line hover:border-line-strong");
               return (
-                <button key={k} onClick={() => setPriority(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#60a5fa] bg-[#60a5fa]/12" : "border-line hover:border-line-strong"}`}>
-                  <div className={`text-sm font-bold ${on ? "text-[#93c5fd]" : "text-ink-dim"}`}>{label}</div>
+                <button key={k} onClick={() => setPriority(k === "true")} className={`rounded-lg border-2 px-3 py-2 text-left transition ${on ? "bg-[#60a5fa]/12" : ""} ${glow}`}>
+                  <div className={`text-sm font-bold ${on || isPriority ? "text-[#93c5fd]" : "text-ink-dim"}`}>{label}</div>
                   <div className="text-[10px] text-ink-faint">{hint}</div>
                 </button>
               );
