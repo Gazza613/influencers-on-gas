@@ -25,10 +25,13 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
     >
       {/* Hero with an accent glow */}
       <div className="relative overflow-hidden border-b border-white/5">
-        <header className="relative mx-auto flex max-w-6xl items-center gap-2.5 px-6 py-5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gas-logo.png" alt="GAS" className="h-9 w-9 rounded-full ring-1 ring-white/15" />
-          <span className="font-extrabold tracking-tight">Influencers <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">on</span> GAS</span>
+        <header className="relative mx-auto flex max-w-6xl items-center gap-3 px-6 py-5">
+          <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#60a5fa] p-[2.5px] shadow-[0_0_28px_rgba(168,85,247,0.55)]">
+            <span className="pointer-events-none absolute inset-0 animate-pulse rounded-full bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#60a5fa] opacity-40 blur-md" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/gas-logo.png" alt="GAS" className="relative h-full w-full rounded-full object-cover ring-1 ring-black/50" />
+          </span>
+          <span className="text-lg font-extrabold tracking-tight">Influencers <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">on</span> GAS</span>
         </header>
         <div className="relative mx-auto max-w-3xl px-6 pb-14 pt-8 text-center sm:pt-12">
           <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">AI Influencer Studio</span>
@@ -64,7 +67,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
       {/* CTA — this is a sales tool, so close with a clear next step */}
       <section className="relative overflow-hidden border-t border-white/10">
         <div className="relative mx-auto max-w-3xl px-6 py-16 text-center">
-          <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Want this for your brand?</h3>
+          <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Influence that converts.</h3>
           <p className="mx-auto mt-3 max-w-lg text-sm text-white/60">
             To influence that matters and conversations that count and convert.
           </p>
