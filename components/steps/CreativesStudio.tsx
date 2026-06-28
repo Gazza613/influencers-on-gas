@@ -381,7 +381,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         </p>
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/8 px-3 py-2 text-[13px] leading-relaxed text-ink-dim">
           <span className="text-lg leading-none">🔎</span>
-          <span>Every shot is rendered with built-in guardrails baked into the prompt, <span className="text-[#c79bff] font-semibold">fully clothed, a single clean frame, true proportions and real skin</span>. Shots appear as they finish; pick your keepers and upscale those to 4K.</span>
+          <span>Every shot is rendered with built-in guardrails baked into the prompt, <span className="text-[#c79bff] font-semibold">a single clean frame, true proportions and real skin</span>. Shots appear as they finish; pick your keepers and upscale those to 4K.</span>
         </div>
 
         {/* Platforms (toggle) */}
