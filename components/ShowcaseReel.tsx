@@ -3,6 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { ShowcaseVideo } from "@/lib/showcase";
 
+// Many reels open on a black intro fade, so frame 0 is black. Rest the tile on a real content frame
+// (~1-2s in) instead, so previews never show a black screen.
+const POSTER_T = (el: HTMLVideoElement) => {
+  const d = el.duration;
+  return Number.isFinite(d) && d > 0 ? Math.min(2, d * 0.2) : 1.2;
+};
+
 // Premium, client-facing reel: tiles preview muted on hover; tap the speaker to play WITH SOUND right in
 // the grid (one at a time), or click the tile for a full-size player.
 export default function ShowcaseReel({ videos }: { videos: ShowcaseVideo[] }) {
@@ -27,7 +34,7 @@ export default function ShowcaseReel({ videos }: { videos: ShowcaseVideo[] }) {
             <video
               src={active.final_video_url ?? undefined}
               controls autoPlay playsInline
-              onEnded={(e) => { const el = e.currentTarget; el.currentTime = 0; el.pause(); }}
+              onEnded={(e) => { const el = e.currentTarget; el.currentTime = POSTER_T(el); el.pause(); }}
               className="aspect-[9/16] max-h-[88vh] rounded-2xl bg-black shadow-[0_30px_120px_rgba(168,85,247,0.35)]"
             />
             {active.title && <div className="mt-3 text-center text-sm font-semibold text-white/80">{active.title}</div>}
@@ -54,12 +61,13 @@ function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () =>
         ref={ref}
         src={v.final_video_url ?? undefined}
         muted playsInline preload="metadata"
+        onLoadedMetadata={(e) => { const el = e.currentTarget; el.currentTime = POSTER_T(el); }}
         onMouseEnter={() => { const el = ref.current; if (el) el.play().catch(() => {}); }}
-        onMouseLeave={() => { const el = ref.current; if (el && !soundOn) el.pause(); }}
+        onMouseLeave={() => { const el = ref.current; if (el && !soundOn) { el.pause(); el.currentTime = POSTER_T(el); } }}
         onEnded={(e) => {
-          // Finished: snap back to the first frame (so we never sit on a black end frame). A muted
-          // hover-preview loops; a sound-on play resets, pauses and clears the sound.
-          const el = e.currentTarget; el.currentTime = 0;
+          // Finished: rest on a CONTENT frame (never a black start/end frame). A muted hover-preview
+          // loops from there; a sound-on play resets, pauses and clears the sound.
+          const el = e.currentTarget; el.currentTime = POSTER_T(el);
           if (soundOn) { el.pause(); onSound(false); } else { el.play().catch(() => {}); }
         }}
         onClick={onOpen}
