@@ -511,7 +511,9 @@ export const generateCreatives = inngest.createFunction(
     // not hold identity in testing; references do). Renders on Nano Banana Pro (best reference
     // fidelity, native square, free on our plan), falling back to the previously-validated
     // gpt_image_2 if the model is unavailable. `cinematic` is an explicit flag, not a model name.
-    const genModel = IMAGE_MODEL;
+    // PRIORITY (faster, paid) render queue when the producer opts in; else the free default. genModel
+    // drives both generation and metering, so this one switch makes the whole creatives run + cost match.
+    const genModel = event.data.priority === true ? PRIORITY_MODEL : IMAGE_MODEL;
     const cinematic = event.data.cinematic === true;
 
     // Re-read + a run COUNTER so concurrent renders (e.g. a 9:16 and a 1:1 at once) don't clobber

@@ -62,6 +62,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   // sets a sensible extras default for that style (still overridable below).
   const [creativeRole, setCreativeRole] = useState<"a-roll" | "b-roll">("a-roll");
   const [extras, setExtras] = useState(false);
+  const [priority, setPriority] = useState(false); // ⚡ faster, paid render queue (opt-in for speed)
   const pickRole = (r: "a-roll" | "b-roll") => { setCreativeRole(r); setExtras(r === "b-roll"); };
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
@@ -187,7 +188,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     setErr(""); setStatus("running"); setStartedAt(Date.now());
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRefs, extras, identityLock, role: creativeRole }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRefs, extras, identityLock, role: creativeRole, priority }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);
@@ -478,6 +479,22 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               return (
                 <button key={k} onClick={() => setExtras(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
                   <div className={`text-sm font-bold ${on ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
+                  <div className="text-[10px] text-ink-faint">{hint}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Render speed: free (slower) vs priority (faster, paid) */}
+        <div className="mt-4">
+          <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Render speed</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {([["false", "Standard", "Free, but can sit in a slow queue"], ["true", "⚡ Priority", "Jumps the queue - a few credits per image, metered in Cost Control"]] as const).map(([k, label, hint]) => {
+              const on = (k === "true") === priority;
+              return (
+                <button key={k} onClick={() => setPriority(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#60a5fa] bg-[#60a5fa]/12" : "border-line hover:border-line-strong"}`}>
+                  <div className={`text-sm font-bold ${on ? "text-[#93c5fd]" : "text-ink-dim"}`}>{label}</div>
                   <div className="text-[10px] text-ink-faint">{hint}</div>
                 </button>
               );
