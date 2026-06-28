@@ -619,7 +619,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {/* Reference-image shoot (keyframes only, no video) - available right here at the storyboard. */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-2.5">
             <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
-            <span className="text-[11px] text-ink-faint">Shoot each scene&apos;s still here. No video yet, that comes after you set the voice. Shoot all, or one at a time on the cards below.</span>
+            <span className="text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below.</span>
             <div className="ml-auto flex items-center gap-2">
               <RatioPicker value={boardRatio} onChange={setBoardRatio} />
               <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
@@ -654,16 +654,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         </div>
                       ) : rendering && !clip?.url && (renderingRole === "" || renderingRole === s.role) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…</div>
-                      ) : clipFailed ? (
-                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[9px] text-alert" title={clip.error || ""}>clip failed{shot?.url && <span className="text-ink-faint">(still ok)</span>}</div>
                       ) : shot?.url ? (
                         <div className="relative">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={shot.url} alt={`scene ${i + 1}`} onClick={() => setZoom(shot.url!)} className="aspect-[9/16] w-full cursor-zoom-in rounded-lg border border-line object-cover transition hover:brightness-110" title="Click to preview full size" />
-                          {/* The keyframe is shot but its clip hasn't been rendered yet - that's a later step. */}
-                          <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">⏳ {s.role} clip pending</span>
+                          {/* The reference image is the HERO. Only once you're at the animate step do we badge the clip
+                              state (pending / failed) - we never hide a good still behind a clip message. */}
+                          {stepReached && <span className={`tabular absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide ${clipFailed ? "bg-alert/85 text-black" : "bg-black/65 text-ink-dim"}`} title={clipFailed ? (clip?.error || "") : ""}>{clipFailed ? "⚠ clip failed - re-animate" : `⏳ ${s.role} clip pending`}</span>}
                         </div>
-                      ) : (shooting && (shootingRole === "" || shootingRole === s.role)) ? (
+                      ) : clipFailed ? (
+                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[9px] text-alert" title={clip.error || ""}>clip failed</div>
+                      ) : (shooting && !anyReshooting && (shootingRole === "" || shootingRole === s.role)) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />shooting…</div>
                       ) : shot?.error ? (
                         <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-alert/30 bg-surface-2 text-center text-[10px] text-alert">shot failed</div>
