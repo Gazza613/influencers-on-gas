@@ -1,11 +1,12 @@
 import AppHeader from "@/components/AppHeader";
 import ShowcaseManager from "@/components/ShowcaseManager";
-import { getShowcaseToken, listFinishedVideos } from "@/lib/showcase";
+import { getShowcaseSlug, listFinishedVideos } from "@/lib/showcase";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShowcasePage() {
-  const [token, videos] = await Promise.all([getShowcaseToken(), listFinishedVideos()]);
+  const videos = await listFinishedVideos();
+  const token = getShowcaseSlug(); // clean shareable link, e.g. /s/showreel
   return (
     <div className="flex h-full flex-col">
       <AppHeader />
