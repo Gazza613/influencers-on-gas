@@ -27,7 +27,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
       <div className="relative overflow-hidden border-b border-white/5">
         <header className="relative mx-auto flex max-w-6xl items-center gap-2.5 px-6 py-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gas-logo.png" alt="GAS" className="h-7 w-7 rounded-full ring-1 ring-white/15" />
+          <img src="/gas-logo.png" alt="GAS" className="h-9 w-9 rounded-full ring-1 ring-white/15" />
           <span className="font-extrabold tracking-tight">Influencers <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">on</span> GAS</span>
         </header>
         <div className="relative mx-auto max-w-3xl px-6 pb-14 pt-8 text-center sm:pt-12">
@@ -74,8 +74,28 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
         </div>
       </section>
 
-      <footer className="border-t border-white/5 px-5 py-6 text-center text-xs text-white/35">
-        Produced with Influencers on GAS · GAS Marketing
+      <footer className="border-t border-white/10">
+        <div className="mx-auto max-w-6xl px-6 py-10">
+          <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:text-left">
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/gas-logo.png" alt="GAS" className="h-10 w-10 rounded-full ring-1 ring-white/15" />
+              <div>
+                <div className="font-extrabold tracking-tight">GAS Marketing</div>
+                <div className="text-xs text-white/55">Conversations that Count</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm">
+              <a href="https://www.gasmarketing.co.za" target="_blank" rel="noreferrer" className="font-semibold text-white/80 hover:text-white">gasmarketing.co.za</a>
+              <a href="https://www.instagram.com/gasmarketingsa/" target="_blank" rel="noreferrer" className="text-white/60 hover:text-white">Instagram</a>
+              <a href="https://www.linkedin.com/company/gas-converged-data/" target="_blank" rel="noreferrer" className="text-white/60 hover:text-white">LinkedIn</a>
+              <a href="https://www.facebook.com/dataongas/" target="_blank" rel="noreferrer" className="text-white/60 hover:text-white">Facebook</a>
+            </div>
+          </div>
+          <p className="mt-7 border-t border-white/5 pt-5 text-center text-xs text-white/35">
+            Response marketing, powered by AI · Produced with Influencers on GAS · © GAS Marketing
+          </p>
+        </div>
       </footer>
     </div>
   );
