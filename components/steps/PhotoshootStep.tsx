@@ -35,9 +35,8 @@ export default function PhotoshootStep({
   const [st, setSt] = useState(initialStatus);
   const [startedAt, setStartedAt] = useState<number | null>(startedAtInit);
   const [frames, setFrames] = useState<Ref[]>(initialFrames || []);
-  const [selected, setSelected] = useState<Set<string>>(
-    new Set(selectedInit.length ? selectedInit : (initialFrames || []).map((f) => f.url)),
-  );
+  // Start with NOTHING pre-selected (restore a prior pick if there is one) — the user chooses their 5+.
+  const [selected, setSelected] = useState<Set<string>>(new Set(selectedInit));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
@@ -142,7 +141,7 @@ export default function PhotoshootStep({
       {hasSet && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[13px] leading-relaxed text-ink-dim">Every frame is the same person across angles, lighting and expressions. The highlighted ones are the frames you have kept. Tap to deselect any odd ones, keep your strongest 5 or more.</p>
+            <p className="text-[13px] leading-relaxed text-ink-dim">Every frame is the same person across angles, lighting and expressions. Tap the ones you love to keep them, and pick your strongest 5 or more. The highlighted frames are the ones you have selected.</p>
             <span className="tabular shrink-0 rounded-full border border-[#a855f7]/40 bg-[#a855f7]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#c79bff]">{selected.size} kept</span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -155,7 +154,7 @@ export default function PhotoshootStep({
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={f.url} alt={`frame ${i + 1}`} onError={() => setBroken((b) => new Set(b).add(f.url))}
-                      className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_18px_rgba(168,85,247,0.5)]" : "border-line opacity-40 hover:opacity-80"}`} />
+                      className={`aspect-[9/16] w-full rounded-lg border-2 object-cover transition ${sel ? "border-[#a855f7] shadow-[0_0_18px_rgba(168,85,247,0.5)]" : "border-line hover:border-[#a855f7]/60"}`} />
                   )}
                   <span className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border text-sm transition ${sel ? "border-white bg-[#a855f7] text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]" : "border-white/60 bg-black/45 text-transparent"}`}>✓</span>
                   {f.hero && <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Chosen</span>}
