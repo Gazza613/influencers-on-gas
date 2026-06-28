@@ -1314,7 +1314,12 @@ export const generateClips = inngest.createFunction(
       // DoP (first-party Higgsfield SDK) — opt-in for b-roll via BROLL_ENGINE=dop. The dedicated
       // image-to-video REST API, used instead of the flaky MCP-Kling path that keeps timing out.
       // Falls through to MCP-Kling below if DoP isn't configured, errors, or returns no url.
-      if (role === "b-roll" && !hero && process.env.BROLL_ENGINE === "dop" && dopConfigured()) {
+      // The DoP renders a FIXED short length (~5s) regardless of the duration we request, so a b-roll whose
+      // narration runs longer would FREEZE on its last frame waiting for the voice (Gary's "b-roll pause").
+      // Use the fast DoP only when the clip fits in its fixed length; route longer b-roll to Kling, which
+      // honours the 3-15s duration so the video matches the narration. Env-tunable cap.
+      const DOP_MAX_SECONDS = Math.max(3, Number(process.env.DOP_MAX_SECONDS) || 5);
+      if (role === "b-roll" && !hero && process.env.BROLL_ENGINE === "dop" && dopConfigured() && clipSeconds <= DOP_MAX_SECONDS) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
         // anyway (same backstop as HeyGen) so a 429 waits-and-lands instead of silently dropping to Kling.
