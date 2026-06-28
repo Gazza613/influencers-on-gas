@@ -919,6 +919,7 @@ export const generateShots = inngest.createFunction(
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running" } } }));
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
+    let castAnchor: string | null = null; // first b-roll frame WITH companions - locks the daughter/companion look + outfit across every b-roll scene
     // CONTINUITY across separate role shoots: a-roll and b-roll references are now shot in separate
     // passes, so when shooting ONE role, anchor it to a frame ALREADY shot for the other role — else
     // the two galleries would render unrelated worlds. (Whole-board shoots set worldRef from frame 1.)
@@ -940,15 +941,23 @@ export const generateShots = inngest.createFunction(
       const worldTag = worldRef ? `@image${++n}` : "";
       const phoneTag = phoneMedia ? `@image${++n}` : "";
       const roleRefTag = roleRefMedia ? `@image${++n}` : "";
+      // Cast anchor: only on b-roll scenes that actually have a companion (talent beyond the influencer),
+      // and only once one has been shot. It locks the daughter/companion's look + outfit across b-roll.
+      const hasCompanions = role === "b-roll" && Array.isArray((sc as Record<string, unknown>).talent) && (sc as unknown as { talent: string[] }).talent.length > 1;
+      const castTag = (castAnchor && hasCompanions) ? `@image${++n}` : "";
       const refInstruction = [
         faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. These face references are the ONLY source of her face and identity — take NOTHING about her face from any wardrobe, world, location or reference-look image. EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer). Every OTHER person in the scene — friends, companions, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling. NEVER duplicate her face, hair or look onto anyone else: absolutely no twins, clones or look-alikes.` : "",
-        roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look and the SINGLE SOURCE OF TRUTH for her WARDROBE: dress her in the EXACT outfit shown in ${roleRefTag} — identical garments, colours, fabric and styling — and match its grooming, lighting and overall mood/world closely. This wardrobe OVERRIDES any clothing mentioned anywhere else in this prompt; if any text describes a different outfit, IGNORE it and follow ${roleRefTag}. Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
+        roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its grooming, styling, lighting and overall mood/world closely for this scene. ${worldTag
+          ? `Her WARDROBE is NOT taken from ${roleRefTag} — it is LOCKED to ${worldTag} below, so her outfit stays IDENTICAL in every single scene; keep her clothing exactly as in ${worldTag}.`
+          : `WARDROBE: dress her in the EXACT outfit shown in ${roleRefTag} — identical garments, colours, fabric and styling — this is the single source of truth for her clothing and OVERRIDES any outfit mentioned in text.`} Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. LOCKED WARDROBE: the influencer wears the EXACT SAME outfit as in ${worldTag} — identical garments, colours, fabric and styling — in every single scene. Never change, swap or restyle her clothing; one consistent outfit across the whole shoot (only her pose, action and the framing change). SUPPORTING CAST CONTINUITY: if ${worldTag} shows any friends or companions, the same people recur here — the SAME individuals (same faces, ages, hair and outfits), not different-looking people swapped in scene to scene.` : "",
         phoneTag ? `${phoneTag} is the PHONE SCREEN content: if the influencer is holding or showing a phone, render its screen displaying THIS exact image, crisp and legible, correctly perspective-fitted to the phone. Do NOT copy any person from it.` : "",
         // Lock recurring companions to a fixed look + outfit so they don't change scene to scene.
         castLockClause(supportingCast, (Array.isArray((sc as Record<string, unknown>).talent) ? (sc as unknown as { talent: string[] }).talent : [])),
+        // Image-anchor the companion(s) to the first b-roll frame so the daughter + her outfit never drift.
+        castTag ? `${castTag} is the CAST ANCHOR: the companion(s) in this scene (e.g. the daughter / family member) are the SAME individuals as in ${castTag} — identical face, age, build, hair AND the SAME outfit/clothing, scene to scene. Take ONLY the companion(s) and their wardrobe from ${castTag}; the main influencer's face comes from the identity references and her own outfit from the world anchor, NOT from ${castTag}.` : "",
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
@@ -960,7 +969,7 @@ export const generateShots = inngest.createFunction(
         // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
         hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: !!worldRef,
       });
-      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : [])].map((value) => ({ value, role: "image" }));
+      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
       // no quality but ~double the render time. 1K ~halves the board with no visible loss.
       const shotExtra = { ...(medias.length ? { medias } : {}), resolution: process.env.HF_BOARD_RES || "1k" };
@@ -1025,7 +1034,23 @@ export const generateShots = inngest.createFunction(
       const firstRow = await renderShot(first.i, first.sc);
       await saveShot(first.i, firstRow);
       if (!worldRef && firstRow.url) worldRef = await step.run(`worldref-${first.i}`, () => importMediaUrl(firstRow.url as string).catch(() => null));
-      const pending = targets.slice(1).map((t) => ({ i: t.i, p: renderShot(t.i, t.sc) }));
+      // Establish the b-roll CAST ANCHOR (first b-roll scene that has a companion) BEFORE the concurrent
+      // render, so every later b-roll scene locks the daughter/companion's look + outfit to it.
+      const isBrollCompanion = (t: { sc: Record<string, string> }) => String(t.sc.role || "") === "b-roll" && Array.isArray((t.sc as Record<string, unknown>).talent) && (t.sc as unknown as { talent: string[] }).talent.length > 1;
+      let rest = targets.slice(1);
+      if (isBrollCompanion(first) && firstRow.url) {
+        castAnchor = worldRef; // the world-anchor frame already includes the companion
+      } else {
+        const bi = rest.findIndex(isBrollCompanion);
+        if (bi >= 0) {
+          const b = rest[bi];
+          const bRow = await renderShot(b.i, b.sc);
+          await saveShot(b.i, bRow);
+          if (bRow.url) castAnchor = await step.run(`castanchor-${b.i}`, () => importMediaUrl(bRow.url as string).catch(() => null));
+          rest = rest.filter((_, k) => k !== bi);
+        }
+      }
+      const pending = rest.map((t) => ({ i: t.i, p: renderShot(t.i, t.sc) }));
       for (const { i, p } of pending) await saveShot(i, await p);
     }
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
