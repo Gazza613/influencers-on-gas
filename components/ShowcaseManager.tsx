@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { upload as blobUpload } from "@vercel/blob/client";
 import type { ShowcaseVideo } from "@/lib/showcase";
-import Uploader from "@/components/Uploader";
+import Uploader, { capturePoster } from "@/components/Uploader";
 
 export default function ShowcaseManager({ token, initial }: { token: string; initial: ShowcaseVideo[] }) {
   const [videos, setVideos] = useState<ShowcaseVideo[]>(initial);
@@ -62,6 +63,27 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ order: on.map((v) => v.id) }),
     }).catch(() => null);
+  }
+
+  // Regenerate the poster still for a video already on the wall: fetch it back, capture a bright frame,
+  // upload it, and save. Needs the blob to be CORS-readable; falls back with a hint if not.
+  async function regenPoster(v: ShowcaseVideo) {
+    if (!v.final_video_url) return;
+    setBusy(v.id);
+    try {
+      const res = await fetch(v.final_video_url, { mode: "cors" });
+      if (!res.ok) throw new Error("fetch failed");
+      const blob = await res.blob();
+      const file = new File([blob], "reel.mp4", { type: blob.type || "video/mp4" });
+      const pb = await capturePoster(file);
+      if (!pb) throw new Error("no frame");
+      const pf = await blobUpload(`influencers/showreel-poster/regen-${v.id}.jpg`, pb, { access: "public", handleUploadUrl: "/api/upload", clientPayload: "showreel-poster" });
+      await fetch("/api/showcase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: v.id, poster_url: pf.url }) });
+      setVideos((vs) => vs.map((x) => (x.id === v.id ? { ...x, poster_url: `${pf.url}?t=${Date.now()}` } : x)));
+    } catch {
+      if (typeof window !== "undefined") window.alert("Couldn't read that video to make a thumbnail. Re-upload it instead and it'll get a fresh poster.");
+    }
+    setBusy(null);
   }
 
   // Rename a reel (the title shown under the video on the wall).
@@ -144,7 +166,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
                       <button onClick={() => reorder(i, i + 1)} disabled={i === onReel.length - 1} title="Move later" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">▶</button>
                       <span title="Drag to reorder" className="ml-0.5 flex h-7 items-center rounded-full bg-black/60 px-2 text-xs text-white/80 backdrop-blur">⠿</span>
                     </div>
-                    <Card v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} reel />
+                    <Card v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} onRegen={regenPoster} reel />
                   </div>
                 ))}</div>}
           </section>
@@ -153,7 +175,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
           {offReel.length > 0 && (
             <section>
               <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Finished videos · {offReel.length}</div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{offReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} />)}</div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{offReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} onRegen={regenPoster} />)}</div>
             </section>
           )}
         </>
@@ -162,7 +184,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
   );
 }
 
-function Card({ v, busy, onToggle, onRemove, onRename, reel = false }: { v: ShowcaseVideo; busy: boolean; onToggle: (id: string, on: boolean) => void; onRemove: (id: string) => void; onRename: (id: string, title: string) => void; reel?: boolean }) {
+function Card({ v, busy, onToggle, onRemove, onRename, onRegen, reel = false }: { v: ShowcaseVideo; busy: boolean; onToggle: (id: string, on: boolean) => void; onRemove: (id: string) => void; onRename: (id: string, title: string) => void; onRegen: (v: ShowcaseVideo) => void; reel?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(v.title || "");
   function save() { setEditing(false); const t = name.trim(); if (t && t !== (v.title || "")) onRename(v.id, t); else setName(v.title || ""); }
@@ -192,13 +214,16 @@ function Card({ v, busy, onToggle, onRemove, onRename, reel = false }: { v: Show
             <span className="shrink-0 text-[11px] text-ink-faint">✎</span>
           </button>
         )}
-        <button
-          onClick={() => (reel ? onRemove(v.id) : onToggle(v.id, true))}
-          disabled={busy}
-          className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50 ${reel ? "border border-line text-ink-dim hover:border-alert/50 hover:text-alert" : "btn-brand"}`}
-        >
-          {busy ? "…" : reel ? "Remove" : "★ Add to showcase"}
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button onClick={() => onRegen(v)} disabled={busy} title="Regenerate thumbnail" className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-ink-dim hover:text-accent disabled:opacity-50">↻🖼</button>
+          <button
+            onClick={() => (reel ? onRemove(v.id) : onToggle(v.id, true))}
+            disabled={busy}
+            className={`rounded-md px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50 ${reel ? "border border-line text-ink-dim hover:border-alert/50 hover:text-alert" : "btn-brand"}`}
+          >
+            {busy ? "…" : reel ? "Remove" : "★ Add to showcase"}
+          </button>
+        </div>
       </div>
     </div>
   );

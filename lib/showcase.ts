@@ -96,6 +96,12 @@ export async function renameShowcaseVideo(id: string, title: string): Promise<vo
   await db()`update productions set title = ${title.slice(0, 120)} where id = ${id}`;
 }
 
+// Set/replace the poster still for a showcase video (used by "regenerate thumbnail").
+export async function setShowcasePoster(id: string, url: string): Promise<void> {
+  await ensureSchema();
+  await db()`update productions set poster_url = ${url} where id = ${id}`;
+}
+
 // Hard-remove a showcase cut so it disappears entirely (re-publish from the Producer's showreel step).
 // Scoped to FINISHED cuts only, so a stray/old id can never delete an in-progress production.
 export async function deleteShowcaseVideo(id: string): Promise<void> {

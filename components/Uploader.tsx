@@ -10,7 +10,7 @@ import { upload as blobUpload } from "@vercel/blob/client";
 // Robust to two failure modes: (1) drawing before the seeked frame is painted — we wait for the actual
 // frame via requestVideoFrameCallback; (2) the sampled point being dark — we measure brightness and try
 // several timestamps, keeping the brightest.
-async function capturePoster(file: File): Promise<Blob | null> {
+export async function capturePoster(file: File): Promise<Blob | null> {
   return new Promise((resolve) => {
     let settled = false;
     let objUrl = "";
