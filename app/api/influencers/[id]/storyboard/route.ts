@@ -4,6 +4,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { generateStoryboard } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
 import { isSafePublicUrl } from "@/lib/safe-url";
+import { bibleProfile } from "@/lib/bible";
 
 const safeUrl = (v: unknown): string => (typeof v === "string" && isSafePublicUrl(v) ? v : "");
 
@@ -35,8 +36,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Influencer profile from the locked bible — so the director casts an age/demographic-suited world,
   // wardrobe and background extras (even when the producer doesn't stipulate a setting).
   const bibleId = ((persona.bible as { identity?: Record<string, string> })?.identity) ?? {};
-  const influencerProfile = [bibleId.age && `age ${bibleId.age}`, bibleId.profession, bibleId.ethnicity_design, bibleId.build]
-    .filter(Boolean).join(", ") || String((persona.bible as { signature_line?: string })?.signature_line || "");
+  // The FULL character bible (identity + performance + psychology + signature wardrobe/palette + tone)
+  // drives the director, so the cast world, wardrobe, performance and VO all align to the character.
+  const influencerProfile = bibleProfile(persona.bible as Record<string, unknown>)
+    || [bibleId.age && `age ${bibleId.age}`, bibleId.profession, bibleId.ethnicity_design, bibleId.build].filter(Boolean).join(", ");
   const brief = {
     influencerName: inf.name,
     influencerProfile,

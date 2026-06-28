@@ -5,6 +5,7 @@ import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { submitDopVideo, pollDopOnce, dopConfigured } from "@/lib/vendors/higgsfield-dop";
 import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
+import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
@@ -874,7 +875,9 @@ export const generateShots = inngest.createFunction(
     // photos the photo is the truth and we must not describe marks that could fight it.
     const faceDesc = [bibleFace.skin, bibleFace.hair, anchored.length ? "" : bibleFace.distinct_features].filter(Boolean).join(", ");
     const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design, faceDesc].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
-    const look = lookClause(persona);
+    // Dress her in her SIGNATURE wardrobe (from the bible) by default, so the cast aligns to the character.
+    const bibleLook = bibleWardrobe(persona.bible as Record<string, unknown>);
+    const look = [lookClause(persona), bibleLook && `wearing ${bibleLook}`].filter(Boolean).join(". ");
 
     // Optional producer uploads: a clothing reference (wardrobe) and a location reference (world).
     const brief = (production?.brief ?? {}) as Record<string, string>;
@@ -1612,7 +1615,9 @@ export const reshootShot = inngest.createFunction(
     // photos the photo is the truth and we must not describe marks that could fight it.
     const faceDesc = [bibleFace.skin, bibleFace.hair, anchored.length ? "" : bibleFace.distinct_features].filter(Boolean).join(", ");
     const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design, faceDesc].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
-    const look = lookClause(persona);
+    // Dress her in her SIGNATURE wardrobe (from the bible) by default, so the cast aligns to the character.
+    const bibleLook = bibleWardrobe(persona.bible as Record<string, unknown>);
+    const look = [lookClause(persona), bibleLook && `wearing ${bibleLook}`].filter(Boolean).join(". ");
     const brief = (production?.brief ?? {}) as Record<string, string>;
     const clothMedia = brief.clothingRef ? await step.run("import-cloth", () => importMediaUrl(brief.clothingRef).catch(() => null)) : null;
     const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;

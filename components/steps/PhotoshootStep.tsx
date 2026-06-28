@@ -22,9 +22,10 @@ const PHOTO_NARRATION = [
 ];
 
 export default function PhotoshootStep({
-  influencerId, status: initialStatus, modelUrl, frames: initialFrames, selectedInit, startedAtInit = null,
+  influencerId, name, status: initialStatus, modelUrl, frames: initialFrames, selectedInit, startedAtInit = null,
 }: {
   influencerId: string;
+  name: string;
   status: string;
   modelUrl: string | null;
   frames: Ref[];
@@ -119,16 +120,16 @@ export default function PhotoshootStep({
 
       {!hasSet && !building && (
         <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <p className="text-[13px] leading-relaxed text-ink-dim">This step is all about her face. We shoot a clean, varied identity set (many angles, lighting and expressions on neutral backgrounds), the proven recipe for a faithful, consistent identity. Wardrobe and locations come later, in Creatives, where you can restyle her freely.</p>
+          <p className="text-[13px] leading-relaxed text-ink-dim">This step is all about {name}&apos;s face. We shoot a clean, varied identity set (many angles, lighting and expressions on neutral backgrounds), the proven recipe for a faithful, consistent identity. Wardrobe and locations come later, in Creatives, where you can restyle {name} freely.</p>
           <button onClick={run} className="btn-brand mt-4 rounded-lg px-4 py-2 text-sm font-bold">📸 Run the photoshoot</button>
         </div>
       )}
 
       {building && (
         <div>
-          <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 5–10 min" startedAt={startedAt}
+          <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 5 to 10 min" startedAt={startedAt}
             pct={frames.length > 1 ? pct : null} sub={`${frames.length}/${SET_TOTAL} frames`}
-            note="A full forensic identity set — frames land in waves as they're shot, not all at once." />
+            note="A full forensic identity set. It stays quiet while the whole set is shot, then the frames drop in together at the end. Usually about 5 to 10 minutes." />
           <div className="mt-2 flex items-center gap-3">
             <button onClick={abort} className="rounded-lg border border-alert/50 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10">⟳ Abort / reset if stuck</button>
             <span className="text-[11px] text-ink-faint">Frames already shot are kept.</span>

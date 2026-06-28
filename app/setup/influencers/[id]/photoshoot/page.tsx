@@ -23,6 +23,7 @@ export default async function PhotoshootPage({ params }: { params: Promise<{ id:
   return (
     <PhotoshootStep
       influencerId={inf.id}
+      name={inf.name}
       status={inf.status}
       modelUrl={modelUrl}
       frames={refs}

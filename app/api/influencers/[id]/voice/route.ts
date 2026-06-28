@@ -43,7 +43,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       voiceName = `${inf.name} (cloned)`;
       await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: "clone", unit: "voice", action: "voice", count: 1 }).catch(() => {});
     } else {
-      const picked = await pickVoiceForGender(typeof persona.gender === "string" ? (persona.gender as string) : "");
+      const descriptor = String((persona.bible as { voice_descriptor?: string })?.voice_descriptor || "");
+      const picked = await pickVoiceForGender(typeof persona.gender === "string" ? (persona.gender as string) : "", descriptor);
       if (!picked) return NextResponse.json({ error: "No voices available on the ElevenLabs account." }, { status: 502 });
       voiceId = picked.voice_id; voiceName = picked.name;
     }

@@ -21,10 +21,11 @@ const CASTING_NARRATION = [
 ];
 
 export default function CastingStep({
-  influencerId, status: initialStatus, candidates: initialCandidates, chosenUrl, referenceUrl,
+  influencerId, name, status: initialStatus, candidates: initialCandidates, chosenUrl, referenceUrl,
   initialBrief, initialBible,
 }: {
   influencerId: string;
+  name: string;
   status: string;
   candidates: Ref[];
   chosenUrl: string | null;
@@ -85,7 +86,7 @@ export default function CastingStep({
 
       {/* Look casting */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Cast the looks</div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Casting {name}&apos;s look</div>
 
         {referenceUrl ? (
           // Reference / twin path, casting is skipped.
@@ -104,18 +105,17 @@ export default function CastingStep({
         ) : (
           <>
             <p className="mt-2 text-sm text-ink-dim">
-              Now we audition the face. We generate <span className="text-ink">6 photoreal looks</span> from your
-              character above, you pick the one that feels right. The looks follow the Character Casting, so to
+              Now we audition {name}&apos;s face. We generate <span className="text-ink">6 photoreal looks</span> from {name}&apos;s
+              character above, and you pick the one that feels right. The looks follow the Character Casting, so to
               change the vibe, tweak the character (or re-brief) first, then cast.
             </p>
             <p className="mt-1 text-[11px] text-ink-faint">
-              💸 Heads up: each casting run costs about <span className="text-ink-dim">6 credits (~R4)</span>. Re-casting
-              spends the same again, so it is worth getting the character right before you fire away.
+              💸 On your Higgsfield <span className="text-ink-dim">Ultra</span> plan these casting images are <span className="text-ink-dim">included</span> (no credit cost) — re-cast as much as you like. Still worth getting the character right first, so the looks land. Live spend is always in <span className="text-ink-dim">Cost Control</span>.
             </p>
 
             {!casting && (
               <button onClick={cast} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold">
-                {candidates.length ? "↻ Re-cast looks (~6 credits)" : "✨ Generate looks"}
+                {candidates.length ? "↻ Re-cast looks" : "✨ Generate looks"}
               </button>
             )}
 

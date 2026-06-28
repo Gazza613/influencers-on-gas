@@ -15,6 +15,7 @@ export default async function CastingPage({ params }: { params: Promise<{ id: st
   return (
     <CastingStep
       influencerId={inf.id}
+      name={inf.name}
       status={inf.status}
       candidates={candidates}
       chosenUrl={(persona.chosen_url as string) ?? null}

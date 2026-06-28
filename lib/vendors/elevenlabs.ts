@@ -37,14 +37,25 @@ export async function listVoices(): Promise<Voice[]> {
 // ── Voice for a-roll (Phase 2) ─────────────────────────────────────────────
 // Pick the best library voice for a gender (synthetics use a designed/library voice,
 // no cloning). Falls back to the first available voice.
-export async function pickVoiceForGender(gender?: string): Promise<{ voice_id: string; name: string } | null> {
+export async function pickVoiceForGender(gender?: string, descriptor?: string): Promise<{ voice_id: string; name: string } | null> {
   const voices = await listVoices().catch(() => [] as Voice[]);
   if (!voices.length) return null;
   const g = (gender || "").toLowerCase();
   const want = g.startsWith("f") ? "female" : g.startsWith("m") ? "male" : "";
-  const match = want ? voices.find((v) => (v.labels?.gender || "").toLowerCase() === want) : null;
-  const v = match || voices[0];
-  return { voice_id: v.voice_id, name: v.name };
+  const pool = want ? voices.filter((v) => (v.labels?.gender || "").toLowerCase() === want) : voices;
+  const candidates = pool.length ? pool : voices;
+  // Score by how well the bible's voice descriptor matches each voice's labels (accent, age, tone, use
+  // case, description) — so the auto-match reflects the character, not just gender.
+  const tokens = String(descriptor || "").toLowerCase().match(/[a-z]{3,}/g) || [];
+  const STOP = new Set(["the", "and", "her", "his", "with", "voice", "for", "that", "she", "speaks", "sounds", "very", "has", "tone", "who"]);
+  const keys = tokens.filter((t) => !STOP.has(t));
+  let best = candidates[0]; let bestScore = -1;
+  for (const v of candidates) {
+    const hay = `${v.name} ${Object.values(v.labels || {}).join(" ")}`.toLowerCase();
+    const score = keys.reduce((n, k) => n + (hay.includes(k) ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; best = v; }
+  }
+  return { voice_id: best.voice_id, name: best.name };
 }
 
 // Clone a voice from one or more audio samples (twins, consent-gated). Returns voice_id.
