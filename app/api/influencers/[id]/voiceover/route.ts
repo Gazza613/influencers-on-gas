@@ -4,6 +4,7 @@ import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { ttsPcm, pcmSliceToWav } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
+import { isSafePublicUrl } from "@/lib/safe-url";
 
 // THE FULL VOICEOVER step: synthesize the WHOLE approved script as ONE continuous take, so the voice is
 // identical across every scene, and the producer can LISTEN to the exact audio that will ship (WYSIWYG).
@@ -21,13 +22,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json({ voiceover_url: prod.voiceover_url ?? null, scenes: Array.isArray(prod.scene_audio) ? (prod.scene_audio as unknown[]).length : 0 });
 }
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const inf = await getInfluencer(id);
   if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
+  const body = await req.json().catch(() => ({}));
+
+  // MANUAL path: the producer uploaded their OWN voice recording; the client already sliced it per scene
+  // (Web Audio, using the Scribe alignment) and uploaded the pieces. Store them as the scene audio — the
+  // animate/stitch pipeline reuses these exactly like the generated voice-once slices.
+  if (Array.isArray(body.scene_audio)) {
+    const clean = (body.scene_audio as { scene?: number; url?: string; duration?: number }[])
+      .filter((e) => typeof e?.scene === "number" && typeof e?.url === "string" && isSafePublicUrl(e.url))
+      .map((e) => ({ scene: e.scene as number, url: e.url as string, duration: Number(e.duration) || 0 }));
+    if (!clean.length) return NextResponse.json({ error: "No valid sliced audio to save." }, { status: 400 });
+    const voUrl = typeof body.voiceover_url === "string" && isSafePublicUrl(body.voiceover_url) ? body.voiceover_url : (clean[0]?.url ?? null);
+    const prod = (persona.production ?? {}) as Record<string, unknown>;
+    await updateInfluencer(id, { persona: { ...persona, production: { ...prod, voiceover_url: voUrl, scene_audio: clean, voiceover_at: Date.now(), voiceover_source: "uploaded" } } });
+    return NextResponse.json({ voiceover_url: voUrl, scenes: clean.length });
+  }
+
   const voiceId = String(persona.voice_id || "");
   if (!voiceId) return NextResponse.json({ error: "Set a voice first." }, { status: 400 });
   const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[] } } | null;

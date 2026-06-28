@@ -5,6 +5,7 @@ import Uploader from "@/components/Uploader";
 import Lightbox from "@/components/Lightbox";
 import Celebration from "@/components/Celebration";
 import VoicePicker from "@/components/VoicePicker";
+import VoiceoverUpload from "@/components/VoiceoverUpload";
 
 type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
@@ -703,6 +704,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ This take is locked in — every a-roll scene lip-syncs to it; b-roll narrates over it. The voice is now identical across all scenes.</p>}
                       </div>
                     )}
+                    {/* Use your OWN recorded voice instead — Scribe aligns + we slice it per scene. */}
+                    <VoiceoverUpload influencerId={influencerId} onDone={() => {
+                      fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); setVoiceoverUrl(`${d.production.voiceover_url || ""}${d.production.voiceover_url ? `?t=${Date.now()}` : ""}`); } }).catch(() => {});
+                      accept("voice");
+                    }} />
                   </>
                 )
               ) : <LockHint />}

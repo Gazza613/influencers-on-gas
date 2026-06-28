@@ -68,6 +68,27 @@ export async function cloneVoice(name: string, sampleUrls: string[]): Promise<st
   return data.voice_id;
 }
 
+// Scribe (speech-to-text) with WORD-LEVEL timestamps — used to align an uploaded real-voice recording
+// to the script so we can slice it per scene (not for generating a voice).
+export async function scribeTranscribe(audioUrl: string): Promise<{ text: string; words: { text: string; start: number; end: number }[] }> {
+  const k = await key();
+  if (!isSafePublicUrl(audioUrl)) throw new Error("Unsafe audio URL");
+  const r = await fetch(audioUrl, { signal: AbortSignal.timeout(30000) });
+  if (!r.ok) throw new Error("Could not fetch the recording");
+  const ct = (r.headers.get("content-type") || "audio/mpeg").split(";")[0];
+  const form = new FormData();
+  form.append("model_id", "scribe_v1");
+  form.append("timestamps_granularity", "word");
+  form.append("file", new Blob([await r.arrayBuffer()], { type: ct }), "voiceover");
+  const res = await fetch(`${BASE}/speech-to-text`, { method: "POST", headers: { "xi-api-key": k }, body: form });
+  const data = (await res.json().catch(() => ({}))) as { text?: string; words?: { text?: string; start?: number; end?: number; type?: string }[] };
+  if (!res.ok) throw new Error(`Scribe failed (${res.status}): ${JSON.stringify((data as { detail?: unknown }).detail || data).slice(0, 180)}`);
+  const words = (Array.isArray(data.words) ? data.words : [])
+    .filter((w) => (w.type || "word") === "word" && typeof w.start === "number" && typeof w.end === "number")
+    .map((w) => ({ text: String(w.text || ""), start: Number(w.start), end: Number(w.end) }));
+  return { text: String(data.text || ""), words };
+}
+
 // The EXPRESSIVE model (supports inline audio tags like [excited], [whispers], [laughs],
 // [thoughtful pause]) for the most human, believable read. Env-overridable in case the
 // account's expressive model id differs; falls back to the stable model on error.
