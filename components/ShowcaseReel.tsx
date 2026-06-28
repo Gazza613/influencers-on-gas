@@ -60,8 +60,10 @@ function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () =>
       <video
         ref={ref}
         src={v.final_video_url ?? undefined}
-        muted playsInline preload="metadata"
+        muted playsInline preload="auto"
         onLoadedMetadata={(e) => { const el = e.currentTarget; el.currentTime = POSTER_T(el); }}
+        onLoadedData={(e) => { const el = e.currentTarget; if (el.currentTime < 0.05) el.currentTime = POSTER_T(el); }}
+        onSeeked={(e) => { const el = e.currentTarget; if (el.paused && el.currentTime < 0.05) el.currentTime = POSTER_T(el); }}
         onMouseEnter={() => { const el = ref.current; if (el) el.play().catch(() => {}); }}
         onMouseLeave={() => { const el = ref.current; if (el && !soundOn) { el.pause(); el.currentTime = POSTER_T(el); } }}
         onEnded={(e) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ShowcaseVideo } from "@/lib/showcase";
 import Uploader from "@/components/Uploader";
 
@@ -46,6 +46,21 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
     }).catch(() => null);
     if (r?.ok) setVideos((vs) => vs.filter((v) => v.id !== id));
     setBusy(null);
+  }
+
+  // Drag-and-drop reorder of the on-reel videos (the order prospects see).
+  const dragIdx = useRef<number | null>(null);
+  function reorder(from: number, to: number) {
+    if (from === to) return;
+    const on = videos.filter((v) => v.showcased);
+    const off = videos.filter((v) => !v.showcased);
+    const [moved] = on.splice(from, 1);
+    on.splice(to, 0, moved);
+    setVideos([...on, ...off]);
+    fetch("/api/showcase", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: on.map((v) => v.id) }),
+    }).catch(() => null);
   }
 
   // Rename a reel (the title shown under the video on the wall).
@@ -107,10 +122,23 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
         <>
           {/* On the showreel */}
           <section>
-            <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ready">★ On the showreel · {onReel.length}</div>
+            <div className="tabular mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-ready">★ On the showreel · {onReel.length}
+              {onReel.length > 1 && <span className="font-medium normal-case tracking-normal text-ink-faint">· drag to reorder</span>}
+            </div>
             {onReel.length === 0
               ? <p className="text-sm text-ink-faint">Nothing on the showreel yet. Flag your best videos in from below.</p>
-              : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{onReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} reel />)}</div>}
+              : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{onReel.map((v, i) => (
+                  <div
+                    key={v.id}
+                    draggable
+                    onDragStart={() => { dragIdx.current = i; }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); if (dragIdx.current !== null) reorder(dragIdx.current, i); dragIdx.current = null; }}
+                    className="cursor-grab active:cursor-grabbing"
+                  >
+                    <Card v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} reel />
+                  </div>
+                ))}</div>}
           </section>
 
           {/* Finished, not on the reel */}
@@ -133,7 +161,12 @@ function Card({ v, busy, onToggle, onRemove, onRename, reel = false }: { v: Show
   return (
     <div className={`overflow-hidden rounded-xl border bg-surface-1 ${reel ? "border-ready/30" : "border-line"}`}>
       {v.final_video_url
-        ? <video src={v.final_video_url} controls playsInline className="aspect-[9/16] max-h-[60vh] w-full bg-black object-contain" />
+        ? <video
+            src={v.final_video_url} controls playsInline draggable={false} preload="auto"
+            onLoadedMetadata={(e) => { const el = e.currentTarget; el.currentTime = Math.min(2, (el.duration || 6) * 0.2); }}
+            onLoadedData={(e) => { const el = e.currentTarget; if (el.currentTime < 0.05) el.currentTime = Math.min(2, (el.duration || 6) * 0.2); }}
+            className="aspect-[9/16] max-h-[60vh] w-full bg-black object-contain"
+          />
         : <div className="flex aspect-[9/16] w-full items-center justify-center bg-surface-2 text-xs text-ink-faint">No video</div>}
       <div className="flex items-center justify-between gap-2 p-3">
         {editing ? (

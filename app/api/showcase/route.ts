@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { listFinishedVideos, setShowcased, deleteShowcaseVideo, renameShowcaseVideo } from "@/lib/showcase";
+import { listFinishedVideos, setShowcased, deleteShowcaseVideo, renameShowcaseVideo, reorderShowcase } from "@/lib/showcase";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,11 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
+  // A drag-and-drop reorder sends an `order` array of ids (no single id needed).
+  if (Array.isArray(body.order)) {
+    await reorderShowcase(body.order.filter((x: unknown) => typeof x === "string"));
+    return NextResponse.json({ ok: true });
+  }
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   // remove === true hard-deletes the cut; a string `title` renames it; otherwise flag it in/out of the reel.

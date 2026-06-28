@@ -17,6 +17,7 @@ let _ensured = false;
 async function ensureSchema(): Promise<void> {
   if (_ensured) return;
   await db()`alter table productions add column if not exists external boolean not null default false`;
+  await db()`alter table productions add column if not exists showcase_order int`;
   _ensured = true;
 }
 
@@ -52,7 +53,7 @@ export async function listShowcaseVideos(): Promise<ShowcaseVideo[]> {
     select id, title, final_video_url, created_at, showcased, external
     from productions
     where status = 'complete' and showcased = true and final_video_url is not null
-    order by created_at desc`) as ShowcaseVideo[];
+    order by showcase_order asc nulls last, created_at desc`) as ShowcaseVideo[];
 }
 
 // What the internal manager shows: every finished video, so a producer can flag
@@ -63,7 +64,13 @@ export async function listFinishedVideos(): Promise<ShowcaseVideo[]> {
     select id, title, final_video_url, created_at, showcased, external
     from productions
     where status = 'complete' and final_video_url is not null
-    order by created_at desc`) as ShowcaseVideo[];
+    order by showcase_order asc nulls last, created_at desc`) as ShowcaseVideo[];
+}
+
+// Save a custom order for the on-reel videos (drag-and-drop). Sets showcase_order to the array index.
+export async function reorderShowcase(ids: string[]): Promise<void> {
+  await ensureSchema();
+  for (let i = 0; i < ids.length; i++) await db()`update productions set showcase_order = ${i} where id = ${ids[i]}`;
 }
 
 // Add a manually-uploaded external showreel (not produced on the platform). Goes straight onto the
