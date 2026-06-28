@@ -36,6 +36,10 @@ const IMAGE_FALLBACK = "nano_banana_pro"; // free fallback (also covers gpt_imag
 // PRIORITY (faster, PAID) image model: jumps Higgsfield's queue when the producer opts in for speed.
 // Metered at its rate_card cost (nano_banana_2 ≈ 1 credit). Env-tunable.
 const PRIORITY_MODEL = process.env.HF_PRIORITY_MODEL || "nano_banana_2";
+// IDENTITY BUILD model (casting + photoshoot): the free models sit in Higgsfield's deprioritised queue
+// for 30+ min, so the foundational build renders on the FAST paid model by default - it's a one-time,
+// metered cost per influencer and far better than a half-hour crawl. Env-tunable (HF_BUILD_MODEL).
+const BUILD_MODEL = process.env.HF_BUILD_MODEL || PRIORITY_MODEL;
 const CREATIVE_FALLBACK = "nano_banana_pro"; // free fallback for creatives/producer (gpt_image_2 is now primary)
 
 // Stage 2 (Photoshoot) builds the Soul TRAINING SET from the chosen face. Recipe follows
@@ -83,10 +87,10 @@ export const generateCandidates = inngest.createFunction(
       // quality after. 1K candidates generate faster AND download to the gallery far quicker (the 2K
       // PNGs were trickling in like a lazy-load).
       const castRes = process.env.HF_CAST_RES || "1k";
-      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), IMAGE_MODEL, "9:16", { resolution: castRes }, IMAGE_FALLBACK));
+      const urls = await step.run("cast", () => generateBatch(Array(CANDIDATE_COUNT).fill(prompt), BUILD_MODEL, "9:16", { resolution: castRes }, IMAGE_FALLBACK));
       const produced = [...new Set(urls.filter((u): u is string => !!u))];
       // Meter what Higgsfield produced (billed), BEFORE dropping any that fail to load.
-      if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "casting", count: produced.length }));
+      if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: BUILD_MODEL, unit: "image", action: "casting", count: produced.length }));
       // Only keep looks whose image actually loads (drops broken/expired URLs).
       const valid = await step.run("validate", () => filterLoadable(produced));
       const candidates = valid.map((url) => ({ url }));
@@ -196,10 +200,10 @@ export const buildIdentity = inngest.createFunction(
           }));
         };
         for (let c = 0; c < prompts.length; c += CHUNK) {
-          const urls = await step.run(`anchored-shoot-${c}`, () => generateBatch(prompts.slice(c, c + CHUNK), IMAGE_MODEL, "9:16", ex, IMAGE_FALLBACK));
+          const urls = await step.run(`anchored-shoot-${c}`, () => generateBatch(prompts.slice(c, c + CHUNK), BUILD_MODEL, "9:16", ex, IMAGE_FALLBACK));
           const got = await step.run(`valid-shoot-${c}`, () => filterLoadable(urls.filter((u): u is string => !!u)));
           if (got.length) {
-            await step.run(`u-shoot-${c}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: got.length }).catch(() => {}));
+            await step.run(`u-shoot-${c}`, () => recordUsage({ influencerId, provider: "higgsfield", model: BUILD_MODEL, unit: "image", action: "photoshoot", count: got.length }).catch(() => {}));
             collected = [...collected, ...got];
             await saveProgress(c, false); // land this wave live
           }
@@ -285,9 +289,9 @@ export const buildIdentity = inngest.createFunction(
           const head = elementId ? `${tag(elementId)}${useCloth ? tag(clothEl) : ""}${constant}` : prompt;
           return `${head}, ${wardrobePhrase}, ${l.frame}, ${l.light}, against a clean simple neutral background, ${look}. ${CLOTHED}. ${core}.`;
         });
-        urls = await step.run("variations", () => generateBatch(vPrompts, IMAGE_MODEL, "9:16", { resolution: "1k" }, IMAGE_FALLBACK));
+        urls = await step.run("variations", () => generateBatch(vPrompts, BUILD_MODEL, "9:16", { resolution: "1k" }, IMAGE_FALLBACK));
         const produced = urls.filter((u): u is string => !!u);
-        if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
+        if (produced.length) await step.run("usage", () => recordUsage({ influencerId, provider: "higgsfield", model: BUILD_MODEL, unit: "image", action: "photoshoot", count: produced.length }));
       }
       
       const produced = urls.filter((u): u is string => !!u);
@@ -325,9 +329,9 @@ export const buildIdentity = inngest.createFunction(
             if (!faceMedia) return null;
             const ex = { medias: [{ value: faceMedia, role: "image" }] };
             const [card, sheet, turn] = await Promise.all([
-              generateBatch([buildIdentityCardPrompt()], IMAGE_MODEL, "1:1", ex, IMAGE_FALLBACK).catch(() => []),
-              generateBatch([buildFeatureSheetPrompt()], IMAGE_MODEL, "3:4", ex, IMAGE_FALLBACK).catch(() => []),
-              generateBatch([buildTurnaroundPrompt()], IMAGE_MODEL, "16:9", ex, IMAGE_FALLBACK).catch(() => []),
+              generateBatch([buildIdentityCardPrompt()], BUILD_MODEL, "1:1", ex, IMAGE_FALLBACK).catch(() => []),
+              generateBatch([buildFeatureSheetPrompt()], BUILD_MODEL, "3:4", ex, IMAGE_FALLBACK).catch(() => []),
+              generateBatch([buildTurnaroundPrompt()], BUILD_MODEL, "16:9", ex, IMAGE_FALLBACK).catch(() => []),
             ]);
             const pick = (a: (string | null)[]) => (a && a[0]) || null;
             // These cards feed the video phase, so they MUST land on durable Blob, not a
@@ -343,7 +347,7 @@ export const buildIdentity = inngest.createFunction(
         await step.run("save-cards", () => updateInfluencer(influencerId, { persona: { ...((fresh?.persona as Record<string, unknown>) || persona), ...cards } }));
         // Only meter NEW generations (twins reuse the real photo, no generation, no cost).
         const made = isTwin ? 0 : [cards.face_card_url, cards.feature_sheet_url, cards.turnaround_url].filter(Boolean).length;
-        if (made) await step.run("usage-cards", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "photoshoot", count: made }));
+        if (made) await step.run("usage-cards", () => recordUsage({ influencerId, provider: "higgsfield", model: BUILD_MODEL, unit: "image", action: "photoshoot", count: made }));
       }
       return { ok: true, frames: frames.length, element: !!elementId };
     } catch (e) {
