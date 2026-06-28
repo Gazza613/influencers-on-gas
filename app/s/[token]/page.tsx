@@ -31,7 +31,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/gas-logo.png" alt="GAS" className="relative h-full w-full rounded-full object-cover ring-1 ring-black/50" />
           </span>
-          <span className="text-lg font-extrabold tracking-tight">Influencers <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">on</span> GAS</span>
+          <span className="text-lg font-extrabold tracking-tight">Influencers <span className="brand-flow">on</span> GAS</span>
         </header>
         <div className="relative mx-auto max-w-3xl px-6 pb-14 pt-8 text-center sm:pt-12">
           <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">AI Influencer Studio</span>
