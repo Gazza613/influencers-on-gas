@@ -105,9 +105,9 @@ export default function LockdownStep({
           <div className="tabular text-xs uppercase tracking-[0.2em] text-ready font-semibold">✓ Your next step</div>
           <div className="mt-1 text-lg font-bold text-ink">Create &amp; download {name}&apos;s creatives</div>
           <p className="mt-1 text-sm text-ink-dim">
-            Generate social-ready images (9:16, 1:1, 16:9 up to 4K) for {name} and download them for Reels, Stories,
-            feeds and ads. These same images feed video production, so this is your step. Voice and the full video
-            pipeline arrive later in the Studio.
+            Generate social-ready images (9:16, 1:1, 16:9, up to 4K) for {name}, ready to download for Reels, Stories,
+            feeds and ads. Pick any of them in the Producer as a reference look and your video scenes inherit that exact
+            wardrobe, styling and world. One locked identity, endless on-brand content.
           </p>
           <div className="mt-3">
             <Link href={`/setup/influencers/${influencerId}/creatives`} className="next-pulse inline-block rounded-full px-5 py-2.5 text-sm font-bold">
