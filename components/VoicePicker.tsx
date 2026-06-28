@@ -1,17 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Uploader from "@/components/Uploader";
 
 type LibVoice = { voice_id: string; name: string; labels?: Record<string, string>; preview_url?: string | null; category?: string | null };
 
-// Self-contained voice chooser used inside the Producer wizard's Voice step: pick from the library
-// (searchable + previewable), design a new voice from a description, or auto-match. Calls onSet with
-// the chosen voice. (Cloning is intentionally omitted here — library + designed voices only.)
+// Self-contained voice chooser used inside the Producer wizard's Voice step: pick from the library,
+// design a voice from a description, UPLOAD your own voice to clone (great for twins), or auto-match.
+// Calls onSet with the chosen voice.
 export default function VoicePicker({ influencerId, name, voiceId, voiceName, voicePreview, onSet }: {
   influencerId: string; name: string; voiceId: string; voiceName: string; voicePreview?: string | null;
   onSet: (v: { voice_id: string; voice_name: string; preview_url: string | null }) => void;
 }) {
-  const [vtab, setVtab] = useState<"library" | "design" | "auto">("library");
+  const [vtab, setVtab] = useState<"library" | "design" | "upload" | "auto">("library");
+  const [samples, setSamples] = useState<string[]>([]);
+  const [consent, setConsent] = useState(false);
   const [lib, setLib] = useState<LibVoice[]>([]);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState("");
@@ -68,7 +71,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
         </div>
       )}
       <div className="mb-3 flex gap-2">
-        {([["library", "Pick a voice"], ["design", "Design a voice"], ["auto", "Auto-match"]] as const).map(([k, l]) => (
+        {([["library", "Pick a voice"], ["design", "Design a voice"], ["upload", "Upload my voice"], ["auto", "Auto-match"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setVtab(k)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${vtab === k ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{l}</button>
         ))}
       </div>
@@ -127,6 +130,20 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {vtab === "upload" && (
+        <div className="space-y-3">
+          <p className="text-[13px] text-ink-faint">Upload 1–3 clear recordings of the voice (about 20–60s each — just natural speaking, minimal background noise). We clone it so {name} speaks in that exact voice — ideal for a twin of yourself or a consenting presenter.</p>
+          <Uploader kind="voice-sample" accept="audio" multiple label="Upload voice samples" onUploaded={(url) => setSamples((s) => [...s, url])} />
+          {samples.length > 0 && <p className="text-[12px] text-ready">✓ {samples.length} sample{samples.length > 1 ? "s" : ""} added</p>}
+          <label className="flex items-start gap-2 text-[12px] text-ink-dim">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#a855f7]" />
+            <span>I confirm the person whose voice this is has consented to it being cloned and used in these videos.</span>
+          </label>
+          <button onClick={() => setVia({ action: "clone", sampleUrls: samples, consentId: consent ? `consent-${Date.now()}` : "", voiceName: `${name} (my voice)` })} disabled={busy || !samples.length || !consent} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? "Cloning your voice…" : "🎙️ Clone my voice"}</button>
+          <p className="text-[10px] text-ink-faint">Cloning a real voice requires consent. If this is blocked, ask an admin to enable voice cloning for the account.</p>
         </div>
       )}
 
