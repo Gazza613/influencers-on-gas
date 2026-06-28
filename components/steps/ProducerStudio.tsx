@@ -371,6 +371,19 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setScriptBusy(false);
     if (r?.script) setDraftScript(r.script); else setErr(r?.error || "Couldn't write the script. Try again.");
   }
+  // VOICE-FIRST: upload a real recording → Scribe transcribes it → the transcript becomes the script,
+  // and the recording is remembered so the Voice step slices THAT audio per scene (your real voice).
+  async function scriptFromVoice(audioUrl: string) {
+    setScriptBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/script/from-voice`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audioUrl }),
+    }).then((x) => x.json()).catch(() => null);
+    setScriptBusy(false);
+    if (r?.script) {
+      setDraftScript(r.script);
+      fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
+    } else setErr(r?.error || "Couldn't transcribe that recording.");
+  }
   async function generate() {
     if (!brand.trim() || !offer.trim() || busy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer."); return; }
     setBusy(true); setErr("");
@@ -501,8 +514,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
             <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Script</div>
             <p className="mb-2 text-[12px] text-ink-dim">Have the producer write the {duration}s script from your concept, then edit it until it reads right — the scenes (a-roll + b-roll) get built around these exact words. (Optional: skip it and the storyboard will write its own.)</p>
-            <button onClick={writeScript} disabled={scriptBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{scriptBusy ? "✍️ Writing the script…" : draftScript ? "↻ Re-write the script" : "✍️ Write the script"}</button>
+            <button onClick={writeScript} disabled={scriptBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{scriptBusy ? "✍️ Working…" : draftScript ? "↻ Re-write the script" : "✍️ Write the script"}</button>
             {draftScript && <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={6} className="mt-2 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#a855f7]" placeholder="The spoken script…" />}
+            {/* VOICE-FIRST: record naturally, we transcribe → that's the script, and your real voice is used in the video. */}
+            <div className="mt-2 border-t border-line/60 pt-2">
+              <p className="mb-1.5 text-[11px] text-ink-faint">…or <b>upload a voice recording</b> and we&apos;ll script from it — your real voice is transcribed into the script, then used in the video (sliced per scene at the Voice step). Just speak naturally.</p>
+              <Uploader kind="my-vo" accept="audio" label="🎙️ Upload a voice recording → script from it" onUploaded={scriptFromVoice} />
+            </div>
           </div>
           {err && <p className="text-xs text-alert">{err}</p>}
           <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : draftScript ? "🎬 Build the scenes from this script" : "🎬 Direct the storyboard"}</button>
@@ -705,7 +723,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       </div>
                     )}
                     {/* Use your OWN recorded voice instead — Scribe aligns + we slice it per scene. */}
-                    <VoiceoverUpload influencerId={influencerId} onDone={() => {
+                    <VoiceoverUpload influencerId={influencerId} presetUrl={String((production as { my_vo_url?: string })?.my_vo_url || "")} onDone={() => {
                       fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); setVoiceoverUrl(`${d.production.voiceover_url || ""}${d.production.voiceover_url ? `?t=${Date.now()}` : ""}`); } }).catch(() => {});
                       accept("voice");
                     }} />

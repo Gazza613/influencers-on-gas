@@ -28,8 +28,8 @@ function sliceToWav(buffer: AudioBuffer, start: number, end: number): Blob {
   return new Blob([ab], { type: "audio/wav" });
 }
 
-export default function VoiceoverUpload({ influencerId, onDone }: { influencerId: string; onDone: () => void }) {
-  const [url, setUrl] = useState("");
+export default function VoiceoverUpload({ influencerId, presetUrl, onDone }: { influencerId: string; presetUrl?: string; onDone: () => void }) {
+  const [url, setUrl] = useState(presetUrl || "");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [err, setErr] = useState("");
@@ -65,10 +65,13 @@ export default function VoiceoverUpload({ influencerId, onDone }: { influencerId
   return (
     <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
       <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Or upload your own voiceover</div>
-      <p className="mb-2 text-[12px] text-ink-dim">Record yourself reading the script and upload it — we transcribe it (Scribe), slice it per scene, and use <b>your real voice</b> for every scene (no AI voice, no cloning). What you record is what ships.</p>
-      <Uploader kind="my-vo" accept="audio" label="Upload your voiceover recording" onUploaded={(u) => { setUrl(u); setErr(""); }} />
+      {presetUrl
+        ? <p className="mb-2 text-[12px] text-ink-dim">We&apos;ll use <b>the recording you scripted from</b> — slicing your real voice into each scene now (no AI voice, no cloning). Or upload a different recording below.</p>
+        : <p className="mb-2 text-[12px] text-ink-dim">Record yourself reading the script and upload it — we transcribe it (Scribe), slice it per scene, and use <b>your real voice</b> for every scene (no AI voice, no cloning). What you record is what ships.</p>}
+      {url && <p className="mb-2 text-[11px] text-ready">✓ Recording ready{presetUrl && url === presetUrl ? " (from the script step)" : ""}.</p>}
+      <Uploader kind="my-vo" accept="audio" label={url ? "Upload a different recording" : "Upload your voiceover recording"} onUploaded={(u) => { setUrl(u); setErr(""); }} />
       {url && (
-        <button onClick={process} disabled={busy} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? `🎙️ ${status || "Working…"}` : "Use my recording (slice per scene)"}</button>
+        <button onClick={process} disabled={busy} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? `🎙️ ${status || "Working…"}` : "Use my voice (slice per scene)"}</button>
       )}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
     </div>
