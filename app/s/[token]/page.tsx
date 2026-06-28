@@ -37,7 +37,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
           <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">AI Influencer Studio</span>
           <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
             AI influencers,<br />
-            <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">brought to life.</span>
+            <span className="brand-flow">brought to life.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base text-white/60 sm:text-lg">
             Scroll-stopping, publish-ready AI video response ads.
