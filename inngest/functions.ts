@@ -1297,14 +1297,17 @@ export const generateClips = inngest.createFunction(
       // for reliability: b-roll now renders a simple start-frame motion clip that finishes fast. Re-enable
       // the seamless-cut chaining with BROLL_END_FRAME=1 once Kling render times are healthy.
       const endImageUrl = process.env.BROLL_END_FRAME === "1" && role === "b-roll" && next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
-      // Match the clip length to the scene's storyboard timecodes (Kling clamps to 3–15s), so the
-      // b-roll lines up with the cut instead of a fixed 5s.
+      // Clip length: b-roll is rendered to the length of ITS NARRATION (the approved VO slice), so the
+      // video is always at least as long as the audio and never freezes waiting for the voice to finish
+      // (Gary's "pause at the end of every b-roll"). We CEIL the narration so clip ≥ audio, then the stitch
+      // trims the slot to the exact audio length → seamless. Falls back to the storyboard timecode when no
+      // narration slice exists. a-roll is synced to its audio separately, so it uses the timecode here.
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const sceneDur = a != null && b != null && b > a ? b - a : 5;
-      // The video vendors render WHOLE seconds (clamped 3-15). Store this EXACT figure as the clip's
-      // duration so the stitch slot equals the real video length — otherwise the slot (e.g. 5.4s) runs
-      // longer than the rendered clip (5s) and the last frame FREEZES = the "pause at the end" of b-roll.
-      const clipSeconds = Math.max(3, Math.min(15, Math.round(sceneDur)));
+      const narrationDur = sceneAudio.get(i)?.duration;
+      const clipSeconds = (role === "b-roll" && typeof narrationDur === "number" && narrationDur > 0)
+        ? Math.max(3, Math.min(15, Math.ceil(narrationDur)))
+        : Math.max(3, Math.min(15, Math.round(sceneDur)));
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
       const hero = role === "b-roll" && String(sc.hero) === "true";
 
