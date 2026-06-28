@@ -71,7 +71,9 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
     if (!v.final_video_url) return;
     setBusy(v.id);
     try {
-      const res = await fetch(v.final_video_url, { mode: "cors" });
+      // Pull the video through our same-origin proxy so the canvas can read it (cross-origin blob
+      // fetches are CORS-blocked for canvas pixel access).
+      const res = await fetch(`/api/showcase/poster-source?url=${encodeURIComponent(v.final_video_url)}`, { cache: "no-store" });
       if (!res.ok) throw new Error("fetch failed");
       const blob = await res.blob();
       const file = new File([blob], "reel.mp4", { type: blob.type || "video/mp4" });
