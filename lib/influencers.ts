@@ -63,6 +63,26 @@ export async function updateInfluencer(
   await db().query(`update influencers set ${sets.join(", ")} where id = $${i}`, vals);
 }
 
+// ATOMIC, SCOPED production write. Patches ONLY the named fields of persona.production at the database
+// (chained jsonb_set), without the read-modify-write of the whole persona blob that updateInfluencer does.
+// This is the fix for the clobber class: two concurrent saves that touch DIFFERENT production fields (e.g.
+// a clip save and an audio save) can no longer overwrite each other. Each key is a top-level production
+// field (clips, shots, scene_audio, clips_status, voiceover_url, ...); arrays are replaced wholesale, so
+// callers that merge into an array (clips/shots) must still serialise writers to the SAME array.
+export async function updateProductionFields(id: string, patch: Record<string, unknown>): Promise<void> {
+  if (!patch || !Object.keys(patch).length) return;
+  // Shallow-merge the patch into persona.production using the jsonb `||` operator (right side wins), then
+  // write it back atomically. Only the patched top-level production keys change; everything else in the
+  // production object is preserved untouched - so a concurrent save to a DIFFERENT field can't clobber it.
+  await db().query(
+    `update influencers
+       set persona = jsonb_set(coalesce(persona, '{}'::jsonb), '{production}',
+             coalesce(persona -> 'production', '{}'::jsonb) || $1::jsonb, true)
+     where id = $2`,
+    [JSON.stringify(patch), id],
+  );
+}
+
 export async function deleteInfluencer(id: string): Promise<void> {
   await db().query("delete from influencers where id = $1", [id]);
 }

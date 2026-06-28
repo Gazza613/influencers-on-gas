@@ -1,5 +1,5 @@
 import { inngest } from "@/lib/inngest";
-import { getInfluencer, updateInfluencer } from "@/lib/influencers";
+import { getInfluencer, updateInfluencer, updateProductionFields } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, castLockClause, CLOTHED, HUMANISER } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
@@ -1045,7 +1045,7 @@ export const generateClips = inngest.createFunction(
     // Rejected references: scenes the producer dropped from the galleries — never animate them.
     const dropped = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: force ? [] : existingClips } } }));
+    await step.run("mark-running", () => updateProductionFields(influencerId, { clips_status: "running", clips: force ? [] : existingClips }));
 
     // VOICE-ONCE: synthesize the WHOLE script as one continuous take, slice per scene by the timestamps
     // → identical voice across every scene + WYSIWYG. Returns the slices FROM the step (Inngest replays
@@ -1336,7 +1336,8 @@ export const generateClips = inngest.createFunction(
         const prod = (fresh.production ?? production) as Record<string, unknown>;
         const list = Array.isArray(prod.clips) ? [...(prod.clips as ClipRow[])] : [];
         const at = list.findIndex((c) => c.scene === i); if (at >= 0) list[at] = row; else list.push(row);
-        await step.run(`csave-${i}`, () => updateInfluencer(influencerId, { persona: { ...fresh, production: { ...prod, clips: list } } }));
+        // SCOPED write: only production.clips - never clobbers a concurrent audio/voiceover/status write.
+        await step.run(`csave-${i}`, () => updateProductionFields(influencerId, { clips: list }));
       });
       await saveLock;
       return row;
@@ -1358,7 +1359,7 @@ export const generateClips = inngest.createFunction(
     const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prodDone = (done.production ?? production) as Record<string, unknown>;
     const ordered = (Array.isArray(prodDone.clips) ? (prodDone.clips as ClipRow[]) : []).filter((c) => !dropped.has(c.scene)).slice().sort((a, b) => a.scene - b.scene);
-    await step.run("done", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prodDone, clips: ordered, clips_status: "done", status: "clips" } } }));
+    await step.run("done", () => updateProductionFields(influencerId, { clips: ordered, clips_status: "done", status: "clips" }));
     return { ok: true, clips: ordered.length };
   },
 );
