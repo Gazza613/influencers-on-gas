@@ -34,8 +34,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   async function setGuide(role: "a-roll" | "b-roll", url: string) {
     const next = (role === "a-roll" ? arollGuide : brollGuide) === url ? "" : url; // tap again to clear
     if (role === "a-roll") setArollGuide(next); else setBrollGuide(next);
+    // AUTO-POPULATE the brief from the chosen creative's own description, so you don't re-type the world
+    // that's already baked into the creative. Only fills empty fields - never clobbers what you typed.
+    if (next) {
+      const c = creatives.find((x) => x.url === next);
+      if (c?.scene?.trim()) {
+        if (!setting.trim()) { setSetting(c.scene.trim()); setAutoFilled(true); }
+      }
+    }
     await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: role === "a-roll" ? { aroll_ref_url: next } : { broll_ref_url: next } }) }).catch(() => {});
   }
+  const [autoFilled, setAutoFilled] = useState(false); // brief setting was auto-filled from a creative
   const [voiceId, setVoiceId] = useState(initialVoiceId);
   const [voiceName, setVoiceName] = useState(initialVoiceName);
   const [voicePreview, setVoicePreview] = useState("");
@@ -245,6 +254,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // BRIEF AUTO-POPULATE on load: if you already chose a-roll/b-roll favourites on the Creatives page and
+  // the setting is still blank, fill it from that creative's own description so you don't re-type it.
+  useEffect(() => {
+    if (setting.trim()) return;
+    const ref = arollGuide || brollGuide;
+    if (!ref) return;
+    const c = creatives.find((x) => x.url === ref);
+    if (c?.scene?.trim()) { setSetting(c.scene.trim()); setAutoFilled(true); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -543,9 +563,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <Field label="Setting / world (one place, optional)" v={setting} set={setSetting} placeholder="upscale sunlit coffee shop, daytime" />
               <Field label="Tone words" v={tone} set={setTone} placeholder="warm, confident, effortless" />
             </div>
-            {(arollRef || brollRef)
-              ? <p className="text-[11px] text-ink-faint">You set a reference look in the creatives, so the shoot already anchors to its world, lighting and wardrobe. Setting is optional here, use it only to add or override detail. Your characters (for example Mary and her daughter) come from your concept and script, not the reference, so describe them there: the producer keeps a-roll solo and writes the companions into b-roll.</p>
-              : <p className="text-[11px] text-ink-faint">Optional. One consistent world for the whole ad. Leave it blank and the producer picks one to suit the character.</p>}
+            {autoFilled
+              ? <p className="text-[11px] text-[#93c5fd]">✨ Setting auto-filled from your chosen creative, so you do not have to re-type it. Edit or clear it if you want something different. Your characters (for example Mary and her daughter) come from your concept and script: the producer keeps a-roll solo and writes the companions into the b-roll.</p>
+              : (arollRef || brollRef)
+                ? <p className="text-[11px] text-ink-faint">You set a reference look in the creatives, so the shoot already anchors to its world, lighting and wardrobe. Setting is optional here, use it only to add or override detail. Your characters (for example Mary and her daughter) come from your concept and script, not the reference, so describe them there: the producer keeps a-roll solo and writes the companions into the b-roll.</p>
+                : <p className="text-[11px] text-ink-faint">Optional. One consistent world for the whole ad. Leave it blank and the producer picks one to suit the character.</p>}
           </div>
 
           {/* ── Look & assets (optional, collapsed) ── */}
