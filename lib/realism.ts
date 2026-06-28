@@ -102,6 +102,10 @@ const SKIN_FACTS = HUMANISER;
 // Structured creative-image prompt (the archive's section format that gpt_image_2 follows
 // far better than a run-on sentence). Scene/wardrobe/pose come from the user's brief; we
 // wrap them in iPhone-realism (or cinematic) framing + identity lock + anti-AI constraints.
+// Keep wardrobe COLOUR identical render to render (cream was drifting greenish from a lighting cast).
+export const WARDROBE_COLOUR =
+  "WARDROBE COLOUR FIDELITY: render every garment in its EXACT stated colour and shade, with neutral accurate white balance and NO colour cast from the light or environment. A colour named cream stays a true cream (never greenish, beige-shifted or tinted), navy stays navy, and so on. Never tint, drift, warm, cool or re-interpret any wardrobe colour, the outfit colours read identical in every render.";
+
 export function buildCreativeImagePrompt(o: {
   sceneText: string; variation: string; refInstruction: string; subjectLine: string;
   faceMarks: string; look: string; peopleClause: string; cinematic: boolean; ratio: string;
@@ -125,7 +129,7 @@ export function buildCreativeImagePrompt(o: {
     camera,
     SKIN_FACTS,
     SCALE,
-    `Wardrobe: ${CLOTHED}. Her clothing is PLAIN with NO branding: absolutely no brand logos, company names, sponsor marks, slogans or printed text on any garment (never put a real brand such as MTN on what she wears). Any brand appears only as a separate overlay added later, never printed on her clothes.`,
+    `Wardrobe: ${CLOTHED}. ${WARDROBE_COLOUR} Her clothing is PLAIN with NO branding: absolutely no brand logos, company names, sponsor marks, slogans or printed text on any garment (never put a real brand such as MTN on what she wears). Any brand appears only as a separate overlay added later, never printed on her clothes.`,
     `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
   ].join("\n\n");
 }
@@ -179,7 +183,7 @@ export function buildShotPrompt(o: {
       : `Framing: ${o.shot}. B-ROLL FRAMING - a CANDID, OBSERVED scene (not a piece to camera): she is a clear, PROMINENT subject (a medium shot, her face plainly visible and identifiable in a natural three-quarter angle so her locked identity holds), BUT she is NOT looking at or talking to the camera - her attention is on her activity, her phone or her companions, with NO eye-contact with the lens and never mid-speech to camera. NO other person in the frame looks at or addresses the camera either; everyone is naturally absorbed in the moment as if unaware of it. ONE single framing of ONE camera angle only - never a close-up combined with a wider shot, and never two views stacked together.`,
     `Performance: ${o.performance}.`,
     "HANDS (render carefully - this is where AI fails): she has EXACTLY TWO hands and TWO arms, each hand with EXACTLY FIVE correctly-formed fingers in natural human proportion and a believable pose; fingers are separate and correctly jointed; no third hand, no extra or duplicated hands or arms, no floating hand, no extra/missing/fused/bent-back fingers. If a gesture is unclear, prefer relaxed, partly-hidden or naturally resting hands over a complex finger pose. Keep any held object in one consistent hand.",
-    `Grooming/wardrobe: ${o.look}. Keep the same outfit and styling as the established world for continuity.`,
+    `Grooming/wardrobe: ${o.look}. Keep the same outfit and styling as the established world for continuity. ${WARDROBE_COLOUR}`,
     SKIN_FACTS,
     SCALE,
     o.hasPeople ? SCENE_PEOPLE : NO_EXTRAS,
