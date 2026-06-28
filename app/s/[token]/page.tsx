@@ -69,7 +69,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
         <div className="relative mx-auto max-w-3xl px-6 py-16 text-center">
           <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Influence that converts.</h3>
           <p className="mx-auto mt-3 max-w-lg text-sm text-white/60">
-            Influence that matters and conversations that count and convert.
+            Let&apos;s have a conversation that counts.
           </p>
           <a href="https://www.gasmarketing.co.za" target="_blank" rel="noreferrer" className="mt-6 inline-block rounded-xl bg-gradient-to-r from-[#a855f7] to-[#60a5fa] px-6 py-3 text-sm font-bold text-white shadow-[0_10px_40px_rgba(168,85,247,0.4)] transition hover:brightness-110">
             Get in Touch →
