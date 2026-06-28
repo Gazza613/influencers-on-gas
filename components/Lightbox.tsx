@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-// Full-screen image viewer with download. Close on Esc or backdrop click.
+// Full-screen image OR video viewer with download. Close on Esc or backdrop click.
 export default function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
   const [loaded, setLoaded] = useState(false);
+  const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -33,8 +34,10 @@ export default function Lightbox({ url, onClose }: { url: string; onClose: () =>
             <span className="spinner-ring text-3xl text-[#c79bff]" />
           </div>
         )}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt="frame" onLoad={() => setLoaded(true)} className={`max-h-[82vh] w-auto rounded-lg border border-line object-contain ${loaded ? "" : "hidden"}`} />
+        {isVideo
+          ? <video src={url} controls autoPlay loop playsInline onLoadedData={() => setLoaded(true)} className={`max-h-[82vh] w-auto rounded-lg border border-line bg-black object-contain ${loaded ? "" : "hidden"}`} />
+          // eslint-disable-next-line @next/next/no-img-element
+          : <img src={url} alt="frame" onLoad={() => setLoaded(true)} className={`max-h-[82vh] w-auto rounded-lg border border-line object-contain ${loaded ? "" : "hidden"}`} />}
         <div className="mt-3 flex items-center justify-center gap-3">
           <button onClick={download} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold">Download</button>
           <a href={url} target="_blank" rel="noopener" className="rounded-lg border border-line px-4 py-2 text-sm text-ink-dim hover:text-ink">Open original</a>
