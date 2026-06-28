@@ -845,6 +845,8 @@ export const generateShots = inngest.createFunction(
     // Role filter: shoot only the a-roll (talking) references, or only the b-roll (scene) references —
     // the producer curates each gallery separately. Empty = the whole board (back-compat).
     const roleFilter = event.data.roleFilter === "a-roll" || event.data.roleFilter === "b-roll" ? String(event.data.roleFilter) : "";
+    // Scene filter: shoot only these scene indices' KEYFRAMES (per-scene reference shoot). Empty = all.
+    const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
     // Aspect ratio is producer-chosen per shoot (9:16 reels / 1:1 feed / 16:9 youtube); falls back to the storyboard format.
     const allowedRatios = ["9:16", "1:1", "16:9"];
     const ratio = allowedRatios.includes(String(event.data.aspectRatio)) ? String(event.data.aspectRatio) : (String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16");
@@ -980,8 +982,9 @@ export const generateShots = inngest.createFunction(
     for (let i = 0; i < scenes.length; i++) {
       const sc = scenes[i] as Record<string, string>;
       const scRole = String(sc.role || "a-roll");
-      // When filtering by role, leave the other role's existing shots untouched (don't re-render them).
+      // When filtering by role/scene, leave the others untouched (don't re-render them).
       if (roleFilter && scRole !== roleFilter) continue;
+      if (sceneFilter && !sceneFilter.includes(i)) continue;
       if (scRole === "graphic") { await saveShot(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); continue; }
       targets.push({ i, sc });
     }

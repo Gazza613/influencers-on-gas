@@ -149,6 +149,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [approved, setApproved] = useState<Set<string>>(() => (initialProduction?.wizard_approved?.length ? new Set(initialProduction.wizard_approved) : seedApproved()));
   const [denied, setDenied] = useState<Set<string>>(new Set());
   const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
+  // ANY work in flight (incl. per-scene shoots that don't flip the global flags) - drives the busy
+  // buttons + the red Reset control so it reflects per-scene + b-roll work too.
+  const anyReshooting = (production?.shots ?? []).some((s) => s.reshooting);
+  const busyAny = shooting || rendering || !!renderingRole || anyReshooting;
   // Curated reference galleries: keep the dropped set in sync with the server + chosen aspect ratio per role.
   useEffect(() => { setDropped(new Set(production?.dropped_scenes ?? [])); }, [production?.dropped_scenes]);
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
@@ -353,8 +357,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
   // SCENE-BY-SCENE: build ONE scene (shoot its keyframe AND animate its clip) using its STORED direction
   // (no edit form) - the reshoot job renders the keyframe then the clip.
-  async function buildScene(i: number) {
-    if (shooting) return;
+  // Shoot ONE scene's REFERENCE IMAGE (keyframe) only - no video. Video comes later (after the voice).
+  async function shootRefScene(i: number) {
+    if (busyAny) return;
     setErr("");
     setProduction((p) => {
       if (!p) return p;
@@ -362,18 +367,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       const shots = list.some((s) => s.scene === i)
         ? list.map((s) => (s.scene === i ? { ...s, reshooting: true } : s))
         : [...list, { scene: i, role: String(sb?.scenes?.[i]?.role || "a-roll"), beat: String(sb?.scenes?.[i]?.beat || ""), url: null, reshooting: true }];
-      return { ...p, shots };
+      return { ...p, shots, shots_status: "running" };
     });
-    const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't build that scene."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
-    for (let k = 0; k < 60; k++) {
-      await new Promise((res) => setTimeout(res, 6000));
-      const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
-      if (d?.production) { setProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
-    }
-    setRenderingRole(sb?.scenes?.[i]?.role === "b-roll" ? "b-roll" : "a-roll");
-    await poll(setProduction, "clips_status");
-    setRenderingRole("");
+    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], aspectRatio: boardRatio }) }).then((x) => x.json()).catch(() => null);
+    if (!r?.queued) { setErr(r?.error || "Couldn't shoot that reference image."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)), shots_status: "idle" } : p)); return; }
+    await poll(setProduction, "shots_status");
   }
   // Animate ONE scene's clip from its existing keyframe (no re-shoot).
   async function animateScene(i: number) {
@@ -598,7 +596,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <div className="tabular mt-1 text-[11px] uppercase tracking-[0.15em] text-ink-faint">{sb.format} · {sb.duration_seconds}s · {sb.scenes.length} scenes · {sb.tone}</div>
               </div>
               <div className="flex gap-2">
-                <button onClick={resetStuck} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${(shooting || rendering || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>
+                <button onClick={resetStuck} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${(busyAny || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>
                 <button onClick={() => setEditing(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">✎ New brief</button>
                 <button onClick={generate} disabled={busy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Re-directing…" : "↻ Regenerate"}</button>
               </div>
@@ -612,6 +610,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             {dropped.size > 0 && (
               <div className="mt-2 rounded-lg border border-active/30 bg-active/5 px-3 py-2 text-[11px] text-active">⚠ {dropped.size} reference{dropped.size === 1 ? "" : "s"} rejected - those scenes are left out of the final cut, so it&apos;ll be shorter. Re-flow the script in the Voice step so the voiceover still reads smoothly.</div>
             )}
+          </div>
+
+          {/* Reference-image shoot (keyframes only, no video) - available right here at the storyboard. */}
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-2.5">
+            <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
+            <span className="text-[11px] text-ink-faint">Shoot each scene&apos;s still here. No video yet, that comes after you set the voice. Shoot all, or one at a time on the cards below.</span>
+            <div className="ml-auto flex items-center gap-2">
+              <RatioPicker value={boardRatio} onChange={setBoardRatio} />
+              <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -658,14 +666,22 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       ) : (
                         <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-dashed border-line bg-surface-2 text-center text-[10px] text-ink-faint">not shot yet</div>
                       )}
-                      {/* Per-scene controls: build (keyframe+clip) or animate, edit, keep/reject. */}
+                      {/* Per-scene controls: shoot the reference image (keyframe) here; animation comes after the voice. */}
                       {!shot?.reshooting && (
                         <div className="mt-1.5 space-y-1">
                           <button
-                            onClick={() => (shot?.url ? animateScene(i) : buildScene(i))}
-                            disabled={shooting || rendering || dropped.has(i)}
+                            onClick={() => shootRefScene(i)}
+                            disabled={busyAny || dropped.has(i)}
                             className="w-full rounded-md btn-brand px-2 py-1 text-[10px] font-bold disabled:opacity-40"
-                          >{clip?.url ? "↻ Re-animate" : shot?.url ? "🎞️ Animate scene" : "🎬 Build scene"}</button>
+                          >{shot?.url ? "↻ Re-shoot reference" : "📸 Shoot reference"}</button>
+                          {shot?.url && (
+                            <button
+                              onClick={() => animateScene(i)}
+                              disabled={busyAny || dropped.has(i) || !approved.has("voice")}
+                              title={approved.has("voice") ? "Animate this scene into video" : "Set the voice first (Voice step), then animate"}
+                              className="w-full rounded-md border border-[#60a5fa]/40 px-2 py-1 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
+                            >{!approved.has("voice") ? "🎞️ Animate (after voice)" : clip?.url ? "↻ Re-animate" : "🎞️ Animate"}</button>
+                          )}
                           <div className="flex gap-1">
                             <button onClick={() => openEdit(i, s)} className="flex-1 rounded-md border border-[#a855f7]/40 px-1.5 py-1 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
                             <button onClick={() => toggleDrop(i)} title={dropped.has(i) ? "Rejected - tap to keep" : "Kept - tap to reject"} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold ${dropped.has(i) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-dim hover:text-ink"}`}>{dropped.has(i) ? "✗ Rejected" : "✓ Keep"}</button>
@@ -769,20 +785,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         setVoiceoverUrl(""); // voice changed → the old full take no longer applies; re-generate
                         accept("voice"); // choosing a voice IS the approval - never block the next step asking to "approve voice"
                       }} />
-                    {/* Voice model: v2 stable vs v3 expressive. */}
-                    {voiceId && (
-                      <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
-                        <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Voice model</div>
-                        <div className="flex gap-2">
-                          {([["v2", "Stable", "Rock-solid + consistent. What you hear is exactly what ships."], ["v3", "Expressive", "More realistic, dynamic delivery + audio tags. Best on Designed/Instant voices (not a PVC)."]] as const).map(([m, label, desc]) => (
-                            <button key={m} onClick={() => setVoiceModel(m)} className={`flex-1 rounded-lg border px-3 py-2 text-left text-xs ${voiceModel === m ? "border-[#a855f7] bg-[#a855f7]/10 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>
-                              <div className="font-bold">{label} <span className="text-ink-faint">({m})</span></div>
-                              <div className="mt-0.5 text-[10px] leading-tight text-ink-faint">{desc}</div>
-                            </button>
-                          ))}
-                        </div>
+                    {/* Voice model: v2 stable vs v3 expressive. Always visible in the Voice step. */}
+                    <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                      <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Voice model</div>
+                      <div className="flex gap-2">
+                        {([["v2", "Stable", "Rock-solid + consistent. What you hear is exactly what ships."], ["v3", "Expressive", "More realistic, dynamic delivery + audio tags. Best on Designed/Instant voices (not a PVC)."]] as const).map(([m, label, desc]) => (
+                          <button key={m} onClick={() => setVoiceModel(m)} className={`flex-1 rounded-lg border px-3 py-2 text-left text-xs ${voiceModel === m ? "border-[#a855f7] bg-[#a855f7]/10 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>
+                            <div className="font-bold">{label} <span className="text-ink-faint">({m})</span></div>
+                            <div className="mt-0.5 text-[10px] leading-tight text-ink-faint">{desc}</div>
+                          </button>
+                        ))}
                       </div>
-                    )}
+                    </div>
                     {/* THE FULL VOICEOVER: one continuous take the producer listens to before animating. */}
                     {voiceId && (
                       <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">

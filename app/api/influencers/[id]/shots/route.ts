@@ -22,6 +22,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const roleFilter = body.roleFilter === "a-roll" || body.roleFilter === "b-roll" ? String(body.roleFilter) : "";
   const aspectRatio = ["9:16", "1:1", "16:9"].includes(body.aspectRatio) ? String(body.aspectRatio) : "";
 
+  // PER-SCENE keyframe (reference) shoot: re-shoot only these scenes' stills, keep everything else
+  // (other scenes' stills + clips, the cut, approvals). Drops only the target scenes' stale clips.
+  const sceneIdxs = Array.isArray(body.scenes) ? (body.scenes as unknown[]).map(Number).filter((n) => Number.isInteger(n)) : [];
+  if (sceneIdxs.length) {
+    const prod = production as Record<string, unknown>;
+    const shots = (Array.isArray(prod.shots) ? prod.shots as { scene: number }[] : []).map((s) => (sceneIdxs.includes(Number(s.scene)) ? { ...s, reshooting: true } : s));
+    const clips = (Array.isArray(prod.clips) ? prod.clips as { scene: number }[] : []).filter((c) => !sceneIdxs.includes(Number(c.scene)));
+    await updateInfluencer(id, { persona: { ...persona, production: { ...prod, shots, clips, shots_status: "running" } } });
+    try {
+      await inngest.send({ name: "influencer/generate.shots", data: { influencerId: id, scenes: sceneIdxs, aspectRatio } });
+    } catch {
+      await updateInfluencer(id, { persona: { ...persona, production: { ...prod, shots_status: "idle" } } });
+      return NextResponse.json({ error: "Could not start the shoot (engine not connected)." }, { status: 503 });
+    }
+    return NextResponse.json({ queued: true });
+  }
+
   // Re-shooting invalidates everything downstream - clear clips, audio and final cut + reset approvals
   // past Voice. Shooting ONE role keeps the OTHER role's existing stills AND its approval (so approving
   // a-roll then shooting b-roll doesn't throw you back to a-roll). The whole board clears all.
