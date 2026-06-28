@@ -440,7 +440,6 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-faint">Both lock your trained Soul for identical identity across every shot, the consistency video production needs.</p>
         </div>
 
         {/* Scene + Perfect with AI */}
