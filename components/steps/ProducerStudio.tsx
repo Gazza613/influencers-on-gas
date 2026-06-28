@@ -664,14 +664,26 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           </div>
 
           {/* Reference-image shoot (keyframes only, no video) - available right here at the storyboard. */}
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-2.5">
-            <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
-            <span className="text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below.</span>
-            <div className="ml-auto flex items-center gap-2">
-              <button onClick={() => setPriority((v) => !v)} title="Faster render: jumps the queue when the free queue is crawling. A few credits per image, metered in Cost Control. Off = free but slower." className={`rounded-lg border px-2.5 py-2 text-[11px] font-semibold transition ${priority ? "border-[#60a5fa]/60 bg-[#60a5fa]/12 text-[#93c5fd]" : "border-line text-ink-faint hover:text-ink"}`}>⚡ Priority {priority ? "ON" : "OFF"}</button>
-              <RatioPicker value={boardRatio} onChange={setBoardRatio} />
-              <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
+          <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
+              {/* Priority toggle: prominent, left-aligned, glows so it can't be missed. */}
+              <button
+                onClick={() => setPriority((v) => !v)}
+                title="Faster render: jumps the queue when the free queue is crawling. A few credits per image, metered in Cost Control. Off = free but slower."
+                className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${priority
+                  ? "priority-on border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]"
+                  : "priority-pulse border-[#60a5fa]/60 bg-[#60a5fa]/[0.08] text-[#93c5fd] hover:bg-[#60a5fa]/15"}`}
+              >
+                <span aria-hidden>⚡</span> Priority
+                <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${priority ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{priority ? "ON" : "OFF"}</span>
+              </button>
+              <div className="ml-auto flex items-center gap-2">
+                <RatioPicker value={boardRatio} onChange={setBoardRatio} />
+                <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
+              </div>
             </div>
+            <p className="mt-2 text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below. <span className="text-[#93c5fd]">⚡ Priority = faster (paid) queue.</span></p>
           </div>
 
           <div className="space-y-3">
