@@ -228,16 +228,11 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   }
   // Upscale the selected 2K keepers to 4K on demand (one paid upscale each, only on shots
   // the producer actually chose). Each upgraded shot moves to the 4K Finals section.
-  async function upscalePicked() {
-    // Upscale ANY kept shot that produced an image (the producer chooses keepers regardless of
-    // QA grade). Skip ones already at 4K and ones with no image.
-    const targets = creatives.filter((c) => picked.has(c.id || "") && !!c.url && !broken.has(c.url) && (c.resolution || "").toLowerCase() !== "4k");
-    const ids = targets.map((c) => c.id || "");
+  async function runUpscale(ids: string[]) {
     if (!ids.length) return;
     setUpscaling((s) => new Set([...s, ...ids]));
     setUpStart((m) => { const n = new Map(m); const t = Date.now(); ids.forEach((id) => n.set(id, t)); return n; });
     setNowMs(Date.now());
-    setPicked(new Set());
     // Queue the durable upscale jobs (fast), then poll until each shot turns 4K (or errors).
     await Promise.all(ids.map((cid) =>
       fetch(`/api/influencers/${influencerId}/creatives/upscale`, {
@@ -245,6 +240,19 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       }).then((x) => x.json()).catch(() => null),
     ));
     pollUpscales(new Set(ids));
+  }
+  async function upscalePicked() {
+    // Upscale ANY kept shot that produced an image (the producer chooses keepers regardless of
+    // QA grade). Skip ones already at 4K and ones with no image.
+    const ids = creatives.filter((c) => picked.has(c.id || "") && !!c.url && !broken.has(c.url) && (c.resolution || "").toLowerCase() !== "4k").map((c) => c.id || "");
+    if (!ids.length) return;
+    setPicked(new Set());
+    await runUpscale(ids);
+  }
+  // Upscale the shot currently set as a Producer reference (convenience, from the references box).
+  async function upscaleRef(role: "aroll" | "broll") {
+    const c = creatives.find((x) => x.url === refs[role]);
+    if (c?.id && !!c.url && !broken.has(c.url) && (c.resolution || "").toLowerCase() !== "4k") await runUpscale([c.id]);
   }
   // Poll until each shot resolves, with a HARD timeout so the spinner can never hang forever.
   function pollUpscales(pending: Set<string>) {
@@ -572,22 +580,38 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             </span>
           </div>
         )}
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-2 text-[11px]">
-          <span className="font-semibold text-[#c79bff]">🎬 Producer references</span>
-          <span className="text-ink-faint">Select one shot, then set it as the A-roll or B-roll reference - the Producer dresses + anchors those scenes to it.</span>
-          <div className="ml-auto flex items-center gap-4">
-            {(["aroll", "broll"] as const).map((role) => (
-              <span key={role} className="flex items-center gap-1.5">
-                <span className="tabular uppercase text-ink-dim">{role === "aroll" ? "A-roll" : "B-roll"}</span>
-                {refs[role] ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={refs[role]} alt="" className="h-7 w-7 rounded border border-line object-cover" />
-                    <button onClick={() => clearRoleRef(role)} className="text-ink-faint hover:text-alert">clear</button>
-                  </>
-                ) : <span className="text-ink-faint">- none</span>}
-              </span>
-            ))}
+        <div className="mb-3 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-2.5 text-[11px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-[#c79bff]">🎬 Producer references</span>
+            <span className="text-ink-faint">Select a shot below, then set it as the A-roll or B-roll reference. The Producer matches its wardrobe, styling, lighting and world when it shoots those scenes.</span>
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-5">
+            {(["aroll", "broll"] as const).map((role) => {
+              const url = refs[role];
+              const c = url ? creatives.find((x) => x.url === url) : null;
+              const is4k = (c?.resolution || "").toLowerCase() === "4k";
+              const upBusy = !!c?.id && upscaling.has(c.id);
+              return (
+                <div key={role} className="flex items-start gap-2">
+                  <span className="tabular mt-0.5 uppercase text-ink-dim">{role === "aroll" ? "A-roll" : "B-roll"}</span>
+                  {url ? (
+                    <div className="flex items-start gap-2">
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`${role} reference`} className="h-24 w-[3.55rem] rounded-md border border-[#a855f7]/50 object-cover" />
+                        <button onClick={() => setZoom(url)} title="Preview full size" className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white backdrop-blur hover:bg-black/80">👁</button>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {is4k
+                          ? <span className="rounded bg-ready/20 px-1.5 py-0.5 text-center text-[10px] font-semibold text-ready">4K ✓</span>
+                          : <button onClick={() => upscaleRef(role)} disabled={upBusy || !c?.id} title="Upscale this reference to 4K" className="rounded border border-[#a855f7]/50 px-1.5 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{upBusy ? "…4K" : "↑ 4K"}</button>}
+                        <button onClick={() => clearRoleRef(role)} className="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-faint hover:border-alert/50 hover:text-alert">clear</button>
+                      </div>
+                    </div>
+                  ) : <span className="mt-0.5 text-ink-faint">none yet</span>}
+                </div>
+              );
+            })}
           </div>
         </div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
