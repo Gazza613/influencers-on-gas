@@ -129,7 +129,7 @@ export default function PhotoshootStep({
         <div>
           <WorkingPanel title="Photoshoot" lines={PHOTO_NARRATION} crew={CREW.photoshoot} eta="about 5 to 10 min" startedAt={startedAt}
             pct={frames.length > 1 ? pct : null} sub={`${frames.length}/${SET_TOTAL} frames`}
-            note="A full forensic identity set. It stays quiet while the whole set is shot, then the frames drop in together at the end. Usually about 5 to 10 minutes." />
+            note={`Behind the scenes, our Identity Forge studies ${name} from every angle, light and expression, then locks one true, consistent face across the whole set. It is painstaking work, so the panel stays quiet until the full set drops in together at the end. About five to ten minutes, and well worth the wait. This is the foundation the entire build stands on.`} />
           <div className="mt-2 flex items-center gap-3">
             <button onClick={abort} className="rounded-lg border border-alert/50 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10">⟳ Abort / reset if stuck</button>
             <span className="text-[11px] text-ink-faint">Frames already shot are kept.</span>
