@@ -905,7 +905,8 @@ export const generateShots = inngest.createFunction(
     const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design, faceDesc].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
     // Dress her in her SIGNATURE wardrobe (from the bible) by default, so the cast aligns to the character.
     const bibleLook = bibleWardrobe(persona.bible as Record<string, unknown>);
-    const look = [lookClause(persona), bibleLook && `wearing ${bibleLook}`].filter(Boolean).join(". ");
+    const lookBase = lookClause(persona); // appearance WITHOUT a specific outfit
+    const look = [lookBase, bibleLook && `wearing ${bibleLook}`].filter(Boolean).join(". ");
 
     // Optional producer uploads: a clothing reference (wardrobe) and a location reference (world).
     const brief = (production?.brief ?? {}) as Record<string, string>;
@@ -941,7 +942,7 @@ export const generateShots = inngest.createFunction(
       const roleRefTag = roleRefMedia ? `@image${++n}` : "";
       const refInstruction = [
         faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, skin tone and texture, hair); zero drift, unmistakably the same individual. These face references are the ONLY source of her face and identity — take NOTHING about her face from any wardrobe, world, location or reference-look image. EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer). Every OTHER person in the scene — friends, companions, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling. NEVER duplicate her face, hair or look onto anyone else: absolutely no twins, clones or look-alikes.` : "",
-        roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its wardrobe, styling, grooming, lighting and overall mood/world closely for this scene. Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
+        roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look and the SINGLE SOURCE OF TRUTH for her WARDROBE: dress her in the EXACT outfit shown in ${roleRefTag} — identical garments, colours, fabric and styling — and match its grooming, lighting and overall mood/world closely. This wardrobe OVERRIDES any clothing mentioned anywhere else in this prompt; if any text describes a different outfit, IGNORE it and follow ${roleRefTag}. Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. LOCKED WARDROBE: the influencer wears the EXACT SAME outfit as in ${worldTag} — identical garments, colours, fabric and styling — in every single scene. Never change, swap or restyle her clothing; one consistent outfit across the whole shoot (only her pose, action and the framing change). SUPPORTING CAST CONTINUITY: if ${worldTag} shows any friends or companions, the same people recur here — the SAME individuals (same faces, ages, hair and outfits), not different-looking people swapped in scene to scene.` : "",
@@ -951,7 +952,9 @@ export const generateShots = inngest.createFunction(
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
-        performance: String(sc.performance || ""), role, subjectLine, look, refInstruction, ratio,
+        // When a guide is chosen, DROP the bible's signature outfit from the text so it can't fight the
+        // guide's wardrobe; the guide reference becomes the single source of truth for her clothing.
+        performance: String(sc.performance || ""), role, subjectLine, look: roleRefMedia ? lookBase : look, refInstruction, ratio,
         // A-ROLL = clean presenter shot (no crowd — HeyGen Avatar IV warps animated background people).
         // B-ROLL gets background strangers ONLY when the director flagged this scene a busy public place
         // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
@@ -1673,7 +1676,8 @@ export const reshootShot = inngest.createFunction(
     const subjectLine = [bibleId.age, bibleId.build, bibleId.ethnicity_design, faceDesc].filter(Boolean).join(", ") || `${inf.name}, the influencer`;
     // Dress her in her SIGNATURE wardrobe (from the bible) by default, so the cast aligns to the character.
     const bibleLook = bibleWardrobe(persona.bible as Record<string, unknown>);
-    const look = [lookClause(persona), bibleLook && `wearing ${bibleLook}`].filter(Boolean).join(". ");
+    const lookBase = lookClause(persona); // appearance WITHOUT a specific outfit
+    const look = [lookBase, bibleLook && `wearing ${bibleLook}`].filter(Boolean).join(". ");
     const brief = (production?.brief ?? {}) as Record<string, string>;
     const clothMedia = brief.clothingRef ? await step.run("import-cloth", () => importMediaUrl(brief.clothingRef).catch(() => null)) : null;
     const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;
