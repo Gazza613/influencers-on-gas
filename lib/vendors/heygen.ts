@@ -5,7 +5,7 @@ const API = "https://api.heygen.com";
 const UPLOAD = "https://upload.heygen.com";
 // Avatar IV gesture intensity. "high" drove the EXAGGERATED, unrealistic hand movements the owner
 // flagged; "normal" keeps natural, calm gestures while still moving. Env-tunable (low|normal|high).
-const HEYGEN_EXP = (process.env.HEYGEN_EXPRESSIVENESS || "normal").toLowerCase();
+const HEYGEN_EXP = (process.env.HEYGEN_EXPRESSIVENESS || "low").toLowerCase();
 
 async function key(): Promise<string> {
   const k = await getSecret("heygen");
