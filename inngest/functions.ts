@@ -1515,14 +1515,17 @@ export const assembleVideo = inngest.createFunction(
     let cursor = 0;
     const placed = kept.map(({ sc, i }) => {
       const role = String(sc.role || "a-roll");
+      const vo = String(sc.vo_line || "").trim();
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const tcLen = a != null && b != null && b > a ? b - a : 5;
       let len = clipDur(i) ?? tcLen;
       // b-roll → narration length (cuts the engine's frozen tail; keeps the VO continuous).
       if (role === "b-roll" && sceneAudioDur.has(i)) len = sceneAudioDur.get(i)!;
+      // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
+      else if (role === "b-roll" && !vo) len = Math.min(len, 2.8);
       const start = cursor;
       cursor = start + len;
-      return { i, start, len, role, vo: String(sc.vo_line || "").trim(), caption: String(sc.caption || "").trim() };
+      return { i, start, len, role, vo, caption: String(sc.caption || "").trim() };
     });
     // A breath after the last word so the cut doesn't end abruptly: hold the final clip ~1.2s longer
     // and extend the timeline (music fades out over it).
