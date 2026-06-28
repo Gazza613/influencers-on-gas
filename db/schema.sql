@@ -323,6 +323,9 @@ on conflict (provider, model, unit) do nothing;
 alter table productions add column if not exists showcased boolean not null default false;
 -- Manually-uploaded external showreels (brag work not produced on the platform) are tagged external.
 alter table productions add column if not exists external boolean not null default false;
+-- Custom drag-and-drop order on the showcase wall, and a captured poster still (so tiles never show black).
+alter table productions add column if not exists showcase_order int;
+alter table productions add column if not exists poster_url text;
 
 create table if not exists app_settings (
   key        text primary key,

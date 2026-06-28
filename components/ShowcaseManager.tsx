@@ -13,11 +13,11 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
 
   // Add a manually-uploaded external reel (brag work not produced on the platform). It goes straight
   // onto the wall, tagged "Uploaded".
-  async function addExternal(url: string) {
+  async function addExternal(url: string, posterUrl?: string) {
     setUpBusy(true);
     const r = await fetch("/api/showcase/upload", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, title: upTitle.trim() }),
+      body: JSON.stringify({ url, poster_url: posterUrl || "", title: upTitle.trim() }),
     }).then((x) => x.json()).catch(() => null);
     setUpBusy(false);
     if (r?.video) { setVideos((vs) => [r.video, ...vs]); setUpTitle(""); }
@@ -50,6 +50,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
 
   // Drag-and-drop reorder of the on-reel videos (the order prospects see).
   const dragIdx = useRef<number | null>(null);
+  const [dragging, setDragging] = useState<number | null>(null);
   function reorder(from: number, to: number) {
     if (from === to) return;
     const on = videos.filter((v) => v.showcased);
@@ -105,7 +106,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
           <label className="flex-1 min-w-[200px] text-[11px] text-ink-faint">Title / brand
             <input value={upTitle} onChange={(e) => setUpTitle(e.target.value)} placeholder="e.g. MTN MoMo — Launch reel" className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#a855f7]" />
           </label>
-          <div className={upBusy ? "pointer-events-none opacity-60" : ""}><Uploader kind="showreel" accept="video" label={upBusy ? "Adding…" : "Choose video"} onUploaded={addExternal} /></div>
+          <div className={upBusy ? "pointer-events-none opacity-60" : ""}><Uploader kind="showreel" accept="video" withPoster label={upBusy ? "Adding…" : "Choose video"} onUploaded={addExternal} /></div>
         </div>
       </div>
 
@@ -131,11 +132,18 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
                   <div
                     key={v.id}
                     draggable
-                    onDragStart={() => { dragIdx.current = i; }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.preventDefault(); if (dragIdx.current !== null) reorder(dragIdx.current, i); dragIdx.current = null; }}
-                    className="cursor-grab active:cursor-grabbing"
+                    onDragStart={(e) => { dragIdx.current = i; setDragging(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
+                    onDragEnd={() => { dragIdx.current = null; setDragging(null); }}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+                    onDrop={(e) => { e.preventDefault(); const from = dragIdx.current ?? Number(e.dataTransfer.getData("text/plain")); if (!Number.isNaN(from)) reorder(from, i); dragIdx.current = null; setDragging(null); }}
+                    className={`group/drag relative cursor-grab rounded-xl transition active:cursor-grabbing ${dragging === i ? "opacity-50 ring-2 ring-[#a855f7]" : ""}`}
                   >
+                    {/* Reorder controls — drag the card, OR use the arrows (always work, incl. touch) */}
+                    <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
+                      <button onClick={() => reorder(i, i - 1)} disabled={i === 0} title="Move earlier" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">◀</button>
+                      <button onClick={() => reorder(i, i + 1)} disabled={i === onReel.length - 1} title="Move later" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">▶</button>
+                      <span title="Drag to reorder" className="ml-0.5 flex h-7 items-center rounded-full bg-black/60 px-2 text-xs text-white/80 backdrop-blur">⠿</span>
+                    </div>
                     <Card v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} reel />
                   </div>
                 ))}</div>}
@@ -162,9 +170,8 @@ function Card({ v, busy, onToggle, onRemove, onRename, reel = false }: { v: Show
     <div className={`overflow-hidden rounded-xl border bg-surface-1 ${reel ? "border-ready/30" : "border-line"}`}>
       {v.final_video_url
         ? <video
-            src={v.final_video_url} controls playsInline draggable={false} preload="auto"
-            onLoadedMetadata={(e) => { const el = e.currentTarget; el.currentTime = Math.min(2, (el.duration || 6) * 0.2); }}
-            onLoadedData={(e) => { const el = e.currentTarget; if (el.currentTime < 0.05) el.currentTime = Math.min(2, (el.duration || 6) * 0.2); }}
+            src={v.final_video_url} poster={v.poster_url || undefined} controls playsInline draggable={false} preload="metadata"
+            onLoadedMetadata={!v.poster_url ? (e) => { const el = e.currentTarget; el.currentTime = Math.min(2, (el.duration || 6) * 0.2); } : undefined}
             className="aspect-[9/16] max-h-[60vh] w-full bg-black object-contain"
           />
         : <div className="flex aspect-[9/16] w-full items-center justify-center bg-surface-2 text-xs text-ink-faint">No video</div>}

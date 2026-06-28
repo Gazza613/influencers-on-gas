@@ -9,6 +9,7 @@ export type ShowcaseVideo = {
   created_at: string;
   showcased: boolean;
   external: boolean; // true = a reel uploaded manually (not produced on the platform)
+  poster_url: string | null; // a captured still, shown before play (so tiles never sit on a black frame)
 };
 
 // Lazily ensure the `external` column exists, so manual showreel uploads work without a separate
@@ -18,6 +19,7 @@ async function ensureSchema(): Promise<void> {
   if (_ensured) return;
   await db()`alter table productions add column if not exists external boolean not null default false`;
   await db()`alter table productions add column if not exists showcase_order int`;
+  await db()`alter table productions add column if not exists poster_url text`;
   _ensured = true;
 }
 
@@ -50,7 +52,7 @@ export async function isValidShowcaseToken(token: string): Promise<boolean> {
 export async function listShowcaseVideos(): Promise<ShowcaseVideo[]> {
   await ensureSchema();
   return (await db()`
-    select id, title, final_video_url, created_at, showcased, external
+    select id, title, final_video_url, created_at, showcased, external, poster_url
     from productions
     where status = 'complete' and showcased = true and final_video_url is not null
     order by showcase_order asc nulls last, created_at desc`) as ShowcaseVideo[];
@@ -61,7 +63,7 @@ export async function listShowcaseVideos(): Promise<ShowcaseVideo[]> {
 export async function listFinishedVideos(): Promise<ShowcaseVideo[]> {
   await ensureSchema();
   return (await db()`
-    select id, title, final_video_url, created_at, showcased, external
+    select id, title, final_video_url, created_at, showcased, external, poster_url
     from productions
     where status = 'complete' and final_video_url is not null
     order by showcase_order asc nulls last, created_at desc`) as ShowcaseVideo[];
@@ -75,12 +77,12 @@ export async function reorderShowcase(ids: string[]): Promise<void> {
 
 // Add a manually-uploaded external showreel (not produced on the platform). Goes straight onto the
 // wall (showcased) and is tagged external so the internal manager can distinguish it.
-export async function addExternalShowreel(opts: { title: string; url: string; clientId: string }): Promise<ShowcaseVideo> {
+export async function addExternalShowreel(opts: { title: string; url: string; clientId: string; posterUrl?: string | null }): Promise<ShowcaseVideo> {
   await ensureSchema();
   const rows = (await db()`
-    insert into productions (client_id, title, final_video_url, status, showcased, external)
-    values (${opts.clientId}, ${opts.title}, ${opts.url}, 'complete', true, true)
-    returning id, title, final_video_url, created_at, showcased, external`) as ShowcaseVideo[];
+    insert into productions (client_id, title, final_video_url, status, showcased, external, poster_url)
+    values (${opts.clientId}, ${opts.title}, ${opts.url}, 'complete', true, true, ${opts.posterUrl ?? null})
+    returning id, title, final_video_url, created_at, showcased, external, poster_url`) as ShowcaseVideo[];
   return rows[0];
 }
 

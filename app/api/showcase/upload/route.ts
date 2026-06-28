@@ -13,8 +13,9 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const title = (typeof body.title === "string" ? body.title.trim() : "").slice(0, 120) || "Showreel";
+  const posterUrl = typeof body.poster_url === "string" && isSafePublicUrl(body.poster_url) ? body.poster_url.trim() : null;
   if (!url || !isSafePublicUrl(url)) return NextResponse.json({ error: "A valid uploaded video URL is required." }, { status: 400 });
   const clientId = await resolveClientId(null);
-  const video = await addExternalShowreel({ title, url, clientId });
+  const video = await addExternalShowreel({ title, url, clientId, posterUrl });
   return NextResponse.json({ ok: true, video });
 }

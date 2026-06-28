@@ -33,6 +33,7 @@ export default function ShowcaseReel({ videos }: { videos: ShowcaseVideo[] }) {
           <div onClick={(e) => e.stopPropagation()} className="relative">
             <video
               src={active.final_video_url ?? undefined}
+              poster={active.poster_url || undefined}
               controls autoPlay playsInline
               onEnded={(e) => { const el = e.currentTarget; el.currentTime = POSTER_T(el); el.pause(); }}
               className="aspect-[9/16] max-h-[88vh] rounded-2xl bg-black shadow-[0_30px_120px_rgba(168,85,247,0.35)]"
@@ -60,10 +61,10 @@ function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () =>
       <video
         ref={ref}
         src={v.final_video_url ?? undefined}
-        muted playsInline preload="auto"
-        onLoadedMetadata={(e) => { const el = e.currentTarget; el.currentTime = POSTER_T(el); }}
-        onLoadedData={(e) => { const el = e.currentTarget; if (el.currentTime < 0.05) el.currentTime = POSTER_T(el); }}
-        onSeeked={(e) => { const el = e.currentTarget; if (el.paused && el.currentTime < 0.05) el.currentTime = POSTER_T(el); }}
+        poster={v.poster_url || undefined}
+        muted playsInline preload={v.poster_url ? "metadata" : "auto"}
+        onLoadedMetadata={v.poster_url ? undefined : (e) => { const el = e.currentTarget; el.currentTime = POSTER_T(el); }}
+        onLoadedData={v.poster_url ? undefined : (e) => { const el = e.currentTarget; if (el.currentTime < 0.05) el.currentTime = POSTER_T(el); }}
         onMouseEnter={() => { const el = ref.current; if (el) el.play().catch(() => {}); }}
         onMouseLeave={() => { const el = ref.current; if (el && !soundOn) { el.pause(); el.currentTime = POSTER_T(el); } }}
         onEnded={(e) => {
