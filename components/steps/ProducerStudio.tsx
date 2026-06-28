@@ -514,9 +514,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <Field label="CTA mechanic / code" v={ctaCode} set={setCtaCode} placeholder="dial *120*151#" />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Setting / world (one place, used throughout)" v={setting} set={setSetting} placeholder="upscale sunlit coffee shop, daytime" />
+              <Field label="Setting / world (one place, optional)" v={setting} set={setSetting} placeholder="upscale sunlit coffee shop, daytime" />
               <Field label="Tone words" v={tone} set={setTone} placeholder="warm, confident, effortless" />
             </div>
+            {(arollRef || brollRef)
+              ? <p className="text-[11px] text-ink-faint">You set a reference look in the creatives, so the shoot already anchors to its world, lighting and wardrobe. Setting is optional here, use it only to add or override detail. Your characters (for example Mary and her daughter) come from your concept and script, not the reference, so describe them there: the producer keeps a-roll solo and writes the companions into b-roll.</p>
+              : <p className="text-[11px] text-ink-faint">Optional. One consistent world for the whole ad. Leave it blank and the producer picks one to suit the character.</p>}
           </div>
 
           {/* ── Look & assets (optional, collapsed) ── */}
@@ -580,6 +583,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <p className="mb-1.5 text-[11px] text-ink-faint">…or <b>upload a voice recording</b> and we&apos;ll script from it - your real voice is transcribed into the script, then used in the video (sliced per scene at the Voice step). Just speak naturally.</p>
               <Uploader kind="my-vo" accept="audio" label="🎙️ Upload a voice recording → script from it" onUploaded={scriptFromVoice} />
             </div>
+            <p className="mt-2 text-[11px] text-ink-faint">🔊 You pick or create the voice (library, design your own, upload or clone) in the very next step, <b>Voice</b> — it runs before any scene is shot. Build the storyboard here first, then set the voice.</p>
           </div>
           {err && <p className="text-xs text-alert">{err}</p>}
           <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : draftScript ? "🎬 Build the scenes from this script" : "🎬 Direct the storyboard"}</button>
