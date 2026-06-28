@@ -26,7 +26,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
       {/* Hero with an accent glow */}
       <div className="relative overflow-hidden border-b border-white/5">
         <header className="relative mx-auto flex max-w-6xl items-center gap-3 px-6 py-5">
-          <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#60a5fa] p-[2.5px] shadow-[0_0_28px_rgba(168,85,247,0.55)]">
+          <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#60a5fa] p-px shadow-[0_0_28px_rgba(168,85,247,0.55)]">
             <span className="pointer-events-none absolute inset-0 animate-pulse rounded-full bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#60a5fa] opacity-40 blur-md" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/gas-logo.png" alt="GAS" className="relative h-full w-full rounded-full object-cover ring-1 ring-black/50" />
@@ -69,7 +69,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
         <div className="relative mx-auto max-w-3xl px-6 py-16 text-center">
           <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Influence that converts.</h3>
           <p className="mx-auto mt-3 max-w-lg text-sm text-white/60">
-            To influence that matters and conversations that count and convert.
+            Influence that matters and conversations that count and convert.
           </p>
           <a href="mailto:gary@gasmarketing.co.za?subject=AI%20influencer%20video%20enquiry" className="mt-6 inline-block rounded-xl bg-gradient-to-r from-[#a855f7] to-[#60a5fa] px-6 py-3 text-sm font-bold text-white shadow-[0_10px_40px_rgba(168,85,247,0.4)] transition hover:brightness-110">
             Start a project →
