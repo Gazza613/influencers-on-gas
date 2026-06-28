@@ -52,7 +52,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setVoBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/voiceover`, { method: "POST" }).then((x) => x.json()).catch(() => null);
     setVoBusy(false);
-    if (r?.voiceover_url) { setVoiceoverUrl(`${r.voiceover_url}?t=${Date.now()}`); accept("voice"); } // cache-bust + auto-approve voice (generating the full take IS the confirm - no separate Accept needed)
+    if (r?.voiceover_url) setVoiceoverUrl(`${r.voiceover_url}?t=${Date.now()}`); // cache-bust; do NOT auto-approve - you listen first, then hit "✓ Accept & continue"
     else setErr(r?.error || "Could not generate the voiceover.");
   }
   const [editing, setEditing] = useState(!initialProduction?.storyboard);
@@ -807,7 +807,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <button onClick={genVoiceover} disabled={voBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voBusy ? "🎙️ Generating the full voiceover…" : voiceoverUrl ? "↻ Re-run the voiceover" : "🎙️ Generate the full voiceover"}</button>
                           {voiceoverUrl && <audio src={voiceoverUrl} controls className="h-9" />}
                         </div>
-                        {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ This take is locked in - every a-roll scene lip-syncs to it; b-roll narrates over it. The voice is now identical across all scenes.</p>}
+                        {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ Generated - have a listen. Re-run until it sounds right, then hit <b>✓ Accept &amp; continue</b> below. This exact take is what ships (every a-roll lip-syncs to it, b-roll narrates over it), so the voice stays identical across all scenes.</p>}
                       </div>
                     )}
                     {/* Use your OWN recorded voice instead - Scribe aligns + we slice it per scene. */}
