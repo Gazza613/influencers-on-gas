@@ -45,7 +45,7 @@ export async function getShowcaseToken(): Promise<string> {
 // A clean, shareable vanity slug for the public wall (e.g. /s/showreel) — works alongside the random
 // token. Overridable via SHOWCASE_SLUG. The wall is public marketing, so a guessable slug is fine.
 export function getShowcaseSlug(): string {
-  return (process.env.SHOWCASE_SLUG || "showreel").trim();
+  return (process.env.SHOWCASE_SLUG || "showcase").trim();
 }
 
 export async function isValidShowcaseToken(token: string): Promise<boolean> {
