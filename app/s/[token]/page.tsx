@@ -37,8 +37,8 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
             <span className="bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#60a5fa] bg-clip-text text-transparent">brought to life.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base text-white/60 sm:text-lg">
-            Scroll-stopping, publish-ready video ads — fronted by consistent, fully-owned AI faces.
-            Concept to final cut, produced end-to-end by GAS.
+            Scroll-stopping, publish-ready AI video response ads.
+            Concept to final cut, produced end-to-end by GAS Marketing.
           </p>
         </div>
       </div>
