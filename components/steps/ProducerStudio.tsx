@@ -400,11 +400,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     await poll(setProduction, "shots_status");
   }
   // Batch: animate EVERY kept scene's clip (parallel).
-  async function animateAll() {
+  // force=false (default) only animates scenes that don't already have a good clip (finishes a partial
+  // run cheaply); force=true re-animates the whole board (a deliberate, paid redo).
+  async function animateAll(force = false) {
     if (rendering || shooting) return;
+    if (force && !confirm("Re-animate EVERY scene from scratch? This re-renders clips you already have and costs more. To just finish the missing ones, use Animate remaining instead.")) return;
     setErr(""); setRenderingRole("");
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(force ? { force: true } : {}) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start animating."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
     await poll(setProduction, "clips_status"); setRenderingRole("");
   }
@@ -849,9 +852,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => shootAll(boardRatio)} disabled={shooting || rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting all keyframes…" : "📸 Shoot all keyframes"}</button>
-                    <button onClick={animateAll} disabled={shooting || rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering && renderingRole === "" ? "🎞️ Animating all scenes…" : "🎞️ Animate all"}</button>
+                    <button onClick={() => animateAll(false)} disabled={shooting || rendering || builtCount === keptScenes.length} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering && renderingRole === "" ? "🎞️ Animating…" : builtCount === keptScenes.length && keptScenes.length > 0 ? "✓ All scenes animated" : builtCount > 0 ? `🎞️ Animate remaining (${keptScenes.length - builtCount})` : "🎞️ Animate all"}</button>
+                    {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || rendering} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
                   </div>
-                  <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. Build or fix any individually with the buttons on the cards above.</p>
+                  <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have). Fix any single scene with the buttons on the cards above.</p>
                   {/* Optional: steer the shoot with one of your own creatives as a reference look. */}
                   <details className="rounded-lg border border-line bg-surface-2/40 p-2">
                     <summary className="cursor-pointer text-[11px] font-semibold text-ink-dim">Reference look (optional) - steer the shoot with one of your creatives</summary>

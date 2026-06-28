@@ -1035,10 +1035,15 @@ export const generateClips = inngest.createFunction(
     const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
     const keepExisting = !!(roleFilter || sceneFilter); // filtered render → keep the other clips
     const existingClips = Array.isArray(production?.clips) ? (production!.clips as ClipRow[]) : [];
+    // INCREMENTAL by default: a whole-board "animate" only renders scenes that DON'T already have a good
+    // clip (so a partial 6/8 run finishes the last 2 instead of re-rendering all 8 - that was pointless +
+    // costly). force=true re-animates everything; an explicit scene filter always re-renders those scenes.
+    const force = event.data.force === true;
+    const hasGoodClip = (i: number) => existingClips.some((c) => Number(c.scene) === i && c.url && c.status !== "failed");
     // Rejected references: scenes the producer dropped from the galleries — never animate them.
     const dropped = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: keepExisting ? existingClips : [] } } }));
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips_status: "running", clips: force ? [] : existingClips } } }));
 
     // VOICE-ONCE: synthesize the WHOLE script as one continuous take, slice per scene by the timestamps
     // → identical voice across every scene + WYSIWYG. Returns the slices FROM the step (Inngest replays
@@ -1309,7 +1314,7 @@ export const generateClips = inngest.createFunction(
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
     // scene merge-saves its result as it lands so the UI fills in live; a final save is authoritative.
     // Only render the scenes in the role filter (all of them when no filter).
-    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)));
+    const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)) && (sceneFilter || force ? true : !hasGoodClip(i)));
     const renderAndSave = async ({ sc, i }: { sc: Record<string, string>; i: number }) => {
       // Contain a single scene's failure: if renderOne throws (a vendor error after retries), save a
       // "failed" clip instead of rejecting the whole batch — otherwise the final "done" step never
