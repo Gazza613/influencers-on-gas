@@ -24,7 +24,12 @@ export default function ShowcaseReel({ videos }: { videos: ShowcaseVideo[] }) {
       {active && (
         <div onClick={() => setActive(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
           <div onClick={(e) => e.stopPropagation()} className="relative">
-            <video src={active.final_video_url ?? undefined} controls autoPlay playsInline className="aspect-[9/16] max-h-[88vh] rounded-2xl bg-black shadow-[0_30px_120px_rgba(168,85,247,0.35)]" />
+            <video
+              src={active.final_video_url ?? undefined}
+              controls autoPlay playsInline
+              onEnded={(e) => { const el = e.currentTarget; el.currentTime = 0; el.pause(); }}
+              className="aspect-[9/16] max-h-[88vh] rounded-2xl bg-black shadow-[0_30px_120px_rgba(168,85,247,0.35)]"
+            />
             {active.title && <div className="mt-3 text-center text-sm font-semibold text-white/80">{active.title}</div>}
             <button onClick={() => setActive(null)} aria-label="Close" className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-base font-bold text-black shadow-lg">✕</button>
           </div>
@@ -48,9 +53,15 @@ function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () =>
       <video
         ref={ref}
         src={v.final_video_url ?? undefined}
-        muted loop playsInline preload="metadata"
+        muted playsInline preload="metadata"
         onMouseEnter={() => { const el = ref.current; if (el) el.play().catch(() => {}); }}
         onMouseLeave={() => { const el = ref.current; if (el && !soundOn) el.pause(); }}
+        onEnded={(e) => {
+          // Finished: snap back to the first frame (so we never sit on a black end frame). A muted
+          // hover-preview loops; a sound-on play resets, pauses and clears the sound.
+          const el = e.currentTarget; el.currentTime = 0;
+          if (soundOn) { el.pause(); onSound(false); } else { el.play().catch(() => {}); }
+        }}
         onClick={onOpen}
         className="h-full w-full cursor-zoom-in object-cover transition duration-500 group-hover:scale-[1.03]"
       />
@@ -65,8 +76,8 @@ function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () =>
         {soundOn ? "🔊" : "🔇"}
       </button>
 
-      {/* Expand affordance */}
-      <button onClick={onOpen} aria-label="Expand" className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-sm text-white opacity-0 backdrop-blur transition group-hover:opacity-100">⤢</button>
+      {/* Expand affordance — small eye, always visible */}
+      <button onClick={onOpen} aria-label="Expand" className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-xs text-white/90 backdrop-blur transition hover:bg-black/70">👁</button>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 pr-12 text-left">
         <div className="truncate text-[13px] font-bold text-white drop-shadow">{v.title || "Untitled"}</div>
