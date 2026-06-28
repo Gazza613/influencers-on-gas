@@ -151,9 +151,9 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
         </div>
       </div>
       <p className="mt-2 text-sm text-ink-dim">
-        This is where your influencer is born. Tell us a line or two about who they are, and our co-pilot
-        casts a full film-grade character: their face, their story, the way they move, even their wardrobe.
-        Think of it as the audition before the photoshoot. The richer the brief, the more alive they feel.
+        {bible
+          ? <>Your character is <b className="text-ink">cast</b>. Everything below is yours — click any line to edit it (it saves as you type), hit <span className="text-[#c79bff]">↻ Reimagine</span> on a section to re-roll just that part, or <span className="text-[#c79bff]">↻ Re-brief</span> up top to start a whole new character.</>
+          : <>This is where your influencer is born. Tell us a line or two about who they are, and our co-pilot casts a full film-grade character: their face, their story, the way they move, even their wardrobe. Think of it as the audition before the photoshoot. The richer the brief, the more alive they feel.</>}
       </p>
 
       {(open || !bible) && (
@@ -183,7 +183,10 @@ export default function BibleEditor({ influencerId, initialBrief, initialBible, 
             Not feeling one part? Hit <span className="text-[#c79bff]">↻ Reimagine</span> on that section and the AI re-rolls
             just that bit, in keeping with the rest. Want a whole new character? <span className="text-[#c79bff]">↻ Re-brief</span> up top.
           </div>
-          <Bare value={String(bible.signature_line ?? "")} onChange={(v) => edit((b) => { b.signature_line = v; })} placeholder="Signature line" />
+          <div>
+            <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Signature line · a short quote in their own voice (anchors their tone)</div>
+            <Bare value={String(bible.signature_line ?? "")} onChange={(v) => edit((b) => { b.signature_line = v; })} placeholder={"e.g. “A room should feel like it’s always been here.”"} />
+          </div>
 
           <div className="space-y-3">
             <Section title="Identity" action={<Regen section="identity" busy={regen} onClick={reimagine} />}>
