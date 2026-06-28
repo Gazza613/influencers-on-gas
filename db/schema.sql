@@ -347,6 +347,7 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('higgsfield','nano_banana_pro','image', 0, 0, true),
   ('higgsfield','nano_banana_2','image', 1, 77, true),
   ('anthropic','claude-sonnet-4-6','scene', 0, 30, true),
+  ('anthropic','claude-opus-4-8','request', 0, 500, true),
   ('anthropic','claude-haiku-4-5','image', 0, 5, true),
   ('voyage','voyage-4-lite','embed', 0, 0, true),
   -- B-ROLL motion (Producer): Kling 3.0 image->video ~5s std, from the 9,000-credit Ultra POOL.

@@ -6,6 +6,9 @@ import { PLATFORM_STATE } from "../platform-state";
 // Sonnet 4.6 designs the Character Casting + refines prompts: near-Opus quality for a
 // structured creative sheet, but markedly faster (Opus was noticeably slow here).
 const MODEL = "claude-sonnet-4-6";
+// The DIRECTOR runs on the premium model: the storyboard is the highest-leverage reasoning step
+// (it must stay context-aware about who does what, and read the reference creatives), so it's worth it.
+export const PREMIUM = "claude-opus-4-8";
 
 async function client(): Promise<Anthropic> {
   const key = await getSecret("anthropic");
@@ -567,6 +570,7 @@ COMPLIANCE - write LEGITIMATE, honest brand advertising. Do NOT use deceptive, p
 WORLD + CONTINUITY (critical for a world-class feel) - set the ENTIRE ad in ONE coherent, specific location/world (e.g. a particular sunlit coffee shop), with the SAME wardrobe, lighting and look on the influencer across every scene, so scenes cut together as one seamless film, never disconnected shots. The presenter is physically PRESENT IN the scene doing something real (sitting at a table with a coffee, leaning at the counter, walking through the space), NEVER a floating head on a plain backdrop - and background strangers appear ONLY where the setting is a genuinely busy public place (see CAST DISCIPLINE), not forced into every shot. Every b-roll uses the SAME location/world as the a-roll (different angles, details and moments of that same place) so the film flows. State the shared world in each scene's location and keep wardrobe consistent in blocking.
 
 CAST DISCIPLINE (critical - viewers instantly notice extra or shape-shifting people):
+• WHO DOES WHAT (context awareness - read the story properly): assign each action to the RIGHT person. The influencer is the on-camera VOICE / narrator and emotional anchor, but she is NOT automatically the one who performs every action. If the ad is about someone ELSE doing something - e.g. a mother talking about how HER DAUGHTER went back to study - then the DAUGHTER is the student and the DAUGHTER studies on screen (laptop, books) in the b-roll, while the mother (the influencer) narrates and reacts with pride. Never collapse two people into one, and never hand another character's action to the influencer. "My daughter studied with X" means you SHOW the daughter studying with the mother's voice over it - NOT the mother studying. Get the protagonist of each beat right.
 • SHOW THE PEOPLE THE BRIEF FEATURES (do not drop them): if the concept, setting, script or product story names or implies a companion who should be SEEN on screen (e.g. "with her daughter", "showing her daughter", a son, a partner, a customer, a friend), that person is a REAL on-screen character, not just a name in the voiceover. Define them in supporting_cast (locked look) AND put them in the talent + blocking of the relevant b-roll scenes - physically present and doing something WITH the influencer (studying together, sharing the moment, reacting, being shown the product). If the ad is ABOUT that person (a mother and her daughter), they appear across MOST of the b-roll, never zero scenes. Reducing a featured family member to a passing mention is a failure.
 • Keep the cast TIGHT. Most ads need only the influencer, or the influencer plus ONE named person. Do NOT pad scenes with friends or a crowd unless the concept truly calls for it.
 • Each scene's 'talent' lists EXACTLY who is in that scene - the influencer and any named companions, nobody else. If a scene is just her, talent contains only her.
@@ -642,6 +646,7 @@ export async function generateStoryboard(brief: {
   influencerName: string; brand: string; goal: string; offer: string; benefits: string;
   cta: string; ctaCode?: string; durationSeconds: number; format: string; talent: string;
   setting: string; tone: string; logo?: string; legal?: string; influencerProfile?: string; script?: string;
+  arollRefImage?: string; brollRefImage?: string;
 }): Promise<Storyboard> {
   const c = await client();
   const input =
@@ -653,16 +658,25 @@ export async function generateStoryboard(brief: {
     `Setting / world: ${brief.setting || "(not stipulated - choose an age- and demographic-appropriate world for this influencer)"}\nTone words: ${brief.tone}\n` +
     `Brand overlay: the logo/promo is applied AUTOMATICALLY as an overlay at assembly - do NOT write the logo into any scene's graphics or render it in any shot.\n` +
     `Mandatory legal line (verbatim, or none): ${brief.legal || "(none)"}\n` +
+    (brief.arollRefImage || brief.brollRefImage
+      ? `\nREFERENCE CREATIVES (attached as images below) - these are the APPROVED look for this ad and the single most important context you have. STUDY them like a director studies a mood board:\n• WHO is in each one (the influencer? a second person - a child, daughter, partner, customer?), their apparent age and role.\n• WHAT they are DOING (studying on a laptop, using the product, talking to camera).\n• The wardrobe, setting and world.\nReproduce what you see. If a B-ROLL reference shows a SPECIFIC person (e.g. a young woman / a daughter) performing an action (e.g. studying on a laptop), that person is a REAL character in this film and that action is a REAL scene - put THAT person in the b-roll doing THAT thing (define them in supporting_cast, place them in the scene talent + blocking). Do NOT replace them with the influencer, and do NOT reassign their action to the influencer.\n`
+      : "") +
     (brief.script && brief.script.trim()
       ? `\nAPPROVED SCRIPT - the producer has already written and approved this exact voiceover. You MUST use it VERBATIM: set full_vo to this script word-for-word, and split it sensibly across the scenes' vo_line fields (each scene a contiguous chunk, in order, covering the whole script). Do NOT rewrite, shorten, extend or add to the words - only decide how the scenes (a-roll/b-roll), visuals, pacing and timecodes carry this script. SCRIPT:\n"""${brief.script.trim()}"""\n\nNow build the directed storyboard around this approved script.`
       : `\nWrite the directed storyboard now.`);
+  // Attach the approved reference creatives as vision so the director SEES the real cast + action,
+  // not just text (fixes "it made the mum the student" + "it ignored the daughter-on-laptop b-roll").
+  type Part = { type: "text"; text: string } | { type: "image"; source: { type: "url"; url: string } };
+  const content: Part[] = [{ type: "text", text: input }];
+  if (brief.arollRefImage) { content.push({ type: "text", text: "A-ROLL reference creative (the approved talking-shot look + cast):" }, { type: "image", source: { type: "url", url: brief.arollRefImage } }); }
+  if (brief.brollRefImage) { content.push({ type: "text", text: "B-ROLL reference creative (study WHO is in it and WHAT they are doing - reproduce that person + action):" }, { type: "image", source: { type: "url", url: brief.brollRefImage } }); }
   const res = await c.messages.create({
-    model: MODEL,
+    model: PREMIUM,
     max_tokens: 6000,
     system: PRODUCER_SYSTEM,
     tools: [{ name: "storyboard", description: "Return the complete directed storyboard.", input_schema: STORYBOARD_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
     tool_choice: { type: "tool", name: "storyboard" },
-    messages: [{ role: "user", content: input }],
+    messages: [{ role: "user", content: content as unknown as Anthropic.MessageParam["content"] }],
   });
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("No storyboard returned");

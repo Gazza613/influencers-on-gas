@@ -412,6 +412,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     if (d?.production) setProduction(d.production);
   }
+  // Drop every existing clip + the final cut (leftover videos from earlier testing) so the board is clean
+  // reference images again. Keeps the storyboard, shots, voice + approvals - only the videos go.
+  async function clearStaleClips() {
+    if (busyAny) return;
+    if (!confirm("Clear all existing clips and the final cut? Your storyboard, reference images and voice stay - only the rendered videos are removed, so you can re-animate from clean stills.")) return;
+    setErr("");
+    await fetch(`/api/influencers/${influencerId}/production/reset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clearClips: true }) }).catch(() => {});
+    const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+    if (d?.production) setProduction(d.production);
+  }
 
   async function decideShowreel(decision: "accept" | "decline") {
     setErr("");
@@ -601,6 +611,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               </div>
               <div className="flex gap-2">
                 <button onClick={resetStuck} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${(busyAny || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>
+                {clips.length > 0 && <button onClick={clearStaleClips} disabled={busyAny} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-faint hover:text-ink disabled:opacity-40" title="Drop all existing clips + the final cut (leftover videos) and go back to clean reference images. Keeps the storyboard, stills and voice.">🧹 Clear clips</button>}
                 <button onClick={() => setEditing(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">✎ New brief</button>
                 <button onClick={generate} disabled={busy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Re-directing…" : "↻ Regenerate"}</button>
               </div>

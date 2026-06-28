@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { generateStoryboard } from "@/lib/vendors/anthropic";
+import { generateStoryboard, PREMIUM } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
 import { isSafePublicUrl } from "@/lib/safe-url";
 import { bibleProfile } from "@/lib/bible";
@@ -57,6 +57,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     logo: String(b.logo || "").trim(),
     legal: String(b.legal || "").trim(),
     script: String(b.script || "").trim().slice(0, 6000), // approved script-first read: built into the scenes verbatim
+    // The approved reference creatives (the a-roll + b-roll guides the producer picked) - passed to the
+    // director as VISION so it SEES the real cast + action (e.g. the daughter studying on a laptop) and
+    // builds the storyboard around them, instead of writing blind and casting the wrong person.
+    arollRefImage: safeUrl(persona.aroll_ref_url) || safeUrl(b.arollRef),
+    brollRefImage: safeUrl(persona.broll_ref_url) || safeUrl(b.brollRef),
     // Optional uploads: a clothing ref + a location ref steer the SHOOT; a transparent PNG logo +
     // its corner are burned onto the final cut at assembly.
     // All URLs are SSRF-guarded (isSafePublicUrl) - they get fetched by Higgsfield/Shotstack, so an
@@ -74,7 +79,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   try {
     const storyboard = await generateStoryboard(brief);
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "storyboard", count: 1 }).catch(() => {});
+    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: PREMIUM, unit: "request", action: "storyboard", count: 1 }).catch(() => {});
     const production = { brief, storyboard, status: "storyboard", at: Date.now() };
     await updateInfluencer(id, { persona: { ...persona, production } });
     return NextResponse.json({ production });
