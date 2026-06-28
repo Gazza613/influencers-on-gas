@@ -408,6 +408,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(""); setRenderingRole("");
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(force ? { force: true } : {}) }).then((x) => x.json()).catch(() => null);
+    if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; } // every scene already has a clip
     if (!r?.queued) { setErr(r?.error || "Couldn't start animating."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
     await poll(setProduction, "clips_status"); setRenderingRole("");
   }

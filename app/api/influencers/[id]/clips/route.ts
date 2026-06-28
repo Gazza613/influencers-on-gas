@@ -14,21 +14,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const inf = await getInfluencer(id);
   if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
-  const production = persona.production as { storyboard?: { scenes?: unknown[] }; shots?: { url?: string | null }[]; clips?: unknown[] } | undefined;
+  type Clip = { scene?: number; url?: string | null; status?: string };
+  const production = persona.production as { storyboard?: { scenes?: { role?: string }[] }; shots?: { url?: string | null }[]; clips?: Clip[]; dropped_scenes?: number[] } | undefined;
   if (!production?.storyboard?.scenes?.length) return NextResponse.json({ error: "Direct a storyboard first." }, { status: 400 });
   if (!production.shots?.some((s) => s.url)) return NextResponse.json({ error: "Shoot the shots first." }, { status: 400 });
 
-  // Optional: render only certain roles (the wizard renders a-roll then b-roll as separate steps).
   const body = await req.json().catch(() => ({}));
   const roles = Array.isArray(body?.roles) ? body.roles.map(String).filter((r: string) => ["a-roll", "b-roll", "graphic"].includes(r)) : null;
-  const keptClips = roles && roles.length ? (production.clips ?? []) : []; // keep the other role's clips when filtering
+  const explicitScenes = Array.isArray(body?.scenes) ? body.scenes.map(Number).filter((n: number) => Number.isInteger(n)) : null;
+  const force = body?.force === true; // a deliberate, paid full redo
 
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: keptClips, clips_status: "running" } } });
+  // COST SAFETY (single source of truth): never wipe clips and never re-render a scene that already has a
+  // good clip unless the caller explicitly forces it. A whole-board animate computes EXACTLY the scenes
+  // that still need a clip and renders only those - so 7/8 animates the 1, not all 8.
+  const allScenes = production.storyboard.scenes;
+  const existingClips: Clip[] = Array.isArray(production.clips) ? production.clips : [];
+  const dropped = new Set((Array.isArray(production.dropped_scenes) ? production.dropped_scenes : []).map(Number));
+  const hasGoodClip = (i: number) => existingClips.some((c) => Number(c.scene) === i && !!c.url && c.status !== "failed");
+
+  // Decide the exact scene list to render.
+  let targetScenes: number[] | null = explicitScenes && explicitScenes.length ? explicitScenes : null;
+  if (!targetScenes && !roles && !force) {
+    // Incremental whole-board animate: only the scenes missing a good clip (skip graphics + dropped).
+    targetScenes = allScenes
+      .map((sc, i) => ({ role: String(sc?.role || "a-roll"), i }))
+      .filter(({ role, i }) => role !== "graphic" && !dropped.has(i) && !hasGoodClip(i))
+      .map(({ i }) => i);
+    if (!targetScenes.length) return NextResponse.json({ queued: false, nothingToDo: true, message: "Every kept scene already has a clip." });
+  }
+
+  // Keep ALL existing clips in the DB (never wipe) unless this is a forced full redo. Renders merge in place.
+  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: force ? [] : existingClips, clips_status: "running" } } });
   try {
-    await inngest.send({ name: "influencer/generate.clips", data: { influencerId: id, ...(roles && roles.length ? { roles } : {}) } });
+    await inngest.send({ name: "influencer/generate.clips", data: { influencerId: id,
+      ...(roles && roles.length ? { roles } : {}),
+      ...(targetScenes && targetScenes.length ? { scenes: targetScenes } : {}),
+      ...(force ? { force: true } : {}) } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips_status: "idle" } } });
     return NextResponse.json({ error: "Could not start rendering (generation engine not connected)." }, { status: 503 });
   }
-  return NextResponse.json({ queued: true });
+  return NextResponse.json({ queued: true, animating: targetScenes ? targetScenes.length : (roles ? "role" : "all") });
 }
