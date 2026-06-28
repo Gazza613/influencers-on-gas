@@ -95,6 +95,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       status: c.status || (c.url ? "approved" : "failed_generation"),
       qa: c.qa ?? null,
       error: c.error ?? null,
+      role: c.role === "b-roll" ? "b-roll" : "a-roll", // keep the role so a-roll vs b-roll stay separated
       upscaling: !!c.upscaling,
       upscale_error: c.upscale_error ?? null,
     }));
@@ -533,7 +534,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           )}
         </div>
         {rates && nFormats > 0 && (
-          <p className="mt-1.5 text-[11px] text-ink-faint">Each run (and each &ldquo;generate more&rdquo;) costs the above. Track every cent in <Link href="/cost-control" className="text-[#c79bff] hover:underline">Cost Control</Link>.</p>
+          <p className="mt-1.5 text-[11px] text-ink-faint">Generating runs on a model included in your Higgsfield Ultra plan, so each run (and each &ldquo;generate more&rdquo;) is R0,00, no credit cost. Only the optional 4K upscale on the keepers you choose costs anything. Every cent is tracked in <Link href="/cost-control" className="text-[#c79bff] hover:underline">Cost Control</Link>.</p>
         )}
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}
 
