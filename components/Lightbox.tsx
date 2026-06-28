@@ -29,13 +29,15 @@ export default function Lightbox({ url, onClose }: { url: string; onClose: () =>
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-6" onClick={onClose}>
       <div className="relative max-h-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-        {!loaded && (
+        {/* Spinner only for IMAGES (they pop in once decoded). Video streams natively - show it straight
+            away with its own controls/buffering UI, never hidden behind a spinner (that read as "buffering forever"). */}
+        {!loaded && !isVideo && (
           <div className="flex h-[60vh] w-[60vw] max-w-3xl items-center justify-center rounded-lg border border-line bg-surface-1">
             <span className="spinner-ring text-3xl text-[#c79bff]" />
           </div>
         )}
         {isVideo
-          ? <video src={url} controls autoPlay loop playsInline onLoadedData={() => setLoaded(true)} className={`max-h-[82vh] w-auto rounded-lg border border-line bg-black object-contain ${loaded ? "" : "hidden"}`} />
+          ? <video src={url} controls autoPlay playsInline preload="auto" className="max-h-[82vh] w-auto rounded-lg border border-line bg-black object-contain" />
           // eslint-disable-next-line @next/next/no-img-element
           : <img src={url} alt="frame" onLoad={() => setLoaded(true)} className={`max-h-[82vh] w-auto rounded-lg border border-line object-contain ${loaded ? "" : "hidden"}`} />}
         <div className="mt-3 flex items-center justify-center gap-3">
