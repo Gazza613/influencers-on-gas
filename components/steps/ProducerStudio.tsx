@@ -93,6 +93,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // EXACT scope of the current shoot so only the scenes truly being shot show a spinner: "all" = a
   // whole-board shoot, an array = just those scene indices (a per-scene re-shoot). Never spin the rest.
   const [shootScope, setShootScope] = useState<number[] | "all">("all");
+  // ⚡ Priority (faster, PAID) render queue - opt-in for speed when the free queue is crawling.
+  const [priority, setPriority] = useState(false);
   const shotFor = (i: number) => shots.find((s) => s.scene === i);
   const clips = production?.clips ?? [];
   const rendering = production?.clips_status === "running";
@@ -258,7 +260,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const drop = new Set([role === "a-roll" ? "arollRefs" : "brollRefs", "aroll", "broll", "audio", "stitch", "showreel"]);
     setApproved((s) => { const n = new Set([...s].filter((k) => !drop.has(k))); persistApproved(n); return n; });
     setDenied(new Set());
-    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roleFilter: role, aspectRatio: ratio }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roleFilter: role, aspectRatio: ratio, priority }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot - give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); setShootingRole(""); return; }
     await poll(setProduction, "shots_status");
     setShootingRole("");
@@ -379,7 +381,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
         : [...list, { scene: i, role: String(sb?.scenes?.[i]?.role || "a-roll"), beat: String(sb?.scenes?.[i]?.beat || ""), url: null, reshooting: true }];
       return { ...p, shots, shots_status: "running" };
     });
-    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], aspectRatio: boardRatio }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], aspectRatio: boardRatio, priority }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't shoot that reference image."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)), shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
   }
@@ -398,7 +400,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(""); setShootingRole(""); setShootScope("all"); // whole-board shoot
     setProduction((p) => (p ? { ...p, shots: [], shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
     setApproved((s) => { const n = new Set([...s].filter((k) => k === "concept" || k === "voice")); persistApproved(n); return n; });
-    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aspectRatio: ratio }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aspectRatio: ratio, priority }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
   }
@@ -644,6 +646,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
             <span className="text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below.</span>
             <div className="ml-auto flex items-center gap-2">
+              <button onClick={() => setPriority((v) => !v)} title="Faster render: jumps the queue when the free queue is crawling. A few credits per image, metered in Cost Control. Off = free but slower." className={`rounded-lg border px-2.5 py-2 text-[11px] font-semibold transition ${priority ? "border-[#60a5fa]/60 bg-[#60a5fa]/12 text-[#93c5fd]" : "border-line text-ink-faint hover:text-ink"}`}>⚡ Priority {priority ? "ON" : "OFF"}</button>
               <RatioPicker value={boardRatio} onChange={setBoardRatio} />
               <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
             </div>

@@ -33,6 +33,9 @@ const CANDIDATE_COUNT = 6;
 const QA_ON = process.env.PRODUCER_QA === "1";
 const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "gpt_image_2";
 const IMAGE_FALLBACK = "nano_banana_pro"; // free fallback (also covers gpt_image_2's only weak spot: 1:1/square)
+// PRIORITY (faster, PAID) image model: jumps Higgsfield's queue when the producer opts in for speed.
+// Metered at its rate_card cost (nano_banana_2 ≈ 1 credit). Env-tunable.
+const PRIORITY_MODEL = process.env.HF_PRIORITY_MODEL || "nano_banana_2";
 const CREATIVE_FALLBACK = "nano_banana_pro"; // free fallback for creatives/producer (gpt_image_2 is now primary)
 
 // Stage 2 (Photoshoot) builds the Soul TRAINING SET from the chosen face. Recipe follows
@@ -847,6 +850,8 @@ export const generateShots = inngest.createFunction(
     const roleFilter = event.data.roleFilter === "a-roll" || event.data.roleFilter === "b-roll" ? String(event.data.roleFilter) : "";
     // Scene filter: shoot only these scene indices' KEYFRAMES (per-scene reference shoot). Empty = all.
     const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
+    // PRIORITY (faster, paid) render model when the producer opts in for speed; else the free default.
+    const shotModel = event.data.priority === true ? PRIORITY_MODEL : IMAGE_MODEL;
     // Aspect ratio is producer-chosen per shoot (9:16 reels / 1:1 feed / 16:9 youtube); falls back to the storyboard format.
     const allowedRatios = ["9:16", "1:1", "16:9"];
     const ratio = allowedRatios.includes(String(event.data.aspectRatio)) ? String(event.data.aspectRatio) : (String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16");
@@ -935,7 +940,7 @@ export const generateShots = inngest.createFunction(
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
       // no quality but ~double the render time. 1K ~halves the board with no visible loss.
       const shotExtra = { ...(medias.length ? { medias } : {}), resolution: process.env.HF_BOARD_RES || "1k" };
-      const gen = () => generateBatch([prompt], IMAGE_MODEL, ratio, shotExtra, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
+      const gen = () => generateBatch([prompt], shotModel, ratio, shotExtra, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
       const url = await step.run(`shot-${i}`, gen);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
       // QA GATE (opt-in): reject waxy/malformed/drift frames and re-roll once. Off by default for speed.
@@ -944,7 +949,7 @@ export const generateShots = inngest.createFunction(
         await step.run(`uqa-${i}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: 1 }).catch(() => {}));
         if (!verdict.pass) {
           const reroll = await step.run(`reroll-${i}`, gen);
-          if (reroll && (await step.run(`valid2-${i}`, () => filterLoadable([reroll as string]))).length > 0) { usable = reroll; await step.run(`u2-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }).catch(() => {})); }
+          if (reroll && (await step.run(`valid2-${i}`, () => filterLoadable([reroll as string]))).length > 0) { usable = reroll; await step.run(`u2-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: shotModel, unit: "image", action: "creative", count: 1 }).catch(() => {})); }
         }
       }
       // THE HUMANISER (realism pass): re-render the keyframe through Nano Banana Pro using itself as
@@ -961,7 +966,7 @@ export const generateShots = inngest.createFunction(
       let hosted: string | null = null;
       if (usable) {
         hosted = (await step.run(`host-${i}`, () => rehostToBlob(usable as string, "shots").catch(() => null))) || usable;
-        await step.run(`usage-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "creative", count: 1 }));
+        await step.run(`usage-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: shotModel, unit: "image", action: "creative", count: 1 }));
       }
       return { scene: i, role, beat, url: hosted, error: hosted ? null : "no image" };
     };
