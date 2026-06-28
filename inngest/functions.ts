@@ -543,17 +543,22 @@ export const generateCreatives = inngest.createFunction(
         ? twinPhotos
         : [(persona.face_card_url as string) || (persona.hero_realism_url as string) || (persona.hero_url as string) || (persona.chosen_url as string) || refs.find((r) => r.hero)?.url || refs.find((r) => r.face)?.url || refs[0]?.url || (persona.reference_url as string) || ""].filter(Boolean);
       const featureUrl = twinPhotos.length ? "" : ((persona.feature_sheet_url as string) || "");
+      // MATCH THIS LOOK: a previously-generated creative the producer chose to match. We reproduce its
+      // SECONDARY people (a daughter/companion) + the WARDROBE from it, while the main subject's FACE
+      // still comes from the identity lock - so people + clothes stay consistent across creative sets.
+      const matchRefUrl = typeof event.data.matchRef === "string" && event.data.matchRef ? event.data.matchRef : "";
       const imported = await step.run("import-refs", async () => {
         const ids = (await Promise.all(idRefUrls.map((u) => importMediaUrl(u).catch(() => null)))).filter((v): v is string => !!v);
-        const [feat, cloth, locs] = await Promise.all([
+        const [feat, cloth, locs, match] = await Promise.all([
           featureUrl ? importMediaUrl(featureUrl).catch(() => null) : Promise.resolve(null),
           clothingRef ? importMediaUrl(clothingRef).catch(() => null) : Promise.resolve(null),
           Promise.all(locationRefs.map((u) => importMediaUrl(u).catch(() => null))).then((a) => a.filter((v): v is string => !!v)),
+          matchRefUrl ? importMediaUrl(matchRefUrl).catch(() => null) : Promise.resolve(null),
         ]);
-        return { ids, feat, cloth, locs };
+        return { ids, feat, cloth, locs, match };
       });
       const idMedias = imported.ids;
-      const medias = [...idMedias, imported.feat, imported.cloth, ...imported.locs].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
+      const medias = [...idMedias, imported.feat, imported.cloth, ...imported.locs, imported.match].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
       // Render the preview pass at 1K (env-tunable) — these are for SELECTION; the keepers upscale to
       // 4K after. 1K generates much faster and the tiles stop trickling in. Explicit-4K requests keep a
       // 2K working base for the upscale.
@@ -566,6 +571,7 @@ export const generateCreatives = inngest.createFunction(
       const clothTag = imported.cloth ? `@image${++n}` : null;
       const locTags = imported.locs.map(() => `@image${++n}`);
       const locRange = locTags.length > 1 ? `${locTags[0]} to ${locTags[locTags.length - 1]}` : locTags[0];
+      const matchTag = imported.match ? `@image${++n}` : null;
       const refInstruction = [
         faceTags.length && (faceTags.length > 1
           ? `IDENTITY LOCK: ${faceRange} are photos of the SAME real person from different angles, lighting and expressions. Replicate this exact person faithfully, the same face, bone structure, eyes, nose, lips, skin tone and hair across all of them. Zero facial drift, unmistakably the same individual. Use them ONLY for the face and identity; IGNORE their clothing, backgrounds, poses and lighting.`
@@ -584,6 +590,9 @@ export const generateCreatives = inngest.createFunction(
         clothTag && `${clothTag} is the WARDROBE reference (CRITICAL): dress her in this EXACT outfit — the identical garments, colours, fabric and styling — in EVERY shot of this set, never changed, swapped, recoloured or restyled between shots. The garments are PLAIN: no brand logos, company names or printed text on them. Do NOT copy any face or person from ${clothTag}.`,
         locTags.length === 1 && `${locTags[0]} is a SCENE reference: match its location and setting. Do NOT copy any face or person from it.`,
         locTags.length > 1 && `${locRange} are ${locTags.length} DIFFERENT location/scene references. Set each shot in a DIFFERENT one of these locations and VARY the backdrop across the set — never repeat the same backdrop twice. Do NOT copy any face or person from them.`,
+        // MATCH THIS LOOK: carry the companions + the wardrobe from a chosen earlier creative, but keep the
+        // main subject's face from the identity lock above (never her face from the match).
+        matchTag && `${matchTag} is the MATCH reference (CRITICAL for consistency across sets): reproduce EVERY OTHER person in it — any companion such as a daughter, partner, child or friend — EXACTLY as they appear: the SAME face, age, build, hair and the SAME clothing. ALSO dress the MAIN SUBJECT in the SAME outfit as in ${matchTag}. The ONE thing you do NOT take from ${matchTag} is the main subject's FACE — her face comes ONLY from the identity references above. So: her face = identity lock; her outfit + all other people + their outfits = matched to ${matchTag}.`,
       ].filter(Boolean).join(" ");
 
       const userScene = !!scene;

@@ -63,6 +63,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const [creativeRole, setCreativeRole] = useState<"a-roll" | "b-roll">("a-roll");
   const [extras, setExtras] = useState(false);
   const [priority, setPriority] = useState(false); // ⚡ faster, paid render queue (opt-in for speed)
+  const [matchRef, setMatchRef] = useState(""); // "Match this look": reproduce people + wardrobe from a chosen creative
   const pickRole = (r: "a-roll" | "b-roll") => { setCreativeRole(r); setExtras(r === "b-roll"); };
   const [scene, setScene] = useState("");
   const [refining, setRefining] = useState(false);
@@ -188,7 +189,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     setErr(""); setStatus("running"); setStartedAt(Date.now());
     const r = await fetch(`/api/influencers/${influencerId}/creatives`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRefs, extras, identityLock, role: creativeRole, priority }),
+      body: JSON.stringify({ ratios: [...ratios], resolution: "2k", scene, count: PER_RATIO, cinematic: tier === "soul_cinematic", clothingRef, locationRefs, extras, identityLock, role: creativeRole, priority, matchRef }),
     });
     if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start"); setStatus("idle"); return; }
     flex(`${CREW.creatives.emoji} ${CREW.creatives.name}, your ${CREW.creatives.role}: ${CREW.creatives.greeting}`);
@@ -501,6 +502,27 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             })}
           </div>
         </div>
+
+        {/* Match this look: reproduce the people + wardrobe from a chosen earlier creative (durable
+            cross-set consistency for a second person + outfits). The locked face still wins. */}
+        {creatives.some((c) => !!c.url) && (
+          <div className="mt-4">
+            <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Match this look (optional)</div>
+            <p className="mb-2 text-[11px] text-ink-faint">Pick one you love and the next renders reproduce its <b>people + outfits</b> (the locked face still wins) - keeps a daughter + wardrobe consistent across sets. Tap again to clear.</p>
+            <div className="flex flex-wrap gap-2">
+              {creatives.filter((c) => !!c.url).slice(0, 12).map((c) => {
+                const on = matchRef === c.url;
+                return (
+                  <button key={c.id || c.url} onClick={() => setMatchRef(on ? "" : (c.url as string))} title={on ? "Matching this look - tap to clear" : "Match this look"} className={`relative h-16 w-12 shrink-0 overflow-hidden rounded-lg border-2 transition ${on ? "border-[#60a5fa]" : "border-line hover:border-line-strong"}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={c.url as string} alt="" className="h-full w-full object-cover" />
+                    {on && <span className="absolute inset-0 flex items-center justify-center bg-[#60a5fa]/35 text-[8px] font-bold text-white">MATCH</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Identity lock - only shown when it actually changes the result (single-reference /
             Soul-only builds). Multi-photo influencers always use the strong multi-image lock. */}

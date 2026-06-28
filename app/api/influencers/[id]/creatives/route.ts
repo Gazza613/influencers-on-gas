@@ -70,6 +70,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // legacy soul_cinematic model name too so older clients keep working.
   const cinematic = body.cinematic === true || body.model === "soul_cinematic";
   const clothingRef = typeof body.clothingRef === "string" ? body.clothingRef : "";
+  const matchRef = typeof body.matchRef === "string" ? body.matchRef : ""; // "Match this look": an earlier creative to reproduce people + wardrobe from
   // Multiple location references (shots rotate through them for varied backdrops). Back-compat with the old single locationRef.
   const locationRefs = (Array.isArray(body.locationRefs) ? body.locationRefs : [body.locationRef]).filter((u: unknown): u is string => typeof u === "string" && !!u).slice(0, 8);
   // A-roll (presenter) vs B-roll (lifestyle/scene). Drives pose + extras default in the engine.
@@ -83,7 +84,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Send first; only flip to "running" once accepted, so a send failure can't strand the
   // gallery showing "Rendering" forever with no job running.
   try {
-    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, cinematic, clothingRef, locationRefs, extras, identityLock, role, priority: body.priority === true } });
+    await inngest.send({ name: "influencer/generate.creatives", data: { influencerId: id, ratios, resolution, scene, count, cinematic, clothingRef, locationRefs, extras, identityLock, role, matchRef, priority: body.priority === true } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }
