@@ -133,8 +133,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const builtCount = keptScenes.filter((x) => clipDone(x.i)).length;
   const scenesReady = !!sb && keptScenes.length > 0 && builtCount === keptScenes.length && !rendering && !shooting;
   const ready: Record<string, boolean> = {
-    concept: !!sb, voice: !voiceMissing && !!sb, scenes: scenesReady,
-    audio: !audioBusy, stitch: !!finalUrl && !assembling,
+    concept: !!sb, voice: !!sb && (!needsVoice || (!!voiceId && !!voiceoverUrl)), scenes: scenesReady,
+    audio: audioReady, stitch: !!finalUrl && !assembling,
     showreel: production?.showreel_status === "accepted" || production?.showreel_status === "declined",
   };
   const ORDER = ["concept", "voice", "scenes", "audio", "stitch", "showreel"] as const;
@@ -186,6 +186,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Accept / Not-yet gate for a step. Shows once the step's artifact exists; Accept turns it green
   // and unlocks the next step, Not-yet shows an edit hint and keeps the next step locked.
   function renderGate(k: string, hint: string) {
+    // HARD GATE: a step never shows the Accept / Not-yet controls until (a) the step before it is
+    // approved (it's unlocked) AND (b) this step's own work actually exists. A locked step shows only
+    // its "🔒 Approve the previous step" message - never an approve button that jumps the queue.
+    if (stepState(k as typeof ORDER[number]) === "locked") return null;
     if (!ready[k]) return null;
     if (approved.has(k)) return (
       <div className="mt-3 flex items-center gap-2 border-t border-line pt-3 text-[12px] font-semibold text-ready">✓ Approved
