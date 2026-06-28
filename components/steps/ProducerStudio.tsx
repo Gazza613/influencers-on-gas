@@ -164,6 +164,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [approved, setApproved] = useState<Set<string>>(() => (initialProduction?.wizard_approved?.length ? new Set(initialProduction.wizard_approved) : seedApproved()));
   const [denied, setDenied] = useState<Set<string>>(new Set());
   const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
+  // EXACT scope of the current animate so only the scenes truly rendering show a spinner: "all" = a
+  // whole-board/role animate, an array = just those scene indices (a per-scene re-animate). Never spin the rest.
+  const [clipScope, setClipScope] = useState<number[] | "all">("all");
   // ANY work in flight (incl. per-scene shoots that don't flip the global flags) - drives the busy
   // buttons + the red Reset control so it reflects per-scene + b-roll work too.
   const anyReshooting = (production?.shots ?? []).some((s) => s.reshooting);
@@ -288,7 +291,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
   // FAST PATH: render every scene (a-roll + b-roll) in ONE parallel job, so the two roles render
   // concurrently instead of back-to-back (~halves the wait).
-  async function renderRole(role: "a-roll" | "b-roll") {
+  async function renderRole(role: "a-roll" | "b-roll") { setClipScope("all");
     if (rendering) return;
     setErr(""); setRenderingRole(role);
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
@@ -408,7 +411,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Animate ONE scene's clip from its existing keyframe (no re-shoot).
   async function animateScene(i: number) {
     if (rendering) return;
-    setErr(""); setRenderingRole(sb?.scenes?.[i]?.role === "b-roll" ? "b-roll" : "a-roll");
+    setErr(""); setRenderingRole(sb?.scenes?.[i]?.role === "b-roll" ? "b-roll" : "a-roll"); setClipScope([i]); // ONLY this scene is animating
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], reanimate: true }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't animate that scene."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
@@ -430,7 +433,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   async function animateAll(force = false) {
     if (rendering || shooting) return;
     if (force && !confirm("Re-animate EVERY scene from scratch? This re-renders clips you already have and costs more. To just finish the missing ones, use Animate remaining instead.")) return;
-    setErr(""); setRenderingRole("");
+    setErr(""); setRenderingRole(""); setClipScope("all");
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(force ? { force: true } : {}) }).then((x) => x.json()).catch(() => null);
     if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; } // every scene already has a clip
@@ -713,7 +716,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
                           <button onClick={() => setZoom(clip.url!)} title="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
                         </div>
-                      ) : rendering && !clip?.url && (renderingRole === "" || renderingRole === s.role) ? (
+                      ) : rendering && !clip?.url && (clipScope === "all" ? (renderingRole === "" || renderingRole === s.role) : clipScope.includes(i)) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…</div>
                       ) : shot?.url ? (
                         <div className="relative">
