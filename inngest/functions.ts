@@ -1493,12 +1493,21 @@ export const assembleVideo = inngest.createFunction(
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
     // so the voice matches the lips perfectly. B-roll/graphic: generate the VO from the scene line.
+    // The producer's APPROVED voiceover, sliced per scene (generated or uploaded) - this is the exact
+    // audio they listened to. Use it for EVERY scene (a-roll's synced slice + b-roll's narration slice)
+    // so the final cut ships the take they approved, byte-for-byte. Only re-synthesize if a slice is
+    // genuinely missing (e.g. a line added after the voiceover was generated).
+    const approvedSlice = new Map<number, string>();
+    (Array.isArray((production as { scene_audio?: { scene: number; url: string }[] }).scene_audio)
+      ? (production as { scene_audio: { scene: number; url: string }[] }).scene_audio : [])
+      .forEach((e) => { if (e?.url) approvedSlice.set(Number(e.scene), e.url); });
     const voTrack: Record<string, unknown>[] = [];
     for (const p of placed) {
       const clip = clips.find((c) => c.scene === p.i);
-      const synced = clip?.audio_url as string | undefined;
+      const synced = (clip?.audio_url as string | undefined) || approvedSlice.get(p.i);
       // A-roll: the scene slot (p.len) now equals the EXACT audio duration, so play the voice to its
       // precise length — NO +tail bleeding into the next scene (that bleed was the "two audios at once").
+      // B-roll: lay the APPROVED slice as narration over the silent scene (not a fresh re-synthesis).
       if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len }); continue; }
       if (voiceId && p.vo) {
         try {
