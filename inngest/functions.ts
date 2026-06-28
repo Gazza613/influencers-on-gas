@@ -1440,7 +1440,7 @@ export const generateAudio = inngest.createFunction(
     const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
     const [musicUrl, ambientUrl] = await Promise.all([
       step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg")).catch(() => null),
-      step.run("ambient", async () => putBytes(await generateSfx(`continuous ambient background sound of ${setting}: low natural room tone, distant murmur and movement, gentle environment, no music and no speech`, 22), "ambient", "mp3", "audio/mpeg")).catch(() => null),
+      step.run("ambient", async () => putBytes(await generateSfx(`a rich, immersive and clearly audible ambient soundscape for ${setting}: the real, characterful environmental sounds you would actually hear in that place - present room tone with genuine depth, natural background detail and gentle life and movement, layered and believable so the world feels alive (not a faint whisper). Full and noticeable in the mix. Absolutely NO music, NO speech and NO voices.`, 22), "ambient", "mp3", "audio/mpeg")).catch(() => null),
     ]);
     if (musicUrl) await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     if (ambientUrl) await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
@@ -1536,13 +1536,13 @@ export const assembleVideo = inngest.createFunction(
     let ambientUrl: string | null = (production as { ambient_url?: string })?.ambient_url || null;
     if (!ambientUrl) try {
       const setting = String((production?.brief as { setting?: string })?.setting || scenes[0]?.location || "the location").slice(0, 120);
-      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`continuous ambient background sound of ${setting}: low natural room tone, distant murmur and movement, gentle environment, no music and no speech`, 22), "ambient", "mp3", "audio/mpeg"));
+      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`a rich, immersive and clearly audible ambient soundscape for ${setting}: the real, characterful environmental sounds you would actually hear in that place - present room tone with genuine depth, natural background detail and gentle life and movement, layered and believable so the world feels alive (not a faint whisper). Full and noticeable in the mix. Absolutely NO music, NO speech and NO voices.`, 22), "ambient", "mp3", "audio/mpeg"));
       await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
     } catch { ambientUrl = null; }
     const ambientTrack: Record<string, unknown>[] = [];
     // Ambient sits UNDER the VO + music but must be audible — 0.1 was inaudible. ~0.3 reads as real
     // room tone without competing. Env-tunable (AMBIENT_VOLUME).
-    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.4));
+    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.62)); // present enough to feel the world (was 0.4 - too faint under music + voice)
     if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: ambientVol }, start: t, length: Math.min(22, total - t) });
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
