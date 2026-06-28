@@ -89,6 +89,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // WHICH role is being shot - so only that gallery shows the shooting state (a-roll and b-roll are
   // shot step by step, never both at once).
   const [shootingRole, setShootingRole] = useState<"a-roll" | "b-roll" | "">("");
+  // EXACT scope of the current shoot so only the scenes truly being shot show a spinner: "all" = a
+  // whole-board shoot, an array = just those scene indices (a per-scene re-shoot). Never spin the rest.
+  const [shootScope, setShootScope] = useState<number[] | "all">("all");
   const shotFor = (i: number) => shots.find((s) => s.scene === i);
   const clips = production?.clips ?? [];
   const rendering = production?.clips_status === "running";
@@ -244,7 +247,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // invalidates downstream clips/audio/final (board changed) and resets approvals back to concept.
   async function shootRole(role: "a-roll" | "b-roll", ratio: string) {
     if (shooting) return;
-    setErr(""); setShootingRole(role);
+    setErr(""); setShootingRole(role); setShootScope("all"); // all scenes of this role
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).filter((s) => s.role !== role), shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
     // Re-shooting THIS role's refs invalidates only its own approval + everything downstream
     // (animate/audio/stitch/showreel). Keep Concept, Voice AND the OTHER role's refs intact - and
@@ -364,7 +367,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Shoot ONE scene's REFERENCE IMAGE (keyframe) only - no video. Video comes later (after the voice).
   async function shootRefScene(i: number) {
     if (busyAny) return;
-    setErr("");
+    setErr(""); setShootingRole(""); setShootScope([i]); // ONLY this scene is shooting
     setProduction((p) => {
       if (!p) return p;
       const list = p.shots ?? [];
@@ -389,7 +392,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Batch: shoot EVERY scene's keyframe (parallel), then you Animate all.
   async function shootAll(ratio: string) {
     if (shooting) return;
-    setErr(""); setShootingRole("");
+    setErr(""); setShootingRole(""); setShootScope("all"); // whole-board shoot
     setProduction((p) => (p ? { ...p, shots: [], shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
     setApproved((s) => { const n = new Set([...s].filter((k) => k === "concept" || k === "voice")); persistApproved(n); return n; });
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aspectRatio: ratio }) }).then((x) => x.json()).catch(() => null);
@@ -675,7 +678,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         </div>
                       ) : clipFailed ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[9px] text-alert" title={clip.error || ""}>clip failed</div>
-                      ) : (shooting && !anyReshooting && (shootingRole === "" || shootingRole === s.role)) ? (
+                      ) : (shooting && (shootScope === "all" ? !anyReshooting : shootScope.includes(i)) && (shootingRole === "" || shootingRole === s.role)) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />shooting…</div>
                       ) : shot?.error ? (
                         <div className="flex aspect-[9/16] w-full items-center justify-center rounded-lg border border-alert/30 bg-surface-2 text-center text-[10px] text-alert">shot failed</div>
