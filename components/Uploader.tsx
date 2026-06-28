@@ -5,28 +5,54 @@ import { upload as blobUpload } from "@vercel/blob/client";
 
 // Reusable image uploader → Vercel Blob (direct client upload, so large PNGs work).
 // Drag/drop or click; shows a preview and a quirky uploading state. Calls onUploaded(url).
-// Capture a real still from a video FILE (locally, before upload) so a tile never sits on a black
-// intro frame. Same-origin blob: URL → canvas isn't tainted → we can export a JPEG.
+// Capture a real, NON-BLACK still from a video FILE (locally, before upload) so a tile never sits on a
+// black intro frame. Same-origin blob: URL → canvas isn't tainted → we can read pixels + export a JPEG.
+// Robust to two failure modes: (1) drawing before the seeked frame is painted — we wait for the actual
+// frame via requestVideoFrameCallback; (2) the sampled point being dark — we measure brightness and try
+// several timestamps, keeping the brightest.
 async function capturePoster(file: File): Promise<Blob | null> {
   return new Promise((resolve) => {
+    let settled = false;
+    let objUrl = "";
+    const finish = (b: Blob | null) => { if (settled) return; settled = true; if (objUrl) URL.revokeObjectURL(objUrl); resolve(b); };
     try {
-      const objUrl = URL.createObjectURL(file);
+      objUrl = URL.createObjectURL(file);
       const vid = document.createElement("video");
       vid.muted = true; vid.preload = "auto"; vid.playsInline = true; vid.src = objUrl;
-      const done = (b: Blob | null) => { URL.revokeObjectURL(objUrl); resolve(b); };
-      vid.onloadeddata = () => { try { vid.currentTime = Math.min(1.5, (vid.duration || 5) * 0.2); } catch { done(null); } };
-      vid.onseeked = () => {
+      const points = [0.25, 0.45, 0.6, 0.12, 0.8];
+      let pi = 0, dur = 5;
+      let best: { blob: Blob; bright: number } | null = null;
+
+      const seekNext = () => { try { vid.currentTime = Math.max(0.1, Math.min(dur - 0.1, dur * points[pi])); } catch { finish(best?.blob ?? null); } };
+
+      const grab = () => {
         try {
-          const c = document.createElement("canvas");
-          c.width = vid.videoWidth || 720; c.height = vid.videoHeight || 1280;
-          const ctx = c.getContext("2d"); if (!ctx) return done(null);
-          ctx.drawImage(vid, 0, 0, c.width, c.height);
-          c.toBlob((b) => done(b), "image/jpeg", 0.82);
-        } catch { done(null); }
+          const w = vid.videoWidth || 720, h = vid.videoHeight || 1280;
+          const c = document.createElement("canvas"); c.width = w; c.height = h;
+          const ctx = c.getContext("2d"); if (!ctx) return finish(null);
+          ctx.drawImage(vid, 0, 0, w, h);
+          // Average brightness from a tiny downscale (cheap).
+          const sw = 32, sh = 56, s = document.createElement("canvas"); s.width = sw; s.height = sh;
+          const sctx = s.getContext("2d"); let bright = 999;
+          if (sctx) { sctx.drawImage(vid, 0, 0, sw, sh); const d = sctx.getImageData(0, 0, sw, sh).data; let sum = 0; for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2]; bright = sum / ((d.length / 4) * 3); }
+          c.toBlob((blob) => {
+            if (blob && (!best || bright > best.bright)) best = { blob, bright };
+            if (bright > 30 || pi >= points.length - 1) finish(best?.blob ?? blob);
+            else { pi++; seekNext(); }
+          }, "image/jpeg", 0.82);
+        } catch { finish(best?.blob ?? null); }
       };
-      vid.onerror = () => done(null);
-      setTimeout(() => done(null), 8000); // never hang the upload
-    } catch { resolve(null); }
+
+      const onSeeked = () => {
+        const rvfc = (vid as unknown as { requestVideoFrameCallback?: (cb: () => void) => void }).requestVideoFrameCallback;
+        if (typeof rvfc === "function") rvfc.call(vid, () => grab());
+        else requestAnimationFrame(() => requestAnimationFrame(grab));
+      };
+      vid.onloadeddata = () => { dur = vid.duration || 5; pi = 0; seekNext(); };
+      vid.onseeked = onSeeked;
+      vid.onerror = () => finish(best?.blob ?? null);
+      setTimeout(() => finish(best?.blob ?? null), 12000); // never hang the upload
+    } catch { finish(null); }
   });
 }
 
