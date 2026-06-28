@@ -654,7 +654,7 @@ export const generateCreatives = inngest.createFunction(
           await step.run(`usage-gen-${rid}-${mdl}`, () => recordUsage({ influencerId, provider: "higgsfield", model: mdl, unit: "image", action: "creative", count: n }));
         }
         // AI Vision QA (Claude Haiku) runs once per loadable shot, meter it so it appears in Cost Control.
-        if (valid.length) await step.run(`usage-qa-${rid}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: valid.length }));
+        if (QA_ON && valid.length) await step.run(`usage-qa-${rid}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: valid.length }));
         // Per attempt: failed generation stays visible, QA gets a score, and only approved
         // shots are upscaled/rehosted.
         const attempts = await Promise.all(rawProduced.map((sourceUrl, k) =>
