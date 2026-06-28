@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { listFinishedVideos, setShowcased, deleteShowcaseVideo } from "@/lib/showcase";
+import { listFinishedVideos, setShowcased, deleteShowcaseVideo, renameShowcaseVideo } from "@/lib/showcase";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,9 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  // remove === true hard-deletes the cut (it disappears); otherwise just flag it in/out of the reel.
+  // remove === true hard-deletes the cut; a string `title` renames it; otherwise flag it in/out of the reel.
   if (body.remove === true) await deleteShowcaseVideo(id);
+  else if (typeof body.title === "string") await renameShowcaseVideo(id, body.title.trim());
   else await setShowcased(id, body.showcased === true);
   return NextResponse.json({ ok: true });
 }

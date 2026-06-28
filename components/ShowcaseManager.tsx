@@ -48,6 +48,15 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
     setBusy(null);
   }
 
+  // Rename a reel (the title shown under the video on the wall).
+  async function rename(id: string, title: string) {
+    setVideos((vs) => vs.map((v) => (v.id === id ? { ...v, title } : v))); // optimistic
+    await fetch("/api/showcase", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, title }),
+    }).catch(() => null);
+  }
+
   async function copyLink() {
     try { await navigator.clipboard.writeText(publicUrl); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ }
   }
@@ -101,14 +110,14 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
             <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ready">★ On the showreel · {onReel.length}</div>
             {onReel.length === 0
               ? <p className="text-sm text-ink-faint">Nothing on the showreel yet. Flag your best videos in from below.</p>
-              : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{onReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} reel />)}</div>}
+              : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{onReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} reel />)}</div>}
           </section>
 
           {/* Finished, not on the reel */}
           {offReel.length > 0 && (
             <section>
               <div className="tabular mb-3 text-xs uppercase tracking-[0.2em] text-ink-faint">Finished videos · {offReel.length}</div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{offReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} />)}</div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{offReel.map((v) => <Card key={v.id} v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} />)}</div>
             </section>
           )}
         </>
@@ -117,17 +126,32 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
   );
 }
 
-function Card({ v, busy, onToggle, onRemove, reel = false }: { v: ShowcaseVideo; busy: boolean; onToggle: (id: string, on: boolean) => void; onRemove: (id: string) => void; reel?: boolean }) {
+function Card({ v, busy, onToggle, onRemove, onRename, reel = false }: { v: ShowcaseVideo; busy: boolean; onToggle: (id: string, on: boolean) => void; onRemove: (id: string) => void; onRename: (id: string, title: string) => void; reel?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(v.title || "");
+  function save() { setEditing(false); const t = name.trim(); if (t && t !== (v.title || "")) onRename(v.id, t); else setName(v.title || ""); }
   return (
     <div className={`overflow-hidden rounded-xl border bg-surface-1 ${reel ? "border-ready/30" : "border-line"}`}>
       {v.final_video_url
         ? <video src={v.final_video_url} controls playsInline className="aspect-[9/16] max-h-[60vh] w-full bg-black object-contain" />
         : <div className="flex aspect-[9/16] w-full items-center justify-center bg-surface-2 text-xs text-ink-faint">No video</div>}
       <div className="flex items-center justify-between gap-2 p-3">
-        <span className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-ink">
-          {v.external && <span className="shrink-0 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#60a5fa]">Uploaded</span>}
-          <span className="truncate">{v.title || "Untitled production"}</span>
-        </span>
+        {editing ? (
+          <input
+            autoFocus value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setName(v.title || ""); setEditing(false); } }}
+            className="min-w-0 flex-1 rounded-md border border-[#a855f7] bg-surface-2 px-2 py-1 text-sm font-semibold text-ink outline-none"
+            placeholder="Showreel name"
+          />
+        ) : (
+          <button onClick={() => setEditing(true)} title="Click to rename" className="flex min-w-0 items-center gap-1.5 truncate text-left text-sm font-semibold text-ink hover:text-accent">
+            {v.external && <span className="shrink-0 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#60a5fa]">Uploaded</span>}
+            <span className="truncate">{v.title || "Untitled production"}</span>
+            <span className="shrink-0 text-[11px] text-ink-faint">✎</span>
+          </button>
+        )}
         <button
           onClick={() => (reel ? onRemove(v.id) : onToggle(v.id, true))}
           disabled={busy}

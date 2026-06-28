@@ -82,6 +82,11 @@ export async function setShowcased(id: string, on: boolean): Promise<void> {
   await db()`update productions set showcased = ${on} where id = ${id}`;
 }
 
+// Rename a showcase video (the title shown under it on the wall).
+export async function renameShowcaseVideo(id: string, title: string): Promise<void> {
+  await db()`update productions set title = ${title.slice(0, 120)} where id = ${id}`;
+}
+
 // Hard-remove a showcase cut so it disappears entirely (re-publish from the Producer's showreel step).
 // Scoped to FINISHED cuts only, so a stray/old id can never delete an in-progress production.
 export async function deleteShowcaseVideo(id: string): Promise<void> {
