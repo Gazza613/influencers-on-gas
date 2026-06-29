@@ -1629,9 +1629,10 @@ export const assembleVideo = inngest.createFunction(
     // the last scene. Extends the timeline so the music bed carries under it.
     const endCardUrl = String((production?.brief as { endCardUrl?: string })?.endCardUrl || "").trim();
     const endCardKind = (production?.brief as { endCardKind?: string })?.endCardKind === "image" ? "image" : "video";
+    let endCardClip: Record<string, unknown> | null = null;
     if (endCardUrl) {
       const endLen = endCardKind === "image" ? 4 : 6;
-      videoClips.push({ asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) } as Record<string, unknown>, start: total, length: endLen, fit: "cover" } as unknown as typeof videoClips[number]);
+      endCardClip = { asset: { type: endCardKind, src: endCardUrl, ...(endCardKind === "video" ? { volume: 0.9 } : {}) }, start: total, length: endLen, fit: "cover" };
     }
     // Captions are OPT-IN at stitch time (the producer ticks "Burn captions"). Default OFF.
     // Rendered as an HTML asset (NOT the basic "title" asset, which mis-sized and rendered unreliably) —
@@ -1662,7 +1663,18 @@ export const assembleVideo = inngest.createFunction(
     if (captionClips.length) tracks.push({ clips: captionClips });
     if (voTrack.length) tracks.push({ clips: voTrack });
     if (ambientTrack.length) tracks.push({ clips: ambientTrack });
-    tracks.push({ clips: videoClips });
+    // Scene transitions. Default = a SUBTLE CROSSFADE so cuts aren't abrupt (Gary's note). Each scene goes
+    // on its OWN track with the LATER scene pushed FIRST (= higher z), starting a touch before the previous
+    // ends and fading in over it → a real dissolve (not a dip-to-black, which a single-track fade caused).
+    // Audio is on its own track, so sync is unaffected. Set SCENE_XFADE=0 for clean hard cuts.
+    const XFADE = Math.max(0, Math.min(1.2, Number.isFinite(Number(process.env.SCENE_XFADE)) ? Number(process.env.SCENE_XFADE) : 0.35));
+    if (XFADE > 0 && videoClips.length > 1) {
+      const xf = videoClips.map((c, idx) => idx === 0 ? c : ({ ...c, start: Math.max(0, (c.start as number) - XFADE), length: (c.length as number) + XFADE, transition: { in: "fade" } }));
+      for (let j = xf.length - 1; j >= 0; j--) tracks.push({ clips: [xf[j]] }); // last scene topmost → each fades in over the previous
+    } else {
+      tracks.push({ clips: videoClips });
+    }
+    if (endCardClip) tracks.push({ clips: [endCardClip] });
 
     const edit: Record<string, unknown> = {
       timeline: { background: "#000000", ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.28)) } } : {}), tracks },
