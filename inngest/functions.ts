@@ -1667,10 +1667,13 @@ export const assembleVideo = inngest.createFunction(
     // on its OWN track with the LATER scene pushed FIRST (= higher z), starting a touch before the previous
     // ends and fading in over it → a real dissolve (not a dip-to-black, which a single-track fade caused).
     // Audio is on its own track, so sync is unaffected. Set SCENE_XFADE=0 for clean hard cuts.
-    const XFADE = Math.max(0, Math.min(1.2, Number.isFinite(Number(process.env.SCENE_XFADE)) ? Number(process.env.SCENE_XFADE) : 0.35));
+    // DEFAULT = clean hard cuts (perfectly in sync). SCENE_XFADE>0 opts into a crossfade that extends each
+    // clip's TAIL (never shifts its START), so the a-roll video stays exactly aligned to its audio - the
+    // earlier version shifted starts and threw the voice out of sync.
+    const XFADE = Math.max(0, Math.min(1.2, Number(process.env.SCENE_XFADE) || 0));
     if (XFADE > 0 && videoClips.length > 1) {
-      const xf = videoClips.map((c, idx) => idx === 0 ? c : ({ ...c, start: Math.max(0, (c.start as number) - XFADE), length: (c.length as number) + XFADE, transition: { in: "fade" } }));
-      for (let j = xf.length - 1; j >= 0; j--) tracks.push({ clips: [xf[j]] }); // last scene topmost → each fades in over the previous
+      const xf = videoClips.map((c, idx) => ({ ...c, length: (c.length as number) + (idx < videoClips.length - 1 ? XFADE : 0), ...(idx > 0 ? { transition: { in: "fade" } } : {}) }));
+      for (let j = xf.length - 1; j >= 0; j--) tracks.push({ clips: [xf[j]] }); // last scene topmost → each fades in over the previous tail
     } else {
       tracks.push({ clips: videoClips });
     }
