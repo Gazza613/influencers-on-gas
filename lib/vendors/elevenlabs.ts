@@ -258,10 +258,23 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
   // Falls back to the prompt-based endpoint below if the plan shape isn't accepted.
   try {
     const styles = (stripped || "warm modern background").split(/[,.;\n]/).map((s) => s.trim()).filter(Boolean).slice(0, 12);
+    // Split into MULTIPLE shorter sections so the model fills the WHOLE duration. A single long section
+    // left ~9s of trailing SILENCE at the end (the model composed ~65s then stopped) - chunks of ~25s each
+    // are each composed fully, so the bed plays continuously to the very end with no dead air.
+    const SECTION_MS = 25000;
+    const nSec = Math.max(1, Math.ceil(ms / SECTION_MS));
+    const secMs = Math.round(ms / nSec);
+    const sections = Array.from({ length: nSec }, (_, i) => ({
+      section_name: nSec === 1 ? "bed" : i === 0 ? "intro" : i === nSec - 1 ? "outro" : `part${i}`,
+      positive_local_styles: [],
+      negative_local_styles: ["vocals"],
+      duration_ms: i === nSec - 1 ? ms - secMs * (nSec - 1) : secMs,
+      lines: [],
+    }));
     const composition_plan = {
       positive_global_styles: styles.length ? styles : ["warm", "modern", "instrumental"],
       negative_global_styles: ["vocals", "lyrics", "singing", "spoken word", "any specific real artist, band or song", "copyrighted melody"],
-      sections: [{ section_name: "bed", positive_local_styles: [], negative_local_styles: ["vocals"], duration_ms: ms, lines: [] }],
+      sections,
     };
     const res = await fetch(`${BASE}/music`, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify({ composition_plan, model_id: "music_v2" }), signal: AbortSignal.timeout(150000) });
     if (res.ok) return Buffer.from(await res.arrayBuffer());
