@@ -920,11 +920,13 @@ export const generateShots = inngest.createFunction(
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
     let castAnchor: string | null = null; // first b-roll frame WITH companions - locks the daughter/companion look + outfit across every b-roll scene
-    // CONTINUITY across separate role shoots: a-roll and b-roll references are now shot in separate
-    // passes, so when shooting ONE role, anchor it to a frame ALREADY shot for the other role — else
-    // the two galleries would render unrelated worlds. (Whole-board shoots set worldRef from frame 1.)
-    if (roleFilter) {
-      const prior = ((production as { shots?: { url?: string | null }[] } | null)?.shots ?? []).find((s) => s?.url);
+    // CONTINUITY across SEPARATE shoots (one role, or a single re-shot scene): anchor to a frame ALREADY
+    // shot for ANOTHER scene so the wardrobe + world stay IDENTICAL to the rest of the production - else a
+    // re-shot scene takes its own guide's outfit and the clothing drifts. (Whole-board shoots set worldRef
+    // from frame 1.) For a per-scene re-shoot, exclude the scene being re-shot from the anchor search.
+    if (roleFilter || sceneFilter) {
+      const prior = ((production as { shots?: { scene?: number; url?: string | null }[] } | null)?.shots ?? [])
+        .find((s) => s?.url && (!sceneFilter || !sceneFilter.includes(Number(s.scene))));
       if (prior?.url) worldRef = await step.run("worldref-anchor", () => importMediaUrl(prior.url as string).catch(() => null));
     }
 
