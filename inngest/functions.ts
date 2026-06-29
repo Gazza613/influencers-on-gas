@@ -1609,19 +1609,10 @@ export const assembleVideo = inngest.createFunction(
     // fit:cover + a hair of OVERSCAN so the clip always fully covers the 1080×1920 frame — kills the thin
     // white/edge lines left & right when a source video is a pixel or two off the exact 9:16 ratio.
     const VIDEO_OVERSCAN = Math.max(1, Number(process.env.VIDEO_OVERSCAN) || 1.04);
-    // Lay each scene's video to fill its slot. If the rendered clip is SHORTER than the slot (a b-roll on
-    // the fixed-length DoP whose narration runs longer), LOOP it across the slot instead of freezing on the
-    // last frame - tile copies of the clip end-to-end until the narration is covered. a-roll/long Kling clips
-    // already equal their slot, so they lay as a single piece.
-    const videoClips = placed.filter((p) => clipUrl(p.i)).flatMap((p) => {
-      const src = clipUrl(p.i) as string;
-      const vlen = Math.max(1, clipDur(p.i) || p.len); // the clip's real playable length
-      const segs: Record<string, unknown>[] = [];
-      for (let t = 0; t < p.len - 0.05; t += vlen) {
-        segs.push({ asset: { type: "video", src, volume: 0 }, start: p.start + t, length: Math.min(vlen, p.len - t), fit: "cover", scale: VIDEO_OVERSCAN });
-      }
-      return segs;
-    });
+    const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
+      asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 },
+      start: p.start, length: p.len, fit: "cover", scale: VIDEO_OVERSCAN,
+    }));
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
     const endCardUrl = String((production?.brief as { endCardUrl?: string })?.endCardUrl || "").trim();
