@@ -1441,7 +1441,14 @@ export const generateAudio = inngest.createFunction(
     const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[]; duration_seconds?: number; tone?: string; music_bed?: string }; brief?: { setting?: string } } | null;
     const sb = production?.storyboard;
     if (!sb?.scenes?.length) return { error: "no storyboard" };
-    const total = Math.max(15, Number(sb.duration_seconds) || sb.scenes.length * 5);
+    // Length the music must cover = the REAL video length, not the storyboard estimate. The actual cut runs
+    // to the sum of the per-scene narration (each scene plays for its voice), which often overruns the
+    // estimate - that's why the music was stopping ~20s early. Use the voiceover slices' total + a buffer
+    // (the music plays UNDER the video, so a little extra just fades out; too SHORT leaves dead silence).
+    const sa = Array.isArray((production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; duration?: number }[] }).scene_audio : [];
+    const droppedA = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
+    const voTotal = sa.filter((e) => !droppedA.has(Number(e.scene))).reduce((s, e) => s + (Number(e.duration) || 0), 0);
+    const total = Math.max(15, Number(sb.duration_seconds) || sb.scenes.length * 5, Math.ceil(voTotal) + 6);
     await step.run("mark", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, audio_status: "running" } } }));
 
     // Generate music + ambient IN PARALLEL (they're independent) — this halves the wait vs running
@@ -1550,7 +1557,7 @@ export const assembleVideo = inngest.createFunction(
     let musicUrl: string | null = (production as { music_url?: string })?.music_url || null;
     if (!musicUrl) try {
       const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
-      musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg"));
+      musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, (total + 4) * 1000), "music", "mp3", "audio/mpeg")); // +4s so it outlasts the cut (plays under it, extra fades out)
       await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     } catch { musicUrl = null; }
 
