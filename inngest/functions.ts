@@ -1464,7 +1464,7 @@ export const generateAudio = inngest.createFunction(
 
     const done = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prod = (done.production ?? production) as Record<string, unknown>;
-    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, music_url: musicUrl, ambient_url: ambientUrl, audio_status: "done" } } }));
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, music_url: musicUrl, ambient_url: ambientUrl, music_seconds: total, audio_status: "done" } } }));
     return { ok: true, music: !!musicUrl, ambient: !!ambientUrl };
   },
 );
@@ -1555,6 +1555,9 @@ export const assembleVideo = inngest.createFunction(
 
     // Music bed (full length) → Blob. REUSE the audio step's bed if it already produced one.
     let musicUrl: string | null = (production as { music_url?: string })?.music_url || null;
+    // If the pre-generated bed is SHORTER than the real cut, drop it and re-generate at the true length -
+    // else it stops early with no fade (the fade-out only lands at the FILE's end, not the timeline's).
+    if (musicUrl && Number((production as { music_seconds?: number })?.music_seconds || 0) + 2 < total) musicUrl = null;
     if (!musicUrl) try {
       const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
       musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, (total + 4) * 1000), "music", "mp3", "audio/mpeg")); // +4s so it outlasts the cut (plays under it, extra fades out)
