@@ -1673,7 +1673,7 @@ export const assembleVideo = inngest.createFunction(
     if (musicUrl) for (let t = 0; t < total; t += MUSIC_LOOP) {
       const len = Math.min(MUSIC_LOOP, total - t);
       if (len < 0.5) break;
-      musicTrack.push({ asset: { type: "audio", src: musicUrl, volume: musicVol, trim: 0 }, start: t, length: len, effect: "fadeInFadeOut" });
+      musicTrack.push({ asset: { type: "audio", src: musicUrl, volume: musicVol }, start: t, length: len });
     }
     if (musicTrack.length) tracks.push({ clips: musicTrack });
     // Scene transitions. Default = a SUBTLE CROSSFADE so cuts aren't abrupt (Gary's note). Each scene goes
