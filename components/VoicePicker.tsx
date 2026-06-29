@@ -24,6 +24,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
   const [designing, setDesigning] = useState(false);
   const [designDesc, setDesignDesc] = useState("");
   const [previews, setPreviews] = useState<{ generatedVoiceId: string; url: string }[]>([]);
+  const [savingId, setSavingId] = useState(""); // which designed option is being saved (so only IT spins)
   const [accent, setAccent] = useState(""); // quick accent filter / design seed (South African first - our market)
   const ACCENTS = ["South African", "British", "American", "Australian", "Nigerian", "Irish"];
 
@@ -44,11 +45,14 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
     if (r?.previews?.length) { setPreviews(r.previews); setDesignDesc(r.voice_description || ""); }
     else setErr(r?.error || "Could not design a voice.");
   }
-  async function useDesigned(generatedVoiceId: string) {
-    setBusy(true); setErr("");
+  async function useDesigned(generatedVoiceId: string, heardUrl: string) {
+    if (savingId) return;
+    setSavingId(generatedVoiceId); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/voice/design`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ generatedVoiceId, voice_description: designDesc }) }).then((x) => x.json()).catch(() => null);
-    setBusy(false);
-    if (r?.voice_id) { onSet({ voice_id: r.voice_id, voice_name: r.voice_name, preview_url: r.preview_url ?? null }); setPreviews([]); }
+    setSavingId("");
+    // Show the EXACT preview the producer just listened to (heardUrl), not a fresh ElevenLabs sample, so
+    // the selected voice matches what they picked. The created voice_id IS that option's generated voice.
+    if (r?.voice_id) { onSet({ voice_id: r.voice_id, voice_name: r.voice_name, preview_url: heardUrl || r.preview_url || null }); setPreviews([]); }
     else setErr(r?.error || "Could not save the designed voice.");
   }
 
@@ -125,7 +129,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
                 <div key={p.generatedVoiceId} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2">
                   <span className="text-xs font-semibold text-ink-dim">Option {i + 1}</span>
                   <audio src={p.url} controls className="h-8" />
-                  <button onClick={() => useDesigned(p.generatedVoiceId)} disabled={busy} className="rounded-lg border border-[#a855f7]/50 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Saving…" : "Use this voice"}</button>
+                  <button onClick={() => useDesigned(p.generatedVoiceId, p.url)} disabled={!!savingId} className="rounded-lg border border-[#a855f7]/50 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{savingId === p.generatedVoiceId ? "Saving…" : "Use this voice"}</button>
                 </div>
               ))}
             </div>
