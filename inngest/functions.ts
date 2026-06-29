@@ -1665,6 +1665,18 @@ export const assembleVideo = inngest.createFunction(
     if (captionClips.length) tracks.push({ clips: captionClips });
     if (voTrack.length) tracks.push({ clips: voTrack });
     if (ambientTrack.length) tracks.push({ clips: ambientTrack });
+    // MUSIC bed: ElevenLabs caps the actual composed music short of the full cut (it stopped ~6s before the
+    // end), so loop a reliably-filled portion of the bed across the whole timeline - it never goes silent.
+    // (The clicking Gary heard was the voice-slice boundaries, not this loop - that's fixed in the slices.)
+    const musicVol = Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.18));
+    const MUSIC_LOOP = Math.max(10, Number(process.env.MUSIC_LOOP_SECONDS) || 45);
+    const musicTrack: Record<string, unknown>[] = [];
+    if (musicUrl) for (let t = 0; t < total; t += MUSIC_LOOP) {
+      const len = Math.min(MUSIC_LOOP, total - t);
+      if (len < 0.5) break;
+      musicTrack.push({ asset: { type: "audio", src: musicUrl, volume: musicVol }, start: t, length: len });
+    }
+    if (musicTrack.length) tracks.push({ clips: musicTrack });
     // Scene transitions. Default = a SUBTLE CROSSFADE so cuts aren't abrupt (Gary's note). Each scene goes
     // on its OWN track with the LATER scene pushed FIRST (= higher z), starting a touch before the previous
     // ends and fading in over it → a real dissolve (not a dip-to-black, which a single-track fade caused).
@@ -1682,7 +1694,7 @@ export const assembleVideo = inngest.createFunction(
     if (endCardClip) tracks.push({ clips: [endCardClip] });
 
     const edit: Record<string, unknown> = {
-      timeline: { background: "#000000", ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.18)) } } : {}), tracks },
+      timeline: { background: "#000000", tracks },
       output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : "9:16", resolution: "1080", fps: 25 },
     };
 

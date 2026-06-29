@@ -200,7 +200,18 @@ export function pcmSliceToWav(pcm: Buffer, startSec: number, endSec: number): Bu
   const SR = 44100, CH = 1, BPS = 2;
   const startByte = Math.min(pcm.length, Math.max(0, Math.floor(startSec * SR) * BPS));
   const endByte = Math.min(pcm.length, Math.max(startByte, Math.floor(endSec * SR) * BPS));
-  const data = pcm.subarray(startByte, endByte);
+  // COPY (don't mutate the shared pcm) and apply a ~4ms fade in/out so the slice starts and ends at zero
+  // amplitude. Without this, two slices played back-to-back jump from one non-zero sample to another at the
+  // scene cut = an audible CLICK. 4ms is far shorter than any speech transient, so it's inaudible.
+  const data = Buffer.from(pcm.subarray(startByte, endByte));
+  const nS = Math.floor(data.length / BPS);
+  const fadeN = Math.min(Math.floor(nS / 2), Math.floor((SR * 4) / 1000));
+  for (let i = 0; i < fadeN; i++) {
+    const g = i / fadeN;
+    data.writeInt16LE(Math.round(data.readInt16LE(i * BPS) * g), i * BPS);
+    const j = nS - 1 - i;
+    data.writeInt16LE(Math.round(data.readInt16LE(j * BPS) * g), j * BPS);
+  }
   const h = Buffer.alloc(44);
   h.write("RIFF", 0); h.writeUInt32LE(36 + data.length, 4); h.write("WAVE", 8);
   h.write("fmt ", 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(CH, 22);
