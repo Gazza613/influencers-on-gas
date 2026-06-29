@@ -1125,7 +1125,7 @@ export const generateClips = inngest.createFunction(
         }
         if (!full.trim() || !parts.length) return [];
         let pcm: Buffer; let charEndTimes: number[];
-        try { ({ pcm, charEndTimes } = await ttsPcm(voiceId as string, full, { expressive: (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1") })); }
+        try { ({ pcm, charEndTimes } = await ttsPcm(voiceId as string, full, { expressive: (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1"), speed: Number(persona.voice_speed) || undefined })); }
         catch { return []; }
         if (!charEndTimes.length) return [];
         const timeAt = (c: number) => charEndTimes[Math.min(charEndTimes.length - 1, Math.max(0, c))] || 0;
@@ -1183,12 +1183,12 @@ export const generateClips = inngest.createFunction(
             if (!mod.allowed) return null;
             const exp = (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1");
             try {
-              const { buffer, durationSeconds } = await ttsWithDuration(voiceId as string, line, { expressive: exp });
+              const { buffer, durationSeconds } = await ttsWithDuration(voiceId as string, line, { expressive: exp, speed: Number(persona.voice_speed) || undefined });
               const url = await putBytes(buffer, "scene-vo", "mp3", "audio/mpeg");
               return { url, duration: durationSeconds };
             } catch {
               // Fallback: plain TTS (no duration) so a-roll never hard-fails on the timestamps endpoint.
-              const url = await putBytes(await tts(voiceId as string, line, { expressive: exp }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
+              const url = await putBytes(await tts(voiceId as string, line, { expressive: exp, speed: Number(persona.voice_speed) || undefined }), "scene-vo", "mp3", "audio/mpeg").catch(() => null);
               return url ? { url, duration: null as number | null } : null;
             }
           });
@@ -1589,7 +1589,7 @@ export const assembleVideo = inngest.createFunction(
           const url = await step.run(`vo-${p.i}`, async () => {
             const mod = await moderateText(p.vo); // screen before any ElevenLabs TTS call
             if (!mod.allowed) return null;
-            return putBytes(await tts(voiceId, p.vo, { expressive: (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1") }), "vo", "mp3", "audio/mpeg");
+            return putBytes(await tts(voiceId, p.vo, { expressive: (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1"), speed: Number(persona.voice_speed) || undefined }), "vo", "mp3", "audio/mpeg");
           });
           if (url) {
             await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));

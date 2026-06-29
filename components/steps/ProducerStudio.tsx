@@ -57,6 +57,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setVoiceModelState(m); setVoiceoverUrl(""); // model changed → re-generate to hear the new delivery
     await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: { voice_model: m } }) }).catch(() => {});
   }
+  // Voice SPEED (0.7–1.2, 1 = default). Faster often reads more natural; persisted + clears the take to re-gen.
+  const [voiceSpeed, setVoiceSpeedState] = useState<number>(Number((initialProduction as { voice_speed?: number })?.voice_speed) || Number((initialProduction as { brief?: { voice_speed?: number } })?.brief?.voice_speed) || 1);
+  async function setVoiceSpeed(s: number) {
+    setVoiceSpeedState(s); setVoiceoverUrl(""); // speed changed → re-generate to hear it
+    await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: { voice_speed: s } }) }).catch(() => {});
+  }
   async function genVoiceover() {
     if (voBusy) return;
     setVoBusy(true); setErr("");
@@ -866,6 +872,19 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           </button>
                         ))}
                       </div>
+                    </div>
+                    {/* Voice SPEED: default + slower/faster. Faster often reads more natural/energetic. */}
+                    <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                      <div className="tabular mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-ink-faint"><span>Voice speed</span><span className="tabular text-[#93c5fd]">{voiceSpeed === 1 ? "Default (1.0×)" : `${voiceSpeed.toFixed(2)}×`}</span></div>
+                      <div className="flex gap-2">
+                        {([[0.9, "Slower"], [1, "Default"], [1.1, "Faster"], [1.2, "Fastest"]] as const).map(([s, label]) => (
+                          <button key={s} onClick={() => setVoiceSpeed(s)} className={`flex-1 rounded-lg border px-3 py-2 text-center text-xs ${Math.abs(voiceSpeed - s) < 0.001 ? "border-[#60a5fa] bg-[#60a5fa]/10 text-ink" : "border-line text-ink-dim hover:border-[#60a5fa]/40"}`}>
+                            <div className="font-bold">{label}</div>
+                            <div className="mt-0.5 text-[10px] text-ink-faint tabular">{s.toFixed(2)}×</div>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-[10px] text-ink-faint">A little faster often sounds more natural and energetic. Changing it clears the take so you re-generate to hear it.</p>
                     </div>
                     {/* THE FULL VOICEOVER: one continuous take the producer listens to before animating. */}
                     {voiceId && (

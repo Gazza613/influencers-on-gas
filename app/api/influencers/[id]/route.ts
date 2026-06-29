@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   // Merge a small persona patch (step hand-off only). Allow-listed so a client can't
   // overwrite gates like `locked` or identity fields (element_id / soul references).
-  const ALLOWED_PATCH = new Set(["chosen_url", "selected_frames", "video_selects", "creatives", "aroll_ref_url", "broll_ref_url", "voice_model"]);
+  const ALLOWED_PATCH = new Set(["chosen_url", "selected_frames", "video_selects", "creatives", "aroll_ref_url", "broll_ref_url", "voice_model", "voice_speed"]);
   let persona: Record<string, unknown> | undefined;
   if (body.personaPatch && typeof body.personaPatch === "object") {
     const inf = await getInfluencer(id);
@@ -56,6 +56,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         // fetches it, so SSRF-guard: accept only an empty string or a safe public URL.
         const v = body.personaPatch[k];
         if (v === "" || (typeof v === "string" && isSafePublicUrl(v))) patch[k] = v;
+      } else if (k === "voice_speed") {
+        const n = Number(body.personaPatch[k]); // ElevenLabs speed range
+        if (Number.isFinite(n)) patch[k] = Math.max(0.7, Math.min(1.2, n));
       } else {
         patch[k] = body.personaPatch[k];
       }

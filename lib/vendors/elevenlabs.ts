@@ -109,16 +109,23 @@ const SAYABLE: [RegExp, string][] = [
 ];
 function sayable(t: string): string { return SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t); }
 
-export async function tts(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<Buffer> {
+// Voice SPEED (producer-tunable): ElevenLabs accepts voice_settings.speed in [0.7, 1.2] (1 = default).
+// Slightly faster (e.g. 1.1) often reads more natural/energetic. Added only when set + non-default.
+function withSpeed(vs: Record<string, unknown>, speed?: number): Record<string, unknown> {
+  if (typeof speed === "number" && speed > 0 && Math.abs(speed - 1) > 0.001) vs.speed = Math.max(0.7, Math.min(1.2, speed));
+  return vs;
+}
+
+export async function tts(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string; speed?: number } = {}): Promise<Buffer> {
   text = sayable(text);
   // v2 (Stable) would SPEAK bracketed audio tags aloud; strip them. v3 (Expressive) reads them as direction.
   if (!opts.expressive) text = text.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim();
   const k = await key();
   const expressive = opts.expressive ?? false;
   const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
-  const voice_settings = expressive
+  const voice_settings = withSpeed(expressive
     ? { stability: 0.35, similarity_boost: 0.8, style: 0.6, use_speaker_boost: true }
-    : { stability: 0.5, similarity_boost: 0.75 };
+    : { stability: 0.5, similarity_boost: 0.75 }, opts.speed);
   const call = async (model: string) => {
     const res = await fetch(`${BASE}/text-to-speech/${voiceId}`, {
       method: "POST",
@@ -136,16 +143,16 @@ export async function tts(voiceId: string, text: string, opts: { expressive?: bo
 // duration (last character end time). The a-roll timeline uses this real length instead of estimated
 // storyboard timecodes - that estimate mismatch was the root of the scene-switch pause + the audio
 // overlapping into the next scene. Returns the same voice/model audio + the measured duration.
-export async function ttsWithDuration(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ buffer: Buffer; durationSeconds: number | null }> {
+export async function ttsWithDuration(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string; speed?: number } = {}): Promise<{ buffer: Buffer; durationSeconds: number | null }> {
   text = sayable(text);
   // v2 (Stable) would SPEAK bracketed audio tags aloud; strip them. v3 (Expressive) reads them as direction.
   if (!opts.expressive) text = text.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim();
   const k = await key();
   const expressive = opts.expressive ?? false;
   const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
-  const voice_settings = expressive
+  const voice_settings = withSpeed(expressive
     ? { stability: 0.35, similarity_boost: 0.8, style: 0.6, use_speaker_boost: true }
-    : { stability: 0.5, similarity_boost: 0.75 };
+    : { stability: 0.5, similarity_boost: 0.75 }, opts.speed);
   const res = await fetch(`${BASE}/text-to-speech/${voiceId}/with-timestamps`, {
     method: "POST",
     headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "application/json" },
@@ -164,7 +171,7 @@ export async function ttsWithDuration(voiceId: string, text: string, opts: { exp
 // so the voice is a single continuous take. We then slice it per scene by the timestamps - that is
 // what makes the voice IDENTICAL across every scene (per-scene generation is why it drifts), and what
 // makes "what we hear" literally "what we get". Returns 16-bit/44.1kHz/mono PCM + char end times.
-export async function ttsPcm(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string } = {}): Promise<{ pcm: Buffer; charEndTimes: number[] }> {
+export async function ttsPcm(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string; speed?: number } = {}): Promise<{ pcm: Buffer; charEndTimes: number[] }> {
   text = sayable(text);
   // v2 (Stable) would SPEAK bracketed audio tags aloud; strip them. v3 (Expressive) reads them as direction.
   if (!opts.expressive) text = text.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim();
@@ -173,9 +180,9 @@ export async function ttsPcm(voiceId: string, text: string, opts: { expressive?:
   const modelId = opts.modelId || (expressive ? EXPRESSIVE_MODEL : STABLE_MODEL);
   // Higher stability + similarity = more consistent, faithful delivery (avoid Creative). This is the
   // owner's "voice doesn't stay consistent" lever, on the WYSIWYG stable model.
-  const voice_settings = expressive
+  const voice_settings = withSpeed(expressive
     ? { stability: 0.5, similarity_boost: 0.85, style: 0.4, use_speaker_boost: true }
-    : { stability: 0.7, similarity_boost: 0.85 };
+    : { stability: 0.7, similarity_boost: 0.85 }, opts.speed);
   const res = await fetch(`${BASE}/text-to-speech/${voiceId}/with-timestamps?output_format=pcm_44100`, {
     method: "POST",
     headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "application/json" },
