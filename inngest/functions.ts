@@ -1614,15 +1614,17 @@ export const assembleVideo = inngest.createFunction(
       // precise length — NO +tail bleeding into the next scene (that bleed was the "two audios at once").
       // B-roll: lay the APPROVED slice as narration over the silent scene (not a fresh re-synthesis).
       if (synced) {
-        // Fade the slice EDGES (4ms) so it starts/ends at zero amplitude → no click where it butts the next
-        // scene's clip. Works on the stored slice (no re-generation); 4ms is inaudible so a-roll lip-sync is
-        // unaffected. WAV only; a one-off MP3 TTS passes through unchanged.
+        // Fade the slice EDGES so it starts/ends at zero amplitude → no click where it butts the next scene's
+        // clip. ElevenLabs varies each take, so a boundary can land on a sharp sound; a longer fade (18ms,
+        // env VO_FADE_MS) reliably smooths it where 4ms was hit-and-miss. Still inaudible (a syllable is
+        // ~150ms), so a-roll lip-sync is unaffected. WAV only; a one-off MP3 TTS passes through unchanged.
+        const fadeMs = Math.max(2, Number(process.env.VO_FADE_MS) || 18);
         const fadedSrc = await step.run(`vofade-${p.i}`, async () => {
           try {
             const r = await fetch(synced as string);
             if (!r.ok) return synced as string;
             const buf = Buffer.from(await r.arrayBuffer());
-            const faded = fadeWavEdges(buf);
+            const faded = fadeWavEdges(buf, fadeMs);
             if (faded === buf) return synced as string; // not a WAV we can fade (e.g. MP3) → leave as-is
             return await putBytes(faded, "vo-faded", "wav", "audio/wav");
           } catch { return synced as string; }
