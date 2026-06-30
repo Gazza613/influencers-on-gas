@@ -172,12 +172,27 @@ function stripOutfit(s: string): string {
     .replace(/\s*,\s*,/g, ",").replace(/\s*;\s*;/g, ";").replace(/,\s*;/g, ";")
     .replace(/(^|[.;])\s*,/g, "$1").replace(/\s+([,;.])/g, "$1").replace(/\s{2,}/g, " ").replace(/[\s,;]+$/g, "").replace(/^[\s,;]+/, "").trim();
 }
+// A-ROLL keyframes were rendering with a raised hand because the storyboard DIRECTS a gesture (e.g. "one
+// warm open hand gesture toward the viewer"). The keyframe sets the pose the video animates from, so we want
+// it calm + hands down. Remove gesture/raised-hand directions from the scene text; the prompt's HANDS-DOWN
+// clause then takes over. (The animation still adds subtle natural movement.)
+function calmHands(s: string): string {
+  return String(s || "")
+    .replace(/\bwith (?:a |her |his |their |one )?relaxed open hand\b/gi, "")
+    .replace(/\b(?:then |and )?(?:(?:one|a|an|her|his|their|some|small|warm|calm|measured|gentle|open|natural|subtle|slight|light|expressive|big|broad|sweeping|animated|enthusiastic|lively|confident|generous|relaxed)[\s,-]+)*(?:open[\s-]?hand(?:ed)?[\s-]*)?(?:hand[\s-]*)?gestur(?:es|ing|e)(?:\s+naturally)?(?:\s+(?:toward|towards|to|at|into)\s+(?:the\s+)?(?:viewer|camera|lens|audience|screen|you))?/gi, "")
+    .replace(/\b(?:raises?|raising|lifts?|lifting|holds? up|holding up)\s+(?:a |her |his |their |one |both )?hands?\b/gi, "rests her hands low")
+    .replace(/\bhands? (?:raised|up|lifted)\b/gi, "hands low and resting")
+    .replace(/\s{2,}/g, " ").replace(/\s+([,;.·])/g, "$1").replace(/([,;])\s*(?=[,;])/g, "").replace(/^[\s,;·]+/, "").replace(/[\s,;·]+$/, "").trim();
+}
 export function buildShotPrompt(o: {
   location: string; blocking: string; shot: string; performance: string; role: string;
   subjectLine: string; look: string; refInstruction: string; ratio: string;
   hasPeople: boolean; worldAnchored: boolean; lockedOutfit?: string;
 }): string {
   o = { ...o, blocking: deHandRisk(o.blocking), performance: deHandRisk(o.performance), shot: deHandRisk(o.shot) };
+  // A-ROLL presenter shots: drop the storyboard's gesture/raised-hand directions so the keyframe sits calm
+  // with hands down (the HANDS-DOWN pose clause then governs). B-roll keeps its activity directions.
+  if (o.role === "a-roll") o = { ...o, blocking: calmHands(o.blocking), performance: calmHands(o.performance) };
   // Locked wardrobe wins: remove any conflicting outfit the storyboard wrote into this scene's text.
   if (o.lockedOutfit) o = { ...o, blocking: stripOutfit(o.blocking), performance: stripOutfit(o.performance) };
   return [
