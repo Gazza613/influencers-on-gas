@@ -220,6 +220,26 @@ export function pcmSliceToWav(pcm: Buffer, startSec: number, endSec: number): Bu
   return Buffer.concat([h, data]);
 }
 
+// Apply a ~4ms fade in/out to the EDGES of an already-encoded 16-bit PCM WAV (our slice format: 44-byte
+// header). Used at stitch time so any voice clip - even one cut/animated before the slice-fade existed -
+// starts and ends at zero amplitude, killing the click where two clips butt up at a scene cut. Returns the
+// input unchanged if it isn't a WAV we recognise (e.g. an MP3 from a one-off TTS).
+export function fadeWavEdges(wav: Buffer, fadeMs = 4): Buffer {
+  if (wav.length <= 46 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return wav;
+  const SR = 44100, BPS = 2, dataStart = 44;
+  const out = Buffer.from(wav);
+  const nS = Math.floor((out.length - dataStart) / BPS);
+  const fadeN = Math.min(Math.floor(nS / 2), Math.floor((SR * fadeMs) / 1000));
+  for (let i = 0; i < fadeN; i++) {
+    const g = i / fadeN;
+    const a = dataStart + i * BPS;
+    out.writeInt16LE(Math.round(out.readInt16LE(a) * g), a);
+    const b = dataStart + (nS - 1 - i) * BPS;
+    out.writeInt16LE(Math.round(out.readInt16LE(b) * g), b);
+  }
+  return out;
+}
+
 // Short preview line so the producer can hear a voice before locking it.
 export async function previewVoice(voiceId: string, line = "Hi, this is how I will sound in your videos."): Promise<Buffer> {
   return tts(voiceId, line);

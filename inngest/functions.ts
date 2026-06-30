@@ -8,7 +8,7 @@ import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
 import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
-import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
+import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity } from "@/lib/vendors/anthropic";
@@ -1544,15 +1544,12 @@ export const assembleVideo = inngest.createFunction(
       cursor = start + len;
       return { i, start, len, role, vo, caption: String(sc.caption || "").trim() };
     });
-    // A breath after the last word so the cut doesn't end abruptly: hold the final clip ~1.2s longer
-    // and extend the timeline (music fades out over it).
-    const TAIL = 1.2;
-    // The storyboard timecodes are ESTIMATES; the real spoken line can run longer, so the a-roll VO was
-    // being chopped off at p.len. Give the voiceover a ~1s tail so the last words always finish.
-    const AROLL_VO_TAIL = 1.0;
-    const total = (Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30) + TAIL + AROLL_VO_TAIL;
-    // HOLD the last scene's frame all the way to the END of the timeline (no black tail). The VO finishes +
-    // music fades over the held frame - was a black screen for the ~2s audio tail (Gary's abrupt black end).
+    // End on her last word - NOT a long hold. A ~2s tail froze the actor on her last frame (looked odd).
+    // Now just a brief beat (0.4s) so the final word fully lands and the cut doesn't clip, then end. The
+    // music's fade-out runs over her last line (soundtrack fadeInFadeOut), so it eases out as she finishes.
+    const TAIL = Math.max(0, Number(process.env.END_TAIL) || 0.4);
+    const total = (Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30) + TAIL;
+    // Carry the last scene's frame across just that brief beat (no black tail), not a noticeable freeze.
     if (placed.length) placed[placed.length - 1].len = Math.max(placed[placed.length - 1].len, total - placed[placed.length - 1].start);
 
     // Music bed (full length) → Blob. REUSE the audio step's bed if it already produced one.
@@ -1597,7 +1594,22 @@ export const assembleVideo = inngest.createFunction(
       // A-roll: the scene slot (p.len) now equals the EXACT audio duration, so play the voice to its
       // precise length — NO +tail bleeding into the next scene (that bleed was the "two audios at once").
       // B-roll: lay the APPROVED slice as narration over the silent scene (not a fresh re-synthesis).
-      if (synced) { voTrack.push({ asset: { type: "audio", src: synced }, start: p.start, length: p.len }); continue; }
+      if (synced) {
+        // Fade the slice EDGES (4ms) so it starts/ends at zero amplitude → no click where it butts the next
+        // scene's clip. Works on the stored slice (no re-generation); 4ms is inaudible so a-roll lip-sync is
+        // unaffected. WAV only; a one-off MP3 TTS passes through unchanged.
+        const fadedSrc = await step.run(`vofade-${p.i}`, async () => {
+          try {
+            const r = await fetch(synced as string);
+            if (!r.ok) return synced as string;
+            const buf = Buffer.from(await r.arrayBuffer());
+            const faded = fadeWavEdges(buf);
+            if (faded === buf) return synced as string; // not a WAV we can fade (e.g. MP3) → leave as-is
+            return await putBytes(faded, "vo-faded", "wav", "audio/wav");
+          } catch { return synced as string; }
+        });
+        voTrack.push({ asset: { type: "audio", src: fadedSrc }, start: p.start, length: p.len }); continue;
+      }
       if (voiceId && p.vo) {
         try {
           const url = await step.run(`vo-${p.i}`, async () => {
