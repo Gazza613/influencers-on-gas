@@ -110,7 +110,16 @@ const SAYABLE: [RegExp, string][] = [
   // the word "Rand" follows the amount). On-screen captions keep "R700"; only the SPOKEN text changes.
   [/\bR\s?(\d[\d,]*(?:\.\d+)?)\b/g, "$1 Rand"],
 ];
-function sayable(t: string): string { return SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t); }
+// Respell + de-click. IDEMPOTENT (running it twice == once) so the voiceover route can pre-apply it to each
+// line before computing the per-scene slice spans, and the TTS call can apply it again, and they stay aligned.
+export function sayable(t: string): string {
+  t = SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t);
+  // ElevenLabs can POP/click at COMMA pauses (Gary's click only happened on lines with commas). Drop commas
+  // so it reads the clause straight through: number separators collapse to clean digits ("1,400"->"1400"),
+  // every other comma becomes a space. KEEP_COMMAS=1 restores them if a delivery ever needs the harder pause.
+  if (process.env.KEEP_COMMAS !== "1") t = t.replace(/,(?=\d)/g, "").replace(/,/g, " ").replace(/\s{2,}/g, " ").trim();
+  return t;
+}
 
 // Voice SPEED (producer-tunable): ElevenLabs accepts voice_settings.speed in [0.7, 1.2] (1 = default).
 // Slightly faster (e.g. 1.1) often reads more natural/energetic. Added only when set + non-default.

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { ttsPcm, pcmSliceToWav } from "@/lib/vendors/elevenlabs";
+import { ttsPcm, pcmSliceToWav, sayable } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 import { isSafePublicUrl } from "@/lib/safe-url";
@@ -55,7 +55,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parts: { i: number; start: number; end: number }[] = [];
   let full = "";
   scenes.forEach((sc, i) => {
-    const ln = String(sc.vo_line || "").trim();
+    // Pre-apply sayable() (respell + comma de-click) HERE so the char spans match the exact text the TTS
+    // speaks - otherwise dropping commas would shift the slice timestamps and mis-cut the per-scene audio.
+    const ln = sayable(String(sc.vo_line || "").trim());
     if (!ln) return;
     const start = full.length ? full.length + 1 : 0;
     full += (full.length ? " " : "") + ln;
