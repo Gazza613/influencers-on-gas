@@ -1456,7 +1456,7 @@ export const generateAudio = inngest.createFunction(
     const brief = sb.music_bed || `${sb.tone || "warm, modern"} background music bed for a social ad, no vocals`;
     const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
     const [musicUrl, ambientUrl] = await Promise.all([
-      step.run("music", async () => putBytes(await generateMusic(brief, total * 1000), "music", "mp3", "audio/mpeg")).catch(() => null),
+      step.run("music", async () => { const m = await generateMusic(brief, total * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }).catch(() => null),
       step.run("ambient", async () => putBytes(await generateSfx(`a rich, immersive and clearly audible ambient soundscape for ${setting}: the real, characterful environmental sounds you would actually hear in that place - present room tone with genuine depth, natural background detail and gentle life and movement, layered and believable so the world feels alive (not a faint whisper). Full and noticeable in the mix. Absolutely NO music, NO speech and NO voices.`, 22), "ambient", "mp3", "audio/mpeg")).catch(() => null),
     ]);
     if (musicUrl) await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
@@ -1559,7 +1559,7 @@ export const assembleVideo = inngest.createFunction(
     if (musicUrl && Number((production as { music_seconds?: number })?.music_seconds || 0) + 2 < total) musicUrl = null;
     if (!musicUrl) try {
       const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
-      musicUrl = await step.run("music", async () => putBytes(await generateMusic(brief, (total + 4) * 1000), "music", "mp3", "audio/mpeg")); // +4s so it outlasts the cut (plays under it, extra fades out)
+      musicUrl = await step.run("music", async () => { const m = await generateMusic(brief, total * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }); // PCM path trims+loops to the EXACT cut length (no early stop, no pop)
       await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     } catch { musicUrl = null; }
 

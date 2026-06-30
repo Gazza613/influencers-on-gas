@@ -15,8 +15,8 @@ export async function GET() {
 
   let musicUrl: string | null = null; let musicError: string | null = null;
   try {
-    const buf = await generateMusic("warm, upbeat, modern background music bed for a social ad, no vocals", 15000);
-    musicUrl = await putBytes(buf, "spike-music", "mp3", "audio/mpeg");
+    const m = await generateMusic("warm, upbeat, modern background music bed for a social ad, no vocals", 15000);
+    musicUrl = await putBytes(m.buf, "spike-music", m.ext, m.mime);
   } catch (e) { musicError = String((e as Error)?.message || e).slice(0, 300); }
 
   let sfxUrl: string | null = null; let sfxError: string | null = null;

@@ -240,6 +240,44 @@ export function fadeWavEdges(wav: Buffer, fadeMs = 4): Buffer {
   return out;
 }
 
+// Crossfade-join two mono 16-bit PCM buffers, overlapping `ov` samples (linear blend) - no click/pop.
+function xfConcatPcm(a: Buffer, b: Buffer, xfSamples: number): Buffer {
+  const BPS = 2, as = a.length / BPS, bs = b.length / BPS;
+  const ov = Math.min(xfSamples, as, bs);
+  if (ov <= 0) return Buffer.concat([a, b]);
+  const out = Buffer.alloc((as + bs - ov) * BPS);
+  a.copy(out, 0, 0, (as - ov) * BPS);
+  for (let i = 0; i < ov; i++) {
+    const g = i / ov;
+    const av = a.readInt16LE((as - ov + i) * BPS);
+    const bv = b.readInt16LE(i * BPS);
+    out.writeInt16LE(Math.round(av * (1 - g) + bv * g), (as - ov + i) * BPS);
+  }
+  b.copy(out, as * BPS, ov * BPS);
+  return out;
+}
+
+// Turn a raw mono 16-bit PCM music take into a clean WAV of EXACTLY targetMs: trim the trailing silence
+// ElevenLabs pads (it composes ~64s then pads to the request with dead air), then CROSSFADE-LOOP the real
+// content to fill the full length. One continuous bed - no 6s of silence at the end, and no hard-restart
+// POP (the loop seam is a 0.5s crossfade). The soundtrack fade handles the musical in/out.
+export function seamlessMusicLoop(pcm: Buffer, targetMs: number): Buffer {
+  const SR = 44100, BPS = 2;
+  const nS = Math.floor(pcm.length / BPS);
+  // trim trailing silence (scan back for the last sample above ~-42 dBFS)
+  let lastLoud = 0;
+  for (let i = nS - 1; i >= 0; i--) { if (Math.abs(pcm.readInt16LE(i * BPS)) > 250) { lastLoud = i; break; } }
+  const contentS = Math.max(Math.floor(SR * 2), Math.min(nS, lastLoud + Math.floor(SR * 0.05)));
+  const content = pcm.subarray(0, contentS * BPS);
+  const targetS = Math.max(1, Math.floor((targetMs / 1000) * SR));
+  const xf = Math.floor(SR * 0.5);
+  let acc = content;
+  for (let guard = 0; acc.length / BPS < targetS && guard < 40; guard++) acc = xfConcatPcm(acc, content, xf);
+  const filled = acc.subarray(0, Math.min(acc.length, targetS * BPS));
+  // pcmSliceToWav adds the header + 4ms edge fades (anti-click); the soundtrack fades the music musically.
+  return pcmSliceToWav(Buffer.from(filled), 0, filled.length / BPS / SR);
+}
+
 // Short preview line so the producer can hear a voice before locking it.
 export async function previewVoice(voiceId: string, line = "Hi, this is how I will sound in your videos."): Promise<Buffer> {
   return tts(voiceId, line);
@@ -275,9 +313,23 @@ export async function createDesignedVoice(name: string, description: string, gen
 
 // ── Music bed + ambient SFX (Producer assembly) ────────────────────────────
 // ElevenLabs Music: a full-length scored track from a text brief. Returns mp3 bytes.
-export async function generateMusic(prompt: string, lengthMs: number): Promise<Buffer> {
+export async function generateMusic(prompt: string, lengthMs: number): Promise<{ buf: Buffer; ext: string; mime: string }> {
   const k = await key();
   const ms = Math.max(10000, Math.min(300000, Math.round(lengthMs)));
+  const PCM_Q = "?output_format=pcm_44100"; // ask for raw PCM so we can trim the trailing silence + loop it
+  // Turn a music response into the final asset. If it's RAW PCM (our preferred path) we trim ElevenLabs'
+  // trailing-silence padding and crossfade-loop it to the exact length → a clean, full-length WAV with no
+  // dead air and no loop pop. If it came back as MP3 (PCM not available), we use it as-is (plays straight;
+  // may stop a touch early - the soundtrack still fades it). We ONLY treat it as PCM when the content-type
+  // clearly says so, so an MP3 is never mis-processed into garbage.
+  const finalize = (bytes: Buffer, ct: string): { buf: Buffer; ext: string; mime: string } => {
+    const c = (ct || "").toLowerCase();
+    const looksPcm = (c.includes("pcm") || c.includes("l16") || c.includes("raw") || c.includes("basic") || c.includes("octet")) && !c.includes("mpeg") && !c.includes("mp3");
+    if (looksPcm && bytes.length > 40000) {
+      try { return { buf: seamlessMusicLoop(bytes, ms), ext: "wav", mime: "audio/wav" }; } catch { /* fall back to raw bytes below */ }
+    }
+    return { buf: bytes, ext: "mp3", mime: "audio/mpeg" };
+  };
   // SAFETY: ElevenLabs Music prohibits prompts that reference real artists/bands/songs/copyrighted
   // works (a common violation trigger). Strip "like/in the style of/reminiscent of X" phrases and
   // force an original, royalty-free, no-imitation instruction onto every request.
@@ -309,8 +361,8 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
       negative_global_styles: ["vocals", "lyrics", "singing", "spoken word", "any specific real artist, band or song", "copyrighted melody"],
       sections,
     };
-    const res = await fetch(`${BASE}/music`, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify({ composition_plan, model_id: "music_v2" }), signal: AbortSignal.timeout(150000) });
-    if (res.ok) return Buffer.from(await res.arrayBuffer());
+    const res = await fetch(`${BASE}/music${PCM_Q}`, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/pcm, audio/mpeg" }, body: JSON.stringify({ composition_plan, model_id: "music_v2" }), signal: AbortSignal.timeout(150000) });
+    if (res.ok) return finalize(Buffer.from(await res.arrayBuffer()), res.headers.get("content-type") || "");
     if (res.status === 401 || res.status === 402 || res.status === 429) throw new Error(`music_v2 ${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`); // auth/quota - don't bother with fallback
   } catch (e) {
     if ((e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") throw e; // genuine timeout → bubble up (caller falls back to ambient-only)
@@ -319,6 +371,9 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
 
   // Fallback: prompt-based Music endpoint (the proven path).
   const bodies: [string, Record<string, unknown>][] = [
+    [`${BASE}/music${PCM_Q}`, { prompt: safePrompt, music_length_ms: ms }],
+    [`${BASE}/music/compose${PCM_Q}`, { prompt: safePrompt, music_length_ms: ms }],
+    // Last resort: clean MP3 (no format param) so music never vanishes if PCM isn't accepted.
     [`${BASE}/music`, { prompt: safePrompt, music_length_ms: ms }],
     [`${BASE}/music/compose`, { prompt: safePrompt, music_length_ms: ms }],
   ];
@@ -327,10 +382,10 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
     try {
       // Hard timeout so a hung/queued music request can't stall the whole audio step - the caller
       // falls back to ambient-only instead of waiting indefinitely.
-      const res = await fetch(url, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify(body), signal: AbortSignal.timeout(150000) });
-      if (res.ok) return Buffer.from(await res.arrayBuffer());
+      const res = await fetch(url, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/pcm, audio/mpeg" }, body: JSON.stringify(body), signal: AbortSignal.timeout(150000) });
+      if (res.ok) return finalize(Buffer.from(await res.arrayBuffer()), res.headers.get("content-type") || "");
       lastErr = `${res.status} ${(await res.text().catch(() => "")).slice(0, 160)}`;
-      if (res.status !== 404 && res.status !== 405) break;
+      if (res.status === 401 || res.status === 402 || res.status === 429) break; // auth/quota - stop; otherwise try the next (incl. the clean-MP3 fallbacks)
     } catch (e) {
       lastErr = String((e as Error)?.message || e).slice(0, 160);
       if ((e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") break; // don't retry the fallback after a timeout
