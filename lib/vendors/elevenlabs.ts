@@ -106,6 +106,9 @@ const SAYABLE: [RegExp, string][] = [
   [/\bgigabyte\b/gi, "gigga-byte"],
   [/\bmegabytes\b/gi, "megga-bytes"],
   [/\bmegabyte\b/gi, "megga-byte"],
+  // South African Rand: "R700" / "R1,400" is spoken "700 Rand" / "1,400 Rand" (the R prefix is silent,
+  // the word "Rand" follows the amount). On-screen captions keep "R700"; only the SPOKEN text changes.
+  [/\bR\s?(\d[\d,]*(?:\.\d+)?)\b/g, "$1 Rand"],
 ];
 function sayable(t: string): string { return SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t); }
 
