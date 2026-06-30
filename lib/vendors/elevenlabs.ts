@@ -277,8 +277,10 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<B
     const secMs = Math.round(ms / nSec);
     const sections = Array.from({ length: nSec }, (_, i) => ({
       section_name: nSec === 1 ? "bed" : i === 0 ? "intro" : i === nSec - 1 ? "outro" : `part${i}`,
-      positive_local_styles: [],
-      negative_local_styles: ["vocals"],
+      // Cue the model to keep playing to the very end and RESOLVE into a gentle fade - this stops it from
+      // composing ~65s then trailing off into dead air. The last section is an explicit fading outro.
+      positive_local_styles: i === nSec - 1 && nSec > 1 ? ["sustained to the end", "gentle resolving outro", "soft fade out ending"] : ["steady continuous groove"],
+      negative_local_styles: ["vocals", ...(i === nSec - 1 ? ["abrupt ending", "early silence", "sudden stop"] : [])],
       duration_ms: i === nSec - 1 ? ms - secMs * (nSec - 1) : secMs,
       lines: [],
     }));
