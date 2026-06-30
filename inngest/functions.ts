@@ -988,6 +988,7 @@ export const generateShots = inngest.createFunction(
         // B-ROLL gets background strangers ONLY when the director flagged this scene a busy public place
         // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
         hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: !!worldRef,
+        lockedOutfit: wardrobeLock || undefined, // her one outfit OVERRIDES any per-scene outfit the storyboard wrote
       });
       const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add

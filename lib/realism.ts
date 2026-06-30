@@ -163,12 +163,23 @@ function deHandRisk(s: string): string {
     .replace(/\bfinger[\s-]?counting\b/gi, "natural gesturing")
     .replace(/\bnumber of fingers\b/gi, "a natural gesture");
 }
+// When a wardrobe is LOCKED, the storyboard often still names a specific outfit per scene (e.g. "deep-teal
+// wrap dress") - and that scene text fights the lock, so her clothes drift scene to scene. Strip any clause
+// that describes a garment, leaving the locked outfit as the only clothing signal in the prompt.
+function stripOutfit(s: string): string {
+  return String(s || "")
+    .replace(/[^,;.]*\b(dress|gown|frock|blouse|shirt|t-?shirts?|tee|sweater|jumper|cardigan|hoodie|jacket|blazer|coat|trench|trousers|jeans|chinos|slacks|skirt|shorts|kaftan|kimono|romper|jumpsuit|leggings|outfit|attire|ensemble|saree|sari|robe)\b[^,;.]*/gi, "")
+    .replace(/\s*,\s*,/g, ",").replace(/\s*;\s*;/g, ";").replace(/,\s*;/g, ";")
+    .replace(/(^|[.;])\s*,/g, "$1").replace(/\s+([,;.])/g, "$1").replace(/\s{2,}/g, " ").replace(/[\s,;]+$/g, "").replace(/^[\s,;]+/, "").trim();
+}
 export function buildShotPrompt(o: {
   location: string; blocking: string; shot: string; performance: string; role: string;
   subjectLine: string; look: string; refInstruction: string; ratio: string;
-  hasPeople: boolean; worldAnchored: boolean;
+  hasPeople: boolean; worldAnchored: boolean; lockedOutfit?: string;
 }): string {
   o = { ...o, blocking: deHandRisk(o.blocking), performance: deHandRisk(o.performance), shot: deHandRisk(o.shot) };
+  // Locked wardrobe wins: remove any conflicting outfit the storyboard wrote into this scene's text.
+  if (o.lockedOutfit) o = { ...o, blocking: stripOutfit(o.blocking), performance: stripOutfit(o.performance) };
   return [
     "Photograph style: a real, candid photo of the influencer living this exact moment, CAPTURED ON A PHONE - iPhone 16 Pro main lens, handheld at a natural height, automatic exposure and focus, faint natural sensor noise in the shadows and a touch of lens distortion at the edges. NOT a studio camera, NOT studio lighting, NOT a posed studio portrait - it reads like a real moment a friend caught on their phone, never a glossy AI render.",
     "CRITICAL - ONE FRAME, ONE ANGLE: output a SINGLE continuous photograph from ONE camera angle of ONE moment, filling the whole frame edge to edge. It is ONE framing only - do NOT combine a close-up with a wider shot, and do NOT stack or place two views together top-and-bottom or side-by-side. If the direction below lists several shots, cuts, framings or moments (e.g. 'close-up of hands… then a wider shot', 'three rapid cuts', 'over-the-shoulder and coffee-table shots'), choose ONLY the single most important one and render that alone. ABSOLUTELY NEVER a split-screen, diptych, triptych, grid, collage, stacked panels, top/bottom halves or side-by-side images.",
@@ -183,7 +194,9 @@ export function buildShotPrompt(o: {
       : `Framing: ${o.shot}. B-ROLL FRAMING - a CANDID, OBSERVED scene (not a piece to camera): she is a clear, PROMINENT subject (a medium shot, her face plainly visible and identifiable in a natural three-quarter angle so her locked identity holds), BUT she is NOT looking at or talking to the camera - her attention is on her activity, her phone or her companions, with NO eye-contact with the lens and never mid-speech to camera. NO other person in the frame looks at or addresses the camera either; everyone is naturally absorbed in the moment as if unaware of it. ONE single framing of ONE camera angle only - never a close-up combined with a wider shot, and never two views stacked together.`,
     `Performance: ${o.performance}.`,
     "HANDS (render carefully - this is where AI fails): she has EXACTLY TWO hands and TWO arms, each hand with EXACTLY FIVE correctly-formed fingers in natural human proportion and a believable pose; fingers are separate and correctly jointed; no third hand, no extra or duplicated hands or arms, no floating hand, no extra/missing/fused/bent-back fingers. DEFAULT TO HANDS LOW AND RESTING (at her sides, in her lap, or settled on a surface) rather than raised or mid-gesture - a calm posture reads best and animates calmest; only raise a hand if the scene's action genuinely needs it. If a gesture is unclear, prefer relaxed, partly-hidden or naturally resting hands over a complex finger pose. Keep any held object in one consistent hand.",
-    `Grooming/wardrobe: ${o.look}. Keep the same outfit and styling as the established world for continuity. ${WARDROBE_COLOUR}`,
+    o.lockedOutfit
+      ? `Grooming/wardrobe (LOCKED - this OVERRIDES everything): she wears EXACTLY this one outfit, head to toe, in this scene and in EVERY scene of the production: ${o.lockedOutfit}. This is her ONLY outfit - identical garments, colours, fabric and footwear every single time. IGNORE and DO NOT render any other dress, top, garment or clothing colour mentioned anywhere in the scene direction above; her clothing NEVER changes scene to scene. ${o.look ? o.look + ". " : ""}${WARDROBE_COLOUR}`
+      : `Grooming/wardrobe: ${o.look}. Keep the same outfit and styling as the established world for continuity. ${WARDROBE_COLOUR}`,
     SKIN_FACTS,
     SCALE,
     o.hasPeople ? SCENE_PEOPLE : NO_EXTRAS,
