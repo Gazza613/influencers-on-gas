@@ -11,7 +11,7 @@ import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
-import { qaCreative, composeCreativeScene, moderateText, matchesIdentity } from "@/lib/vendors/anthropic";
+import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
@@ -916,7 +916,22 @@ export const generateShots = inngest.createFunction(
     const arollRefMedia = persona.aroll_ref_url ? await step.run("import-aroll-ref", () => importMediaUrl(String(persona.aroll_ref_url)).catch(() => null)) : null;
     const brollRefMedia = persona.broll_ref_url ? await step.run("import-broll-ref", () => importMediaUrl(String(persona.broll_ref_url)).catch(() => null)) : null;
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running" } } }));
+    // WARDROBE LOCK: one concrete outfit, head to toe, carried as TEXT into EVERY scene so the influencer's
+    // clothes never drift - the image anchor alone is weak when a scene's anchor frame is a tight a-roll
+    // head-shot (it hides her bottoms/shoes, so the model re-invents them per scene). Derive ONCE: describe
+    // the outfit in her chosen A-ROLL guide creative (what the producer actually picked), else her B-ROLL
+    // guide, else her bible signature outfit. Persisted so every later re-shoot uses the IDENTICAL outfit.
+    let wardrobeLock = String((production as { wardrobe_lock?: string })?.wardrobe_lock || "").trim();
+    if (!wardrobeLock) {
+      const guideUrl = String(persona.aroll_ref_url || persona.broll_ref_url || "").trim();
+      if (guideUrl) wardrobeLock = await step.run("wardrobe-extract", async () => {
+        const d = await describeOutfit(guideUrl).catch(() => "");
+        if (d) await recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "wardrobe", count: 1 }).catch(() => {});
+        return d;
+      });
+      if (!wardrobeLock) wardrobeLock = bibleLook;
+    }
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running", wardrobe_lock: wardrobeLock || undefined } } }));
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
     let castAnchor: string | null = null; // first b-roll frame WITH companions - locks the daughter/companion look + outfit across every b-roll scene
@@ -949,6 +964,9 @@ export const generateShots = inngest.createFunction(
       const castTag = (castAnchor && hasCompanions) ? `@image${++n}` : "";
       const refInstruction = [
         faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, ETHNICITY and heritage, skin tone and texture, AND her exact hair colour, length and style, AND her apparent AGE); zero drift, unmistakably the same individual. Her ethnicity and skin tone are FIXED by these references and must be identical in EVERY scene — never lighten, darken or change her race/ethnicity to match a companion, a guide image or the scene. She looks IDENTICAL in every scene whether she is alone or beside another person — NEVER make her look younger or older, never change or darken her hair, and never soften or blend her features to match a companion, a guide image or the scene. These face references are the ONLY source of her face, hair, age and identity — take NOTHING about her from any wardrobe, world, location, companion or reference-look image. EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer) — she is the PRIMARY adult in the frame and the locked face is hers. Every OTHER person in the scene — a daughter, friend, companion, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling (a daughter is clearly YOUNGER). NEVER duplicate her face, hair or look onto anyone else, and never swap her identity onto the companion: absolutely no twins, clones or look-alikes.` : "",
+        // WARDROBE LOCK (text): her ONE outfit, head to toe, identical every scene - the durable fix for
+        // clothing drifting between scenes (the image anchor alone misses the bottoms/shoes on tight shots).
+        wardrobeLock ? `LOCKED OUTFIT - the influencer wears the SAME single outfit in EVERY scene of this production, head to toe: ${wardrobeLock}. Identical garments, colours, fabric, footwear and accessories every time; never change, swap, recolour, add or restyle ANY part of her clothing between scenes, whether she is talking to camera or in a wider scene - only her pose, action and the framing change. This is her established wardrobe and overrides any different outfit implied by the scene text.` : "",
         roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its grooming, styling, lighting and overall mood/world closely for this scene. ${worldTag
           ? `Her WARDROBE is NOT taken from ${roleRefTag} — it is LOCKED to ${worldTag} below, so her outfit stays IDENTICAL in every single scene; keep her clothing exactly as in ${worldTag}.`
           : `WARDROBE: dress her in the EXACT outfit shown in ${roleRefTag} — identical garments, colours, fabric and styling — this is the single source of truth for her clothing and OVERRIDES any outfit mentioned in text.`} Do NOT copy its exact pose or framing (take those from the direction below), and do NOT copy any other person from it.` : "",

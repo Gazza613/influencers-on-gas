@@ -243,6 +243,36 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; score10:
   }
 }
 
+// WARDROBE EXTRACTION: describe ONLY the outfit of the main person in a guide creative, head to toe, as a
+// concise sentence. Used to LOCK the influencer's clothing as consistent TEXT across every scene (the image
+// anchor alone drifts when a scene's anchor frame is a tight head-shot that hides the bottoms/shoes).
+export async function describeOutfit(url: string): Promise<string> {
+  let b64: string, mt: string;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return "";
+    mt = (res.headers.get("content-type") || "image/jpeg").split(";")[0];
+    if (!QA_MEDIA.has(mt)) mt = "image/jpeg";
+    b64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+  } catch { return ""; }
+  try {
+    const c = await client();
+    const res = await c.messages.create({
+      model: QA_MODEL,
+      max_tokens: 150,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: "Describe ONLY the OUTFIT of the main foreground adult in this image, head to toe, in ONE concise sentence (about 25-35 words): the top, the bottoms (trousers/skirt/dress), the footwear, their colours and fabric, and any worn accessories (glasses, watch, jewellery, bag, scarf). Do NOT mention the person's face, hair, body, age, pose, or the background. Reply with just the outfit description, no preamble." },
+          { type: "image", source: { type: "base64", media_type: mt as "image/jpeg", data: b64 } },
+        ],
+      }],
+    });
+    const block = res.content.find((b) => b.type === "text");
+    return block && block.type === "text" ? block.text.trim().replace(/\s+/g, " ").slice(0, 320) : "";
+  } catch { return ""; }
+}
+
 // IDENTITY-MATCH QA: is the person in `frameUrl` the SAME individual as the `refUrl` anchor? Used to
 // drop drifted photoshoot frames (a wide/full-body shot sometimes renders a different model). Fails
 // OPEN (returns true) on any error so a QA hiccup can never empty the set.
