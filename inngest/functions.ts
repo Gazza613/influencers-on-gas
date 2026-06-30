@@ -1716,7 +1716,7 @@ export const assembleVideo = inngest.createFunction(
     if (endCardClip) tracks.push({ clips: [endCardClip] });
 
     const edit: Record<string, unknown> = {
-      timeline: { background: "#000000", ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.18)) } } : {}), tracks },
+      timeline: { background: "#000000", ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.24)) } } : {}), tracks },
       output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : "9:16", resolution: "1080", fps: 25 },
     };
 

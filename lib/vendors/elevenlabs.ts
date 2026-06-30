@@ -316,20 +316,12 @@ export async function createDesignedVoice(name: string, description: string, gen
 export async function generateMusic(prompt: string, lengthMs: number): Promise<{ buf: Buffer; ext: string; mime: string }> {
   const k = await key();
   const ms = Math.max(10000, Math.min(300000, Math.round(lengthMs)));
-  const PCM_Q = "?output_format=pcm_44100"; // ask for raw PCM so we can trim the trailing silence + loop it
-  // Turn a music response into the final asset. If it's RAW PCM (our preferred path) we trim ElevenLabs'
-  // trailing-silence padding and crossfade-loop it to the exact length → a clean, full-length WAV with no
-  // dead air and no loop pop. If it came back as MP3 (PCM not available), we use it as-is (plays straight;
-  // may stop a touch early - the soundtrack still fades it). We ONLY treat it as PCM when the content-type
-  // clearly says so, so an MP3 is never mis-processed into garbage.
-  const finalize = (bytes: Buffer, ct: string): { buf: Buffer; ext: string; mime: string } => {
-    const c = (ct || "").toLowerCase();
-    const looksPcm = (c.includes("pcm") || c.includes("l16") || c.includes("raw") || c.includes("basic") || c.includes("octet")) && !c.includes("mpeg") && !c.includes("mp3");
-    if (looksPcm && bytes.length > 40000) {
-      try { return { buf: seamlessMusicLoop(bytes, ms), ext: "wav", mime: "audio/wav" }; } catch { /* fall back to raw bytes below */ }
-    }
-    return { buf: bytes, ext: "mp3", mime: "audio/mpeg" };
-  };
+  // PCM path DISABLED: requesting raw PCM and looping it produced CRACKLING (the bytes came back in a format
+  // our mono loop mis-read - it garbled the bed into noise). Back to the clean MP3 bed (plays straight; may
+  // stop a touch early on a long cut - the soundtrack fades it). Full-length looping needs the exact PCM
+  // format confirmed first; until then, clean beats full-length. seamlessMusicLoop stays for that later work.
+  const PCM_Q = "";
+  const finalize = (bytes: Buffer): { buf: Buffer; ext: string; mime: string } => ({ buf: bytes, ext: "mp3", mime: "audio/mpeg" });
   // SAFETY: ElevenLabs Music prohibits prompts that reference real artists/bands/songs/copyrighted
   // works (a common violation trigger). Strip "like/in the style of/reminiscent of X" phrases and
   // force an original, royalty-free, no-imitation instruction onto every request.
@@ -362,7 +354,7 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<{
       sections,
     };
     const res = await fetch(`${BASE}/music${PCM_Q}`, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/pcm, audio/mpeg" }, body: JSON.stringify({ composition_plan, model_id: "music_v2" }), signal: AbortSignal.timeout(150000) });
-    if (res.ok) return finalize(Buffer.from(await res.arrayBuffer()), res.headers.get("content-type") || "");
+    if (res.ok) return finalize(Buffer.from(await res.arrayBuffer()));
     if (res.status === 401 || res.status === 402 || res.status === 429) throw new Error(`music_v2 ${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`); // auth/quota - don't bother with fallback
   } catch (e) {
     if ((e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") throw e; // genuine timeout → bubble up (caller falls back to ambient-only)
@@ -383,7 +375,7 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<{
       // Hard timeout so a hung/queued music request can't stall the whole audio step - the caller
       // falls back to ambient-only instead of waiting indefinitely.
       const res = await fetch(url, { method: "POST", headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/pcm, audio/mpeg" }, body: JSON.stringify(body), signal: AbortSignal.timeout(150000) });
-      if (res.ok) return finalize(Buffer.from(await res.arrayBuffer()), res.headers.get("content-type") || "");
+      if (res.ok) return finalize(Buffer.from(await res.arrayBuffer()));
       lastErr = `${res.status} ${(await res.text().catch(() => "")).slice(0, 160)}`;
       if (res.status === 401 || res.status === 402 || res.status === 429) break; // auth/quota - stop; otherwise try the next (incl. the clean-MP3 fallbacks)
     } catch (e) {
