@@ -1240,30 +1240,35 @@ export const generateClips = inngest.createFunction(
         if (AROLL_ENGINE === "heygen") {
           // HeyGen RATE-LIMITS concurrent submits (429). Retry the submit with exponential back-off so a
           // burst of a-roll scenes all land instead of failing — each waits out the limiter and gets in.
-          let hg: { ok: true; videoId: string; version: "v2" | "v3"; variant?: string } | { ok: false; error: string } = { ok: false, error: "not attempted" };
           const HG_TRIES = Math.max(1, Number(process.env.HEYGEN_SUBMIT_RETRIES) || 6);
-          for (let attempt = 0; attempt < HG_TRIES; attempt++) {
-            hg = await step.run(`hg-submit-${i}-${attempt}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
-            if (hg.ok || !/429|rate.?limit/i.test((hg as { error: string }).error)) break;
-            await step.sleep(`hg-rl-${i}-${attempt}`, `${Math.min(120, 20 * (attempt + 1))}s`); // 20s,40s,60s,80s,100s,120s
-          }
-          if (hg.ok) {
-            let hgUrl: string | null = null; let hgErr: string | null = null;
+          // HeyGen often returns a TRANSIENT "render failed" (no real reason) that succeeds on a fresh submit.
+          // Wrap the whole submit+poll in an outer RETRY (default 3) on a render-level failure, so a scene
+          // isn't lost to a HeyGen hiccup. A genuine content failure still gives up after the retries.
+          const RENDER_TRIES = Math.max(1, Number(process.env.HEYGEN_RENDER_RETRIES) || 3);
+          let hgUrl: string | null = null; let hgErr = "not attempted"; let hgVariant: string | undefined;
+          for (let render = 0; render < RENDER_TRIES && !hgUrl; render++) {
+            let hg: { ok: true; videoId: string; version: "v2" | "v3"; variant?: string } | { ok: false; error: string } = { ok: false, error: "not attempted" };
+            for (let attempt = 0; attempt < HG_TRIES; attempt++) {
+              hg = await step.run(`hg-submit-${i}-${render}-${attempt}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
+              if (hg.ok || !/429|rate.?limit/i.test((hg as { error: string }).error)) break;
+              await step.sleep(`hg-rl-${i}-${render}-${attempt}`, `${Math.min(120, 20 * (attempt + 1))}s`); // 20s,40s,60s,80s,100s,120s
+            }
+            if (!hg.ok) { hgErr = `submit failed: ${(hg as { error: string }).error}`; if (render < RENDER_TRIES - 1) await step.sleep(`hg-resubmit-${i}-${render}`, "8s"); continue; }
             for (let n = 0; n < 100; n++) { // ~100 x 6s ≈ 10 min
-              const s = await step.run(`hg-poll-${i}-${n}`, () => pollTalking(hg.videoId, hg.version));
-              if (s.url) { hgUrl = s.url; break; }
+              const s = await step.run(`hg-poll-${i}-${render}-${n}`, () => pollTalking(hg.videoId, hg.version));
+              if (s.url) { hgUrl = s.url; hgVariant = hg.variant; break; }
               if (s.error || s.status === "failed") { hgErr = s.error || "render failed"; break; }
-              await step.sleep(`hg-wait-${i}-${n}`, "6s");
+              await step.sleep(`hg-wait-${i}-${render}-${n}`, "6s");
             }
-            if (hgUrl) {
-              // model=avatar_iv always (no legacy path); the VARIANT records whether full motion+expressiveness applied.
-              await step.run(`u-hg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "avatar_iv", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
-              const hosted = (await step.run(`hghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
-              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: `heygen:avatar_iv:${hg.variant}` };
-            }
-            return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV did not finish: ${hgErr || "timed out after ~10 min"}`, engine: "heygen:avatar_iv" };
+            if (!hgUrl && render < RENDER_TRIES - 1) await step.sleep(`hg-render-retry-${i}-${render}`, "10s"); // let HeyGen settle, then re-render fresh
           }
-          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV submit failed: ${hg.error}`, engine: "heygen:failed" };
+          if (hgUrl) {
+            // model=avatar_iv always (no legacy path); the VARIANT records whether full motion+expressiveness applied.
+            await step.run(`u-hg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "avatar_iv", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+            const hosted = (await step.run(`hghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: `heygen:avatar_iv:${hgVariant}` };
+          }
+          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV did not finish: ${hgErr}`, engine: "heygen:avatar_iv" };
         } else {
           // OPT-IN fal OmniHuman path (expensive, per-second). fal rejects inputs >5MB so re-encode first.
           const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
