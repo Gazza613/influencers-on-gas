@@ -722,6 +722,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-faint">Guide selected. {lockErr || "Locking the wardrobe…"}</div>
                 ) : null}
                 {lockErr && (wardrobeLock || (!arollGuide && !brollGuide)) ? <div className="text-[11px] text-red-400">{lockErr}</div> : null}
+                {brollGuide ? (
+                  <div className="rounded-lg border border-[#a855f7]/40 bg-gradient-to-r from-[#a855f7]/16 via-[#8b5cf6]/10 to-[#6366f1]/14 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-[#c4b5fd]">🔒 B-roll cast + scene locked</span> - the companion (e.g. her daughter) and the setting from your chosen b-roll creative will carry into every b-roll scene. Her outfit stays the locked wardrobe above.</div>
+                ) : null}
               </div>
             )}
           </div>
