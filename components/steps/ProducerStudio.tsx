@@ -708,6 +708,22 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               </div>
             </div>
             <p className="mt-2 text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below. <span className="text-[#93c5fd]">⚡ Priority = faster (paid) queue.</span></p>
+            {/* REFERENCE GUIDE + WARDROBE LOCK - set this BEFORE shooting so every scene matches the look + outfit. */}
+            {creatives.length > 0 && (
+              <div className="mt-3 space-y-2 border-t border-[#a855f7]/15 pt-3">
+                <div className="text-[11px] font-semibold text-ink-dim">🎯 Reference guide <span className="text-ink-faint font-normal">(optional, but set it BEFORE you shoot)</span> - pick one of your creatives to lock her look + wardrobe across every scene.</div>
+                <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
+                <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
+                {lockBusy ? (
+                  <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-dim">🔎 Reading the outfit from your guide…</div>
+                ) : wardrobeLock ? (
+                  <div className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-accent">🔒 Wardrobe locked in</span> - every scene will use this exact outfit: <span className="text-ink-dim">{wardrobeLock}</span></div>
+                ) : (arollGuide || brollGuide) ? (
+                  <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-faint">Guide selected. {lockErr || "Locking the wardrobe…"}</div>
+                ) : null}
+                {lockErr && (wardrobeLock || (!arollGuide && !brollGuide)) ? <div className="text-[11px] text-red-400">{lockErr}</div> : null}
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -937,23 +953,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || rendering} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
                   </div>
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have). Fix any single scene with the buttons on the cards above.</p>
-                  {/* Optional: steer the shoot with one of your own creatives as a reference look. */}
-                  <details className="rounded-lg border border-line bg-surface-2/40 p-2">
-                    <summary className="cursor-pointer text-[11px] font-semibold text-ink-dim">Reference look (optional) - steer the shoot with one of your creatives</summary>
-                    <div className="mt-2 space-y-2">
-                      <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
-                      <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
-                      {/* PROOF the selection registered: shows the exact outfit read from the chosen guide. */}
-                      {lockBusy ? (
-                        <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-dim">🔎 Reading the outfit from your guide…</div>
-                      ) : wardrobeLock ? (
-                        <div className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-accent">🔒 Wardrobe locked in</span> - every scene will use this exact outfit: <span className="text-ink-dim">{wardrobeLock}</span></div>
-                      ) : (arollGuide || brollGuide) ? (
-                        <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-faint">Guide selected. {lockErr || "Locking the wardrobe…"}</div>
-                      ) : null}
-                      {lockErr && (wardrobeLock || (!arollGuide && !brollGuide)) ? <div className="text-[11px] text-red-400">{lockErr}</div> : null}
-                    </div>
-                  </details>
+                  {wardrobeLock ? <p className="text-[11px] text-ink-faint"><span className="text-accent">🔒 Wardrobe locked:</span> {wardrobeLock} <span className="text-ink-faint">(set on the Reference images step)</span></p> : null}
                 </div>
               ) : <LockHint />}
             </StepShell>
