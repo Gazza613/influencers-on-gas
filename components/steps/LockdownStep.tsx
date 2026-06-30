@@ -131,7 +131,7 @@ export default function LockdownStep({
         <ul className="mt-3 space-y-1.5 text-[13px] text-ink-dim">
           <li>⚡ It is <span className="text-ink">near instant</span> now, the heavy lifting already happened in the photoshoot.</li>
           <li>🧬 <span className="text-ink">Why lock down?</span> Until it is locked, the identity is not sealed. Locking fixes it as the reference for every creative.</li>
-          <li>🎬 Creatives and (later) video both build from this locked identity, so it unlocks them the moment you lock.</li>
+          <li>🎬 Wardrobe &amp; Set and (later) video both build from this locked identity, so it unlocks them the moment you lock.</li>
         </ul>
 
         {(frames.length > 0 || (refCards && (refCards.faceCard || refCards.featureSheet || refCards.turnaround))) && !working && (

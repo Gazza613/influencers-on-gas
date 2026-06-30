@@ -384,7 +384,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Creatives · social outputs <span className="ml-2 rounded-full border border-[#a855f7]/60 bg-[#a855f7]/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-[#d8b4fe]">Optional</span></div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Wardrobe &amp; Set · dress her + build the world <span className="ml-2 rounded-full border border-[#a855f7]/60 bg-[#a855f7]/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-[#d8b4fe]">Optional</span></div>
         <p className="mt-2 text-sm text-ink-dim">
           Render social-ready shots of this locked influencer. Pick platforms or formats, optionally steer the wardrobe
           and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
@@ -570,7 +570,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         {/* Generate */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button onClick={generate} disabled={!nFormats} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">
-            {running ? `✨ Generate ${images} more (runs alongside)` : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} creatives`}
+            {running ? `✨ Generate ${images} more (runs alongside)` : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} looks`}
           </button>
           {running && (
             <button onClick={abort} className="rounded-lg border border-alert/60 px-4 py-2.5 text-sm font-bold text-alert hover:bg-alert/10">■ Abort</button>
@@ -590,7 +590,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
 
         {running && (
           <div className="mt-4">
-            <WorkingPanel title="Creatives" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null} startedAt={startedAt}
+            <WorkingPanel title="Wardrobe & Set" lines={CREATIVE_NARRATION} crew={CREW.creatives} pct={null} startedAt={startedAt}
               onAbort={abort}
               note={`Generating each shot - they appear below as they finish. Pick your keepers and upscale those to 4K afterwards. Stuck? Hit Abort and run again.`} />
           </div>
@@ -657,7 +657,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           </div>
         </div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Your creatives · {creatives.length}</div>
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Your looks · {creatives.length}</div>
             <div className="flex items-center gap-1">
               {([ ["all", "All"], ["excellent", "Excellent · 4K"], ["good", "Good"] ] as const).map(([k, label]) => (
                 <button
@@ -717,7 +717,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       {creatives.some((c) => c.url) && !running && (
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ready/40 bg-ready/8 p-4">
           <div>
-            <div className="text-sm font-bold text-ready">Happy with your creatives?</div>
+            <div className="text-sm font-bold text-ready">Happy with your looks?</div>
             <div className="text-[13px] text-ink-dim">Your stills are saved. Next: make a video with this influencer in the Producer.</div>
           </div>
           <Link href={`/setup/influencers/${influencerId}/producer`} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold">🎬 Go to the Producer →</Link>

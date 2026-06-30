@@ -90,7 +90,7 @@ export default function BuildHeader({
   const creativesDone = s.creatives > 0;
   if (s.locked) {
     const onProducer = pathname.endsWith("/producer");
-    tabs.push({ href: `${base}/creatives`, label: "Creatives", icon: "✦", done: creativesDone, warn: !creativesDone && onProducer, match: (p: string) => p.endsWith("/creatives") });
+    tabs.push({ href: `${base}/creatives`, label: "Wardrobe & Set", icon: "✦", done: creativesDone, warn: !creativesDone && onProducer, match: (p: string) => p.endsWith("/creatives") });
     tabs.push({ href: `${base}/producer`, label: "Producer", icon: "🎬", done: false, match: (p: string) => p.endsWith("/producer") });
   }
 
