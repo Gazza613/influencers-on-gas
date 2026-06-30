@@ -31,6 +31,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Guide = a creative (made in the Creative section) the shoot anchors to (wardrobe/look/world). Persisted as aroll_ref_url/broll_ref_url.
   const [arollGuide, setArollGuide] = useState(arollRef);
   const [brollGuide, setBrollGuide] = useState(brollRef);
+  // Wardrobe lock: the outfit read from the chosen guide, shown back so the producer SEES the selection took.
+  const [wardrobeLock, setWardrobeLock] = useState(String((initialProduction as { wardrobe_lock?: string })?.wardrobe_lock || ""));
+  const [lockBusy, setLockBusy] = useState(false);
+  const [lockErr, setLockErr] = useState("");
   async function setGuide(role: "a-roll" | "b-roll", url: string) {
     const next = (role === "a-roll" ? arollGuide : brollGuide) === url ? "" : url; // tap again to clear
     if (role === "a-roll") setArollGuide(next); else setBrollGuide(next);
@@ -43,6 +47,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       }
     }
     await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: role === "a-roll" ? { aroll_ref_url: next } : { broll_ref_url: next } }) }).catch(() => {});
+    // Read the outfit from the chosen guide RIGHT NOW and lock it in - so you SEE it registered (and the
+    // shoot threads this exact outfit into every scene). Clearing the guide clears the lock.
+    setLockErr("");
+    if (!next) { setWardrobeLock(""); fetch(`/api/influencers/${influencerId}/wardrobe-lock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: "" }) }).catch(() => {}); return; }
+    setLockBusy(true);
+    try {
+      const r = await fetch(`/api/influencers/${influencerId}/wardrobe-lock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: next }) });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.wardrobe) setWardrobeLock(d.wardrobe); else setLockErr(d.error || "Could not lock the wardrobe - try another guide.");
+    } catch { setLockErr("Could not lock the wardrobe - check your connection."); }
+    setLockBusy(false);
   }
   const [autoFilled, setAutoFilled] = useState(false); // brief setting was auto-filled from a creative
   const [voiceId, setVoiceId] = useState(initialVoiceId);
@@ -928,6 +943,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <div className="mt-2 space-y-2">
                       <GuidePicker role="a-roll" creatives={creatives} selected={arollGuide} onPick={setGuide} onZoom={setZoom} />
                       <GuidePicker role="b-roll" creatives={creatives} selected={brollGuide} onPick={setGuide} onZoom={setZoom} />
+                      {/* PROOF the selection registered: shows the exact outfit read from the chosen guide. */}
+                      {lockBusy ? (
+                        <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-dim">🔎 Reading the outfit from your guide…</div>
+                      ) : wardrobeLock ? (
+                        <div className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-accent">🔒 Wardrobe locked in</span> - every scene will use this exact outfit: <span className="text-ink-dim">{wardrobeLock}</span></div>
+                      ) : (arollGuide || brollGuide) ? (
+                        <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-faint">Guide selected. {lockErr || "Locking the wardrobe…"}</div>
+                      ) : null}
+                      {lockErr && (wardrobeLock || (!arollGuide && !brollGuide)) ? <div className="text-[11px] text-red-400">{lockErr}</div> : null}
                     </div>
                   </details>
                 </div>
