@@ -717,7 +717,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 {lockBusy ? (
                   <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-dim">🔎 Reading the outfit from your guide…</div>
                 ) : wardrobeLock ? (
-                  <div className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-accent">🔒 Wardrobe locked in</span> - every scene will use this exact outfit: <span className="text-ink-dim">{wardrobeLock}</span></div>
+                  <div className="rounded-lg border border-[#a855f7]/45 bg-gradient-to-r from-[#a855f7]/20 via-[#8b5cf6]/12 to-[#6366f1]/16 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-[#c4b5fd]">🔒 Wardrobe locked in</span> - every scene will use this exact outfit: <span className="text-ink-dim">{wardrobeLock}</span></div>
                 ) : (arollGuide || brollGuide) ? (
                   <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-[12px] text-ink-faint">Guide selected. {lockErr || "Locking the wardrobe…"}</div>
                 ) : null}
@@ -953,7 +953,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || rendering} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
                   </div>
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have). Fix any single scene with the buttons on the cards above.</p>
-                  {wardrobeLock ? <p className="text-[11px] text-ink-faint"><span className="text-accent">🔒 Wardrobe locked:</span> {wardrobeLock} <span className="text-ink-faint">(set on the Reference images step)</span></p> : null}
+                  {wardrobeLock ? <p className="text-[11px] text-ink-faint"><span className="text-[#c4b5fd]">🔒 Wardrobe locked:</span> {wardrobeLock} <span className="text-ink-faint">(set on the Reference images step)</span></p> : null}
                 </div>
               ) : <LockHint />}
             </StepShell>
