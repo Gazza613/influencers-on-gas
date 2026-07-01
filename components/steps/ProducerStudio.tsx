@@ -738,6 +738,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <span aria-hidden>⚡</span> Priority
                 <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${priority ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{priority ? "ON" : "OFF"}</span>
               </button>
+              {/* Draft speed: faster keyframes (skip humaniser) + 720p a-roll clips. Final stitch is always 1080p. */}
+              <button
+                onClick={() => setSpeedMode((v) => !v)}
+                title="Draft speed: skip the skin-humaniser on keyframes AND render a-roll clips at 720p - faster + cheaper while you iterate. The final is ALWAYS stitched at 1080p; for a crisp final, switch this OFF and re-shoot/re-animate."
+                className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#a855f7] bg-[#a855f7]/15 text-[#d8b4fe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}
+              >
+                <span aria-hidden>⚡</span> Draft speed
+                <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#a855f7] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "ON" : "OFF"}</span>
+              </button>
               <div className="ml-auto flex items-center gap-2">
                 <RatioPicker value={boardRatio} onChange={setBoardRatio} />
                 <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
