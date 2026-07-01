@@ -1701,7 +1701,7 @@ export const assembleVideo = inngest.createFunction(
     // this gives controlled font size, wrapping, and a legible rounded background pill, sized for 9:16.
     const captionsOn = event.data.captions === true;
     // Strip any v3 audio tags ([excited] etc.) so they never render on screen, then HTML-escape.
-    const esc = (s: string) => s.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const esc = (s: string) => s.replace(/\[[^\]]*\]/g, " ").replace(/\s*\|\s*/g, ", ").replace(/\s+([,.;:!?])/g, "$1").replace(/,(\s*[,.;:!?])/g, "$1").replace(/\s{2,}/g, " ").trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const capW = ratio === "1:1" ? 920 : 940; // box width within the 1080 frame (leaves side margins)
     // CAPTION STYLES the producer can pick (the old dark pill read "low-level"). Each is a full CSS look for
     // the per-scene caption line. Default = "bold" (the punchy social standard). Picked via captionStyle.
@@ -1709,7 +1709,7 @@ export const assembleVideo = inngest.createFunction(
       pill: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:36px;line-height:1.3;padding:10px 20px;background:rgba(0,0,0,0.6);border-radius:12px;-webkit-box-decoration-break:clone;box-decoration-break:clone}", height: 260, offY: 0.10 },
       bold: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:800;font-size:48px;line-height:1.22;text-transform:uppercase;letter-spacing:0.5px;-webkit-text-stroke:5px #000;paint-order:stroke fill;text-shadow:0 4px 10px rgba(0,0,0,0.55);padding:4px 14px}", height: 330, offY: 0.13 },
       highlight: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:800;font-size:42px;line-height:1.45;padding:6px 16px;background:#a855f7;border-radius:10px;-webkit-box-decoration-break:clone;box-decoration-break:clone;text-shadow:0 2px 4px rgba(0,0,0,0.35)}", height: 300, offY: 0.12 },
-      clean: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:42px;line-height:1.3;text-shadow:0 2px 6px rgba(0,0,0,0.95),0 0 3px rgba(0,0,0,0.9);padding:4px 14px}", height: 280, offY: 0.11 },
+      clean: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:42px;line-height:1.3;-webkit-text-stroke:3px #000;paint-order:stroke fill;text-shadow:0 2px 6px rgba(0,0,0,0.6);padding:4px 14px}", height: 280, offY: 0.11 },
       sunny: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFE14D;font-family:'Open Sans',sans-serif;font-weight:800;font-size:46px;line-height:1.25;text-transform:uppercase;letter-spacing:0.5px;-webkit-text-stroke:5px #111;paint-order:stroke fill;text-shadow:0 4px 10px rgba(0,0,0,0.5);padding:4px 14px}", height: 320, offY: 0.13 },
     };
     // SAFE ZONE: sit captions ~20% up from the bottom (env CAPTION_Y) so they clear the platform's bottom UI
