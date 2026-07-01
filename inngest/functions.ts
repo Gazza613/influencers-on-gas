@@ -1432,7 +1432,7 @@ export const generateClips = inngest.createFunction(
         // narration OVER the silent scene — the continuous voiceover never drops out across the cut.
         return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: clipSeconds, audio_url: audioUrl || undefined, synced: false };
       }
-      return { scene: i, role, beat, kind: role, url: null, status: "failed", error: sub.error || `render started (${sub.model}) but did not finish in time` };
+      return { scene: i, role, beat, kind: role, url: null, status: "failed", error: (sub.error || `render started (${sub.model}) but did not finish in time`) + (role === "b-roll" && !dopConfigured() ? " — B-ROLL is on the flaky Kling fallback because the reliable DoP engine is NOT configured: set HIGGSFIELD_KEY_ID + HIGGSFIELD_KEY_SECRET in the environment." : "") };
     };
 
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
