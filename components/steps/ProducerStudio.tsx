@@ -78,6 +78,21 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setVoiceSpeedState(s); setVoiceoverUrl(""); // speed changed → re-generate to hear it
     await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: { voice_speed: s } }) }).catch(() => {});
   }
+  // TEST-THE-DELIVERY preview box: pull a scene's copy in, A/B v2 vs v3 (v3 gets expressive + accent tags),
+  // hear which holds the accent before committing to the full voiceover.
+  const firstVoLine = ((initialProduction?.storyboard?.scenes || []).find((s) => (s.vo_line || "").trim())?.vo_line || "").trim();
+  const [previewText, setPreviewText] = useState(firstVoLine);
+  const [previewAccent, setPreviewAccent] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewBusy, setPreviewBusy] = useState<"" | "v2" | "v3">("");
+  const [previewErr, setPreviewErr] = useState("");
+  async function runPreview(m: "v2" | "v3") {
+    if (!previewText.trim() || previewBusy) return;
+    setPreviewBusy(m); setPreviewErr(""); setPreviewUrl("");
+    const r = await fetch(`/api/influencers/${influencerId}/voice/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: previewText.trim(), model: m, accent: previewAccent.trim(), speed: voiceSpeed }) }).then((x) => x.json()).catch(() => null);
+    if (r?.url) setPreviewUrl(`${r.url}?t=${Date.now()}`); else setPreviewErr(r?.error || "Preview failed - try again.");
+    setPreviewBusy("");
+  }
   async function genVoiceover() {
     if (voBusy) return;
     setVoBusy(true); setErr("");
@@ -906,6 +921,27 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           </button>
                         ))}
                       </div>
+                    </div>
+                    {/* TEST THE DELIVERY: A/B v2 vs v3 on the real scene copy before committing to the take. */}
+                    <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                      <div className="tabular mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                        <span>🎧 Test the delivery</span>
+                        {sb && sb.scenes.some((s) => (s.vo_line || "").trim()) && (
+                          <select onChange={(e) => { if (e.target.value) setPreviewText(e.target.value); }} defaultValue="" className="rounded border border-line bg-surface-1 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink-dim">
+                            <option value="">Load a scene line…</option>
+                            {sb.scenes.map((s, i) => (s.vo_line || "").trim() ? <option key={i} value={s.vo_line}>Scene {i + 1}</option> : null)}
+                          </select>
+                        )}
+                      </div>
+                      <textarea value={previewText} onChange={(e) => setPreviewText(e.target.value)} rows={2} placeholder="Type or load a scene line to test…" className="w-full resize-none rounded-lg border border-line bg-surface-1 px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faint" />
+                      <input value={previewAccent} onChange={(e) => setPreviewAccent(e.target.value)} placeholder="Accent cue for v3 (e.g. South African) — optional" className="mt-2 w-full rounded-lg border border-line bg-surface-1 px-2.5 py-1.5 text-[12px] text-ink placeholder:text-ink-faint" />
+                      <div className="mt-2 flex gap-2">
+                        <button onClick={() => runPreview("v2")} disabled={!!previewBusy || !previewText.trim()} className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink-dim hover:border-[#a855f7]/40 hover:text-ink disabled:opacity-50">{previewBusy === "v2" ? "Synthesising…" : "▶ Preview v2 (Stable)"}</button>
+                        <button onClick={() => runPreview("v3")} disabled={!!previewBusy || !previewText.trim()} className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink-dim hover:border-[#a855f7]/40 hover:text-ink disabled:opacity-50">{previewBusy === "v3" ? "Synthesising…" : "▶ Preview v3 (Expressive)"}</button>
+                      </div>
+                      {previewUrl && <audio key={previewUrl} src={previewUrl} controls autoPlay className="mt-2 h-9 w-full" />}
+                      {previewErr && <p className="mt-1.5 text-[11px] text-red-400">{previewErr}</p>}
+                      <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">Hear the same line on both models, pick the one that keeps Leah&apos;s accent, then set it above. v3 adds expressive tags (+ the accent cue if you give one) — which is also what can drift a designed voice.</p>
                     </div>
                     {/* Voice SPEED: default + slower/faster. Faster often reads more natural/energetic. */}
                     <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
