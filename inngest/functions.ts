@@ -873,6 +873,7 @@ export const generateShots = inngest.createFunction(
     const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
     // PRIORITY (faster, paid) render model when the producer opts in for speed; else the free default.
     const shotModel = event.data.priority === true ? PRIORITY_MODEL : IMAGE_MODEL;
+    const speed = event.data.speed === true; // DRAFT speed: skip the humaniser (a whole 2nd render/keyframe) for faster shoots
     // Aspect ratio is producer-chosen per shoot (9:16 reels / 1:1 feed / 16:9 youtube); falls back to the storyboard format.
     const allowedRatios = ["9:16", "1:1", "16:9"];
     const ratio = allowedRatios.includes(String(event.data.aspectRatio)) ? String(event.data.aspectRatio) : (String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16");
@@ -950,6 +951,18 @@ export const generateShots = inngest.createFunction(
         .find((s) => s?.url && (!sceneFilter || !sceneFilter.includes(Number(s.scene))));
       if (prior?.url) worldRef = await step.run("worldref-anchor", () => importMediaUrl(prior.url as string).catch(() => null));
     }
+    // CAST ANCHOR for a filtered/per-scene b-roll re-shoot: lock the COMPANION (the daughter) so re-shooting
+    // ONE b-roll scene doesn't invent a DIFFERENT person. Prefer the b-roll GUIDE (the fixed creative the
+    // producer chose, which shows the daughter); else anchor to a PRIOR b-roll frame. (Whole-board runs set
+    // this from the first companion frame below.)
+    if ((roleFilter || sceneFilter) && !castAnchor) {
+      if (brollRefMedia) castAnchor = brollRefMedia;
+      else {
+        const priorCast = ((production as { shots?: { scene?: number; url?: string | null }[] } | null)?.shots ?? [])
+          .find((s) => s?.url && String((scenes[Number(s.scene)] as Record<string, string> | undefined)?.role || "") === "b-roll" && (!sceneFilter || !sceneFilter.includes(Number(s.scene))));
+        if (priorCast?.url) castAnchor = await step.run("castanchor-prior", () => importMediaUrl(priorCast.url as string).catch(() => null));
+      }
+    }
 
     // Render ONE scene to a keyframe (pure — reads worldRef which is set by the anchor pass first).
     const renderShot = async (i: number, sc: Record<string, string>): Promise<ShotRow> => {
@@ -1022,7 +1035,7 @@ export const generateShots = inngest.createFunction(
       // the reference — holds identity/pose/wardrobe/framing, fixes ONLY the skin so it reads as a real
       // photo (kills the plastic/AI sheen). This is the world-class-scene finish. Default ON; set
       // HF_HUMANISE=0 to skip it for speed.
-      if (usable && process.env.HF_HUMANISE !== "0") {
+      if (usable && process.env.HF_HUMANISE !== "0" && !speed) {
         const human = await step.run(`humanise-${i}`, () => humaniseUrl(usable as string, { prompt: HUMANISER, ratio }).catch(() => null));
         if (human && (await step.run(`vhuman-${i}`, () => filterLoadable([human]))).length > 0) {
           usable = human;
