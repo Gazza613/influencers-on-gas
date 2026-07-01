@@ -461,7 +461,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (!r?.queued) { setErr(r?.error || "Couldn't animate that scene."); setAnimatingScenes((s) => { const n = new Set(s); n.delete(i); return n; }); return; }
     // Self-poll THIS scene only (independent of the others), until its clip is new or has failed.
     for (let n = 0; n < 400; n++) {
-      await new Promise((res) => setTimeout(res, n < 60 ? 6000 : 12000));
+      await new Promise((res) => setTimeout(res, n < 40 ? 4000 : 8000));
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
       if (d?.production) {
         setProduction(d.production);

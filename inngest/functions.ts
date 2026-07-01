@@ -1261,14 +1261,14 @@ export const generateClips = inngest.createFunction(
             for (let attempt = 0; attempt < HG_TRIES; attempt++) {
               hg = await step.run(`hg-submit-${i}-${render}-${attempt}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: prompt }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
               if (hg.ok || !/429|rate.?limit/i.test((hg as { error: string }).error)) break;
-              await step.sleep(`hg-rl-${i}-${render}-${attempt}`, `${Math.min(120, 20 * (attempt + 1))}s`); // 20s,40s,60s,80s,100s,120s
+              await step.sleep(`hg-rl-${i}-${render}-${attempt}`, `${Math.min(120, 12 * (attempt + 1))}s`); // 20s,40s,60s,80s,100s,120s
             }
             if (!hg.ok) { hgErr = `submit failed: ${(hg as { error: string }).error}`; if (render < RENDER_TRIES - 1) await step.sleep(`hg-resubmit-${i}-${render}`, "8s"); continue; }
-            for (let n = 0; n < 100; n++) { // ~100 x 6s ≈ 10 min
+            for (let n = 0; n < 170; n++) { // POLL FAST early (clips usually land in 1-3 min): 4s for ~5 min, then 8s. ~13 min total.
               const s = await step.run(`hg-poll-${i}-${render}-${n}`, () => pollTalking(hg.videoId, hg.version));
               if (s.url) { hgUrl = s.url; hgVariant = hg.variant; break; }
               if (s.error || s.status === "failed") { hgErr = s.error || "render failed"; break; }
-              await step.sleep(`hg-wait-${i}-${render}-${n}`, "6s");
+              await step.sleep(`hg-wait-${i}-${render}-${n}`, n < 75 ? "4s" : "8s");
             }
             if (!hgUrl && render < RENDER_TRIES - 1) await step.sleep(`hg-render-retry-${i}-${render}`, "10s"); // let HeyGen settle, then re-render fresh
           }
@@ -1372,18 +1372,18 @@ export const generateClips = inngest.createFunction(
         for (let attempt = 0; attempt < DOP_TRIES; attempt++) {
           dop = await step.run(`dop-submit-${i}-${attempt}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: clipSeconds }));
           if (dop.jobSetId || !/429|rate.?limit/i.test(dop.error || "")) break;
-          await step.sleep(`dop-rl-${i}-${attempt}`, `${Math.min(120, 20 * (attempt + 1))}s`);
+          await step.sleep(`dop-rl-${i}-${attempt}`, `${Math.min(120, 12 * (attempt + 1))}s`);
         }
         if (dop.jobSetId) {
           let dopUrl: string | null = null;
           // DoP turbo can sit in the queue ~20-30 min under load, so poll for ~40 min (env-tunable)
           // before giving up — a too-short window abandons a render that would have completed.
-          const DOP_POLL_ROUNDS = Math.max(60, Number(process.env.DOP_POLL_ROUNDS) || 300); // ~300 x 8s ≈ 40 min
+          const DOP_POLL_ROUNDS = Math.max(60, Number(process.env.DOP_POLL_ROUNDS) || 360); // poll FAST early (5s ~6 min) then 10s → ~40 min ceiling
           for (let n = 0; n < DOP_POLL_ROUNDS; n++) {
             const s = await step.run(`dop-poll-${i}-${n}`, () => pollDopOnce(dop.jobSetId as string));
             if (s.url) { dopUrl = s.url; break; }
             if (s.terminal) break; // failed/nsfw/canceled → fall through to Kling
-            await step.sleep(`dop-wait-${i}-${n}`, "8s");
+            await step.sleep(`dop-wait-${i}-${n}`, n < 72 ? "5s" : "10s");
           }
           if (dopUrl) {
             await step.run(`u-dop-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "dop_turbo", unit: "video", action: "broll", count: 1 }).catch(() => {}));
