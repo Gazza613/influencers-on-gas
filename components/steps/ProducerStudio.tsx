@@ -771,6 +771,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <video src={clip.url} controls playsInline className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
                           <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
                           <button onClick={() => setZoom(clip.url!)} title="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
+                          {/* RE-ANIMATING this scene (it already has a clip): overlay feedback so it's clearly working. */}
+                          {rendering && (clipScope === "all" ? (renderingRole === "" || renderingRole === s.role) : clipScope.includes(i)) && (
+                            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/65 text-[10px] font-semibold text-white"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />re-animating…</div>
+                          )}
                         </div>
                       ) : rendering && !clip?.url && (clipScope === "all" ? (renderingRole === "" || renderingRole === s.role) : clipScope.includes(i)) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…</div>
