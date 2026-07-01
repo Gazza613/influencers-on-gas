@@ -83,6 +83,21 @@ export async function updateProductionFields(id: string, patch: Record<string, u
   );
 }
 
+// Atomically upsert ONE clip into production.clips by scene index, in a single UPDATE. The row lock
+// serialises concurrent updates on the same influencer, so animating several scenes AT ONCE (separate
+// runs) can't clobber each other's clips (the old read-merge-write race). Removes any existing clip for
+// this scene, then appends the new one.
+export async function upsertClip(id: string, clip: Record<string, unknown> & { scene: number }): Promise<void> {
+  await db().query(
+    `update influencers
+       set persona = jsonb_set(coalesce(persona, '{}'::jsonb), '{production,clips}',
+             coalesce((select jsonb_agg(c) from jsonb_array_elements(coalesce(persona -> 'production' -> 'clips', '[]'::jsonb)) c
+                       where (c ->> 'scene') is distinct from $1), '[]'::jsonb) || $2::jsonb, true)
+     where id = $3`,
+    [String(clip.scene), JSON.stringify([clip]), id],
+  );
+}
+
 export async function deleteInfluencer(id: string): Promise<void> {
   await db().query("delete from influencers where id = $1", [id]);
 }

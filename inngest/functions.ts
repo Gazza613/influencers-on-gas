@@ -1,5 +1,5 @@
 import { inngest } from "@/lib/inngest";
-import { getInfluencer, updateInfluencer, updateProductionFields } from "@/lib/influencers";
+import { getInfluencer, updateInfluencer, updateProductionFields, upsertClip } from "@/lib/influencers";
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, castLockClause, CLOTHED, HUMANISER } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
@@ -1132,7 +1132,9 @@ export const generateClips = inngest.createFunction(
     // Rejected references: scenes the producer dropped from the galleries — never animate them.
     const dropped = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
 
-    await step.run("mark-running", () => updateProductionFields(influencerId, { clips_status: "running", clips: force ? [] : existingClips }));
+    // Only WIPE clips on a forced full redo. A normal/per-scene run must NOT re-write the whole clips array
+    // (that bulk write would clobber a clip a CONCURRENT per-scene run just saved) - it only flips the status.
+    await step.run("mark-running", () => updateProductionFields(influencerId, force ? { clips_status: "running", clips: [] } : { clips_status: "running" }));
 
     // VOICE-ONCE: synthesize the WHOLE script as one continuous take, slice per scene by the timestamps
     // → identical voice across every scene + WYSIWYG. Returns the slices FROM the step (Inngest replays
@@ -1423,27 +1425,16 @@ export const generateClips = inngest.createFunction(
     // FINAL COST GUARD: never re-render a scene that already has a good clip unless this is a forced full
     // redo or an explicit per-scene re-animate - even if the caller's scene list mistakenly includes it.
     const targets = scenes.map((sc, i) => ({ sc, i })).filter(({ sc, i }) => !dropped.has(i) && (!roleFilter || roleFilter.includes(String(sc.role || "a-roll"))) && (!sceneFilter || sceneFilter.includes(i)) && (force || reanimate || !hasGoodClip(i)));
-    // SERIALIZE the reload-merge-save critical section: clips render in PARALLEL (expensive) but their
-    // saves run one-at-a-time through this lock. updateInfluencer overwrites the whole persona blob, so
-    // two parallel reload-merge-saves would clobber each other and silently drop a just-saved clip - that
-    // was the "I animated 8 but only 7 stuck" bug that forced costly re-animates.
-    let saveLock: Promise<unknown> = Promise.resolve();
+    // Each clip saves via an ATOMIC per-scene upsert (upsertClip) - the row lock makes it safe both across
+    // the parallel renders in THIS run AND across SEPARATE concurrent runs (animating several scenes at once),
+    // with no reload-merge-write race. This replaces the old serialized saveLock that only guarded one run.
     const renderAndSave = async ({ sc, i }: { sc: Record<string, string>; i: number }) => {
       // Contain a single scene's failure: if renderOne throws (a vendor error after retries), save a
-      // "failed" clip instead of rejecting the whole batch — otherwise the final "done" step never
-      // runs and clips_status is stuck on "running" forever.
+      // "failed" clip instead of rejecting the whole batch — otherwise the final "done" step never runs.
       let row: ClipRow;
       try { row = await renderOne(i, sc); }
       catch (e) { row = { scene: i, role: String(sc.role || "a-roll"), beat: String(sc.beat || ""), kind: String(sc.role || "a-roll"), url: null, status: "failed", error: String((e as Error)?.message || e).slice(0, 160) }; }
-      saveLock = saveLock.then(async () => {
-        const fresh = (((await step.run(`creload-${i}`, () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
-        const prod = (fresh.production ?? production) as Record<string, unknown>;
-        const list = Array.isArray(prod.clips) ? [...(prod.clips as ClipRow[])] : [];
-        const at = list.findIndex((c) => c.scene === i); if (at >= 0) list[at] = row; else list.push(row);
-        // SCOPED write: only production.clips - never clobbers a concurrent audio/voiceover/status write.
-        await step.run(`csave-${i}`, () => updateProductionFields(influencerId, { clips: list }));
-      });
-      await saveLock;
+      await step.run(`csave-${i}`, () => upsertClip(influencerId, row as unknown as Record<string, unknown> & { scene: number }));
       return row;
     };
     // Render scenes in PARALLEL so clips queue at their vendor simultaneously (wall-clock ≈ slowest clip,
@@ -1459,12 +1450,11 @@ export const generateClips = inngest.createFunction(
     const otherTargets = targets.filter((t) => String(t.sc.role || "a-roll") !== "a-roll");
     await Promise.all([runPool(arollTargets, AROLL_CONCURRENCY), runPool(otherTargets, CLIP_CONCURRENCY)]);
 
-    // Re-sort the FULL merged list (this render's clips + any kept from the other role).
-    const done = (((await step.run("reload-done", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
-    const prodDone = (done.production ?? production) as Record<string, unknown>;
-    const ordered = (Array.isArray(prodDone.clips) ? (prodDone.clips as ClipRow[]) : []).filter((c) => !dropped.has(c.scene)).slice().sort((a, b) => a.scene - b.scene);
-    await step.run("done", () => updateProductionFields(influencerId, { clips: ordered, clips_status: "done", status: "clips" }));
-    return { ok: true, clips: ordered.length };
+    // DONE: only flip the status - never bulk-write the clips array (the upserts already saved each clip, and
+    // a bulk write here would clobber a CONCURRENT per-scene run's clip). Order doesn't matter: everything
+    // that reads clips looks them up BY SCENE. clips_status="done" is a hint; the UI tracks per-scene finish.
+    await step.run("done", () => updateProductionFields(influencerId, { clips_status: "done", status: "clips" }));
+    return { ok: true, clips: targets.length };
   },
 );
 

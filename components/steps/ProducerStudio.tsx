@@ -203,6 +203,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // EXACT scope of the current animate so only the scenes truly rendering show a spinner: "all" = a
   // whole-board/role animate, an array = just those scene indices (a per-scene re-animate). Never spin the rest.
   const [clipScope, setClipScope] = useState<number[] | "all">("all");
+  // CONCURRENT per-scene animate: which scenes are animating RIGHT NOW (fire one, then fire the next without
+  // waiting). wholeBoardBusy = a whole-board Animate-all / role batch is running (blocks per-scene during it).
+  const [animatingScenes, setAnimatingScenes] = useState<Set<number>>(new Set());
+  const [wholeBoardBusy, setWholeBoardBusy] = useState(false);
   // ANY work in flight (incl. per-scene shoots that don't flip the global flags) - drives the busy
   // buttons + the red Reset control so it reflects per-scene + b-roll work too.
   const anyReshooting = (production?.shots ?? []).some((s) => s.reshooting);
@@ -329,13 +333,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // FAST PATH: render every scene (a-roll + b-roll) in ONE parallel job, so the two roles render
   // concurrently instead of back-to-back (~halves the wait).
   async function renderRole(role: "a-roll" | "b-roll") { setClipScope("all");
-    if (rendering) return;
-    setErr(""); setRenderingRole(role);
+    if (rendering || wholeBoardBusy) return;
+    setErr(""); setRenderingRole(role); setWholeBoardBusy(true);
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: [role] }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the render - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the render - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); setWholeBoardBusy(false); return; }
     await poll(setProduction, "clips_status");
-    setRenderingRole("");
+    setRenderingRole(""); setWholeBoardBusy(false);
   }
 
   const [reflowBusy, setReflowBusy] = useState(false);
@@ -445,14 +449,27 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (!r?.queued) { setErr(r?.error || "Couldn't shoot that reference image."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)), shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
   }
-  // Animate ONE scene's clip from its existing keyframe (no re-shoot).
+  // Animate ONE scene's clip from its existing keyframe (no re-shoot). CONCURRENT: fire it and return - you
+  // can immediately fire the NEXT scene without waiting (the backend saves each clip atomically). Each scene
+  // self-polls until ITS clip lands, so several can render at once, each with its own spinner.
   async function animateScene(i: number) {
-    if (rendering) return;
-    setErr(""); setRenderingRole(sb?.scenes?.[i]?.role === "b-roll" ? "b-roll" : "a-roll"); setClipScope([i]); // ONLY this scene is animating
-    setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
+    if (animatingScenes.has(i) || wholeBoardBusy) return; // already doing this one, or a whole-board run is on
+    setErr("");
+    const before = (production?.clips ?? []).find((c) => c.scene === i)?.url || null;
+    setAnimatingScenes((s) => new Set(s).add(i));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], reanimate: true }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't animate that scene."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
-    await poll(setProduction, "clips_status"); setRenderingRole("");
+    if (!r?.queued) { setErr(r?.error || "Couldn't animate that scene."); setAnimatingScenes((s) => { const n = new Set(s); n.delete(i); return n; }); return; }
+    // Self-poll THIS scene only (independent of the others), until its clip is new or has failed.
+    for (let n = 0; n < 400; n++) {
+      await new Promise((res) => setTimeout(res, n < 60 ? 6000 : 12000));
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+      if (d?.production) {
+        setProduction(d.production);
+        const c = (d.production.clips ?? []).find((x: { scene?: number }) => x.scene === i) as { url?: string | null; status?: string } | undefined;
+        if (c && ((c.url && c.url !== before) || c.status === "failed")) break;
+      }
+    }
+    setAnimatingScenes((s) => { const n = new Set(s); n.delete(i); return n; });
   }
   // Batch: shoot EVERY scene's keyframe (parallel), then you Animate all.
   async function shootAll(ratio: string) {
@@ -468,16 +485,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // force=false (default) only animates scenes that don't already have a good clip (finishes a partial
   // run cheaply); force=true re-animates the whole board (a deliberate, paid redo).
   async function animateAll(force = false) {
-    if (rendering || shooting) return;
+    if (rendering || shooting || wholeBoardBusy || animatingScenes.size) return;
     if (force && !confirm("Re-animate EVERY scene from scratch? This re-renders clips you already have and costs more. To just finish the missing ones, use Animate remaining instead.")) return;
-    setErr(""); setRenderingRole(""); setClipScope("all");
+    setErr(""); setRenderingRole(""); setClipScope("all"); setWholeBoardBusy(true);
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(force ? { force: true } : {}) }).then((x) => x.json()).catch(() => null);
-    if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; } // every scene already has a clip
-    if (!r?.queued) { setErr(r?.error || "Couldn't start animating."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); return; }
+    if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); setWholeBoardBusy(false); return; } // every scene already has a clip
+    if (!r?.queued) { setErr(r?.error || "Couldn't start animating."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); setWholeBoardBusy(false); return; }
     // Ground truth: show exactly how many scenes the server decided to render (not perceived spinners).
     if (typeof r.animating === "number") flex(`🎞️ Animating ${r.animating} scene${r.animating === 1 ? "" : "s"}${force ? " (full redo)" : ""}`, { milestone: true });
-    await poll(setProduction, "clips_status"); setRenderingRole("");
+    await poll(setProduction, "clips_status"); setRenderingRole(""); setWholeBoardBusy(false);
   }
 
   async function resetStuck() {
@@ -774,11 +791,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           {/* RE-ANIMATING this scene (it already has a clip): overlay feedback so it's clearly working.
                               ONLY for an explicit per-scene list (clipScope is an array with this scene) - a whole-board
                               "all" run never re-renders scenes that already have a clip, so it must NOT light them up. */}
-                          {rendering && Array.isArray(clipScope) && clipScope.includes(i) && (
+                          {animatingScenes.has(i) && (
                             <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/65 text-[10px] font-semibold text-white"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />re-animating…</div>
                           )}
                         </div>
-                      ) : rendering && !clip?.url && (clipScope === "all" ? (renderingRole === "" || renderingRole === s.role) : clipScope.includes(i)) ? (
+                      ) : !clip?.url && (animatingScenes.has(i) || (wholeBoardBusy && (renderingRole === "" || renderingRole === s.role))) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…</div>
                       ) : shot?.url ? (
                         <div className="relative">
@@ -808,7 +825,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           {shot?.url && (
                             <button
                               onClick={() => animateScene(i)}
-                              disabled={busyAny || dropped.has(i) || !approved.has("voice")}
+                              disabled={shooting || wholeBoardBusy || animatingScenes.has(i) || dropped.has(i) || !approved.has("voice")}
                               title={approved.has("voice") ? "Animate this scene into video" : "Set the voice first (Voice step), then animate"}
                               className="w-full rounded-md border border-[#60a5fa]/40 px-2 py-1 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
                             >{!approved.has("voice") ? "🎞️ Animate (after voice)" : clip?.url ? "↻ Re-animate" : "🎞️ Animate"}</button>
@@ -995,8 +1012,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => shootAll(boardRatio)} disabled={shooting || rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting all keyframes…" : "📸 Shoot all keyframes"}</button>
-                    <button onClick={() => animateAll(false)} disabled={shooting || rendering || builtCount === keptScenes.length} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{rendering && renderingRole === "" ? "🎞️ Animating…" : builtCount === keptScenes.length && keptScenes.length > 0 ? "✓ All scenes animated" : builtCount > 0 ? `🎞️ Animate remaining (${keptScenes.length - builtCount})` : "🎞️ Animate all"}</button>
-                    {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || rendering} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
+                    <button onClick={() => animateAll(false)} disabled={shooting || wholeBoardBusy || animatingScenes.size > 0 || builtCount === keptScenes.length} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{wholeBoardBusy ? "🎞️ Animating…" : builtCount === keptScenes.length && keptScenes.length > 0 ? "✓ All scenes animated" : builtCount > 0 ? `🎞️ Animate remaining (${keptScenes.length - builtCount})` : "🎞️ Animate all"}</button>
+                    {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || wholeBoardBusy || animatingScenes.size > 0} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
                   </div>
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have). Fix any single scene with the buttons on the cards above.</p>
                   {wardrobeLock ? <p className="text-[11px] text-ink-faint"><span className="text-[#c4b5fd]">🔒 Wardrobe locked:</span> {wardrobeLock} <span className="text-ink-faint">(set on the Reference images step)</span></p> : null}
