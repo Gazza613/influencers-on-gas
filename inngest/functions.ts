@@ -910,17 +910,9 @@ export const generateShots = inngest.createFunction(
 
     // Optional producer uploads: a clothing reference (wardrobe) and a location reference (world).
     const brief = (production?.brief ?? {}) as Record<string, string>;
-    const clothMedia = brief.clothingRef ? await step.run("import-cloth", () => importMediaUrl(brief.clothingRef).catch(() => null)) : null;
-    const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;
-    // CREATIVE REFERENCES (Phase 1): a chosen creative becomes the wardrobe + world anchor per role.
-    const arollRefMedia = persona.aroll_ref_url ? await step.run("import-aroll-ref", () => importMediaUrl(String(persona.aroll_ref_url)).catch(() => null)) : null;
-    const brollRefMedia = persona.broll_ref_url ? await step.run("import-broll-ref", () => importMediaUrl(String(persona.broll_ref_url)).catch(() => null)) : null;
-
-    // WARDROBE LOCK: one concrete outfit, head to toe, carried as TEXT into EVERY scene so the influencer's
-    // clothes never drift - the image anchor alone is weak when a scene's anchor frame is a tight a-roll
-    // head-shot (it hides her bottoms/shoes, so the model re-invents them per scene). Derive ONCE: describe
-    // the outfit in her chosen A-ROLL guide creative (what the producer actually picked), else her B-ROLL
-    // guide, else her bible signature outfit. Persisted so every later re-shoot uses the IDENTICAL outfit.
+    // WARDROBE LOCK value first (it drives the cloth reference below). One concrete outfit, head to toe,
+    // read once from the chosen A-ROLL guide (else B-ROLL guide, else bible) and persisted, so every scene +
+    // every re-shoot uses the IDENTICAL outfit even when a scene's anchor frame hides the bottoms/shoes.
     let wardrobeLock = String((production as { wardrobe_lock?: string })?.wardrobe_lock || "").trim();
     if (!wardrobeLock) {
       const guideUrl = String(persona.aroll_ref_url || persona.broll_ref_url || "").trim();
@@ -931,6 +923,17 @@ export const generateShots = inngest.createFunction(
       });
       if (!wardrobeLock) wardrobeLock = bibleLook;
     }
+    // CLOTH reference = an explicit upload, ELSE (when a wardrobe is locked) the guide the lock came from - a
+    // CORRECT-COLOUR (e.g. cream) image of HER outfit, passed to EVERY scene so it beats a teal b-roll guide
+    // or cast-anchor frame. Images beat text, so we fight a wrong-colour image with a right-colour image.
+    const clothSrc = String(brief.clothingRef || (wardrobeLock ? (persona.aroll_ref_url || persona.broll_ref_url || "") : "")).trim();
+    const clothMedia = clothSrc ? await step.run("import-cloth", () => importMediaUrl(clothSrc).catch(() => null)) : null;
+    const clothIsLock = !brief.clothingRef && !!wardrobeLock && !!clothMedia; // the cloth ref IS the wardrobe lock, not an upload
+    const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;
+    // CREATIVE REFERENCES (Phase 1): a chosen creative becomes the wardrobe + world anchor per role.
+    const arollRefMedia = persona.aroll_ref_url ? await step.run("import-aroll-ref", () => importMediaUrl(String(persona.aroll_ref_url)).catch(() => null)) : null;
+    const brollRefMedia = persona.broll_ref_url ? await step.run("import-broll-ref", () => importMediaUrl(String(persona.broll_ref_url)).catch(() => null)) : null;
+
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running", wardrobe_lock: wardrobeLock || undefined } } }));
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
@@ -977,7 +980,7 @@ export const generateShots = inngest.createFunction(
           : worldTag
           ? `Her WARDROBE is NOT taken from ${roleRefTag} — it is LOCKED to ${worldTag} below, so her outfit stays IDENTICAL in every single scene; keep her clothing exactly as in ${worldTag}.`
           : `WARDROBE: dress her in the EXACT outfit shown in ${roleRefTag} — identical garments, colours, fabric and styling — this is the single source of truth for her clothing and OVERRIDES any outfit mentioned in text.`} Do NOT copy its exact pose or framing (take those from the direction below).${role === "b-roll" ? ` REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter or a family member) EXACTLY in this scene — the SAME person: same face, age, build, hair AND the same outfit — so that companion is identical in every b-roll scene. The MAIN influencer's face still comes ONLY from the identity references, never from ${roleRefTag}.` : ` Do NOT copy any other person from it.`}` : "",
-        clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this exact outfit (silhouette, fabric, colour, styling). Do NOT copy any face or person from it.` : "",
+        clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this EXACT outfit (silhouette, fabric, COLOUR, styling).${clothIsLock ? ` This is her ONE LOCKED outfit and it OVERRIDES her clothing in EVERY other reference image here (the world anchor, the ${role} guide, and the cast-anchor frame) AND in the scene text — if any other image shows her in a different colour or garment (e.g. teal/green), IGNORE that and dress her in THIS outfit's colour and garments.` : ""} Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. ${wardrobeLock
           ? `Take her WARDROBE from the LOCKED OUTFIT stated above, NOT from ${worldTag} — ${worldTag} may show her in a DIFFERENT outfit or colour; IGNORE its clothing entirely and dress her in the locked outfit (do not copy ${worldTag}'s top, dress or colour).`
