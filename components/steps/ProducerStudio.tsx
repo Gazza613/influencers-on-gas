@@ -1050,7 +1050,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   {stitchCaptions && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-ink-faint">Caption style:</span>
-                      {([["bold", "Bold", "Big uppercase, thick black outline — punchy social look"], ["clean", "Clean", "White text with a soft shadow, no box — elegant"], ["highlight", "Highlight", "White on a purple highlight bar — on-brand"], ["sunny", "Sunny", "Bright yellow uppercase with a black outline — energetic"], ["pill", "Pill", "Classic dark rounded pill (the original)"]] as const).map(([k, label, desc]) => (
+                      {([["karaoke", "Word-pop ✨", "Word-by-word — each word pops to yellow as it's spoken (TikTok karaoke)"], ["bold", "Bold", "Big uppercase, thick black outline — punchy social look"], ["clean", "Clean", "White text with a soft shadow, no box — elegant"], ["highlight", "Highlight", "White on a purple highlight bar — on-brand"], ["sunny", "Sunny", "Bright yellow uppercase with a black outline — energetic"], ["pill", "Pill", "Classic dark rounded pill (the original)"]] as const).map(([k, label, desc]) => (
                         <button key={k} onClick={() => setStitchCaptionStyle(k)} title={desc} className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${stitchCaptionStyle === k ? "border-[#a855f7] bg-[#a855f7]/12 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>{label}</button>
                       ))}
                     </div>

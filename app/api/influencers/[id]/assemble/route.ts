@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // resume re-stitches the same way. URL is SSRF-guarded (Shotstack fetches it).
   const body = await req.json().catch(() => ({}));
   const captions = body.captions === true;
-  const captionStyle = ["pill", "bold", "highlight", "clean", "sunny"].includes(body.captionStyle) ? body.captionStyle : "bold";
+  const captionStyle = ["pill", "bold", "highlight", "clean", "sunny", "karaoke"].includes(body.captionStyle) ? body.captionStyle : "bold";
   const endCardUrl = typeof body.endCardUrl === "string" && isSafePublicUrl(body.endCardUrl) ? body.endCardUrl : "";
   const endCardKind = body.endCardKind === "image" ? "image" : "video";
   const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind, captionStyle };

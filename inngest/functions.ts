@@ -1706,16 +1706,37 @@ export const assembleVideo = inngest.createFunction(
       clean: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:42px;line-height:1.3;text-shadow:0 2px 6px rgba(0,0,0,0.95),0 0 3px rgba(0,0,0,0.9);padding:4px 14px}", height: 280, offY: 0.11 },
       sunny: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFE14D;font-family:'Open Sans',sans-serif;font-weight:800;font-size:46px;line-height:1.25;text-transform:uppercase;letter-spacing:0.5px;-webkit-text-stroke:5px #111;paint-order:stroke fill;text-shadow:0 4px 10px rgba(0,0,0,0.5);padding:4px 14px}", height: 320, offY: 0.13 },
     };
-    const capStyle = CAPTION_STYLES[String(event.data.captionStyle || "")] || CAPTION_STYLES.bold;
-    const captionClips = captionsOn ? placed.filter((p) => p.caption).map((p) => ({
-      asset: {
-        type: "html",
-        html: `<div class="cap"><span>${esc(p.caption)}</span></div>`,
-        css: capStyle.css,
-        width: capW, height: capStyle.height, background: "transparent",
-      },
-      start: p.start, length: p.len, position: "bottom", offset: { y: capStyle.offY },
-    })) : [];
+    // SAFE ZONE: sit captions ~20% up from the bottom (env CAPTION_Y) so they clear the platform's bottom UI
+    // (TikTok/Reels caption bar, username, CTA + the right-side action buttons). The old ~11% sat too low.
+    const CAP_Y = Math.max(0, Math.min(0.4, Number(process.env.CAPTION_Y) || 0.2));
+    const capSel = String(event.data.captionStyle || "");
+    let captionClips: Record<string, unknown>[] = [];
+    if (captionsOn) {
+      if (capSel === "karaoke") {
+        // WORD-BY-WORD "karaoke": the full line shows, each word POPS to yellow as it's spoken. Word timings
+        // are length-weighted across the scene's duration (approx sync). One clip per word, each highlighting
+        // a different word. Big bold outlined for punch, in the safe zone.
+        const KARAOKE_CSS = ".cap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}.w{color:#FFFFFF;font-weight:800;font-size:46px;line-height:1.32;-webkit-text-stroke:4px #000;paint-order:stroke fill;text-shadow:0 3px 8px rgba(0,0,0,0.5)}.hl{color:#FFE14D}";
+        captionClips = placed.filter((p) => p.caption).flatMap((p) => {
+          const words = esc(p.caption).split(/\s+/).filter(Boolean);
+          const totalChars = words.reduce((s, w) => s + w.length, 0) || 1;
+          let acc = 0;
+          return words.map((w, wi) => {
+            const isLast = wi === words.length - 1;
+            const dur = isLast ? Math.max(0.12, p.len - acc) : Math.max(0.12, (p.len * w.length) / totalChars);
+            const start = p.start + acc; acc += dur;
+            const html = `<div class="cap">${words.map((ww, j) => `<span class="w${j === wi ? " hl" : ""}">${ww}</span>`).join(" ")}</div>`;
+            return { asset: { type: "html", html, css: KARAOKE_CSS, width: capW, height: 340, background: "transparent" }, start, length: dur, position: "bottom", offset: { y: CAP_Y } };
+          });
+        });
+      } else {
+        const capStyle = CAPTION_STYLES[capSel] || CAPTION_STYLES.bold;
+        captionClips = placed.filter((p) => p.caption).map((p) => ({
+          asset: { type: "html", html: `<div class="cap"><span>${esc(p.caption)}</span></div>`, css: capStyle.css, width: capW, height: capStyle.height, background: "transparent" },
+          start: p.start, length: p.len, position: "bottom", offset: { y: Math.max(capStyle.offY, CAP_Y) },
+        }));
+      }
+    }
     // Brand overlay: ONLY an uploaded logo (top-left) / promo (top-right) — both explicit. No auto
     // "brand name as text" bug (it was burning the brand name on cuts nobody asked to brand).
     const logoUrl = (production?.brief?.logoUrl || "").trim();
