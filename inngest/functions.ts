@@ -956,12 +956,14 @@ export const generateShots = inngest.createFunction(
     // producer chose, which shows the daughter); else anchor to a PRIOR b-roll frame. (Whole-board runs set
     // this from the first companion frame below.)
     if ((roleFilter || sceneFilter) && !castAnchor) {
-      if (brollRefMedia) castAnchor = brollRefMedia;
-      else {
-        const priorCast = ((production as { shots?: { scene?: number; url?: string | null }[] } | null)?.shots ?? [])
-          .find((s) => s?.url && String((scenes[Number(s.scene)] as Record<string, string> | undefined)?.role || "") === "b-roll" && (!sceneFilter || !sceneFilter.includes(Number(s.scene))));
-        if (priorCast?.url) castAnchor = await step.run("castanchor-prior", () => importMediaUrl(priorCast.url as string).catch(() => null));
-      }
+      // Prefer a PRIOR b-roll frame that already has the companion (from the good run): Leah is in her CORRECT
+      // locked outfit there AND the daughter is consistent, so nothing leaks. Only fall back to the b-roll
+      // GUIDE if there's no such frame - the guide can show Leah in a DIFFERENT outfit, which then bleeds onto
+      // her (why the mom's top changed on a single-scene b-roll re-shoot).
+      const priorCast = ((production as { shots?: { scene?: number; url?: string | null }[] } | null)?.shots ?? [])
+        .find((s) => { const sc = scenes[Number(s.scene)] as Record<string, unknown> | undefined; return !!s?.url && String(sc?.role || "") === "b-roll" && Array.isArray(sc?.talent) && (sc.talent as unknown[]).length > 1 && (!sceneFilter || !sceneFilter.includes(Number(s.scene))); });
+      if (priorCast?.url) castAnchor = await step.run("castanchor-prior", () => importMediaUrl(priorCast.url as string).catch(() => null));
+      else if (brollRefMedia) castAnchor = brollRefMedia;
     }
 
     // Render ONE scene to a keyframe (pure — reads worldRef which is set by the anchor pass first).
@@ -1002,7 +1004,7 @@ export const generateShots = inngest.createFunction(
         // Lock recurring companions to a fixed look + outfit so they don't change scene to scene.
         castLockClause(supportingCast, (Array.isArray((sc as Record<string, unknown>).talent) ? (sc as unknown as { talent: string[] }).talent : [])),
         // Image-anchor the companion(s) to the first b-roll frame so the daughter + her outfit never drift.
-        castTag ? `${castTag} is the CAST ANCHOR: the companion(s) in this scene (e.g. the daughter / family member) are the SAME individuals as in ${castTag} — identical face, age, build, hair AND the SAME outfit/clothing, scene to scene. Take ONLY the companion(s) and their wardrobe from ${castTag}; the main influencer's face comes from the identity references and her own outfit from the world anchor, NOT from ${castTag}.` : "",
+        castTag ? `${castTag} is the CAST ANCHOR: the companion(s) in this scene (e.g. the daughter / family member) are the SAME individuals as in ${castTag} — identical face, age, build, hair AND the SAME outfit/clothing, scene to scene. Take ONLY the companion(s) and their wardrobe from ${castTag}. The MAIN influencer's face comes from the identity references, and her OUTFIT is her LOCKED outfit${wardrobeLock ? ` (${wardrobeLock})` : ""} - NOT whatever she happens to be wearing in ${castTag}; if she wears a different top or colour in ${castTag}, IGNORE it and keep her in the locked outfit.` : "",
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
