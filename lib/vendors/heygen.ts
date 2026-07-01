@@ -128,15 +128,16 @@ function arOf(ratio?: string): string { return ratio === "1:1" ? "1:1" : ratio =
 // Returns the video_id PLUS which variant rendered, so the caller can log whether the FULL Avatar IV
 // quality (motion prompt + high expressiveness) was applied, or whether HeyGen rejected those fields
 // and we had to drop to a leaner request (which looks more static - the thing we must catch).
-async function generateV3(opts: { imageAssetId: string; audioAssetId: string; ratio?: string; motionPrompt?: string }): Promise<{ videoId: string; variant: string }> {
+async function generateV3(opts: { imageAssetId: string; audioAssetId: string; ratio?: string; motionPrompt?: string; speed?: boolean }): Promise<{ videoId: string; variant: string }> {
   const k = await key();
   const image = { type: "asset_id", asset_id: opts.imageAssetId };
   const motion = opts.motionPrompt || "natural, lively delivery: relaxed posture, easy head movement and subtle hand gestures while talking to camera";
+  const res = opts.speed ? "720p" : "1080p"; // speed mode = 720p (faster render); final stitch always re-outputs 1080p
   // Richest (expressiveness HIGH + motion) first; fall back ONLY if a field is rejected with a 400.
   const variants: { label: string; body: Record<string, unknown> }[] = [
-    { label: "full(motion+expressiveness)", body: { type: "image", image, audio_asset_id: opts.audioAssetId, motion_prompt: motion, expressiveness: HEYGEN_EXP, resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
-    { label: "expressiveness-only", body: { type: "image", image, audio_asset_id: opts.audioAssetId, expressiveness: HEYGEN_EXP, resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
-    { label: "bare(no-motion/expressiveness)", body: { type: "image", image, audio_asset_id: opts.audioAssetId, resolution: "1080p", aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
+    { label: "full(motion+expressiveness)", body: { type: "image", image, audio_asset_id: opts.audioAssetId, motion_prompt: motion, expressiveness: HEYGEN_EXP, resolution: res, aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
+    { label: "expressiveness-only", body: { type: "image", image, audio_asset_id: opts.audioAssetId, expressiveness: HEYGEN_EXP, resolution: res, aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
+    { label: "bare(no-motion/expressiveness)", body: { type: "image", image, audio_asset_id: opts.audioAssetId, resolution: res, aspect_ratio: arOf(opts.ratio), title: "GAS a-roll" } },
   ];
   let lastErr = "";
   for (const v of variants) {
@@ -165,9 +166,9 @@ async function statusV3(videoId: string): Promise<{ status: string; url: string 
 // to the legacy v2 talking_photo engine: that produced the "static photo, weak motion, poor lip-sync"
 // look, and silently degrading hid the problem. If Avatar IV fails, we surface the real error so the
 // caller fails LOUDLY (and we know to fix it) rather than shipping an inferior clip.
-export async function startTalkingVideo(opts: { imageUrl: string; audioUrl: string; ratio?: string; motionPrompt?: string }): Promise<{ videoId: string; version: "v3"; variant: string }> {
+export async function startTalkingVideo(opts: { imageUrl: string; audioUrl: string; ratio?: string; motionPrompt?: string; speed?: boolean }): Promise<{ videoId: string; version: "v3"; variant: string }> {
   const [imageAssetId, audioAssetId] = await Promise.all([uploadAssetV3(opts.imageUrl), uploadAssetV3(opts.audioUrl)]);
-  const { videoId, variant } = await generateV3({ imageAssetId, audioAssetId, ratio: opts.ratio, motionPrompt: opts.motionPrompt });
+  const { videoId, variant } = await generateV3({ imageAssetId, audioAssetId, ratio: opts.ratio, motionPrompt: opts.motionPrompt, speed: opts.speed });
   return { videoId, version: "v3", variant };
 }
 

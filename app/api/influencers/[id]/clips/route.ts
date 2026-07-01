@@ -24,6 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const explicitScenes = Array.isArray(body?.scenes) ? body.scenes.map(Number).filter((n: number) => Number.isInteger(n)) : null;
   const force = body?.force === true; // a deliberate, paid full redo
   const reanimate = body?.reanimate === true; // an explicit per-scene re-animate (may redo a scene that has a clip)
+  const speed = body?.speed === true; // draft speed: 720p a-roll clips (faster); the final stitch always outputs 1080p
 
   // COST SAFETY (single source of truth): never wipe clips and never re-render a scene that already has a
   // good clip unless the caller explicitly forces it. A whole-board animate computes EXACTLY the scenes
@@ -51,6 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ...(roles && roles.length ? { roles } : {}),
       ...(targetScenes && targetScenes.length ? { scenes: targetScenes } : {}),
       ...(reanimate ? { reanimate: true } : {}),
+      ...(speed ? { speed: true } : {}),
       ...(force ? { force: true } : {}) } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips_status: "idle" } } });
