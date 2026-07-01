@@ -10,7 +10,7 @@ import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
-import { startTalkingVideo, pollTalking } from "@/lib/vendors/heygen";
+import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape } from "@/lib/vendors/firecrawl";
@@ -1273,7 +1273,10 @@ export const generateClips = inngest.createFunction(
             const hosted = (await step.run(`hghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
             return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: `heygen:avatar_iv:${hgVariant}` };
           }
-          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV did not finish: ${hgErr}`, engine: "heygen:avatar_iv" };
+          // Surface remaining HeyGen credits on failure - "render failed" across many scenes is usually the
+          // account running out of quota (like Shotstack did), and this makes that obvious instead of guessing.
+          const hgQuota = await step.run(`hg-quota-${i}`, () => remainingQuota().then((q) => { const r = (q as { remaining_quota?: number; data?: { remaining_quota?: number } })?.remaining_quota ?? (q as { data?: { remaining_quota?: number } })?.data?.remaining_quota; return typeof r === "number" ? r : null; }).catch(() => null));
+          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: `HeyGen Avatar IV did not finish: ${hgErr}${hgQuota != null ? ` — HeyGen credits remaining: ${hgQuota}${hgQuota <= 0 ? " (OUT OF CREDITS - top up HeyGen)" : ""}` : ""}`, engine: "heygen:avatar_iv" };
         } else {
           // OPT-IN fal OmniHuman path (expensive, per-second). fal rejects inputs >5MB so re-encode first.
           const ohImg = await step.run(`oh-prep-${i}`, () => compressForFal(img as string));
