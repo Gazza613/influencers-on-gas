@@ -1697,14 +1697,24 @@ export const assembleVideo = inngest.createFunction(
     // Strip any v3 audio tags ([excited] etc.) so they never render on screen, then HTML-escape.
     const esc = (s: string) => s.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const capW = ratio === "1:1" ? 920 : 940; // box width within the 1080 frame (leaves side margins)
+    // CAPTION STYLES the producer can pick (the old dark pill read "low-level"). Each is a full CSS look for
+    // the per-scene caption line. Default = "bold" (the punchy social standard). Picked via captionStyle.
+    const CAPTION_STYLES: Record<string, { css: string; height: number; offY: number }> = {
+      pill: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:36px;line-height:1.3;padding:10px 20px;background:rgba(0,0,0,0.6);border-radius:12px;-webkit-box-decoration-break:clone;box-decoration-break:clone}", height: 260, offY: 0.10 },
+      bold: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:800;font-size:48px;line-height:1.22;text-transform:uppercase;letter-spacing:0.5px;-webkit-text-stroke:5px #000;paint-order:stroke fill;text-shadow:0 4px 10px rgba(0,0,0,0.55);padding:4px 14px}", height: 330, offY: 0.13 },
+      highlight: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:800;font-size:42px;line-height:1.45;padding:6px 16px;background:#a855f7;border-radius:10px;-webkit-box-decoration-break:clone;box-decoration-break:clone;text-shadow:0 2px 4px rgba(0,0,0,0.35)}", height: 300, offY: 0.12 },
+      clean: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:42px;line-height:1.3;text-shadow:0 2px 6px rgba(0,0,0,0.95),0 0 3px rgba(0,0,0,0.9);padding:4px 14px}", height: 280, offY: 0.11 },
+      sunny: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFE14D;font-family:'Open Sans',sans-serif;font-weight:800;font-size:46px;line-height:1.25;text-transform:uppercase;letter-spacing:0.5px;-webkit-text-stroke:5px #111;paint-order:stroke fill;text-shadow:0 4px 10px rgba(0,0,0,0.5);padding:4px 14px}", height: 320, offY: 0.13 },
+    };
+    const capStyle = CAPTION_STYLES[String(event.data.captionStyle || "")] || CAPTION_STYLES.bold;
     const captionClips = captionsOn ? placed.filter((p) => p.caption).map((p) => ({
       asset: {
         type: "html",
         html: `<div class="cap"><span>${esc(p.caption)}</span></div>`,
-        css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:36px;line-height:1.3;padding:10px 20px;background:rgba(0,0,0,0.6);border-radius:12px;-webkit-box-decoration-break:clone;box-decoration-break:clone}",
-        width: capW, height: 260, background: "transparent",
+        css: capStyle.css,
+        width: capW, height: capStyle.height, background: "transparent",
       },
-      start: p.start, length: p.len, position: "bottom", offset: { y: 0.10 },
+      start: p.start, length: p.len, position: "bottom", offset: { y: capStyle.offY },
     })) : [];
     // Brand overlay: ONLY an uploaded logo (top-left) / promo (top-right) — both explicit. No auto
     // "brand name as text" bug (it was burning the brand name on cuts nobody asked to brand).

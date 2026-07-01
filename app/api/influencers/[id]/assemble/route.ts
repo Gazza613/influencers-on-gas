@@ -22,12 +22,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // resume re-stitches the same way. URL is SSRF-guarded (Shotstack fetches it).
   const body = await req.json().catch(() => ({}));
   const captions = body.captions === true;
+  const captionStyle = ["pill", "bold", "highlight", "clean", "sunny"].includes(body.captionStyle) ? body.captionStyle : "bold";
   const endCardUrl = typeof body.endCardUrl === "string" && isSafePublicUrl(body.endCardUrl) ? body.endCardUrl : "";
   const endCardKind = body.endCardKind === "image" ? "image" : "video";
-  const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind };
+  const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind, captionStyle };
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, brief: briefNext, assembly_status: "running", final_url: null, stitch_captions: captions } } });
   try {
-    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, endCardUrl, endCardKind } });
+    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, captionStyle, endCardUrl, endCardKind } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, assembly_status: "idle" } } });
     return NextResponse.json({ error: "Could not start the stitch (assembly engine not connected)." }, { status: 503 });
