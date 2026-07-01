@@ -936,10 +936,13 @@ export const generateShots = inngest.createFunction(
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
     let castAnchor: string | null = null; // first b-roll frame WITH companions - locks the daughter/companion look + outfit across every b-roll scene
     // CONTINUITY across SEPARATE shoots (one role, or a single re-shot scene): anchor to a frame ALREADY
-    // shot for ANOTHER scene so the wardrobe + world stay IDENTICAL to the rest of the production - else a
-    // re-shot scene takes its own guide's outfit and the clothing drifts. (Whole-board shoots set worldRef
-    // from frame 1.) For a per-scene re-shoot, exclude the scene being re-shot from the anchor search.
-    if (roleFilter || sceneFilter) {
+    // shot for ANOTHER scene so the world stays IDENTICAL to the rest of the production. (Whole-board shoots
+    // set worldRef from frame 1.) For a per-scene re-shoot, exclude the scene being re-shot from the search.
+    // CRITICAL: SKIP this when a wardrobe is LOCKED. That prior frame can be a STALE frame in the WRONG
+    // outfit (e.g. an old teal shot), and its IMAGE colour bleeds through the "ignore its clothing" text -
+    // exactly why a re-shot scene came back teal while a full run stayed cream. With a lock, the outfit comes
+    // from the locked text + the (correct-colour) guide, and the world from the guide + the location text.
+    if ((roleFilter || sceneFilter) && !wardrobeLock) {
       const prior = ((production as { shots?: { scene?: number; url?: string | null }[] } | null)?.shots ?? [])
         .find((s) => s?.url && (!sceneFilter || !sceneFilter.includes(Number(s.scene))));
       if (prior?.url) worldRef = await step.run("worldref-anchor", () => importMediaUrl(prior.url as string).catch(() => null));
@@ -968,7 +971,9 @@ export const generateShots = inngest.createFunction(
         // clothing drifting between scenes (the image anchor alone misses the bottoms/shoes on tight shots).
         wardrobeLock ? `LOCKED OUTFIT - the influencer wears the SAME single outfit in EVERY scene of this production, head to toe: ${wardrobeLock}. Identical garments, colours, fabric, footwear and accessories every time; never change, swap, recolour, add or restyle ANY part of her clothing between scenes, whether she is talking to camera or in a wider scene - only her pose, action and the framing change. This is her established wardrobe and overrides any different outfit implied by the scene text.` : "",
         roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its grooming, styling, lighting and overall mood/world closely for this scene. ${wardrobeLock
-          ? `Her WARDROBE comes ONLY from the LOCKED OUTFIT stated above — IGNORE whatever clothing ${roleRefTag} shows (it may be a different outfit or colour); take only its grooming, styling, lighting and world.`
+          ? (role === "a-roll"
+            ? `Her WARDROBE is the LOCKED OUTFIT stated above, which is the SAME outfit ${roleRefTag} shows — dress her in that EXACT outfit (garments, colours, fabric, footwear) taken from ${roleRefTag} together with the locked-outfit text. Her clothing comes ONLY from ${roleRefTag} + the locked outfit, NEVER from any other reference image or the scene text.`
+            : `Her WARDROBE comes ONLY from the LOCKED OUTFIT stated above — IGNORE whatever clothing ${roleRefTag} shows (it may be a different outfit or colour); take only its grooming, styling, lighting and world.`)
           : worldTag
           ? `Her WARDROBE is NOT taken from ${roleRefTag} — it is LOCKED to ${worldTag} below, so her outfit stays IDENTICAL in every single scene; keep her clothing exactly as in ${worldTag}.`
           : `WARDROBE: dress her in the EXACT outfit shown in ${roleRefTag} — identical garments, colours, fabric and styling — this is the single source of truth for her clothing and OVERRIDES any outfit mentioned in text.`} Do NOT copy its exact pose or framing (take those from the direction below).${role === "b-roll" ? ` REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter or a family member) EXACTLY in this scene — the SAME person: same face, age, build, hair AND the same outfit — so that companion is identical in every b-roll scene. The MAIN influencer's face still comes ONLY from the identity references, never from ${roleRefTag}.` : ` Do NOT copy any other person from it.`}` : "",
@@ -1341,15 +1346,16 @@ export const generateClips = inngest.createFunction(
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
       const hero = role === "b-roll" && String(sc.hero) === "true";
 
-      // DoP (first-party Higgsfield SDK) — opt-in for b-roll via BROLL_ENGINE=dop. The dedicated
-      // image-to-video REST API, used instead of the flaky MCP-Kling path that keeps timing out.
-      // Falls through to MCP-Kling below if DoP isn't configured, errors, or returns no url.
+      // DoP (first-party Higgsfield SDK) — the DEFAULT b-roll engine whenever it's configured. The dedicated
+      // image-to-video REST API, used instead of the flaky MCP-Kling path that keeps TIMING OUT (Gary's
+      // "kling3_0_turbo did not finish in time"). Set BROLL_ENGINE=kling to force the old Kling path.
+      // Falls through to MCP-Kling below only if DoP isn't configured, errors, or returns no url.
       // The DoP renders a FIXED short length (~5s) regardless of the duration we request. Rather than route
       // longer b-roll to the flaky/timing-out Kling (clips then don't land), keep the fast, reliable DoP for
       // ALL b-roll and LOOP the ~5s clip across the narration in the stitch (no freeze, no timeout). The DoP
       // output length is env-tunable so the stitch knows how long each loop is.
       const DOP_OUT_SECONDS = Math.max(3, Number(process.env.DOP_OUT_SECONDS) || 5);
-      if (role === "b-roll" && !hero && process.env.BROLL_ENGINE === "dop" && dopConfigured()) {
+      if (role === "b-roll" && !hero && process.env.BROLL_ENGINE !== "kling" && dopConfigured()) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
         // anyway (same backstop as HeyGen) so a 429 waits-and-lands instead of silently dropping to Kling.

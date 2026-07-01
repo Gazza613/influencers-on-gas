@@ -184,15 +184,30 @@ function calmHands(s: string): string {
     .replace(/\bhands? (?:raised|up|lifted)\b/gi, "hands low and resting")
     .replace(/\s{2,}/g, " ").replace(/\s+([,;.·])/g, "$1").replace(/([,;])\s*(?=[,;])/g, "").replace(/^[\s,;·]+/, "").replace(/[\s,;·]+$/, "").trim();
 }
+// A-ROLL is a TALKING-TO-CAMERA presenter shot - HeyGen needs a visible FACE. But the storyboard sometimes
+// writes "back to camera" / "over the shoulder" / "from behind" into an a-roll scene, so the keyframe renders
+// her from BEHIND and HeyGen fails with "No face detected". Turn those away-from-camera directions front-on.
+function faceCamera(s: string): string {
+  return String(s || "")
+    .replace(/\b(?:with )?(?:her |his )?back (?:is )?(?:turned |facing )?to (?:the )?(?:camera|lens|viewer)\b/gi, "facing the camera")
+    .replace(/\bback to (?:the )?(?:camera|lens|viewer)\b/gi, "facing the camera")
+    .replace(/\b(?:seen |shot |viewed |framed |captured )?from behind\b/gi, "front-on, facing the camera")
+    .replace(/\bover[\s-]the[\s-]shoulder\b/gi, "front-on")
+    .replace(/\b(?:rear|back)[\s-]?view\b/gi, "front view")
+    .replace(/\b(?:turned|facing|looking) away(?: from (?:the )?(?:camera|lens|viewer))?\b/gi, "facing the camera")
+    .replace(/\bback turned\b/gi, "facing the camera")
+    .replace(/\bfrom the back\b/gi, "from the front")
+    .replace(/\s{2,}/g, " ").replace(/\s+([,;.])/g, "$1").trim();
+}
 export function buildShotPrompt(o: {
   location: string; blocking: string; shot: string; performance: string; role: string;
   subjectLine: string; look: string; refInstruction: string; ratio: string;
   hasPeople: boolean; worldAnchored: boolean; lockedOutfit?: string;
 }): string {
   o = { ...o, blocking: deHandRisk(o.blocking), performance: deHandRisk(o.performance), shot: deHandRisk(o.shot) };
-  // A-ROLL presenter shots: drop the storyboard's gesture/raised-hand directions so the keyframe sits calm
-  // with hands down (the HANDS-DOWN pose clause then governs). B-roll keeps its activity directions.
-  if (o.role === "a-roll") o = { ...o, blocking: calmHands(o.blocking), performance: calmHands(o.performance) };
+  // A-ROLL presenter shots: drop gesture/raised-hand directions (calm hands) AND any "back to camera" /
+  // "from behind" directions (she MUST face the lens - HeyGen needs a face). B-roll keeps its directions.
+  if (o.role === "a-roll") o = { ...o, blocking: faceCamera(calmHands(o.blocking)), performance: faceCamera(calmHands(o.performance)), shot: faceCamera(o.shot) };
   // Locked wardrobe wins: remove any conflicting outfit the storyboard wrote into this scene's text.
   if (o.lockedOutfit) o = { ...o, blocking: stripOutfit(o.blocking), performance: stripOutfit(o.performance) };
   return [
