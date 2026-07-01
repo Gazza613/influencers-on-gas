@@ -114,10 +114,10 @@ const SAYABLE: [RegExp, string][] = [
 // line before computing the per-scene slice spans, and the TTS call can apply it again, and they stay aligned.
 export function sayable(t: string): string {
   t = SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t);
-  // ElevenLabs can POP/click at COMMA pauses (Gary's click only happened on lines with commas). Drop commas
-  // so it reads the clause straight through: number separators collapse to clean digits ("1,400"->"1400"),
-  // every other comma becomes a space. KEEP_COMMAS=1 restores them if a delivery ever needs the harder pause.
-  if (process.env.KEEP_COMMAS !== "1") t = t.replace(/,(?=\d)/g, "").replace(/,/g, " ").replace(/\s{2,}/g, " ").trim();
+  // Commas are KEPT by default. Dropping them (an earlier de-click attempt) mis-pronounced some words - e.g.
+  // "not" - so correct pronunciation wins over the mild comma-pause pop. Opt back in with STRIP_COMMAS=1
+  // if that pop ever returns and matters more than the phrasing.
+  if (process.env.STRIP_COMMAS === "1") t = t.replace(/,(?=\d)/g, "").replace(/,/g, " ").replace(/\s{2,}/g, " ").trim();
   return t;
 }
 
