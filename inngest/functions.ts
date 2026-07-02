@@ -975,12 +975,20 @@ export const generateShots = inngest.createFunction(
       const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
       const phoneMedia = sc.phone_screen_url ? await step.run(`phone-${i}`, () => importMediaUrl(String(sc.phone_screen_url)).catch(() => null)) : null;
       const roleRefMedia = role === "a-roll" ? arollRefMedia : role === "b-roll" ? brollRefMedia : null;
+      // When a GUIDE is chosen for this role it IS the character (her right face, right outfit, right set), so
+      // it becomes the AUTHORITATIVE reference: pass only ONE identity crop (a light face-confirm) and DROP the
+      // separate world anchor, so no other image fights the guide's face, clothing or location. This is the
+      // fix for "I picked a guide but her face + clothes came out different" - too many competing references,
+      // and the guide was explicitly BANNED from setting her face.
+      const guided = !!roleRefMedia;
+      const idForRender = guided ? idMedias.slice(0, 1) : idMedias;
+      const worldTagOn = !!worldRef && !guided;
       // @image order: identity, [clothing], [location], [world anchor], [phone screen], [role ref].
-      let n = idMedias.length;
-      const faceTags = idMedias.map((_, k) => `@image${k + 1}`);
+      let n = idForRender.length;
+      const faceTags = idForRender.map((_, k) => `@image${k + 1}`);
       const clothTag = clothMedia ? `@image${++n}` : "";
       const locTag = locMedia ? `@image${++n}` : "";
-      const worldTag = worldRef ? `@image${++n}` : "";
+      const worldTag = worldTagOn ? `@image${++n}` : "";
       const phoneTag = phoneMedia ? `@image${++n}` : "";
       const roleRefTag = roleRefMedia ? `@image${++n}` : "";
       // Cast anchor: only on b-roll scenes that actually have a companion (talent beyond the influencer),
@@ -988,17 +996,11 @@ export const generateShots = inngest.createFunction(
       const hasCompanions = role === "b-roll" && Array.isArray((sc as Record<string, unknown>).talent) && (sc as unknown as { talent: string[] }).talent.length > 1;
       const castTag = (castAnchor && hasCompanions) ? `@image${++n}` : "";
       const refInstruction = [
-        faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, ETHNICITY and heritage, skin tone and texture, AND her exact hair colour, length and style, AND her apparent AGE); zero drift, unmistakably the same individual. Her ethnicity and skin tone are FIXED by these references and must be identical in EVERY scene — never lighten, darken or change her race/ethnicity to match a companion, a guide image or the scene. She looks IDENTICAL in every scene whether she is alone or beside another person — NEVER make her look younger or older, never change or darken her hair, and never soften or blend her features to match a companion, a guide image or the scene. These face references are the ONLY source of her face, hair, age and identity — take NOTHING about her from any wardrobe, world, location, companion or reference-look image. EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer) — she is the PRIMARY adult in the frame and the locked face is hers. Every OTHER person in the scene — a daughter, friend, companion, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling (a daughter is clearly YOUNGER). NEVER duplicate her face, hair or look onto anyone else, and never swap her identity onto the companion: absolutely no twins, clones or look-alikes.` : "",
+        faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, ETHNICITY and heritage, skin tone and texture, AND her exact hair colour, length and style, AND her apparent AGE); zero drift, unmistakably the same individual. Her ethnicity and skin tone are FIXED by these references and must be identical in EVERY scene — never lighten, darken or change her race/ethnicity to match a companion, a guide image or the scene. She looks IDENTICAL in every scene whether she is alone or beside another person — NEVER make her look younger or older, never change or darken her hair, and never soften or blend her features to match a companion or the scene.${guided ? " The chosen GUIDE below shows her TRUE current look - match her face to the guide exactly; this identity image only confirms she is the same person." : " These face references are the ONLY source of her face, hair, age and identity — take NOTHING about her from any wardrobe, world, location, companion or reference-look image."} EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer) — she is the PRIMARY adult in the frame and the locked face is hers. Every OTHER person in the scene — a daughter, friend, companion, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling (a daughter is clearly YOUNGER). NEVER duplicate her face, hair or look onto anyone else, and never swap her identity onto the companion: absolutely no twins, clones or look-alikes.` : "",
         // WARDROBE LOCK (text): her ONE outfit, head to toe, identical every scene - the durable fix for
         // clothing drifting between scenes (the image anchor alone misses the bottoms/shoes on tight shots).
         wardrobeLock ? `LOCKED OUTFIT - the influencer wears the SAME single outfit in EVERY scene of this production, head to toe: ${wardrobeLock}. Identical garments, colours, fabric, footwear and accessories every time; never change, swap, recolour, add or restyle ANY part of her clothing between scenes, whether she is talking to camera or in a wider scene - only her pose, action and the framing change. This is her established wardrobe and overrides any different outfit implied by the scene text.` : "",
-        roleRefTag ? `${roleRefTag} is the APPROVED ${role.toUpperCase()} REFERENCE look: match its grooming, styling, lighting and overall mood/world closely for this scene. ${wardrobeLock
-          ? (role === "a-roll"
-            ? `Her WARDROBE is the LOCKED OUTFIT stated above, which is the SAME outfit ${roleRefTag} shows — dress her in that EXACT outfit (garments, colours, fabric, footwear) taken from ${roleRefTag} together with the locked-outfit text. Her clothing comes ONLY from ${roleRefTag} + the locked outfit, NEVER from any other reference image or the scene text.`
-            : `Her WARDROBE comes ONLY from the LOCKED OUTFIT stated above — IGNORE whatever clothing ${roleRefTag} shows (it may be a different outfit or colour); take only its grooming, styling, lighting and world.`)
-          : worldTag
-          ? `Her WARDROBE is NOT taken from ${roleRefTag} — it is LOCKED to ${worldTag} below, so her outfit stays IDENTICAL in every single scene; keep her clothing exactly as in ${worldTag}.`
-          : `WARDROBE: dress her in the EXACT outfit shown in ${roleRefTag} — identical garments, colours, fabric and styling — this is the single source of truth for her clothing and OVERRIDES any outfit mentioned in text.`} Do NOT copy its exact pose or framing (take those from the direction below).${role === "b-roll" ? ` REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter or a family member) EXACTLY in this scene — the SAME person: same face, age, build, hair AND the same outfit — so that companion is identical in every b-roll scene. The MAIN influencer's face still comes ONLY from the identity references, never from ${roleRefTag}.` : ` Do NOT copy any other person from it.`}` : "",
+        roleRefTag ? `${roleRefTag} is the CHOSEN ${role.toUpperCase()} GUIDE and the DEFINITIVE reference for this influencer - it shows HER exact face, HER exact outfit and the exact SET/LOCATION for this ad, so reproduce ALL THREE from ${roleRefTag} precisely: (a) her FACE and features EXACTLY as in ${roleRefTag}${faceTags.length ? ` (${faceTags.join(", ")} is the same person and only confirms her identity; if they differ at all, ${roleRefTag} wins for her current look)` : ""}; (b) her CLOTHING EXACTLY as in ${roleRefTag} - every garment, colour, fabric and footwear${wardrobeLock ? ` (her locked outfit: ${wardrobeLock})` : ""} - and do NOT take clothing from any identity image, which may show a DIFFERENT outfit; (c) the LOCATION, set dressing, lighting, time of day and colour grade EXACTLY as in ${roleRefTag}. ONLY her pose, action and framing change per the direction below - never her face, her outfit or the place.${role === "b-roll" ? ` Also REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter) EXACTLY - the SAME person: same face, age, build, hair AND the same outfit - identical in every b-roll scene.` : ` Do NOT copy any other person from it.`}` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this EXACT outfit (silhouette, fabric, COLOUR, styling).${clothIsLock ? ` This is her ONE LOCKED outfit and it OVERRIDES her clothing in EVERY other reference image here (the world anchor, the ${role} guide, and the cast-anchor frame) AND in the scene text — if any other image shows her in a different colour or garment (e.g. teal/green), IGNORE that and dress her in THIS outfit's colour and garments.` : ""} Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. ${wardrobeLock
@@ -1022,10 +1024,10 @@ export const generateShots = inngest.createFunction(
         // A-ROLL = clean presenter shot (no crowd — HeyGen Avatar IV warps animated background people).
         // B-ROLL gets background strangers ONLY when the director flagged this scene a busy public place
         // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
-        hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: !!worldRef,
+        hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: worldTagOn,
         lockedOutfit: wardrobeLock || undefined, // her one outfit OVERRIDES any per-scene outfit the storyboard wrote
       });
-      const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
+      const medias = [...idForRender, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldTagOn ? [worldRef as string] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
       // no quality but ~double the render time. 1K ~halves the board with no visible loss.
       const shotExtra = { resolution: process.env.HF_BOARD_RES || "1k" };
@@ -1038,11 +1040,11 @@ export const generateShots = inngest.createFunction(
       if (!res.url && medias.length && /not found|media input|expired|invalid media/i.test(String(res.error || ""))) {
         const fresh = await step.run(`reimport-${i}`, async () => {
           const imp = async (u?: string | null) => (u ? await importMediaUrl(String(u)).catch(() => null) : null);
-          const ids = (await Promise.all(idRefUrls.map((u) => imp(u)))).filter((v): v is string => !!v);
-          if (featureUrl) { const f = await imp(featureUrl); if (f) ids.push(f); }
+          const ids = (await Promise.all((guided ? idRefUrls.slice(0, 1) : idRefUrls).map((u) => imp(u)))).filter((v): v is string => !!v);
+          if (featureUrl && !guided) { const f = await imp(featureUrl); if (f) ids.push(f); }
           const cloth = clothMedia ? await imp(clothSrc) : null;
           const loc = locMedia ? await imp(brief.locationRef) : null;
-          const world = worldRef ? await imp(worldRefUrl) : null;
+          const world = worldTagOn ? await imp(worldRefUrl) : null;
           const roleU = role === "a-roll" ? persona.aroll_ref_url : role === "b-roll" ? persona.broll_ref_url : "";
           const roleM = roleRefMedia ? await imp(roleU ? String(roleU) : null) : null;
           const cast = (castTag && castAnchor) ? await imp(castAnchorUrl) : null;
