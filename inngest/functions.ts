@@ -1001,6 +1001,10 @@ export const generateShots = inngest.createFunction(
           ? `Take her WARDROBE from the LOCKED OUTFIT stated above, NOT from ${worldTag} — ${worldTag} may show her in a DIFFERENT outfit or colour; IGNORE its clothing entirely and dress her in the locked outfit (do not copy ${worldTag}'s top, dress or colour).`
           : `LOCKED WARDROBE: the influencer wears the EXACT SAME outfit as in ${worldTag} — identical garments, colours, fabric and styling — in every single scene. Never change, swap or restyle her clothing; one consistent outfit across the whole shoot (only her pose, action and the framing change).`} SUPPORTING CAST CONTINUITY: if ${worldTag} shows any friends or companions, the same people recur here — the SAME individuals (same faces, ages, hair and outfits), not different-looking people swapped in scene to scene.` : "",
         phoneTag ? `${phoneTag} is the PHONE SCREEN content: if the influencer is holding or showing a phone, render its screen displaying THIS exact image, crisp and legible, correctly perspective-fitted to the phone. Do NOT copy any person from it.` : "",
+        // WHO DOES WHAT (stops the mom/daughter action swap): the image model locks WHOSE face it is, but not
+        // WHO performs each action, so it would put the influencer on the laptop doing the course instead of
+        // the daughter. Assign actions explicitly on companion b-roll.
+        (role === "b-roll" && hasCompanions) ? `WHO DOES WHAT (do not swap the people or merge them into one): render EACH person doing EXACTLY the action the direction below assigns them. The locked-face influencer is the OLDER adult; the companion (e.g. her daughter) is a DISTINCT, clearly YOUNGER person. If the scene shows someone studying, using a laptop or phone, reading, or doing a course, that is the COMPANION doing it while the influencer watches, reacts with pride or is simply present beside her - NEVER transfer the studying / laptop / phone / course / working action onto the influencer unless the direction explicitly says SHE is the one doing it. Two separate individuals, each kept in their assigned role.` : "",
         // Lock recurring companions to a fixed look + outfit so they don't change scene to scene.
         castLockClause(supportingCast, (Array.isArray((sc as Record<string, unknown>).talent) ? (sc as unknown as { talent: string[] }).talent : [])),
         // Image-anchor the companion(s) to the first b-roll frame so the daughter + her outfit never drift.
@@ -1074,21 +1078,33 @@ export const generateShots = inngest.createFunction(
       if (scRole === "graphic") { await saveShot(i, { scene: i, role: "graphic", beat: String(sc.beat || ""), url: null }); continue; }
       targets.push({ i, sc });
     }
-    // Shoot the FIRST frame to establish the world (continuity anchor), then render the REST CONCURRENTLY
-    // so one slow image can never stall the whole board — each failed frame just comes back as an error to
-    // re-shoot. Saves stay sequential (in scene order) so the DB merge can't race; frames still land live.
+    // Shoot the MASTER ANCHOR frame FIRST to establish the world (continuity anchor), then render the REST
+    // CONCURRENTLY so one slow image can never stall the whole board — each failed frame just comes back as
+    // an error to re-shoot. Saves stay sequential (in scene order) so the DB merge can't race; frames land live.
     if (targets.length) {
-      const first = targets[0];
-      const firstRow = await renderShot(first.i, first.sc);
-      await saveShot(first.i, firstRow);
-      if (!worldRef && firstRow.url) worldRef = await step.run(`worldref-${first.i}`, () => importMediaUrl(firstRow.url as string).catch(() => null));
-      // Establish the b-roll CAST ANCHOR (first b-roll scene that has a companion) BEFORE the concurrent
-      // render, so every later b-roll scene locks the daughter/companion's look + outfit to it.
+      // CRITICAL: the anchor must be a LOCATION-RICH frame, NOT the a-roll hook. The hook is a deliberately
+      // clean presenter shot (plain, shallow-DoF, blurred background), so anchoring the whole film's world to
+      // it gave the b-roll scenes nothing to match — and they invented a NEW location (the "apartment →
+      // coffee shop" drift). Prefer the first b-roll-WITH-companion scene (it shows the full set AND Leah's
+      // outfit AND the daughter — one frame that locks world + wardrobe + companion), else any b-roll (shows
+      // the set), else fall back to the hook (all-a-roll films have no location to drift). worldRef locks the
+      // location + lighting + Leah's wardrobe for EVERY later scene (a-roll and b-roll); castAnchor locks the
+      // companion. So the whole film copies one real establishing frame instead of a blurred talking head.
       const isBrollCompanion = (t: { sc: Record<string, string> }) => String(t.sc.role || "") === "b-roll" && Array.isArray((t.sc as Record<string, unknown>).talent) && (t.sc as unknown as { talent: string[] }).talent.length > 1;
-      let rest = targets.slice(1);
-      if (isBrollCompanion(first) && firstRow.url) {
-        castAnchor = worldRef; // the world-anchor frame already includes the companion
-      } else {
+      let anchorAt = targets.findIndex(isBrollCompanion);
+      if (anchorAt < 0) anchorAt = targets.findIndex((t) => String(t.sc.role || "") === "b-roll");
+      if (anchorAt < 0) anchorAt = 0;
+      const anchor = targets[anchorAt];
+      const anchorRow = await renderShot(anchor.i, anchor.sc);
+      await saveShot(anchor.i, anchorRow);
+      if (anchorRow.url) {
+        if (!worldRef) worldRef = await step.run(`worldref-${anchor.i}`, () => importMediaUrl(anchorRow.url as string).catch(() => null));
+        if (isBrollCompanion(anchor) && !castAnchor) castAnchor = worldRef; // this frame already includes the companion
+      }
+      // If the anchor wasn't a companion frame, still lock the cast from the first companion b-roll before the
+      // concurrent render, so every later b-roll scene locks the daughter/companion's look + outfit to it.
+      let rest = targets.filter((_, k) => k !== anchorAt);
+      if (!castAnchor) {
         const bi = rest.findIndex(isBrollCompanion);
         if (bi >= 0) {
           const b = rest[bi];
