@@ -310,13 +310,21 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             <span>{c.error || "No image returned"}</span>
           </div>
         ) : broken.has(u) ? (
-          <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
+          <button type="button" onClick={() => setBroken((b) => { const n = new Set(b); n.delete(u); return n; })}
+            className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint transition hover:bg-surface-1">
             <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">image failed to load</span>
-            <span>{c.error || "image didn&apos;t load"}</span>
-          </div>
+            <span>{c.error || "tap to retry"}</span>
+          </button>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={u} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(u)} onError={() => setBroken((b) => new Set(b).add(u))} />
+          <img src={u} alt={c.scene} className="aspect-square w-full cursor-pointer object-cover" onClick={() => setZoom(u)}
+            onError={(e) => {
+              // A fresh Set & Wardrobe run can momentarily 404 while the blob is still propagating (or a CDN
+              // hiccup). Retry the same image a few times with backoff + a cache-buster before giving up.
+              const t = e.currentTarget; const tries = Number(t.dataset.retry || "0");
+              if (tries < 3) { t.dataset.retry = String(tries + 1); setTimeout(() => { t.src = `${u}${u.includes("?") ? "&" : "?"}r=${tries + 1}`; }, 600 * (tries + 1)); }
+              else setBroken((b) => new Set(b).add(u));
+            }} />
         )}
         {busy && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-2 text-center text-white">
