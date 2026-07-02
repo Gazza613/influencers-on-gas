@@ -35,29 +35,38 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [wardrobeLock, setWardrobeLock] = useState(String((initialProduction as { wardrobe_lock?: string })?.wardrobe_lock || ""));
   const [lockBusy, setLockBusy] = useState(false);
   const [lockErr, setLockErr] = useState("");
+  // The in-flight guide save (ref PATCH + wardrobe-lock read). A shoot MUST await this before it fires, else
+  // the shoot reads a stale persona (no guide, no lock) and every scene drifts - the exact "it appears not to
+  // submit before I run the scenes" bug. awaitGuideSave() (below) blocks each shoot on it.
+  const guideSaveRef = useRef<Promise<void> | null>(null);
+  async function awaitGuideSave() { if (guideSaveRef.current) { try { await guideSaveRef.current; } catch { /* proceed even if the lock read failed */ } } }
   async function setGuide(role: "a-roll" | "b-roll", url: string) {
-    const next = (role === "a-roll" ? arollGuide : brollGuide) === url ? "" : url; // tap again to clear
-    if (role === "a-roll") setArollGuide(next); else setBrollGuide(next);
-    // AUTO-POPULATE the brief from the chosen creative's own description, so you don't re-type the world
-    // that's already baked into the creative. Only fills empty fields - never clobbers what you typed.
-    if (next) {
-      const c = creatives.find((x) => x.url === next);
-      if (c?.scene?.trim()) {
-        if (!setting.trim()) { setSetting(c.scene.trim()); setAutoFilled(true); }
-      }
-    }
-    await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: role === "a-roll" ? { aroll_ref_url: next } : { broll_ref_url: next } }) }).catch(() => {});
-    // Read the outfit from the chosen guide RIGHT NOW and lock it in - so you SEE it registered (and the
-    // shoot threads this exact outfit into every scene). Clearing the guide clears the lock.
-    setLockErr("");
-    if (!next) { setWardrobeLock(""); fetch(`/api/influencers/${influencerId}/wardrobe-lock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: "" }) }).catch(() => {}); return; }
-    setLockBusy(true);
+    let done: () => void = () => {};
+    guideSaveRef.current = new Promise<void>((res) => { done = res; });
     try {
-      const r = await fetch(`/api/influencers/${influencerId}/wardrobe-lock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: next }) });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok && d.wardrobe) setWardrobeLock(d.wardrobe); else setLockErr(d.error || "Could not lock the wardrobe - try another guide.");
-    } catch { setLockErr("Could not lock the wardrobe - check your connection."); }
-    setLockBusy(false);
+      const next = (role === "a-roll" ? arollGuide : brollGuide) === url ? "" : url; // tap again to clear
+      if (role === "a-roll") setArollGuide(next); else setBrollGuide(next);
+      // AUTO-POPULATE the brief from the chosen creative's own description, so you don't re-type the world
+      // that's already baked into the creative. Only fills empty fields - never clobbers what you typed.
+      if (next) {
+        const c = creatives.find((x) => x.url === next);
+        if (c?.scene?.trim()) {
+          if (!setting.trim()) { setSetting(c.scene.trim()); setAutoFilled(true); }
+        }
+      }
+      await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: role === "a-roll" ? { aroll_ref_url: next } : { broll_ref_url: next } }) }).catch(() => {});
+      // Read the outfit from the chosen guide RIGHT NOW and lock it in - so you SEE it registered (and the
+      // shoot threads this exact outfit into every scene). Clearing the guide clears the lock.
+      setLockErr("");
+      if (!next) { setWardrobeLock(""); await fetch(`/api/influencers/${influencerId}/wardrobe-lock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: "" }) }).catch(() => {}); return; }
+      setLockBusy(true);
+      try {
+        const r = await fetch(`/api/influencers/${influencerId}/wardrobe-lock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: next }) });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.wardrobe) setWardrobeLock(d.wardrobe); else setLockErr(d.error || "Could not lock the wardrobe - try another guide.");
+      } catch { setLockErr("Could not lock the wardrobe - check your connection."); }
+      setLockBusy(false);
+    } finally { done(); }
   }
   const [autoFilled, setAutoFilled] = useState(false); // brief setting was auto-filled from a creative
   const [voiceId, setVoiceId] = useState(initialVoiceId);
@@ -327,6 +336,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const drop = new Set([role === "a-roll" ? "arollRefs" : "brollRefs", "aroll", "broll", "audio", "stitch", "showreel"]);
     setApproved((s) => { const n = new Set([...s].filter((k) => !drop.has(k))); persistApproved(n); return n; });
     setDenied(new Set());
+    await awaitGuideSave(); // never shoot before the chosen guide + wardrobe lock have persisted
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roleFilter: role, aspectRatio: ratio, priority, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot - give it another go, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); setShootingRole(""); return; }
     await poll(setProduction, "shots_status");
@@ -448,6 +458,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
         : [...list, { scene: i, role: String(sb?.scenes?.[i]?.role || "a-roll"), beat: String(sb?.scenes?.[i]?.beat || ""), url: null, reshooting: true }];
       return { ...p, shots, shots_status: "running" };
     });
+    await awaitGuideSave(); // never shoot before the chosen guide + wardrobe lock have persisted
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], aspectRatio: boardRatio, priority, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't shoot that reference image."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)), shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
@@ -480,6 +491,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(""); setShootingRole(""); setShootScope("all"); // whole-board shoot
     setProduction((p) => (p ? { ...p, shots: [], shots_status: "running", clips: [], clips_status: "idle", music_url: null, ambient_url: null, audio_status: "idle", final_url: null, assembly_status: "idle" } : p));
     setApproved((s) => { const n = new Set([...s].filter((k) => k === "concept" || k === "voice")); persistApproved(n); return n; });
+    await awaitGuideSave(); // never shoot before the chosen guide + wardrobe lock have persisted
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aspectRatio: ratio, priority, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
