@@ -1591,6 +1591,9 @@ export const assembleVideo = inngest.createFunction(
     // to its exact synced length, so it's untouched.
     const sceneAudioDur = new Map<number, number>();
     (Array.isArray((production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; duration?: number }[] }).scene_audio : []).forEach((e) => { if (typeof e?.duration === "number" && e.duration > 0) sceneAudioDur.set(Number(e.scene), e.duration); });
+    // Per-scene WORD CUES (start time of each spoken word, relative to the scene) → exact caption sync.
+    const sceneCues = new Map<number, number[]>();
+    (Array.isArray((production as { scene_audio?: { scene: number; cues?: number[] }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; cues?: number[] }[] }).scene_audio : []).forEach((e) => { if (Array.isArray(e?.cues) && e.cues.length) sceneCues.set(Number(e.scene), e.cues); });
     let cursor = 0;
     const placed = kept.map(({ sc, i }) => {
       const role = String(sc.role || "a-roll");
@@ -1771,14 +1774,28 @@ export const assembleVideo = inngest.createFunction(
         const KARAOKE_CSS = ".cap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}.w{color:#FFFFFF;font-weight:800;font-size:46px;line-height:1.32;-webkit-text-stroke:4px #000;paint-order:stroke fill;text-shadow:0 3px 8px rgba(0,0,0,0.5)}.hl{color:#FFE14D}";
         captionClips = placed.filter((p) => p.caption).flatMap((p) => {
           const words = esc(p.caption).split(/\s+/).filter(Boolean);
-          const totalChars = words.reduce((s, w) => s + w.length, 0) || 1;
-          let acc = 0;
+          if (!words.length) return [];
+          // Each word POPS exactly when she speaks it: START times come from the REAL per-word speech
+          // timestamps (cues) when present, else fall back to length-weighting across the scene.
+          const cues = sceneCues.get(p.i);
+          const starts: number[] = new Array(words.length);
+          if (cues && cues.length) {
+            for (let wi = 0; wi < words.length; wi++) {
+              const si = Math.min(cues.length - 1, Math.max(0, Math.round((wi / words.length) * cues.length)));
+              let st = p.start + (cues[si] || 0);
+              if (wi && st <= starts[wi - 1]) st = starts[wi - 1] + 0.08;
+              starts[wi] = Math.min(st, p.start + p.len - 0.08);
+            }
+          } else {
+            const totalChars = words.reduce((s, w) => s + w.length, 0) || 1;
+            let acc = 0;
+            for (let wi = 0; wi < words.length; wi++) { starts[wi] = p.start + acc; acc += Math.max(0.12, (p.len * words[wi].length) / totalChars); }
+          }
           return words.map((w, wi) => {
-            const isLast = wi === words.length - 1;
-            const dur = isLast ? Math.max(0.12, p.len - acc) : Math.max(0.12, (p.len * w.length) / totalChars);
-            const start = p.start + acc; acc += dur;
+            const st = starts[wi];
+            const end = wi < words.length - 1 ? starts[wi + 1] : p.start + p.len;
             const html = `<div class="cap">${words.map((ww, j) => `<span class="w${j === wi ? " hl" : ""}">${ww}</span>`).join(" ")}</div>`;
-            return { asset: { type: "html", html, css: KARAOKE_CSS, width: capW, height: 340, background: "transparent" }, start, length: dur, position: "bottom", offset: { y: CAP_Y } };
+            return { asset: { type: "html", html, css: KARAOKE_CSS, width: capW, height: 340, background: "transparent" }, start: st, length: Math.max(0.1, end - st), position: "bottom", offset: { y: CAP_Y } };
           });
         });
       } else {
@@ -1794,14 +1811,30 @@ export const assembleVideo = inngest.createFunction(
             start, length, position: "bottom", offset: { y: offY },
           });
           if (chunks.length <= 1) return [clip(text, p.start, p.len)];
-          // Time the chunks in SEQUENCE across the scene, weighted by length (longer phrase = longer on screen).
-          const totalChars = chunks.reduce((s, c) => s + c.length, 0) || 1;
-          let acc = 0;
+          // START TIME per chunk: from the REAL per-word speech timestamps (cues) when we have them - so a
+          // chunk appears exactly when she starts speaking it - else fall back to length-weighting.
+          const cues = sceneCues.get(p.i);
+          const wc = (s: string) => s.split(/\s+/).filter(Boolean).length;
+          const capWords = chunks.reduce((s, c) => s + wc(c), 0) || 1;
+          const starts: number[] = [];
+          if (cues && cues.length) {
+            let before = 0;
+            for (const c of chunks) {
+              const si = Math.min(cues.length - 1, Math.max(0, Math.round((before / capWords) * cues.length)));
+              let st = p.start + (cues[si] || 0);
+              if (starts.length) st = Math.max(st, starts[starts.length - 1] + 0.4);
+              starts.push(Math.min(st, p.start + p.len - 0.4));
+              before += wc(c);
+            }
+          } else {
+            const totalChars = chunks.reduce((s, c) => s + c.length, 0) || 1;
+            let acc = 0;
+            for (const c of chunks) { starts.push(p.start + acc); acc += Math.max(0.5, (p.len * c.length) / totalChars); }
+          }
           return chunks.map((c, ci) => {
-            const isLast = ci === chunks.length - 1;
-            const dur = isLast ? Math.max(0.5, p.len - acc) : Math.max(0.5, (p.len * c.length) / totalChars);
-            const start = p.start + acc; acc += dur;
-            return clip(c, start, dur);
+            const st = starts[ci];
+            const end = ci < chunks.length - 1 ? starts[ci + 1] : p.start + p.len;
+            return clip(c, st, Math.max(0.4, end - st));
           });
         });
       }

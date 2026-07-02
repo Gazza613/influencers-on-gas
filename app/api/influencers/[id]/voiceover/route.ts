@@ -74,14 +74,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const totalSec = pcm.length / (44100 * 2);
     // Whole take → one WAV the producer can listen to.
     const voiceover_url = await putBytes(pcmSliceToWav(pcm, 0, totalSec), "voiceover", "wav", "audio/wav");
-    // Per-scene slices → Animate reuses these (consistent + WYSIWYG).
-    const scene_audio: { scene: number; url: string; duration: number }[] = [];
+    // Per-scene slices → Animate reuses these (consistent + WYSIWYG). Each slice also carries `cues`: the
+    // start time (seconds, relative to the scene's own audio) of every spoken word, from the SAME ElevenLabs
+    // timestamps - so the stitch can place each caption chunk at the exact moment she starts speaking it.
+    const scene_audio: { scene: number; url: string; duration: number; cues?: number[] }[] = [];
     for (const p of parts) {
       const startSec = p.start > 0 ? timeAt(p.start - 1) : 0;
       const endSec = timeAt(p.end - 1);
       if (!(endSec > startSec)) continue;
       const url = await putBytes(pcmSliceToWav(pcm, startSec, endSec), "scene-vo", "wav", "audio/wav").catch(() => null);
-      if (url) scene_audio.push({ scene: p.i, url, duration: endSec - startSec });
+      if (!url) continue;
+      const cues: number[] = [];
+      const seg = full.slice(p.start, p.end);
+      const re = /\S+/g; let m: RegExpExecArray | null;
+      while ((m = re.exec(seg))) { const ci = p.start + m.index; cues.push(Math.max(0, Math.round(((ci > 0 ? timeAt(ci - 1) : 0) - startSec) * 100) / 100)); }
+      scene_audio.push({ scene: p.i, url, duration: endSec - startSec, cues });
     }
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, voiceover_url, scene_audio, voiceover_at: Date.now() } } });
