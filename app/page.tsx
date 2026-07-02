@@ -60,6 +60,18 @@ export default function Landing() {
   const router = useRouter();
   const animatedWord = useTypewriter();
   const [cardSrcs, setCardSrcs] = useState<({ url: string; hero: string } | null)[]>(CARDS.map(() => null));
+  // Session-aware: an ALREADY signed-in user who lands here (e.g. tapping "← Home") should go straight into
+  // the app, not see the logged-out "Get Started" marketing view - which read as a surprise logout. Hold the
+  // render until we know, so the CTA never flashes for a signed-in user.
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => { if (cancelled) return; if (s?.user) router.replace("/studio"); else setAuthChecked(true); })
+      .catch(() => { if (!cancelled) setAuthChecked(true); });
+    return () => { cancelled = true; };
+  }, [router]);
 
   // Load real influencer hero images: ONE distinct influencer per card (no repeats, no
   // cycling). Cards beyond the number of available influencers stay empty.
@@ -88,6 +100,9 @@ export default function Landing() {
       })
       .catch(() => {});
   }, []);
+
+  // Signed-in users are being redirected to /studio; don't flash the marketing CTA at them.
+  if (!authChecked) return <div style={{ minHeight: "100vh", background: "#07070E" }} />;
 
   return (
     <div style={{ minHeight: "100vh", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#07070E", overflow: "hidden", padding: "40px 24px 80px", textAlign: "center" }}>
