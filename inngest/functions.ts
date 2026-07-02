@@ -939,6 +939,10 @@ export const generateShots = inngest.createFunction(
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
     let castAnchor: string | null = null; // first b-roll frame WITH companions - locks the daughter/companion look + outfit across every b-roll scene
+    // SOURCE urls of the anchors above - kept so a scene that fails with "Media input not found" (a stale
+    // shared media_id on a long shoot) can RE-IMPORT the reference fresh and retry.
+    let worldRefUrl: string | null = null;
+    let castAnchorUrl: string | null = null;
     // CONTINUITY across SEPARATE shoots (one role, or a single re-shot scene): anchor to a frame ALREADY
     // shot for ANOTHER scene so the world stays IDENTICAL to the rest of the production. (Whole-board shoots
     // set worldRef from frame 1.) For a per-scene re-shoot, exclude the scene being re-shot from the search.
@@ -949,7 +953,7 @@ export const generateShots = inngest.createFunction(
     if ((roleFilter || sceneFilter) && !wardrobeLock) {
       const prior = ((production as { shots?: { scene?: number; url?: string | null }[] } | null)?.shots ?? [])
         .find((s) => s?.url && (!sceneFilter || !sceneFilter.includes(Number(s.scene))));
-      if (prior?.url) worldRef = await step.run("worldref-anchor", () => importMediaUrl(prior.url as string).catch(() => null));
+      if (prior?.url) { worldRefUrl = prior.url as string; worldRef = await step.run("worldref-anchor", () => importMediaUrl(prior.url as string).catch(() => null)); }
     }
     // CAST ANCHOR for a filtered/per-scene b-roll re-shoot: lock the COMPANION (the daughter) so re-shooting
     // ONE b-roll scene doesn't invent a DIFFERENT person. Prefer the b-roll GUIDE (the fixed creative the
@@ -962,8 +966,8 @@ export const generateShots = inngest.createFunction(
       // her (why the mom's top changed on a single-scene b-roll re-shoot).
       const priorCast = ((production as { shots?: { scene?: number; url?: string | null }[] } | null)?.shots ?? [])
         .find((s) => { const sc = scenes[Number(s.scene)] as Record<string, unknown> | undefined; return !!s?.url && String(sc?.role || "") === "b-roll" && Array.isArray(sc?.talent) && (sc.talent as unknown[]).length > 1 && (!sceneFilter || !sceneFilter.includes(Number(s.scene))); });
-      if (priorCast?.url) castAnchor = await step.run("castanchor-prior", () => importMediaUrl(priorCast.url as string).catch(() => null));
-      else if (brollRefMedia) castAnchor = brollRefMedia;
+      if (priorCast?.url) { castAnchorUrl = priorCast.url as string; castAnchor = await step.run("castanchor-prior", () => importMediaUrl(priorCast.url as string).catch(() => null)); }
+      else if (brollRefMedia) { castAnchor = brollRefMedia; castAnchorUrl = String(persona.broll_ref_url || ""); }
     }
 
     // Render ONE scene to a keyframe (pure — reads worldRef which is set by the anchor pass first).
@@ -1024,9 +1028,30 @@ export const generateShots = inngest.createFunction(
       const medias = [...idMedias, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldRef ? [worldRef] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
       // no quality but ~double the render time. 1K ~halves the board with no visible loss.
-      const shotExtra = { ...(medias.length ? { medias } : {}), resolution: process.env.HF_BOARD_RES || "1k" };
-      const gen = () => generateBatch([prompt], shotModel, ratio, shotExtra, CREATIVE_FALLBACK).then((a) => a[0] ?? null);
-      const url = await step.run(`shot-${i}`, gen);
+      const shotExtra = { resolution: process.env.HF_BOARD_RES || "1k" };
+      const runGen = (m: { value: string; role: string }[]) => generateBatchDetailed([prompt], shotModel, ratio, { ...shotExtra, ...(m.length ? { medias: m } : {}) }, CREATIVE_FALLBACK).then((a) => a[0] ?? { url: null as string | null, error: "no result", model: shotModel });
+      let activeMedias = medias;
+      let res = await step.run(`shot-${i}`, () => runGen(activeMedias));
+      // "Media input not found" = a SHARED reference media_id (identity/world/cast/cloth) imported once at the
+      // top of the shoot has gone STALE by the time this (later) scene renders - the classic mid-shoot b-roll
+      // failure. Re-import EVERY reference this scene uses FRESH from its source URL, then retry once.
+      if (!res.url && medias.length && /not found|media input|expired|invalid media/i.test(String(res.error || ""))) {
+        const fresh = await step.run(`reimport-${i}`, async () => {
+          const imp = async (u?: string | null) => (u ? await importMediaUrl(String(u)).catch(() => null) : null);
+          const ids = (await Promise.all(idRefUrls.map((u) => imp(u)))).filter((v): v is string => !!v);
+          if (featureUrl) { const f = await imp(featureUrl); if (f) ids.push(f); }
+          const cloth = clothMedia ? await imp(clothSrc) : null;
+          const loc = locMedia ? await imp(brief.locationRef) : null;
+          const world = worldRef ? await imp(worldRefUrl) : null;
+          const roleU = role === "a-roll" ? persona.aroll_ref_url : role === "b-roll" ? persona.broll_ref_url : "";
+          const roleM = roleRefMedia ? await imp(roleU ? String(roleU) : null) : null;
+          const cast = (castTag && castAnchor) ? await imp(castAnchorUrl) : null;
+          return [...ids, ...(cloth ? [cloth] : []), ...(loc ? [loc] : []), ...(world ? [world] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleM ? [roleM] : []), ...(cast ? [cast] : [])].map((value) => ({ value, role: "image" }));
+        });
+        if (fresh.length) { activeMedias = fresh; res = await step.run(`shot-retry-${i}`, () => runGen(activeMedias)); }
+      }
+      const url = res.url;
+      const gen = () => runGen(activeMedias).then((r) => r.url);
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
       // QA GATE (opt-in): reject waxy/malformed/drift frames and re-roll once. Off by default for speed.
       if (usable && QA_ON) {
@@ -1098,8 +1123,8 @@ export const generateShots = inngest.createFunction(
       const anchorRow = await renderShot(anchor.i, anchor.sc);
       await saveShot(anchor.i, anchorRow);
       if (anchorRow.url) {
-        if (!worldRef) worldRef = await step.run(`worldref-${anchor.i}`, () => importMediaUrl(anchorRow.url as string).catch(() => null));
-        if (isBrollCompanion(anchor) && !castAnchor) castAnchor = worldRef; // this frame already includes the companion
+        if (!worldRef) { worldRefUrl = anchorRow.url as string; worldRef = await step.run(`worldref-${anchor.i}`, () => importMediaUrl(anchorRow.url as string).catch(() => null)); }
+        if (isBrollCompanion(anchor) && !castAnchor) { castAnchor = worldRef; castAnchorUrl = worldRefUrl; } // this frame already includes the companion
       }
       // If the anchor wasn't a companion frame, still lock the cast from the first companion b-roll before the
       // concurrent render, so every later b-roll scene locks the daughter/companion's look + outfit to it.
@@ -1110,7 +1135,7 @@ export const generateShots = inngest.createFunction(
           const b = rest[bi];
           const bRow = await renderShot(b.i, b.sc);
           await saveShot(b.i, bRow);
-          if (bRow.url) castAnchor = await step.run(`castanchor-${b.i}`, () => importMediaUrl(bRow.url as string).catch(() => null));
+          if (bRow.url) { castAnchorUrl = bRow.url as string; castAnchor = await step.run(`castanchor-${b.i}`, () => importMediaUrl(bRow.url as string).catch(() => null)); }
           rest = rest.filter((_, k) => k !== bi);
         }
       }
