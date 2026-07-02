@@ -1731,6 +1731,36 @@ export const assembleVideo = inngest.createFunction(
     // SAFE ZONE: sit captions ~20% up from the bottom (env CAPTION_Y) so they clear the platform's bottom UI
     // (TikTok/Reels caption bar, username, CTA + the right-side action buttons). The old ~11% sat too low.
     const CAP_Y = Math.max(0, Math.min(0.4, Number(process.env.CAPTION_Y) || 0.2));
+    // CHUNK a long scene line into short, screen-safe pieces that play in SEQUENCE across the scene, so a long
+    // a-roll line never overflows the box and clips off the bottom of the frame (the "long copy gets cut off"
+    // bug). Break at sentence + comma boundaries first (natural phrases), grouping whole phrases up to a char
+    // budget (~2 lines); any single phrase longer than the budget is hard-split on word boundaries. The budget
+    // is tighter for the UPPERCASE styles (bold/sunny) since their glyphs are wider.
+    const chunkCaption = (text: string, maxChars: number): string[] => {
+      const clean = text.trim();
+      if (!clean) return [];
+      const segs = (clean.match(/[^.!?,]+[.!?,]*/g) || [clean]).map((s) => s.trim()).filter(Boolean);
+      const chunks: string[] = [];
+      let cur = "";
+      const flush = () => { if (cur.trim()) chunks.push(cur.trim()); cur = ""; };
+      for (const seg of segs) {
+        if (seg.length > maxChars) { // a single phrase too long for the box - hard-split on words
+          flush();
+          let line = "";
+          for (const w of seg.split(/\s+/)) {
+            if (line && (line + " " + w).length > maxChars) { chunks.push(line); line = w; }
+            else line = line ? line + " " + w : w;
+          }
+          if (line) cur = line; // carry the tail so a short next phrase can join it
+          continue;
+        }
+        if (!cur) cur = seg;
+        else if ((cur + " " + seg).length <= maxChars) cur += " " + seg;
+        else { flush(); cur = seg; }
+      }
+      flush();
+      return chunks;
+    };
     const capSel = String(event.data.captionStyle || "");
     let captionClips: Record<string, unknown>[] = [];
     if (captionsOn) {
@@ -1753,10 +1783,27 @@ export const assembleVideo = inngest.createFunction(
         });
       } else {
         const capStyle = CAPTION_STYLES[capSel] || CAPTION_STYLES.bold;
-        captionClips = placed.filter((p) => p.caption).map((p) => ({
-          asset: { type: "html", html: `<div class="cap"><span>${esc(p.caption)}</span></div>`, css: capStyle.css, width: capW, height: capStyle.height, background: "transparent" },
-          start: p.start, length: p.len, position: "bottom", offset: { y: Math.max(capStyle.offY, CAP_Y) },
-        }));
+        // Uppercase styles (bold/sunny + the default) are wider per glyph, so fewer chars fit a line.
+        const maxChars = (capSel === "bold" || capSel === "sunny" || capSel === "") ? 42 : 52;
+        const offY = Math.max(capStyle.offY, CAP_Y);
+        captionClips = placed.filter((p) => p.caption).flatMap((p) => {
+          const text = esc(p.caption);
+          const chunks = chunkCaption(text, maxChars);
+          const clip = (html: string, start: number, length: number) => ({
+            asset: { type: "html", html: `<div class="cap"><span>${html}</span></div>`, css: capStyle.css, width: capW, height: capStyle.height, background: "transparent" },
+            start, length, position: "bottom", offset: { y: offY },
+          });
+          if (chunks.length <= 1) return [clip(text, p.start, p.len)];
+          // Time the chunks in SEQUENCE across the scene, weighted by length (longer phrase = longer on screen).
+          const totalChars = chunks.reduce((s, c) => s + c.length, 0) || 1;
+          let acc = 0;
+          return chunks.map((c, ci) => {
+            const isLast = ci === chunks.length - 1;
+            const dur = isLast ? Math.max(0.5, p.len - acc) : Math.max(0.5, (p.len * c.length) / totalChars);
+            const start = p.start + acc; acc += dur;
+            return clip(c, start, dur);
+          });
+        });
       }
     }
     // Brand overlay: ONLY an uploaded logo (top-left) / promo (top-right) — both explicit. No auto
