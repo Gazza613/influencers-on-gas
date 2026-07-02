@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import DeleteInfluencerButton from "@/components/DeleteInfluencerButton";
 import { listConnections } from "@/lib/connections";
 import { listInfluencers, type Influencer } from "@/lib/influencers";
 
@@ -85,7 +86,9 @@ export default async function StudioPage() {
                   const isLocked = ((inf.persona ?? {}) as Persona).locked;
                   const href = isLocked ? `/setup/influencers/${inf.id}/producer` : `/setup/influencers/${inf.id}`;
                   return (
-                    <Link key={inf.id} href={href} className="card lift group relative block overflow-hidden rounded-2xl">
+                    <div key={inf.id} className="relative">
+                      <DeleteInfluencerButton id={inf.id} name={inf.name} />
+                      <Link href={href} className="card lift group relative block overflow-hidden rounded-2xl">
                       <div className="relative aspect-[3/4] w-full overflow-hidden">
                         {src
                           // eslint-disable-next-line @next/next/no-img-element
@@ -99,7 +102,8 @@ export default async function StudioPage() {
                           <div className="mt-0.5 translate-y-1 text-[11px] font-semibold text-[#c79bff] opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">{isLocked ? "Produce →" : "Continue build →"}</div>
                         </div>
                       </div>
-                    </Link>
+                      </Link>
+                    </div>
                   );
                 })}
               </div>

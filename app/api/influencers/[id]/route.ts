@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { deleteInfluencer, updateInfluencer, getInfluencer } from "@/lib/influencers";
 import { isSafePublicUrl } from "@/lib/safe-url";
+import { deleteBlobs } from "@/lib/blob";
+
+// Walk any nested value and collect every http(s) URL string (hero/refs/shots/clips/scene_audio/final/...).
+function collectUrls(v: unknown, out: string[]): void {
+  if (!v) return;
+  if (typeof v === "string") { if (/^https?:\/\//i.test(v)) out.push(v); return; }
+  if (Array.isArray(v)) { for (const x of v) collectUrls(x, out); return; }
+  if (typeof v === "object") { for (const x of Object.values(v as Record<string, unknown>)) collectUrls(x, out); }
+}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -79,6 +88,16 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const session = await auth();
   if (session?.user?.role !== "super_admin") return NextResponse.json({ error: "Super admin only" }, { status: 403 });
   const { id } = await params;
+  // NUKE EVERYWHERE: purge every blob this influencer owns (references, keyframes, clips, voice, final cut)
+  // BEFORE dropping the row - best-effort, never blocks the delete. Then remove the DB record, which takes it
+  // out of the studio, cast list, landing, start and showcase (all its production data lives in persona).
+  const inf = await getInfluencer(id).catch(() => null);
+  if (inf) {
+    const urls: string[] = [];
+    collectUrls(inf.persona, urls);
+    collectUrls(inf.look_refs, urls);
+    await deleteBlobs(urls).catch(() => {});
+  }
   await deleteInfluencer(id);
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,18 @@
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { isSafePublicUrl } from "./safe-url";
+
+// Permanently delete blobs we own (only our own store's URLs) - used when nuking an influencer so its
+// references/keyframes/clips/voice/final cut don't linger in storage. Best-effort: never throws.
+export async function deleteBlobs(urls: string[]): Promise<number> {
+  const mine = [...new Set(urls.filter((u) => typeof u === "string" && /\.blob\.vercel-storage\.com\//i.test(u)))];
+  if (!mine.length) return 0;
+  let removed = 0;
+  for (let i = 0; i < mine.length; i += 100) {
+    const batch = mine.slice(i, i + 100);
+    try { await del(batch); removed += batch.length; } catch { /* best-effort */ }
+  }
+  return removed;
+}
 
 // Re-host a remote image onto Vercel Blob so the stored URL is permanent, public and
 // always loadable in an <img> tag. Vendor CDNs (Higgsfield, upscale outputs) can expire,
