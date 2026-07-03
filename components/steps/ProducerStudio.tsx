@@ -16,7 +16,7 @@ type Scene = {
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
-type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
+type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; audio_url?: string | null; synced?: boolean };
 type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[] } | null;
 
 const ROLE = {
@@ -877,8 +877,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         </div>
                       ) : clip?.url ? (
                         <div className="relative">
-                          <video src={clip.url} controls playsInline className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
+                          <ClipPreview clip={clip} className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
                           <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
+                          {clip.audio_url && clip.synced !== true && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-semibold text-[#7dd3fc]" title="This clip renders silent; her voiceover is overlaid here and baked in at the final stitch.">🔊 voice overlaid</span>}
                           <button onClick={() => setZoom(clip.url!)} title="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
                           {/* RE-ANIMATING this scene (it already has a clip): overlay feedback so it's clearly working.
                               ONLY for an explicit per-scene list (clipScope is an array with this scene) - a whole-board
@@ -1008,7 +1009,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <div>
                             <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
                             <button onClick={() => setEd((e) => ({ ...e, liveBg: e.liveBg === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.liveBg === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.liveBg === "true" ? "🎬 Live background · Veo ✓" : "🎬 Live background (moving scene)"}</button>
-                            <p className="mt-1 text-[10px] text-ink-faint">Renders this scene on the FAST DoP engine so the WHOLE world moves behind her (e.g. horses racing), her voice laid over. Trade-off: she reads as IN the living scene rather than tight lip-syncing to camera (the engine animates the scene, not the lips). Best for short hero beats (~5s). Default off = HeyGen (tight lip-sync, still background). Needs a re-shoot + re-animate.</p>
+                            <p className="mt-1 text-[10px] text-ink-faint">Renders this scene on a full-scene video engine so the WHOLE world moves behind her (e.g. horses racing), her voice laid over. Trade-off: she reads as IN the living scene rather than tight lip-syncing to camera (the engine animates the scene, not the lips), and it&apos;s slower than the default. Best for short hero beats (~5s). Default off = HeyGen (tight lip-sync, still background). Needs a re-shoot + re-animate.</p>
                           </div>
                         )}
                       </div>
@@ -1386,6 +1387,34 @@ function RefGallery({ role, scenes, shots, dropped, shooting, onToggleDrop, onZo
     </div>
   );
 }
+// A clip preview that can HEAR her. Live-bg a-roll and b-roll clips render SILENT (the engine animates the
+// scene, not the lips) - the voice is only laid over at the final stitch, so the raw clip has no audio and
+// you can't judge it. When the clip carries a voiceover (audio_url + synced:false), we overlay that VO on a
+// hidden <audio> kept in lock-step with the video (play/pause/seek/rate/ended), so the preview plays with her
+// voice exactly as the final cut will. A synced (HeyGen) clip already has baked audio, so we leave it alone.
+function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
+  const vRef = useRef<HTMLVideoElement>(null);
+  const aRef = useRef<HTMLAudioElement>(null);
+  const overlayVO = !!clip.audio_url && clip.synced !== true; // silent clip + a VO to lay over
+  const sync = (fn: (v: HTMLVideoElement, a: HTMLAudioElement) => void) => { const v = vRef.current, a = aRef.current; if (v && a) fn(v, a); };
+  return (
+    <>
+      <video
+        ref={vRef}
+        src={clip.url || undefined}
+        controls
+        playsInline
+        className={className}
+        onPlay={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; a.play().catch(() => {}); }) : undefined}
+        onPause={overlayVO ? () => sync((_v, a) => a.pause()) : undefined}
+        onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; }) : undefined}
+        onRateChange={overlayVO ? () => sync((v, a) => { a.playbackRate = v.playbackRate; }) : undefined}
+        onEnded={overlayVO ? () => sync((_v, a) => { a.pause(); a.currentTime = 0; }) : undefined}
+      />
+      {overlayVO && <audio ref={aRef} src={clip.audio_url || undefined} preload="auto" />}
+    </>
+  );
+}
 // Playable previews for one role - one tile per scene IN ORDER, each either the rendered clip
 // (play before approving) or a "not rendered yet" tile (e.g. after a re-shoot clears it).
 function ClipStrip({ clips, role, sceneIdx, onExpand }: { clips: Clip[]; role: "a-roll" | "b-roll"; sceneIdx: number[]; onExpand: (url: string) => void }) {
@@ -1400,7 +1429,7 @@ function ClipStrip({ clips, role, sceneIdx, onExpand }: { clips: Clip[]; role: "
             <div key={i} className="relative">
               {c?.url ? (
                 <>
-                  <video src={c.url} controls playsInline className="aspect-[9/16] w-40 rounded-lg border border-ready/40 bg-black object-cover" />
+                  <ClipPreview clip={c} className="aspect-[9/16] w-40 rounded-lg border border-ready/40 bg-black object-cover" />
                   <button onClick={() => onExpand(c.url!)} title="Expand full size" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-xs text-white/90 hover:bg-black/85">👁</button>
                 </>
               ) : (

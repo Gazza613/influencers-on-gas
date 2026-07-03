@@ -1430,7 +1430,7 @@ export const generateClips = inngest.createFunction(
       // env-tunable (BROLL_MIN_SECONDS); set to 3 to go back to VO-matched lengths.
       const BROLL_MIN = Math.max(3, Math.min(8, Number(process.env.BROLL_MIN_SECONDS) || 8));
       const clipSeconds = (liveBg && typeof narrationDur === "number" && narrationDur > 0)
-        ? Math.max(3, Math.min(8, Math.ceil(narrationDur))) // live-bg a-roll: match her spoken line, capped to Veo's 8s
+        ? Math.max(3, Math.min(15, Math.ceil(narrationDur))) // live-bg a-roll: match her FULL spoken line - Kling 3.0 does 3-15s so a long script (e.g. scene 3) is never cut. Veo snaps down to 8s and DoP ignores duration (fixed ~5s), so the length only truly holds on the Kling lane - which is why Kling is the live-bg default.
         : (role === "b-roll" && typeof narrationDur === "number" && narrationDur > 0)
         ? Math.max(BROLL_MIN, Math.min(15, Math.ceil(narrationDur)))
         : Math.max(3, Math.min(15, Math.round(sceneDur)));
@@ -1442,11 +1442,12 @@ export const generateClips = inngest.createFunction(
       // fixed-5s DoP (looped) so previews are quick; the final (non-draft) render uses Veo. BROLL_ENGINE=dop
       // forces DoP everywhere, =kling forces Kling. Veo falls back to Kling inside submitVideoFromImage on error.
       const brollEngine = (process.env.BROLL_ENGINE || "veo").toLowerCase();
-      // SPEED FIX: a Live-background a-roll now renders on the FAST first-party DoP lane (priority queue,
-      // ~5 min) instead of Veo on the slow MCP session (10-20 min). DoP animates the whole scene (horses
-      // move) - her voice is laid over. Hero b-roll keeps Veo (premium 4K, opt-in, slower is accepted).
-      const useVeo = role === "b-roll" && (hero || (brollEngine === "veo" && !speed));
-      const useDop = (liveBg || role === "b-roll") && !useVeo && brollEngine !== "kling" && dopConfigured();
+      // LIVE-BG ENGINE (tunable for A/B): dop = fast first-party lane (~5 min, scene-not-lips); kling/veo = MCP
+      // lane (slower, but a fuller talking-moving look). Default KLING now for the scene-3 quality test vs DoP;
+      // set LIVEBG_ENGINE=dop to switch back to the fast lane. (First-party only exposes DoP, so Kling is MCP.)
+      const LIVEBG_ENGINE = (process.env.LIVEBG_ENGINE || "kling").toLowerCase();
+      const useVeo = (role === "b-roll" && (hero || (brollEngine === "veo" && !speed))) || (liveBg && LIVEBG_ENGINE === "veo");
+      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || role === "b-roll") && !useVeo && brollEngine !== "kling" && dopConfigured();
       // DoP renders a FIXED ~5s clip; the stitch LOOPS it across a longer narration (no freeze). Its real
       // length is probed at render time so the loop/slot stay accurate.
       const DOP_OUT_SECONDS = Math.max(3, Number(process.env.DOP_OUT_SECONDS) || 5);
