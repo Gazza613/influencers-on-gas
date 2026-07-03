@@ -237,7 +237,7 @@ export function buildShotPrompt(o: {
     SKIN_FACTS,
     SCALE,
     o.hasPeople ? SCENE_PEOPLE : NO_EXTRAS,
-    o.role === "a-roll" ? "SOLO PRESENTER SHOT: the influencer is the ONLY person anywhere in the frame - no friends, companions, bystanders, reflections or background people of ANY kind, even distant or blurred. Just her talking to camera against a simple, softly out-of-focus background. NEVER add anyone the direction did not explicitly request." : "",
+    o.role === "a-roll" ? "SOLO PRESENTER SHOT: the influencer is the ONLY person anywhere in the frame - no friends, companions, bystanders, reflections or background people of ANY kind, even distant or blurred. Just her talking to camera against a simple, softly out-of-focus, STATIC background. NO racing horses, moving vehicles, crowds in motion or any action / moving element in the background - this shot is animated by a talking-photo engine that moves ONLY her, so anything that should be moving would FREEZE and look broken (stationary horses on the track). Keep it a calm, blurred backdrop only. NEVER add anyone the direction did not explicitly request." : "",
     `Wardrobe: ${CLOTHED}.`,
     o.grade ? `COLOUR GRADE (IDENTICAL in every scene of this film - this is the locked look): ${o.grade}. Apply this exact grade - palette, warmth, contrast and film character - to this shot so it cuts together seamlessly with every other scene. Never a different or mismatched grade. It stays a real, natural photograph, just consistently graded (never a heavy filter or oversaturated look).` : "",
     `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
