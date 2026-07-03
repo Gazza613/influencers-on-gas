@@ -862,9 +862,10 @@ export const generateShots = inngest.createFunction(
     const inf = await step.run("load", () => getInfluencer(influencerId));
     if (!inf) return { skipped: "not found" };
     const persona = (inf.persona ?? {}) as Record<string, unknown>;
-    const production = (persona.production ?? null) as { brief?: Record<string, unknown>; storyboard?: { scenes?: Record<string, unknown>[]; format?: string; supporting_cast?: { name: string; look: string }[] } } | null;
+    const production = (persona.production ?? null) as { brief?: Record<string, unknown>; storyboard?: { scenes?: Record<string, unknown>[]; format?: string; supporting_cast?: { name: string; look: string }[]; colour_grade?: string } } | null;
     const scenes = production?.storyboard?.scenes ?? [];
     const supportingCast = production?.storyboard?.supporting_cast ?? [];
+    const grade = String(production?.storyboard?.colour_grade || "").trim(); // one locked look, applied to every keyframe
     if (!scenes.length) return { error: "no storyboard" };
     // Role filter: shoot only the a-roll (talking) references, or only the b-roll (scene) references —
     // the producer curates each gallery separately. Empty = the whole board (back-compat).
@@ -1032,6 +1033,7 @@ export const generateShots = inngest.createFunction(
         // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
         hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: worldTagOn,
         lockedOutfit: lockEff || undefined, // her one outfit OVERRIDES any per-scene outfit the storyboard wrote
+        grade: grade || undefined, // the film's ONE locked colour grade, identical on every keyframe
       });
       const medias = [...idForRender, ...(clothMediaEff ? [clothMediaEff] : []), ...(locMedia ? [locMedia] : []), ...(worldTagOn ? [worldRef as string] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
@@ -1393,7 +1395,7 @@ export const generateClips = inngest.createFunction(
       // her front-on. B-ROLL: she is naturally absorbed in the scene and does NOT address the camera.
       const motion = (role === "a-roll"
         ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. Only she and the background move (background people, ambient motion).`
-        : `${base}. A natural, candid video SCENE: she is IN the environment doing something real (sitting, using or showing the product, a relaxed glance or small gesture) and is NOT looking at or talking to the camera — observed b-roll, not a piece to camera. NOBODY in the scene looks at, mouths words to, or addresses the camera; her mouth is NOT moving as if speaking to camera (her voice is a voiceover laid over the top). The scene has GENTLE, restrained life: she moves naturally at a calm real-life pace with only SUBTLE ambient motion (a soft breeze, light shifting, any water or leaves). The CAMERA is essentially LOCKED on a tripod — at most a very slow, barely-perceptible drift; NO fast pans, swoops, zooms, push-ins, whip moves or crane. Calm, observational, minimal motion — never busy, never sweeping, and never warping the room.`) + MOTION_SAFE + WATER;
+        : `${base}. A natural, candid video SCENE: she is IN the environment doing something real (sitting, using or showing the product, a relaxed glance or small gesture) and is NOT looking at or talking to the camera — observed b-roll, not a piece to camera. NOBODY in the scene looks at, mouths words to, or addresses the camera; her mouth is NOT moving as if speaking to camera (her voice is a voiceover laid over the top). The scene has GENTLE, restrained life: she moves naturally at a calm real-life pace with only SUBTLE ambient motion (a soft breeze, light shifting, any water or leaves). The CAMERA makes exactly ONE slow, deliberate cinematic move that serves the moment — a gentle push-in, a slow dolly, a soft lateral drift, or a rack-focus onto her or the product — smooth, controlled and motivated, playing out over the whole clip. ONE continuous move only: NEVER a whip-pan, snap-zoom, crash-zoom, fast swoop, crane, multiple cuts or hand-held shake, and the move NEVER warps the room, the subject, faces or straight lines. Cinematic and calm, not busy — when unsure, a slow steady push-in.`) + MOTION_SAFE + WATER;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
       // the background can't drift/reverse (it's anchored to a defined end frame).

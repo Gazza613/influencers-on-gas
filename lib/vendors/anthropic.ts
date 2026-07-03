@@ -524,7 +524,7 @@ export type SupportingCast = { name: string; look: string };
 export type Storyboard = {
   title: string; format: string; duration_seconds: number; tone: string;
   music_bed: string; full_vo: string; legal: string; scenes: StoryScene[];
-  supporting_cast: SupportingCast[];
+  supporting_cast: SupportingCast[]; colour_grade: string;
 };
 
 const STORYBOARD_SCHEMA = {
@@ -532,6 +532,7 @@ const STORYBOARD_SCHEMA = {
   properties: {
     title: { type: "string" }, format: { type: "string" }, duration_seconds: { type: "number" },
     tone: { type: "string" }, music_bed: { type: "string", description: "how the music behaves across the film" },
+    colour_grade: { type: "string", description: "ONE locked colour grade / 'look' for the WHOLE film in a short phrase - palette, warmth, contrast and film character (e.g. 'warm golden natural light, soft filmic contrast, gently lifted shadows, true skin tones'). Every scene shares this exact grade so the cut reads as one graded piece." },
     full_vo: { type: "string", description: "the entire continuous voiceover as one block" },
     legal: { type: "string", description: "the mandatory legal line, verbatim, or empty" },
     scenes: {
@@ -571,7 +572,7 @@ const STORYBOARD_SCHEMA = {
       },
     },
   },
-  required: ["title", "format", "duration_seconds", "tone", "music_bed", "full_vo", "legal", "scenes", "supporting_cast"],
+  required: ["title", "format", "duration_seconds", "tone", "music_bed", "full_vo", "legal", "scenes", "supporting_cast", "colour_grade"],
 };
 
 const PRODUCER_SYSTEM =
@@ -614,11 +615,12 @@ CINEMATOGRAPHY (this is what makes it world-class, not merely consistent - direc
 • LENS + ANGLE per shot: pick a lens feel that serves the beat - a wider ~35mm to sit intimately in the room on b-roll, ~50mm for a natural look, a tighter ~85mm to compress and isolate for a hero close-up. Shoot at eye level or a touch (10-15°) ABOVE for a flattering angle; use a slight low angle only to lend authority.
 • COMPOSE THE VERTICAL FRAME: rule of thirds with her eyes on the upper third; build FOREGROUND DEPTH (a shoulder, a plant, a prop, a soft out-of-focus edge) so the tall 9:16 frame reads three-dimensional; use real leading lines (a counter, a doorway, a table edge) to draw the eye to her.
 • COVERAGE RHYTHM: vary shot SIZE across the arc - an establishing wider shot, mediums for connection, a tight insert on the product or a telling detail - never a run of same-size shots.
+• COLOUR GRADE: decide ONE consistent look for the WHOLE film and put it in 'colour_grade' - a palette, warmth, contrast and film character that fits the tone and world (e.g. 'warm golden natural light, soft filmic contrast, gently lifted shadows, true skin tones'). EVERY scene is graded the same so the cut reads as one film, never eight mismatched shots.
 Put these choices (light direction + mood, lens feel, angle, composition) into each scene's 'shot' line so they carry into the render.
 
 CAPTIONS - burned-in, match vo_line word-for-word, split into short readable beats (~6-14 words each) with natural punctuation (commas and full stops). NEVER use pipe or bar '|' separators. Empty when there is no VO.
 
-MOTION - for a-roll and b-roll give a short motion_prompt (natural, not robotic): for a-roll subtle head movement + hand gestures; for b-roll the scene action and that background people move naturally. Describe ONE single continuous camera move per scene; never multiple cuts in one motion_prompt.
+MOTION - give each scene a short motion_prompt (natural, not robotic). A-ROLL: only HER own subtle movement (a little head movement, a small hand gesture) with the CAMERA HELD STILL - the talking-head engine animates her, not the camera, so a moving camera warps her. B-ROLL: direct ONE deliberate, slow CINEMATIC camera move that serves the beat - a gentle push-in on a reveal, a slow dolly or soft lateral drift through the space, or a rack-focus onto her or the product - alongside the natural scene action. ONE single continuous move per scene, calm and controlled; NEVER multiple cuts, a whip-pan, a snap-zoom or a fast swoop.
 
 BLOCKING / HANDS (critical - AI image models render deformed or extra hands when fingers do something fiddly) - keep blocking and gestures SIMPLE and hand-safe. Do NOT write poses that count on fingers, hold up a number of fingers, make hand signs (peace sign, thumbs up, finger guns), interlace fingers, or raise hands to the face. Prefer relaxed hands, a hand resting on a surface, holding a cup/phone/the product naturally, or one simple open gesture. Write hands as occupied and natural, never as the focal point of a precise finger pose.
 

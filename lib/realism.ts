@@ -202,7 +202,7 @@ function faceCamera(s: string): string {
 export function buildShotPrompt(o: {
   location: string; blocking: string; shot: string; performance: string; role: string;
   subjectLine: string; look: string; refInstruction: string; ratio: string;
-  hasPeople: boolean; worldAnchored: boolean; lockedOutfit?: string;
+  hasPeople: boolean; worldAnchored: boolean; lockedOutfit?: string; grade?: string;
 }): string {
   o = { ...o, blocking: deHandRisk(o.blocking), performance: deHandRisk(o.performance), shot: deHandRisk(o.shot) };
   // A-ROLL presenter shots: drop gesture/raised-hand directions (calm hands) AND any "back to camera" /
@@ -236,6 +236,7 @@ export function buildShotPrompt(o: {
     o.hasPeople ? SCENE_PEOPLE : NO_EXTRAS,
     o.role === "a-roll" ? "SOLO PRESENTER SHOT: the influencer is the ONLY person anywhere in the frame - no friends, companions, bystanders, reflections or background people of ANY kind, even distant or blurred. Just her talking to camera against a simple, softly out-of-focus background. NEVER add anyone the direction did not explicitly request." : "",
     `Wardrobe: ${CLOTHED}.`,
+    o.grade ? `COLOUR GRADE (IDENTICAL in every scene of this film - this is the locked look): ${o.grade}. Apply this exact grade - palette, warmth, contrast and film character - to this shot so it cuts together seamlessly with every other scene. Never a different or mismatched grade. It stays a real, natural photograph, just consistently graded (never a heavy filter or oversaturated look).` : "",
     `Constraints: ${aspectFraming(o.ratio)} ${ANTI_AI} ${SINGLE_FRAME}.`,
     `Avoid entirely (do NOT depict any of these): ${SHOT_NEGATIVE}.`,
   ].filter(Boolean).join("\n\n");
