@@ -415,11 +415,19 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   // Close the edit panel but KEEP the scene you were on in view - collapsing the panel otherwise slides the
-  // viewport onto a later scene (Gary's "Save jumps me to scene 6").
+  // viewport onto a later scene (Gary's "Save jumps me to scene 6"). We stash the scene and scroll it back in
+  // an EFFECT (after the panel has actually collapsed + re-laid-out) - a requestAnimationFrame alone fired too
+  // early, against the OLD height, so the jump remained.
+  const pendingScroll = useRef<number | null>(null);
   function closeEditKeep(i: number | null) {
+    pendingScroll.current = i;
     setEditIdx(null);
-    if (i != null) requestAnimationFrame(() => document.getElementById(`prod-scene-${i}`)?.scrollIntoView({ block: "center", behavior: "auto" }));
   }
+  useEffect(() => {
+    if (editIdx !== null || pendingScroll.current == null) return;
+    const i = pendingScroll.current; pendingScroll.current = null;
+    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`prod-scene-${i}`)?.scrollIntoView({ block: "center", behavior: "auto" })));
+  }, [editIdx]);
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { closeEditKeep(i); return; }
     setEditIdx(i); setAiInstr("");
