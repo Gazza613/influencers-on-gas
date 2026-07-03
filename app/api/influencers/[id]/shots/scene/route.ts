@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Apply edited direction + script to the scene (persists + drives the clip/caption later).
   // vo_line + caption are script edits (no image regen needed); location/blocking/shot/motion change the image.
   const edited = { ...scenes[index] };
-  for (const k of ["location", "blocking", "shot", "performance", "motion_prompt", "vo_line", "caption", "vo_audio_url", "phone_screen_url", "hero", "ref_url"] as const) {
+  for (const k of ["location", "blocking", "shot", "performance", "motion_prompt", "vo_line", "caption", "vo_audio_url", "phone_screen_url", "hero", "ref_url", "live_bg"] as const) {
     if (typeof b[k] === "string") edited[k] = String(b[k]).trim();
   }
   const newScenes = scenes.map((s, i) => (i === index ? edited : s));

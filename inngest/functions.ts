@@ -974,6 +974,7 @@ export const generateShots = inngest.createFunction(
     // Render ONE scene to a keyframe (pure — reads worldRef which is set by the anchor pass first).
     const renderShot = async (i: number, sc: Record<string, string>): Promise<ShotRow> => {
       const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
+      const liveBg = role === "a-roll" && String((sc as Record<string, unknown>).live_bg) === "true"; // presenter + moving venue (Veo)
       const phoneMedia = sc.phone_screen_url ? await step.run(`phone-${i}`, () => importMediaUrl(String(sc.phone_screen_url)).catch(() => null)) : null;
       // PER-SCENE reference: a gallery image the producer pinned to THIS scene overrides the production-wide
       // guide + wardrobe lock, so the scene's chosen Set & Wardrobe image is the single source of truth here.
@@ -1029,9 +1030,11 @@ export const generateShots = inngest.createFunction(
         // guide's wardrobe; the guide reference becomes the single source of truth for her clothing.
         performance: String(sc.performance || ""), role, subjectLine, look: roleRefMedia ? lookBase : look, refInstruction, ratio,
         // A-ROLL = clean presenter shot (no crowd — HeyGen Avatar IV warps animated background people).
-        // B-ROLL gets background strangers ONLY when the director flagged this scene a busy public place
-        // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
-        hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: worldTagOn,
+        // EXCEPTION: a LIVE-BACKGROUND a-roll renders on Veo (full-scene animation), so it KEEPS the presenter
+        // framing but SHOWS the living venue behind her (the track + crowd) - the background will actually move.
+        // B-ROLL gets background strangers ONLY when the director flagged this scene a busy public place.
+        hasPeople: (role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true) || liveBg, worldAnchored: worldTagOn,
+        liveBg, // live-background a-roll: presenter framing WITH the full live venue scene behind her
         lockedOutfit: lockEff || undefined, // her one outfit OVERRIDES any per-scene outfit the storyboard wrote
         grade: grade || undefined, // the film's ONE locked colour grade, identical on every keyframe
       });
@@ -1255,6 +1258,11 @@ export const generateClips = inngest.createFunction(
       if (!img) return { scene: i, role, beat, kind: role, url: null, status: "failed", error: "no shot frame" };
       const base = String(sc.motion_prompt || sc.blocking || "natural movement");
       const line = String(sc.vo_line || "").trim();
+      // LIVE BACKGROUND a-roll: render this talking scene on Veo (the whole scene animates - e.g. horses
+      // racing behind her) instead of HeyGen (which freezes the background). Veo generates the mouth movement;
+      // her real ElevenLabs voice is laid OVER it in the stitch (approximate lip-sync, moving world - the
+      // documented pro workflow). Opt-in per scene; HeyGen stays the default for tight-sync clean talking heads.
+      const liveBg = role === "a-roll" && String((sc as Record<string, unknown>).live_bg) === "true";
       const presetAudio = String(sc.vo_audio_url || "").trim(); // producer's own uploaded VO for this scene
       // Steer the video model away from its two worst tells: shaky camera + people clipping through
       // the world. Appended to every clip prompt.
@@ -1302,7 +1310,7 @@ export const generateClips = inngest.createFunction(
       // A-ROLL ONLY = she speaks DIRECT TO CAMERA, lip-synced (OmniHuman drives her lips from our VO).
       // B-ROLL is a video SCENE: NEVER lip-synced — its VO narrates OVER the silent motion (laid in the
       // stitch via audio_url below). This is the standard a-roll/b-roll split.
-      if (role === "a-roll" && audioUrl) {
+      if (role === "a-roll" && audioUrl && !liveBg) {
         // A-ROLL prompt for HeyGen Avatar IV: it animates the PERSON, not the scene. Asking it to move
         // "background people" makes it WARP/fast-forward the crowd in the still (the hallucination we saw).
         // So this is SUBJECT-ONLY motion + an explicitly CALM, still background. No MOTION_SAFE/WATER here
@@ -1393,7 +1401,9 @@ export const generateClips = inngest.createFunction(
 
       // B-ROLL = a video SCENE (silent; the VO narrates OVER it in the stitch). A-ROLL fallback keeps
       // her front-on. B-ROLL: she is naturally absorbed in the scene and does NOT address the camera.
-      const motion = (role === "a-roll"
+      const motion = (liveBg
+        ? `${base}. She looks STRAIGHT INTO THE LENS and talks to camera, her lips moving naturally as she clearly speaks the line: "${line}". Behind and around her the WHOLE SCENE is fully ALIVE and moving in real time - the signature life of this exact place actually happening (e.g. racehorses thundering down the track, the grandstand crowd reacting, flags moving). She is the sharp foreground subject addressing the viewer while the living world plays out behind her. Calm, warm, natural delivery; hands mostly at rest. A steady, gentle, essentially locked frame - only a very slow, subtle push-in at most.`
+        : role === "a-roll"
         ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. Only she and the background move (background people, ambient motion).`
         : `${base}. A natural, candid video SCENE: she is IN the environment doing something real (sitting, using or showing the product, a relaxed glance or small gesture) and is NOT looking at or talking to the camera — observed b-roll, not a piece to camera. NOBODY in the scene looks at, mouths words to, or addresses the camera; her mouth is NOT moving as if speaking to camera (her voice is a voiceover laid over the top). The scene has GENTLE, restrained life: she moves naturally at a calm real-life pace with only SUBTLE ambient motion (a soft breeze, light shifting, any water or leaves). The CAMERA makes exactly ONE slow, deliberate cinematic move that serves the moment — a gentle push-in, a slow dolly, a soft lateral drift, or a rack-focus onto her or the product — smooth, controlled and motivated, playing out over the whole clip. ONE continuous move only: NEVER a whip-pan, snap-zoom, crash-zoom, fast swoop, crane, multiple cuts or hand-held shake, and the move NEVER warps the room, the subject, faces or straight lines. Cinematic and calm, not busy — FAVOUR a very slow, subtle push-in (it distorts fixed objects the least); use a lateral dolly/drift only if gentle, and keep fixed objects (umbrellas, signs, poles, furniture) rock-solid and anchored as the camera moves. When unsure, a very slow, subtle push-in.`) + MOTION_SAFE + WATER;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
@@ -1419,7 +1429,9 @@ export const generateClips = inngest.createFunction(
       // team wants) - the VO plays over the first part, music/ambient carry the cinematic breather to 8s.
       // env-tunable (BROLL_MIN_SECONDS); set to 3 to go back to VO-matched lengths.
       const BROLL_MIN = Math.max(3, Math.min(8, Number(process.env.BROLL_MIN_SECONDS) || 8));
-      const clipSeconds = (role === "b-roll" && typeof narrationDur === "number" && narrationDur > 0)
+      const clipSeconds = (liveBg && typeof narrationDur === "number" && narrationDur > 0)
+        ? Math.max(3, Math.min(8, Math.ceil(narrationDur))) // live-bg a-roll: match her spoken line, capped to Veo's 8s
+        : (role === "b-roll" && typeof narrationDur === "number" && narrationDur > 0)
         ? Math.max(BROLL_MIN, Math.min(15, Math.ceil(narrationDur)))
         : Math.max(3, Math.min(15, Math.round(sceneDur)));
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
@@ -1430,7 +1442,7 @@ export const generateClips = inngest.createFunction(
       // fixed-5s DoP (looped) so previews are quick; the final (non-draft) render uses Veo. BROLL_ENGINE=dop
       // forces DoP everywhere, =kling forces Kling. Veo falls back to Kling inside submitVideoFromImage on error.
       const brollEngine = (process.env.BROLL_ENGINE || "veo").toLowerCase();
-      const useVeo = role === "b-roll" && (hero || (brollEngine === "veo" && !speed));
+      const useVeo = liveBg || (role === "b-roll" && (hero || (brollEngine === "veo" && !speed)));
       const useDop = role === "b-roll" && !useVeo && brollEngine !== "kling" && dopConfigured();
       // DoP renders a FIXED ~5s clip; the stitch LOOPS it across a longer narration (no freeze). Its real
       // length is probed at render time so the loop/slot stay accurate.
