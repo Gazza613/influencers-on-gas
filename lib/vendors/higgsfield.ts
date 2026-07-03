@@ -710,9 +710,9 @@ export async function submitVideoFromImage(opts: { imageUrl: string; prompt: str
   const medias = [{ value: mediaId, role: "start_image" }, ...(endId ? [{ value: endId, role: "end_image" }] : [])];
   const dur = Math.max(3, Math.min(15, Math.round(opts.duration || 5))); // Kling 3.0 allows 3-15s
   const start = (model: string, extra: AnyObj = {}): AnyObj => ({ model, prompt: opts.prompt, aspect_ratio: ar, duration: dur, count: 1, medias, ...extra });
-  // HERO shot: route to Veo 3.1 (4K, native ambient audio). Veo durations are 4/6/8 - snap to the
-  // nearest. Tried FIRST; Kling fallback below if Veo errors.
-  const veoDur = [4, 6, 8].reduce((p, c) => (Math.abs(c - dur) < Math.abs(p - dur) ? c : p), 8);
+  // Veo 3.1 (4K, native ambient audio). Veo durations are 4/6/8 - snap UP to the nearest that COVERS the
+  // requested length so the clip is at least as long as the narration (max 8s). Tried FIRST; Kling fallback.
+  const veoDur = [4, 6, 8].find((c) => c >= dur) ?? 8;
   const heroShape: AnyObj = { model: "veo3_1", prompt: opts.prompt, aspect_ratio: ar, duration: veoDur, count: 1, medias, sound: "on" };
   // kling3_0_turbo is PRIMARY for b-roll: standard kling3_0 renders slowly and was running past our poll
   // window ("did not finish in time"). Turbo is built for speed and finishes far more reliably; standard

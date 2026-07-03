@@ -1418,17 +1418,18 @@ export const generateClips = inngest.createFunction(
         : Math.max(3, Math.min(15, Math.round(sceneDur)));
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
       const hero = role === "b-roll" && String(sc.hero) === "true";
-
-      // DoP (first-party Higgsfield SDK) — the DEFAULT b-roll engine whenever it's configured. The dedicated
-      // image-to-video REST API, used instead of the flaky MCP-Kling path that keeps TIMING OUT (Gary's
-      // "kling3_0_turbo did not finish in time"). Set BROLL_ENGINE=kling to force the old Kling path.
-      // Falls through to MCP-Kling below only if DoP isn't configured, errors, or returns no url.
-      // The DoP renders a FIXED short length (~5s) regardless of the duration we request. Rather than route
-      // longer b-roll to the flaky/timing-out Kling (clips then don't land), keep the fast, reliable DoP for
-      // ALL b-roll and LOOP the ~5s clip across the narration in the stitch (no freeze, no timeout). The DoP
-      // output length is env-tunable so the stitch knows how long each loop is.
+      // B-ROLL ENGINE — VEO is now the DEFAULT. Higgsfield's DoP API has NO duration control (verified against
+      // the official SDK), so DoP is stuck at a fixed ~5s clip; Veo 3.1 renders 4/6/8s at 4K with native audio
+      // = genuinely LONGER, better b-roll (fine on the Ultra plan). DRAFT SPEED mode falls back to the fast
+      // fixed-5s DoP (looped) so previews are quick; the final (non-draft) render uses Veo. BROLL_ENGINE=dop
+      // forces DoP everywhere, =kling forces Kling. Veo falls back to Kling inside submitVideoFromImage on error.
+      const brollEngine = (process.env.BROLL_ENGINE || "veo").toLowerCase();
+      const useVeo = role === "b-roll" && (hero || (brollEngine === "veo" && !speed));
+      const useDop = role === "b-roll" && !useVeo && brollEngine !== "kling" && dopConfigured();
+      // DoP renders a FIXED ~5s clip; the stitch LOOPS it across a longer narration (no freeze). Its real
+      // length is probed at render time so the loop/slot stay accurate.
       const DOP_OUT_SECONDS = Math.max(3, Number(process.env.DOP_OUT_SECONDS) || 5);
-      if (role === "b-roll" && !hero && process.env.BROLL_ENGINE !== "kling" && dopConfigured()) {
+      if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
         // anyway (same backstop as HeyGen) so a 429 waits-and-lands instead of silently dropping to Kling.
@@ -1466,7 +1467,7 @@ export const generateClips = inngest.createFunction(
         if (dop.error) await step.run(`dop-alert-${i}`, async () => { await alertIfCritical("Higgsfield DoP (b-roll video)", dop.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
       }
 
-      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: clipSeconds, hero }));
+      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: clipSeconds, hero: useVeo }));
       let url: string | null = sub.url;
       if (!url && sub.jobId) {
         let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
@@ -1478,7 +1479,7 @@ export const generateClips = inngest.createFunction(
         }
       }
       if (url) {
-        const usedModel = hero ? "veo3_1" : (process.env.HF_VIDEO_MODEL || "kling3");
+        const usedModel = useVeo ? "veo3_1" : (process.env.HF_VIDEO_MODEL || "kling3");
         await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: usedModel, unit: "video", action: role === "a-roll" ? "aroll" : "broll", count: 1 }).catch(() => {}));
         const hosted = (await step.run(`vhost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
         // B-ROLL (and silent a-roll fallback) carries its VO as audio_url so the stitch lays the
