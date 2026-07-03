@@ -376,9 +376,12 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             className="absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-alert/70 bg-black/60 text-sm text-alert transition hover:bg-alert/20 active:scale-90"
           >✕</button>
         )}
-        <div className="absolute left-1.5 top-1.5 flex gap-1">
+        <div className="absolute left-1.5 top-1.5 flex flex-wrap gap-1">
           <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
           <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
+          {c.url && (refs.aroll === c.url || refs.broll === c.url) && (
+            <span className="tabular rounded bg-[#a855f7] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]">★ {refs.aroll === c.url ? "A-roll" : "B-roll"} ref</span>
+          )}
         </div>
         {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (
           <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
@@ -400,8 +403,13 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/40 bg-black/55 text-lg text-white opacity-60 backdrop-blur-sm transition hover:scale-105 hover:bg-black/80 hover:opacity-100 active:scale-95">👁</button>
         )}
         {c.url && !broken.has(c.url) && !busy && editingId !== id && (
-          <button onClick={(e) => { e.stopPropagation(); setEditingId(id); setEditText(""); }} title="Edit this shot - change one thing, keep the rest"
-            className="absolute bottom-1.5 left-1.5 z-10 rounded-full border border-white/40 bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100 hover:bg-black/80">✎ Edit</button>
+          <div className="absolute bottom-1.5 left-1.5 z-10 flex gap-1 opacity-0 transition group-hover:opacity-100">
+            <button onClick={(e) => { e.stopPropagation(); setEditingId(id); setEditText(""); }} title="Edit this shot - change one thing, keep the rest"
+              className="rounded-full border border-white/40 bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm hover:bg-black/80">✎ Edit</button>
+            <button onClick={(e) => { e.stopPropagation(); setRoleRef(c.role === "b-roll" ? "broll" : "aroll", c.url as string); }}
+              title={`Set this as the ${c.role === "b-roll" ? "B-roll" : "A-roll"} reference the Producer matches (no 4K needed)`}
+              className="rounded-full border border-[#a855f7]/60 bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-[#c79bff] backdrop-blur-sm hover:bg-[#a855f7]/25">★ Set {c.role === "b-roll" ? "B-roll" : "A-roll"} ref</button>
+          </div>
         )}
         {editingId === id && !busy && (
           <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 bg-black/85 p-2 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
