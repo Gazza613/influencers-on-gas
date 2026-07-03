@@ -1656,14 +1656,20 @@ export const assembleVideo = inngest.createFunction(
     // Carry the last scene's frame across just that brief beat (no black tail), not a noticeable freeze.
     if (placed.length) placed[placed.length - 1].len = Math.max(placed[placed.length - 1].len, total - placed[placed.length - 1].start);
 
+    // The music (and ambient) must cover the FULL timeline INCLUDING the appended end card, or the bed stops
+    // ~endLen (up to 6s) before the real end — the "music dies ~6s before the video ends" bug. Add the end
+    // card length to the music length so the soundtrack survives to the very last second.
+    const endCardLenForBed = String((production?.brief as { endCardUrl?: string })?.endCardUrl || "").trim()
+      ? ((production?.brief as { endCardKind?: string })?.endCardKind === "image" ? 4 : 6) : 0;
+    const musicLen = total + endCardLenForBed;
     // Music bed (full length) → Blob. REUSE the audio step's bed if it already produced one.
     let musicUrl: string | null = (production as { music_url?: string })?.music_url || null;
-    // If the pre-generated bed is SHORTER than the real cut, drop it and re-generate at the true length -
-    // else it stops early with no fade (the fade-out only lands at the FILE's end, not the timeline's).
-    if (musicUrl && Number((production as { music_seconds?: number })?.music_seconds || 0) + 2 < total) musicUrl = null;
+    // If the pre-generated bed is SHORTER than the real cut (scenes + end card), drop it and re-generate at
+    // the true length — else it stops early (the fade-out only lands at the FILE's end, not the timeline's).
+    if (musicUrl && Number((production as { music_seconds?: number })?.music_seconds || 0) + 2 < musicLen) musicUrl = null;
     if (!musicUrl) try {
       const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
-      musicUrl = await step.run("music", async () => { const m = await generateMusic(brief, total * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }); // PCM path trims+loops to the EXACT cut length (no early stop, no pop)
+      musicUrl = await step.run("music", async () => { const m = await generateMusic(brief, musicLen * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }); // covers scenes + end card to the last second
       await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     } catch { musicUrl = null; }
 
