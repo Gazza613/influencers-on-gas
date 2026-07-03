@@ -16,7 +16,7 @@ type Scene = {
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
-type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; audio_url?: string | null; synced?: boolean };
+type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; audio_url?: string | null; synced?: boolean; draft?: boolean };
 type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[] } | null;
 
 const ROLE = {
@@ -176,6 +176,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const clips = production?.clips ?? [];
   const rendering = production?.clips_status === "running";
   const clipFor = (i: number) => clips.find((c) => c.scene === i);
+  // Draft clips = fast 720p/DoP proxies that still need a full-quality conform before delivery.
+  const draftClipCount = clips.filter((c) => c.url && c.status !== "failed" && c.draft).length;
   const shotsReady = shots.some((s) => s.url);
   const needsVoice = !!sb && sb.scenes.some((s) => (s.vo_line || "").trim().length > 0); // a-roll lip-sync AND b-roll VO-over both need the voice
   const voiceMissing = needsVoice && !voiceId;
@@ -404,6 +406,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
+  }
+
+  // CONFORM to full quality for delivery: re-animate every DRAFT clip at 1080p (a-roll) / Veo (b-roll)
+  // from its already-locked keyframe. Full-quality clips are skipped, so it only re-renders the proxies.
+  async function finalizeClips() {
+    if (rendering) return;
+    setErr("");
+    setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
+    const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ finalize: true }) }).then((x) => x.json()).catch(() => null);
+    if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the full-quality render - try again."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
+    await poll(setProduction, "clips_status");
   }
 
   const [zoom, setZoom] = useState<string | null>(null);
@@ -811,10 +825,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               {/* Priority queue is now ALWAYS ON (the fast paid image model) - a keyframe is the foundation of
                   every shot and ~1 credit is negligible on the Ultra plan, so there's no reason to sit in the
                   slow free queue. No toggle needed. */}
-              {/* Draft speed: faster keyframes (skip humaniser) + 720p a-roll clips. Final stitch is always 1080p. */}
+              {/* Draft speed: animation-only proxy (a-roll 720p, b-roll fast DoP). Keyframes stay FULL quality;
+                  the "Render final quality" conform at the Stitch step upgrades drafts to 1080p/Veo, no drift. */}
               <button
                 onClick={() => setSpeedMode((v) => !v)}
-                title="Draft speed: skip the skin-humaniser on keyframes AND render a-roll clips at 720p - faster + cheaper while you iterate. The final is ALWAYS stitched at 1080p; for a crisp final, switch this OFF and re-shoot/re-animate."
+                title="Draft speed: render your PREVIEW clips fast + cheap (a-roll at 720p, b-roll on the quick DoP engine) so your team can review quickly. Your keyframes stay FULL quality, so nothing about the shot is lost. When you're happy, hit 'Render final quality' at the Stitch step - it conforms every draft to 1080p / Veo from the SAME keyframe (same shot, no drift). Turn OFF to render at full quality from the start."
                 className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#a855f7] bg-[#a855f7]/15 text-[#d8b4fe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}
               >
                 <span aria-hidden>⚡</span> Draft speed
@@ -872,6 +887,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <div className="relative">
                           <ClipPreview clip={clip} className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
                           <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
+                          {clip.draft && <span className="absolute right-1 bottom-1 rounded bg-[#f59e0b]/90 px-1 py-0.5 text-[8px] font-bold text-black" title="Draft preview (720p a-roll / fast DoP b-roll). Render final quality at the Stitch step before delivery.">720p DRAFT</span>}
                           {clip.audio_url && clip.synced !== true && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-semibold text-[#7dd3fc]" title="This clip renders silent; her voiceover is overlaid here and baked in at the final stitch.">🔊 voice overlaid</span>}
                           <button onClick={() => setZoom(clip.url!)} title="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
                           {/* RE-ANIMATING this scene (it already has a clip): overlay feedback so it's clearly working.
@@ -1136,7 +1152,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <button onClick={() => shootAll(boardRatio)} disabled={shooting || rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting all keyframes…" : "📸 Shoot all keyframes"}</button>
                     <button onClick={() => animateAll(false)} disabled={shooting || wholeBoardBusy || animatingScenes.size > 0 || builtCount === keptScenes.length} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{wholeBoardBusy ? "🎞️ Animating…" : builtCount === keptScenes.length && keptScenes.length > 0 ? "✓ All scenes animated" : builtCount > 0 ? `🎞️ Animate remaining (${keptScenes.length - builtCount})` : "🎞️ Animate all"}</button>
                     {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || wholeBoardBusy || animatingScenes.size > 0} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
-                    <button onClick={() => setSpeedMode((v) => !v)} title="Draft speed renders a-roll clips at 720p (faster + cheaper) while you iterate. The final stitch is ALWAYS 1080p - for a crisp final, turn this OFF and re-animate the a-roll." className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}><span aria-hidden>⚡</span> Draft speed <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "720p" : "1080p"}</span></button>
+                    <button onClick={() => setSpeedMode((v) => !v)} title="Draft speed renders PREVIEW clips fast (a-roll 720p, b-roll on the quick DoP engine) for quick team review. Keyframes stay full quality. When happy, 'Render final quality' at the Stitch step conforms every draft to 1080p / Veo from the same keyframe - no drift. Turn OFF to render full quality from the start." className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}><span aria-hidden>⚡</span> Draft speed <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "720p" : "1080p"}</span></button>
                   </div>
                   {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - a-roll renders at 720p for faster iteration. Your final is still stitched at 1080p; for a crisp a-roll in the final, switch this to 1080p and re-animate before the last stitch.</p>}
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have). Fix any single scene with the buttons on the cards above.</p>
@@ -1194,11 +1210,24 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       </div>
                     )}
                   </div>
+                  {/* FULL-QUALITY CONFORM: draft previews are 720p (a-roll) / fast DoP (b-roll) proxies. Before
+                      delivery, re-render them at full quality (1080p a-roll, Veo b-roll) from the SAME locked
+                      keyframes - same shot, properly rendered, no drift. Shown only while draft clips remain. */}
+                  {draftClipCount > 0 && (
+                    <div className="mb-3 rounded-lg border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-[12px] font-semibold text-[#fbbf24]">⚠ {draftClipCount} scene{draftClipCount > 1 ? "s are" : " is"} still a draft preview (720p)</span>
+                        <button onClick={finalizeClips} disabled={rendering} className="ml-auto rounded-lg border-2 border-[#f59e0b] bg-[#f59e0b]/15 px-3 py-1.5 text-xs font-bold text-[#fbbf24] transition hover:bg-[#f59e0b]/25 disabled:opacity-50">{rendering ? "🎬 Rendering full quality…" : "🎬 Render final quality (1080p)"}</button>
+                      </div>
+                      <p className="mt-2 text-[11px] text-ink-faint">Re-renders every draft scene at full delivery quality (1080p a-roll, Veo b-roll) from the exact keyframe you approved - the same shot, properly finished, no drift. Full-quality scenes are skipped, so it only re-does the drafts. This takes longer (full engines), then stitch for a client-ready cut.</p>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-3">
                     <button onClick={stitchCut} disabled={assembling} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
                     <label className="flex cursor-pointer items-center gap-2 text-[12px] text-ink-dim"><input type="checkbox" checked={stitchCaptions} onChange={(e) => setStitchCaptions(e.target.checked)} className="h-4 w-4 accent-[#a855f7]" /> Burn in captions</label>
                     {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{production.assembly_error}</span>}
                   </div>
+                  {draftClipCount > 0 && <p className="mt-1.5 text-[11px] text-[#fbbf24]">Heads up: stitching now ships the 720p draft. Render final quality above first for a client-ready cut.</p>}
                   {stitchCaptions && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-ink-faint">Caption style:</span>

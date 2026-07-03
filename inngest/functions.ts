@@ -1082,9 +1082,12 @@ export const generateShots = inngest.createFunction(
       }
       // THE HUMANISER (realism pass): re-render the keyframe through Nano Banana Pro using itself as
       // the reference — holds identity/pose/wardrobe/framing, fixes ONLY the skin so it reads as a real
-      // photo (kills the plastic/AI sheen). This is the world-class-scene finish. Default ON; set
-      // HF_HUMANISE=0 to skip it for speed.
-      if (usable && process.env.HF_HUMANISE !== "0" && !speed) {
+      // photo (kills the plastic/AI sheen). This is the world-class-scene finish.
+      // ALWAYS ON, even in Draft speed: the keyframe LOCKS the shot, and the final-quality conform pass
+      // re-animates this EXACT still - so if the still weren't humanised, the delivered clip couldn't be
+      // full quality without re-shooting (which would drift). Draft speed is animation-only; the still is
+      // always the real thing. (HF_HUMANISE=0 is the global off switch.)
+      if (usable && process.env.HF_HUMANISE !== "0") {
         const human = await step.run(`humanise-${i}`, () => humaniseUrl(usable as string, { prompt: HUMANISER, ratio }).catch(() => null));
         if (human && (await step.run(`vhuman-${i}`, () => filterLoadable([human]))).length > 0) {
           usable = human;
@@ -1172,7 +1175,7 @@ export const generateShots = inngest.createFunction(
 // become HeyGen talking clips (the frame + our expressive VO); B-ROLL scenes become Kling
 // image->video motion clips (face-safe). Graphic scenes pass through to assembly. Durable +
 // progressive; every clip metered; one failed clip never blocks the rest.
-type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number; engine?: string };
+type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number; engine?: string; draft?: boolean };
 // Keep at least the old ~16 minute floor even when env-tuned lower; default to ~24 minutes for slow vendor queues.
 const CLIP_POLL_ROUNDS = Math.max(120, Number(process.env.CLIP_POLL_ROUNDS) || 180);
 export const generateClips = inngest.createFunction(
@@ -1356,7 +1359,7 @@ export const generateClips = inngest.createFunction(
             // model=avatar_iv always (no legacy path); the VARIANT records whether full motion+expressiveness applied.
             await step.run(`u-hg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "avatar_iv", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
             const hosted = (await step.run(`hghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
-            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: `heygen:avatar_iv:${hgVariant}` };
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: `heygen:avatar_iv:${hgVariant}`, draft: speed };
           }
           // Surface remaining HeyGen credits on failure - "render failed" across many scenes is usually the
           // account running out of quota (like Shotstack did), and this makes that obvious instead of guessing.
@@ -1378,7 +1381,7 @@ export const generateClips = inngest.createFunction(
               const billSeconds = Math.max(1, Math.round(ohSeconds || 8));
               await step.run(`u-oh-${i}`, () => recordUsage({ influencerId, provider: "fal", model: "omnihuman_1_5", unit: "second", action: "aroll", count: billSeconds }).catch(() => {}));
               const hosted = (await step.run(`ohhost-${i}`, () => rehostToBlob(ohUrl as string, "clips").catch(() => null))) || ohUrl;
-              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined };
+              return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: ohSeconds && ohSeconds > 0 ? ohSeconds : undefined, draft: speed };
             }
           }
         }
@@ -1399,7 +1402,7 @@ export const generateClips = inngest.createFunction(
           const hosted = (await step.run(`ahost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
           // Save the EXACT audio we lip-synced to — Seedance outputs a SILENT video (the audio
           // only drives the lips), so the stitch lays this same clip back over it for sound.
-          return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined };
+          return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, draft: speed };
         }
         // fall through to Kling motion (no sync) if both OmniHuman and Seedance failed
       }
@@ -1485,7 +1488,7 @@ export const generateClips = inngest.createFunction(
             // The stitch uses this to play the FULL clip — a single smooth b-roll instead of a 5s loop — and
             // only loops when the clip is genuinely shorter than its narration. Falls back to the old assumed 5s.
             const realDur = await step.run(`dopdur-${i}`, () => probeDuration(hosted as string).catch(() => null));
-            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : DOP_OUT_SECONDS, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo" };
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : DOP_OUT_SECONDS, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo", draft: speed };
           }
         }
         // DoP submit failed / render not done / errored → fall through to MCP-Kling below. But if the
@@ -1512,7 +1515,9 @@ export const generateClips = inngest.createFunction(
         // B-ROLL (and silent a-roll fallback) carries its VO as audio_url so the stitch lays the
         // narration OVER the silent scene — the continuous voiceover never drops out across the cut.
         const realDur = await step.run(`vdur-${i}`, () => probeDuration(hosted as string).catch(() => null));
-        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : clipSeconds, audio_url: audioUrl || undefined, synced: false };
+        // This path is Veo (b-roll) or Kling (live-bg) at full engine + 1080p - already delivery quality
+        // regardless of the draft flag, so it's never a proxy and the conform pass must skip it.
+        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : clipSeconds, audio_url: audioUrl || undefined, synced: false, draft: false };
       }
       return { scene: i, role, beat, kind: role, url: null, status: "failed", error: (sub.error || `render started (${sub.model}) but did not finish in time`) + (role === "b-roll" && !dopConfigured() ? " — B-ROLL is on the flaky Kling fallback because the reliable DoP engine is NOT configured: set HIGGSFIELD_KEY_ID + HIGGSFIELD_KEY_SECRET in the environment." : "") };
     };
