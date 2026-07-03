@@ -773,6 +773,7 @@ export async function rewriteSceneScript(o: { brand: string; tone: string; beat:
 export async function draftBrief(o: {
   influencerName: string; influencerProfile?: string; brand: string;
   offer?: string; benefits?: string; cta?: string; tone?: string; durationSeconds: number;
+  audience?: string; keyMessage?: string; proof?: string; brainFacts?: string;
 }): Promise<{ offer: string; benefits: string; cta: string; tone: string }> {
   const c = await client();
   const res = await c.messages.create({
@@ -786,7 +787,12 @@ export async function draftBrief(o: {
       tone: { type: "string", description: "3 to 4 tone words, comma separated" },
     }, required: ["offer", "benefits", "cta", "tone"] } as unknown as Anthropic.Tool["input_schema"] }],
     tool_choice: { type: "tool", name: "brief" },
-    messages: [{ role: "user", content: `Influencer: ${o.influencerName}.${o.influencerProfile ? ` Who she is: ${o.influencerProfile}.` : ""}\nBrand / product: ${o.brand || "(not specified)"}.\nCurrent draft - offer: "${o.offer || ""}"; benefits: "${o.benefits || ""}"; CTA: "${o.cta || ""}"; tone: "${o.tone || ""}".\n\nWrite the sharpened, world-class brief for this ${o.durationSeconds}s ad.` }],
+    messages: [{ role: "user", content: `Influencer: ${o.influencerName}.${o.influencerProfile ? ` Who she is: ${o.influencerProfile}.` : ""}\nBrand / product: ${o.brand || "(not specified)"}.\n` +
+      (o.audience ? `Target audience: ${o.audience}.\n` : "") +
+      (o.keyMessage ? `The ONE thing to land: ${o.keyMessage}.\n` : "") +
+      (o.proof ? `Proof / credibility to lean on: ${o.proof}.\n` : "") +
+      (o.brainFacts ? `\nVERIFIED BRAND FACTS from the client's knowledge base - use these as ground truth, do NOT contradict or invent around them:\n${o.brainFacts}\n` : "") +
+      `Current draft - offer: "${o.offer || ""}"; benefits: "${o.benefits || ""}"; CTA: "${o.cta || ""}"; tone: "${o.tone || ""}".\n\nWrite the sharpened, world-class brief for this ${o.durationSeconds}s ad.` }],
   });
   const block = res.content.find((b) => b.type === "tool_use");
   if (block && block.type === "tool_use") return block.input as { offer: string; benefits: string; cta: string; tone: string };

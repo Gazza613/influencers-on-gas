@@ -137,6 +137,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [offer, setOffer] = useState(String((initialProduction?.brief as { offer?: string })?.offer || ""));
   const [benefits, setBenefits] = useState(String((initialProduction?.brief as { benefits?: string })?.benefits || ""));
   const [briefBusy, setBriefBusy] = useState(false); // AI brief co-pilot in flight
+  const [briefOpen, setBriefOpen] = useState(false); // guided-questions panel open
+  const [briefAudience, setBriefAudience] = useState("");
+  const [briefKeyMsg, setBriefKeyMsg] = useState("");
+  const [briefProof, setBriefProof] = useState("");
+  const [briefUsedBrain, setBriefUsedBrain] = useState(false);
   const [cta, setCta] = useState(String((initialProduction?.brief as { cta?: string })?.cta || ""));
   const [ctaCode, setCtaCode] = useState(String((initialProduction?.brief as { ctaCode?: string })?.ctaCode || ""));
   const [duration, setDuration] = useState<number>(Number((initialProduction?.brief as { durationSeconds?: number })?.durationSeconds) || 60);
@@ -578,11 +583,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setBriefBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/producer/brief`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, tone, durationSeconds: duration }),
+      body: JSON.stringify({ brand, offer, benefits, cta, tone, durationSeconds: duration, audience: briefAudience, keyMessage: briefKeyMsg, proof: briefProof }),
     }).then((x) => x.json()).catch(() => null);
     setBriefBusy(false);
     if (r && typeof r.benefits === "string") {
       if (r.offer) setOffer(r.offer); if (r.benefits) setBenefits(r.benefits); if (r.cta) setCta(r.cta); if (r.tone) setTone(r.tone);
+      setBriefUsedBrain(!!r.usedBrain); setBriefOpen(false);
     } else setErr(r?.error || "Couldn't draft the brief - give it another go.");
   }
   async function writeScript() {
@@ -674,9 +680,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           <div className="space-y-3 border-t border-line pt-4">
             <div className="flex items-center justify-between gap-2">
               <div className="eyebrow">Story &amp; messaging</div>
-              <button onClick={draftBriefAI} disabled={briefBusy} title="Sharpen your offer and draft world-class key benefits, CTA + tone from the brand and this influencer" className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{briefBusy ? "✨ Drafting the brief…" : "✨ Draft with AI"}</button>
+              <button onClick={() => setBriefOpen((v) => !v)} disabled={briefBusy} title="Answer 2-3 quick questions and I draft a world-class brief - sharper offer, concrete benefits, CTA + tone (uses the client's brain if one is connected)" className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{briefBusy ? "✨ Drafting the brief…" : briefOpen ? "✕ Close" : "✨ Draft with AI"}</button>
             </div>
-            <p className="text-[11px] text-ink-faint">Add the <b>brand</b> (and a rough offer if you have one), then let me draft a world-class brief - I sharpen the offer and fill the benefits, CTA and tone. Edit anything after.</p>
+            {briefOpen && !briefBusy && (
+              <div className="space-y-2 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/[0.06] p-3">
+                <p className="text-[11px] text-ink-dim">Answer a couple (all optional) and I&apos;ll draft a world-class brief — a sharper offer, concrete benefits, the CTA and tone. If the client has a connected brain, I&apos;ll ground it in those facts too.</p>
+                <Field label="Who is it for? (audience)" v={briefAudience} set={setBriefAudience} placeholder="e.g. first-time bettors who think racing isn't for them" />
+                <Field label="The ONE thing to land" v={briefKeyMsg} set={setBriefKeyMsg} placeholder="e.g. you can get in the draw from just R50" />
+                <Field label="Proof / credibility to lean on" v={briefProof} set={setBriefProof} placeholder="e.g. R2.5m prize pool, official Durban July partner" />
+                <button onClick={draftBriefAI} disabled={briefBusy || !brand.trim()} className="btn-brand rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50">✨ Draft the brief →</button>
+                {!brand.trim() && <p className="text-[10px] text-amber-400">Add the brand / product up top first.</p>}
+              </div>
+            )}
+            {briefUsedBrain && <p className="text-[11px] text-[#93c5fd]">🧠 Grounded in the client&apos;s brain. Edit anything below.</p>}
+            <p className="text-[11px] text-ink-faint">The co-pilot sharpens the offer and fills the benefits, CTA and tone — edit anything after. Works with or without a client brain.</p>
             <Area label="Key benefits (comma separated)" v={benefits} set={setBenefits} placeholder="airtime, data, payments, vouchers, all in one app" />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Primary CTA" v={cta} set={setCta} placeholder="Download the MTN MoMo App, register today" />
