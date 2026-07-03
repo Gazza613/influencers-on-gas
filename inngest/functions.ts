@@ -1765,16 +1765,16 @@ export const assembleVideo = inngest.createFunction(
     // this gives controlled font size, wrapping, and a legible rounded background pill, sized for 9:16.
     const captionsOn = event.data.captions === true;
     // Strip any v3 audio tags ([excited] etc.) so they never render on screen, then HTML-escape.
-    const esc = (s: string) => s.replace(/\[[^\]]*\]/g, " ").replace(/\s*\|\s*/g, ", ").replace(/\s+([,.;:!?])/g, "$1").replace(/,(\s*[,.;:!?])/g, "$1").replace(/\s{2,}/g, " ").trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const esc = (s: string) => s.replace(/\[[^\]]*\]/g, " ").replace(/\s*\|\s*/g, ", ").replace(/\s+([,.;:!?])/g, "$1").replace(/,\s*([.!?;:])/g, "$1").replace(/([.!?;:])\s*,/g, "$1").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const capW = ratio === "1:1" ? 920 : 940; // box width within the 1080 frame (leaves side margins)
     // CAPTION STYLES the producer can pick (the old dark pill read "low-level"). Each is a full CSS look for
     // the per-scene caption line. Default = "bold" (the punchy social standard). Picked via captionStyle.
     const CAPTION_STYLES: Record<string, { css: string; height: number; offY: number }> = {
       pill: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:36px;line-height:1.3;padding:10px 20px;background:rgba(0,0,0,0.6);border-radius:12px;-webkit-box-decoration-break:clone;box-decoration-break:clone}", height: 260, offY: 0.10 },
-      bold: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:800;font-size:48px;line-height:1.22;text-transform:uppercase;letter-spacing:0.5px;-webkit-text-stroke:5px #000;paint-order:stroke fill;text-shadow:0 4px 10px rgba(0,0,0,0.55);padding:4px 14px}", height: 330, offY: 0.13 },
+      bold: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:800;font-size:48px;line-height:1.22;text-transform:uppercase;letter-spacing:0.5px;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 4px 10px rgba(0,0,0,0.55);padding:4px 14px}", height: 330, offY: 0.13 },
       highlight: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:800;font-size:42px;line-height:1.45;padding:6px 16px;background:#a855f7;border-radius:10px;-webkit-box-decoration-break:clone;box-decoration-break:clone;text-shadow:0 2px 4px rgba(0,0,0,0.35)}", height: 300, offY: 0.12 },
       clean: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFFFFF;font-family:'Open Sans',sans-serif;font-weight:700;font-size:42px;line-height:1.3;text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 -2px 0 #000,0 2px 0 #000,-2px 0 0 #000,2px 0 0 #000,0 3px 7px rgba(0,0,0,0.55);padding:4px 14px}", height: 280, offY: 0.11 },
-      sunny: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFE14D;font-family:'Open Sans',sans-serif;font-weight:800;font-size:46px;line-height:1.25;text-transform:uppercase;letter-spacing:0.5px;-webkit-text-stroke:5px #111;paint-order:stroke fill;text-shadow:0 4px 10px rgba(0,0,0,0.5);padding:4px 14px}", height: 320, offY: 0.13 },
+      sunny: { css: ".cap{width:100%;text-align:center}span{display:inline-block;color:#FFE14D;font-family:'Open Sans',sans-serif;font-weight:800;font-size:46px;line-height:1.25;text-transform:uppercase;letter-spacing:0.5px;text-shadow:-3px -3px 0 #111,3px -3px 0 #111,-3px 3px 0 #111,3px 3px 0 #111,0 -3px 0 #111,0 3px 0 #111,-3px 0 0 #111,3px 0 0 #111,0 4px 10px rgba(0,0,0,0.5);padding:4px 14px}", height: 320, offY: 0.13 },
     };
     // SAFE ZONE: sit captions ~20% up from the bottom (env CAPTION_Y) so they clear the platform's bottom UI
     // (TikTok/Reels caption bar, username, CTA + the right-side action buttons). The old ~11% sat too low.
@@ -1816,7 +1816,7 @@ export const assembleVideo = inngest.createFunction(
         // WORD-BY-WORD "karaoke": the full line shows, each word POPS to yellow as it's spoken. Word timings
         // are length-weighted across the scene's duration (approx sync). One clip per word, each highlighting
         // a different word. Big bold outlined for punch, in the safe zone.
-        const KARAOKE_CSS = ".cap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}.w{color:#FFFFFF;font-weight:800;font-size:46px;line-height:1.32;-webkit-text-stroke:4px #000;paint-order:stroke fill;text-shadow:0 3px 8px rgba(0,0,0,0.5)}.hl{color:#FFE14D}";
+        const KARAOKE_CSS = ".cap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}.w{color:#FFFFFF;font-weight:800;font-size:46px;line-height:1.32;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 3px 8px rgba(0,0,0,0.5)}.hl{color:#FFE14D}";
         captionClips = placed.filter((p) => p.caption).flatMap((p) => {
           const words = esc(p.caption).split(/\s+/).filter(Boolean);
           if (!words.length) return [];
@@ -1846,7 +1846,7 @@ export const assembleVideo = inngest.createFunction(
       } else {
         const capStyle = CAPTION_STYLES[capSel] || CAPTION_STYLES.bold;
         // Uppercase styles (bold/sunny + the default) are wider per glyph, so fewer chars fit a line.
-        const maxChars = (capSel === "bold" || capSel === "sunny" || capSel === "") ? 42 : 52;
+        const maxChars = (capSel === "bold" || capSel === "sunny" || capSel === "") ? 38 : 50;
         const offY = Math.max(capStyle.offY, CAP_Y);
         captionClips = placed.filter((p) => p.caption).flatMap((p) => {
           const text = esc(p.caption);
