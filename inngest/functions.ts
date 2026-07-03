@@ -9,7 +9,7 @@ import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
-import { renderEdit, pollRenderOnce } from "@/lib/vendors/shotstack";
+import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
@@ -1453,7 +1453,11 @@ export const generateClips = inngest.createFunction(
           if (dopUrl) {
             await step.run(`u-dop-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "dop_turbo", unit: "video", action: "broll", count: 1 }).catch(() => {}));
             const hosted = (await step.run(`dophost-${i}`, () => rehostToBlob(dopUrl as string, "clips").catch(() => null))) || dopUrl;
-            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: DOP_OUT_SECONDS, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo" };
+            // Record the clip's REAL rendered length (DoP may honour our requested duration and render >5s).
+            // The stitch uses this to play the FULL clip — a single smooth b-roll instead of a 5s loop — and
+            // only loops when the clip is genuinely shorter than its narration. Falls back to the old assumed 5s.
+            const realDur = await step.run(`dopdur-${i}`, () => probeDuration(hosted as string).catch(() => null));
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : DOP_OUT_SECONDS, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo" };
           }
         }
         // DoP submit failed / render not done / errored → fall through to MCP-Kling below. But if the
@@ -1479,7 +1483,8 @@ export const generateClips = inngest.createFunction(
         const hosted = (await step.run(`vhost-${i}`, () => rehostToBlob(url as string, "clips").catch(() => null))) || url;
         // B-ROLL (and silent a-roll fallback) carries its VO as audio_url so the stitch lays the
         // narration OVER the silent scene — the continuous voiceover never drops out across the cut.
-        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: clipSeconds, audio_url: audioUrl || undefined, synced: false };
+        const realDur = await step.run(`vdur-${i}`, () => probeDuration(hosted as string).catch(() => null));
+        return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : clipSeconds, audio_url: audioUrl || undefined, synced: false };
       }
       return { scene: i, role, beat, kind: role, url: null, status: "failed", error: (sub.error || `render started (${sub.model}) but did not finish in time`) + (role === "b-roll" && !dopConfigured() ? " — B-ROLL is on the flaky Kling fallback because the reliable DoP engine is NOT configured: set HIGGSFIELD_KEY_ID + HIGGSFIELD_KEY_SECRET in the environment." : "") };
     };

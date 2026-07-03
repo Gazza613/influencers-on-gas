@@ -12,6 +12,22 @@ async function key(): Promise<string> {
 
 type AnyObj = Record<string, unknown>;
 
+// Probe a hosted media URL for its REAL duration (seconds) via Shotstack's probe endpoint. Used to record
+// the actual length of a rendered b-roll clip (the DoP engine may render longer or shorter than requested),
+// so the stitch plays the full clip instead of assuming a fixed ~5s. Best-effort: returns null on any error.
+export async function probeDuration(url: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${BASE}/probe/${encodeURIComponent(url)}`, { headers: { "x-api-key": await key() }, cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json().catch(() => null)) as { response?: { metadata?: { format?: { duration?: number | string }; streams?: { codec_type?: string; duration?: number | string }[] } } } | null;
+    const meta = data?.response?.metadata;
+    const fmt = Number(meta?.format?.duration);
+    if (fmt > 0) return fmt;
+    for (const s of meta?.streams ?? []) { const d = Number(s?.duration); if (d > 0) return d; }
+    return null;
+  } catch { return null; }
+}
+
 // Submit an edit; returns the render id.
 export async function renderEdit(edit: AnyObj): Promise<string> {
   const res = await fetch(`${BASE}/render`, {
