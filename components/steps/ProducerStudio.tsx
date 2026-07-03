@@ -398,8 +398,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "" });
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  // Close the edit panel but KEEP the scene you were on in view - collapsing the panel otherwise slides the
+  // viewport onto a later scene (Gary's "Save jumps me to scene 6").
+  function closeEditKeep(i: number | null) {
+    setEditIdx(null);
+    if (i != null) requestAnimationFrame(() => document.getElementById(`prod-scene-${i}`)?.scrollIntoView({ block: "center", behavior: "auto" }));
+  }
   function openEdit(i: number, s: Scene) {
-    if (editIdx === i) { setEditIdx(null); return; }
+    if (editIdx === i) { closeEditKeep(i); return; }
     setEditIdx(i); setAiInstr("");
     setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false", ref: s.ref_url || "" });
   }
@@ -421,7 +427,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref }),
     }).then((x) => x.json()).catch(() => null);
-    if (r?.saved) { applyEditsLocally(i); setEditIdx(null); } else setErr(r?.error || "Couldn't save.");
+    if (r?.saved) { applyEditsLocally(i); closeEditKeep(i); } else setErr(r?.error || "Couldn't save.");
   }
   async function reshootScene(i: number) {
     setErr(""); setEditIdx(null);
@@ -815,7 +821,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               const stepReached = unlocked("scenes");
               const clipFailed = clip?.status === "failed" && stepReached;
               return (
-                <div key={i} className="flex gap-4 rounded-xl border border-line bg-surface-1 p-4">
+                <div key={i} id={`prod-scene-${i}`} className="flex gap-4 rounded-xl border border-line bg-surface-1 p-4">
                   {s.role !== "graphic" && (
                     <div className="w-32 shrink-0">
                       {shot?.reshooting ? (
@@ -959,7 +965,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button onClick={() => saveScene(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save changes</button>
                         <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>
-                        <button onClick={() => setEditIdx(null)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
+                        <button onClick={() => closeEditKeep(editIdx)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                       </div>
                       <p className="text-[10px] text-ink-faint">Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched.</p>
                     </div>
