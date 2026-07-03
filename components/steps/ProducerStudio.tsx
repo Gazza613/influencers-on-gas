@@ -1008,7 +1008,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <div>
                             <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
                             <button onClick={() => setEd((e) => ({ ...e, liveBg: e.liveBg === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.liveBg === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.liveBg === "true" ? "🎬 Live background · Veo ✓" : "🎬 Live background (moving scene)"}</button>
-                            <p className="mt-1 text-[10px] text-ink-faint">Renders this talking scene in Veo so the WHOLE world moves behind her (e.g. horses racing), her voice laid over. Trade-off: lip-sync is a touch looser than the default, and it&apos;s pricier + slower. Default off = HeyGen (tight lip-sync, still background). Needs a re-shoot + re-animate.</p>
+                            <p className="mt-1 text-[10px] text-ink-faint">Renders this scene on the FAST DoP engine so the WHOLE world moves behind her (e.g. horses racing), her voice laid over. Trade-off: she reads as IN the living scene rather than tight lip-syncing to camera (the engine animates the scene, not the lips). Best for short hero beats (~5s). Default off = HeyGen (tight lip-sync, still background). Needs a re-shoot + re-animate.</p>
                           </div>
                         )}
                       </div>

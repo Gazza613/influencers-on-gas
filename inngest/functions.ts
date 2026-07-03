@@ -1442,8 +1442,11 @@ export const generateClips = inngest.createFunction(
       // fixed-5s DoP (looped) so previews are quick; the final (non-draft) render uses Veo. BROLL_ENGINE=dop
       // forces DoP everywhere, =kling forces Kling. Veo falls back to Kling inside submitVideoFromImage on error.
       const brollEngine = (process.env.BROLL_ENGINE || "veo").toLowerCase();
-      const useVeo = liveBg || (role === "b-roll" && (hero || (brollEngine === "veo" && !speed)));
-      const useDop = role === "b-roll" && !useVeo && brollEngine !== "kling" && dopConfigured();
+      // SPEED FIX: a Live-background a-roll now renders on the FAST first-party DoP lane (priority queue,
+      // ~5 min) instead of Veo on the slow MCP session (10-20 min). DoP animates the whole scene (horses
+      // move) - her voice is laid over. Hero b-roll keeps Veo (premium 4K, opt-in, slower is accepted).
+      const useVeo = role === "b-roll" && (hero || (brollEngine === "veo" && !speed));
+      const useDop = (liveBg || role === "b-roll") && !useVeo && brollEngine !== "kling" && dopConfigured();
       // DoP renders a FIXED ~5s clip; the stitch LOOPS it across a longer narration (no freeze). Its real
       // length is probed at render time so the loop/slot stay accurate.
       const DOP_OUT_SECONDS = Math.max(3, Number(process.env.DOP_OUT_SECONDS) || 5);
