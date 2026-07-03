@@ -874,6 +874,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <div className="mt-1 text-[13px] text-ink-dim"><span className="text-ink-faint">🎥</span> {s.shot}</div>
                   <div className="mt-1 text-[13px] text-ink-dim"><span className="text-ink-faint">🎬</span> {s.blocking} <span className="text-ink-faint">· {s.performance}</span></div>
                   {s.vo_line && <div className="mt-2 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 px-3 py-2 text-[13px] text-ink">🎙️ “{s.vo_line}”</div>}
+                  {s.role === "b-roll" && (() => {
+                    const words = (s.vo_line || "").trim().split(/\s+/).filter(Boolean).length;
+                    const secs = words / 2.5; // ~2.5 words/sec natural VO pace
+                    return words > 20 ? <div className="mt-1 text-[11px] font-semibold text-amber-400">⚠ This b-roll line is ~{secs.toFixed(0)}s ({words} words) — over the 8s b-roll cap. Tighten it via ✎ Edit scene → ✨ Rewrite with AI so the clip fits in one shot.</div> : null;
+                  })()}
                   {s.caption && <div className="mt-1 text-[12px] text-ink-faint">CC: {String(s.caption).replace(/\s*\|\s*/g, ", ").replace(/\s+([,.;:!?])/g, "$1")}</div>}
                   {s.motion_prompt && <div className="mt-1 text-[12px] text-ink-faint">↗ Motion: {s.motion_prompt}</div>}
                   {s.graphics?.length > 0 && <div className="mt-1 text-[12px] text-ink-faint">▣ {s.graphics.join(" · ")}</div>}
