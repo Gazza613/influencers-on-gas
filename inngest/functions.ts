@@ -515,9 +515,11 @@ export const generateCreatives = inngest.createFunction(
     // not hold identity in testing; references do). Renders on Nano Banana Pro (best reference
     // fidelity, native square, free on our plan), falling back to the previously-validated
     // gpt_image_2 if the model is unavailable. `cinematic` is an explicit flag, not a model name.
-    // PRIORITY (faster, paid) render queue when the producer opts in; else the free default. genModel
-    // drives both generation and metering, so this one switch makes the whole creatives run + cost match.
-    const genModel = event.data.priority === true ? PRIORITY_MODEL : IMAGE_MODEL;
+    // PRIORITY is now ALWAYS ON (Gary's call): every image renders on the fast paid model - ~1 credit is
+    // negligible on Ultra and a foundation image should never sit in the slow free queue. No opt-in flag;
+    // the server forces it so it can't accidentally be off. genModel drives both generation and metering.
+    // (HF_IMAGES_FREE=1 is an emergency escape hatch back to the free model.)
+    const genModel = process.env.HF_IMAGES_FREE === "1" ? IMAGE_MODEL : PRIORITY_MODEL;
     const cinematic = event.data.cinematic === true;
 
     // Re-read + a run COUNTER so concurrent renders (e.g. a 9:16 and a 1:1 at once) don't clobber
@@ -872,8 +874,11 @@ export const generateShots = inngest.createFunction(
     const roleFilter = event.data.roleFilter === "a-roll" || event.data.roleFilter === "b-roll" ? String(event.data.roleFilter) : "";
     // Scene filter: shoot only these scene indices' KEYFRAMES (per-scene reference shoot). Empty = all.
     const sceneFilter: number[] | null = Array.isArray(event.data.scenes) && event.data.scenes.length ? (event.data.scenes as unknown[]).map(Number) : null;
-    // PRIORITY (faster, paid) render model when the producer opts in for speed; else the free default.
-    const shotModel = event.data.priority === true ? PRIORITY_MODEL : IMAGE_MODEL;
+    // PRIORITY is now ALWAYS ON (Gary's call): producer keyframes always render on the fast paid model,
+    // regardless of any caller flag, so a keyframe never waits in the slow free queue. ~1 credit, negligible
+    // on Ultra. This also keeps the keyframe on the SAME model the identity was built on (BUILD_MODEL).
+    // (HF_IMAGES_FREE=1 is an emergency escape hatch back to the free model.)
+    const shotModel = process.env.HF_IMAGES_FREE === "1" ? IMAGE_MODEL : PRIORITY_MODEL;
     const speed = event.data.speed === true; // DRAFT speed: skip the humaniser (a whole 2nd render/keyframe) for faster shoots
     // Aspect ratio is producer-chosen per shoot (9:16 reels / 1:1 feed / 16:9 youtube); falls back to the storyboard format.
     const allowedRatios = ["9:16", "1:1", "16:9"];
