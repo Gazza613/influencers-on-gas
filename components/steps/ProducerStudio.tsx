@@ -91,6 +91,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // hear which holds the accent before committing to the full voiceover.
   const firstVoLine = ((initialProduction?.storyboard?.scenes || []).find((s) => (s.vo_line || "").trim())?.vo_line || "").trim();
   const [previewText, setPreviewText] = useState(firstVoLine);
+  const [previewSceneIdx, setPreviewSceneIdx] = useState<number | null>(null); // which scene's copy is loaded (so edits can be saved back to it)
+  const [previewSaved, setPreviewSaved] = useState(false);
   const [previewAccent, setPreviewAccent] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewBusy, setPreviewBusy] = useState<"" | "v2" | "v3">("");
@@ -101,6 +103,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const r = await fetch(`/api/influencers/${influencerId}/voice/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: previewText.trim(), model: m, accent: previewAccent.trim(), speed: voiceSpeed }) }).then((x) => x.json()).catch(() => null);
     if (r?.url) setPreviewUrl(`${r.url}?t=${Date.now()}`); else setPreviewErr(r?.error || "Preview failed - try again.");
     setPreviewBusy("");
+  }
+  // Save the tested copy back to its scene so it actually SHIPS (the preview box alone is just a scratchpad;
+  // the full voiceover reads each scene's line). Persists vo_line + matching caption, updates the board.
+  async function savePreviewToScene() {
+    if (previewSceneIdx == null || !previewText.trim() || previewSaved) return;
+    const i = previewSceneIdx; const line = previewText.trim();
+    setPreviewErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, vo_line: line, caption: line }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.saved) {
+      setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, vo_line: line, caption: line } : s)) } } : p));
+      setPreviewSaved(true);
+    } else setPreviewErr(r?.error || "Couldn't save the copy to the scene.");
   }
   async function genVoiceover() {
     if (voBusy) return;
@@ -1026,21 +1042,24 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       <div className="tabular mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-ink-faint">
                         <span>🎧 Test the delivery</span>
                         {sb && sb.scenes.some((s) => (s.vo_line || "").trim()) && (
-                          <select onChange={(e) => { if (e.target.value) setPreviewText(e.target.value); }} defaultValue="" className="rounded border border-line bg-surface-1 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink-dim">
+                          <select onChange={(e) => { const v = e.target.value; if (v === "") { setPreviewSceneIdx(null); return; } const idx = Number(v); setPreviewSceneIdx(idx); setPreviewText(String(sb?.scenes?.[idx]?.vo_line || "")); setPreviewSaved(false); }} value={previewSceneIdx == null ? "" : String(previewSceneIdx)} className="rounded border border-line bg-surface-1 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink-dim">
                             <option value="">Load a scene line…</option>
-                            {sb.scenes.map((s, i) => (s.vo_line || "").trim() ? <option key={i} value={s.vo_line}>Scene {i + 1}</option> : null)}
+                            {sb.scenes.map((s, i) => (s.vo_line || "").trim() ? <option key={i} value={i}>Scene {i + 1}</option> : null)}
                           </select>
                         )}
                       </div>
-                      <textarea value={previewText} onChange={(e) => setPreviewText(e.target.value)} rows={2} placeholder="Type or load a scene line to test…" className="w-full resize-none rounded-lg border border-line bg-surface-1 px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faint" />
+                      <textarea value={previewText} onChange={(e) => { setPreviewText(e.target.value); setPreviewSaved(false); }} rows={2} placeholder="Type or load a scene line to test…" className="w-full resize-none rounded-lg border border-line bg-surface-1 px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faint" />
                       <input value={previewAccent} onChange={(e) => setPreviewAccent(e.target.value)} placeholder="Accent cue for v3 (e.g. South African) — optional" className="mt-2 w-full rounded-lg border border-line bg-surface-1 px-2.5 py-1.5 text-[12px] text-ink placeholder:text-ink-faint" />
                       <div className="mt-2 flex gap-2">
                         <button onClick={() => runPreview("v2")} disabled={!!previewBusy || !previewText.trim()} className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink-dim hover:border-[#a855f7]/40 hover:text-ink disabled:opacity-50">{previewBusy === "v2" ? "Synthesising…" : "▶ Preview v2 (Stable)"}</button>
                         <button onClick={() => runPreview("v3")} disabled={!!previewBusy || !previewText.trim()} className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink-dim hover:border-[#a855f7]/40 hover:text-ink disabled:opacity-50">{previewBusy === "v3" ? "Synthesising…" : "▶ Preview v3 (Expressive)"}</button>
                       </div>
+                      {previewSceneIdx != null && (
+                        <button onClick={savePreviewToScene} disabled={previewSaved || !previewText.trim()} className={`mt-2 w-full rounded-lg border px-3 py-2 text-xs font-semibold transition ${previewSaved ? "border-ready/50 text-ready" : "border-[#a855f7]/50 text-[#c79bff] hover:bg-[#a855f7]/10"} disabled:opacity-60`}>{previewSaved ? `✓ Saved to Scene ${previewSceneIdx + 1} — re-run the voiceover to hear it` : `💾 Save this copy to Scene ${previewSceneIdx + 1} (so it ships)`}</button>
+                      )}
                       {previewUrl && <audio key={previewUrl} src={previewUrl} controls autoPlay className="mt-2 h-9 w-full" />}
                       {previewErr && <p className="mt-1.5 text-[11px] text-red-400">{previewErr}</p>}
-                      <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">Hear the same line on both models, pick the one that keeps Leah&apos;s accent, then set it above. v3 adds expressive tags (+ the accent cue if you give one) — which is also what can drift a designed voice.</p>
+                      <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">This box only TESTS the voice — editing the words here does NOT change what ships on its own. To make an edit stick: load its scene, tweak, then <b>Save this copy to the scene</b> (or edit it in ✎ Edit scene). The full voiceover reads each scene&apos;s line, so <b>re-run the voiceover</b> after any copy change. v3 adds expressive tags (+ the accent cue) — which can drift a designed voice.</p>
                     </div>
                     {/* Voice SPEED: default + slower/faster. Faster often reads more natural/energetic. */}
                     <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
