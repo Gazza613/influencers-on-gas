@@ -1413,8 +1413,12 @@ export const generateClips = inngest.createFunction(
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const sceneDur = a != null && b != null && b > a ? b - a : 5;
       const narrationDur = sceneAudio.get(i)?.duration;
+      // B-ROLL 8s FLOOR: every b-roll with a VO renders a FULL 8s clip by default (the impactful length the
+      // team wants) - the VO plays over the first part, music/ambient carry the cinematic breather to 8s.
+      // env-tunable (BROLL_MIN_SECONDS); set to 3 to go back to VO-matched lengths.
+      const BROLL_MIN = Math.max(3, Math.min(8, Number(process.env.BROLL_MIN_SECONDS) || 8));
       const clipSeconds = (role === "b-roll" && typeof narrationDur === "number" && narrationDur > 0)
-        ? Math.max(3, Math.min(15, Math.ceil(narrationDur)))
+        ? Math.max(BROLL_MIN, Math.min(15, Math.ceil(narrationDur)))
         : Math.max(3, Math.min(15, Math.round(sceneDur)));
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
       const hero = role === "b-roll" && String(sc.hero) === "true";
@@ -1556,17 +1560,22 @@ export const generateAudio = inngest.createFunction(
     // them back-to-back. Each is a single slow ElevenLabs request.
     const brief = sb.music_bed || `${sb.tone || "warm, modern"} background music bed for a social ad, no vocals`;
     const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
-    const [musicUrl, ambientUrl] = await Promise.all([
-      step.run("music", async () => { const m = await generateMusic(brief, total * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }).catch(() => null),
-      step.run("ambient", async () => putBytes(await generateSfx(`a rich, immersive and clearly audible ambient soundscape for ${setting}: the real, characterful environmental sounds you would actually hear in that place - present room tone with genuine depth, natural background detail and gentle life and movement, layered and believable so the world feels alive (not a faint whisper). Full and noticeable in the mix. Absolutely NO music, NO speech and NO voices.`, 22), "ambient", "mp3", "audio/mpeg")).catch(() => null),
+    // CATCH INSIDE each step (return {url,error}) so a failed vendor call NEVER throws the step - with
+    // retries:0 a thrown step would fail the whole run and save NOTHING (the "audio step produces nothing"
+    // bug). This way whichever bed succeeds still shows, and a real failure surfaces its reason in the UI.
+    const [music, ambient] = await Promise.all([
+      step.run("music", async () => { try { const m = await generateMusic(brief, total * 1000); return { url: await putBytes(m.buf, "music", m.ext, m.mime), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
+      step.run("ambient", async () => { try { const buf = await generateSfx(`a rich, immersive and clearly audible ambient soundscape for ${setting}: the real, characterful environmental sounds you would actually hear in that place - present room tone with genuine depth, natural background detail and gentle life and movement, layered and believable so the world feels alive (not a faint whisper). Full and noticeable in the mix. Absolutely NO music, NO speech and NO voices.`, 22); return { url: await putBytes(buf, "ambient", "mp3", "audio/mpeg"), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
     ]);
+    const musicUrl = music.url, ambientUrl = ambient.url;
     if (musicUrl) await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     if (ambientUrl) await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
 
     const done = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prod = (done.production ?? production) as Record<string, unknown>;
-    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, music_url: musicUrl, ambient_url: ambientUrl, music_seconds: total, audio_status: "done" } } }));
-    return { ok: true, music: !!musicUrl, ambient: !!ambientUrl };
+    const audioError = [music.error && `Music: ${music.error}`, ambient.error && `Ambient: ${ambient.error}`].filter(Boolean).join(" · ") || null;
+    await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, music_url: musicUrl, ambient_url: ambientUrl, music_seconds: total, audio_error: audioError, audio_status: "done" } } }));
+    return { ok: true, music: !!musicUrl, ambient: !!ambientUrl, error: audioError };
   },
 );
 
@@ -1641,7 +1650,9 @@ export const assembleVideo = inngest.createFunction(
       const tcLen = a != null && b != null && b > a ? b - a : 5;
       let len = clipDur(i) ?? tcLen;
       // b-roll → narration length (cuts the engine's frozen tail; keeps the VO continuous).
-      if (role === "b-roll" && sceneAudioDur.has(i)) len = sceneAudioDur.get(i)!;
+      // Show the FULL b-roll clip (8s floor): the slot is the longer of the narration and the real clip
+      // length, so a short VO still plays the whole 8s shot (VO over the start, music/ambient after).
+      if (role === "b-roll" && sceneAudioDur.has(i)) len = Math.max(sceneAudioDur.get(i)!, clipDur(i) ?? 0);
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
       else if (role === "b-roll" && !vo) len = Math.min(len, 2.8);
       const start = cursor;

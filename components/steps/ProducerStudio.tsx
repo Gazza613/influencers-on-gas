@@ -17,7 +17,7 @@ type Scene = {
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; wizard_approved?: string[]; dropped_scenes?: number[] } | null;
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[] } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -875,9 +875,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <div className="mt-1 text-[13px] text-ink-dim"><span className="text-ink-faint">🎬</span> {s.blocking} <span className="text-ink-faint">· {s.performance}</span></div>
                   {s.vo_line && <div className="mt-2 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 px-3 py-2 text-[13px] text-ink">🎙️ “{s.vo_line}”</div>}
                   {s.role === "b-roll" && (() => {
+                    // Prefer the REAL TTS slice duration once the voiceover exists (exact gate); before that,
+                    // estimate from word count at ~2.5 words/sec. Flag anything genuinely over the 8s b-roll cap.
+                    const real = (production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio?.find?.((e) => Number(e.scene) === i)?.duration;
                     const words = (s.vo_line || "").trim().split(/\s+/).filter(Boolean).length;
-                    const secs = words / 2.5; // ~2.5 words/sec natural VO pace
-                    return words > 20 ? <div className="mt-1 text-[11px] font-semibold text-amber-400">⚠ This b-roll line is ~{secs.toFixed(0)}s ({words} words) — over the 8s b-roll cap. Tighten it via ✎ Edit scene → ✨ Rewrite with AI so the clip fits in one shot.</div> : null;
+                    const hasReal = typeof real === "number" && real > 0;
+                    const secs = hasReal ? real : words / 2.5;
+                    const over = hasReal ? real > 8.3 : words > 20;
+                    return over ? <div className="mt-1 text-[11px] font-semibold text-amber-400">⚠ This b-roll VO is ~{secs.toFixed(0)}s{hasReal ? " (measured)" : ` (${words} words)`} — over the 8s b-roll cap. Tighten it via ✎ Edit scene → ✨ Rewrite with AI so it fits one clip.</div> : null;
                   })()}
                   {s.caption && <div className="mt-1 text-[12px] text-ink-faint">CC: {String(s.caption).replace(/\s*\|\s*/g, ", ").replace(/\s+([,.;:!?])/g, "$1")}</div>}
                   {s.motion_prompt && <div className="mt-1 text-[12px] text-ink-faint">↗ Motion: {s.motion_prompt}</div>}
@@ -1073,10 +1078,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               {unlocked("audio") ? (
                 <>
                   <button onClick={genAudio} disabled={audioBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{audioBusy ? "🎵 Generating audio…" : audioReady ? "↻ Re-generate audio" : "🎵 Generate music & ambient"}</button>
-                  {audioReady ? (
+                  {production?.audio_status === "done" ? (
                     <div className="mt-3 space-y-2">
                       {production?.music_url && <div><div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Music bed</div><audio src={production.music_url} controls className="mt-1 h-8 w-full max-w-sm" /></div>}
                       {production?.ambient_url && <div><div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Ambient tone</div><audio src={production.ambient_url} controls className="mt-1 h-8 w-full max-w-sm" /></div>}
+                      {(!production?.music_url || !production?.ambient_url) && (
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300">
+                          ⚠ {!production?.music_url && !production?.ambient_url ? "Neither bed generated" : !production?.ambient_url ? "The ambient tone didn't generate" : "The music bed didn't generate"}{production?.audio_error ? ` — ${production.audio_error}` : ""}. Hit ↻ Re-generate audio, or just <b>Accept</b> — the stitch creates the music + ambient automatically at the final cut.
+                        </div>
+                      )}
                     </div>
                   ) : !audioBusy && (
                     <p className="mt-2 text-[11px] text-ink-faint">Optional - generate to preview the beds, or just <b>Accept</b> to skip; the stitch will create the music + ambient for you automatically.</p>
