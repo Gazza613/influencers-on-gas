@@ -709,17 +709,36 @@ export async function generateStoryboard(brief: {
   const content: Part[] = [{ type: "text", text: input }];
   if (brief.arollRefImage) { content.push({ type: "text", text: "A-ROLL reference creative (the approved talking-shot look + cast):" }, { type: "image", source: { type: "url", url: brief.arollRefImage } }); }
   if (brief.brollRefImage) { content.push({ type: "text", text: "B-ROLL reference creative (study WHO is in it and WHAT they are doing - reproduce that person + action):" }, { type: "image", source: { type: "url", url: brief.brollRefImage } }); }
-  const res = await c.messages.create({
-    model: PREMIUM,
-    max_tokens: 6000,
-    system: PRODUCER_SYSTEM,
-    tools: [{ name: "storyboard", description: "Return the complete directed storyboard.", input_schema: STORYBOARD_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
-    tool_choice: { type: "tool", name: "storyboard" },
-    messages: [{ role: "user", content: content as unknown as Anthropic.MessageParam["content"] }],
-  });
-  const block = res.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") throw new Error("No storyboard returned");
-  return block.input as Storyboard;
+  const genOnce = async (): Promise<Storyboard> => {
+    const res = await c.messages.create({
+      model: PREMIUM,
+      max_tokens: 6000,
+      system: PRODUCER_SYSTEM,
+      tools: [{ name: "storyboard", description: "Return the complete directed storyboard.", input_schema: STORYBOARD_SCHEMA as unknown as Anthropic.Tool["input_schema"] }],
+      tool_choice: { type: "tool", name: "storyboard" },
+      messages: [{ role: "user", content: content as unknown as Anthropic.MessageParam["content"] }],
+    });
+    const block = res.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") throw new Error("No storyboard returned");
+    return block.input as Storyboard;
+  };
+  // GUARANTEE the a-roll → b-roll → a-roll rhythm the team locked in (start + end on a-roll, never two of the
+  // same role back to back). It's a prompt rule the LLM occasionally slips on, so validate + retry, and as a
+  // final backstop force the role pattern so a NON-alternating cut can never ship again.
+  const alternates = (sb: Storyboard): boolean => {
+    const roles = (sb.scenes || []).map((s) => String(s.role || "")).filter((r) => r === "a-roll" || r === "b-roll");
+    if (roles.length < 2) return true;
+    if (roles[0] !== "a-roll" || roles[roles.length - 1] !== "a-roll") return false;
+    for (let i = 1; i < roles.length; i++) if (roles[i] === roles[i - 1]) return false;
+    return true;
+  };
+  let sb = await genOnce();
+  for (let attempt = 0; attempt < 2 && !alternates(sb); attempt++) sb = await genOnce();
+  if (!alternates(sb)) {
+    // Backstop: force a-roll, b-roll, a-roll, … (even index = a-roll) so it starts + ends on a-roll.
+    (sb.scenes || []).forEach((s, i) => { if (String(s.role) !== "graphic") s.role = (i % 2 === 0 ? "a-roll" : "b-roll") as StoryScene["role"]; });
+  }
+  return sb;
 }
 
 // THE PRODUCER's script helper: rewrite ONE scene's voiceover line + matching caption, in the
