@@ -1207,7 +1207,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
         </div>
       ) : null}
       {celebrate && <Celebration name={name} onDone={() => setCelebrate(false)} />}
-      {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} />}
+      {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} fill />}
       {vzoom && (
         <div onClick={() => setVzoom(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
           <video src={vzoom} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} className="max-h-[90vh] max-w-[90vw] rounded-xl border border-line bg-black" />

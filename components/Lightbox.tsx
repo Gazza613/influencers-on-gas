@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 // Full-screen image OR video viewer with download. Close on Esc or backdrop click.
-export default function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
+export default function Lightbox({ url, onClose, fill = false }: { url: string; onClose: () => void; fill?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
   useEffect(() => {
@@ -37,7 +37,9 @@ export default function Lightbox({ url, onClose }: { url: string; onClose: () =>
           </div>
         )}
         {isVideo
-          ? <video src={url} controls autoPlay playsInline preload="auto" className="max-h-[82vh] w-auto rounded-lg border border-line bg-black object-contain" />
+          // fill = crop the raw clip to a 9:16 frame, exactly like the final stitch does - hides HeyGen Avatar
+          // IV's baked-in pillarbox bars (Avatar IV renders 16:9 only) so the zoom matches the published cut.
+          ? <video src={url} controls autoPlay playsInline preload="auto" className={fill ? "aspect-[9/16] max-h-[82vh] w-auto rounded-lg border border-line bg-black object-cover" : "max-h-[82vh] w-auto rounded-lg border border-line bg-black object-contain"} />
           // eslint-disable-next-line @next/next/no-img-element
           : <img src={url} alt="frame" onLoad={() => setLoaded(true)} className={`max-h-[82vh] w-auto rounded-lg border border-line object-contain ${loaded ? "" : "hidden"}`} />}
         <div className="mt-3 flex items-center justify-center gap-3">
