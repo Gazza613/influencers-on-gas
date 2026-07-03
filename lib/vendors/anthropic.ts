@@ -740,6 +740,32 @@ export async function rewriteSceneScript(o: { brand: string; tone: string; beat:
   return { vo_line: o.currentVo, caption: o.currentCaption };
 }
 
+// BRIEF CO-PILOT: from the brand + this influencer (+ whatever the producer has drafted so far), write a
+// SHARP, world-class direct-response brief - a punchy offer/hook, concrete key benefits, one clear CTA and
+// tone words. Sharpens what's there rather than discarding it. Powers the "Draft with AI" button on the brief.
+export async function draftBrief(o: {
+  influencerName: string; influencerProfile?: string; brand: string;
+  offer?: string; benefits?: string; cta?: string; tone?: string; durationSeconds: number;
+}): Promise<{ offer: string; benefits: string; cta: string; tone: string }> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 700,
+    system: `You are a world-class direct-response brand strategist and creative director - the calibre behind the highest-performing short-form ads on the planet. Given an AI influencer, a brand/product, and whatever the producer has drafted so far, write a SHARP, world-class brief for a ${o.durationSeconds}-second vertical social ad. Response-marketing best practice: lead with the real problem or desire, make every benefit CONCRETE and specific (never vague adjectives or hype), and land on ONE clear, low-friction CTA. Honest and trustworthy, on-brand for THIS influencer and her audience. If the producer already wrote something, SHARPEN and complete it rather than discarding it. UK spelling, no em dashes, no emojis. Return ONLY via the tool.`,
+    tools: [{ name: "brief", description: "The sharpened world-class brief.", input_schema: { type: "object", additionalProperties: false, properties: {
+      offer: { type: "string", description: "the core offer / hook in one punchy line" },
+      benefits: { type: "string", description: "3 to 6 CONCRETE key benefits, comma separated (specifics, not adjectives)" },
+      cta: { type: "string", description: "one clear, low-friction call to action" },
+      tone: { type: "string", description: "3 to 4 tone words, comma separated" },
+    }, required: ["offer", "benefits", "cta", "tone"] } as unknown as Anthropic.Tool["input_schema"] }],
+    tool_choice: { type: "tool", name: "brief" },
+    messages: [{ role: "user", content: `Influencer: ${o.influencerName}.${o.influencerProfile ? ` Who she is: ${o.influencerProfile}.` : ""}\nBrand / product: ${o.brand || "(not specified)"}.\nCurrent draft - offer: "${o.offer || ""}"; benefits: "${o.benefits || ""}"; CTA: "${o.cta || ""}"; tone: "${o.tone || ""}".\n\nWrite the sharpened, world-class brief for this ${o.durationSeconds}s ad.` }],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (block && block.type === "tool_use") return block.input as { offer: string; benefits: string; cta: string; tone: string };
+  return { offer: o.offer || "", benefits: o.benefits || "", cta: o.cta || "", tone: o.tone || "" };
+}
+
 // Continuity pass: after the producer curates (keeps/rejects) the reference shots, re-flow the VO so
 // the KEPT scenes read as ONE coherent narrative (no gaps from dropped scenes). Returns one rewritten
 // vo_line + caption per kept scene (keyed by its scene index). Fails open (callers keep originals).

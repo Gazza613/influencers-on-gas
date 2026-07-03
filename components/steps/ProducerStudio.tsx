@@ -120,6 +120,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [brand, setBrand] = useState(String((initialProduction?.brief as { brand?: string })?.brand || ""));
   const [offer, setOffer] = useState(String((initialProduction?.brief as { offer?: string })?.offer || ""));
   const [benefits, setBenefits] = useState(String((initialProduction?.brief as { benefits?: string })?.benefits || ""));
+  const [briefBusy, setBriefBusy] = useState(false); // AI brief co-pilot in flight
   const [cta, setCta] = useState(String((initialProduction?.brief as { cta?: string })?.cta || ""));
   const [ctaCode, setCtaCode] = useState(String((initialProduction?.brief as { ctaCode?: string })?.ctaCode || ""));
   const [duration, setDuration] = useState<number>(Number((initialProduction?.brief as { durationSeconds?: number })?.durationSeconds) || 60);
@@ -538,6 +539,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     else setErr(r?.error || "Couldn't record the decision.");
   }
 
+  // AI BRIEF CO-PILOT: draft/sharpen the offer, key benefits, CTA + tone from the brand + this influencer.
+  async function draftBriefAI() {
+    if (briefBusy) return;
+    if (!brand.trim()) { setErr("Add the brand / product first, then I can draft a world-class brief."); return; }
+    setBriefBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/producer/brief`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brand, offer, benefits, cta, tone, durationSeconds: duration }),
+    }).then((x) => x.json()).catch(() => null);
+    setBriefBusy(false);
+    if (r && typeof r.benefits === "string") {
+      if (r.offer) setOffer(r.offer); if (r.benefits) setBenefits(r.benefits); if (r.cta) setCta(r.cta); if (r.tone) setTone(r.tone);
+    } else setErr(r?.error || "Couldn't draft the brief - give it another go.");
+  }
   async function writeScript() {
     if (!brand.trim() || !offer.trim() || scriptBusy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer to write the script."); return; }
     setScriptBusy(true); setErr("");
@@ -625,7 +640,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
           {/* ── Story & messaging ── */}
           <div className="space-y-3 border-t border-line pt-4">
-            <div className="eyebrow">Story &amp; messaging</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="eyebrow">Story &amp; messaging</div>
+              <button onClick={draftBriefAI} disabled={briefBusy} title="Sharpen your offer and draft world-class key benefits, CTA + tone from the brand and this influencer" className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{briefBusy ? "✨ Drafting the brief…" : "✨ Draft with AI"}</button>
+            </div>
+            <p className="text-[11px] text-ink-faint">Add the <b>brand</b> (and a rough offer if you have one), then let me draft a world-class brief - I sharpen the offer and fill the benefits, CTA and tone. Edit anything after.</p>
             <Area label="Key benefits (comma separated)" v={benefits} set={setBenefits} placeholder="airtime, data, payments, vouchers, all in one app" />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Primary CTA" v={cta} set={setCta} placeholder="Download the MTN MoMo App, register today" />
