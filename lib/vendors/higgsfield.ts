@@ -392,6 +392,28 @@ export async function humaniseUrl(url: string, opts: { prompt: string; ratio?: s
   return out;
 }
 
+// EDIT THIS SHOT (forensic image-to-image): reproduce a finished creative EXACTLY - same person, location,
+// pose, framing, lighting and grade - and change ONLY the one thing the producer asks (e.g. "make her dress
+// bright MTN-yellow"). This is the targeted iterate: keep everything you love, change one detail.
+export async function editImageUrl(url: string, opts: { instruction: string; ratio?: string; resolution?: "2k" | "4k" }): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null;
+  const imageId = await importMediaUrl(url);
+  if (!imageId) return null;
+  const { call } = await openSession();
+  const ar = opts.ratio === "1:1" ? "1:1" : opts.ratio === "16:9" ? "16:9" : (opts.ratio || "9:16");
+  const params: AnyObj = {
+    ...baseParams("nano_banana_pro", ar),
+    prompt: `@image1 is the finished photograph. Reproduce it EXACTLY and identically: the SAME person and likeness, the same face, the same pose, framing and crop, the same LOCATION and background, the same lighting, colour grade and composition - pixel-for-pixel. Change ONLY this one thing, seamlessly and photorealistically: ${opts.instruction}. Everything else stays identical - do NOT move, restyle, reframe, relight, beautify or alter anything the edit did not ask for, and keep the exact same background/location. Keep it a real, natural photograph, never plastic or over-rendered.`,
+    medias: [{ value: imageId, role: "image" }],
+  };
+  if (opts.resolution) params.resolution = opts.resolution;
+  const r = await call("generate_image", { params });
+  let out: string | null = extractImageUrls(r)[0] ?? null;
+  const jobId = extractJobIds(r)[0] ?? null;
+  if (!out && jobId) out = await pollJob(call, jobId, 60);
+  return out;
+}
+
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
 export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
   const token = await getValidHFAccessToken();

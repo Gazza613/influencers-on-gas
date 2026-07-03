@@ -82,6 +82,25 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const [upStart, setUpStart] = useState<Map<string, number>>(new Map());
   const [nowMs, setNowMs] = useState<number>(Date.now());
   const [err, setErr] = useState("");
+  // "Edit this shot": image-to-image edit of ONE creative - keeps location/pose/identity, changes one thing.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editBusy, setEditBusy] = useState<Set<string>>(new Set());
+  async function applyEdit(c: Creative) {
+    const cid = c.url || "";
+    const instruction = editText.trim();
+    if (!c.url || !instruction || editBusy.has(cid)) return;
+    setEditBusy((s) => new Set([...s, cid])); setEditingId(null); setEditText(""); setErr("");
+    try {
+      const r = await fetch(`/api/influencers/${influencerId}/creatives/edit`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: c.url, instruction }),
+      }).then((x) => x.json()).catch(() => null);
+      if (r?.creative) {
+        setCreatives((list) => { const idx = list.findIndex((x) => x.url === c.url); const nc = r.creative as Creative; return idx < 0 ? [nc, ...list] : [...list.slice(0, idx + 1), nc, ...list.slice(idx + 1)]; });
+      } else setErr(r?.error || "The edit didn't work - try again or rephrase it.");
+    } catch { setErr("The edit failed - check your connection and try again."); }
+    setEditBusy((s) => { const n = new Set(s); n.delete(cid); return n; });
+  }
   const [zoom, setZoom] = useState<string | null>(null);
 
   const running = status === "running";
@@ -300,7 +319,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     const sel = picked.has(id);
     const canPick = !!c.url && !broken.has(c.url);
     const u = c.url || "";
-    const busy = upscaling.has(id) || !!c.upscaling;
+    const busy = upscaling.has(id) || !!c.upscaling || (!!c.url && editBusy.has(c.url));
     const g = gradeOf(c);
     return (
       <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
@@ -329,9 +348,18 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         {busy && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-2 text-center text-white">
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            <span className="text-[12px] font-bold">Upscaling to 4K</span>
-            <span className="text-[10px] leading-tight text-white/75">Takes 3 to 5 minutes<br />for perfection</span>
-            {upStart.has(id) && <span className="tabular mt-0.5 text-[11px] font-semibold text-[#c79bff]">{fmtElapsed(nowMs - (upStart.get(id) || nowMs))}</span>}
+            {c.url && editBusy.has(c.url) ? (
+              <>
+                <span className="text-[12px] font-bold">Editing the shot…</span>
+                <span className="text-[10px] leading-tight text-white/75">Keeping everything,<br />changing just that</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[12px] font-bold">Upscaling to 4K</span>
+                <span className="text-[10px] leading-tight text-white/75">Takes 3 to 5 minutes<br />for perfection</span>
+                {upStart.has(id) && <span className="tabular mt-0.5 text-[11px] font-semibold text-[#c79bff]">{fmtElapsed(nowMs - (upStart.get(id) || nowMs))}</span>}
+              </>
+            )}
           </div>
         )}
         {canPick ? (
@@ -367,9 +395,26 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             4K failed
           </span>
         )}
-        {c.url && !broken.has(c.url) && !busy && (
+        {c.url && !broken.has(c.url) && !busy && editingId !== id && (
           <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="Review full size"
             className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/40 bg-black/55 text-lg text-white opacity-60 backdrop-blur-sm transition hover:scale-105 hover:bg-black/80 hover:opacity-100 active:scale-95">👁</button>
+        )}
+        {c.url && !broken.has(c.url) && !busy && editingId !== id && (
+          <button onClick={(e) => { e.stopPropagation(); setEditingId(id); setEditText(""); }} title="Edit this shot - change one thing, keep the rest"
+            className="absolute bottom-1.5 left-1.5 z-10 rounded-full border border-white/40 bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100 hover:bg-black/80">✎ Edit</button>
+        )}
+        {editingId === id && !busy && (
+          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 bg-black/85 p-2 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
+            <input autoFocus value={editText} onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") applyEdit(c); if (e.key === "Escape") { setEditingId(null); setEditText(""); } }}
+              placeholder="Change one thing… e.g. make her dress bright MTN-yellow"
+              className="w-full rounded-md border border-white/20 bg-black/60 px-2 py-1.5 text-[11px] text-white outline-none placeholder:text-white/40 focus:border-[#a855f7]" />
+            <div className="flex gap-1.5">
+              <button onClick={() => applyEdit(c)} disabled={!editText.trim()} className="flex-1 rounded-md bg-[#a855f7] px-2 py-1 text-[11px] font-bold text-white disabled:opacity-40">Apply</button>
+              <button onClick={() => { setEditingId(null); setEditText(""); }} className="rounded-md border border-white/25 px-2 py-1 text-[11px] text-white/80">Cancel</button>
+            </div>
+            <p className="text-[9px] leading-tight text-white/50">Keeps the location, pose &amp; her — changes only what you say. Adds a new shot beside this one.</p>
+          </div>
         )}
       </div>
     );
