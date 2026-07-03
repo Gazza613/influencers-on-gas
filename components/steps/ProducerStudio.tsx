@@ -490,7 +490,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // can immediately fire the NEXT scene without waiting (the backend saves each clip atomically). Each scene
   // self-polls until ITS clip lands, so several can render at once, each with its own spinner.
   async function animateScene(i: number) {
-    if (animatingScenes.has(i) || wholeBoardBusy) return; // already doing this one, or a whole-board run is on
+    if (animatingScenes.has(i)) return; // only block re-firing THIS scene; a per-scene animate is independent
+    // (each clip saves atomically via upsertClip), so you can fire it even while another scene - or a whole-
+    // board run - is still rendering.
     setErr("");
     const before = (production?.clips ?? []).find((c) => c.scene === i)?.url || null;
     setAnimatingScenes((s) => new Set(s).add(i));
@@ -890,7 +892,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           {shot?.url && (
                             <button
                               onClick={() => animateScene(i)}
-                              disabled={shooting || wholeBoardBusy || animatingScenes.has(i) || dropped.has(i) || !approved.has("voice")}
+                              disabled={animatingScenes.has(i) || dropped.has(i) || !approved.has("voice") || !!shot?.reshooting}
                               title={approved.has("voice") ? "Animate this scene into video" : "Set the voice first (Voice step), then animate"}
                               className="w-full rounded-md border border-[#60a5fa]/40 px-2 py-1 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
                             >{!approved.has("voice") ? "🎞️ Animate (after voice)" : clip?.url ? "↻ Re-animate" : "🎞️ Animate"}</button>
