@@ -974,7 +974,13 @@ export const generateShots = inngest.createFunction(
     const renderShot = async (i: number, sc: Record<string, string>): Promise<ShotRow> => {
       const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
       const phoneMedia = sc.phone_screen_url ? await step.run(`phone-${i}`, () => importMediaUrl(String(sc.phone_screen_url)).catch(() => null)) : null;
-      const roleRefMedia = role === "a-roll" ? arollRefMedia : role === "b-roll" ? brollRefMedia : null;
+      // PER-SCENE reference: a gallery image the producer pinned to THIS scene overrides the production-wide
+      // guide + wardrobe lock, so the scene's chosen Set & Wardrobe image is the single source of truth here.
+      const sceneRefUrl = String((sc as Record<string, unknown>).ref_url || "").trim();
+      const sceneRefMedia = sceneRefUrl ? await step.run(`scene-ref-${i}`, () => importMediaUrl(sceneRefUrl).catch(() => null)) : null;
+      const roleRefMedia = sceneRefMedia || (role === "a-roll" ? arollRefMedia : role === "b-roll" ? brollRefMedia : null);
+      const lockEff = sceneRefMedia ? "" : wardrobeLock; // scene ref defines the outfit → drop the global lock here
+      const clothMediaEff = sceneRefMedia ? null : clothMedia; // …and the global cloth anchor
       // When a GUIDE is chosen for this role it IS the character (her right face, right outfit, right set), so
       // it becomes the AUTHORITATIVE reference: pass only ONE identity crop (a light face-confirm) and DROP the
       // separate world anchor, so no other image fights the guide's face, clothing or location. This is the
@@ -986,7 +992,7 @@ export const generateShots = inngest.createFunction(
       // @image order: identity, [clothing], [location], [world anchor], [phone screen], [role ref].
       let n = idForRender.length;
       const faceTags = idForRender.map((_, k) => `@image${k + 1}`);
-      const clothTag = clothMedia ? `@image${++n}` : "";
+      const clothTag = clothMediaEff ? `@image${++n}` : "";
       const locTag = locMedia ? `@image${++n}` : "";
       const worldTag = worldTagOn ? `@image${++n}` : "";
       const phoneTag = phoneMedia ? `@image${++n}` : "";
@@ -999,8 +1005,8 @@ export const generateShots = inngest.createFunction(
         faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, ETHNICITY and heritage, skin tone and texture, AND her exact hair colour, length and style, AND her apparent AGE); zero drift, unmistakably the same individual. Her ethnicity and skin tone are FIXED by these references and must be identical in EVERY scene — never lighten, darken or change her race/ethnicity to match a companion, a guide image or the scene. She looks IDENTICAL in every scene whether she is alone or beside another person — NEVER make her look younger or older, never change or darken her hair, and never soften or blend her features to match a companion or the scene.${guided ? " The chosen GUIDE below shows her TRUE current look - match her face to the guide exactly; this identity image only confirms she is the same person." : " These face references are the ONLY source of her face, hair, age and identity — take NOTHING about her from any wardrobe, world, location, companion or reference-look image."} EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer) — she is the PRIMARY adult in the frame and the locked face is hers. Every OTHER person in the scene — a daughter, friend, companion, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling (a daughter is clearly YOUNGER). NEVER duplicate her face, hair or look onto anyone else, and never swap her identity onto the companion: absolutely no twins, clones or look-alikes.` : "",
         // WARDROBE LOCK (text): her ONE outfit, head to toe, identical every scene - the durable fix for
         // clothing drifting between scenes (the image anchor alone misses the bottoms/shoes on tight shots).
-        wardrobeLock ? `LOCKED OUTFIT - the influencer wears the SAME single outfit in EVERY scene of this production, head to toe: ${wardrobeLock}. Identical garments, colours, fabric, footwear and accessories every time; never change, swap, recolour, add or restyle ANY part of her clothing between scenes, whether she is talking to camera or in a wider scene - only her pose, action and the framing change. This is her established wardrobe and overrides any different outfit implied by the scene text.` : "",
-        roleRefTag ? `${roleRefTag} is the CHOSEN ${role.toUpperCase()} GUIDE and the DEFINITIVE reference for this influencer - it shows HER exact face, HER exact outfit and the exact SET/LOCATION for this ad, so reproduce ALL THREE from ${roleRefTag} precisely: (a) her FACE and features EXACTLY as in ${roleRefTag}${faceTags.length ? ` (${faceTags.join(", ")} is the same person and only confirms her identity; if they differ at all, ${roleRefTag} wins for her current look)` : ""}; (b) her CLOTHING EXACTLY as in ${roleRefTag} - every garment, colour, fabric and footwear${wardrobeLock ? ` (her locked outfit: ${wardrobeLock})` : ""} - and do NOT take clothing from any identity image, which may show a DIFFERENT outfit; (c) the LOCATION, set dressing, lighting, time of day and colour grade EXACTLY as in ${roleRefTag}. ONLY her pose, action and framing change per the direction below - never her face, her outfit or the place.${role === "b-roll" ? ` Also REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter) EXACTLY - the SAME person: same face, age, build, hair AND the same outfit - identical in every b-roll scene.` : ` Do NOT copy any other person from it.`}` : "",
+        lockEff ? `LOCKED OUTFIT - the influencer wears the SAME single outfit in EVERY scene of this production, head to toe: ${lockEff}. Identical garments, colours, fabric, footwear and accessories every time; never change, swap, recolour, add or restyle ANY part of her clothing between scenes, whether she is talking to camera or in a wider scene - only her pose, action and the framing change. This is her established wardrobe and overrides any different outfit implied by the scene text.` : "",
+        roleRefTag ? `${roleRefTag} is the CHOSEN ${role.toUpperCase()} GUIDE and the DEFINITIVE reference for this influencer - it shows HER exact face, HER exact outfit and the exact SET/LOCATION for this ad, so reproduce ALL THREE from ${roleRefTag} precisely: (a) her FACE and features EXACTLY as in ${roleRefTag}${faceTags.length ? ` (${faceTags.join(", ")} is the same person and only confirms her identity; if they differ at all, ${roleRefTag} wins for her current look)` : ""}; (b) her CLOTHING EXACTLY as in ${roleRefTag} - every garment, colour, fabric and footwear${lockEff ? ` (her locked outfit: ${lockEff})` : ""} - and do NOT take clothing from any identity image, which may show a DIFFERENT outfit; (c) the LOCATION, set dressing, lighting, time of day and colour grade EXACTLY as in ${roleRefTag}. ONLY her pose, action and framing change per the direction below - never her face, her outfit or the place.${role === "b-roll" ? ` Also REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter) EXACTLY - the SAME person: same face, age, build, hair AND the same outfit - identical in every b-roll scene.` : ` Do NOT copy any other person from it.`}` : "",
         clothTag ? `${clothTag} is a WARDROBE reference: dress the influencer in this EXACT outfit (silhouette, fabric, COLOUR, styling).${clothIsLock ? ` This is her ONE LOCKED outfit and it OVERRIDES her clothing in EVERY other reference image here (the world anchor, the ${role} guide, and the cast-anchor frame) AND in the scene text — if any other image shows her in a different colour or garment (e.g. teal/green), IGNORE that and dress her in THIS outfit's colour and garments.` : ""} Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. ${wardrobeLock
@@ -1014,7 +1020,7 @@ export const generateShots = inngest.createFunction(
         // Lock recurring companions to a fixed look + outfit so they don't change scene to scene.
         castLockClause(supportingCast, (Array.isArray((sc as Record<string, unknown>).talent) ? (sc as unknown as { talent: string[] }).talent : [])),
         // Image-anchor the companion(s) to the first b-roll frame so the daughter + her outfit never drift.
-        castTag ? `${castTag} is the CAST ANCHOR: the companion(s) in this scene (e.g. the daughter / family member) are the SAME individuals as in ${castTag} — identical face, age, build, hair AND the SAME outfit/clothing, scene to scene. Take ONLY the companion(s) and their wardrobe from ${castTag}. The MAIN influencer's face comes from the identity references, and her OUTFIT is her LOCKED outfit${wardrobeLock ? ` (${wardrobeLock})` : ""} - NOT whatever she happens to be wearing in ${castTag}; if she wears a different top or colour in ${castTag}, IGNORE it and keep her in the locked outfit.` : "",
+        castTag ? `${castTag} is the CAST ANCHOR: the companion(s) in this scene (e.g. the daughter / family member) are the SAME individuals as in ${castTag} — identical face, age, build, hair AND the SAME outfit/clothing, scene to scene. Take ONLY the companion(s) and their wardrobe from ${castTag}. The MAIN influencer's face comes from the identity references, and her OUTFIT is her LOCKED outfit${lockEff ? ` (${lockEff})` : ""} - NOT whatever she happens to be wearing in ${castTag}; if she wears a different top or colour in ${castTag}, IGNORE it and keep her in the locked outfit.` : "",
       ].filter(Boolean).join(" ");
       const prompt = buildShotPrompt({
         location: String(sc.location || ""), blocking: String(sc.blocking || ""), shot: String(sc.shot || ""),
@@ -1025,9 +1031,9 @@ export const generateShots = inngest.createFunction(
         // B-ROLL gets background strangers ONLY when the director flagged this scene a busy public place
         // (crowd_extras) — intimate/private scenes stay to the named cast, fixing "extra actors appearing".
         hasPeople: role === "b-roll" && (sc as Record<string, unknown>).crowd_extras === true, worldAnchored: worldTagOn,
-        lockedOutfit: wardrobeLock || undefined, // her one outfit OVERRIDES any per-scene outfit the storyboard wrote
+        lockedOutfit: lockEff || undefined, // her one outfit OVERRIDES any per-scene outfit the storyboard wrote
       });
-      const medias = [...idForRender, ...(clothMedia ? [clothMedia] : []), ...(locMedia ? [locMedia] : []), ...(worldTagOn ? [worldRef as string] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
+      const medias = [...idForRender, ...(clothMediaEff ? [clothMediaEff] : []), ...(locMedia ? [locMedia] : []), ...(worldTagOn ? [worldRef as string] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleRefMedia ? [roleRefMedia] : []), ...(castTag ? [castAnchor as string] : [])].map((value) => ({ value, role: "image" }));
       // Board keyframes at 1K (env-tunable): they're animated into 720p/1080p video, so 2K stills add
       // no quality but ~double the render time. 1K ~halves the board with no visible loss.
       const shotExtra = { resolution: process.env.HF_BOARD_RES || "1k" };
@@ -1042,10 +1048,10 @@ export const generateShots = inngest.createFunction(
           const imp = async (u?: string | null) => (u ? await importMediaUrl(String(u)).catch(() => null) : null);
           const ids = (await Promise.all((guided ? idRefUrls.slice(0, 1) : idRefUrls).map((u) => imp(u)))).filter((v): v is string => !!v);
           if (featureUrl && !guided) { const f = await imp(featureUrl); if (f) ids.push(f); }
-          const cloth = clothMedia ? await imp(clothSrc) : null;
+          const cloth = clothMediaEff ? await imp(clothSrc) : null;
           const loc = locMedia ? await imp(brief.locationRef) : null;
           const world = worldTagOn ? await imp(worldRefUrl) : null;
-          const roleU = role === "a-roll" ? persona.aroll_ref_url : role === "b-roll" ? persona.broll_ref_url : "";
+          const roleU = sceneRefUrl || (role === "a-roll" ? persona.aroll_ref_url : role === "b-roll" ? persona.broll_ref_url : "");
           const roleM = roleRefMedia ? await imp(roleU ? String(roleU) : null) : null;
           const cast = (castTag && castAnchor) ? await imp(castAnchorUrl) : null;
           return [...ids, ...(cloth ? [cloth] : []), ...(loc ? [loc] : []), ...(world ? [world] : []), ...(phoneMedia ? [phoneMedia] : []), ...(roleM ? [roleM] : []), ...(cast ? [cast] : [])].map((value) => ({ value, role: "image" }));
@@ -1728,11 +1734,23 @@ export const assembleVideo = inngest.createFunction(
     // fast ad. (A true crossfade needs overlapping clips on separate tracks — a later refinement.)
     // fit:cover + a hair of OVERSCAN so the clip always fully covers the 1080×1920 frame — kills the thin
     // white/edge lines left & right when a source video is a pixel or two off the exact 9:16 ratio.
-    const VIDEO_OVERSCAN = Math.max(1, Number(process.env.VIDEO_OVERSCAN) || 1.04);
-    const videoClips = placed.filter((p) => clipUrl(p.i)).map((p) => ({
-      asset: { type: "video", src: clipUrl(p.i) as string, volume: 0 },
-      start: p.start, length: p.len, fit: "cover", scale: VIDEO_OVERSCAN,
-    }));
+    const VIDEO_OVERSCAN = Math.max(1, Number(process.env.VIDEO_OVERSCAN) || 1.06);
+    const videoClips = placed.filter((p) => clipUrl(p.i)).flatMap((p) => {
+      const src = clipUrl(p.i) as string;
+      const realDur = clipDur(p.i); // the clip's actual rendered length (DoP b-roll ≈ 5s)
+      // B-ROLL LOOP (fixes the "pause where the voice exceeds the clip"): the DoP engine renders a FIXED ~5s
+      // clip, but the scene slot is the (often longer) narration. A short clip in a long slot FREEZES on its
+      // last frame = the pause. Instead LOOP the clip back-to-back across the slot so motion never stops.
+      if (p.role === "b-roll" && realDur && realDur > 0.6 && p.len > realDur + 0.2) {
+        const copies: Record<string, unknown>[] = [];
+        const end = p.start + p.len;
+        for (let t = p.start; t < end - 0.05; t += realDur) {
+          copies.push({ asset: { type: "video", src, volume: 0, trim: 0 }, start: t, length: Math.min(realDur, end - t), fit: "cover", scale: VIDEO_OVERSCAN });
+        }
+        return copies;
+      }
+      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: VIDEO_OVERSCAN }];
+    });
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
     const endCardUrl = String((production?.brief as { endCardUrl?: string })?.endCardUrl || "").trim();

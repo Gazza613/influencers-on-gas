@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Apply edited direction + script to the scene (persists + drives the clip/caption later).
   // vo_line + caption are script edits (no image regen needed); location/blocking/shot/motion change the image.
   const edited = { ...scenes[index] };
-  for (const k of ["location", "blocking", "shot", "performance", "motion_prompt", "vo_line", "caption", "vo_audio_url", "phone_screen_url", "hero"] as const) {
+  for (const k of ["location", "blocking", "shot", "performance", "motion_prompt", "vo_line", "caption", "vo_audio_url", "phone_screen_url", "hero", "ref_url"] as const) {
     if (typeof b[k] === "string") edited[k] = String(b[k]).trim();
   }
   const newScenes = scenes.map((s, i) => (i === index ? edited : s));
@@ -39,7 +39,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, storyboard: { ...production!.storyboard, scenes: newScenes }, shots } } });
   if (!reshoot) return NextResponse.json({ saved: true });
   try {
-    await inngest.send({ name: "influencer/reshoot.shot", data: { influencerId: id, scene: index } });
+    // Re-shoot this ONE scene through the SAME path as the whole board (generateShots, scene-filtered) so it
+    // gets the guide-authoritative look, the wardrobe lock, the phone-screen image, the per-scene reference
+    // and the stale-media retry - NOT the old stripped-down reshootShot, which ignored all of those (why an
+    // edited scene came back in different clothing and the uploaded phone screen never pulled through).
+    await inngest.send({ name: "influencer/generate.shots", data: { influencerId: id, scenes: [index] } });
   } catch {
     return NextResponse.json({ error: "Could not start the re-shoot (engine not connected)." }, { status: 503 });
   }
