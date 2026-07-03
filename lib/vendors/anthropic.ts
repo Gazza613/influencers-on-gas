@@ -544,7 +544,7 @@ const STORYBOARD_SCHEMA = {
           start: { type: "string" }, end: { type: "string" },
           location: { type: "string" },
           talent: { type: "array", items: { type: "string" } },
-          shot: { type: "string", description: "ONE single framing/angle in one line (type, angle, movement, lens feel). Describe ONLY ONE shot - never list or combine multiple framings (no 'close-up of hands AND a wider shot', no 'over-the-shoulder and coffee-table shots'); that causes split-screen renders. For b-roll keep her a clearly visible, prominent subject (medium shot), not a tiny distant figure." },
+          shot: { type: "string", description: "ONE single framing/angle in one line, directed like a DoP: shot size, camera angle (eye-level or a touch above), lens feel (~35/50/85mm), the KEY LIGHT's direction + mood (e.g. 'soft window light from frame left, warm'), and a composition note (rule of thirds, foreground depth). Describe ONLY ONE shot - never list or combine multiple framings (no 'close-up of hands AND a wider shot', no 'over-the-shoulder and coffee-table shots'); that causes split-screen renders. For b-roll keep her a clearly visible, prominent subject (medium shot), not a tiny distant figure." },
           blocking: { type: "string" },
           performance: { type: "string" },
           graphics: { type: "array", items: { type: "string" } },
@@ -609,7 +609,14 @@ CAST DISCIPLINE (critical - viewers instantly notice extra or shape-shifting peo
 
 ROLES (get this exactly right) - classify every scene as ONLY 'a-roll' or 'b-roll' (never 'graphic'). 'a-roll' = she speaks DIRECT TO CAMERA: head-on, tighter framing, looking into the lens and delivering her line (this is lip-synced). 'b-roll' = a VIDEO SCENE / cutaway: a medium-to-wider shot of her IN the location doing something real (walking through the space, sitting, using or showing the product, glancing around) - she does NOT look at or talk to the camera. The voiceover NARRATES OVER b-roll (her same continuous voice), so b-roll is never silent, but she is not addressing the lens and is NOT lip-synced. Use a-roll for the direct, human beats (hook, key message, CTA) and b-roll for the demo / proof / lifestyle beats. The film cuts between a-roll and b-roll under ONE unbroken voiceover. A-ROLL BACKGROUND (important): keep a-roll a CLEAN presenter framing - a simple, uncluttered background with shallow depth of field and NO background crowd or moving extras behind her. Friends, companions, background people and lifestyle action belong ONLY in b-roll scenes, never behind an a-roll talking shot (the talking-photo engine animates her, not a crowd, so background people in an a-roll shot come out warped). Motion_prompts: for a-roll, only her own natural movement; for b-roll, the scene action and that background people move.
 
-CAPTIONS - burned-in, match vo_line word-for-word, split into short beats (~6-14 words each) using ' | '. Empty when there is no VO.
+CINEMATOGRAPHY (this is what makes it world-class, not merely consistent - direct every scene like a director of photography):
+• LIGHT WITH INTENT: give each scene a MOTIVATED, DIRECTIONAL light from a believable real source (a window, a practical lamp, a doorway, golden-hour sun) coming from one clear direction so it shapes her face and the room - never flat, frontal, on-camera or hard studio light. Match the light's MOOD to the beat: bright and airy for warm/upbeat moments, softer with deeper shadows for intimate ones.
+• LENS + ANGLE per shot: pick a lens feel that serves the beat - a wider ~35mm to sit intimately in the room on b-roll, ~50mm for a natural look, a tighter ~85mm to compress and isolate for a hero close-up. Shoot at eye level or a touch (10-15°) ABOVE for a flattering angle; use a slight low angle only to lend authority.
+• COMPOSE THE VERTICAL FRAME: rule of thirds with her eyes on the upper third; build FOREGROUND DEPTH (a shoulder, a plant, a prop, a soft out-of-focus edge) so the tall 9:16 frame reads three-dimensional; use real leading lines (a counter, a doorway, a table edge) to draw the eye to her.
+• COVERAGE RHYTHM: vary shot SIZE across the arc - an establishing wider shot, mediums for connection, a tight insert on the product or a telling detail - never a run of same-size shots.
+Put these choices (light direction + mood, lens feel, angle, composition) into each scene's 'shot' line so they carry into the render.
+
+CAPTIONS - burned-in, match vo_line word-for-word, split into short readable beats (~6-14 words each) with natural punctuation (commas and full stops). NEVER use pipe or bar '|' separators. Empty when there is no VO.
 
 MOTION - for a-roll and b-roll give a short motion_prompt (natural, not robotic): for a-roll subtle head movement + hand gestures; for b-roll the scene action and that background people move naturally. Describe ONE single continuous camera move per scene; never multiple cuts in one motion_prompt.
 
