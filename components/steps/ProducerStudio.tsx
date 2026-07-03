@@ -169,8 +169,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // EXACT scope of the current shoot so only the scenes truly being shot show a spinner: "all" = a
   // whole-board shoot, an array = just those scene indices (a per-scene re-shoot). Never spin the rest.
   const [shootScope, setShootScope] = useState<number[] | "all">("all");
-  // ⚡ Priority (faster, PAID) render queue - opt-in for speed when the free queue is crawling.
-  const [priority, setPriority] = useState(false);
+  // ⚡ Priority (fast paid image queue) is now ALWAYS ON - the keyframe is the foundation of every shot and
+  // ~1 credit is negligible on Ultra, so we never sit in the slow free queue. No user toggle.
+  const priority = true;
   const shotFor = (i: number) => shots.find((s) => s.scene === i);
   const clips = production?.clips ?? [];
   const rendering = production?.clips_status === "running";
@@ -807,17 +808,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
-              {/* Priority toggle: prominent, left-aligned, glows so it can't be missed. */}
-              <button
-                onClick={() => setPriority((v) => !v)}
-                title="Faster render: jumps the queue when the free queue is crawling. A few credits per image, metered in Cost Control. Off = free but slower."
-                className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${priority
-                  ? "priority-on border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]"
-                  : "priority-pulse border-[#60a5fa]/60 bg-[#60a5fa]/[0.08] text-[#93c5fd] hover:bg-[#60a5fa]/15"}`}
-              >
-                <span aria-hidden>⚡</span> Priority
-                <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${priority ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{priority ? "ON" : "OFF"}</span>
-              </button>
+              {/* Priority queue is now ALWAYS ON (the fast paid image model) - a keyframe is the foundation of
+                  every shot and ~1 credit is negligible on the Ultra plan, so there's no reason to sit in the
+                  slow free queue. No toggle needed. */}
               {/* Draft speed: faster keyframes (skip humaniser) + 720p a-roll clips. Final stitch is always 1080p. */}
               <button
                 onClick={() => setSpeedMode((v) => !v)}
@@ -832,7 +825,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below. <span className="text-[#93c5fd]">⚡ Priority = faster (paid) queue.</span></p>
+            <p className="mt-2 text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below.</p>
             {/* REFERENCE GUIDE + WARDROBE LOCK - set this BEFORE shooting so every scene matches the look + outfit. */}
             {creatives.length > 0 && (
               <div className="mt-3 space-y-2 border-t border-[#a855f7]/15 pt-3">
