@@ -64,7 +64,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Keep ALL existing clips in the DB (never wipe) unless this is a forced full redo. Renders merge in place.
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: force ? [] : existingClips, clips_status: "running" } } });
+  // BUT clear a prior FAILURE on the scenes about to re-render (the target scenes, or failed clips of a role
+  // being animated): drop the "failed" status + error so the UI immediately shows progress instead of leaving
+  // the old error banner on screen through the whole re-render (the "nothing happens, error still shows" bug).
+  const resetScenes = new Set(targetScenes ?? []);
+  const clipsNext = force ? [] : existingClips.map((c) => {
+    const bySceneClear = resetScenes.has(Number(c.scene));
+    const byRoleClear = !!roles && roles.length > 0 && roles.includes(String((c as { role?: string }).role)) && (c as { status?: string }).status === "failed";
+    return (bySceneClear || byRoleClear) ? { ...c, status: "pending", error: null } : c;
+  });
+  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: clipsNext, clips_status: "running" } } });
   try {
     await inngest.send({ name: "influencer/generate.clips", data: { influencerId: id,
       ...(roles && roles.length ? { roles } : {}),

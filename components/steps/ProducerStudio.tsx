@@ -539,6 +539,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     const before = (production?.clips ?? []).find((c) => c.scene === i)?.url || null;
     setAnimatingScenes((s) => new Set(s).add(i));
+    // Optimistically clear a prior FAILURE on this scene so the error banner disappears immediately and the
+    // card flips to "rendering" - not left showing the old failure through the whole re-render.
+    setProduction((p) => (p ? { ...p, clips: (p.clips ?? []).map((c) => (c.scene === i && c.status === "failed" ? { ...c, status: "pending", error: null } : c)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], reanimate: true, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't animate that scene."); setAnimatingScenes((s) => { const n = new Set(s); n.delete(i); return n; }); return; }
     // Self-poll THIS scene only (independent of the others), until its clip is new or has failed.
