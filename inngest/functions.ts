@@ -1948,7 +1948,37 @@ export const assembleVideo = inngest.createFunction(
     if (logoUrl) brandTrack.push({ asset: { type: "image", src: logoUrl }, start: 0, length: total, position: "topLeft", scale: 0.16, offset: { x: 0.04, y: -0.04 } });
     if (promoUrl) brandTrack.push({ asset: { type: "image", src: promoUrl }, start: 0, length: total, position: "topRight", scale: 0.18, offset: { x: -0.04, y: -0.04 } });
 
+    // ON-SCREEN OFFER CALLOUT (frosted glass): an animated overlay of the client's hook offer near the top.
+    // Shotstack renders the HTML as ONE static frame, so the motion is the clip-level transition (slide-up in,
+    // fade out) - a clean, premium land. Faux-frosted (translucent gradient + hairline border + soft shadow +
+    // inset highlight); a live backdrop-blur of the video isn't possible in the compositor. Text is escaped.
+    const cb = (event.data.callout ?? (production?.brief as { callout?: Record<string, unknown> })?.callout ?? {}) as { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; start?: number; duration?: number };
+    const calloutClips: Record<string, unknown>[] = [];
+    if (cb.on && (cb.line || cb.num || cb.suffix || cb.kick)) {
+      const accent = /^#[0-9a-fA-F]{6}$/.test(String(cb.accent)) ? String(cb.accent) : "#ffcb05";
+      const kick = esc(String(cb.kick || "")); const line = esc(String(cb.line || ""));
+      const cnum = esc(String(cb.num || "")); const suffix = esc(String(cb.suffix || ""));
+      const inner = [
+        kick ? `<div class="k">${kick}</div>` : "",
+        line ? `<div class="l">${line}</div>` : "",
+        (cnum || suffix) ? `<div class="o">${cnum ? `<span class="n">${cnum}</span>` : ""}${suffix ? `<span class="f">${suffix}</span>` : ""}</div>` : "",
+      ].join("");
+      const calloutCss = `.card{box-sizing:border-box;width:100%;padding:34px 42px 40px;border-radius:40px;`
+        + `background:linear-gradient(180deg,rgba(255,255,255,0.17),rgba(255,255,255,0.05));`
+        + `border:2px solid rgba(255,255,255,0.42);`
+        + `box-shadow:0 26px 70px rgba(0,0,0,0.5),inset 0 2px 0 rgba(255,255,255,0.55),inset 0 -2px 0 rgba(255,255,255,0.06)}`
+        + `.k{font-family:'Open Sans',sans-serif;font-weight:700;font-size:24px;letter-spacing:4px;text-transform:uppercase;color:#fff;opacity:0.9;margin:0 0 12px}`
+        + `.l{font-family:'Open Sans',sans-serif;font-weight:700;font-size:46px;line-height:1.18;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,0.35);margin:0}`
+        + `.o{display:flex;align-items:baseline;gap:16px;margin-top:22px}`
+        + `.n{font-family:'Open Sans',sans-serif;font-weight:800;font-size:86px;line-height:1;letter-spacing:-1px;color:#0c0d10;background:${accent};padding:6px 26px;border-radius:22px;box-shadow:0 10px 26px ${accent}55}`
+        + `.f{font-family:'Open Sans',sans-serif;font-weight:800;font-size:40px;letter-spacing:2px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.4)}`;
+      const cStart = Math.max(0, Math.min(total - 0.6, Number(cb.start) || 0.6));
+      const cDur = Math.max(1.5, Math.min(total - cStart, Number(cb.duration) || 4));
+      calloutClips.push({ asset: { type: "html", html: `<div class="card">${inner}</div>`, css: calloutCss, width: 940, height: 480, background: "transparent" }, start: cStart, length: cDur, position: "top", offset: { y: -0.05 }, transition: { in: "slideUp", out: "fade" } });
+    }
+
     const tracks: Record<string, unknown>[] = [];
+    if (calloutClips.length) tracks.push({ clips: calloutClips });
     if (brandTrack.length) tracks.push({ clips: brandTrack });
     if (captionClips.length) tracks.push({ clips: captionClips });
     if (voTrack.length) tracks.push({ clips: voTrack });

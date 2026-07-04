@@ -257,6 +257,21 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // clip/image reuses the brief's endCardUrl/endCardKind state so there's one source of truth.
   const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
   const [stitchCaptionStyle, setStitchCaptionStyle] = useState<string>(String((initialProduction?.brief as { captionStyle?: string })?.captionStyle || "bold"));
+  // ON-SCREEN OFFER CALLOUT (frosted glass): an animated overlay of the client's hook offer. Persisted in the
+  // brief so a re-stitch reuses it. Off by default.
+  type Callout = { on: boolean; kick: string; line: string; num: string; suffix: string; accent: string; start: number; duration: number };
+  const savedCallout = (initialProduction?.brief as { callout?: Partial<Callout> })?.callout || {};
+  const [callout, setCallout] = useState<Callout>({
+    on: savedCallout.on === true,
+    kick: savedCallout.kick ?? "Limited offer",
+    line: savedCallout.line ?? "",
+    num: savedCallout.num ?? "",
+    suffix: savedCallout.suffix ?? "FREE",
+    accent: savedCallout.accent ?? "#ffcb05",
+    start: typeof savedCallout.start === "number" ? savedCallout.start : 0.6,
+    duration: typeof savedCallout.duration === "number" ? savedCallout.duration : 4,
+  });
+  const setCo = (patch: Partial<Callout>) => setCallout((c) => ({ ...c, ...patch }));
   async function toggleDrop(scene: number) {
     setDropped((s) => { const n = new Set(s); n.has(scene) ? n.delete(scene) : n.add(scene); return n; }); // optimistic
     // Confirm from the server so a later render/stitch can't race on a stale dropped list.
@@ -403,7 +418,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (assembling) return;
     setErr("");
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, endCardUrl, endCardKind, callout }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
   }
@@ -1210,6 +1225,54 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       </div>
                     )}
                   </div>
+
+                  {/* ON-SCREEN OFFER CALLOUT (frosted glass) - an animated overlay of the client's hook offer. */}
+                  <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" checked={callout.on} onChange={(e) => setCo({ on: e.target.checked })} className="h-4 w-4 accent-[#a855f7]" />
+                      <span className="text-[12px] font-semibold text-ink">🪟 On-screen offer callout</span>
+                      <span className="tabular text-[10px] uppercase tracking-[0.15em] text-ink-faint">frosted glass · animated</span>
+                    </label>
+                    {callout.on && (
+                      <div className="mt-3 grid gap-4 md:grid-cols-[1fr_auto]">
+                        <div className="space-y-2.5">
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="text-[10px] text-ink-faint">Eyebrow<input value={callout.kick} onChange={(e) => setCo({ kick: e.target.value })} maxLength={40} placeholder="Limited offer" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#a855f7]" /></label>
+                            <label className="text-[10px] text-ink-faint">Headline<input value={callout.line} onChange={(e) => setCo({ line: e.target.value })} maxLength={80} placeholder="Download MoMo & register" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#a855f7]" /></label>
+                            <label className="text-[10px] text-ink-faint">Offer (chip)<input value={callout.num} onChange={(e) => setCo({ num: e.target.value })} maxLength={24} placeholder="1GB" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] font-bold text-ink outline-none focus:border-[#a855f7]" /></label>
+                            <label className="text-[10px] text-ink-faint">Offer suffix<input value={callout.suffix} onChange={(e) => setCo({ suffix: e.target.value })} maxLength={24} placeholder="FREE" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#a855f7]" /></label>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] text-ink-faint">Accent</span>
+                            {["#ffcb05", "#22c55e", "#5aa2ff", "#ff7ac0", "#ffffff"].map((h) => (
+                              <button key={h} onClick={() => setCo({ accent: h })} title={h} style={{ background: h }} className={`h-6 w-6 rounded-md border-2 transition ${callout.accent === h ? "border-ink" : "border-transparent"}`} />
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-4">
+                            <label className="flex items-center gap-2 text-[10px] text-ink-faint">Appears at
+                              <input type="number" min={0} max={60} step={0.5} value={callout.start} onChange={(e) => setCo({ start: Math.max(0, Math.min(60, Number(e.target.value) || 0)) })} className="tabular w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-[13px] text-ink outline-none focus:border-[#a855f7]" />s</label>
+                            <label className="flex items-center gap-2 text-[10px] text-ink-faint">Holds for
+                              <input type="number" min={1.5} max={12} step={0.5} value={callout.duration} onChange={(e) => setCo({ duration: Math.max(1.5, Math.min(12, Number(e.target.value) || 4)) })} className="tabular w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-[13px] text-ink outline-none focus:border-[#a855f7]" />s</label>
+                          </div>
+                        </div>
+                        {/* Live mini-preview (matches the render's frosted card) */}
+                        <div className="relative flex h-[210px] w-[118px] items-start justify-center overflow-hidden rounded-xl border border-line bg-gradient-to-br from-[#1b2338] via-[#241a2e] to-[#0d1017]">
+                          <div className="mt-4 w-[102px] rounded-[10px] border border-white/40 bg-gradient-to-b from-white/[0.16] to-white/[0.05] px-2 py-1.5 shadow-lg" style={{ boxShadow: "0 8px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.5)" }}>
+                            {callout.kick && <div className="text-[6px] font-bold uppercase tracking-[0.14em] text-white/90">{callout.kick}</div>}
+                            {callout.line && <div className="mt-0.5 text-[9px] font-bold leading-tight text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,.4)" }}>{callout.line}</div>}
+                            {(callout.num || callout.suffix) && (
+                              <div className="mt-1.5 flex items-baseline gap-1">
+                                {callout.num && <span className="rounded-[5px] px-1.5 py-0.5 text-[15px] font-extrabold leading-none text-[#0c0d10]" style={{ background: callout.accent }}>{callout.num}</span>}
+                                {callout.suffix && <span className="text-[8px] font-extrabold tracking-wide text-white">{callout.suffix}</span>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {!callout.on && <p className="mt-1.5 text-[10px] text-ink-faint">A premium animated glass card for your hook offer (e.g. &quot;Download MoMo &amp; register - 1GB FREE&quot;). Slides in, holds, eases out.</p>}
+                  </div>
+
                   {/* FULL-QUALITY CONFORM: draft previews are 720p (a-roll) / fast DoP (b-roll) proxies. Before
                       delivery, re-render them at full quality (1080p a-roll, Veo b-roll) from the SAME locked
                       keyframes - same shot, properly rendered, no drift. Shown only while draft clips remain. */}

@@ -25,10 +25,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const captionStyle = ["pill", "bold", "highlight", "clean", "sunny", "karaoke"].includes(body.captionStyle) ? body.captionStyle : "bold";
   const endCardUrl = typeof body.endCardUrl === "string" && isSafePublicUrl(body.endCardUrl) ? body.endCardUrl : "";
   const endCardKind = body.endCardKind === "image" ? "image" : "video";
-  const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind, captionStyle };
+  // ON-SCREEN OFFER CALLOUT (frosted glass): an optional animated overlay of the client's hook offer. Sanitise
+  // every field - text is HTML-escaped in the stitch, but cap lengths + validate the accent hex + clamp timing.
+  const cbRaw = (body.callout ?? {}) as Record<string, unknown>;
+  const str = (v: unknown, n: number) => (typeof v === "string" ? v.trim().slice(0, n) : "");
+  const num = (v: unknown, d: number, lo: number, hi: number) => { const x = Number(v); return Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : d; };
+  const callout = cbRaw.on === true ? {
+    on: true,
+    kick: str(cbRaw.kick, 40),
+    line: str(cbRaw.line, 80),
+    num: str(cbRaw.num, 24),
+    suffix: str(cbRaw.suffix, 24),
+    accent: /^#[0-9a-fA-F]{6}$/.test(String(cbRaw.accent)) ? String(cbRaw.accent) : "#ffcb05",
+    start: num(cbRaw.start, 0.6, 0, 60),
+    duration: num(cbRaw.duration, 4, 1.5, 12),
+  } : { on: false };
+  const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind, captionStyle, callout };
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, brief: briefNext, assembly_status: "running", final_url: null, stitch_captions: captions } } });
   try {
-    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, captionStyle, endCardUrl, endCardKind } });
+    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, captionStyle, endCardUrl, endCardKind, callout } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, assembly_status: "idle" } } });
     return NextResponse.json({ error: "Could not start the stitch (assembly engine not connected)." }, { status: 503 });
