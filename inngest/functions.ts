@@ -1511,6 +1511,28 @@ export const generateClips = inngest.createFunction(
           await step.sleep(`vwait-${i}-${n}`, "8s");
         }
       }
+      // LIVE-BG A-ROLL did not land in time → fall back to a reliable HeyGen talking-head (frozen background)
+      // so the scene ALWAYS lands instead of failing. A still-background a-roll beats a dead clip; live-bg on
+      // Higgsfield's Kling lane is slow + flaky, so this is the safety net. (The moving background is the
+      // nice-to-have that gracefully degrades to HeyGen when the slow lane can't deliver.)
+      if (!url && role === "a-roll" && liveBg && audioUrl && (process.env.AROLL_ENGINE || "heygen") === "heygen") {
+        const fbPrompt = `Natural, lifelike talking-to-camera delivery: ${base}. Calm, human, subject-driven motion: gentle head movement, warm micro-expressions, hands resting and essentially still. The camera holds a steady, essentially locked frame on her, centred and fully in frame. The background stays calm and naturally STILL - only she moves, at real-life speed.`;
+        let hgUrl: string | null = null; let hgVariant: string | undefined;
+        const hg = await step.run(`lbhg-submit-${i}`, () => startTalkingVideo({ imageUrl: img as string, audioUrl, ratio, motionPrompt: fbPrompt, speed }).then((r) => ({ ok: true as const, ...r })).catch((e) => ({ ok: false as const, error: String((e as Error)?.message || e).slice(0, 200) })));
+        if (hg.ok) {
+          for (let n = 0; n < 170; n++) {
+            const s = await step.run(`lbhg-poll-${i}-${n}`, () => pollTalking(hg.videoId, hg.version));
+            if (s.url) { hgUrl = s.url; hgVariant = hg.variant; break; }
+            if (s.error || s.status === "failed") break;
+            await step.sleep(`lbhg-wait-${i}-${n}`, n < 75 ? "4s" : "8s");
+          }
+        }
+        if (hgUrl) {
+          await step.run(`u-lbhg-${i}`, () => recordUsage({ influencerId, provider: "heygen", model: "avatar_iv", unit: "video", action: "aroll", count: 1 }).catch(() => {}));
+          const hosted = (await step.run(`lbhghost-${i}`, () => rehostToBlob(hgUrl as string, "clips").catch(() => null))) || hgUrl;
+          return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: "heygen:avatar_iv:livebg-fallback", draft: speed };
+        }
+      }
       // VEO/KLING did not land in time → for B-ROLL, fall back to the FAST, reliable first-party DoP lane so
       // the scene is NEVER just lost (a ~5s DoP clip loops to the 8s slot in the stitch). Only when DoP wasn't
       // already the primary engine for this scene. This is the safety net for "render started (veo3_1) but did
