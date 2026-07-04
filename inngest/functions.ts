@@ -1677,12 +1677,17 @@ export const assembleVideo = inngest.createFunction(
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const tcLen = a != null && b != null && b > a ? b - a : 5;
       let len = clipDur(i) ?? tcLen;
-      // b-roll → narration length (cuts the engine's frozen tail; keeps the VO continuous).
-      // Show the FULL b-roll clip (8s floor): the slot is the longer of the narration and the real clip
-      // length, so a short VO still plays the whole 8s shot (VO over the start, music/ambient after).
-      if (role === "b-roll" && sceneAudioDur.has(i)) len = Math.max(sceneAudioDur.get(i)!, clipDur(i) ?? 0);
+      // b-roll WITH narration → play to the 8s FLOOR (the impactful length), or longer if the VO or the clip
+      // is longer. The VO plays over the start; music/ambient carry the cinematic breather to the end. A short
+      // draft DoP clip (~5s) LOOPS to fill this slot so the motion never freezes, and the VO is NEVER cut.
+      // CRITICAL: honour the floor even when the slice duration wasn't stored - otherwise the slot collapsed to
+      // the fixed ~5s DoP clip and BOTH the video and the voiceover were chopped at 5s (the bug Gary hit).
+      if (role === "b-roll" && vo) {
+        const BROLL_FLOOR = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 8));
+        len = Math.max(sceneAudioDur.get(i) ?? 0, clipDur(i) ?? 0, BROLL_FLOOR);
+      }
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
-      else if (role === "b-roll" && !vo) len = Math.min(len, 2.8);
+      else if (role === "b-roll") len = Math.min(len, 2.8);
       const start = cursor;
       cursor = start + len;
       return { i, start, len, role, vo, caption: String(sc.caption || "").trim() };
