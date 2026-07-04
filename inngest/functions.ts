@@ -1508,6 +1508,29 @@ export const generateClips = inngest.createFunction(
           await step.sleep(`vwait-${i}-${n}`, "8s");
         }
       }
+      // VEO/KLING did not land in time → for B-ROLL, fall back to the FAST, reliable first-party DoP lane so
+      // the scene is NEVER just lost (a ~5s DoP clip loops to the 8s slot in the stitch). Only when DoP wasn't
+      // already the primary engine for this scene. This is the safety net for "render started (veo3_1) but did
+      // not finish in time" - premium Veo is attempted first, DoP guarantees a clip if it stalls.
+      if (!url && role === "b-roll" && !useDop && dopConfigured()) {
+        const fb = await step.run(`dopfb-submit-${i}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: clipSeconds }));
+        if (fb.jobSetId) {
+          const FB_ROUNDS = Math.max(60, Number(process.env.DOP_POLL_ROUNDS) || 360);
+          let dopUrl: string | null = null;
+          for (let n = 0; n < FB_ROUNDS; n++) {
+            const s = await step.run(`dopfb-poll-${i}-${n}`, () => pollDopOnce(fb.jobSetId as string));
+            if (s.url) { dopUrl = s.url; break; }
+            if (s.terminal) break;
+            await step.sleep(`dopfb-wait-${i}-${n}`, n < 72 ? "5s" : "10s");
+          }
+          if (dopUrl) {
+            await step.run(`u-dopfb-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "dop_turbo", unit: "video", action: "broll", count: 1 }).catch(() => {}));
+            const hosted = (await step.run(`dopfbhost-${i}`, () => rehostToBlob(dopUrl as string, "clips").catch(() => null))) || dopUrl;
+            const realDur = await step.run(`dopfbdur-${i}`, () => probeDuration(hosted as string).catch(() => null));
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : DOP_OUT_SECONDS, audio_url: audioUrl || undefined, synced: false, engine: "higgsfield:dop_turbo:veo-fallback", draft: false };
+          }
+        }
+      }
       if (url) {
         const usedModel = useVeo ? "veo3_1" : (process.env.HF_VIDEO_MODEL || "kling3");
         await step.run(`u-vid-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: usedModel, unit: "video", action: role === "a-roll" ? "aroll" : "broll", count: 1 }).catch(() => {}));
