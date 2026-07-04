@@ -241,6 +241,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // waiting). wholeBoardBusy = a whole-board Animate-all / role batch is running (blocks per-scene during it).
   const [animatingScenes, setAnimatingScenes] = useState<Set<number>>(new Set());
   const [wholeBoardBusy, setWholeBoardBusy] = useState(false);
+  // When each scene's render was first OBSERVED (ms), for the live elapsed timer on the rendering card.
+  // Reconciled from the render state below, so it survives a refresh (starts from when we re-observe it).
+  const [renderStarts, setRenderStarts] = useState<Record<number, number>>({});
   // DRAFT SPEED: render a-roll clips at 720p (faster) while iterating. The final stitch ALWAYS outputs 1080p,
   // so for a crisp final turn this OFF and re-animate the a-roll. Default ON for fast iteration.
   const [speedMode, setSpeedMode] = useState(true);
@@ -250,6 +253,26 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const busyAny = shooting || rendering || !!renderingRole || anyReshooting;
   // Curated reference galleries: keep the dropped set in sync with the server + chosen aspect ratio per role.
   useEffect(() => { setDropped(new Set(production?.dropped_scenes ?? [])); }, [production?.dropped_scenes]);
+  // Record when each rendering scene STARTED (for the live elapsed timer). A scene reads as rendering if it's
+  // in a per-scene animate, or a whole-board/role run is covering it and it has no good clip yet. Reconciled
+  // on every state change: sets a start when rendering begins, clears it when the clip lands or fails. Survives
+  // a refresh (re-observes and starts the clock fresh - a slight undercount, but never a false hang).
+  useEffect(() => {
+    const scenesArr = production?.storyboard?.scenes ?? [];
+    const cl = production?.clips ?? [];
+    setRenderStarts((prev) => {
+      let next = prev; let touched = false;
+      const mut = () => { if (next === prev) next = { ...prev }; };
+      scenesArr.forEach((sc, i) => {
+        const roleStr = String((sc as { role?: string }).role || "a-roll");
+        const c = cl.find((x) => x.scene === i);
+        const rendering = !dropped.has(i) && (animatingScenes.has(i) || (wholeBoardBusy && (renderingRole === "" || renderingRole === roleStr) && !c?.url && c?.status !== "failed"));
+        if (rendering && next[i] == null) { mut(); next[i] = Date.now(); touched = true; }
+        else if (!rendering && next[i] != null) { mut(); delete next[i]; touched = true; }
+      });
+      return touched ? next : prev;
+    });
+  }, [production, animatingScenes, wholeBoardBusy, renderingRole, dropped]);
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [brollRatio, setBrollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [boardRatio, setBoardRatio] = useState<"9:16" | "1:1" | "16:9">("9:16"); // one ratio for the whole scene board
@@ -912,11 +935,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               ONLY for an explicit per-scene list (clipScope is an array with this scene) - a whole-board
                               "all" run never re-renders scenes that already have a clip, so it must NOT light them up. */}
                           {animatingScenes.has(i) && (
-                            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/65 text-[10px] font-semibold text-white"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />re-animating…</div>
+                            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/65 text-[10px] font-semibold text-white"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />re-animating…<RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-20 min" : s.role === "a-roll" ? "2-6 min" : String((s as { hero?: string }).hero) === "true" ? "10-25 min" : speedMode ? "3-8 min" : "10-25 min"} /></div>
                           )}
                         </div>
                       ) : !clip?.url && (animatingScenes.has(i) || (wholeBoardBusy && (renderingRole === "" || renderingRole === s.role))) ? (
-                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…</div>
+                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…<RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-20 min" : s.role === "a-roll" ? "2-6 min" : String((s as { hero?: string }).hero) === "true" ? "10-25 min" : speedMode ? "3-8 min" : "10-25 min"} /></div>
                       ) : shot?.url ? (
                         <div className="relative">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1035,8 +1058,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         {s.role === "a-roll" && (
                           <div>
                             <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
-                            <button onClick={() => setEd((e) => ({ ...e, liveBg: e.liveBg === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.liveBg === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.liveBg === "true" ? "🎬 Live background · Veo ✓" : "🎬 Live background (moving scene)"}</button>
-                            <p className="mt-1 text-[10px] text-ink-faint">Renders this scene on a full-scene video engine so the WHOLE world moves behind her (e.g. horses racing), her voice laid over. Trade-off: she reads as IN the living scene rather than tight lip-syncing to camera (the engine animates the scene, not the lips), and it&apos;s slower than the default. Best for short hero beats (~5s). Default off = HeyGen (tight lip-sync, still background). Needs a re-shoot + re-animate.</p>
+                            <button onClick={() => setEd((e) => ({ ...e, liveBg: e.liveBg === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.liveBg === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.liveBg === "true" ? "🎬 Live background · Kling 3.0 ✓" : "🎬 Live background (moving scene)"}</button>
+                            <p className="mt-1 text-[10px] text-ink-faint">Renders this scene on Kling 3.0 so the WHOLE world moves behind her (e.g. horses racing), her voice laid over. Trade-off: she reads as IN the living scene rather than tight lip-syncing to camera (the engine animates the scene, not the lips). Kling is on the slower lane, so expect ~10-20 min even in Draft (there&apos;s no fast option that holds a full talking length). Default off = HeyGen (tight lip-sync, still background, much faster). Needs a re-shoot + re-animate.</p>
                           </div>
                         )}
                       </div>
@@ -1501,6 +1524,20 @@ function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
       />
       {overlayVO && <audio ref={aRef} src={clip.audio_url || undefined} preload="auto" />}
     </>
+  );
+}
+// Live elapsed-time + typical-time hint for a rendering scene, so a slow lane reads as "still going",
+// not "hung". Ticks itself every second; start is the ms timestamp the render was first observed.
+function RenderTimer({ start, hint }: { start: number; hint?: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const secs = Math.max(0, Math.floor((now - start) / 1000));
+  const mm = Math.floor(secs / 60); const ss = secs % 60;
+  return (
+    <div className="tabular text-center leading-tight">
+      <div className="text-[11px] font-bold">{mm}:{String(ss).padStart(2, "0")}</div>
+      {hint && <div className="mt-0.5 text-[8px] font-normal opacity-60">typically {hint}</div>}
+    </div>
   );
 }
 // Playable previews for one role - one tile per scene IN ORDER, each either the rendered clip
