@@ -1444,18 +1444,21 @@ export const generateClips = inngest.createFunction(
         : Math.max(3, Math.min(15, Math.round(sceneDur)));
       // HERO shot (b-roll only): route to Veo 3.1 (4K + native ambient audio) for this scene.
       const hero = role === "b-roll" && String(sc.hero) === "true";
-      // B-ROLL ENGINE — VEO is now the DEFAULT. Higgsfield's DoP API has NO duration control (verified against
-      // the official SDK), so DoP is stuck at a fixed ~5s clip; Veo 3.1 renders 4/6/8s at 4K with native audio
-      // = genuinely LONGER, better b-roll (fine on the Ultra plan). DRAFT SPEED mode falls back to the fast
-      // fixed-5s DoP (looped) so previews are quick; the final (non-draft) render uses Veo. BROLL_ENGINE=dop
-      // forces DoP everywhere, =kling forces Kling. Veo falls back to Kling inside submitVideoFromImage on error.
-      const brollEngine = (process.env.BROLL_ENGINE || "veo").toLowerCase();
+      // B-ROLL ENGINE — KLING 3.0 is now the DEFAULT final engine (Gary's call). Kling renders native 3-15s
+      // (NO loop) for clean long motion, and the DoP fallback below covers it if the MCP lane stalls. Veo is
+      // opt-in (BROLL_ENGINE=veo) or forced by a HERO shot. CRITICAL: DRAFT b-roll always uses the FAST DoP
+      // proxy (looped to the 8s slot in the stitch) regardless of the chosen final engine, so iteration stays
+      // quick - only the FINAL (non-draft) render uses Kling/Veo. BROLL_ENGINE=dop keeps DoP for the final too.
+      const brollEngine = (process.env.BROLL_ENGINE || "kling").toLowerCase();
       // LIVE-BG ENGINE (tunable for A/B): dop = fast first-party lane (~5 min, scene-not-lips); kling/veo = MCP
       // lane (slower, but a fuller talking-moving look). Default KLING now for the scene-3 quality test vs DoP;
       // set LIVEBG_ENGINE=dop to switch back to the fast lane. (First-party only exposes DoP, so Kling is MCP.)
       const LIVEBG_ENGINE = (process.env.LIVEBG_ENGINE || "kling").toLowerCase();
-      const useVeo = (role === "b-roll" && (hero || (brollEngine === "veo" && !speed))) || (liveBg && LIVEBG_ENGINE === "veo");
-      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || role === "b-roll") && !useVeo && brollEngine !== "kling" && dopConfigured();
+      // FINAL b-roll → Veo only when hero or explicitly chosen; DRAFT b-roll never uses Veo.
+      const useVeo = (role === "b-roll" && !speed && (hero || brollEngine === "veo")) || (liveBg && LIVEBG_ENGINE === "veo");
+      // DoP when: live-bg set to dop, OR ANY draft b-roll (fast proxy), OR final b-roll explicitly on dop.
+      // Otherwise a final b-roll falls through to submitVideoFromImage on Kling (the default) with a DoP net.
+      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop")) && !useVeo && dopConfigured();
       // DoP renders a FIXED ~5s clip; the stitch LOOPS it across a longer narration (no freeze). Its real
       // length is probed at render time so the loop/slot stay accurate.
       const DOP_OUT_SECONDS = Math.max(3, Number(process.env.DOP_OUT_SECONDS) || 5);
