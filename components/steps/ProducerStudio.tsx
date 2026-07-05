@@ -26,7 +26,15 @@ const ROLE = {
 } as const;
 
 type CreativeGuide = { url: string; role: string; ratio: string; scene: string; resolution: string };
-export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3" }) {
+export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio" }) {
+  // STAGE SPLIT: "foundation" = Script & Voice stage (brief -> storyboard -> voice); "studio" = The Studio
+  // stage (shoot -> animate -> music -> stitch -> showreel). "all" = the legacy single page (unchanged).
+  const isFoundation = mode !== "studio"; // show brief + concept + voice
+  const isStudio = mode !== "foundation"; // show scene keyframes/animate + audio + stitch + showreel
+  const showStep = (k: string) => (k === "concept" || k === "voice") ? isFoundation : isStudio;
+  // Display step numbers restart at 1 within each stage (Studio's "Scenes" is step 1, not step 3).
+  const VISIBLE_STEPS = (["concept", "voice", "scenes", "audio", "stitch", "showreel"] as const).filter(showStep);
+  const stepNum = (k: string) => (VISIBLE_STEPS as readonly string[]).indexOf(k) + 1;
   const [production, setProduction] = useState<Production>(initialProduction);
   // Guide = a creative (made in the Creative section) the shoot anchors to (wardrobe/look/world). Persisted as aroll_ref_url/broll_ref_url.
   const [arollGuide, setArollGuide] = useState(arollRef);
@@ -697,9 +705,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       <div className="flex items-start gap-3 rounded-xl border border-[#a855f7]/30 bg-gradient-to-r from-[#a855f7]/12 to-[#60a5fa]/8 p-5">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#a855f7]/20 text-2xl">🎬</div>
         <div>
-          <div className="text-sm font-extrabold text-white">Your Producer</div>
+          <div className="text-sm font-extrabold text-white">{mode === "foundation" ? "Script & Voice" : mode === "studio" ? "The Studio" : "Your Producer"}</div>
           <p className="mt-1 text-sm text-ink-dim">
-            {editing
+            {mode === "foundation"
+              ? `Write the ad and lock the voice - the foundation everything else is built to. Tell me about the ad and I'll direct ${name}'s storyboard, shot by shot; then pick the voice and generate the voiceover.`
+              : mode === "studio"
+              ? `Shoot, animate and cut - built to ${name}'s locked script + voice. Work scene by scene on the cards, then music and the final stitch.`
+              : editing
               ? `Tell me about the ad and I'll direct a full storyboard for ${name}, shot by shot, in our house style. Then we shoot it together.`
               : `Here's the storyboard I've directed for ${name}. Review the scenes, regenerate anything, and when you're happy we'll shoot it.`}
           </p>
@@ -707,6 +719,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       </div>
 
       {editing ? (
+        mode === "studio" ? (
+          /* Studio opened before the script exists → send them to Script & Voice first. */
+          <a href={`/setup/influencers/${influencerId}/voice`} className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-4 py-4 text-sm font-bold text-[#fbbf24]">⚠ Start with Script &amp; Voice - write the script and lock the voice first, then come back to The Studio →</a>
+        ) : (
         /* Brief */
         <div className="space-y-4 rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex items-center justify-between">
@@ -841,6 +857,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {err && <p className="text-xs text-alert">{err}</p>}
           <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : draftScript ? "🎬 Build the scenes from this script" : "🎬 Direct the storyboard"}</button>
         </div>
+        )
       ) : sb ? (
         /* Storyboard */
         <div className="space-y-4">
@@ -853,8 +870,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <div className="flex gap-2">
                 <button onClick={resetStuck} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${(busyAny || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>
                 {clips.length > 0 && <button onClick={clearStaleClips} disabled={busyAny} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-faint hover:text-ink disabled:opacity-40" title="Drop all existing clips + the final cut (leftover videos) and go back to clean reference images. Keeps the storyboard, stills and voice.">🧹 Clear clips</button>}
-                <button onClick={() => setEditing(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">✎ New brief</button>
-                <button onClick={generate} disabled={busy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Re-directing…" : "↻ Regenerate"}</button>
+                {/* Script edits (New brief / Regenerate) live in the Script & Voice stage - hidden in The Studio
+                    so a locked script can't be blown away mid-build. */}
+                {isFoundation && <button onClick={() => setEditing(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">✎ New brief</button>}
+                {isFoundation && <button onClick={generate} disabled={busy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Re-directing…" : "↻ Regenerate"}</button>}
               </div>
             </div>
             {sb.music_bed && <p className="mt-2 text-[12px] text-ink-faint">🎵 {sb.music_bed}</p>}
@@ -868,8 +887,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             )}
           </div>
 
-          {/* Reference-image shoot (keyframes only, no video) - available right here at the storyboard. */}
-          <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-3">
+          {/* Reference-image shoot (keyframes) - The Studio stage only (foundation is script + voice). */}
+          {isStudio && (<div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
               {/* Priority queue is now ALWAYS ON (the fast paid image model) - a keyframe is the foundation of
@@ -910,7 +929,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 ) : null}
               </div>
             )}
-          </div>
+          </div>)}
 
           <div className="space-y-3">
             {sb.scenes.map((s, i) => {
@@ -923,7 +942,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               const clipFailed = clip?.status === "failed" && stepReached;
               return (
                 <div key={i} id={`prod-scene-${i}`} className="flex gap-4 rounded-xl border border-line bg-surface-1 p-4">
-                  {s.role !== "graphic" && (
+                  {isStudio && s.role !== "graphic" && (
                     <div className="w-32 shrink-0">
                       {shot?.reshooting ? (
                         <div className="relative">
@@ -1096,14 +1115,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {/* ── The 8-step gated production wizard ── */}
           <div className="space-y-3">
             <WizardSpine
-              steps={([["concept", "Concept"], ["voice", "Voice"], ["scenes", "Scenes"], ["audio", "Music"], ["stitch", "Stitch"], ["showreel", "Showreel"]] as const).map(([key, label], idx) => ({ key, label, n: idx + 1, state: stepState(key) }))}
+              steps={([["concept", "Script"], ["voice", "Voice"], ["scenes", "Scenes"], ["audio", "Music"], ["stitch", "Stitch"], ["showreel", "Showreel"]] as const).filter(([key]) => showStep(key)).map(([key, label], idx) => ({ key, label, n: idx + 1, state: stepState(key) }))}
               onJump={(k) => document.getElementById(`step-${k}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
-            {/* 1 · Brief & concept */}
-            <StepShell n={1} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} - talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt - location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem - tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />
+            {/* 1 · Brief & concept (foundation stage) */}
+            {showStep("concept") && <StepShell n={stepNum("concept")} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} - talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt - location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem - tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />}
 
-            {/* 2 · Voice */}
-            <StepShell n={2} title="Voice" desc={`Pick the voice ${name} speaks in, then generate the full voiceover - every talking (a-roll) scene is lip-synced to it and the scenes are built to its real timing.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
+            {/* 2 · Voice (foundation stage) */}
+            {showStep("voice") && (<>
+            <StepShell n={stepNum("voice")} title="Voice" desc={`Pick the voice ${name} speaks in, then generate the full voiceover - every talking (a-roll) scene is lip-synced to it and the scenes are built to its real timing.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
               {unlocked("voice") ? (
                 !needsVoice ? (
                   <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
@@ -1194,9 +1214,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 )
               ) : <LockHint />}
             </StepShell>
+            {/* Foundation stage done → hand off to The Studio for the visual build. */}
+            {mode === "foundation" && approved.has("voice") && (
+              <a href={`/setup/influencers/${influencerId}/producer`} className="btn-brand mt-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold">🎬 Script &amp; voice locked - continue to The Studio →</a>
+            )}
+            </>)}
 
             {/* 3 · Scenes - the scene-by-scene build board (per-scene controls live on the cards above) */}
-            <StepShell n={3} title="Build the scenes" desc={`Shoot each scene's keyframe and animate it. Work scene by scene on the cards above (🎬 build · 🎞️ animate · ✎ edit · ✓ keep / ✗ reject), or build the whole board at once here. Talking (a-roll) scenes lip-sync to the voice; scene (b-roll) shots get natural motion.`} state={stepState("scenes")} anchor="step-scenes" gate={renderGate("scenes", "Every kept scene needs a finished clip. Build any that are still missing (or reject a scene), then Accept.")}>
+            {showStep("scenes") && (<>
+            {mode === "studio" && !approved.has("voice") && (
+              <a href={`/setup/influencers/${influencerId}/voice`} className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-4 py-3 text-sm font-bold text-[#fbbf24]">⚠ Finish Script &amp; Voice first (the scenes build to the locked voice) →</a>
+            )}
+            <StepShell n={stepNum("scenes")} title="Build the scenes" desc={`Shoot each scene's keyframe and animate it. Work scene by scene on the cards above (🎬 build · 🎞️ animate · ✎ edit · ✓ keep / ✗ reject), or build the whole board at once here. Talking (a-roll) scenes lip-sync to the voice; scene (b-roll) shots get natural motion.`} state={stepState("scenes")} anchor="step-scenes" gate={renderGate("scenes", "Every kept scene needs a finished clip. Build any that are still missing (or reject a scene), then Accept.")}>
               {unlocked("scenes") ? (
                 <div className="space-y-3">
                   <div>
@@ -1217,7 +1246,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 4 · Music & ambient */}
-            <StepShell n={4} title="Music & ambient" desc="I generate the music bed and the ambient room tone for the world. Have a listen before we cut it together." state={stepState("audio")} anchor="step-audio" gate={renderGate("audio", "Re-generate the audio if it's not right, then Accept. The cut reuses exactly these beds.")}>
+            <StepShell n={stepNum("audio")} title="Music & ambient" desc="I generate the music bed and the ambient room tone for the world. Have a listen before we cut it together." state={stepState("audio")} anchor="step-audio" gate={renderGate("audio", "Re-generate the audio if it's not right, then Accept. The cut reuses exactly these beds.")}>
               {unlocked("audio") ? (
                 <>
                   <button onClick={genAudio} disabled={audioBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{audioBusy ? "🎵 Generating audio…" : audioReady ? "↻ Re-generate audio" : "🎵 Generate music & ambient"}</button>
@@ -1239,7 +1268,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 5 · Stitch */}
-            <StepShell n={5} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order with clean cuts, a continuous voiceover, the music + ambient mixed underneath${(production?.brief as { logoUrl?: string })?.logoUrl ? " and your uploaded logo" : ""} - one finished ${sb.format} ad. Captions are optional (off by default).`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
+            <StepShell n={stepNum("stitch")} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order with clean cuts, a continuous voiceover, the music + ambient mixed underneath${(production?.brief as { logoUrl?: string })?.logoUrl ? " and your uploaded logo" : ""} - one finished ${sb.format} ad. Captions are optional (off by default).`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
               {unlocked("stitch") ? (
                 <>
                   {/* Optional closing clip / end card - the LAST spot to upload the tail of the video. */}
@@ -1351,7 +1380,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 6 · Showreel */}
-            <StepShell n={6} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")} anchor="step-showreel">
+            <StepShell n={stepNum("showreel")} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")} anchor="step-showreel">
               {unlocked("showreel") ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <button onClick={() => { decideShowreel("accept"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>✓ Accept into showreel</button>
@@ -1361,6 +1390,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 </div>
               ) : <LockHint />}
             </StepShell>
+            </>)}
           </div>
         </div>
       ) : null}

@@ -84,7 +84,7 @@ export default async function StudioPage() {
                 {influencers.slice(0, 10).map((inf) => {
                   const src = thumb(inf);
                   const isLocked = ((inf.persona ?? {}) as Persona).locked;
-                  const href = isLocked ? `/setup/influencers/${inf.id}/producer` : `/setup/influencers/${inf.id}`;
+                  const href = isLocked ? `/setup/influencers/${inf.id}/voice` : `/setup/influencers/${inf.id}`;
                   return (
                     <div key={inf.id} className="relative">
                       <DeleteInfluencerButton id={inf.id} name={inf.name} />

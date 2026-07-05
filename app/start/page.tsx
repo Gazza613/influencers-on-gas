@@ -158,7 +158,7 @@ export default function StartPage() {
                   const face = (inf.persona as { hero_url?: string })?.hero_url || (inf.persona as { reference_url?: string })?.reference_url || inf.look_refs?.find?.((r) => r.hero)?.url || null;
                   const locked = !!(inf.persona as { locked?: boolean })?.locked;
                   const opening = navId === inf.id;
-                  const open = () => { if (navId) return; setNavId(inf.id); router.push(locked ? `/setup/influencers/${inf.id}/producer` : `/setup/influencers/${inf.id}`); };
+                  const open = () => { if (navId) return; setNavId(inf.id); router.push(locked ? `/setup/influencers/${inf.id}/voice` : `/setup/influencers/${inf.id}`); };
                   return (
                     <button key={inf.id} onClick={open} disabled={!!navId} className={`group relative rounded-xl border bg-surface-2 p-3 text-left transition ${opening ? "border-[#a855f7] ring-2 ring-[#a855f7]/40" : "border-line hover:border-[#a855f7]/50 hover:bg-surface-1"} disabled:cursor-wait`}>
                       <div className="flex items-center gap-2">

@@ -781,7 +781,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             <div className="text-sm font-bold text-ready">Happy with your looks?</div>
             <div className="text-[13px] text-ink-dim">Your stills are saved. Next: make a video with this influencer in the Producer.</div>
           </div>
-          <Link href={`/setup/influencers/${influencerId}/producer`} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold">🎬 Go to the Producer →</Link>
+          <Link href={`/setup/influencers/${influencerId}/voice`} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold">🎙️ Go to Script &amp; Voice →</Link>
         </div>
       )}
 
