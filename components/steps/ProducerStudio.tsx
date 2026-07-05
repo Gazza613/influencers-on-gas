@@ -156,7 +156,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [cta, setCta] = useState(String((initialProduction?.brief as { cta?: string })?.cta || ""));
   const [ctaCode, setCtaCode] = useState(String((initialProduction?.brief as { ctaCode?: string })?.ctaCode || ""));
   const [duration, setDuration] = useState<number>(Number((initialProduction?.brief as { durationSeconds?: number })?.durationSeconds) || 60);
-  const [format, setFormat] = useState<"9:16" | "1:1" | "16:9">("9:16");
+  // Restore the chosen format from the saved brief (stored as "16:9 (1920x1080)" etc.) so returning to a
+  // production keeps its aspect - otherwise it silently reset to 9:16 and a re-direct would change the ratio.
+  const [format, setFormat] = useState<"9:16" | "1:1" | "16:9">(() => {
+    const f = String((initialProduction?.brief as { format?: string })?.format || "");
+    return f.includes("16:9") ? "16:9" : f.includes("1:1") ? "1:1" : "9:16";
+  });
   const [setting, setSetting] = useState(String((initialProduction?.brief as { setting?: string })?.setting || ""));
   const [tone, setTone] = useState(String((initialProduction?.brief as { tone?: string })?.tone || "warm, confident, effortless"));
   const [logo, setLogo] = useState(String((initialProduction?.brief as { logo?: string })?.logo || ""));
@@ -746,6 +751,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
   async function generate() {
     if (!brand.trim() || !offer.trim() || busy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer."); return; }
+    // Re-directing writes brand-new scenes and REPLACES the whole production. If there's already rendered
+    // work, warn first - it clears the keyframes/clips/final cut + per-scene edits (captions, placements).
+    // The locked identity, chosen guides and voice are persona-level, so they survive.
+    const hasWork = !!production?.final_url || !!production?.clips?.some((c) => c.url) || !!production?.shots?.some((s) => s.url);
+    if (hasWork && !(await askConfirm({ title: "Re-direct the storyboard from scratch?", body: "This writes new scenes and CLEARS the current keyframes, rendered clips, the final cut and your per-scene edits (caption text + placements). Your locked identity, chosen guides and voice are kept. To just re-render the video, use the Stitch step instead.", tone: "danger", confirmLabel: "Re-direct (clears clips)" }))) return;
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
