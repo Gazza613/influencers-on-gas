@@ -106,14 +106,30 @@ const SAYABLE: [RegExp, string][] = [
   [/\bgigabyte\b/gi, "gigga-byte"],
   [/\bmegabytes\b/gi, "megga-bytes"],
   [/\bmegabyte\b/gi, "megga-byte"],
-  // South African Rand: "R700" / "R1,400" is spoken "700 Rand" / "1,400 Rand" (the R prefix is silent,
-  // the word "Rand" follows the amount). On-screen captions keep "R700"; only the SPOKEN text changes.
-  [/\bR\s?(\d[\d,]*(?:\.\d+)?)\b/g, "$1 Rand"],
 ];
 // Respell + de-click. IDEMPOTENT (running it twice == once) so the voiceover route can pre-apply it to each
 // line before computing the per-scene slice spans, and the TTS call can apply it again, and they stay aligned.
+// South African Rand spoken NATURALLY (Gary's hard rule): the R prefix moves to the word "Rand" AFTER the
+// amount + scale, and common fractions read as words - so "R2.5 million" is SPOKEN "two and a half million
+// rand", "R2.5m" the same, "R700" -> "700 Rand", "R1,400" -> "1400 Rand". On-screen captions keep the written
+// "R2.5 million"; only the SPOKEN read changes. The old rule dropped the R in place ("2.5 Rand million"),
+// which is exactly the bug.
+function speakRand(t: string): string {
+  if (t.indexOf("R") === -1 && t.indexOf("r") === -1) return t;
+  const frac: Record<string, string> = { "5": " and a half", "25": " and a quarter", "75": " and three quarters" };
+  const scaleWord: Record<string, string> = { m: "million", k: "thousand", b: "billion", bn: "billion", thousand: "thousand", million: "million", billion: "billion" };
+  return t
+    .replace(/\bR\s?(\d[\d,]*)(?:\.(\d+))?(\s?(?:million|billion|thousand|m|bn|b|k))?\b/gi, (_m, whole, dec, scale) => {
+      let words = String(whole).replace(/,/g, "");
+      if (dec) words += (frac[dec] ?? ` point ${String(dec).split("").join(" ")}`);
+      const scl = scale ? ` ${scaleWord[String(scale).trim().toLowerCase()]}` : "";
+      return `${words}${scl} Rand`;
+    })
+    .replace(/\b(Rand)\s+rand\b/gi, "$1"); // guard against copy that already wrote "... rand"
+}
 export function sayable(t: string): string {
   t = SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t);
+  t = speakRand(t);
   // COMMA/SEMICOLON POP FIX (Gary's): ElevenLabs pops at comma AND semicolon pauses, but DROPPING them merged
   // words and mis-said "not". Swapping each clause comma/semicolon for a spaced hyphen " - " gives the SAME
   // pause WITHOUT the pop, and keeps the words separate so pronunciation stays correct. Number separators
