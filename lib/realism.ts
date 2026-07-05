@@ -141,6 +141,7 @@ export function buildCreativeImagePrompt(o: {
 export const SHOT_NEGATIVE =
   "mixed-race couple, interracial couple, two people of different races shown together as a pair or walking side by side; " +
   "a second copy, twin, clone or look-alike of the influencer; duplicated or identical background people; matching/uniform outfits on extras; a background person wearing the same or similar outfit, dress, hat, headwear or colour as the main subject; anyone in the background echoing or twinning the influencer's look; " +
+  "TWO OR MORE background people wearing the SAME or a matching outfit, dress, top, suit, hat or colour; several women dressed alike or in the same dress; repeated, cloned, copy-pasted or duplicated outfits across the crowd; any two extras that look styled as a matching set - EVERY single person in the crowd is individually and distinctly dressed, no two share an outfit; " +
   "a third arm or third hand, extra or duplicated hands, extra or duplicated arms, a floating or disembodied hand, more than two hands, more than five fingers on a hand, six fingers, fewer than five fingers, fused, melted, twisted, bent-backwards, extra, missing or malformed fingers, deformed or distorted hands, mangled knuckles, claw hands; " +
   "moles, beauty marks, prominent facial moles, moles on the chest/neck/décolletage; " +
   "plastic or waxy skin, airbrushed, beauty-filtered, doll-like, CGI or 3D-render look; " +
