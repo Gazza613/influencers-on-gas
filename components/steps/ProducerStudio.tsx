@@ -1268,24 +1268,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         {/* Live background moved to the per-scene controls under the preview image (left) - a
                             cleaner user journey than buried in the edit box. See toggleLiveBg below. */}
                       </div>)}
-                      {/* ON-SCREEN CAPTION placement - a scene/visual overlay control (not a script/voice one).
-                          Applied at Stitch, so it needs NO re-shoot. 9-zone map + per-scene show/hide. */}
+                      {/* Captions always sit in the bottom safe zone (consistent for social) - just a per-scene show/hide. */}
                       {isStudio && (
-                        <div className="space-y-2 border-t border-line pt-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">On-screen caption placement</div>
-                            <label className="flex items-center gap-1.5 text-[11px] text-ink-dim">
-                              <input type="checkbox" checked={!ed.captionOff} onChange={(e) => setEd((s) => ({ ...s, captionOff: !e.target.checked }))} />
-                              Show on this scene
-                            </label>
-                          </div>
-                          <div className={`grid grid-cols-3 gap-1 ${ed.captionOff ? "pointer-events-none opacity-40" : ""}`} style={{ maxWidth: 138 }}>
-                            {([["topLeft", "↖"], ["topCenter", "↑"], ["topRight", "↗"], ["midLeft", "←"], ["center", "•"], ["midRight", "→"], ["lowerLeft", "↙"], ["lowerCenter", "↓"], ["lowerRight", "↘"]] as const).map(([key, glyph]) => {
-                              const sel = (ed.captionPos || "lowerCenter") === key;
-                              return <button key={key} type="button" onClick={() => setEd((s) => ({ ...s, captionPos: key }))} title={key} aria-label={`Caption ${key}`} className={`flex h-9 items-center justify-center rounded border text-sm ${sel ? "border-[#a855f7] bg-[#a855f7]/20 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"}`}>{glyph}</button>;
-                            })}
-                          </div>
-                          <p className="text-[10px] text-ink-faint">Where this scene&apos;s caption sits (kept inside the safe zone). Lower-middle is the default. Applied when you Stitch (no re-shoot); captions only render if &ldquo;Burn captions&rdquo; is on at the Stitch step.</p>
+                        <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
+                          <span className="text-[11px] text-ink-dim">Caption sits in the bottom safe zone (consistent across the ad).</span>
+                          <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-ink-dim">
+                            <input type="checkbox" checked={!ed.captionOff} onChange={(e) => setEd((s) => ({ ...s, captionOff: !e.target.checked }))} />
+                            Show on this scene
+                          </label>
                         </div>
                       )}
                       <div className="flex flex-wrap gap-2 pt-1">

@@ -1443,11 +1443,10 @@ export const generateClips = inngest.createFunction(
       // TTS AND probed presets), NOT just the pre-slice map. Falling back to the pre-slice, then the timecode.
       // This is why the b-roll used to render 8s (timecode) for a 12s VO - audioDur was captured but ignored.
       const narrationDur = (typeof audioDur === "number" && audioDur > 0) ? audioDur : sceneAudio.get(i)?.duration;
-      // B-ROLL 10s FLOOR (Gary's pick): every b-roll with a VO renders a FULL ~10s clip by default (the more
-      // impactful length) - the VO plays over the first part, music/ambient carry the cinematic breather to the
-      // end. Kling 3.0 does native 3-15s, so it holds the real length; a shorter draft DoP clip HOLDS ITS LAST FRAME for the remainder (never loops - Gary's hard rule).
-      // env-tunable (BROLL_MIN_SECONDS), up to 15s; set to 3 to go back to VO-matched lengths.
-      const BROLL_MIN = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 10));
+      // B-ROLL length = the MEASURED VO (Kling 3.0 renders native 3-15s), so the clip has real motion for the
+      // WHOLE line and the slot matches it - no forced 10s floor freezing a short line, no VO cut. A 3s min
+      // avoids a flicker-short cutaway; env-tunable (BROLL_MIN_SECONDS) if a longer default is ever wanted.
+      const BROLL_MIN = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 3));
       const clipSeconds = (liveBg && typeof narrationDur === "number" && narrationDur > 0)
         ? Math.max(3, Math.min(15, Math.ceil(narrationDur))) // live-bg a-roll: match her FULL spoken line - Kling 3.0 does 3-15s so a long script (e.g. scene 3) is never cut. Veo snaps down to 8s and DoP ignores duration (fixed ~5s), so the length only truly holds on the Kling lane - which is why Kling is the live-bg default.
         : (role === "b-roll" && typeof narrationDur === "number" && narrationDur > 0)
@@ -1727,17 +1726,24 @@ export const assembleVideo = inngest.createFunction(
     // to its exact synced length, so it's untouched.
     const sceneAudioDur = new Map<number, number>();
     (Array.isArray((production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; duration?: number }[] }).scene_audio : []).forEach((e) => { if (typeof e?.duration === "number" && e.duration > 0) sceneAudioDur.set(Number(e.scene), e.duration); });
+    // GENEROUS word-count estimate (~2.0 words/sec, deliberately slow so it errs LONG) - the last-ditch floor
+    // for the scene length + VO audio length if BOTH the live probe and the stored slice duration are somehow
+    // missing, so the voiceover can never be cut short. Erring long only leaves harmless trailing silence.
+    const wordSecs = (t: string) => { const w = String(t || "").trim().split(/\s+/).filter(Boolean).length; return w ? w / 2.0 : 0; };
     // Per-scene WORD CUES (start time of each spoken word, relative to the scene) → exact caption sync.
     const sceneCues = new Map<number, number[]>();
     (Array.isArray((production as { scene_audio?: { scene: number; cues?: number[] }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; cues?: number[] }[] }).scene_audio : []).forEach((e) => { if (Array.isArray(e?.cues) && e.cues.length) sceneCues.set(Number(e.scene), e.cues); });
-    // BULLETPROOF b-roll length: MEASURE each b-roll's real voiceover file (probe its duration) instead of
-    // trusting a stored slice length that can be stale or missing. This is the definitive fix for the recurring
-    // "the VO cut off at 8s" bug - the slot below is driven by the measured VO, so it can NEVER be shorter than
-    // the audio. Take the max of stored + measured so it can only ever be too long (music carries), never short.
+    // The approved per-scene VO slice URL, for probing the REAL audio duration below.
+    const sceneAudioUrl = new Map<number, string>();
+    (Array.isArray((production as { scene_audio?: { scene: number; url?: string }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; url?: string }[] }).scene_audio : []).forEach((e) => { if (e?.url) sceneAudioUrl.set(Number(e.scene), e.url); });
+    // BULLETPROOF VO LENGTH for EVERY scene (a-roll AND b-roll): MEASURE the actual voiceover file we'll lay
+    // down (probe its real duration), not a stored slice length that can be stale/missing. Both the scene SLOT
+    // and the audio track length below are driven by this, so the voice can NEVER be cut short (the slot is
+    // always >= the audio) and the clip never has to freeze far past its motion (the slot = the VO, not a floor).
     const voRealDur = new Map<number, number>();
     for (const { sc, i } of kept) {
-      if (String(sc.role) !== "b-roll" || !String(sc.vo_line || "").trim()) continue;
-      const vurl = (clips.find((c) => c.scene === i)?.audio_url as string | undefined) || undefined;
+      if (!String(sc.vo_line || "").trim()) continue;
+      const vurl = (clips.find((c) => c.scene === i)?.audio_url as string | undefined) || sceneAudioUrl.get(i);
       let d = sceneAudioDur.get(i) ?? 0;
       if (vurl) { const probed = await step.run(`voprobe-${i}`, () => probeDuration(vurl).catch(() => null)); if (typeof probed === "number" && probed > 0.3) d = Math.max(d, probed); }
       if (d > 0) voRealDur.set(i, d);
@@ -1749,15 +1755,16 @@ export const assembleVideo = inngest.createFunction(
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const tcLen = a != null && b != null && b > a ? b - a : 5;
       let len = clipDur(i) ?? tcLen;
-      // b-roll length = the b-roll runs EXACTLY as long as its voiceover (a 12s VO -> 12s, 14s -> 14s), with a
-      // 10s FLOOR for impact on short lines and NO upper cap on the slot - if the VO is long, the (max 15s)
-      // clip simply LOOPS to fill it, so the voiceover is NEVER cut. Driven by the MEASURED VO file (voRealDur),
-      // so a stale/missing stored slice can't shrink it. music/ambient carry any breather past the VO.
-      if (role === "b-roll" && vo) {
-        const BROLL_FLOOR = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 10));
-        // Ceiling is a SANITY guard only (no real b-roll VO exceeds this) - stops a spurious probeDuration
-        // reading from ballooning the slot + the loop-copy count into a runaway Shotstack render.
-        len = Math.min(Math.max(voRealDur.get(i) ?? sceneAudioDur.get(i) ?? 0, clipDur(i) ?? 0, BROLL_FLOOR), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
+      // Real VO length = the LARGEST of: probed audio, stored slice duration, and the word-count floor. Erring
+      // long is safe (music/silence carries); erring short cuts the voice - so we take the max of all three.
+      const realVo = Math.max(voRealDur.get(i) ?? 0, sceneAudioDur.get(i) ?? 0, wordSecs(vo));
+      // A scene with a VO runs EXACTLY as long as its measured voiceover: slot = max(real VO, the clip's own
+      // length). >= the VO so the voice is NEVER cut; >= the clip so the video never freezes past its motion.
+      // No forced floor (a 6s line = a 6s scene, not a padded 10s freeze). b-roll keeps a tiny 3s min for a
+      // very short line; a sanity ceiling stops a bad probe reading ballooning the cut.
+      if (vo && realVo > 0) {
+        const floor = role === "b-roll" ? 3 : 0;
+        len = Math.min(Math.max(realVo, clipDur(i) ?? 0, floor), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
       }
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
       else if (role === "b-roll") len = Math.min(len, 2.8);
@@ -1844,7 +1851,9 @@ export const assembleVideo = inngest.createFunction(
             return await putBytes(faded, "vo-faded", "wav", "audio/wav");
           } catch { return synced as string; }
         });
-        voTrack.push({ asset: { type: "audio", src: fadedSrc }, start: p.start, length: p.len }); continue;
+        // Play the FULL measured VO (never truncate to a shorter slot = the "voice cut off" bug). The slot is
+        // built >= this, so it also never bleeds into the next scene.
+        voTrack.push({ asset: { type: "audio", src: fadedSrc }, start: p.start, length: Math.max(voRealDur.get(p.i) ?? 0, sceneAudioDur.get(p.i) ?? 0, wordSecs(p.vo)) || p.len }); continue;
       }
       if (voiceId && p.vo) {
         try {
@@ -1855,7 +1864,7 @@ export const assembleVideo = inngest.createFunction(
           });
           if (url) {
             await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-            voTrack.push({ asset: { type: "audio", src: url }, start: p.start, length: p.len });
+            voTrack.push({ asset: { type: "audio", src: url }, start: p.start, length: Math.max(voRealDur.get(p.i) ?? 0, sceneAudioDur.get(p.i) ?? 0, wordSecs(p.vo)) || p.len });
           }
         } catch { /* skip this VO */ }
       }
@@ -1971,7 +1980,7 @@ export const assembleVideo = inngest.createFunction(
         captionClips = placed.filter((p) => p.caption && !p.captionOff).flatMap((p) => {
           const words = esc(p.caption).split(/\s+/).filter(Boolean);
           if (!words.length) return [];
-          const cp = placeCaption(p.captionPos, capW);
+          const cp = placeCaption("lowerCenter", capW); // captions ALWAYS sit in the bottom safe zone (consistent for social)
           // Each word POPS exactly when she speaks it: START times come from the REAL per-word speech
           // timestamps (cues) when present, else fall back to length-weighting across the scene.
           const cues = sceneCues.get(p.i);
@@ -2003,7 +2012,7 @@ export const assembleVideo = inngest.createFunction(
         captionClips = placed.filter((p) => p.caption && !p.captionOff).flatMap((p) => {
           const text = esc(p.caption);
           const chunks = chunkCaption(text, maxChars);
-          const cp = placeCaption(p.captionPos, capW);
+          const cp = placeCaption("lowerCenter", capW); // captions ALWAYS sit in the bottom safe zone (consistent for social)
           // Bottom placements honour the style's own safe-zone offY (>= CAP_Y); other zones use the map offset.
           const off = cp.position === "bottom" || cp.position === "bottomLeft" || cp.position === "bottomRight" ? { ...cp.offset, y: offY } : cp.offset;
           const clip = (html: string, start: number, length: number) => ({
@@ -2067,25 +2076,21 @@ export const assembleVideo = inngest.createFunction(
         line ? `<div class="l">${line}</div>` : "",
         (cnum || suffix) ? `<div class="o">${cnum ? `<span class="n">${cnum}</span>` : ""}${suffix ? `<span class="f">${suffix}</span>` : ""}</div>` : "",
       ].join("");
-      // DARK GLASS MORPHISM: a Shotstack overlay can't blur the video behind it, and WHITE text on a light
-      // translucent card was unreadable over bright footage. So the card is DARK translucent glass (white text
-      // reads cleanly on ANY scene), with a hairline light border + top bevel, a soft accent halo, a glowing
-      // accent top line, a subtle sheen, an accent eyebrow pill and an accent offer chip.
-      const css = `.wrap{width:100%;text-align:center}`
-        + `.card{box-sizing:border-box;position:relative;overflow:hidden;display:inline-block;text-align:center;max-width:840px;padding:26px 44px 30px;border-radius:28px;`
-        + `background:linear-gradient(160deg,rgba(17,19,30,0.66) 0%,rgba(9,10,16,0.58) 100%);`
-        + `border:1px solid rgba(255,255,255,0.30);`
-        + `box-shadow:0 30px 72px rgba(0,0,0,0.62),0 0 60px ${accent}22,inset 0 1px 0 rgba(255,255,255,0.4),inset 0 -1px 0 rgba(0,0,0,0.4)}`
-        + `.card::after{content:'';position:absolute;top:0;left:28%;right:28%;height:3px;border-radius:0 0 5px 5px;background:${accent};box-shadow:0 0 16px ${accent},0 0 5px ${accent};z-index:3}`
-        + `.card::before{content:'';position:absolute;top:0;left:-45%;width:34%;height:100%;z-index:1;background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,0.16) 50%,transparent 100%);transform:skewX(-16deg);animation:sheen 3s ease-in-out infinite}`
-        + `@keyframes sheen{0%{left:-45%}55%,100%{left:125%}}`
-        + `.k{position:relative;z-index:2;display:inline-block;font-family:'Open Sans',sans-serif;font-weight:800;font-size:19px;letter-spacing:3px;text-transform:uppercase;color:#0c0d10;background:${accent};padding:6px 16px;border-radius:999px;margin:0 0 14px;box-shadow:0 6px 20px ${accent}66}`
-        + `.l{position:relative;z-index:2;font-family:'Open Sans',sans-serif;font-weight:800;font-size:44px;line-height:1.16;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.5);margin:0 0 16px}`
-        + `.o{position:relative;z-index:2;margin:0;line-height:1}`
-        + `.n{display:inline-block;vertical-align:middle;font-family:'Open Sans',sans-serif;font-weight:900;font-size:56px;line-height:1;color:#0c0d10;background:${accent};padding:8px 24px;border-radius:16px;box-shadow:0 10px 32px ${accent}88}`
-        + `.f{display:inline-block;vertical-align:middle;margin-left:12px;font-family:'Open Sans',sans-serif;font-weight:900;font-size:30px;letter-spacing:2px;color:#fff}`;
+      // DARK GLASS (a Shotstack overlay can't blur the video behind it; white text on a light card was
+      // unreadable). Kept DELIBERATELY SIMPLE for Shotstack's HTML renderer: no @keyframes / ::before / ::after
+      // (those broke the layout into a squashed line) - the accent bar is a real element, and every block is
+      // explicit display:block, so it stacks cleanly every time. Motion comes from the Shotstack zoom transition.
+      const css = `.wrap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}`
+        + `.card{box-sizing:border-box;display:inline-block;text-align:center;max-width:820px;padding:28px 46px 32px;border-radius:26px;`
+        + `background:rgba(13,15,23,0.72);border:1px solid rgba(255,255,255,0.28);box-shadow:0 26px 64px rgba(0,0,0,0.6),0 0 48px ${accent}22}`
+        + `.bar{display:block;width:120px;height:4px;margin:0 auto 18px;border-radius:3px;background:${accent};box-shadow:0 0 14px ${accent}}`
+        + `.k{display:inline-block;font-weight:800;font-size:20px;letter-spacing:3px;text-transform:uppercase;color:#0c0d10;background:${accent};padding:6px 18px;border-radius:100px;margin-bottom:16px}`
+        + `.l{display:block;font-weight:800;font-size:44px;line-height:1.18;color:#fff;margin-bottom:18px;text-shadow:0 2px 6px rgba(0,0,0,0.5)}`
+        + `.o{display:block;line-height:1}`
+        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:56px;line-height:1;color:#0c0d10;background:${accent};padding:8px 26px;border-radius:16px;box-shadow:0 8px 26px ${accent}80}`
+        + `.f{display:inline-block;vertical-align:middle;margin-left:14px;font-weight:900;font-size:32px;letter-spacing:2px;color:#fff;text-shadow:0 2px 5px rgba(0,0,0,0.5)}`;
       const cp = placeCaption(String(co.pos || "lowerCenter"), 0); // reuse the 9-zone map for placement + safe-zone offset
-      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
+      return { asset: { type: "html", html: `<div class="wrap"><div class="card"><div class="bar"></div>${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
     };
     const calloutClips: Record<string, unknown>[] = [];
     for (const p of placed) {
