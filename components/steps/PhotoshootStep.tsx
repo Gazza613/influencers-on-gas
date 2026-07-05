@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
 import WorkingPanel from "@/components/WorkingPanel";
@@ -51,6 +51,14 @@ export default function PhotoshootStep({
     setBusy(false); setSt("cast_ready");
     await fetch(`/api/influencers/${influencerId}/build`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset: true }) }).catch(() => {});
   }
+  // Resume live polling if we mounted mid-shoot (e.g. a reload or the re-login return): the server has
+  // status="generating" for 5-10 min, so without this the spinner would hang forever with nothing
+  // streaming frames in. Mirrors CastingStep / LockdownStep.
+  useEffect(() => {
+    if (initialStatus === "generating") poll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function poll(tries = 0): Promise<void> {
     if (aborted.current || tries > 200) { setBusy(false); return; }
     await new Promise((r) => setTimeout(r, 5000));

@@ -150,7 +150,10 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
     }
     return d;
   }
-  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // On mount, refetch; and if a generation run is still in progress on the server, RESUME the live poll
+  // (e.g. after a reload / re-login return) so newly-finished shots keep streaming in and the panel
+  // auto-flips to done - otherwise it'd sit "running" until another manual reload.
+  useEffect(() => { refresh().then((d) => { if (d?.status === "running") poll(); }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   // Resume polling any upscales still in flight (e.g. after a page refresh).
   useEffect(() => {
     const pend = normalize(initial.creatives || []).filter((c) => c.upscaling).map((c) => c.id || "");

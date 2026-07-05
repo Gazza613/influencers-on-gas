@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ConnectionStatus } from "@/lib/connections";
+import { flex } from "@/lib/flex";
 
 export default function ConnectTools({
   initial,
@@ -33,7 +34,7 @@ export default function ConnectTools({
       setEditing(null);
       setSecret("");
       await refresh();
-    }
+    } else flex((await r.json().catch(() => ({})))?.error || "Couldn't save that key - check it and try again.");
   }
 
   async function disconnect(provider: string) {

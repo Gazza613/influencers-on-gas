@@ -8,6 +8,7 @@ import { buildProgress, ringColour } from "@/lib/build-progress";
 import ConsentGate from "@/components/ConsentGate";
 import Uploader from "@/components/Uploader";
 import { askConfirm } from "@/lib/confirm";
+import { flex } from "@/lib/flex";
 
 type Mode = "synthetic" | "twin";
 
@@ -52,7 +53,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     if (r.ok) {
       if (pathname.startsWith(`/setup/influencers/${inf.id}`)) router.push("/setup/influencers");
       router.refresh();
-    }
+    } else flex("Couldn't delete that influencer - please try again.");
   }
 
   async function rename(e: React.MouseEvent, inf: Influencer) {
@@ -61,6 +62,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     if (!next || next === inf.name) return;
     const r = await fetch(`/api/influencers/${inf.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next }) });
     if (r.ok) router.refresh();
+    else flex("Couldn't rename that influencer - please try again.");
   }
 
   async function createSynthetic() {
@@ -72,6 +74,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     });
     setBusy(false);
     if (r.ok) { const { id } = await r.json(); reset(); router.push(`/setup/influencers/${id}`); router.refresh(); }
+    else flex((await r.json().catch(() => ({})))?.error || "Couldn't create that influencer - please try again.");
   }
 
   async function createTwin() {
@@ -83,6 +86,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
     });
     setBusy(false);
     if (r.ok) { const { id } = await r.json(); reset(); router.push(`/setup/influencers/${id}`); router.refresh(); }
+    else flex((await r.json().catch(() => ({})))?.error || "Couldn't create that influencer - please try again.");
   }
 
   return (

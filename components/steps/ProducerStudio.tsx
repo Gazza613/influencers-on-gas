@@ -302,10 +302,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Offer callouts are now PER-SCENE (production.scene_callouts) - see openCallout/saveCallout below. The old
   // single global callout is gone; the stitch still honours a legacy brief.callout as a fallback only.
   async function toggleDrop(scene: number) {
+    const wasDropped = dropped.has(scene);
     setDropped((s) => { const n = new Set(s); n.has(scene) ? n.delete(scene) : n.add(scene); return n; }); // optimistic
     // Confirm from the server so a later render/stitch can't race on a stale dropped list.
     const r = await fetch(`/api/influencers/${influencerId}/production/drop`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene }) }).then((x) => x.json()).catch(() => null);
     if (Array.isArray(r?.dropped)) setDropped(new Set(r.dropped.map(Number)));
+    else {
+      // Persist failed: REVERT the optimistic change, else the UI would show a scene rejected while the
+      // server still has it - and a later render/stitch would silently include the scene you dropped.
+      setDropped((s) => { const n = new Set(s); wasDropped ? n.add(scene) : n.delete(scene); return n; });
+      setErr("Couldn't update that scene - please try again.");
+    }
   }
   function persistApproved(s: Set<string>) {
     fetch(`/api/influencers/${influencerId}/production/approvals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approved: [...s] }) }).catch(() => {});
@@ -589,8 +596,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   async function saveCallout(i: number, remove = false) {
     const body = remove ? { scene: i, callout: { on: false } } : { scene: i, callout: { on: true, ...coDraft } };
     const r = await fetch(`/api/influencers/${influencerId}/callout`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json()).catch(() => null);
-    if (r?.scene_callouts) setProduction((p) => (p ? ({ ...p, scene_callouts: r.scene_callouts } as Production) : p));
-    setCoOpen(null);
+    // Only close the editor once the save is CONFIRMED - otherwise it looked saved but the stitch wouldn't include it.
+    if (r?.scene_callouts) { setProduction((p) => (p ? ({ ...p, scene_callouts: r.scene_callouts } as Production) : p)); setCoOpen(null); }
+    else setErr("Couldn't save that on-screen offer - please try again.");
   }
   // Toggle a scene's Live background right on the card (a-roll only) - a text-only persist, no re-shoot. Off
   // by default and the slow/flaky lane, so it's opt-in per scene. Re-shoot + re-animate to apply the change.
@@ -687,13 +695,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (d?.production) setProduction(d.production);
   }
 
-  async function decideShowreel(decision: "accept" | "decline") {
+  async function decideShowreel(decision: "accept" | "decline"): Promise<boolean> {
     setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/showreel`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }),
     }).then((x) => x.json()).catch(() => null);
-    if (r?.showreel_status) setProduction((p) => (p ? { ...p, showreel_status: r.showreel_status } : p));
-    else setErr(r?.error || "Couldn't record the decision.");
+    if (r?.showreel_status) { setProduction((p) => (p ? { ...p, showreel_status: r.showreel_status } : p)); return true; }
+    setErr(r?.error || "Couldn't record the decision.");
+    return false;
   }
 
   // AI BRIEF CO-PILOT: draft/sharpen the offer, key benefits, CTA + tone from the brand + this influencer.
@@ -1506,8 +1515,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 {draftClipCount > 0 && <p className="mb-2 text-[11px] font-semibold text-[#fbbf24]">⚠ This cut still contains 720p draft scenes. Render final quality + re-stitch before accepting it to the showcase wall.</p>}
                 <div className="flex flex-wrap items-center gap-3">
                   {/* GUARD: accepting a still-draft cut into the public showcase needs a deliberate two-click confirm. */}
-                  <button onClick={() => { if (draftClipCount > 0 && !showreelArmed) { setShowreelArmed(true); return; } setShowreelArmed(false); decideShowreel("accept"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${draftClipCount > 0 && showreelArmed ? "border-alert bg-alert/15 text-alert" : production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>{draftClipCount > 0 && showreelArmed ? "⚠ Accept the draft anyway" : "✓ Accept into showreel"}</button>
-                  <button onClick={() => { decideShowreel("decline"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "declined" ? "border-active bg-active/15 text-active" : "border-active/40 text-active hover:bg-active/10"}`}>✕ Decline</button>
+                  <button onClick={async () => { if (draftClipCount > 0 && !showreelArmed) { setShowreelArmed(true); return; } setShowreelArmed(false); if (await decideShowreel("accept")) accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${draftClipCount > 0 && showreelArmed ? "border-alert bg-alert/15 text-alert" : production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>{draftClipCount > 0 && showreelArmed ? "⚠ Accept the draft anyway" : "✓ Accept into showreel"}</button>
+                  <button onClick={async () => { if (await decideShowreel("decline")) accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "declined" ? "border-active bg-active/15 text-active" : "border-active/40 text-active hover:bg-active/10"}`}>✕ Decline</button>
                   {production?.showreel_status === "accepted" && <span className="tabular text-[11px] font-semibold text-ready">● In the showreel</span>}
                   {production?.showreel_status === "declined" && <span className="tabular text-[11px] font-semibold text-active">● Kept out</span>}
                 </div>
