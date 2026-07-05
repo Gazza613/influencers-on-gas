@@ -127,9 +127,20 @@ function speakRand(t: string): string {
     })
     .replace(/\b(Rand)\s+rand\b/gi, "$1"); // guard against copy that already wrote "... rand"
 }
+// Data offers spoken naturally (Gary's rule): "1GB" -> "1 gig", "2GB" -> "2 gigs", "500MB" -> "500 megabytes",
+// "300MB" -> "300 megabytes" - for ANY number, singular/plural correct. On-screen captions keep "1GB"/"500MB".
+function speakData(t: string): string {
+  if (!/\d\s?[GMTK]B\b/i.test(t)) return t;
+  return t
+    .replace(/\b(\d+(?:\.\d+)?)\s?GB\b/gi, (_m, n) => `${n} ${n === "1" ? "gig" : "gigs"}`)
+    .replace(/\b(\d+(?:\.\d+)?)\s?MB\b/gi, (_m, n) => `${n} ${n === "1" ? "megabyte" : "megabytes"}`)
+    .replace(/\b(\d+(?:\.\d+)?)\s?TB\b/gi, (_m, n) => `${n} ${n === "1" ? "terabyte" : "terabytes"}`)
+    .replace(/\b(\d+(?:\.\d+)?)\s?KB\b/gi, (_m, n) => `${n} ${n === "1" ? "kilobyte" : "kilobytes"}`);
+}
 export function sayable(t: string): string {
   t = SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t);
   t = speakRand(t);
+  t = speakData(t);
   // COMMA/SEMICOLON POP FIX (Gary's): ElevenLabs pops at comma AND semicolon pauses, but DROPPING them merged
   // words and mis-said "not". Swapping each clause comma/semicolon for a spaced hyphen " - " gives the SAME
   // pause WITHOUT the pop, and keeps the words separate so pronunciation stays correct. Number separators
