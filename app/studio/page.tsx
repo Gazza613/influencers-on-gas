@@ -85,7 +85,7 @@ export default async function StudioPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                {influencers.slice(0, 10).map((inf) => {
+                {influencers.map((inf) => {
                   const src = thumb(inf);
                   const isLocked = ((inf.persona ?? {}) as Persona).locked;
                   const href = isLocked ? `/setup/influencers/${inf.id}/voice` : `/setup/influencers/${inf.id}`;
@@ -122,7 +122,7 @@ export default async function StudioPage() {
                 <Link href="/showcase" className="text-xs font-semibold text-accent hover:underline">Showcase →</Link>
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {cuts.slice(0, 8).map(({ inf, url, title }) => (
+                {cuts.map(({ inf, url, title }) => (
                   <div key={inf.id} className="card lift relative overflow-hidden rounded-2xl">
                     <DeleteCutButton id={inf.id} name={inf.name} />
                     <video src={url as string} controls playsInline className="aspect-[9/16] w-full bg-black object-cover" />
