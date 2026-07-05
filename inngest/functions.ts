@@ -1465,13 +1465,16 @@ export const generateClips = inngest.createFunction(
       // set LIVEBG_ENGINE=dop to switch back to the fast lane. (First-party only exposes DoP, so Kling is MCP.)
       const LIVEBG_ENGINE = (process.env.LIVEBG_ENGINE || "kling").toLowerCase();
       // FINAL b-roll → Veo only when hero or explicitly chosen; DRAFT b-roll never uses Veo.
-      const useVeo = (role === "b-roll" && !speed && (hero || brollEngine === "veo")) || (liveBg && LIVEBG_ENGINE === "veo");
-      // DoP when: live-bg set to dop, OR ANY draft b-roll (fast proxy), OR final b-roll explicitly on dop.
-      // Otherwise a final b-roll falls through to submitVideoFromImage on Kling (the default) with a DoP net.
-      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop")) && !useVeo && dopConfigured();
-      // DoP renders a FIXED ~5s clip; the stitch LOOPS it across a longer narration (no freeze). Its real
-      // length is probed at render time so the loop/slot stay accurate.
+      // DoP renders a FIXED ~5s clip - the Higgsfield SDK has NO duration control for image2video/dop, so it
+      // CANNOT be told to go longer (that's why a b-roll under an 8s VO always came out 5.37s). So DoP is only
+      // valid when the clip actually needs <= ~5s; a LONGER b-roll line MUST render on Kling (native 3-15s) or
+      // the video runs out of motion. THIS is the real fix for "the scene shot maxed out at 5s".
       const DOP_OUT_SECONDS = Math.max(3, Number(process.env.DOP_OUT_SECONDS) || 5);
+      const dopFits = clipSeconds <= DOP_OUT_SECONDS + 0.8; // does the needed clip length fit DoP's fixed output?
+      const useVeo = (role === "b-roll" && !speed && (hero || brollEngine === "veo")) || (liveBg && LIVEBG_ENGINE === "veo");
+      // DoP when: live-bg set to dop, OR a SHORT-enough draft b-roll (fast proxy), OR a short-enough final
+      // b-roll explicitly on dop. A longer b-roll (draft or final) skips DoP and renders full-length on Kling.
+      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed && dopFits) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured();
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
@@ -1887,13 +1890,10 @@ export const assembleVideo = inngest.createFunction(
     const overscanFor = (role: string) => (role === "a-roll" ? AROLL_OVERSCAN : VIDEO_OVERSCAN);
     const videoClips = placed.filter((p) => clipUrl(p.i)).flatMap((p) => {
       const src = clipUrl(p.i) as string;
-      // NO LOOPING (Gary's hard rule). The clip plays ONCE for the slot length. A full-length Kling b-roll IS
-      // the slot, so it plays cleanly end to end. When a clip is SHORTER than its slot (a draft/DoP proxy or a
-      // Kling-timeout fallback ~5s under a longer VO), it would otherwise HOLD its last frame = a dead freeze.
-      // Apply a gentle slow ZOOM so that hold reads as an intentional cinematic push-in, not a frozen frame.
-      const cd = clipDur(p.i);
-      const willHold = p.role === "b-roll" && typeof cd === "number" && cd > 0 && cd < p.len - 0.4;
-      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role), ...(willHold ? { effect: "zoomIn" } : {}) }];
+      // NO LOOPING (Gary's hard rule). The clip plays ONCE for the slot length. The REAL fix for the "b-roll
+      // pauses" is that the clip is rendered to the full VO length (so clip == slot, no hold at all) - see the
+      // b-roll render path. This just lays it flat.
+      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role) }];
     });
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
