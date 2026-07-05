@@ -1719,6 +1719,18 @@ export const assembleVideo = inngest.createFunction(
     // Per-scene WORD CUES (start time of each spoken word, relative to the scene) → exact caption sync.
     const sceneCues = new Map<number, number[]>();
     (Array.isArray((production as { scene_audio?: { scene: number; cues?: number[] }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; cues?: number[] }[] }).scene_audio : []).forEach((e) => { if (Array.isArray(e?.cues) && e.cues.length) sceneCues.set(Number(e.scene), e.cues); });
+    // BULLETPROOF b-roll length: MEASURE each b-roll's real voiceover file (probe its duration) instead of
+    // trusting a stored slice length that can be stale or missing. This is the definitive fix for the recurring
+    // "the VO cut off at 8s" bug - the slot below is driven by the measured VO, so it can NEVER be shorter than
+    // the audio. Take the max of stored + measured so it can only ever be too long (music carries), never short.
+    const voRealDur = new Map<number, number>();
+    for (const { sc, i } of kept) {
+      if (String(sc.role) !== "b-roll" || !String(sc.vo_line || "").trim()) continue;
+      const vurl = (clips.find((c) => c.scene === i)?.audio_url as string | undefined) || undefined;
+      let d = sceneAudioDur.get(i) ?? 0;
+      if (vurl) { const probed = await step.run(`voprobe-${i}`, () => probeDuration(vurl).catch(() => null)); if (typeof probed === "number" && probed > 0.3) d = Math.max(d, probed); }
+      if (d > 0) voRealDur.set(i, d);
+    }
     let cursor = 0;
     const placed = kept.map(({ sc, i }) => {
       const role = String(sc.role || "a-roll");
@@ -1726,14 +1738,13 @@ export const assembleVideo = inngest.createFunction(
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const tcLen = a != null && b != null && b > a ? b - a : 5;
       let len = clipDur(i) ?? tcLen;
-      // b-roll WITH narration → play to the 8s FLOOR (the impactful length), or longer if the VO or the clip
-      // is longer. The VO plays over the start; music/ambient carry the cinematic breather to the end. A short
-      // draft DoP clip (~5s) LOOPS to fill this slot so the motion never freezes, and the VO is NEVER cut.
-      // CRITICAL: honour the floor even when the slice duration wasn't stored - otherwise the slot collapsed to
-      // the fixed ~5s DoP clip and BOTH the video and the voiceover were chopped at 5s (the bug Gary hit).
+      // b-roll length = the b-roll runs EXACTLY as long as its voiceover (a 12s VO -> 12s, 14s -> 14s), with a
+      // 10s FLOOR for impact on short lines and NO upper cap on the slot - if the VO is long, the (max 15s)
+      // clip simply LOOPS to fill it, so the voiceover is NEVER cut. Driven by the MEASURED VO file (voRealDur),
+      // so a stale/missing stored slice can't shrink it. music/ambient carry any breather past the VO.
       if (role === "b-roll" && vo) {
         const BROLL_FLOOR = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 10));
-        len = Math.max(sceneAudioDur.get(i) ?? 0, clipDur(i) ?? 0, BROLL_FLOOR);
+        len = Math.max(voRealDur.get(i) ?? sceneAudioDur.get(i) ?? 0, clipDur(i) ?? 0, BROLL_FLOOR);
       }
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
       else if (role === "b-roll") len = Math.min(len, 2.8);
