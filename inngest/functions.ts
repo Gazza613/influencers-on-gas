@@ -1851,6 +1851,10 @@ export const assembleVideo = inngest.createFunction(
     // fit:cover + a hair of OVERSCAN so the clip always fully covers the 1080×1920 frame — kills the thin
     // white/edge lines left & right when a source video is a pixel or two off the exact 9:16 ratio.
     const VIDEO_OVERSCAN = Math.max(1, Number(process.env.VIDEO_OVERSCAN) || 1.06);
+    // A-ROLL needs MORE overscan: HeyGen Avatar IV renders a 16:9 canvas and can bake a thin white edge; a
+    // small extra zoom pushes that border off the 9:16 frame so there's never a white line. Env-tunable.
+    const AROLL_OVERSCAN = Math.max(VIDEO_OVERSCAN, Number(process.env.AROLL_OVERSCAN) || 1.12);
+    const overscanFor = (role: string) => (role === "a-roll" ? AROLL_OVERSCAN : VIDEO_OVERSCAN);
     const videoClips = placed.filter((p) => clipUrl(p.i)).flatMap((p) => {
       const src = clipUrl(p.i) as string;
       const realDur = clipDur(p.i); // the clip's actual rendered length (DoP b-roll ≈ 5s)
@@ -1865,7 +1869,7 @@ export const assembleVideo = inngest.createFunction(
         }
         return copies;
       }
-      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: VIDEO_OVERSCAN }];
+      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role) }];
     });
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
