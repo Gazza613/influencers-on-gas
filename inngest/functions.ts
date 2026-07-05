@@ -1755,9 +1755,10 @@ export const assembleVideo = inngest.createFunction(
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const tcLen = a != null && b != null && b > a ? b - a : 5;
       let len = clipDur(i) ?? tcLen;
-      // Real VO length = the LARGEST of: probed audio, stored slice duration, and the word-count floor. Erring
-      // long is safe (music/silence carries); erring short cuts the voice - so we take the max of all three.
-      const realVo = Math.max(voRealDur.get(i) ?? 0, sceneAudioDur.get(i) ?? 0, wordSecs(vo));
+      // Real VO length = the MEASURED audio (probe, else stored slice); the word-count floor is only a
+      // last-ditch fallback if BOTH are missing. (Taking a max WITH the word estimate over-inflated the slot -
+      // an 8.4s VO padded to a 10s slot - which made the b-roll freeze WORSE. Use the true duration.)
+      const realVo = voRealDur.get(i) ?? sceneAudioDur.get(i) ?? wordSecs(vo);
       // A scene with a VO runs EXACTLY as long as its measured voiceover: slot = max(real VO, the clip's own
       // length). >= the VO so the voice is NEVER cut; >= the clip so the video never freezes past its motion.
       // No forced floor (a 6s line = a 6s scene, not a padded 10s freeze). b-roll keeps a tiny 3s min for a
@@ -1853,7 +1854,7 @@ export const assembleVideo = inngest.createFunction(
         });
         // Play the FULL measured VO (never truncate to a shorter slot = the "voice cut off" bug). The slot is
         // built >= this, so it also never bleeds into the next scene.
-        voTrack.push({ asset: { type: "audio", src: fadedSrc }, start: p.start, length: Math.max(voRealDur.get(p.i) ?? 0, sceneAudioDur.get(p.i) ?? 0, wordSecs(p.vo)) || p.len }); continue;
+        voTrack.push({ asset: { type: "audio", src: fadedSrc }, start: p.start, length: (voRealDur.get(p.i) ?? sceneAudioDur.get(p.i) ?? wordSecs(p.vo)) || p.len }); continue;
       }
       if (voiceId && p.vo) {
         try {
@@ -1864,7 +1865,7 @@ export const assembleVideo = inngest.createFunction(
           });
           if (url) {
             await step.run(`u-vo-${p.i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
-            voTrack.push({ asset: { type: "audio", src: url }, start: p.start, length: Math.max(voRealDur.get(p.i) ?? 0, sceneAudioDur.get(p.i) ?? 0, wordSecs(p.vo)) || p.len });
+            voTrack.push({ asset: { type: "audio", src: url }, start: p.start, length: (voRealDur.get(p.i) ?? sceneAudioDur.get(p.i) ?? wordSecs(p.vo)) || p.len });
           }
         } catch { /* skip this VO */ }
       }
@@ -2076,21 +2077,21 @@ export const assembleVideo = inngest.createFunction(
         line ? `<div class="l">${line}</div>` : "",
         (cnum || suffix) ? `<div class="o">${cnum ? `<span class="n">${cnum}</span>` : ""}${suffix ? `<span class="f">${suffix}</span>` : ""}</div>` : "",
       ].join("");
-      // DARK GLASS (a Shotstack overlay can't blur the video behind it; white text on a light card was
-      // unreadable). Kept DELIBERATELY SIMPLE for Shotstack's HTML renderer: no @keyframes / ::before / ::after
-      // (those broke the layout into a squashed line) - the accent bar is a real element, and every block is
-      // explicit display:block, so it stacks cleanly every time. Motion comes from the Shotstack zoom transition.
+      // FROSTED-GLASS CARD (the design Gary approved): a translucent frosted panel, LEFT-aligned, with a muted
+      // spaced "eyebrow", a bold white headline, and a glowing accent offer chip beside a light suffix. Dark-enough
+      // translucent so white text stays razor-legible over bright footage. Shotstack-safe: no @keyframes /
+      // pseudo-elements (those squashed the layout) - explicit display:block, motion is the zoom transition.
       const css = `.wrap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}`
-        + `.card{box-sizing:border-box;display:inline-block;text-align:center;max-width:820px;padding:28px 46px 32px;border-radius:26px;`
-        + `background:rgba(13,15,23,0.72);border:1px solid rgba(255,255,255,0.28);box-shadow:0 26px 64px rgba(0,0,0,0.6),0 0 48px ${accent}22}`
-        + `.bar{display:block;width:120px;height:4px;margin:0 auto 18px;border-radius:3px;background:${accent};box-shadow:0 0 14px ${accent}}`
-        + `.k{display:inline-block;font-weight:800;font-size:20px;letter-spacing:3px;text-transform:uppercase;color:#0c0d10;background:${accent};padding:6px 18px;border-radius:100px;margin-bottom:16px}`
-        + `.l{display:block;font-weight:800;font-size:44px;line-height:1.18;color:#fff;margin-bottom:18px;text-shadow:0 2px 6px rgba(0,0,0,0.5)}`
+        + `.card{box-sizing:border-box;display:inline-block;text-align:left;max-width:660px;padding:30px 42px 34px;border-radius:26px;`
+        + `background:linear-gradient(135deg,rgba(38,42,60,0.60) 0%,rgba(17,19,30,0.52) 100%);`
+        + `border:1px solid rgba(255,255,255,0.24);box-shadow:0 30px 70px rgba(0,0,0,0.52),inset 0 1px 0 rgba(255,255,255,0.22)}`
+        + `.k{display:block;font-weight:700;font-size:19px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.62);margin-bottom:14px}`
+        + `.l{display:block;font-weight:800;font-size:42px;line-height:1.16;color:#fff;margin-bottom:22px;text-shadow:0 2px 8px rgba(0,0,0,0.4)}`
         + `.o{display:block;line-height:1}`
-        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:56px;line-height:1;color:#0c0d10;background:${accent};padding:8px 26px;border-radius:16px;box-shadow:0 8px 26px ${accent}80}`
-        + `.f{display:inline-block;vertical-align:middle;margin-left:14px;font-weight:900;font-size:32px;letter-spacing:2px;color:#fff;text-shadow:0 2px 5px rgba(0,0,0,0.5)}`;
+        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:52px;line-height:1;color:#0c0d10;background:${accent};padding:8px 22px;border-radius:14px;box-shadow:0 8px 30px ${accent}88}`
+        + `.f{display:inline-block;vertical-align:middle;margin-left:16px;font-weight:800;font-size:30px;letter-spacing:1px;color:#fff}`;
       const cp = placeCaption(String(co.pos || "lowerCenter"), 0); // reuse the 9-zone map for placement + safe-zone offset
-      return { asset: { type: "html", html: `<div class="wrap"><div class="card"><div class="bar"></div>${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
+      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
     };
     const calloutClips: Record<string, unknown>[] = [];
     for (const p of placed) {

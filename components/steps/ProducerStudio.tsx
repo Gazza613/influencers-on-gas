@@ -1184,24 +1184,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             const justify = pos.includes("Left") ? "flex-start" : pos.includes("Right") ? "flex-end" : "center";
                             return (
                               <div className="absolute inset-x-0 flex px-2" style={{ ...vstyle, justifyContent: justify }}>
-                                <div className="relative overflow-hidden rounded-[14px] px-2.5 py-2 text-center" style={{ width: "88%", border: "1px solid rgba(255,255,255,0.3)", background: "linear-gradient(160deg,rgba(17,19,30,0.72) 0%,rgba(9,10,16,0.64) 100%)", boxShadow: `0 12px 30px rgba(0,0,0,0.55), 0 0 26px ${coDraft.accent}26, inset 0 1px 0 rgba(255,255,255,0.35)`, animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
-                                  <div style={{ position: "absolute", top: 0, left: "28%", right: "28%", height: 2, borderRadius: "0 0 4px 4px", background: coDraft.accent, boxShadow: `0 0 8px ${coDraft.accent}`, zIndex: 3 }} />
-                                  <div style={{ position: "absolute", top: 0, left: "-45%", width: "34%", height: "100%", zIndex: 1, background: "linear-gradient(105deg,transparent,rgba(255,255,255,0.18),transparent)", transform: "skewX(-16deg)", animation: "gasCoSheen 3s ease-in-out infinite" }} />
-                                  <div className="relative" style={{ zIndex: 2 }}>
-                                    {coDraft.kick && <span className="inline-block rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase leading-none tracking-[0.1em] text-[#0c0d10]" style={{ background: coDraft.accent }}>{coDraft.kick}</span>}
-                                    {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white">{coDraft.line}</div>}
-                                    {(coDraft.num || coDraft.suffix) && (
-                                      <div className="mt-1.5">
-                                        {coDraft.num && <span className="rounded-[7px] px-1.5 py-0.5 text-[15px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 4px 14px ${coDraft.accent}88` }}>{coDraft.num}</span>}
-                                        {coDraft.suffix && <span className="ml-1 align-middle text-[8px] font-black text-white">{coDraft.suffix}</span>}
-                                      </div>
-                                    )}
-                                  </div>
+                                <div className="rounded-[14px] px-3 py-2.5 text-left" style={{ width: "90%", border: "1px solid rgba(255,255,255,0.24)", background: "linear-gradient(135deg,rgba(38,42,60,0.62) 0%,rgba(17,19,30,0.54) 100%)", boxShadow: "0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.22)", animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
+                                  {coDraft.kick && <div className="text-[6px] font-bold uppercase leading-none tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.6)" }}>{coDraft.kick}</div>}
+                                  {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white">{coDraft.line}</div>}
+                                  {(coDraft.num || coDraft.suffix) && (
+                                    <div className="mt-2">
+                                      {coDraft.num && <span className="rounded-[6px] px-1.5 py-0.5 text-[15px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 4px 14px ${coDraft.accent}88` }}>{coDraft.num}</span>}
+                                      {coDraft.suffix && <span className="ml-1.5 align-middle text-[9px] font-black text-white">{coDraft.suffix}</span>}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
                           })()}
-                          <style>{`@keyframes gasCoSheen{0%{left:-45%}55%,100%{left:125%}}@keyframes gasCoPop{0%{opacity:0;transform:scale(0.82) translateY(-6px)}60%{opacity:1;transform:scale(1.05)}100%{transform:scale(1)}}`}</style>
+                          <style>{`@keyframes gasCoPop{0%{opacity:0;transform:scale(0.86) translateY(-5px)}60%{opacity:1;transform:scale(1.04)}100%{transform:scale(1)}}`}</style>
                         </div>
                       </div>
                     </div>
