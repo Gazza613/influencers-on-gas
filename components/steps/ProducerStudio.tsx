@@ -253,9 +253,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // When each scene's render was first OBSERVED (ms), for the live elapsed timer on the rendering card.
   // Reconciled from the render state below, so it survives a refresh (starts from when we re-observe it).
   const [renderStarts, setRenderStarts] = useState<Record<number, number>>({});
-  // DRAFT SPEED: render a-roll clips at 720p (faster) while iterating. The final stitch ALWAYS outputs 1080p,
-  // so for a crisp final turn this OFF and re-animate the a-roll. Default ON for fast iteration.
+  // DRAFT SPEED: render a-roll clips at 720p (faster) while iterating. A 720p draft STAYS 720p in the final
+  // unless "Render final quality" upgrades it, so there are two-click guards on Stitch + Showreel-Accept while
+  // draft clips remain (P0-2), to stop an accidental 720p delivery. Default ON for fast iteration.
   const [speedMode, setSpeedMode] = useState(true);
+  const [stitchArmed, setStitchArmed] = useState(false); // two-click confirm to stitch a still-draft cut
+  const [showreelArmed, setShowreelArmed] = useState(false); // two-click confirm to accept a still-draft cut
   // ANY work in flight (incl. per-scene shoots that don't flip the global flags) - drives the busy
   // buttons + the red Reset control so it reflects per-scene + b-roll work too.
   const anyReshooting = (production?.shots ?? []).some((s) => s.reshooting);
@@ -1303,7 +1306,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || wholeBoardBusy || animatingScenes.size > 0} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
                     <button onClick={() => setSpeedMode((v) => !v)} title="Draft speed renders PREVIEW clips fast (a-roll 720p, b-roll on the quick DoP engine) for quick team review. Keyframes stay full quality. When happy, 'Render final quality' at the Stitch step conforms every draft to 1080p / Veo from the same keyframe - no drift. Turn OFF to render full quality from the start." className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}><span aria-hidden>⚡</span> Draft speed <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "720p" : "1080p"}</span></button>
                   </div>
-                  {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - a-roll renders at 720p for faster iteration. Your final is still stitched at 1080p; for a crisp a-roll in the final, switch this to 1080p and re-animate before the last stitch.</p>}
+                  {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - previews render fast (a-roll 720p, b-roll on the quick engine) for review. Important: a 720p draft clip STAYS 720p in the final unless you upgrade it - hit <b>🎬 Render final quality</b> at the Stitch step before delivery, or turn Draft speed OFF and re-animate.</p>}
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have).</p>
                   {/* IN-STEP SCENE CAROUSEL: every scene at a glance - edit or re-animate any without scrolling
                       up. ✎ Edit jumps to the scene's card (opens the editor); on Save it returns you here. */}
@@ -1416,11 +1419,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-3">
-                    <button onClick={stitchCut} disabled={assembling} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
+                    {/* GUARD: while draft clips remain, "Stitch the cut" is NOT the primary action - "Render final
+                        quality" above is. Stitching a draft needs a deliberate two-click confirm so a 720p cut
+                        can't be shipped by accident. */}
+                    {draftClipCount > 0 ? (
+                      <button onClick={() => { if (!stitchArmed) { setStitchArmed(true); return; } setStitchArmed(false); stitchCut(); }} disabled={assembling} className={`rounded-lg border-2 px-4 py-2 text-sm font-bold disabled:opacity-50 ${stitchArmed ? "border-alert bg-alert/15 text-alert" : "border-[#f59e0b]/60 text-[#fbbf24] hover:bg-[#f59e0b]/10"}`}>{assembling ? "✂️ Stitching…" : stitchArmed ? "⚠ Yes, ship the 720p DRAFT" : "Stitch the draft anyway"}</button>
+                    ) : (
+                      <button onClick={stitchCut} disabled={assembling} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
+                    )}
                     <label className="flex cursor-pointer items-center gap-2 text-[12px] text-ink-dim"><input type="checkbox" checked={stitchCaptions} onChange={(e) => setStitchCaptions(e.target.checked)} className="h-4 w-4 accent-[#a855f7]" /> Burn in captions</label>
                     {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{production.assembly_error}</span>}
                   </div>
-                  {draftClipCount > 0 && <p className="mt-1.5 text-[11px] text-[#fbbf24]">Heads up: stitching now ships the 720p draft. Render final quality above first for a client-ready cut.</p>}
+                  {draftClipCount > 0 && <p className="mt-1.5 text-[11px] text-[#fbbf24]">This cut would ship as a <b>720p draft</b>. Hit <b>🎬 Render final quality</b> above for a client-ready delivery.{stitchArmed ? " (Click the amber button again to ship the draft anyway.)" : ""}</p>}
                   {stitchCaptions && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-ink-faint">Caption style:</span>
@@ -1431,9 +1441,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   )}
                   {finalUrl && (
                     <div className="mt-4">
-                      <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut</div>
-                      <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
-                      <div className="mt-2"><a href={finalUrl} download className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">↓ Download</a></div>
+                      <div className="tabular mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut {draftClipCount > 0 && <span className="rounded bg-[#f59e0b]/85 px-1.5 py-0.5 text-[9px] font-bold text-black">720p DRAFT</span>}</div>
+                      <div className="relative inline-block">
+                        <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
+                        {draftClipCount > 0 && <span className="pointer-events-none absolute left-2 top-2 rounded bg-[#f59e0b]/90 px-1.5 py-0.5 text-[9px] font-bold text-black">720p DRAFT</span>}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2"><a href={finalUrl} download={draftClipCount > 0 ? "gas-cut-DRAFT.mp4" : "gas-cut.mp4"} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">↓ Download{draftClipCount > 0 ? " (draft)" : ""}</a>{draftClipCount > 0 && <span className="text-[11px] text-[#fbbf24]">Not client-ready - render final quality + re-stitch first.</span>}</div>
                     </div>
                   )}
                 </>
@@ -1443,12 +1456,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             {/* 6 · Showreel */}
             <StepShell n={stepNum("showreel")} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")} anchor="step-showreel">
               {unlocked("showreel") ? (
+                <>
+                {draftClipCount > 0 && <p className="mb-2 text-[11px] font-semibold text-[#fbbf24]">⚠ This cut still contains 720p draft scenes. Render final quality + re-stitch before accepting it to the showcase wall.</p>}
                 <div className="flex flex-wrap items-center gap-3">
-                  <button onClick={() => { decideShowreel("accept"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>✓ Accept into showreel</button>
+                  {/* GUARD: accepting a still-draft cut into the public showcase needs a deliberate two-click confirm. */}
+                  <button onClick={() => { if (draftClipCount > 0 && !showreelArmed) { setShowreelArmed(true); return; } setShowreelArmed(false); decideShowreel("accept"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${draftClipCount > 0 && showreelArmed ? "border-alert bg-alert/15 text-alert" : production?.showreel_status === "accepted" ? "border-ready bg-ready/15 text-ready" : "border-ready/40 text-ready hover:bg-ready/10"}`}>{draftClipCount > 0 && showreelArmed ? "⚠ Accept the draft anyway" : "✓ Accept into showreel"}</button>
                   <button onClick={() => { decideShowreel("decline"); accept("showreel"); }} className={`rounded-lg border px-4 py-2 text-sm font-bold ${production?.showreel_status === "declined" ? "border-active bg-active/15 text-active" : "border-active/40 text-active hover:bg-active/10"}`}>✕ Decline</button>
                   {production?.showreel_status === "accepted" && <span className="tabular text-[11px] font-semibold text-ready">● In the showreel</span>}
                   {production?.showreel_status === "declined" && <span className="tabular text-[11px] font-semibold text-active">● Kept out</span>}
                 </div>
+                </>
               ) : <LockHint />}
             </StepShell>
             </>)}
