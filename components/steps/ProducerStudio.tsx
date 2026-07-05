@@ -1135,17 +1135,25 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           </div>
                           <p className="text-[10px] text-ink-faint">Re-stitch after saving to see it. It slides in near the top while this scene plays.</p>
                         </div>
-                        {/* live mini-preview */}
-                        <div className="relative flex h-[150px] w-[84px] items-start justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-br from-[#1b2338] via-[#241a2e] to-[#0d1017]">
-                          <div className="mt-3 w-[74px] rounded-[8px] border border-white/40 bg-gradient-to-b from-white/[0.16] to-white/[0.05] px-1.5 py-1 text-center shadow-lg">
-                            {coDraft.kick && <div className="text-[5px] font-bold uppercase tracking-[0.12em] text-white/90">{coDraft.kick}</div>}
-                            {coDraft.line && <div className="mt-0.5 text-[7px] font-bold leading-tight text-white">{coDraft.line}</div>}
-                            {(coDraft.num || coDraft.suffix) && (
-                              <div className="mt-1">
-                                {coDraft.num && <span className="rounded-[4px] px-1 py-0.5 text-[11px] font-extrabold leading-none text-[#0c0d10]" style={{ background: coDraft.accent }}>{coDraft.num}</span>}
-                                {coDraft.suffix && <span className="ml-0.5 align-middle text-[6px] font-extrabold text-white">{coDraft.suffix}</span>}
-                              </div>
-                            )}
+                        {/* live WYSIWYG preview - the glass callout ON this scene's actual keyframe (matches the
+                            faux-glass render: light bevel + float shadow + accent eyebrow pill + accent chip glow). */}
+                        <div className="relative h-[268px] w-[151px] shrink-0 overflow-hidden rounded-xl border border-line bg-gradient-to-br from-[#1b2338] via-[#241a2e] to-[#0d1017]">
+                          {shot?.url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={shot.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                          )}
+                          <div className="absolute inset-x-0 top-2.5 flex justify-center px-2">
+                            <div className="w-full rounded-[15px] px-2.5 py-2.5 text-center"
+                              style={{ border: "1.5px solid rgba(255,255,255,0.62)", background: "linear-gradient(135deg,rgba(255,255,255,0.34) 0%,rgba(255,255,255,0.13) 48%,rgba(255,255,255,0.06) 100%)", boxShadow: "0 12px 30px rgba(0,0,0,0.5), inset 0 1.5px 0 rgba(255,255,255,0.85)" }}>
+                              {coDraft.kick && <span className="inline-block rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase leading-none tracking-[0.12em] text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 3px 10px ${coDraft.accent}70` }}>{coDraft.kick}</span>}
+                              {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.line}</div>}
+                              {(coDraft.num || coDraft.suffix) && (
+                                <div className="mt-2">
+                                  {coDraft.num && <span className="rounded-[8px] px-2 py-0.5 text-[17px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 5px 16px ${coDraft.accent}99, inset 0 1px 0 rgba(255,255,255,0.55)` }}>{coDraft.num}</span>}
+                                  {coDraft.suffix && <span className="ml-1 align-middle text-[9px] font-black text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.suffix}</span>}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
