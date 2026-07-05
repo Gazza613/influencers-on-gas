@@ -1577,9 +1577,12 @@ function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
         onPause={overlayVO ? () => sync((_v, a) => a.pause()) : undefined}
         onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; }) : undefined}
         onRateChange={overlayVO ? () => sync((v, a) => { a.playbackRate = v.playbackRate; }) : undefined}
-        onEnded={overlayVO ? () => sync((_v, a) => { a.pause(); a.currentTime = 0; }) : undefined}
+        // When the (draft) video ends but the voiceover is longer, DON'T stop the VO - the video holds its last
+        // frame while the voice plays out, so you hear the FULL line (the final cut renders the clip at the VO
+        // length, so there's no hold there). Only reset once the VO itself has finished.
+        onEnded={undefined}
       />
-      {overlayVO && <audio ref={aRef} src={clip.audio_url || undefined} preload="auto" />}
+      {overlayVO && <audio ref={aRef} src={clip.audio_url || undefined} preload="auto" onEnded={() => { const v = vRef.current; if (v) { v.pause(); try { v.currentTime = 0; } catch { /* noop */ } } }} />}
     </>
   );
 }

@@ -1314,6 +1314,13 @@ export const generateClips = inngest.createFunction(
         }
         if (audioUrl && !presetAudio && !preSlice) await step.run(`u-tts-${i}`, () => recordUsage({ influencerId, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {}));
       }
+      // BULLETPROOF VO LENGTH: if we have the voiceover but not its exact duration (e.g. a preset upload, or a
+      // plain-TTS fallback with no timestamps), MEASURE the file. The b-roll clip length + the stitch slot are
+      // both driven off this, so it must be the REAL spoken length, never the storyboard's 8s timecode estimate.
+      if (audioUrl && !(typeof audioDur === "number" && audioDur > 0)) {
+        const d = await step.run(`voprobe-clip-${i}`, () => probeDuration(audioUrl as string).catch(() => null));
+        if (typeof d === "number" && d > 0.3) audioDur = d;
+      }
 
       // A-ROLL ONLY = she speaks DIRECT TO CAMERA, lip-synced (OmniHuman drives her lips from our VO).
       // B-ROLL is a video SCENE: NEVER lip-synced — its VO narrates OVER the silent motion (laid in the
@@ -1432,7 +1439,10 @@ export const generateClips = inngest.createFunction(
       // narration slice exists. a-roll is synced to its audio separately, so it uses the timecode here.
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const sceneDur = a != null && b != null && b > a ? b - a : 5;
-      const narrationDur = sceneAudio.get(i)?.duration;
+      // Drive the clip length off the ACTUAL measured voiceover (audioDur - covers voice-once slices, per-scene
+      // TTS AND probed presets), NOT just the pre-slice map. Falling back to the pre-slice, then the timecode.
+      // This is why the b-roll used to render 8s (timecode) for a 12s VO - audioDur was captured but ignored.
+      const narrationDur = (typeof audioDur === "number" && audioDur > 0) ? audioDur : sceneAudio.get(i)?.duration;
       // B-ROLL 10s FLOOR (Gary's pick): every b-roll with a VO renders a FULL ~10s clip by default (the more
       // impactful length) - the VO plays over the first part, music/ambient carry the cinematic breather to the
       // end. Kling 3.0 does native 3-15s, so it holds the real length; a draft DoP clip loops to fill the slot.
