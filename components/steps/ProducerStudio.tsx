@@ -17,7 +17,8 @@ type Scene = {
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; audio_url?: string | null; synced?: boolean; draft?: boolean };
-type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[] } | null;
+type SceneCallout = { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; hold?: number };
+type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[]; scene_callouts?: Record<string, SceneCallout> } | null;
 
 const ROLE = {
   "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
@@ -288,21 +289,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // clip/image reuses the brief's endCardUrl/endCardKind state so there's one source of truth.
   const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
   const [stitchCaptionStyle, setStitchCaptionStyle] = useState<string>(String((initialProduction?.brief as { captionStyle?: string })?.captionStyle || "bold"));
-  // ON-SCREEN OFFER CALLOUT (frosted glass): an animated overlay of the client's hook offer. Persisted in the
-  // brief so a re-stitch reuses it. Off by default.
-  type Callout = { on: boolean; kick: string; line: string; num: string; suffix: string; accent: string; start: number; duration: number };
-  const savedCallout = (initialProduction?.brief as { callout?: Partial<Callout> })?.callout || {};
-  const [callout, setCallout] = useState<Callout>({
-    on: savedCallout.on === true,
-    kick: savedCallout.kick ?? "Limited offer",
-    line: savedCallout.line ?? "",
-    num: savedCallout.num ?? "",
-    suffix: savedCallout.suffix ?? "FREE",
-    accent: savedCallout.accent ?? "#ffcb05",
-    start: typeof savedCallout.start === "number" ? savedCallout.start : 0.6,
-    duration: typeof savedCallout.duration === "number" ? savedCallout.duration : 4,
-  });
-  const setCo = (patch: Partial<Callout>) => setCallout((c) => ({ ...c, ...patch }));
+  // Offer callouts are now PER-SCENE (production.scene_callouts) - see openCallout/saveCallout below. The old
+  // single global callout is gone; the stitch still honours a legacy brief.callout as a fallback only.
   async function toggleDrop(scene: number) {
     setDropped((s) => { const n = new Set(s); n.has(scene) ? n.delete(scene) : n.add(scene); return n; }); // optimistic
     // Confirm from the server so a later render/stitch can't race on a stale dropped list.
@@ -449,7 +437,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (assembling) return;
     setErr("");
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, endCardUrl, endCardKind, callout }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
   }
@@ -559,6 +547,22 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], aspectRatio: boardRatio, priority, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't shoot that reference image."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)), shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
+  }
+  // PER-SCENE offer callouts (frosted glass). Source of truth = production.scene_callouts, keyed by scene idx.
+  const sceneCallouts = (production?.scene_callouts) || {};
+  const [coOpen, setCoOpen] = useState<number | null>(null);
+  const [coDraft, setCoDraft] = useState<SceneCallout>({ kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05" });
+  function openCallout(i: number) {
+    if (coOpen === i) { setCoOpen(null); return; }
+    const ex = sceneCallouts[String(i)];
+    setCoDraft(ex ? { kick: ex.kick ?? "", line: ex.line ?? "", num: ex.num ?? "", suffix: ex.suffix ?? "", accent: ex.accent ?? "#ffcb05" } : { kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05" });
+    setCoOpen(i);
+  }
+  async function saveCallout(i: number, remove = false) {
+    const body = remove ? { scene: i, callout: { on: false } } : { scene: i, callout: { on: true, ...coDraft } };
+    const r = await fetch(`/api/influencers/${influencerId}/callout`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json()).catch(() => null);
+    if (r?.scene_callouts) setProduction((p) => (p ? ({ ...p, scene_callouts: r.scene_callouts } as Production) : p));
+    setCoOpen(null);
   }
   // Toggle a scene's Live background right on the card (a-roll only) - a text-only persist, no re-shoot. Off
   // by default and the slow/flaky lane, so it's opt-in per scene. Re-shoot + re-animate to apply the change.
@@ -1025,8 +1029,57 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}-{s.end}</span>
                     <span className="text-[11px] font-semibold text-ink-dim">{s.beat}</span>
                     <span className={`tabular rounded border px-1.5 py-0.5 text-[9px] font-bold ${role.cls}`}>{role.label}</span>
-                    {s.role !== "graphic" && <button onClick={() => openEdit(i, s)} className="ml-auto rounded-md border border-[#a855f7]/40 px-2 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">{editIdx === i ? "Close" : "✎ Edit scene"}</button>}
+                    {s.role !== "graphic" && (
+                      <span className="ml-auto flex gap-1.5">
+                        {isStudio && <button onClick={() => openCallout(i)} title="Add a frosted-glass offer callout that appears ON this scene (each scene can have its own)" className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${sceneCallouts[String(i)] ? "border-[#ffcb05]/60 bg-[#ffcb05]/10 text-[#ffcb05]" : "border-line text-ink-dim hover:text-ink"}`}>{coOpen === i ? "Close" : sceneCallouts[String(i)] ? "🪟 Callout ✓" : "🪟 Callout"}</button>}
+                        <button onClick={() => openEdit(i, s)} className="rounded-md border border-[#a855f7]/40 px-2 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">{editIdx === i ? "Close" : "✎ Edit scene"}</button>
+                      </span>
+                    )}
                   </div>
+                  {/* PER-SCENE offer callout editor (frosted glass), appears ON this scene during the cut. */}
+                  {coOpen === i && (
+                    <div className="mb-2 rounded-lg border border-[#ffcb05]/30 bg-[#ffcb05]/[0.04] p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="text-[12px] font-semibold text-[#fbbf24]">🪟 On-screen callout for Scene {i + 1}</span>
+                        <span className="tabular text-[10px] uppercase tracking-[0.15em] text-ink-faint">frosted glass · animated</span>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="text-[10px] text-ink-faint">Eyebrow<input value={coDraft.kick} onChange={(e) => setCoDraft((c) => ({ ...c, kick: e.target.value }))} maxLength={40} placeholder="Limited offer" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#ffcb05]" /></label>
+                            <label className="text-[10px] text-ink-faint">Headline<input value={coDraft.line} onChange={(e) => setCoDraft((c) => ({ ...c, line: e.target.value }))} maxLength={80} placeholder="Download MoMo & register" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#ffcb05]" /></label>
+                            <label className="text-[10px] text-ink-faint">Offer (chip)<input value={coDraft.num} onChange={(e) => setCoDraft((c) => ({ ...c, num: e.target.value }))} maxLength={24} placeholder="1GB" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] font-bold text-ink outline-none focus:border-[#ffcb05]" /></label>
+                            <label className="text-[10px] text-ink-faint">Offer suffix<input value={coDraft.suffix} onChange={(e) => setCoDraft((c) => ({ ...c, suffix: e.target.value }))} maxLength={24} placeholder="FREE" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#ffcb05]" /></label>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] text-ink-faint">Accent</span>
+                            {["#ffcb05", "#22c55e", "#5aa2ff", "#ff7ac0", "#ffffff"].map((h) => (
+                              <button key={h} onClick={() => setCoDraft((c) => ({ ...c, accent: h }))} title={h} style={{ background: h }} className={`h-6 w-6 rounded-md border-2 transition ${coDraft.accent === h ? "border-ink" : "border-transparent"}`} />
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button onClick={() => saveCallout(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save callout</button>
+                            {sceneCallouts[String(i)] && <button onClick={() => saveCallout(i, true)} className="rounded-lg border border-alert/40 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10">Remove</button>}
+                            <button onClick={() => setCoOpen(null)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
+                          </div>
+                          <p className="text-[10px] text-ink-faint">Re-stitch after saving to see it. It slides in near the top while this scene plays.</p>
+                        </div>
+                        {/* live mini-preview */}
+                        <div className="relative flex h-[150px] w-[84px] items-start justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-br from-[#1b2338] via-[#241a2e] to-[#0d1017]">
+                          <div className="mt-3 w-[74px] rounded-[8px] border border-white/40 bg-gradient-to-b from-white/[0.16] to-white/[0.05] px-1.5 py-1 text-center shadow-lg">
+                            {coDraft.kick && <div className="text-[5px] font-bold uppercase tracking-[0.12em] text-white/90">{coDraft.kick}</div>}
+                            {coDraft.line && <div className="mt-0.5 text-[7px] font-bold leading-tight text-white">{coDraft.line}</div>}
+                            {(coDraft.num || coDraft.suffix) && (
+                              <div className="mt-1">
+                                {coDraft.num && <span className="rounded-[4px] px-1 py-0.5 text-[11px] font-extrabold leading-none text-[#0c0d10]" style={{ background: coDraft.accent }}>{coDraft.num}</span>}
+                                {coDraft.suffix && <span className="ml-0.5 align-middle text-[6px] font-extrabold text-white">{coDraft.suffix}</span>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="text-[13px] text-ink-dim"><span className="text-ink-faint">📍 {s.location}</span></div>
                   <div className="mt-1 text-[13px] text-ink-dim"><span className="text-ink-faint">🎥</span> {s.shot}</div>
                   <div className="mt-1 text-[13px] text-ink-dim"><span className="text-ink-faint">🎬</span> {s.blocking} <span className="text-ink-faint">· {s.performance}</span></div>
@@ -1296,51 +1349,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     )}
                   </div>
 
-                  {/* ON-SCREEN OFFER CALLOUT (frosted glass) - an animated overlay of the client's hook offer. */}
-                  <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input type="checkbox" checked={callout.on} onChange={(e) => setCo({ on: e.target.checked })} className="h-4 w-4 accent-[#a855f7]" />
-                      <span className="text-[12px] font-semibold text-ink">🪟 On-screen offer callout</span>
-                      <span className="tabular text-[10px] uppercase tracking-[0.15em] text-ink-faint">frosted glass · animated</span>
-                    </label>
-                    {callout.on && (
-                      <div className="mt-3 grid gap-4 md:grid-cols-[1fr_auto]">
-                        <div className="space-y-2.5">
-                          <div className="grid grid-cols-2 gap-2">
-                            <label className="text-[10px] text-ink-faint">Eyebrow<input value={callout.kick} onChange={(e) => setCo({ kick: e.target.value })} maxLength={40} placeholder="Limited offer" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#a855f7]" /></label>
-                            <label className="text-[10px] text-ink-faint">Headline<input value={callout.line} onChange={(e) => setCo({ line: e.target.value })} maxLength={80} placeholder="Download MoMo & register" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#a855f7]" /></label>
-                            <label className="text-[10px] text-ink-faint">Offer (chip)<input value={callout.num} onChange={(e) => setCo({ num: e.target.value })} maxLength={24} placeholder="1GB" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] font-bold text-ink outline-none focus:border-[#a855f7]" /></label>
-                            <label className="text-[10px] text-ink-faint">Offer suffix<input value={callout.suffix} onChange={(e) => setCo({ suffix: e.target.value })} maxLength={24} placeholder="FREE" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#a855f7]" /></label>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] text-ink-faint">Accent</span>
-                            {["#ffcb05", "#22c55e", "#5aa2ff", "#ff7ac0", "#ffffff"].map((h) => (
-                              <button key={h} onClick={() => setCo({ accent: h })} title={h} style={{ background: h }} className={`h-6 w-6 rounded-md border-2 transition ${callout.accent === h ? "border-ink" : "border-transparent"}`} />
-                            ))}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4">
-                            <label className="flex items-center gap-2 text-[10px] text-ink-faint">Appears at
-                              <input type="number" min={0} max={60} step={0.5} value={callout.start} onChange={(e) => setCo({ start: Math.max(0, Math.min(60, Number(e.target.value) || 0)) })} className="tabular w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-[13px] text-ink outline-none focus:border-[#a855f7]" />s</label>
-                            <label className="flex items-center gap-2 text-[10px] text-ink-faint">Holds for
-                              <input type="number" min={1.5} max={12} step={0.5} value={callout.duration} onChange={(e) => setCo({ duration: Math.max(1.5, Math.min(12, Number(e.target.value) || 4)) })} className="tabular w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-[13px] text-ink outline-none focus:border-[#a855f7]" />s</label>
-                          </div>
-                        </div>
-                        {/* Live mini-preview (matches the render's frosted card) */}
-                        <div className="relative flex h-[210px] w-[118px] items-start justify-center overflow-hidden rounded-xl border border-line bg-gradient-to-br from-[#1b2338] via-[#241a2e] to-[#0d1017]">
-                          <div className="mt-4 w-[102px] rounded-[10px] border border-white/40 bg-gradient-to-b from-white/[0.16] to-white/[0.05] px-2 py-1.5 shadow-lg" style={{ boxShadow: "0 8px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.5)" }}>
-                            {callout.kick && <div className="text-[6px] font-bold uppercase tracking-[0.14em] text-white/90">{callout.kick}</div>}
-                            {callout.line && <div className="mt-0.5 text-[9px] font-bold leading-tight text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,.4)" }}>{callout.line}</div>}
-                            {(callout.num || callout.suffix) && (
-                              <div className="mt-1.5 flex items-baseline gap-1">
-                                {callout.num && <span className="rounded-[5px] px-1.5 py-0.5 text-[15px] font-extrabold leading-none text-[#0c0d10]" style={{ background: callout.accent }}>{callout.num}</span>}
-                                {callout.suffix && <span className="text-[8px] font-extrabold tracking-wide text-white">{callout.suffix}</span>}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {!callout.on && <p className="mt-1.5 text-[10px] text-ink-faint">A premium animated glass card for your hook offer (e.g. &quot;Download MoMo &amp; register - 1GB FREE&quot;). Slides in, holds, eases out.</p>}
+                  {/* Callouts are now PER-SCENE - add them on each scene card above via the 🪟 Callout button, so
+                      different scenes can carry different offers, each timed to its own shot. */}
+                  <div className="mb-3 rounded-lg border border-[#ffcb05]/25 bg-[#ffcb05]/[0.04] p-3 text-[11px] text-ink-dim">
+                    🪟 <b className="text-[#fbbf24]">On-screen offer callouts are per scene.</b> Scroll up to any scene card and hit <b>🪟 Callout</b> to add a frosted-glass offer that appears on THAT shot - each scene can have its own. {Object.keys(sceneCallouts).length > 0 ? <span className="text-ink-faint">Currently on {Object.keys(sceneCallouts).length} scene{Object.keys(sceneCallouts).length > 1 ? "s" : ""}.</span> : <span className="text-ink-faint">None added yet.</span>}
                   </div>
 
                   {/* FULL-QUALITY CONFORM: draft previews are 720p (a-roll) / fast DoP (b-roll) proxies. Before

@@ -1323,7 +1323,7 @@ export const generateClips = inngest.createFunction(
         // "background people" makes it WARP/fast-forward the crowd in the still (the hallucination we saw).
         // So this is SUBJECT-ONLY motion + an explicitly CALM, still background. No MOTION_SAFE/WATER here
         // (that crowd-motion language is for the b-roll video model, not a talking-photo engine).
-        const prompt = `Natural, lifelike talking-to-camera delivery: ${base}. She FINISHES her sentence completely and then SETTLES calmly — mouth closing, a composed beat, holding her relaxed expression — never inhaling, never looking about to speak again, never cut mid-word. Her movement is entirely SUBJECT-driven, calm and human: gentle natural head movement, subtle shoulder and posture shifts, natural blinking and warm micro-expressions as she speaks. HANDS STAY RESTING FOR ESSENTIALLY THE ENTIRE CLIP (in her lap, at her sides, or lightly clasped) and barely move at all — AT MOST ONE tiny, slow, low hand motion across the whole clip, or none. NEVER raised to chest height or above, never wide, sweeping, repeated, waving, pointing, gesturing, flailing or animated. She barely uses her hands: the warmth and life come from her FACE and gentle head movement, NOT her hands, which stay quiet and still like a composed person calmly speaking to a friend — err firmly on the side of NO hand movement. Real, like a person calmly talking to a friend. The camera holds a steady, gentle, essentially locked frame on her — no pan, tilt, zoom, push or crane — and she stays centred and fully in frame throughout. The BACKGROUND behind her has shallow depth of field and stays CALM and naturally STILL: do NOT animate, move, warp, duplicate or fast-forward any background people or objects. Any people in the background are a STILL, calm backdrop FAR behind her - they do NOT walk, cross, step, turn, duplicate, vanish, reappear or repeat, and NOBODY walks behind her and pops out the other side; treat the background like a near-frozen, softly out-of-focus backdrop. ONLY she moves, naturally and at real-life speed.`;
+        const prompt = `Natural, lifelike talking-to-camera delivery: ${base}. She FINISHES her sentence completely and then SETTLES calmly — mouth closing, a composed beat, holding her relaxed expression — never inhaling, never looking about to speak again, never cut mid-word. Her movement is entirely SUBJECT-driven, calm and human: gentle natural head movement, subtle shoulder and posture shifts, natural blinking and warm micro-expressions as she speaks. HANDS STAY RESTING FOR ESSENTIALLY THE ENTIRE CLIP (in her lap, at her sides, or lightly clasped) and barely move at all — AT MOST ONE tiny, slow, low hand motion across the whole clip, or none. NEVER raised to chest height or above, never wide, sweeping, repeated, waving, pointing, gesturing, flailing or animated. She barely uses her hands: the warmth and life come from her FACE and gentle head movement, NOT her hands, which stay quiet and still like a composed person calmly speaking to a friend — err firmly on the side of NO hand movement. Real, like a person calmly talking to a friend. The camera holds a steady, gentle, essentially locked frame on her — no pan, tilt, zoom, push or crane — and she stays centred and fully in frame throughout. The BACKGROUND behind her has shallow depth of field and stays CALM and naturally STILL: do NOT animate, move, warp, duplicate or fast-forward any background people or objects. Any people in the background are a STILL, calm backdrop FAR behind her - they do NOT walk, cross, step, turn, duplicate, vanish, reappear or repeat, and NOBODY walks behind her and pops out the other side; treat the background like a near-frozen, softly out-of-focus backdrop. ONLY she moves, naturally and at real-life speed. SKIN REALISM (critical): keep her REAL skin texture, visible pores and natural imperfections exactly as in the source photo - do NOT smooth, wax, plastic-ify, airbrush, beautify, retouch or porcelain-glaze her face; she must read as a real person filmed on camera, never a glossy plastic CGI render.`;
 
         // PRIMARY a-roll engine: HeyGen Avatar IV (v3) — purpose-built talking-photo lip-sync, cheap
         // (subscription), and it animates OUR photo so skin texture is preserved. It is the ONLY a-roll
@@ -2017,29 +2017,47 @@ export const assembleVideo = inngest.createFunction(
     // Shotstack renders the HTML as ONE static frame, so the motion is the clip-level transition (slide-up in,
     // fade out) - a clean, premium land. Faux-frosted (translucent gradient + hairline border + soft shadow +
     // inset highlight); a live backdrop-blur of the video isn't possible in the compositor. Text is escaped.
-    const cb = (event.data.callout ?? (production?.brief as { callout?: Record<string, unknown> })?.callout ?? {}) as { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; start?: number; duration?: number };
-    const calloutClips: Record<string, unknown>[] = [];
-    if (cb.on && (cb.line || cb.num || cb.suffix || cb.kick)) {
-      const accent = /^#[0-9a-fA-F]{6}$/.test(String(cb.accent)) ? String(cb.accent) : "#ffcb05";
-      const kick = esc(String(cb.kick || "")); const line = esc(String(cb.line || ""));
-      const cnum = esc(String(cb.num || "")); const suffix = esc(String(cb.suffix || ""));
+    // PER-SCENE offer callouts: each scene can carry its OWN frosted-glass callout, rendered ONLY during that
+    // scene's window (so it lands with the right shot and different scenes can show different offers). Robust
+    // inline-block layout (Shotstack renders HTML statically and mishandles complex flex - the old flex layout
+    // overlapped the chip onto the headline). Motion = the clip transition (slide-up in, fade out). Text escaped.
+    type Callout = { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; hold?: number };
+    const sceneCallouts = ((production as { scene_callouts?: Record<string, Callout> })?.scene_callouts) || {};
+    const buildCalloutClip = (co: Callout, startSec: number, lenSec: number): Record<string, unknown> | null => {
+      const kick = esc(String(co.kick || "")); const line = esc(String(co.line || ""));
+      const cnum = esc(String(co.num || "")); const suffix = esc(String(co.suffix || ""));
+      if (!(kick || line || cnum || suffix)) return null;
+      const accent = /^#[0-9a-fA-F]{6}$/.test(String(co.accent)) ? String(co.accent) : "#ffcb05";
       const inner = [
         kick ? `<div class="k">${kick}</div>` : "",
         line ? `<div class="l">${line}</div>` : "",
         (cnum || suffix) ? `<div class="o">${cnum ? `<span class="n">${cnum}</span>` : ""}${suffix ? `<span class="f">${suffix}</span>` : ""}</div>` : "",
       ].join("");
-      const calloutCss = `.card{box-sizing:border-box;width:100%;padding:34px 42px 40px;border-radius:40px;`
-        + `background:linear-gradient(180deg,rgba(255,255,255,0.17),rgba(255,255,255,0.05));`
-        + `border:2px solid rgba(255,255,255,0.42);`
-        + `box-shadow:0 26px 70px rgba(0,0,0,0.5),inset 0 2px 0 rgba(255,255,255,0.55),inset 0 -2px 0 rgba(255,255,255,0.06)}`
-        + `.k{font-family:'Open Sans',sans-serif;font-weight:700;font-size:24px;letter-spacing:4px;text-transform:uppercase;color:#fff;opacity:0.9;margin:0 0 12px}`
-        + `.l{font-family:'Open Sans',sans-serif;font-weight:700;font-size:46px;line-height:1.18;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,0.35);margin:0}`
-        + `.o{display:flex;align-items:baseline;gap:16px;margin-top:22px}`
-        + `.n{font-family:'Open Sans',sans-serif;font-weight:800;font-size:86px;line-height:1;letter-spacing:-1px;color:#0c0d10;background:${accent};padding:6px 26px;border-radius:22px;box-shadow:0 10px 26px ${accent}55}`
-        + `.f{font-family:'Open Sans',sans-serif;font-weight:800;font-size:40px;letter-spacing:2px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.4)}`;
+      const css = `.wrap{width:100%;text-align:center}`
+        + `.card{box-sizing:border-box;display:inline-block;text-align:center;max-width:900px;padding:24px 38px 30px;border-radius:32px;`
+        + `background:linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06));border:2px solid rgba(255,255,255,0.45);`
+        + `box-shadow:0 22px 55px rgba(0,0,0,0.5),inset 0 2px 0 rgba(255,255,255,0.5)}`
+        + `.k{font-family:'Open Sans',sans-serif;font-weight:700;font-size:22px;letter-spacing:4px;text-transform:uppercase;color:#fff;opacity:0.9;margin:0 0 10px}`
+        + `.l{font-family:'Open Sans',sans-serif;font-weight:700;font-size:40px;line-height:1.2;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.4);margin:0 0 16px}`
+        + `.o{margin:0;line-height:1}`
+        + `.n{display:inline-block;vertical-align:middle;font-family:'Open Sans',sans-serif;font-weight:800;font-size:58px;line-height:1;color:#0c0d10;background:${accent};padding:6px 22px;border-radius:16px}`
+        + `.f{display:inline-block;vertical-align:middle;margin-left:12px;font-family:'Open Sans',sans-serif;font-weight:800;font-size:32px;letter-spacing:2px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.4)}`;
+      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 620, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1.2, lenSec), position: "top", offset: { y: -0.07 }, transition: { in: "slideUp", out: "fade" } };
+    };
+    const calloutClips: Record<string, unknown>[] = [];
+    for (const p of placed) {
+      const co = sceneCallouts[String(p.i)];
+      if (!co || co.on === false) continue;
+      const hold = Math.max(1.5, Math.min(p.len - 0.4, Number(co.hold) || Math.min(p.len - 0.4, 5)));
+      const c = buildCalloutClip(co, p.start + 0.3, hold);
+      if (c) calloutClips.push(c);
+    }
+    // Back-compat: a single legacy brief.callout with no per-scene callouts lands on the opening hook.
+    const cb = (event.data.callout ?? (production?.brief as { callout?: Callout & { start?: number; duration?: number } })?.callout ?? {}) as Callout & { start?: number; duration?: number };
+    if (!calloutClips.length && cb.on) {
       const cStart = Math.max(0, Math.min(total - 0.6, Number(cb.start) || 0.6));
-      const cDur = Math.max(1.5, Math.min(total - cStart, Number(cb.duration) || 4));
-      calloutClips.push({ asset: { type: "html", html: `<div class="card">${inner}</div>`, css: calloutCss, width: 940, height: 480, background: "transparent" }, start: cStart, length: cDur, position: "top", offset: { y: -0.05 }, transition: { in: "slideUp", out: "fade" } });
+      const c = buildCalloutClip(cb, cStart, Math.max(1.5, Math.min(total - cStart, Number(cb.duration) || 4)));
+      if (c) calloutClips.push(c);
     }
 
     const tracks: Record<string, unknown>[] = [];
