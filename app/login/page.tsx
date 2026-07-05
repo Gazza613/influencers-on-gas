@@ -21,7 +21,12 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      window.location.href = "/studio";
+      // Return the user to where they were before the reload re-gate (?next=), if it's a safe internal
+      // path; otherwise the studio hub. This is what makes a refresh keep your place.
+      let next = "";
+      try { next = new URLSearchParams(window.location.search).get("next") || ""; } catch { next = ""; }
+      const safe = next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") && !next.startsWith("/api/");
+      window.location.href = safe ? next : "/studio";
     } catch {
       setError("Something went wrong signing in. Please try again.");
       setBusy(false);
