@@ -76,7 +76,8 @@ export default function Landing() {
   // Load real influencer hero images: ONE distinct influencer per card (no repeats, no
   // cycling). Cards beyond the number of available influencers stay empty.
   useEffect(() => {
-    fetch("/api/influencers", { cache: "no-store" })
+    // Public feed (the landing page is logged-out; /api/influencers is auth-gated). Image URLs only.
+    fetch("/api/landing-cards", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { influencers: [] }))
       .then((d) => {
         const list = [...((d.influencers as Inf[]) || [])].sort((a, b) => rank(a) - rank(b));

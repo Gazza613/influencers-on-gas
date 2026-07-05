@@ -16,8 +16,8 @@ const COOKIES = [
 
 // A safe SAME-ORIGIN internal path only. We resolve against the real origin with `new URL`, which NORMALISES
 // away control chars (tab/CR/LF) that browsers strip and that a bare prefix-check would miss (e.g. an encoded
-// tab turns "/<tab>/evil.com" into "//evil.com" -> cross-origin). The origin comparison then rejects anything
-// off-origin; we also drop /api routes and only ever return a path+query, never an absolute URL.
+// tab turns "/<tab>/outside.example" into "//outside.example" -> cross-origin). The origin comparison then
+// rejects anything off-origin; we also drop /api routes and only ever return a path+query, never an absolute URL.
 function safeNext(v: string | null, origin: string): string {
   if (!v) return "";
   try { v = decodeURIComponent(v); } catch { return ""; }
