@@ -1045,8 +1045,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             >{String(s.live_bg) === "true" ? "🎬 Live bg · Kling ✓" : "🎬 Live background"}</button>
                           )}
                           <div className="flex gap-1">
-                            <button onClick={() => openEdit(i, s)} className="flex-1 rounded-md border border-[#a855f7]/40 px-1.5 py-1 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
-                            <button onClick={() => toggleDrop(i)} title={dropped.has(i) ? "Rejected - tap to keep" : "Kept - tap to reject"} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold ${dropped.has(i) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-dim hover:text-ink"}`}>{dropped.has(i) ? "✗ Rejected" : "✓ Keep"}</button>
+                            {/* Edit lives once, in the header ("✎ Edit scene") - the duplicate here was removed to declutter the card. */}
+                            <button onClick={() => toggleDrop(i)} title={dropped.has(i) ? "Rejected - tap to keep" : "Kept - tap to reject"} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold ${dropped.has(i) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-dim hover:text-ink"}`}>{dropped.has(i) ? "✗ Rejected - tap to keep" : "✓ Keep"}</button>
                           </div>
                         </div>
                       )}
