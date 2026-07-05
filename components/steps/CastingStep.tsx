@@ -128,9 +128,9 @@ export default function CastingStep({
 
             {casting && (
               <div className="mt-4">
-                <WorkingPanel title="Casting" lines={CASTING_NARRATION} crew={CREW.casting} eta="about 2 min"
+                <WorkingPanel title="Casting" lines={CASTING_NARRATION} crew={CREW.casting} eta="about 2 min" estimateSeconds={150}
                   pct={candidates.length ? pct : null} sub={`${candidates.length}/${CAST_TOTAL} looks`}
-                  note="Fresh, distinct faces appear as they're cast." />
+                  note="Fresh, distinct faces appear as they're cast. Safe to close this tab - casting keeps running and the looks will be here when you return." />
               </div>
             )}
 

@@ -8,7 +8,7 @@ import type { CrewMember } from "@/lib/crew";
 // rotating narration that flexes what the platform is doing, and a progress / sweep bar.
 // Turns dead waits into an over-the-shoulder, premium moment. Used across every build step.
 export default function WorkingPanel({
-  title, lines, pct, sub, note, onAbort, crew, eta, startedAt,
+  title, lines, pct, sub, note, onAbort, crew, eta, startedAt, estimateSeconds,
 }: {
   title: string;
   lines: string[];
@@ -19,6 +19,8 @@ export default function WorkingPanel({
   crew?: CrewMember;
   eta?: string; // e.g. "about 2 min"
   startedAt?: number | null; // epoch ms; when set, the clock shows TRUE elapsed (survives navigation)
+  estimateSeconds?: number; // when set, the bar advances on ELAPSED TIME (capped ~92%) before real results land,
+                            // so a batch job that only returns at the end still visibly progresses instead of a blank sweep
 }) {
   const [i, setI] = useState(0);
   const [secs, setSecs] = useState(startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0);
@@ -57,9 +59,15 @@ export default function WorkingPanel({
       </div>
 
       <div className="mt-3">
-        {typeof pct === "number"
-          ? <div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.max(4, pct)}%`, background: "linear-gradient(90deg,#ec4899,#a855f7,#60a5fa)" }} /></div>
-          : <div className="bar-sweep" />}
+        {(() => {
+          // Real result-based % wins once results exist; otherwise advance on elapsed time (capped so it never
+          // hits 100 before the job is actually done). Never goes backwards when real progress arrives.
+          const timePct = estimateSeconds && estimateSeconds > 0 ? Math.min(92, Math.round((secs / estimateSeconds) * 100)) : null;
+          const shown = typeof pct === "number" ? Math.max(pct, timePct ?? 0) : timePct;
+          return typeof shown === "number"
+            ? <div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.max(4, shown)}%`, background: "linear-gradient(90deg,#ec4899,#a855f7,#60a5fa)" }} /></div>
+            : <div className="bar-sweep" />;
+        })()}
       </div>
 
       {note && (
