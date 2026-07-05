@@ -1472,9 +1472,13 @@ export const generateClips = inngest.createFunction(
       const DOP_OUT_SECONDS = Math.max(3, Number(process.env.DOP_OUT_SECONDS) || 5);
       const dopFits = clipSeconds <= DOP_OUT_SECONDS + 0.8; // does the needed clip length fit DoP's fixed output?
       const useVeo = (role === "b-roll" && !speed && (hero || brollEngine === "veo")) || (liveBg && LIVEBG_ENGINE === "veo");
-      // DoP when: live-bg set to dop, OR a SHORT-enough draft b-roll (fast proxy), OR a short-enough final
-      // b-roll explicitly on dop. A longer b-roll (draft or final) skips DoP and renders full-length on Kling.
-      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed && dopFits) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured();
+      // B-ROLL now renders on KLING by default - draft AND final (Gary's call to drop the fixed-5s DoP proxy).
+      // Kling does native 3-15s, so every scene shot is the CORRECT length with real motion for the whole line.
+      // DoP stays only for: live-bg=dop, an explicit BROLL_ENGINE=dop opt-in (short lines), an optional fast
+      // draft proxy for SHORT lines (BROLL_DRAFT_DOP=1), and the Kling-stall fallback below (so a scene never
+      // fails). The slower Kling lane is the trade for correctness; the env toggle brings back fast drafts.
+      const draftDop = process.env.BROLL_DRAFT_DOP === "1" && speed && dopFits;
+      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && brollEngine === "dop" && dopFits) || (role === "b-roll" && draftDop)) && !useVeo && dopConfigured();
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
