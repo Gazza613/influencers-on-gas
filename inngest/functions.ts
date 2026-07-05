@@ -879,7 +879,7 @@ export const generateShots = inngest.createFunction(
     // on Ultra. This also keeps the keyframe on the SAME model the identity was built on (BUILD_MODEL).
     // (HF_IMAGES_FREE=1 is an emergency escape hatch back to the free model.)
     const shotModel = process.env.HF_IMAGES_FREE === "1" ? IMAGE_MODEL : PRIORITY_MODEL;
-    const speed = event.data.speed === true; // DRAFT speed: skip the humaniser (a whole 2nd render/keyframe) for faster shoots
+    const speed = event.data.speed === true; // DRAFT speed: faster/cheaper PREVIEW renders (720p, quick engine). The keyframe humaniser still ALWAYS runs (see below) - draft never ships a plastic face.
     // Aspect ratio is producer-chosen per shoot (9:16 reels / 1:1 feed / 16:9 youtube); falls back to the storyboard format.
     const allowedRatios = ["9:16", "1:1", "16:9"];
     const ratio = allowedRatios.includes(String(event.data.aspectRatio)) ? String(event.data.aspectRatio) : (String(production?.storyboard?.format || "").includes("1:1") ? "1:1" : "9:16");
@@ -1445,7 +1445,7 @@ export const generateClips = inngest.createFunction(
       const narrationDur = (typeof audioDur === "number" && audioDur > 0) ? audioDur : sceneAudio.get(i)?.duration;
       // B-ROLL 10s FLOOR (Gary's pick): every b-roll with a VO renders a FULL ~10s clip by default (the more
       // impactful length) - the VO plays over the first part, music/ambient carry the cinematic breather to the
-      // end. Kling 3.0 does native 3-15s, so it holds the real length; a draft DoP clip loops to fill the slot.
+      // end. Kling 3.0 does native 3-15s, so it holds the real length; a shorter draft DoP clip HOLDS ITS LAST FRAME for the remainder (never loops - Gary's hard rule).
       // env-tunable (BROLL_MIN_SECONDS), up to 15s; set to 3 to go back to VO-matched lengths.
       const BROLL_MIN = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 10));
       const clipSeconds = (liveBg && typeof narrationDur === "number" && narrationDur > 0)
@@ -2107,7 +2107,7 @@ export const assembleVideo = inngest.createFunction(
       // DURABLE poll: short status checks with step.sleep between, so the Shotstack render (which
       // can take minutes) never blocks one invocation long enough to time out + retry-loop.
       let out: { url: string | null; error: string | null } = { url: null, error: "render timed out" };
-      for (let n = 0; n < 100; n++) { // ~100 x 6s ≈ 10 min (Shotstack render of a full cut)
+      for (let n = 0; n < 125; n++) { // ~125 x 6s ≈ 12.5 min - headroom for caption-heavy cuts (per-word HTML clips render slowly); still inside maxDuration=800s
         const s = await step.run(`renderpoll-${n}`, () => pollRenderOnce(renderId));
         if (s.url) { out = { url: s.url, error: null }; break; }
         if (s.terminal) { out = { url: null, error: s.error }; break; }

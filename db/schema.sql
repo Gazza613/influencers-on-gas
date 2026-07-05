@@ -353,9 +353,30 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   -- B-ROLL motion (Producer): Kling 3.0 image->video ~5s std, from the 9,000-credit Ultra POOL.
   -- ~6 credits/clip (2026 sourced; Higgsfield publishes no per-model table) × ~R0.77/credit.
   ('higgsfield','kling3','video', 6, 462, true),
+  ('higgsfield','kling3_0','video', 6, 462, true),            -- b-roll engine id used in metering (alias of kling3)
+  ('higgsfield','seedance_2_0','video', 6, 462, true),        -- a-roll fallback, from the Ultra credit pool
+  ('higgsfield','veo3_1','video', 40, 3080, true),            -- Veo 3.1 HERO b-roll (4K + native audio) - pricey; recalibrate
+  -- PRIMARY b-roll engine on the Producer path (DoP-turbo, fast first-party). Draws from the Ultra
+  -- credit POOL. ESTIMATE below - "Recalibrate costs" trues this up from Higgsfield get_cost.
+  ('higgsfield','dop_turbo','video', 4, 308, true),
+  -- PRIMARY a-roll engine (HeyGen Avatar IV, default AROLL_ENGINE). ESTIMATE per talking-head clip -
+  -- confirm against GAS's HeyGen plan (flat quota vs pay-per-clip). Not auto-calibrated.
+  ('heygen','avatar_iv','video', 0, 300, true),
+  ('heygen','talking_photo','video', 0, 300, true),           -- legacy build/twin presenter path
+  ('heygen','talking_photo','avatar', 0, 300, true),
+  -- fal OmniHuman 1.5 a-roll (opt-in AROLL_ENGINE=omnihuman): fal PAYG ~$0.16/s metered per second.
+  ('fal','omnihuman_1_5','second', 0, 296, true),
+  -- ElevenLabs voice/STT: within the ElevenLabs SUBSCRIPTION quota, so $0 marginal (like the music bed).
+  -- Metered for usage visibility.
+  ('elevenlabs','eleven_multilingual_v2','tts', 0, 0, true),
+  ('elevenlabs','clone','voice', 0, 0, true),
+  ('elevenlabs','scribe_v1','stt', 0, 0, true),
   -- ElevenLabs Music bed: drawn from the ElevenLabs SUBSCRIPTION credit pool, so $0 marginal
   -- within quota (like Higgsfield images). Metered for usage visibility.
   ('elevenlabs','music','music', 0, 0, true),
+  -- Claude 'bible' unit (Character Casting + creative refine) and voyage-3.5 brief retrieval.
+  ('anthropic','claude-sonnet-4-6','bible', 0, 200, true),
+  ('voyage','voyage-3.5','embedding', 0, 0, true),
   -- Shotstack render: PAY-AS-YOU-GO (not a subscription) ~$0.30/rendered min => ~$0.24 per 45s cut.
   ('shotstack','edit','render', 0, 450, true)
 on conflict (provider, model, unit) do nothing;
