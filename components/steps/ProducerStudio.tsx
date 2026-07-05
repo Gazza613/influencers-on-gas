@@ -1212,11 +1212,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
                 ) : (
                   <>
-                    {/* Continuity pass: re-flow the script so the kept scenes read as one seamless script */}
-                    <div className="mb-3 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
-                      <p className="text-[12px] text-ink-dim">Optional producer pass: re-flow the voiceover so it reads as one seamless script before you voice it.</p>
-                      <button onClick={reflowScript} disabled={reflowBusy} className="mt-2 rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reflowBusy ? "✨ Re-flowing the script…" : "✨ Re-flow script for continuity"}</button>
-                    </div>
+                    <p className="mb-2 text-[12px] text-ink-dim">Pick the voice {name} speaks in, then <b>generate the full voiceover</b> and listen. That&apos;s the whole step - the fine-tuning below is optional.</p>
                     <VoicePicker influencerId={influencerId} name={name} voiceId={voiceId} voiceName={voiceName} voicePreview={voicePreview}
                       onSet={(v) => {
                         setVoiceId(v.voice_id); setVoiceName(v.voice_name); setVoicePreview(v.preview_url || "");
@@ -1227,8 +1223,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         // Do NOT auto-approve on selection - it jumped past the test. You test (v2/v3,
                         // generate + listen) and then Accept (or generating the full voiceover approves it).
                       }} />
-                    {/* Voice model: v2 stable vs v3 expressive. Always visible in the Voice step. */}
-                    <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                    {/* ADVANCED (progressive disclosure) - model, preview, speed and the re-flow pass are all
+                        optional tuning; the required path is pick a voice + generate the full voiceover. */}
+                    <details className="mt-3 rounded-lg border border-line bg-surface-2/30">
+                      <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold text-ink-dim marker:content-['']">⚙ Advanced voice options <span className="font-normal text-ink-faint">· model, preview, speed, re-flow (optional)</span></summary>
+                      <div className="space-y-3 p-3 pt-0">
+                    {/* Continuity pass: re-flow the script so the kept scenes read as one seamless script */}
+                    <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
+                      <p className="text-[12px] text-ink-dim">Optional producer pass: re-flow the voiceover so it reads as one seamless script before you voice it.</p>
+                      <button onClick={reflowScript} disabled={reflowBusy} className="mt-2 rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reflowBusy ? "✨ Re-flowing the script…" : "✨ Re-flow script for continuity"}</button>
+                    </div>
+                    {/* Voice model: v2 stable vs v3 expressive. */}
+                    <div className="rounded-lg border border-line bg-surface-2/40 p-3">
                       <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Voice model</div>
                       <div className="flex gap-2">
                         {([["v2", "Stable", "Rock-solid + consistent. What you hear is exactly what ships."], ["v3", "Expressive", "More realistic, dynamic delivery + audio tags. Best on Designed/Instant voices (not a PVC)."]] as const).map(([m, label, desc]) => (
@@ -1282,6 +1288,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       </div>
                       <p className="mt-1.5 text-[10px] text-ink-faint">A little faster often sounds more natural and energetic. Changing it clears the take so you re-generate to hear it.</p>
                     </div>
+                      </div>
+                    </details>
                     {/* THE FULL VOICEOVER: one continuous take the producer listens to before animating. */}
                     {voiceId && (
                       <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
