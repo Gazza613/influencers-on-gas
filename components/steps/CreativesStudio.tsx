@@ -380,7 +380,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
           <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
           {c.url && (refs.aroll === c.url || refs.broll === c.url) && (
-            <span className="tabular rounded bg-[#a855f7] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]">★ {refs.aroll === c.url ? "A-roll" : "B-roll"} ref</span>
+            <span className="tabular rounded bg-[#a855f7] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]">★ {refs.aroll === c.url ? "Talking shot" : "Scene shot"} ref</span>
           )}
         </div>
         {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (
@@ -407,8 +407,8 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
             <button onClick={(e) => { e.stopPropagation(); setEditingId(id); setEditText(""); }} title="Edit this shot - change one thing, keep the rest"
               className="rounded-full border border-white/40 bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm hover:bg-black/80">✎ Edit</button>
             <button onClick={(e) => { e.stopPropagation(); setRoleRef(c.role === "b-roll" ? "broll" : "aroll", c.url as string); }}
-              title={`Set this as the ${c.role === "b-roll" ? "B-roll" : "A-roll"} reference the Producer matches (no 4K needed)`}
-              className="rounded-full border border-[#a855f7]/60 bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-[#c79bff] backdrop-blur-sm hover:bg-[#a855f7]/25">★ Set {c.role === "b-roll" ? "B-roll" : "A-roll"} ref</button>
+              title={`Set this as the ${c.role === "b-roll" ? "scene-shot" : "talking-shot"} reference the Producer matches (no 4K needed)`}
+              className="rounded-full border border-[#a855f7]/60 bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-[#c79bff] backdrop-blur-sm hover:bg-[#a855f7]/25">★ Set {c.role === "b-roll" ? "Scene shot" : "Talking shot"} ref</button>
           </div>
         )}
         {editingId === id && !busy && (
@@ -491,14 +491,14 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Shot type</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["a-roll", "A-roll · presenter", "Front-on, talking to camera - clean presenter shots"], ["b-roll", "B-roll · lifestyle", "Candid in-scene moments, extras + life around her"]] as const).map(([k, label, hint]) => (
+            {([["a-roll", "Talking shot · presenter", "Front-on, talking to camera - clean presenter shots"], ["b-roll", "Scene shot · lifestyle", "Candid in-scene moments, extras + life around her"]] as const).map(([k, label, hint]) => (
               <button key={k} onClick={() => pickRole(k)} className={`rounded-lg border px-3 py-2 text-left transition ${creativeRole === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
                 <div className={`text-sm font-bold ${creativeRole === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
                 <div className="text-[10px] text-ink-faint">{hint}</div>
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-faint">These tag your shots so you can pick A-roll or B-roll references in the Producer. Switching sets a sensible extras default below.</p>
+          <p className="mt-1.5 text-[11px] text-ink-faint">These tag your shots so you can pick talking-shot or scene-shot references in the Producer. Switching sets a sensible extras default below.</p>
         </div>
 
         {/* Quality tier (Soul model) */}
@@ -686,7 +686,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mb-3 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-2.5 text-[11px]">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-[#c79bff]">🎬 Producer references</span>
-            <span className="text-ink-faint">Select a shot below, then set it as the A-roll or B-roll reference. The Producer matches its wardrobe, styling, lighting and world when it shoots those scenes.</span>
+            <span className="text-ink-faint">Select a shot below, then set it as the talking-shot or scene-shot reference. The Producer matches its wardrobe, styling, lighting and world when it shoots those scenes.</span>
           </div>
           <div className="mt-2.5 flex flex-wrap gap-5">
             {(["aroll", "broll"] as const).map((role) => {
@@ -696,7 +696,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               const upBusy = !!c?.id && upscaling.has(c.id);
               return (
                 <div key={role} className="flex items-start gap-2">
-                  <span className="tabular mt-0.5 uppercase text-ink-dim">{role === "aroll" ? "A-roll" : "B-roll"}</span>
+                  <span className="tabular mt-0.5 uppercase text-ink-dim">{role === "aroll" ? "Talking shot" : "Scene shot"}</span>
                   {url ? (
                     <div className="flex items-start gap-2">
                       <div className="relative">
@@ -734,8 +734,8 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
                 {pickedTwoK && <button onClick={upscalePicked} className="rounded-md border border-[#a855f7]/50 px-2.5 py-1 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">↑ Upscale to 4K</button>}
                 {onePickUrl && (
                   <>
-                    <button onClick={() => setRoleRef("aroll", onePickUrl)} title="Use this look as the A-roll (talking) reference in the Producer" className="rounded-md border border-[#a855f7]/50 px-2.5 py-1 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">★ A-roll reference</button>
-                    <button onClick={() => setRoleRef("broll", onePickUrl)} title="Use this look as the B-roll (scene) reference in the Producer" className="rounded-md border border-[#60a5fa]/50 px-2.5 py-1 text-xs font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10">★ B-roll reference</button>
+                    <button onClick={() => setRoleRef("aroll", onePickUrl)} title="Use this look as the talking-shot reference in the Producer" className="rounded-md border border-[#a855f7]/50 px-2.5 py-1 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">★ Talking-shot reference</button>
+                    <button onClick={() => setRoleRef("broll", onePickUrl)} title="Use this look as the scene-shot reference in the Producer" className="rounded-md border border-[#60a5fa]/50 px-2.5 py-1 text-xs font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10">★ Scene-shot reference</button>
                   </>
                 )}
                 <button onClick={removePicked} className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-alert/50 hover:text-alert">Remove</button>
@@ -746,7 +746,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">Shots render fast as previews. Tick the keepers, then <span className="font-semibold text-[#c79bff]">↑ Upscale to 4K</span> to finish only the ones you choose (no wasted cost). A 4K upscale takes about 3 to 5 minutes per shot; upgraded shots move to 4K Finals. Click an image to view full size and download. Video is produced separately in the Producer.</p>
           {(twoK.length > 0 || placeholders > 0) && (
             <div className="mb-5 space-y-5">
-              {([["a-roll", "A-roll · presenter"], ["b-roll", "B-roll · lifestyle"]] as const).map(([r, label]) => {
+              {([["a-roll", "Talking shot · presenter"], ["b-roll", "Scene shot · lifestyle"]] as const).map(([r, label]) => {
                 const group = twoK.filter((c) => (c.role === "b-roll" ? "b-roll" : "a-roll") === r);
                 const ph = creativeRole === r ? placeholders : 0;
                 if (group.length === 0 && ph === 0) return null;

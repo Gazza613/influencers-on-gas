@@ -21,8 +21,8 @@ type SceneCallout = { on?: boolean; kick?: string; line?: string; num?: string; 
 type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[]; scene_callouts?: Record<string, SceneCallout> } | null;
 
 const ROLE = {
-  "a-roll": { label: "A-ROLL · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
-  "b-roll": { label: "B-ROLL · scene", cls: "bg-[#60a5fa]/15 text-[#93c5fd] border-[#60a5fa]/30" },
+  "a-roll": { label: "TALKING SHOT · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
+  "b-roll": { label: "SCENE SHOT", cls: "bg-[#60a5fa]/15 text-[#93c5fd] border-[#60a5fa]/30" },
   graphic: { label: "GRAPHIC", cls: "bg-active/15 text-active border-active/30" },
 } as const;
 
@@ -817,9 +817,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <Field label="Tone words" v={tone} set={setTone} placeholder="warm, confident, effortless" />
             </div>
             {autoFilled
-              ? <p className="text-[11px] text-[#93c5fd]">✨ Setting auto-filled from your chosen creative, so you do not have to re-type it. Edit or clear it if you want something different. Your characters (for example Mary and her daughter) come from your concept and script: the producer keeps a-roll solo and writes the companions into the b-roll.</p>
+              ? <p className="text-[11px] text-[#93c5fd]">✨ Setting auto-filled from your chosen creative, so you do not have to re-type it. Edit or clear it if you want something different. Your characters (for example Mary and her daughter) come from your concept and script: the producer keeps talking shots solo and writes the companions into the scene shots.</p>
               : (arollRef || brollRef)
-                ? <p className="text-[11px] text-ink-faint">You set a reference look in the creatives, so the shoot already anchors to its world, lighting and wardrobe. Setting is optional here, use it only to add or override detail. Your characters (for example Mary and her daughter) come from your concept and script, not the reference, so describe them there: the producer keeps a-roll solo and writes the companions into the b-roll.</p>
+                ? <p className="text-[11px] text-ink-faint">You set a reference look in the creatives, so the shoot already anchors to its world, lighting and wardrobe. Setting is optional here, use it only to add or override detail. Your characters (for example Mary and her daughter) come from your concept and script, not the reference, so describe them there: the producer keeps talking shots solo and writes the companions into the scene shots.</p>
                 : <p className="text-[11px] text-ink-faint">Optional. One consistent world for the whole ad. Leave it blank and the producer picks one to suit the character.</p>}
           </div>
 
@@ -876,7 +876,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {/* SCRIPT-FIRST: the producer writes the spoken script from your concept; edit it, then build the scenes around it. */}
           <div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-3">
             <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Script</div>
-            <p className="mb-2 text-[12px] text-ink-dim">Have the producer write the {duration}s script from your concept, then edit it until it reads right - the scenes (a-roll + b-roll) get built around these exact words. (Optional: skip it and the storyboard will write its own.)</p>
+            <p className="mb-2 text-[12px] text-ink-dim">Have the producer write the {duration}s script from your concept, then edit it until it reads right - the scenes (talking + scene shots) get built around these exact words. (Optional: skip it and the storyboard will write its own.)</p>
             <button onClick={writeScript} disabled={scriptBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{scriptBusy ? "✍️ Working…" : draftScript ? "↻ Re-write the script" : "✍️ Write the script"}</button>
             {draftScript && <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={6} className="mt-2 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#a855f7]" placeholder="The spoken script…" />}
             {/* VOICE-FIRST: record naturally, we transcribe → that's the script, and your real voice is used in the video. */}
@@ -911,8 +911,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             {sb.music_bed && <p className="mt-2 text-[12px] text-ink-faint">🎵 {sb.music_bed}</p>}
             {/* Plain-English glossary - define the two shot types once, up front */}
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-              <span className="rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-1 text-[#c79bff]"><b>A-roll</b> = talking shots - {name} speaking to camera, lip-synced</span>
-              <span className="rounded-md border border-[#60a5fa]/30 bg-[#60a5fa]/10 px-2 py-1 text-[#93c5fd]"><b>B-roll</b> = scene shots - the world and movement around her, no talking</span>
+              <span className="rounded-md border border-[#a855f7]/30 bg-[#a855f7]/10 px-2 py-1 text-[#c79bff]"><b>Talking shot</b> = {name} speaking to camera, lip-synced</span>
+              <span className="rounded-md border border-[#60a5fa]/30 bg-[#60a5fa]/10 px-2 py-1 text-[#93c5fd]"><b>Scene shot</b> = the world and movement around her, no talking</span>
             </div>
             {dropped.size > 0 && (
               <div className="mt-2 rounded-lg border border-active/30 bg-active/5 px-3 py-2 text-[11px] text-active">⚠ {dropped.size} reference{dropped.size === 1 ? "" : "s"} rejected - those scenes are left out of the final cut, so it&apos;ll be shorter. Re-flow the script in the Voice step so the voiceover still reads smoothly.</div>
@@ -930,7 +930,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   the "Render final quality" conform at the Stitch step upgrades drafts to 1080p/Veo, no drift. */}
               <button
                 onClick={() => setSpeedMode((v) => !v)}
-                title="Draft speed: render your PREVIEW clips fast + cheap (a-roll at 720p, b-roll on the quick preview engine) so your team can review quickly. Your keyframes stay FULL quality, so nothing about the shot is lost. When you're happy, hit 'Render final quality' at the Stitch step - it conforms every draft to full 1080p quality from the SAME keyframe (same shot, no drift). Turn OFF to render at full quality from the start."
+                title="Draft speed: render your PREVIEW clips fast + cheap (talking shots at 720p, scene shots on the quick preview engine) so your team can review quickly. Your keyframes stay FULL quality, so nothing about the shot is lost. When you're happy, hit 'Render final quality' at the Stitch step - it conforms every draft to full 1080p quality from the SAME keyframe (same shot, no drift). Turn OFF to render at full quality from the start."
                 className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#a855f7] bg-[#a855f7]/15 text-[#d8b4fe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}
               >
                 <span aria-hidden>⚡</span> Draft speed
@@ -941,7 +941,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking (a-roll) and scene (b-roll) references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below.</p>
+            <p className="mt-2 text-[11px] text-ink-faint">Shoot each scene&apos;s still here - your talking and scene references all shoot together in one pass. No video yet, that comes after you set the voice. Shoot all at once, or one scene at a time on the cards below.</p>
             {/* REFERENCE GUIDE + WARDROBE LOCK - set this BEFORE shooting so every scene matches the look + outfit. */}
             {creatives.length > 0 && (
               <div className="mt-3 space-y-2 border-t border-[#a855f7]/15 pt-3">
@@ -957,7 +957,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 ) : null}
                 {lockErr && (wardrobeLock || (!arollGuide && !brollGuide)) ? <div className="text-[11px] text-red-400">{lockErr}</div> : null}
                 {brollGuide ? (
-                  <div className="rounded-lg border border-[#a855f7]/40 bg-gradient-to-r from-[#a855f7]/16 via-[#8b5cf6]/10 to-[#6366f1]/14 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-[#c4b5fd]">🔒 B-roll cast + scene locked</span> - the companion (e.g. her daughter) and the setting from your chosen b-roll creative will carry into every b-roll scene. Her outfit stays the locked wardrobe above.</div>
+                  <div className="rounded-lg border border-[#a855f7]/40 bg-gradient-to-r from-[#a855f7]/16 via-[#8b5cf6]/10 to-[#6366f1]/14 px-3 py-2 text-[12px] text-ink"><span className="font-bold text-[#c4b5fd]">🔒 Scene-shot cast + scene locked</span> - the companion (e.g. her daughter) and the setting from your chosen scene-shot creative will carry into every scene shot. Her outfit stays the locked wardrobe above.</div>
                 ) : null}
               </div>
             )}
@@ -987,8 +987,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       ) : clip?.url ? (
                         <div className="relative">
                           <ClipPreview clip={clip} className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
-                          <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
-                          {clip.draft && <span className="absolute right-1 bottom-1 rounded bg-[#f59e0b]/90 px-1 py-0.5 text-[8px] font-bold text-black" title="Draft preview (720p a-roll / fast preview b-roll). Render final quality at the Stitch step before delivery.">720p DRAFT</span>}
+                          <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ TALKING SHOT" : "▶ SCENE SHOT"}</span>
+                          {clip.draft && <span className="absolute right-1 bottom-1 rounded bg-[#f59e0b]/90 px-1 py-0.5 text-[8px] font-bold text-black" title="Draft preview (720p talking shots / fast preview scene shots). Render final quality at the Stitch step before delivery.">720p DRAFT</span>}
                           {dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-1 top-8 z-[9] rounded bg-[#a855f7]/90 px-1 py-0.5 text-center text-[8px] font-bold text-white shadow" title="You changed this scene's direction or background - re-shoot/re-animate to apply it to the clip.">⟳ changed - re-render to apply</span>}
                           {clip.audio_url && clip.synced !== true && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-semibold text-[#7dd3fc]" title="This clip renders silent; her voiceover is overlaid here and baked in at the final stitch.">🔊 voice overlaid</span>}
                           <button onClick={() => setZoom(clip.url!)} title="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
@@ -1121,7 +1121,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     const hasReal = typeof real === "number" && real > 0;
                     const secs = hasReal ? real : words / 2.5;
                     const over = hasReal ? real > 8.3 : words > 20;
-                    return over ? <div className="mt-1 text-[11px] font-semibold text-amber-400">⚠ This b-roll VO is ~{secs.toFixed(0)}s{hasReal ? " (measured)" : ` (${words} words)`} — over the 8s b-roll cap. Tighten it via ✎ Edit scene → ✨ Rewrite with AI so it fits one clip.</div> : null;
+                    return over ? <div className="mt-1 text-[11px] font-semibold text-amber-400">⚠ This scene-shot VO is ~{secs.toFixed(0)}s{hasReal ? " (measured)" : ` (${words} words)`} - over the 8s scene-shot cap. Tighten it via ✎ Edit scene → ✨ Rewrite with AI so it fits one clip.</div> : null;
                   })()}
                   {s.caption && <div className="mt-1 text-[12px] text-ink-faint">CC: {String(s.caption).replace(/\s*\|\s*/g, ", ").replace(/\s+([,.;:!?])/g, "$1")}</div>}
                   {s.motion_prompt && <div className="mt-1 text-[12px] text-ink-faint">↗ Motion: {s.motion_prompt}</div>}
@@ -1202,11 +1202,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               onJump={(k) => document.getElementById(`step-${k}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
             {/* 1 · Brief & concept (foundation stage) */}
-            {showStep("concept") && <StepShell n={stepNum("concept")} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} - talking (a-roll) scenes and scene (b-roll) shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt - location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem - tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />}
+            {showStep("concept") && <StepShell n={stepNum("concept")} title="Brief & concept" desc={`Tell me about the video and I direct an expert shot plan for ${name} - talking scenes and scene shots. Review the scenes above, edit any with ✎ Edit scene (the full prompt - location, framing, action, performance, motion + script), or ↻ Regenerate, then approve.`} state={stepState("concept")} anchor="step-concept" gate={renderGate("concept", "No problem - tweak any scene above or hit ↻ Regenerate at the top, then Accept when it reads right.")} />}
 
             {/* 2 · Voice (foundation stage) */}
             {showStep("voice") && (<>
-            <StepShell n={stepNum("voice")} title="Voice" desc={`Pick the voice ${name} speaks in, then generate the full voiceover - every talking (a-roll) scene is lip-synced to it and the scenes are built to its real timing.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
+            <StepShell n={stepNum("voice")} title="Voice" desc={`Pick the voice ${name} speaks in, then generate the full voiceover - every talking scene is lip-synced to it and the scenes are built to its real timing.`} state={stepState("voice")} anchor="step-voice" gate={renderGate("voice", "Set a voice above (auto-match or choose one), then Accept.")}>
               {unlocked("voice") ? (
                 !needsVoice ? (
                   <p className="text-[12px] text-ink-faint">No talking scenes in this storyboard, so no voice is needed.</p>
@@ -1299,7 +1299,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <button onClick={genVoiceover} disabled={voBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{voBusy ? "🎙️ Generating the full voiceover…" : voiceoverUrl ? "↻ Re-run the voiceover" : "🎙️ Generate the full voiceover"}</button>
                           {voiceoverUrl && <audio src={voiceoverUrl} controls className="h-9" />}
                         </div>
-                        {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ Generated - have a listen. Re-run until it sounds right, then hit <b>✓ Accept &amp; continue</b> below. This exact take is what ships (every a-roll lip-syncs to it, b-roll narrates over it), so the voice stays identical across all scenes.</p>}
+                        {voiceoverUrl && <p className="mt-2 text-[11px] text-ready">✓ Generated - have a listen. Re-run until it sounds right, then hit <b>✓ Accept &amp; continue</b> below. This exact take is what ships (every talking shot lip-syncs to it, scene shots narrate over it), so the voice stays identical across all scenes.</p>}
                       </div>
                     )}
                     {/* Use your OWN recorded voice instead - Scribe aligns + we slice it per scene. */}
@@ -1322,7 +1322,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             {mode === "studio" && !approved.has("voice") && (
               <a href={`/setup/influencers/${influencerId}/voice`} className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-4 py-3 text-sm font-bold text-[#fbbf24]">🎙️ You can shoot keyframes now, but animation waits for the locked voice - finish Script &amp; Voice →</a>
             )}
-            <StepShell n={stepNum("scenes")} title="Build the scenes" desc={`Shoot each scene's keyframe and animate it. Work scene by scene on the cards above (🎬 build · 🎞️ animate · ✎ edit · ✓ keep / ✗ reject), or build the whole board at once here. Talking (a-roll) scenes lip-sync to the voice; scene (b-roll) shots get natural motion.`} state={stepState("scenes")} anchor="step-scenes" gate={renderGate("scenes", "Every kept scene needs a finished clip. Build any that are still missing (or reject a scene), then Accept.")}>
+            <StepShell n={stepNum("scenes")} title="Build the scenes" desc={`Shoot each scene's keyframe and animate it. Work scene by scene on the cards above (🎬 build · 🎞️ animate · ✎ edit · ✓ keep / ✗ reject), or build the whole board at once here. Talking scenes lip-sync to the voice; scene shots get natural motion.`} state={stepState("scenes")} anchor="step-scenes" gate={renderGate("scenes", "Every kept scene needs a finished clip. Build any that are still missing (or reject a scene), then Accept.")}>
               {unlocked("scenes") ? (
                 <div className="space-y-3">
                   <div>
@@ -1333,11 +1333,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <button onClick={() => shootAll(boardRatio)} disabled={shooting || rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting all keyframes…" : "📸 Shoot all keyframes"}</button>
                     <button onClick={() => animateAll(false)} disabled={shooting || wholeBoardBusy || animatingScenes.size > 0 || builtCount === keptScenes.length} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{wholeBoardBusy ? "🎞️ Animating…" : builtCount === keptScenes.length && keptScenes.length > 0 ? "✓ All scenes animated" : builtCount > 0 ? `🎞️ Animate remaining (${keptScenes.length - builtCount})` : "🎞️ Animate all"}</button>
                     {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || wholeBoardBusy || animatingScenes.size > 0} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
-                    <button onClick={() => setSpeedMode((v) => !v)} title="Draft speed renders PREVIEW clips fast (a-roll 720p, b-roll on the quick preview engine) for quick team review. Keyframes stay full quality. When happy, 'Render final quality' at the Stitch step conforms every draft to full 1080p quality from the same keyframe - no drift. Turn OFF to render full quality from the start." className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}><span aria-hidden>⚡</span> Draft speed <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "720p" : "1080p"}</span></button>
+                    <button onClick={() => setSpeedMode((v) => !v)} title="Draft speed renders PREVIEW clips fast (talking shots 720p, scene shots on the quick preview engine) for quick team review. Keyframes stay full quality. When happy, 'Render final quality' at the Stitch step conforms every draft to full 1080p quality from the same keyframe - no drift. Turn OFF to render full quality from the start." className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}><span aria-hidden>⚡</span> Draft speed <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "720p" : "1080p"}</span></button>
                   </div>
-                  {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - previews render fast (a-roll 720p, b-roll on the quick engine) for review. Important: a 720p draft clip STAYS 720p in the final unless you upgrade it - hit <b>🎬 Render final quality</b> at the Stitch step before delivery, or turn Draft speed OFF and re-animate.</p>}
+                  {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - previews render fast (talking shots 720p, scene shots on the quick engine) for review. Important: a 720p draft clip STAYS 720p in the final unless you upgrade it - hit <b>🎬 Render final quality</b> at the Stitch step before delivery, or turn Draft speed OFF and re-animate.</p>}
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have).</p>
-                  {(rendering || wholeBoardBusy || animatingScenes.size > 0) && <p className="rounded-md border border-[#38bdf8]/25 bg-[#38bdf8]/[0.06] px-3 py-1.5 text-[11px] text-[#7dd3fc]">🛈 Safe to close this tab or come back later - rendering keeps running on our servers, and everything will be here when you return. A b-roll clip can take up to ~40 min when the queue is busy.</p>}
+                  {(rendering || wholeBoardBusy || animatingScenes.size > 0) && <p className="rounded-md border border-[#38bdf8]/25 bg-[#38bdf8]/[0.06] px-3 py-1.5 text-[11px] text-[#7dd3fc]">🛈 Safe to close this tab or come back later - rendering keeps running on our servers, and everything will be here when you return. A scene-shot clip can take up to ~40 min when the queue is busy.</p>}
                   {/* IN-STEP SCENE CAROUSEL: every scene at a glance - edit or re-animate any without scrolling
                       up. ✎ Edit jumps to the scene's card (opens the editor); on Save it returns you here. */}
                   <div id="scenes-strip">
@@ -1446,7 +1446,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <span className="text-[12px] font-semibold text-[#fbbf24]">⚠ {draftClipCount} scene{draftClipCount > 1 ? "s are" : " is"} still a draft preview (720p)</span>
                         <button onClick={finalizeClips} disabled={rendering} className="ml-auto rounded-lg border-2 border-[#f59e0b] bg-[#f59e0b]/15 px-3 py-1.5 text-xs font-bold text-[#fbbf24] transition hover:bg-[#f59e0b]/25 disabled:opacity-50">{rendering ? "🎬 Rendering full quality…" : "🎬 Render final quality (1080p)"}</button>
                       </div>
-                      <p className="mt-2 text-[11px] text-ink-faint">Re-renders every draft scene at full delivery quality (1080p a-roll, premium b-roll) from the exact keyframe you approved - the same shot, properly finished, no drift. Full-quality scenes are skipped, so it only re-does the drafts. This takes longer (full engines), then stitch for a client-ready cut.</p>
+                      <p className="mt-2 text-[11px] text-ink-faint">Re-renders every draft scene at full delivery quality (1080p talking shots, premium scene shots) from the exact keyframe you approved - the same shot, properly finished, no drift. Full-quality scenes are skipped, so it only re-does the drafts. This takes longer (full engines), then stitch for a client-ready cut.</p>
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-3">

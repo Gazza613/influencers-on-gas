@@ -18,8 +18,8 @@ type Audit = { taken_at: string; remaining: number | null; ledger_credits: numbe
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PROVIDER_LABEL: Record<string, string> = {
-  higgsfield: "Higgsfield · images, b-roll & upscale",
-  fal: "fal.ai · a-roll (OmniHuman)",
+  higgsfield: "Higgsfield · images, scene shots & upscale",
+  fal: "fal.ai · talking shots (OmniHuman)",
   heygen: "HeyGen · presenter",
   anthropic: "Claude · co-pilot & QA",
   elevenlabs: "ElevenLabs · voice",
@@ -30,6 +30,7 @@ const ACTION_LABEL: Record<string, string> = {
   casting: "Casting (looks)", photoshoot: "Photoshoot", soul: "Lock-down (legacy Soul)", humaniser: "Humaniser",
   presenter: "Presenter", bible: "Character Casting", ingest: "Brain ingestion", creative: "Wardrobe & Set", wardrobe: "Wardrobe lock",
   qa: "AI Vision QA", compose: "Scene writing", research: "Daily research", tagline: "Tagline",
+  aroll: "Talking shot", broll: "Scene shot",
 };
 
 const usd = (cents: number, zarPerUsd: number) => zarPerUsd ? "$" + (cents / 100 / zarPerUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
@@ -150,7 +151,7 @@ export default function CostControlPage() {
           </div>
           <div className="flex items-center gap-2">
             {isSuper && (
-              <button onClick={calibrate} disabled={calibrating} title="Apply the latest rates (Kling b-roll, ElevenLabs music, Shotstack) and read each model's real credit cost from Higgsfield"
+              <button onClick={calibrate} disabled={calibrating} title="Apply the latest rates (Kling scene shots, ElevenLabs music, Shotstack) and read each model's real credit cost from Higgsfield"
                 className="rounded-lg border border-[#a855f7]/30 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
                 {calibrating ? "Calibrating…" : "Recalibrate costs"}
               </button>
