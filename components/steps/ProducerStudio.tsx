@@ -638,6 +638,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     await awaitGuideSave(); // never shoot before the chosen guide + wardrobe lock have persisted
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aspectRatio: ratio, priority, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the shoot."); setProduction((p) => (p ? { ...p, shots_status: "idle" } : p)); return; }
+    setDirtyScenes(new Set()); // a whole-board re-shoot regenerates every keyframe, so no scene is "changed, re-render to apply" anymore
     await poll(setProduction, "shots_status");
   }
   // Batch: animate EVERY kept scene's clip (parallel).
@@ -663,6 +664,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(force ? { force: true, speed: speedMode } : { speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); setWholeBoardBusy(false); return; } // every scene already has a clip
     if (!r?.queued) { setErr(r?.error || "Couldn't start animating."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setRenderingRole(""); setWholeBoardBusy(false); return; }
+    if (force) setDirtyScenes(new Set()); // a full redo re-animates every kept scene, so the "changed, re-render" flags are now applied (non-force skips dirty scenes, so it must NOT clear them)
     // Ground truth: show exactly how many scenes the server decided to render (not perceived spinners).
     if (typeof r.animating === "number") flex(`🎞️ Animating ${r.animating} scene${r.animating === 1 ? "" : "s"}${force ? " (full redo)" : ""}`, { milestone: true });
     await poll(setProduction, "clips_status"); setRenderingRole(""); setWholeBoardBusy(false);
@@ -1020,7 +1022,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <img src={shot.url} alt={`scene ${i + 1}`} onClick={() => setZoom(shot.url!)} className="aspect-[9/16] w-full cursor-zoom-in rounded-lg border border-line object-cover transition hover:brightness-110" title="Click to preview full size" />
                           {/* The reference image is the HERO. Only once you're at the animate step do we badge the clip
                               state (pending / failed) - we never hide a good still behind a clip message. */}
-                          {stepReached && <span className={`tabular absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${clipFailed ? "bg-alert/85 text-black" : "bg-black/65 text-ink-dim"}`} title={clipFailed ? (clip?.error || "") : ""}>{clipFailed ? "⚠ clip failed - re-animate" : `⏳ ${s.role} clip pending`}</span>}
+                          {stepReached && <span className={`tabular absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${clipFailed ? "bg-alert/85 text-black" : "bg-black/65 text-ink-dim"}`} title={clipFailed ? (clip?.error || "") : ""}>{clipFailed ? "⚠ clip failed - re-animate" : `⏳ ${s.role === "a-roll" ? "talking shot" : s.role === "b-roll" ? "scene shot" : "graphic"} clip pending`}</span>}
                         </div>
                       ) : clipFailed ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[10px] text-alert" title={clip.error || ""}>clip failed</div>
@@ -1373,8 +1375,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-40m"} /></div>}
                               {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip.url as string) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} aria-label="Preview full size" className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
                               {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[10px] font-bold text-alert">⚠ failed</div>}
-                              {!isRendering && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
-                              {!isRendering && dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b bg-[#a855f7]/90 px-0.5 text-center text-[7px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
+                              {!isRendering && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[10px] font-bold text-black">✓</span>}
+                              {!isRendering && dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b bg-[#a855f7]/90 px-0.5 text-center text-[10px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
                             </div>
                             <div className="mt-1 flex items-center justify-between">
                               <span className="tabular text-[10px] font-bold text-ink">Scene {i + 1}</span>

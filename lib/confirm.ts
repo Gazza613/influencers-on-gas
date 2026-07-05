@@ -17,8 +17,11 @@ export type ConfirmOpts = {
 };
 
 export function askConfirm(opts: ConfirmOpts): Promise<boolean> {
-  // No window (SSR) or nothing listening -> fail safe by NOT proceeding with a destructive/paid action.
+  // SSR: no window -> resolve false (never proceed with a destructive/paid action off the client).
   if (typeof window === "undefined") return Promise.resolve(false);
+  // <ConfirmHost/> is mounted in the root layout, so a listener is always present in the browser and
+  // resolves this promise on the user's choice. (If it were ever unmounted the promise would simply
+  // stay pending - the guarded action would wait, not fire - which is the safe direction to fail.)
   return new Promise<boolean>((resolve) => {
     window.dispatchEvent(new CustomEvent("gas-confirm", { detail: { opts, resolve } }));
   });

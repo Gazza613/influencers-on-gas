@@ -30,11 +30,17 @@ export async function POST(req: Request) {
   }
   const sql = db();
   try {
-    // Single canonical row: clear any prior per-build targets, then insert the new one.
-    await sql`delete from budgets where scope = 'team' and period = 'per_build'`;
+    // Single canonical row. Clearing (cents=0) is just a delete; setting a value does the
+    // clear + insert ATOMICALLY in one transaction, so a mid-operation failure can never leave
+    // the target silently wiped (delete committed, insert lost).
     if (cents > 0) {
-      await sql`insert into budgets (scope, scope_id, period, limit_cents, hard_gate)
-                values ('team', null, 'per_build', ${cents}, false)`;
+      await sql.transaction([
+        sql`delete from budgets where scope = 'team' and period = 'per_build'`,
+        sql`insert into budgets (scope, scope_id, period, limit_cents, hard_gate)
+            values ('team', null, 'per_build', ${cents}, false)`,
+      ]);
+    } else {
+      await sql`delete from budgets where scope = 'team' and period = 'per_build'`;
     }
     return NextResponse.json({ ok: true, perBuildCents: cents > 0 ? cents : null });
   } catch (e) {

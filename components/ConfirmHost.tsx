@@ -15,7 +15,9 @@ export default function ConfirmHost() {
   useEffect(() => {
     const onAsk = (e: Event) => {
       const d = (e as CustomEvent).detail as Pending;
-      setPending(d);
+      // If a dialog is somehow already open, resolve the older one as "false" before replacing it,
+      // so its awaiting caller can never hang on an un-resolved promise (a silent blocked spend/delete).
+      setPending((prev) => { prev?.resolve(false); return d; });
     };
     window.addEventListener("gas-confirm", onAsk as EventListener);
     return () => window.removeEventListener("gas-confirm", onAsk as EventListener);
