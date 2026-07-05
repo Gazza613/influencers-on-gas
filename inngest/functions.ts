@@ -1433,10 +1433,11 @@ export const generateClips = inngest.createFunction(
       const a = tcSeconds(String(sc.start)); const b = tcSeconds(String(sc.end));
       const sceneDur = a != null && b != null && b > a ? b - a : 5;
       const narrationDur = sceneAudio.get(i)?.duration;
-      // B-ROLL 8s FLOOR: every b-roll with a VO renders a FULL 8s clip by default (the impactful length the
-      // team wants) - the VO plays over the first part, music/ambient carry the cinematic breather to 8s.
-      // env-tunable (BROLL_MIN_SECONDS); set to 3 to go back to VO-matched lengths.
-      const BROLL_MIN = Math.max(3, Math.min(8, Number(process.env.BROLL_MIN_SECONDS) || 8));
+      // B-ROLL 10s FLOOR (Gary's pick): every b-roll with a VO renders a FULL ~10s clip by default (the more
+      // impactful length) - the VO plays over the first part, music/ambient carry the cinematic breather to the
+      // end. Kling 3.0 does native 3-15s, so it holds the real length; a draft DoP clip loops to fill the slot.
+      // env-tunable (BROLL_MIN_SECONDS), up to 15s; set to 3 to go back to VO-matched lengths.
+      const BROLL_MIN = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 10));
       const clipSeconds = (liveBg && typeof narrationDur === "number" && narrationDur > 0)
         ? Math.max(3, Math.min(15, Math.ceil(narrationDur))) // live-bg a-roll: match her FULL spoken line - Kling 3.0 does 3-15s so a long script (e.g. scene 3) is never cut. Veo snaps down to 8s and DoP ignores duration (fixed ~5s), so the length only truly holds on the Kling lane - which is why Kling is the live-bg default.
         : (role === "b-roll" && typeof narrationDur === "number" && narrationDur > 0)
@@ -1731,7 +1732,7 @@ export const assembleVideo = inngest.createFunction(
       // CRITICAL: honour the floor even when the slice duration wasn't stored - otherwise the slot collapsed to
       // the fixed ~5s DoP clip and BOTH the video and the voiceover were chopped at 5s (the bug Gary hit).
       if (role === "b-roll" && vo) {
-        const BROLL_FLOOR = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 8));
+        const BROLL_FLOOR = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 10));
         len = Math.max(sceneAudioDur.get(i) ?? 0, clipDur(i) ?? 0, BROLL_FLOOR);
       }
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
