@@ -469,7 +469,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     prevFinal.current = f;
   }, [production?.final_url]);
   const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "", liveBg: "false" });
+  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "" });
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   // Close the edit panel but KEEP the scene you were on in view - collapsing the panel otherwise slides the
@@ -489,10 +489,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { closeEditKeep(i); return; }
     setEditIdx(i); setAiInstr("");
-    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false", ref: s.ref_url || "", liveBg: s.live_bg || "false" });
+    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false", ref: s.ref_url || "" });
   }
   function applyEditsLocally(i: number) {
-    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, live_bg: ed.liveBg } : s)) } } : p));
+    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref } : s)) } } : p));
   }
   async function aiRewrite(i: number) {
     setAiBusy(true); setErr("");
@@ -507,7 +507,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, live_bg: ed.liveBg }),
+      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref }),
     }).then((x) => x.json()).catch(() => null);
     if (r?.saved) { applyEditsLocally(i); closeEditKeep(i); } else setErr(r?.error || "Couldn't save.");
   }
@@ -516,7 +516,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, live_bg: ed.liveBg }),
+      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref }),
     }).then((x) => x.json()).catch(() => null);
     applyEditsLocally(i);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
@@ -551,6 +551,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], aspectRatio: boardRatio, priority, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't shoot that reference image."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)), shots_status: "idle" } : p)); return; }
     await poll(setProduction, "shots_status");
+  }
+  // Toggle a scene's Live background right on the card (a-roll only) - a text-only persist, no re-shoot. Off
+  // by default and the slow/flaky lane, so it's opt-in per scene. Re-shoot + re-animate to apply the change.
+  async function toggleLiveBg(i: number) {
+    const s = production?.storyboard?.scenes?.[i] as Record<string, string> | undefined;
+    if (!s) return;
+    const next = String(s.live_bg) === "true" ? "false" : "true";
+    setProduction((p) => (p?.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((sc, idx) => (idx === i ? { ...sc, live_bg: next } : sc)) } } : p));
+    await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, live_bg: next }) }).catch(() => {});
   }
   // Animate ONE scene's clip from its existing keyframe (no re-shoot). CONCURRENT: fire it and return - you
   // can immediately fire the NEXT scene without waiting (the backend saves each clip atomically). Each scene
@@ -973,6 +982,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               className="w-full rounded-md border border-[#60a5fa]/40 px-2 py-1 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
                             >{!approved.has("voice") ? "🎞️ Animate (after voice)" : clip?.url ? "↻ Re-animate" : "🎞️ Animate"}</button>
                           )}
+                          {/* LIVE BACKGROUND (a-roll only) - moved here from the edit box for a cleaner journey.
+                              Off by default; it's the slow/flaky Kling lane, so opt in per scene for hero beats. */}
+                          {s.role === "a-roll" && (
+                            <button
+                              onClick={() => toggleLiveBg(i)}
+                              disabled={dropped.has(i)}
+                              title="Live background: the whole world moves behind her (Kling 3.0) instead of a still background - cinematic, but the SLOW, flaky lane (~10-20 min, no fast option). Use for hero moments. Off = fast, reliable HeyGen talking-head (still background). Re-shoot + re-animate to apply."
+                              className={`w-full rounded-md border px-2 py-1 text-[10px] font-semibold disabled:opacity-40 ${String(s.live_bg) === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}
+                            >{String(s.live_bg) === "true" ? "🎬 Live bg · Kling ✓" : "🎬 Live background"}</button>
+                          )}
                           <div className="flex gap-1">
                             <button onClick={() => openEdit(i, s)} className="flex-1 rounded-md border border-[#a855f7]/40 px-1.5 py-1 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
                             <button onClick={() => toggleDrop(i)} title={dropped.has(i) ? "Rejected - tap to keep" : "Kept - tap to reject"} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold ${dropped.has(i) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-dim hover:text-ink"}`}>{dropped.has(i) ? "✗ Rejected" : "✓ Keep"}</button>
@@ -1055,13 +1074,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             <p className="mt-1 text-[10px] text-ink-faint">Renders this b-roll in Veo 3.1 (4K, native ambient audio) - premium, slower + pricier. Needs a re-shoot.</p>
                           </div>
                         )}
-                        {s.role === "a-roll" && (
-                          <div>
-                            <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
-                            <button onClick={() => setEd((e) => ({ ...e, liveBg: e.liveBg === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.liveBg === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.liveBg === "true" ? "🎬 Live background · Kling 3.0 ✓" : "🎬 Live background (moving scene)"}</button>
-                            <p className="mt-1 text-[10px] text-ink-faint">Renders this scene on Kling 3.0 so the WHOLE world moves behind her (e.g. horses racing), her voice laid over. Trade-off: she reads as IN the living scene rather than tight lip-syncing to camera (the engine animates the scene, not the lips). Kling is on the slower lane, so expect ~10-20 min even in Draft (there&apos;s no fast option that holds a full talking length). Default off = HeyGen (tight lip-sync, still background, much faster). Needs a re-shoot + re-animate.</p>
-                          </div>
-                        )}
+                        {/* Live background moved to the per-scene controls under the preview image (left) - a
+                            cleaner user journey than buried in the edit box. See toggleLiveBg below. */}
                       </div>
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button onClick={() => saveScene(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save changes</button>
