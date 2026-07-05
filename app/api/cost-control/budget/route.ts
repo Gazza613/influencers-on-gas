@@ -7,10 +7,32 @@ import { db } from "@/lib/db";
 // hardcoded R1000. Stored in the budgets table as scope='team', period='per_build'.
 export const dynamic = "force-dynamic";
 
+// Self-heal: the budgets table ships in db/schema.sql, but this route works even on a DB where the
+// migration hasn't been applied yet (mirrors the showcase tables' pattern). Idempotent; guarded so a
+// warm instance only runs the DDL once.
+let ensured = false;
+async function ensureBudgets() {
+  if (ensured) return;
+  await db()`
+    create table if not exists budgets (
+      id          uuid primary key default gen_random_uuid(),
+      scope       text not null,
+      scope_id    text,
+      period      text not null default 'monthly',
+      limit_cents int not null,
+      spent_cents int not null default 0,
+      hard_gate   boolean not null default true,
+      currency    text default 'ZAR',
+      created_at  timestamptz not null default now()
+    )`;
+  ensured = true;
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    await ensureBudgets();
     const rows = (await db()`
       select limit_cents from budgets
        where scope = 'team' and period = 'per_build' order by created_at desc limit 1`) as { limit_cents: number }[];
@@ -30,6 +52,7 @@ export async function POST(req: Request) {
   }
   const sql = db();
   try {
+    await ensureBudgets();
     // Single canonical row. Clearing (cents=0) is just a delete; setting a value does the
     // clear + insert ATOMICALLY in one transaction, so a mid-operation failure can never leave
     // the target silently wiped (delete committed, insert lost).
