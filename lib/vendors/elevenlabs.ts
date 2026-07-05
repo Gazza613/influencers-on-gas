@@ -434,10 +434,13 @@ export async function generateMusic(prompt: string, lengthMs: number): Promise<{
 // ElevenLabs Sound Effects: a short ambient/foley bed from a text description.
 export async function generateSfx(prompt: string, durationSeconds = 5): Promise<Buffer> {
   const k = await key();
+  // ElevenLabs sound-generation rejects long prompts ("text_too_long"). Cap defensively - a concise prompt
+  // works best for SFX anyway - so a verbose ambient description can never 400 the whole audio step.
+  const text = String(prompt || "").trim().slice(0, 400);
   const res = await fetch(`${BASE}/sound-generation`, {
     method: "POST",
     headers: { "xi-api-key": k, "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({ text: prompt, duration_seconds: Math.max(1, Math.min(22, durationSeconds)) }),
+    body: JSON.stringify({ text, duration_seconds: Math.max(1, Math.min(22, durationSeconds)) }),
     signal: AbortSignal.timeout(90000),
   });
   if (!res.ok) throw new Error(`SFX failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 160)}`);

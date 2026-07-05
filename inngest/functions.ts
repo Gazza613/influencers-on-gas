@@ -1642,7 +1642,7 @@ export const generateAudio = inngest.createFunction(
     // bug). This way whichever bed succeeds still shows, and a real failure surfaces its reason in the UI.
     const [music, ambient] = await Promise.all([
       step.run("music", async () => { try { const m = await generateMusic(brief, total * 1000); return { url: await putBytes(m.buf, "music", m.ext, m.mime), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
-      step.run("ambient", async () => { try { const buf = await generateSfx(`a rich, immersive and clearly audible ambient soundscape for ${setting}: the real, characterful environmental sounds you would actually hear in that place - present room tone with genuine depth, natural background detail and gentle life and movement, layered and believable so the world feels alive (not a faint whisper). Full and noticeable in the mix. Absolutely NO music, NO speech and NO voices.`, 22); return { url: await putBytes(buf, "ambient", "mp3", "audio/mpeg"), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
+      step.run("ambient", async () => { try { const buf = await generateSfx(`Immersive ambient environmental sound of ${setting}: natural, present room tone and gentle background life, full and characterful in the mix. No music, no speech, no voices.`, 22); return { url: await putBytes(buf, "ambient", "mp3", "audio/mpeg"), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
     ]);
     const musicUrl = music.url, ambientUrl = ambient.url;
     if (musicUrl) await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
@@ -1768,14 +1768,21 @@ export const assembleVideo = inngest.createFunction(
     const endCardLenForBed = String((production?.brief as { endCardUrl?: string })?.endCardUrl || "").trim()
       ? ((production?.brief as { endCardKind?: string })?.endCardKind === "image" ? 4 : 6) : 0;
     const musicLen = total + endCardLenForBed;
+    // Overshoot the REQUEST by a margin so even a short ElevenLabs render still covers the last second.
+    const MUSIC_MARGIN = Math.max(2, Number(process.env.MUSIC_END_MARGIN) || 6);
     // Music bed (full length) → Blob. REUSE the audio step's bed if it already produced one.
     let musicUrl: string | null = (production as { music_url?: string })?.music_url || null;
-    // If the pre-generated bed is SHORTER than the real cut (scenes + end card), drop it and re-generate at
-    // the true length — else it stops early (the fade-out only lands at the FILE's end, not the timeline's).
-    if (musicUrl && Number((production as { music_seconds?: number })?.music_seconds || 0) + 2 < musicLen) musicUrl = null;
+    // MEASURE the reused bed's REAL length (music_seconds is the REQUESTED length, which LIES when ElevenLabs
+    // returns a file shorter than asked - the true cause of "the music dies ~6s before the end"). If the real
+    // file falls short of the timeline, drop it and regenerate. Otherwise the fade-out lands at the FILE's end,
+    // leaving dead air after it.
+    if (musicUrl) {
+      const realMusic = await step.run("musicprobe", () => probeDuration(musicUrl as string).catch(() => null));
+      if (typeof realMusic === "number" && realMusic + 0.5 < musicLen) musicUrl = null;
+    }
     if (!musicUrl) try {
       const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
-      musicUrl = await step.run("music", async () => { const m = await generateMusic(brief, musicLen * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }); // covers scenes + end card to the last second
+      musicUrl = await step.run("music", async () => { const m = await generateMusic(brief, (musicLen + MUSIC_MARGIN) * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }); // request timeline + margin so it covers to the last second even if the render comes back short
       await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     } catch { musicUrl = null; }
 
@@ -1784,7 +1791,7 @@ export const assembleVideo = inngest.createFunction(
     let ambientUrl: string | null = (production as { ambient_url?: string })?.ambient_url || null;
     if (!ambientUrl) try {
       const setting = String((production?.brief as { setting?: string })?.setting || scenes[0]?.location || "the location").slice(0, 120);
-      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`a rich, immersive and clearly audible ambient soundscape for ${setting}: the real, characterful environmental sounds you would actually hear in that place - present room tone with genuine depth, natural background detail and gentle life and movement, layered and believable so the world feels alive (not a faint whisper). Full and noticeable in the mix. Absolutely NO music, NO speech and NO voices.`, 22), "ambient", "mp3", "audio/mpeg"));
+      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`Immersive ambient environmental sound of ${setting}: natural, present room tone and gentle background life, full and characterful in the mix. No music, no speech, no voices.`, 22), "ambient", "mp3", "audio/mpeg"));
       await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
     } catch { ambientUrl = null; }
     const ambientTrack: Record<string, unknown>[] = [];
@@ -1859,18 +1866,10 @@ export const assembleVideo = inngest.createFunction(
     const overscanFor = (role: string) => (role === "a-roll" ? AROLL_OVERSCAN : VIDEO_OVERSCAN);
     const videoClips = placed.filter((p) => clipUrl(p.i)).flatMap((p) => {
       const src = clipUrl(p.i) as string;
-      const realDur = clipDur(p.i); // the clip's actual rendered length (DoP b-roll ≈ 5s)
-      // B-ROLL LOOP (fixes the "pause where the voice exceeds the clip"): the DoP engine renders a FIXED ~5s
-      // clip, but the scene slot is the (often longer) narration. A short clip in a long slot FREEZES on its
-      // last frame = the pause. Instead LOOP the clip back-to-back across the slot so motion never stops.
-      if (p.role === "b-roll" && realDur && realDur > 0.6 && p.len > realDur + 0.2) {
-        const copies: Record<string, unknown>[] = [];
-        const end = p.start + p.len;
-        for (let t = p.start; t < end - 0.05; t += realDur) {
-          copies.push({ asset: { type: "video", src, volume: 0, trim: 0 }, start: t, length: Math.min(realDur, end - t), fit: "cover", scale: VIDEO_OVERSCAN });
-        }
-        return copies;
-      }
+      // NO LOOPING (Gary's hard rule - a repeated/looping b-roll reads as broken). The clip plays ONCE for the
+      // slot length. A full-length Kling b-roll IS the slot (clip == VO length), so it plays cleanly end to end
+      // with no repeat and no hold. In the rare case the clip is shorter than the slot (a fallback DoP clip),
+      // it holds its last frame for the remainder rather than repeating - never a loop.
       return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role) }];
     });
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
