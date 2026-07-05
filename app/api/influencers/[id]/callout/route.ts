@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getInfluencer, updateInfluencer } from "@/lib/influencers";
+import { getInfluencer, updateProductionFields } from "@/lib/influencers";
 
 // PER-SCENE offer callout: save (or clear) the frosted-glass callout for ONE scene. Stored on
 // production.scene_callouts keyed by scene index; the stitch renders each during its scene's window.
@@ -29,6 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (cbRaw.on === false || !hasText) {
     delete callouts[String(scene)];
   } else {
+    const POS = ["topLeft", "topCenter", "topRight", "midLeft", "center", "midRight", "lowerLeft", "lowerCenter", "lowerRight"];
     callouts[String(scene)] = {
       on: true,
       kick: str(cbRaw.kick, 40),
@@ -36,9 +37,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       num: str(cbRaw.num, 24),
       suffix: str(cbRaw.suffix, 24),
       accent: /^#[0-9a-fA-F]{6}$/.test(String(cbRaw.accent)) ? String(cbRaw.accent) : "#ffcb05",
-      hold: num(cbRaw.hold, 4, 1.5, 12),
+      hold: num(cbRaw.hold, 1.6, 0.8, 12),
+      pos: POS.includes(String(cbRaw.pos)) ? String(cbRaw.pos) : "lowerCenter",
     };
   }
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, scene_callouts: callouts } } });
+  await updateProductionFields(id, { scene_callouts: callouts });
   return NextResponse.json({ saved: true, scene_callouts: callouts });
 }

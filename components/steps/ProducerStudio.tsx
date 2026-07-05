@@ -19,7 +19,7 @@ type Scene = {
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
 type Clip = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; audio_url?: string | null; synced?: boolean; draft?: boolean };
-type SceneCallout = { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; hold?: number };
+type SceneCallout = { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; hold?: number; pos?: string };
 type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[]; scene_callouts?: Record<string, SceneCallout> } | null;
 
 const ROLE = {
@@ -592,11 +592,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // PER-SCENE offer callouts (frosted glass). Source of truth = production.scene_callouts, keyed by scene idx.
   const sceneCallouts = (production?.scene_callouts) || {};
   const [coOpen, setCoOpen] = useState<number | null>(null);
-  const [coDraft, setCoDraft] = useState<SceneCallout>({ kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05" });
+  const [coDraft, setCoDraft] = useState<SceneCallout>({ kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05", pos: "lowerCenter" });
   function openCallout(i: number) {
     if (coOpen === i) { setCoOpen(null); return; }
     const ex = sceneCallouts[String(i)];
-    setCoDraft(ex ? { kick: ex.kick ?? "", line: ex.line ?? "", num: ex.num ?? "", suffix: ex.suffix ?? "", accent: ex.accent ?? "#ffcb05" } : { kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05" });
+    setCoDraft(ex ? { kick: ex.kick ?? "", line: ex.line ?? "", num: ex.num ?? "", suffix: ex.suffix ?? "", accent: ex.accent ?? "#ffcb05", pos: ex.pos || "lowerCenter" } : { kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05", pos: "lowerCenter" });
     setCoOpen(i);
   }
   async function saveCallout(i: number, remove = false) {
@@ -1122,45 +1122,61 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             <label className="text-[10px] text-ink-faint">Offer (chip)<input value={coDraft.num} onChange={(e) => setCoDraft((c) => ({ ...c, num: e.target.value }))} maxLength={24} placeholder="1GB" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] font-bold text-ink outline-none focus:border-[#ffcb05]" /></label>
                             <label className="text-[10px] text-ink-faint">Offer suffix<input value={coDraft.suffix} onChange={(e) => setCoDraft((c) => ({ ...c, suffix: e.target.value }))} maxLength={24} placeholder="FREE" className="mt-1 w-full rounded-md border border-line bg-surface-2 px-2 py-1.5 text-[13px] text-ink outline-none focus:border-[#ffcb05]" /></label>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] text-ink-faint">Accent</span>
-                            {["#ffcb05", "#22c55e", "#5aa2ff", "#ff7ac0", "#ffffff"].map((h) => (
-                              <button key={h} onClick={() => setCoDraft((c) => ({ ...c, accent: h }))} title={h} style={{ background: h }} className={`h-6 w-6 rounded-md border-2 transition ${coDraft.accent === h ? "border-ink" : "border-transparent"}`} />
-                            ))}
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-ink-faint">Accent</span>
+                              {["#ffcb05", "#22c55e", "#5aa2ff", "#ff7ac0", "#ffffff"].map((h) => (
+                                <button key={h} onClick={() => setCoDraft((c) => ({ ...c, accent: h }))} title={h} style={{ background: h }} className={`h-6 w-6 rounded-md border-2 transition ${coDraft.accent === h ? "border-ink" : "border-transparent"}`} />
+                              ))}
+                            </div>
+                            {/* PLACEMENT: where the callout pops up on the scene (a 3x3 map, kept in the safe zone). */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-ink-faint">Position</span>
+                              <div className="grid grid-cols-3 gap-0.5" style={{ maxWidth: 66 }}>
+                                {([["topLeft", "↖"], ["topCenter", "↑"], ["topRight", "↗"], ["midLeft", "←"], ["center", "•"], ["midRight", "→"], ["lowerLeft", "↙"], ["lowerCenter", "↓"], ["lowerRight", "↘"]] as const).map(([key, glyph]) => {
+                                  const sel = (coDraft.pos || "lowerCenter") === key;
+                                  return <button key={key} type="button" onClick={() => setCoDraft((c) => ({ ...c, pos: key }))} title={key} aria-label={`Callout ${key}`} className={`flex h-5 w-5 items-center justify-center rounded border text-[10px] ${sel ? "border-[#a855f7] bg-[#a855f7]/25 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong"}`}>{glyph}</button>;
+                                })}
+                              </div>
+                            </div>
                           </div>
                           <div className="flex flex-wrap gap-2 pt-1">
                             <button onClick={() => saveCallout(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save callout</button>
                             {sceneCallouts[String(i)] && <button onClick={() => saveCallout(i, true)} className="rounded-lg border border-alert/40 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10">Remove</button>}
                             <button onClick={() => setCoOpen(null)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                           </div>
-                          <p className="text-[10px] text-ink-faint">Re-stitch after saving to see it. It slides in near the top while this scene plays.</p>
+                          <p className="text-[10px] text-ink-faint">Re-stitch after saving to see it. It POPS in for ~1.6s at your chosen position while this scene plays.</p>
                         </div>
-                        {/* live WYSIWYG preview - the glass callout ON this scene's actual keyframe (matches the
-                            faux-glass render: light bevel + float shadow + accent eyebrow pill + accent chip glow). */}
+                        {/* live WYSIWYG preview - the DARK-glass callout ON this scene's actual keyframe, at the
+                            chosen position (matches the render: dark legible glass, accent pill + chip, sheen). */}
                         <div className="relative h-[268px] w-[151px] shrink-0 overflow-hidden rounded-xl border border-line bg-gradient-to-br from-[#1b2338] via-[#241a2e] to-[#0d1017]">
                           {shot?.url && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={shot.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
                           )}
-                          <div className="absolute inset-x-0 top-2.5 flex justify-center px-2">
-                            <div className="relative w-full overflow-hidden rounded-[15px] px-2.5 py-2.5 text-center"
-                              style={{ border: "1.5px solid rgba(255,255,255,0.62)", background: "linear-gradient(135deg,rgba(255,255,255,0.34) 0%,rgba(255,255,255,0.13) 48%,rgba(255,255,255,0.06) 100%)", boxShadow: `0 12px 30px rgba(0,0,0,0.5), 0 0 30px ${coDraft.accent}30, inset 0 1.5px 0 rgba(255,255,255,0.85)`, animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
-                              {/* glowing accent top-edge line */}
-                              <div style={{ position: "absolute", top: 0, left: "26%", right: "26%", height: 2, borderRadius: "0 0 4px 4px", background: coDraft.accent, boxShadow: `0 0 8px ${coDraft.accent}`, zIndex: 3 }} />
-                              {/* animated sheen sweep */}
-                              <div style={{ position: "absolute", top: 0, left: "-45%", width: "36%", height: "100%", zIndex: 1, background: "linear-gradient(105deg,transparent,rgba(255,255,255,0.5),transparent)", transform: "skewX(-16deg)", animation: "gasCoSheen 3s ease-in-out infinite" }} />
-                              <div className="relative" style={{ zIndex: 2 }}>
-                                {coDraft.kick && <span className="inline-block rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase leading-none tracking-[0.12em] text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 3px 10px ${coDraft.accent}70` }}>{coDraft.kick}</span>}
-                                {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.line}</div>}
-                                {(coDraft.num || coDraft.suffix) && (
-                                  <div className="mt-2">
-                                    {coDraft.num && <span className="rounded-[8px] px-2 py-0.5 text-[17px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 5px 16px ${coDraft.accent}99, inset 0 1px 0 rgba(255,255,255,0.55)` }}>{coDraft.num}</span>}
-                                    {coDraft.suffix && <span className="ml-1 align-middle text-[9px] font-black text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.suffix}</span>}
+                          {(() => {
+                            const pos = coDraft.pos || "lowerCenter";
+                            const vstyle: React.CSSProperties = pos.startsWith("top") ? { top: "5%" } : (pos.startsWith("mid") || pos === "center") ? { top: "50%", transform: "translateY(-50%)" } : { bottom: "14%" };
+                            const justify = pos.includes("Left") ? "flex-start" : pos.includes("Right") ? "flex-end" : "center";
+                            return (
+                              <div className="absolute inset-x-0 flex px-2" style={{ ...vstyle, justifyContent: justify }}>
+                                <div className="relative overflow-hidden rounded-[14px] px-2.5 py-2 text-center" style={{ width: "88%", border: "1px solid rgba(255,255,255,0.3)", background: "linear-gradient(160deg,rgba(17,19,30,0.72) 0%,rgba(9,10,16,0.64) 100%)", boxShadow: `0 12px 30px rgba(0,0,0,0.55), 0 0 26px ${coDraft.accent}26, inset 0 1px 0 rgba(255,255,255,0.35)`, animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
+                                  <div style={{ position: "absolute", top: 0, left: "28%", right: "28%", height: 2, borderRadius: "0 0 4px 4px", background: coDraft.accent, boxShadow: `0 0 8px ${coDraft.accent}`, zIndex: 3 }} />
+                                  <div style={{ position: "absolute", top: 0, left: "-45%", width: "34%", height: "100%", zIndex: 1, background: "linear-gradient(105deg,transparent,rgba(255,255,255,0.18),transparent)", transform: "skewX(-16deg)", animation: "gasCoSheen 3s ease-in-out infinite" }} />
+                                  <div className="relative" style={{ zIndex: 2 }}>
+                                    {coDraft.kick && <span className="inline-block rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase leading-none tracking-[0.1em] text-[#0c0d10]" style={{ background: coDraft.accent }}>{coDraft.kick}</span>}
+                                    {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white">{coDraft.line}</div>}
+                                    {(coDraft.num || coDraft.suffix) && (
+                                      <div className="mt-1.5">
+                                        {coDraft.num && <span className="rounded-[7px] px-1.5 py-0.5 text-[15px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 4px 14px ${coDraft.accent}88` }}>{coDraft.num}</span>}
+                                        {coDraft.suffix && <span className="ml-1 align-middle text-[8px] font-black text-white">{coDraft.suffix}</span>}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                </div>
                               </div>
-                            </div>
-                          </div>
+                            );
+                          })()}
                           <style>{`@keyframes gasCoSheen{0%{left:-45%}55%,100%{left:125%}}@keyframes gasCoPop{0%{opacity:0;transform:scale(0.82) translateY(-6px)}60%{opacity:1;transform:scale(1.05)}100%{transform:scale(1)}}`}</style>
                         </div>
                       </div>

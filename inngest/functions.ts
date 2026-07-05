@@ -2055,7 +2055,7 @@ export const assembleVideo = inngest.createFunction(
     // scene's window (so it lands with the right shot and different scenes can show different offers). Robust
     // inline-block layout (Shotstack renders HTML statically and mishandles complex flex - the old flex layout
     // overlapped the chip onto the headline). Motion = the clip transition (slide-up in, fade out). Text escaped.
-    type Callout = { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; hold?: number };
+    type Callout = { on?: boolean; kick?: string; line?: string; num?: string; suffix?: string; accent?: string; hold?: number; pos?: string };
     const sceneCallouts = ((production as { scene_callouts?: Record<string, Callout> })?.scene_callouts) || {};
     const buildCalloutClip = (co: Callout, startSec: number, lenSec: number): Record<string, unknown> | null => {
       const kick = esc(String(co.kick || "")); const line = esc(String(co.line || ""));
@@ -2067,32 +2067,34 @@ export const assembleVideo = inngest.createFunction(
         line ? `<div class="l">${line}</div>` : "",
         (cnum || suffix) ? `<div class="o">${cnum ? `<span class="n">${cnum}</span>` : ""}${suffix ? `<span class="f">${suffix}</span>` : ""}</div>` : "",
       ].join("");
-      // WORLD-CLASS FAUX GLASS: a Shotstack overlay can't blur the video behind it (no real backdrop-filter),
-      // so we sell "glass" with a layered light gradient, a BRIGHT top bevel + inner sheen, a big soft float
-      // shadow, a hairline light border, an ACCENT eyebrow pill and an ACCENT offer chip with a colour glow.
+      // DARK GLASS MORPHISM: a Shotstack overlay can't blur the video behind it, and WHITE text on a light
+      // translucent card was unreadable over bright footage. So the card is DARK translucent glass (white text
+      // reads cleanly on ANY scene), with a hairline light border + top bevel, a soft accent halo, a glowing
+      // accent top line, a subtle sheen, an accent eyebrow pill and an accent offer chip.
       const css = `.wrap{width:100%;text-align:center}`
-        + `.card{box-sizing:border-box;position:relative;overflow:hidden;display:inline-block;text-align:center;max-width:880px;padding:32px 48px 38px;border-radius:34px;`
-        + `background:linear-gradient(135deg,rgba(255,255,255,0.34) 0%,rgba(255,255,255,0.13) 48%,rgba(255,255,255,0.06) 100%);`
-        + `border:1.5px solid rgba(255,255,255,0.62);`
-        // added a soft ACCENT HALO behind the glass (0 0 72px accent) on top of the float shadow + inner bevel.
-        + `box-shadow:0 34px 90px rgba(0,0,0,0.55),0 6px 22px rgba(0,0,0,0.38),0 0 72px ${accent}2b,inset 0 2px 0 rgba(255,255,255,0.9),inset 0 -26px 46px rgba(255,255,255,0.06),inset 0 1px 30px rgba(255,255,255,0.14)}`
-        // GLOWING ACCENT TOP-EDGE LINE (::after) + an animated SHEEN sweep across the glass (::before).
-        + `.card::after{content:'';position:absolute;top:0;left:26%;right:26%;height:4px;border-radius:0 0 6px 6px;background:${accent};box-shadow:0 0 18px ${accent},0 0 6px ${accent};z-index:3}`
-        + `.card::before{content:'';position:absolute;top:0;left:-45%;width:36%;height:100%;z-index:1;background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,0.55) 50%,transparent 100%);transform:skewX(-16deg);animation:sheen 3s ease-in-out infinite}`
+        + `.card{box-sizing:border-box;position:relative;overflow:hidden;display:inline-block;text-align:center;max-width:840px;padding:26px 44px 30px;border-radius:28px;`
+        + `background:linear-gradient(160deg,rgba(17,19,30,0.66) 0%,rgba(9,10,16,0.58) 100%);`
+        + `border:1px solid rgba(255,255,255,0.30);`
+        + `box-shadow:0 30px 72px rgba(0,0,0,0.62),0 0 60px ${accent}22,inset 0 1px 0 rgba(255,255,255,0.4),inset 0 -1px 0 rgba(0,0,0,0.4)}`
+        + `.card::after{content:'';position:absolute;top:0;left:28%;right:28%;height:3px;border-radius:0 0 5px 5px;background:${accent};box-shadow:0 0 16px ${accent},0 0 5px ${accent};z-index:3}`
+        + `.card::before{content:'';position:absolute;top:0;left:-45%;width:34%;height:100%;z-index:1;background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,0.16) 50%,transparent 100%);transform:skewX(-16deg);animation:sheen 3s ease-in-out infinite}`
         + `@keyframes sheen{0%{left:-45%}55%,100%{left:125%}}`
-        + `.k{position:relative;z-index:2;display:inline-block;font-family:'Open Sans',sans-serif;font-weight:800;font-size:20px;letter-spacing:3px;text-transform:uppercase;color:#0c0d10;background:${accent};padding:7px 18px;border-radius:999px;margin:0 0 18px;box-shadow:0 8px 24px ${accent}70,inset 0 1px 0 rgba(255,255,255,0.55)}`
-        + `.l{position:relative;z-index:2;font-family:'Open Sans',sans-serif;font-weight:800;font-size:47px;line-height:1.14;color:#fff;text-shadow:0 2px 5px rgba(0,0,0,0.6),0 10px 30px rgba(0,0,0,0.45);margin:0 0 20px}`
+        + `.k{position:relative;z-index:2;display:inline-block;font-family:'Open Sans',sans-serif;font-weight:800;font-size:19px;letter-spacing:3px;text-transform:uppercase;color:#0c0d10;background:${accent};padding:6px 16px;border-radius:999px;margin:0 0 14px;box-shadow:0 6px 20px ${accent}66}`
+        + `.l{position:relative;z-index:2;font-family:'Open Sans',sans-serif;font-weight:800;font-size:44px;line-height:1.16;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.5);margin:0 0 16px}`
         + `.o{position:relative;z-index:2;margin:0;line-height:1}`
-        + `.n{display:inline-block;vertical-align:middle;font-family:'Open Sans',sans-serif;font-weight:900;font-size:62px;line-height:1;color:#0c0d10;background:${accent};padding:9px 28px;border-radius:20px;box-shadow:0 12px 40px ${accent}99,inset 0 2px 0 rgba(255,255,255,0.6),inset 0 -3px 8px rgba(0,0,0,0.12)}`
-        + `.f{display:inline-block;vertical-align:middle;margin-left:14px;font-family:'Open Sans',sans-serif;font-weight:900;font-size:34px;letter-spacing:2px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.55)}`;
-      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1.2, lenSec), position: "top", offset: { y: -0.06 }, transition: { in: "zoom", out: "fade" } };
+        + `.n{display:inline-block;vertical-align:middle;font-family:'Open Sans',sans-serif;font-weight:900;font-size:56px;line-height:1;color:#0c0d10;background:${accent};padding:8px 24px;border-radius:16px;box-shadow:0 10px 32px ${accent}88}`
+        + `.f{display:inline-block;vertical-align:middle;margin-left:12px;font-family:'Open Sans',sans-serif;font-weight:900;font-size:30px;letter-spacing:2px;color:#fff}`;
+      const cp = placeCaption(String(co.pos || "lowerCenter"), 0); // reuse the 9-zone map for placement + safe-zone offset
+      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
     };
     const calloutClips: Record<string, unknown>[] = [];
     for (const p of placed) {
       const co = sceneCallouts[String(p.i)];
       if (!co || co.on === false) continue;
-      const hold = Math.max(1.5, Math.min(p.len - 0.4, Number(co.hold) || Math.min(p.len - 0.4, 5)));
-      const c = buildCalloutClip(co, p.start + 0.3, hold);
+      // SHORT PUNCHY POP (~1.6s default), not a long hold - it zooms in, holds briefly, fades. Appears a
+      // beat into the scene (when the offer is being said), capped by the scene length.
+      const hold = Math.max(1, Math.min(p.len - 0.3, Number(co.hold) || 1.6));
+      const c = buildCalloutClip(co, p.start + Math.min(0.6, p.len * 0.15), hold);
       if (c) calloutClips.push(c);
     }
     // Back-compat: a single legacy brief.callout with no per-scene callouts lands on the opening hook.
