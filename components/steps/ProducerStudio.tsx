@@ -14,6 +14,7 @@ type Scene = {
   talent: string[]; shot: string; blocking: string; performance: string; graphics: string[];
   vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
   vo_audio_url?: string; phone_screen_url?: string; hero?: string; ref_url?: string; live_bg?: string;
+  caption_pos?: string; caption_off?: string;
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
@@ -155,7 +156,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [cta, setCta] = useState(String((initialProduction?.brief as { cta?: string })?.cta || ""));
   const [ctaCode, setCtaCode] = useState(String((initialProduction?.brief as { ctaCode?: string })?.ctaCode || ""));
   const [duration, setDuration] = useState<number>(Number((initialProduction?.brief as { durationSeconds?: number })?.durationSeconds) || 60);
-  const [format, setFormat] = useState<"9:16" | "1:1">("9:16");
+  const [format, setFormat] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [setting, setSetting] = useState(String((initialProduction?.brief as { setting?: string })?.setting || ""));
   const [tone, setTone] = useState(String((initialProduction?.brief as { tone?: string })?.tone || "warm, confident, effortless"));
   const [logo, setLogo] = useState(String((initialProduction?.brief as { logo?: string })?.logo || ""));
@@ -482,7 +483,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     prevFinal.current = f;
   }, [production?.final_url]);
   const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "" });
+  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "", captionPos: "", captionOff: false });
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   // Close the edit panel but KEEP the scene you were on in view - collapsing the panel otherwise slides the
@@ -513,10 +514,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { closeEditKeep(i); return; }
     setEditIdx(i); setAiInstr("");
-    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false", ref: s.ref_url || "" });
+    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false", ref: s.ref_url || "", captionPos: s.caption_pos || "", captionOff: s.caption_off === "true" });
   }
   function applyEditsLocally(i: number) {
-    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref } : s)) } } : p));
+    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false" } : s)) } } : p));
   }
   async function aiRewrite(i: number) {
     setAiBusy(true); setErr("");
@@ -532,7 +533,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const before = production?.storyboard?.scenes?.[i] as Record<string, string> | undefined;
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref }),
+      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false" }),
     }).then((x) => x.json()).catch(() => null);
     if (r?.saved) {
       // A text-only save that changed VISUAL fields means the current keyframe/clip is now stale → flag it so
@@ -547,7 +548,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref }),
+      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false" }),
     }).then((x) => x.json()).catch(() => null);
     applyEditsLocally(i);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
@@ -805,8 +806,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <div>
                 <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Format</div>
                 <div className="flex gap-2">
-                  {(["9:16", "1:1"] as const).map((f) => (
-                    <button key={f} onClick={() => setFormat(f)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${format === f ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{f}</button>
+                  {([["9:16", "9:16 · reels"], ["1:1", "1:1 · feed"], ["16:9", "16:9 · youtube"]] as const).map(([f, label]) => (
+                    <button key={f} onClick={() => setFormat(f)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${format === f ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{label}</button>
                   ))}
                 </div>
               </div>
@@ -1159,6 +1160,24 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Script for this scene</div>
                         <Area label="Voiceover line (spoken)" v={ed.vo} set={(x) => setEd((e) => ({ ...e, vo: x }))} />
                         <Field label="Caption (burned-in)" v={ed.caption} set={(x) => setEd((e) => ({ ...e, caption: x }))} />
+                        {/* PER-SCENE caption placement: a 9-zone map + a show/hide for this scene. The master
+                            "Burn captions" switch still lives at the Stitch step; this only positions each scene's. */}
+                        <div className="rounded-lg border border-line bg-surface-2/40 p-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Caption placement</div>
+                            <label className="flex items-center gap-1.5 text-[11px] text-ink-dim">
+                              <input type="checkbox" checked={!ed.captionOff} onChange={(e) => setEd((s) => ({ ...s, captionOff: !e.target.checked }))} />
+                              Show on this scene
+                            </label>
+                          </div>
+                          <div className={`mt-2 grid grid-cols-3 gap-1 ${ed.captionOff ? "pointer-events-none opacity-40" : ""}`} style={{ maxWidth: 138 }}>
+                            {([["topLeft", "↖"], ["topCenter", "↑"], ["topRight", "↗"], ["midLeft", "←"], ["center", "•"], ["midRight", "→"], ["lowerLeft", "↙"], ["lowerCenter", "↓"], ["lowerRight", "↘"]] as const).map(([key, glyph]) => {
+                              const sel = (ed.captionPos || "lowerCenter") === key;
+                              return <button key={key} type="button" onClick={() => setEd((s) => ({ ...s, captionPos: key }))} title={key} aria-label={`Caption ${key}`} className={`flex h-9 items-center justify-center rounded border text-sm ${sel ? "border-[#a855f7] bg-[#a855f7]/20 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"}`}>{glyph}</button>;
+                            })}
+                          </div>
+                          <p className="mt-1.5 text-[10px] text-ink-faint">Where this scene&apos;s caption sits (kept inside the safe zone). Lower-middle is the default. Captions only render if &ldquo;Burn captions&rdquo; is on at the Stitch step.</p>
+                        </div>
                         <div className="flex flex-wrap items-end gap-2">
                           <div className="min-w-[150px] flex-1"><Field label="Ask the producer to rewrite (optional)" v={aiInstr} set={setAiInstr} placeholder="e.g. punchier, lead with the free data" /></div>
                           <button onClick={() => aiRewrite(i)} disabled={aiBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-2 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{aiBusy ? "✨ Writing…" : "✨ Rewrite with AI"}</button>
@@ -1498,7 +1517,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <div className="mt-4">
                       <div className="tabular mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut {draftClipCount > 0 && <span className="rounded bg-[#f59e0b]/85 px-1.5 py-0.5 text-[10px] font-bold text-black">720p DRAFT</span>}</div>
                       <div className="relative inline-block">
-                        <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
+                        <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("16:9") ? "aspect-video w-full max-w-md" : sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
                         {draftClipCount > 0 && <span className="pointer-events-none absolute left-2 top-2 rounded bg-[#f59e0b]/90 px-1.5 py-0.5 text-[10px] font-bold text-black">720p DRAFT</span>}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2"><a href={finalUrl} download={draftClipCount > 0 ? "gas-cut-DRAFT.mp4" : "gas-cut.mp4"} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">↓ Download{draftClipCount > 0 ? " (draft)" : ""}</a>{draftClipCount > 0 && <span className="text-[11px] text-[#fbbf24]">Not client-ready - render final quality + re-stitch first.</span>}</div>

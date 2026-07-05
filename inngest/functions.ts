@@ -1692,7 +1692,8 @@ export const assembleVideo = inngest.createFunction(
     const clips = production?.clips ?? [];
     if (!scenes.length || !clips.some((c) => c.url)) return { error: "render the clips first" };
     const voiceId = persona.voice_id as string | undefined;
-    const ratio = String(sb?.format || "").includes("1:1") ? "1:1" : "9:16";
+    const fmt = String(sb?.format || "");
+    const ratio = fmt.includes("16:9") ? "16:9" : fmt.includes("1:1") ? "1:1" : "9:16";
 
     await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, assembly_status: "running", final_url: null } } }));
 
@@ -1762,7 +1763,7 @@ export const assembleVideo = inngest.createFunction(
       else if (role === "b-roll") len = Math.min(len, 2.8);
       const start = cursor;
       cursor = start + len;
-      return { i, start, len, role, vo, caption: String(sc.caption || "").trim() };
+      return { i, start, len, role, vo, caption: String(sc.caption || "").trim(), captionPos: String(sc.caption_pos || ""), captionOff: String(sc.caption_off) === "true" };
     });
     // End on her last word - NOT a long hold. A ~2s tail froze the actor on her last frame (looked odd).
     // Now just a brief beat (0.4s) so the final word fully lands and the cut doesn't clip, then end. The
@@ -1897,7 +1898,8 @@ export const assembleVideo = inngest.createFunction(
     const captionsOn = event.data.captions === true;
     // Strip any v3 audio tags ([excited] etc.) so they never render on screen, then HTML-escape.
     const esc = (s: string) => s.replace(/\[[^\]]*\]/g, " ").replace(/\s*\|\s*/g, ", ").replace(/\s+([,.;:!?])/g, "$1").replace(/,\s*([.!?;:])/g, "$1").replace(/([.!?;:])\s*,/g, "$1").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const capW = ratio === "1:1" ? 920 : 940; // box width within the 1080 frame (leaves side margins)
+    // Full-width caption box within the frame (16:9 is 1920 wide, 1:1/9:16 are 1080). Placement narrows it per-scene below.
+    const capW = ratio === "16:9" ? 1680 : ratio === "1:1" ? 920 : 940;
     // CAPTION STYLES the producer can pick (the old dark pill read "low-level"). Each is a full CSS look for
     // the per-scene caption line. Default = "bold" (the punchy social standard). Picked via captionStyle.
     const CAPTION_STYLES: Record<string, { css: string; height: number; offY: number }> = {
@@ -1910,6 +1912,24 @@ export const assembleVideo = inngest.createFunction(
     // SAFE ZONE: sit captions ~20% up from the bottom (env CAPTION_Y) so they clear the platform's bottom UI
     // (TikTok/Reels caption bar, username, CTA + the right-side action buttons). The old ~11% sat too low.
     const CAP_Y = Math.max(0, Math.min(0.4, Number(process.env.CAPTION_Y) || 0.2));
+    // PER-SCENE caption PLACEMENT (9-zone map the producer picks per scene). Maps a zone key to a
+    // Shotstack anchor + a safe-zone offset + text alignment + a box width (narrower for side columns so
+    // the caption actually hugs that side). Default (empty) = lowerCenter, the current safe-zone bottom.
+    const CAP_POS: Record<string, string> = {
+      topLeft: "topLeft", topCenter: "top", topRight: "topRight",
+      midLeft: "left", center: "center", midRight: "right",
+      lowerLeft: "bottomLeft", lowerCenter: "bottom", lowerRight: "bottomRight",
+    };
+    const CAP_EDGE = 0.06;
+    const placeCaption = (posKey: string, boxW: number) => {
+      const key = CAP_POS[posKey] ? posKey : "lowerCenter";
+      const col = key.includes("Left") ? "L" : key.includes("Right") ? "R" : "C";
+      const row = key.startsWith("top") ? "T" : (key.startsWith("mid") || key === "center") ? "M" : "B";
+      const x = col === "L" ? CAP_EDGE : col === "R" ? -CAP_EDGE : 0;
+      const y = row === "T" ? -CAP_EDGE : row === "B" ? CAP_Y : 0; // bottom lifts into the safe zone; top drops off the edge
+      const align = col === "L" ? "left" : col === "R" ? "right" : "center";
+      return { position: CAP_POS[key], offset: { x, y }, align, w: col === "C" ? boxW : Math.round(boxW * 0.62) };
+    };
     // CHUNK a long scene line into short, screen-safe pieces that play in SEQUENCE across the scene, so a long
     // a-roll line never overflows the box and clips off the bottom of the frame (the "long copy gets cut off"
     // bug). Break at sentence + comma boundaries first (natural phrases), grouping whole phrases up to a char
@@ -1948,9 +1968,10 @@ export const assembleVideo = inngest.createFunction(
         // are length-weighted across the scene's duration (approx sync). One clip per word, each highlighting
         // a different word. Big bold outlined for punch, in the safe zone.
         const KARAOKE_CSS = ".cap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}.w{color:#FFFFFF;font-weight:800;font-size:46px;line-height:1.32;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 3px 8px rgba(0,0,0,0.5)}.hl{color:#FFE14D}";
-        captionClips = placed.filter((p) => p.caption).flatMap((p) => {
+        captionClips = placed.filter((p) => p.caption && !p.captionOff).flatMap((p) => {
           const words = esc(p.caption).split(/\s+/).filter(Boolean);
           if (!words.length) return [];
+          const cp = placeCaption(p.captionPos, capW);
           // Each word POPS exactly when she speaks it: START times come from the REAL per-word speech
           // timestamps (cues) when present, else fall back to length-weighting across the scene.
           const cues = sceneCues.get(p.i);
@@ -1971,7 +1992,7 @@ export const assembleVideo = inngest.createFunction(
             const st = starts[wi];
             const end = wi < words.length - 1 ? starts[wi + 1] : p.start + p.len;
             const html = `<div class="cap">${words.map((ww, j) => `<span class="w${j === wi ? " hl" : ""}">${ww}</span>`).join(" ")}</div>`;
-            return { asset: { type: "html", html, css: KARAOKE_CSS, width: capW, height: 340, background: "transparent" }, start: st, length: Math.max(0.1, end - st), position: "bottom", offset: { y: CAP_Y } };
+            return { asset: { type: "html", html, css: KARAOKE_CSS + `.cap{text-align:${cp.align}}`, width: cp.w, height: 340, background: "transparent" }, start: st, length: Math.max(0.1, end - st), position: cp.position, offset: cp.offset };
           });
         });
       } else {
@@ -1979,12 +2000,15 @@ export const assembleVideo = inngest.createFunction(
         // Uppercase styles (bold/sunny + the default) are wider per glyph, so fewer chars fit a line.
         const maxChars = (capSel === "bold" || capSel === "sunny" || capSel === "") ? 38 : 50;
         const offY = Math.max(capStyle.offY, CAP_Y);
-        captionClips = placed.filter((p) => p.caption).flatMap((p) => {
+        captionClips = placed.filter((p) => p.caption && !p.captionOff).flatMap((p) => {
           const text = esc(p.caption);
           const chunks = chunkCaption(text, maxChars);
+          const cp = placeCaption(p.captionPos, capW);
+          // Bottom placements honour the style's own safe-zone offY (>= CAP_Y); other zones use the map offset.
+          const off = cp.position === "bottom" || cp.position === "bottomLeft" || cp.position === "bottomRight" ? { ...cp.offset, y: offY } : cp.offset;
           const clip = (html: string, start: number, length: number) => ({
-            asset: { type: "html", html: `<div class="cap"><span>${html}</span></div>`, css: capStyle.css, width: capW, height: capStyle.height, background: "transparent" },
-            start, length, position: "bottom", offset: { y: offY },
+            asset: { type: "html", html: `<div class="cap"><span>${html}</span></div>`, css: capStyle.css + `.cap{text-align:${cp.align}}`, width: cp.w, height: capStyle.height, background: "transparent" },
+            start, length, position: cp.position, offset: off,
           });
           if (chunks.length <= 1) return [clip(text, p.start, p.len)];
           // START TIME per chunk: from the REAL per-word speech timestamps (cues) when we have them - so a
@@ -2098,7 +2122,7 @@ export const assembleVideo = inngest.createFunction(
 
     const edit: Record<string, unknown> = {
       timeline: { background: "#000000", fonts: [{ src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Bold.ttf" }, { src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Regular.ttf" }], ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.24)) } } : {}), tracks },
-      output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : "9:16", resolution: "1080", fps: 25 },
+      output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : ratio === "16:9" ? "16:9" : "9:16", resolution: "1080", fps: 25 },
     };
 
     let finalUrl: string | null = null; let err: string | null = null;
