@@ -1325,8 +1325,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                                 : shot?.url ? <img src={shot.url} alt="" className="h-full w-full object-cover" />
                                 : <div className="flex h-full items-center justify-center text-[9px] text-ink-faint">not shot</div>}
                               {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-20m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-25m"} /></div>}
+                              {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip.url as string) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
                               {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[9px] font-bold text-alert">⚠ failed</div>}
-                              {!isRendering && !failed && clip?.url && <span className="absolute bottom-0.5 right-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
+                              {!isRendering && !failed && clip?.url && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
                             </div>
                             <div className="mt-1 flex items-center justify-between">
                               <span className="tabular text-[10px] font-bold text-ink">Scene {i + 1}</span>
