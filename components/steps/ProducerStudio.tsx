@@ -465,7 +465,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
 
   const [zoom, setZoom] = useState<string | null>(null);
-  const [vzoom, setVzoom] = useState<string | null>(null);
+  const [vzoom, setVzoom] = useState<Clip | null>(null); // the whole clip (not just the url) so the expanded player can overlay the VO audio for silent b-roll
   // Fire a celebration the moment a finished cut first appears.
   const [celebrate, setCelebrate] = useState(false);
   const prevFinal = useRef<string | null>(initialProduction?.final_url || null);
@@ -1373,7 +1373,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                                 : shot?.url ? <img src={shot.url} alt="" className="h-full w-full object-cover" />
                                 : <div className="flex h-full items-center justify-center text-[10px] text-ink-faint">not shot</div>}
                               {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-40m"} /></div>}
-                              {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip.url as string) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} aria-label="Preview full size" className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
+                              {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} aria-label="Preview full size" className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
                               {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[10px] font-bold text-alert">⚠ failed</div>}
                               {!isRendering && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[10px] font-bold text-black">✓</span>}
                               {!isRendering && dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b bg-[#a855f7]/90 px-0.5 text-center text-[10px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
@@ -1522,7 +1522,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} fill />}
       {vzoom && (
         <div onClick={() => setVzoom(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-          <video src={vzoom} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} className="max-h-[90vh] max-w-[90vw] rounded-xl border border-line bg-black" />
+          {/* Reuse ClipPreview so the expanded player OVERLAYS the VO audio on a silent b-roll clip (press play to
+              hear her), exactly like the inline thumbnail - the old raw <video> had no audio track so it was silent. */}
+          <div onClick={(e) => e.stopPropagation()} className="max-h-[90vh] max-w-[90vw]">
+            <ClipPreview clip={vzoom} className="max-h-[90vh] max-w-[90vw] rounded-xl border border-line bg-black" />
+          </div>
           <button onClick={() => setVzoom(null)} aria-label="Close" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-lg text-white hover:bg-black/90">✕</button>
         </div>
       )}
