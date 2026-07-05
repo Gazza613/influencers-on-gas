@@ -1177,7 +1177,7 @@ export const generateShots = inngest.createFunction(
 // progressive; every clip metered; one failed clip never blocks the rest.
 type ClipRow = { scene: number; role: string; beat: string; kind: string; url: string | null; status: string; error?: string | null; synced?: boolean; audio_url?: string | null; duration?: number; engine?: string; draft?: boolean };
 // Keep at least the old ~16 minute floor even when env-tuned lower; default to ~24 minutes for slow vendor queues.
-const CLIP_POLL_ROUNDS = Math.max(120, Number(process.env.CLIP_POLL_ROUNDS) || 180);
+const CLIP_POLL_ROUNDS = Math.max(120, Number(process.env.CLIP_POLL_ROUNDS) || 240); // ~240 x 8s ≈ 32 min: give the slow Kling lane more time to LAND a full-length clip before it ever falls back to the fixed-~5s DoP proxy (the b-roll "freeze" cause on a final render)
 export const generateClips = inngest.createFunction(
   { id: "generate-clips", retries: 1, onFailure: onProductionFailure, triggers: [{ event: "influencer/generate.clips" }] },
   async ({ event, step }) => {
@@ -1887,11 +1887,13 @@ export const assembleVideo = inngest.createFunction(
     const overscanFor = (role: string) => (role === "a-roll" ? AROLL_OVERSCAN : VIDEO_OVERSCAN);
     const videoClips = placed.filter((p) => clipUrl(p.i)).flatMap((p) => {
       const src = clipUrl(p.i) as string;
-      // NO LOOPING (Gary's hard rule - a repeated/looping b-roll reads as broken). The clip plays ONCE for the
-      // slot length. A full-length Kling b-roll IS the slot (clip == VO length), so it plays cleanly end to end
-      // with no repeat and no hold. In the rare case the clip is shorter than the slot (a fallback DoP clip),
-      // it holds its last frame for the remainder rather than repeating - never a loop.
-      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role) }];
+      // NO LOOPING (Gary's hard rule). The clip plays ONCE for the slot length. A full-length Kling b-roll IS
+      // the slot, so it plays cleanly end to end. When a clip is SHORTER than its slot (a draft/DoP proxy or a
+      // Kling-timeout fallback ~5s under a longer VO), it would otherwise HOLD its last frame = a dead freeze.
+      // Apply a gentle slow ZOOM so that hold reads as an intentional cinematic push-in, not a frozen frame.
+      const cd = clipDur(p.i);
+      const willHold = p.role === "b-roll" && typeof cd === "number" && cd > 0 && cd < p.len - 0.4;
+      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role), ...(willHold ? { effect: "zoomIn" } : {}) }];
     });
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
