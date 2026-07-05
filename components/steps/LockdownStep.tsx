@@ -106,7 +106,7 @@ export default function LockdownStep({
           <div className="mt-1 text-lg font-bold text-ink">Create &amp; download {name}&apos;s creatives</div>
           <p className="mt-1 text-sm text-ink-dim">
             Generate social-ready images (9:16, 1:1, 16:9, up to 4K) for {name}, ready to download for Reels, Stories,
-            feeds and ads. Pick any of them in The Studio as a reference look and your video scenes inherit that exact
+            feeds and ads. Pick any of them in The Final Cut as a reference look and your video scenes inherit that exact
             wardrobe, styling and world. One locked identity, endless on-brand content.
           </p>
           <div className="mt-3">

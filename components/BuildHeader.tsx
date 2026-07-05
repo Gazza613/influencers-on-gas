@@ -90,13 +90,13 @@ export default function BuildHeader({
     { href: `${base}/lockdown`, label: "Lock down", icon: "③", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
   ];
   // Creatives unlocks once the identity is locked; it turns green once any shot is rendered. Script & Voice is
-  // now its OWN stage (the foundation) before The Studio, where the scenes render to the locked voice timing.
+  // now its OWN stage (the foundation) before The Final Cut, where the scenes render to the locked voice timing.
   const creativesDone = s.creatives > 0;
   if (s.locked) {
     const onBuild = pathname.endsWith("/producer") || pathname.endsWith("/voice");
     tabs.push({ href: `${base}/creatives`, label: "Wardrobe & Set", icon: "✦", done: creativesDone, warn: !creativesDone && onBuild, match: (p: string) => p.endsWith("/creatives") });
     tabs.push({ href: `${base}/voice`, label: "Script & Voice", icon: "🎙️", done: s.voiceApproved, match: (p: string) => p.endsWith("/voice") });
-    tabs.push({ href: `${base}/producer`, label: "The Studio", icon: "🎬", done: s.videoDone, warn: !s.voiceApproved && pathname.endsWith("/producer"), match: (p: string) => p.endsWith("/producer") });
+    tabs.push({ href: `${base}/producer`, label: "The Final Cut", icon: "🎬", done: s.videoDone, warn: !s.voiceApproved && pathname.endsWith("/producer"), match: (p: string) => p.endsWith("/producer") });
   }
 
   return (

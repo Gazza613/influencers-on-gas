@@ -6,7 +6,7 @@ import ProducerStudio from "@/components/steps/ProducerStudio";
 export const dynamic = "force-dynamic";
 
 // SCRIPT & VOICE stage - the foundation everything downstream is built to. Same ProducerStudio component,
-// rendered in "foundation" mode (brief -> storyboard -> voice). The Studio stage picks up from here.
+// rendered in "foundation" mode (brief -> storyboard -> voice). The Final Cut stage picks up from here.
 export default async function ScriptVoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const inf = await getInfluencer(id);

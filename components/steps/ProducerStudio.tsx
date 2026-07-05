@@ -28,7 +28,7 @@ const ROLE = {
 
 type CreativeGuide = { url: string; role: string; ratio: string; scene: string; resolution: string };
 export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio" }) {
-  // STAGE SPLIT: "foundation" = Script & Voice stage (brief -> storyboard -> voice); "studio" = The Studio
+  // STAGE SPLIT: "foundation" = Script & Voice stage (brief -> storyboard -> voice); "studio" = The Final Cut
   // stage (shoot -> animate -> music -> stitch -> showreel). "all" = the legacy single page (unchanged).
   const isFoundation = mode !== "studio"; // show brief + concept + voice
   const isStudio = mode !== "foundation"; // show scene keyframes/animate + audio + stitch + showreel
@@ -473,6 +473,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // an EFFECT (after the panel has actually collapsed + re-laid-out) - a requestAnimationFrame alone fired too
   // early, against the OLD height, so the jump remained.
   const pendingScroll = useRef<number | null>(null);
+  const returnToStrip = useRef(false); // an edit opened from the Scenes carousel returns THERE on save
   function closeEditKeep(i: number | null) {
     pendingScroll.current = i;
     setEditIdx(null);
@@ -480,8 +481,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   useEffect(() => {
     if (editIdx !== null || pendingScroll.current == null) return;
     const i = pendingScroll.current; pendingScroll.current = null;
-    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`prod-scene-${i}`)?.scrollIntoView({ block: "center", behavior: "auto" })));
+    const toStrip = returnToStrip.current; returnToStrip.current = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = toStrip ? document.getElementById("scenes-strip") : document.getElementById(`prod-scene-${i}`);
+      el?.scrollIntoView({ block: toStrip ? "start" : "center", behavior: "smooth" });
+    }));
   }, [editIdx]);
+  // Edit a scene FROM the in-step carousel: jump up to its card (open the editor), then return to the strip on save.
+  function editFromStrip(i: number, s: Scene) {
+    returnToStrip.current = true;
+    if (editIdx !== i) openEdit(i, s);
+    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`prod-scene-${i}`)?.scrollIntoView({ block: "center", behavior: "smooth" })));
+  }
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { closeEditKeep(i); return; }
     setEditIdx(i); setAiInstr("");
@@ -709,7 +720,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       <div className="flex items-start gap-3 rounded-xl border border-[#a855f7]/30 bg-gradient-to-r from-[#a855f7]/12 to-[#60a5fa]/8 p-5">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#a855f7]/20 text-2xl">🎬</div>
         <div>
-          <div className="text-sm font-extrabold text-white">{mode === "foundation" ? "Script & Voice" : mode === "studio" ? "The Studio" : "Your Producer"}</div>
+          <div className="text-sm font-extrabold text-white">{mode === "foundation" ? "Script & Voice" : mode === "studio" ? "The Final Cut" : "Your Producer"}</div>
           <p className="mt-1 text-sm text-ink-dim">
             {mode === "foundation"
               ? `Write the ad and lock the voice - the foundation everything else is built to. Tell me about the ad and I'll direct ${name}'s storyboard, shot by shot; then pick the voice and generate the voiceover.`
@@ -725,7 +736,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       {editing ? (
         mode === "studio" ? (
           /* Studio opened before the script exists → send them to Script & Voice first. */
-          <a href={`/setup/influencers/${influencerId}/voice`} className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-4 py-4 text-sm font-bold text-[#fbbf24]">⚠ Start with Script &amp; Voice - write the script and lock the voice first, then come back to The Studio →</a>
+          <a href={`/setup/influencers/${influencerId}/voice`} className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-4 py-4 text-sm font-bold text-[#fbbf24]">⚠ Start with Script &amp; Voice - write the script and lock the voice first, then come back to The Final Cut →</a>
         ) : (
         /* Brief */
         <div className="space-y-4 rounded-xl border border-line bg-surface-1 p-5">
@@ -874,7 +885,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               <div className="flex gap-2">
                 <button onClick={resetStuck} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${(busyAny || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>
                 {clips.length > 0 && <button onClick={clearStaleClips} disabled={busyAny} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-faint hover:text-ink disabled:opacity-40" title="Drop all existing clips + the final cut (leftover videos) and go back to clean reference images. Keeps the storyboard, stills and voice.">🧹 Clear clips</button>}
-                {/* Script edits (New brief / Regenerate) live in the Script & Voice stage - hidden in The Studio
+                {/* Script edits (New brief / Regenerate) live in the Script & Voice stage - hidden in The Final Cut
                     so a locked script can't be blown away mid-build. */}
                 {isFoundation && <button onClick={() => setEditing(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">✎ New brief</button>}
                 {isFoundation && <button onClick={generate} disabled={busy} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{busy ? "Re-directing…" : "↻ Regenerate"}</button>}
@@ -891,7 +902,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             )}
           </div>
 
-          {/* Reference-image shoot (keyframes) - The Studio stage only (foundation is script + voice). */}
+          {/* Reference-image shoot (keyframes) - The Final Cut stage only (foundation is script + voice). */}
           {isStudio && (<div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
@@ -1113,7 +1124,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <Uploader kind="vo" accept="audio" label="Upload my own VO (ElevenLabs file) - recommended" current={ed.voAudio || null} onUploaded={(u) => setEd((e) => ({ ...e, voAudio: u }))} />
                         <p className="text-[10px] text-ink-faint">Optional. If you drop your own read here, I lip-sync the clip to it; otherwise I generate the voice in-platform.</p>
                       </div>
-                      {/* Scene direction (the visual prompt) = The Studio only. In Script & Voice you edit only
+                      {/* Scene direction (the visual prompt) = The Final Cut only. In Script & Voice you edit only
                           the words above (a re-shoot belongs to the visual build, not the script stage). */}
                       {isStudio && (<div className="space-y-2 border-t border-line pt-3">
                         <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Scene direction - the full prompt (changing these needs a re-shoot)</div>
@@ -1155,7 +1166,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         {isStudio && <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>}
                         <button onClick={() => closeEditKeep(editIdx)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                       </div>
-                      <p className="text-[10px] text-ink-faint">{isStudio ? "Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched." : "Edit the words for this scene, then Save changes. The visual build (framing, re-shoot) happens in The Studio."}</p>
+                      <p className="text-[10px] text-ink-faint">{isStudio ? "Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched." : "Edit the words for this scene, then Save changes. The visual build (framing, re-shoot) happens in The Final Cut."}</p>
                     </div>
                   )}
                   </div>
@@ -1268,9 +1279,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 )
               ) : <LockHint />}
             </StepShell>
-            {/* Foundation stage done → hand off to The Studio for the visual build. */}
+            {/* Foundation stage done → hand off to The Final Cut for the visual build. */}
             {mode === "foundation" && approved.has("voice") && (
-              <a href={`/setup/influencers/${influencerId}/producer`} className="btn-brand mt-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold">🎬 Script &amp; voice locked - continue to The Studio →</a>
+              <a href={`/setup/influencers/${influencerId}/producer`} className="btn-brand mt-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold">🎬 Script &amp; voice locked - continue to The Final Cut →</a>
             )}
             </>)}
 
@@ -1293,7 +1304,43 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <button onClick={() => setSpeedMode((v) => !v)} title="Draft speed renders PREVIEW clips fast (a-roll 720p, b-roll on the quick DoP engine) for quick team review. Keyframes stay full quality. When happy, 'Render final quality' at the Stitch step conforms every draft to 1080p / Veo from the same keyframe - no drift. Turn OFF to render full quality from the start." className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}><span aria-hidden>⚡</span> Draft speed <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "720p" : "1080p"}</span></button>
                   </div>
                   {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - a-roll renders at 720p for faster iteration. Your final is still stitched at 1080p; for a crisp a-roll in the final, switch this to 1080p and re-animate before the last stitch.</p>}
-                  <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have). Fix any single scene with the buttons on the cards above.</p>
+                  <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have).</p>
+                  {/* IN-STEP SCENE CAROUSEL: every scene at a glance - edit or re-animate any without scrolling
+                      up. ✎ Edit jumps to the scene's card (opens the editor); on Save it returns you here. */}
+                  <div id="scenes-strip">
+                    <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Every scene - edit or re-animate right here</div>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {sb.scenes.map((s, i) => {
+                        if (dropped.has(i) || s.role === "graphic") return null;
+                        const rl = ROLE[s.role] ?? ROLE["a-roll"];
+                        const clip = clipFor(i); const shot = shotFor(i);
+                        const failed = clip?.status === "failed";
+                        const isRendering = animatingScenes.has(i) || (wholeBoardBusy && !clip?.url && clip?.status !== "failed" && (renderingRole === "" || renderingRole === s.role));
+                        return (
+                          <div key={i} className="w-[104px] shrink-0 rounded-lg border border-line bg-surface-1 p-1.5">
+                            <div className="relative aspect-[9/16] w-full overflow-hidden rounded-md bg-black">
+                              {clip?.url
+                                ? <video src={clip.url} muted playsInline className="h-full w-full object-cover" />
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                : shot?.url ? <img src={shot.url} alt="" className="h-full w-full object-cover" />
+                                : <div className="flex h-full items-center justify-center text-[9px] text-ink-faint">not shot</div>}
+                              {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-20m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-25m"} /></div>}
+                              {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[9px] font-bold text-alert">⚠ failed</div>}
+                              {!isRendering && !failed && clip?.url && <span className="absolute bottom-0.5 right-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
+                            </div>
+                            <div className="mt-1 flex items-center justify-between">
+                              <span className="tabular text-[10px] font-bold text-ink">Scene {i + 1}</span>
+                              <span className={`tabular rounded border px-1 text-[8px] font-bold ${rl.cls}`}>{rl.label}</span>
+                            </div>
+                            <div className="mt-1 flex gap-1">
+                              <button onClick={() => editFromStrip(i, s)} className="flex-1 rounded border border-[#a855f7]/40 px-1 py-0.5 text-[9px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
+                              <button onClick={() => animateScene(i)} disabled={animatingScenes.has(i) || !approved.has("voice") || !shot?.url} title={!shot?.url ? "Shoot the keyframe first" : !approved.has("voice") ? "Finish Script & Voice first" : clip?.url ? "Re-animate this scene" : "Animate this scene"} className="flex-1 rounded border border-[#60a5fa]/40 px-1 py-0.5 text-[9px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40">{clip?.url ? "↻ Anim" : "🎞️ Anim"}</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                   {wardrobeLock ? <p className="text-[11px] text-ink-faint"><span className="text-[#c4b5fd]">🔒 Wardrobe locked:</span> {wardrobeLock} <span className="text-ink-faint">(set on the Reference images step)</span></p> : null}
                 </div>
               ) : <LockHint />}
