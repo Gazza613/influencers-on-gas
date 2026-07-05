@@ -171,13 +171,16 @@ export default function LockdownStep({
           </div>
         )}
 
-        {!working && (
-          <button onClick={lock} disabled={selectedCount < 5} className="btn-brand mt-4 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
-            {selectedCount < 5 ? "Select 5+ frames in the photoshoot first" : `🔒 Lock down identity (${selectedCount} frames)`}
-          </button>
+        {/* Blocked reason as the HEADLINE + a clear way forward, not a dead disabled button. */}
+        {!working && selectedCount < 5 && (
+          <div className="mt-4 rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/[0.05] p-4">
+            <div className="text-sm font-semibold text-ink">First, keep 5 or more photoshoot frames</div>
+            <p className="mt-1 text-[13px] text-ink-dim">Locking the identity needs at least 5 frames ticked in the photoshoot ({selectedCount} kept so far). Run the photoshoot and choose your favourites, then come back here to lock.</p>
+            <Link href={`/setup/influencers/${influencerId}/photoshoot`} className="btn-brand mt-3 inline-block rounded-lg px-4 py-2 text-sm font-bold">→ Go to the photoshoot</Link>
+          </div>
         )}
-        {selectedCount < 5 && !working && (
-          <Link href={`/setup/influencers/${influencerId}/photoshoot`} className="ml-2 text-xs text-ink-dim hover:text-ink">← back to photoshoot</Link>
+        {!working && selectedCount >= 5 && (
+          <button onClick={lock} className="btn-brand mt-4 rounded-lg px-4 py-2 text-sm font-bold">🔒 Lock down identity ({selectedCount} frames)</button>
         )}
 
         {working && (

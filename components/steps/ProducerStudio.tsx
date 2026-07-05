@@ -1370,7 +1370,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   </div>
                   {wardrobeLock ? <p className="text-[11px] text-ink-faint"><span className="text-[#c4b5fd]">🔒 Wardrobe locked:</span> {wardrobeLock} <span className="text-ink-faint">(set on the Reference images step)</span></p> : null}
                 </div>
-              ) : <LockHint />}
+              ) : <LockHint msg={isStudio ? <>🔒 Finish <b>Script &amp; Voice</b> first (see the link above) - it sets the voice these scenes are built to.</> : undefined} />}
             </StepShell>
 
             {/* 4 · Music & ambient */}
@@ -1552,8 +1552,8 @@ function StepShell({ n, title, desc, state, gate, preview, children, anchor }: {
     </div>
   );
 }
-function LockHint() {
-  return <p className="text-[11px] text-ink-faint">🔒 Approve the previous step to unlock this one.</p>;
+function LockHint({ msg }: { msg?: React.ReactNode }) {
+  return <p className="text-[11px] text-ink-faint">{msg || "🔒 Finish the previous step to unlock this one."}</p>;
 }
 // Aspect-ratio chooser for a reference shoot (output format of the final video).
 // Pick a creative (made in the Creative section, tagged this role) as the GUIDE the shoot anchors to:

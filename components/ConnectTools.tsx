@@ -89,6 +89,10 @@ export default function ConnectTools({
                   Disconnect
                 </button>
               )}
+              {/* Members can't edit connections - so a not-connected required tool isn't a dead row: tell them who can. */}
+              {!canEdit && !c.connected && c.required && (
+                <span className="text-[11px] font-medium text-[#fbbf24]">⚠ Ask a workspace admin to connect this</span>
+              )}
             </div>
           </div>
 
