@@ -1090,7 +1090,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="tabular text-xs font-bold text-ink">Scene {i + 1}</span>
-                    <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}-{s.end}</span>
+                    <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint" title="Scene length = its measured voiceover. The clip renders to fit the full line - it is NOT capped, so the VO is never cut.">{(() => {
+                      // Show the REAL spoken length (measured VO once generated, else a word-count estimate) - the
+                      // clip stretches to this. The old storyboard timecode (s.start-s.end) was stale 8s planning.
+                      const real = (production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio?.find?.((e) => Number(e.scene) === i)?.duration;
+                      const words = (s.vo_line || "").trim().split(/\s+/).filter(Boolean).length;
+                      const secs = (typeof real === "number" && real > 0) ? real : (words ? words / 2.5 : 0);
+                      return secs > 0 ? `~${Math.round(secs)}s${typeof real === "number" && real > 0 ? "" : " est"}` : `${s.start}-${s.end}`;
+                    })()}</span>
                     <span className="text-[11px] font-semibold text-ink-dim">{s.beat}</span>
                     <span className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-bold ${role.cls}`}>{role.label}</span>
                     {s.role !== "graphic" && (
