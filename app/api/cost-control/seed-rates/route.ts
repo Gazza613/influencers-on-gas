@@ -13,9 +13,9 @@ const ROWS: [string, string, string, number, number][] = [
   ["higgsfield", "seedance_2_0", "video", 6, 462], // a-roll fallback, from the Ultra credit pool
   ["higgsfield", "veo3_1", "video", 40, 3080], // Veo 3.1 HERO b-roll (4K + native audio) - pricey; approx, recalibrate
   ["higgsfield", "dop_turbo", "video", 4, 308], // PRIMARY b-roll (DoP-turbo) - ESTIMATE, trued up by the get_cost pass below
-  ["heygen", "avatar_iv", "video", 0, 300], // PRIMARY a-roll (HeyGen Avatar IV) - ESTIMATE per clip, confirm HeyGen plan
-  ["heygen", "talking_photo", "video", 0, 300], // legacy build/twin presenter
-  ["heygen", "talking_photo", "avatar", 0, 300], // legacy build/twin presenter
+  ["heygen", "avatar_iv", "video", 0, 0], // PRIMARY a-roll - within HeyGen Pro $99/mo (~121 min/mo); $0 marginal, overage $0.18/min
+  ["heygen", "talking_photo", "video", 0, 0], // legacy build/twin presenter - same HeyGen plan
+  ["heygen", "talking_photo", "avatar", 0, 0], // legacy build/twin presenter - same HeyGen plan
   ["fal", "omnihuman_1_5", "second", 0, 296], // OmniHuman 1.5 a-roll - fal PAYG $0.16/s ≈ R2.96/s (metered per second)
   ["elevenlabs", "eleven_multilingual_v2", "tts", 0, 0], // within the ElevenLabs subscription quota
   ["elevenlabs", "clone", "voice", 0, 0], // voice clone - within subscription quota

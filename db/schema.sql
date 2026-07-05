@@ -359,11 +359,12 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   -- PRIMARY b-roll engine on the Producer path (DoP-turbo, fast first-party). Draws from the Ultra
   -- credit POOL. ESTIMATE below - "Recalibrate costs" trues this up from Higgsfield get_cost.
   ('higgsfield','dop_turbo','video', 4, 308, true),
-  -- PRIMARY a-roll engine (HeyGen Avatar IV, default AROLL_ENGINE). ESTIMATE per talking-head clip -
-  -- confirm against GAS's HeyGen plan (flat quota vs pay-per-clip). Not auto-calibrated.
-  ('heygen','avatar_iv','video', 0, 300, true),
-  ('heygen','talking_photo','video', 0, 300, true),           -- legacy build/twin presenter path
-  ('heygen','talking_photo','avatar', 0, 300, true),
+  -- PRIMARY a-roll engine (HeyGen Avatar IV, default AROLL_ENGINE). Within the HeyGen PRO $99/mo plan
+  -- (~121 video min/mo included), so $0 marginal per clip within quota (overage $0.18/min). The $99/mo
+  -- is a FIXED cost shown separately on the Cost Control page, not a per-clip charge.
+  ('heygen','avatar_iv','video', 0, 0, true),
+  ('heygen','talking_photo','video', 0, 0, true),             -- legacy build/twin presenter path (same HeyGen plan)
+  ('heygen','talking_photo','avatar', 0, 0, true),
   -- fal OmniHuman 1.5 a-roll (opt-in AROLL_ENGINE=omnihuman): fal PAYG ~$0.16/s metered per second.
   ('fal','omnihuman_1_5','second', 0, 296, true),
   -- ElevenLabs voice/STT: within the ElevenLabs SUBSCRIPTION quota, so $0 marginal (like the music bed).

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
 
-// Small hover-reveal delete control for a cast card. Stops the card's Link from navigating.
+// Always-visible delete control for a cast card, so cleaning up the cast list is obvious (not a
+// hidden hover-only affordance). Stops the card's Link from navigating.
 export default function CastDeleteButton({ id, name }: { id: string; name: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -20,7 +21,7 @@ export default function CastDeleteButton({ id, name }: { id: string; name: strin
   }
   return (
     <button onClick={del} disabled={busy} title={`Delete ${name}`} aria-label={`Delete ${name}`}
-      className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-black/55 text-xs text-white/80 opacity-0 backdrop-blur-sm transition hover:bg-alert/85 hover:text-white group-hover:opacity-100 disabled:opacity-50">
+      className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-black/60 text-xs text-white/90 backdrop-blur-sm transition hover:bg-alert hover:text-white disabled:opacity-50">
       {busy ? "…" : "✕"}
     </button>
   );
