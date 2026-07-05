@@ -610,11 +610,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // PER-SCENE offer callouts (frosted glass). Source of truth = production.scene_callouts, keyed by scene idx.
   const sceneCallouts = (production?.scene_callouts) || {};
   const [coOpen, setCoOpen] = useState<number | null>(null);
-  const [coDraft, setCoDraft] = useState<SceneCallout>({ kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05", pos: "lowerCenter" });
+  const [coDraft, setCoDraft] = useState<SceneCallout>({ kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05", pos: "lowerCenter", hold: 2 });
   function openCallout(i: number) {
     if (coOpen === i) { setCoOpen(null); return; }
     const ex = sceneCallouts[String(i)];
-    setCoDraft(ex ? { kick: ex.kick ?? "", line: ex.line ?? "", num: ex.num ?? "", suffix: ex.suffix ?? "", accent: ex.accent ?? "#ffcb05", pos: ex.pos || "lowerCenter" } : { kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05", pos: "lowerCenter" });
+    setCoDraft(ex ? { kick: ex.kick ?? "", line: ex.line ?? "", num: ex.num ?? "", suffix: ex.suffix ?? "", accent: ex.accent ?? "#ffcb05", pos: ex.pos || "lowerCenter", hold: typeof ex.hold === "number" ? ex.hold : 2 } : { kick: "Limited offer", line: "", num: "", suffix: "FREE", accent: "#ffcb05", pos: "lowerCenter", hold: 2 });
     setCoOpen(i);
   }
   async function saveCallout(i: number, remove = false) {
@@ -1158,12 +1158,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               </div>
                             </div>
                           </div>
+                          {/* SURVIVE TIME: how long the callout stays on screen (it always zooms in + fades out). */}
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-[10px] text-ink-faint">Stays on screen</span>
+                            <input type="range" min={1} max={8} step={0.5} value={typeof coDraft.hold === "number" ? coDraft.hold : 2} onChange={(e) => setCoDraft((c) => ({ ...c, hold: Number(e.target.value) }))} aria-label="Callout time on screen (seconds)" className="h-1.5 w-40 cursor-pointer accent-[#a855f7]" />
+                            <span className="tabular w-9 text-[11px] font-semibold text-[#c79bff]">{(typeof coDraft.hold === "number" ? coDraft.hold : 2).toFixed(1)}s</span>
+                          </div>
                           <div className="flex flex-wrap gap-2 pt-1">
                             <button onClick={() => saveCallout(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save callout</button>
                             {sceneCallouts[String(i)] && <button onClick={() => saveCallout(i, true)} className="rounded-lg border border-alert/40 px-3 py-1.5 text-xs font-semibold text-alert hover:bg-alert/10">Remove</button>}
                             <button onClick={() => setCoOpen(null)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                           </div>
-                          <p className="text-[10px] text-ink-faint">Re-stitch after saving to see it. It POPS in for ~1.6s at your chosen position while this scene plays.</p>
+                          <p className="text-[10px] text-ink-faint">Re-stitch after saving to see it. It zooms in at your chosen position, stays ~{(typeof coDraft.hold === "number" ? coDraft.hold : 2).toFixed(1)}s, then fades (capped by the scene length).</p>
                         </div>
                         {/* live WYSIWYG preview - the DARK-glass callout ON this scene's actual keyframe, at the
                             chosen position (matches the render: dark legible glass, accent pill + chip, sheen). */}
