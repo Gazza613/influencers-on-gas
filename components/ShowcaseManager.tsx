@@ -166,8 +166,8 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
                   >
                     {/* Reorder controls - drag the card, OR use the arrows (always work, incl. touch) */}
                     <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
-                      <button onClick={() => reorder(i, i - 1)} disabled={i === 0} title="Move earlier" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">◀</button>
-                      <button onClick={() => reorder(i, i + 1)} disabled={i === onReel.length - 1} title="Move later" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">▶</button>
+                      <button onClick={() => reorder(i, i - 1)} disabled={i === 0} title="Move earlier" aria-label="Move earlier" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">◀</button>
+                      <button onClick={() => reorder(i, i + 1)} disabled={i === onReel.length - 1} title="Move later" aria-label="Move later" className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur disabled:opacity-30 hover:bg-black/80">▶</button>
                       <span title="Drag to reorder" className="ml-0.5 flex h-7 items-center rounded-full bg-black/60 px-2 text-xs text-white/80 backdrop-blur">⠿</span>
                     </div>
                     <Card v={v} busy={busy === v.id} onToggle={toggle} onRemove={remove} onRename={rename} onRegen={regenPoster} reel />
@@ -213,13 +213,13 @@ function Card({ v, busy, onToggle, onRemove, onRename, onRegen, reel = false }: 
           />
         ) : (
           <button onClick={() => setEditing(true)} title="Click to rename" className="flex min-w-0 items-center gap-1.5 truncate text-left text-sm font-semibold text-ink hover:text-accent">
-            {v.external && <span className="shrink-0 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#60a5fa]">Uploaded</span>}
+            {v.external && <span className="shrink-0 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#60a5fa]">Uploaded</span>}
             <span className="truncate">{v.title || "Untitled production"}</span>
             <span className="shrink-0 text-[11px] text-ink-faint">✎</span>
           </button>
         )}
         <div className="flex shrink-0 items-center gap-1.5">
-          <button onClick={() => onRegen(v)} disabled={busy} title="Regenerate thumbnail" className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-ink-dim hover:text-accent disabled:opacity-50">↻🖼</button>
+          <button onClick={() => onRegen(v)} disabled={busy} title="Regenerate thumbnail" aria-label="Regenerate thumbnail" className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-ink-dim hover:text-accent disabled:opacity-50">↻🖼</button>
           <button
             onClick={() => (reel ? onRemove(v.id) : onToggle(v.id, true))}
             disabled={busy}

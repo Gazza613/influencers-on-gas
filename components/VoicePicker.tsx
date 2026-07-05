@@ -100,7 +100,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
               return (
                 <div key={v.voice_id} onClick={() => setSel(v.voice_id)} className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${on ? "border-[#a855f7] bg-[#a855f7]/10" : "border-line hover:border-line-strong"}`}>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-ink">{v.name}{isMine(v) && <span className="ml-2 rounded bg-[#a855f7]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#c79bff]">Yours</span>}{on && <span className="ml-2 text-[10px] font-bold text-[#c79bff]">✓ selected</span>}</div>
+                    <div className="text-sm font-semibold text-ink">{v.name}{isMine(v) && <span className="ml-2 rounded bg-[#a855f7]/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-[#c79bff]">Yours</span>}{on && <span className="ml-2 text-[10px] font-bold text-[#c79bff]">✓ selected</span>}</div>
                     {d && <div className="truncate text-[11px] text-ink-faint">{d}</div>}
                   </div>
                   {v.preview_url && <audio src={v.preview_url} controls className="h-8 w-40 shrink-0" onClick={(e) => e.stopPropagation()} />}

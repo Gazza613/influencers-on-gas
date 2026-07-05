@@ -168,7 +168,7 @@ export default function CastingStep({
                         )}
                         <span className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border text-sm transition ${sel ? "border-white bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.7)]" : "border-white/70 bg-black/45 text-transparent group-hover:text-white/70"}`}>✓</span>
                         {!broken.has(c.url) && (
-                          <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="Preview full screen"
+                          <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="Preview full screen" aria-label="Preview full screen"
                             className="absolute bottom-1.5 right-1.5 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-black/55 text-base text-white opacity-70 backdrop-blur-sm transition hover:scale-105 hover:bg-black/80 hover:opacity-100 active:scale-95">👁</button>
                         )}
                       </div>

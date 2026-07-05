@@ -97,7 +97,7 @@ export default function StartPage() {
                     <div key={u} className="relative">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={u} alt={`reference ${i + 1}`} className="aspect-square w-full rounded-lg border border-line object-cover" />
-                      <button onClick={() => setRefPhotos((p) => p.filter((x) => x !== u))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
+                      <button onClick={() => setRefPhotos((p) => p.filter((x) => x !== u))} aria-label="Remove photo" className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
                     </div>
                   ))}
                 </div>
@@ -131,7 +131,7 @@ export default function StartPage() {
                       <div key={u} className="relative">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={u} alt={`photo ${i + 1}`} className="aspect-square w-full rounded-lg border border-line object-cover" />
-                        <button onClick={() => setTwinPhotos((p) => p.filter((x) => x !== u))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
+                        <button onClick={() => setTwinPhotos((p) => p.filter((x) => x !== u))} aria-label="Remove photo" className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
                       </div>
                     ))}
                   </div>

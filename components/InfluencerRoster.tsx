@@ -108,7 +108,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={face} alt={inf.name} className="h-5 w-5 rounded-full object-cover" />
                   ) : (
-                    <span className="text-[9px] font-bold text-ink-faint">{pct}%</span>
+                    <span className="text-[10px] font-bold text-ink-faint">{pct}%</span>
                   )}
                 </div>
               </div>
@@ -117,9 +117,9 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
                 <div className="tabular text-[10px] uppercase tracking-wide text-ink-faint">{inf.mode === "twin" ? "digital twin" : "influencer"}</div>
               </div>
               <div className="absolute right-1 top-1 hidden items-center gap-0.5 group-hover:flex">
-                <button onClick={(e) => rename(e, inf)} title={`Rename ${inf.name}`}
+                <button onClick={(e) => rename(e, inf)} title={`Rename ${inf.name}`} aria-label={`Rename ${inf.name}`}
                   className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faint hover:bg-[#a855f7]/15 hover:text-[#c79bff]">✎</button>
-                <button onClick={(e) => remove(e, inf)} title={`Delete ${inf.name}`}
+                <button onClick={(e) => remove(e, inf)} title={`Delete ${inf.name}`} aria-label={`Delete ${inf.name}`}
                   className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faint hover:bg-alert/15 hover:text-alert">
                   {deleting === inf.id ? "…" : "✕"}
                 </button>
@@ -190,7 +190,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
                 <div key={u} className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={u} alt={`photo ${i + 1}`} className="aspect-square w-full rounded-lg border border-line object-cover" />
-                  <button onClick={() => setTwinPhotos((p) => p.filter((x) => x !== u))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
+                  <button onClick={() => setTwinPhotos((p) => p.filter((x) => x !== u))} aria-label="Remove photo" className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">✕</button>
                 </div>
               ))}
             </div>

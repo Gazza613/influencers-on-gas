@@ -19,7 +19,7 @@ export default function CastDeleteButton({ id, name }: { id: string; name: strin
     else flex("Couldn't delete that influencer.");
   }
   return (
-    <button onClick={del} disabled={busy} title={`Delete ${name}`}
+    <button onClick={del} disabled={busy} title={`Delete ${name}`} aria-label={`Delete ${name}`}
       className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-black/55 text-xs text-white/80 opacity-0 backdrop-blur-sm transition hover:bg-alert/85 hover:text-white group-hover:opacity-100 disabled:opacity-50">
       {busy ? "…" : "✕"}
     </button>

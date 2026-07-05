@@ -876,7 +876,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           ? <video src={c.url} muted playsInline className="h-full w-full object-cover" />
                           /* eslint-disable-next-line @next/next/no-img-element */
                           : <img src={c.url} alt={c.label} className="h-full w-full object-cover" />}
-                        {endCardUrl === c.url && <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#a855f7] text-[9px] text-white">✓</span>}
+                        {endCardUrl === c.url && <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#a855f7] text-[10px] text-white">✓</span>}
                       </button>
                     ))}
                   </div>
@@ -1000,11 +1000,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       ) : clip?.url ? (
                         <div className="relative">
                           <ClipPreview clip={clip} className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
-                          <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ TALKING SHOT" : "▶ SCENE SHOT"}</span>
-                          {clip.draft && <span className="absolute right-1 bottom-1 rounded bg-[#f59e0b]/90 px-1 py-0.5 text-[8px] font-bold text-black" title="Draft preview (720p talking shots / fast preview scene shots). Render final quality at the Stitch step before delivery.">720p DRAFT</span>}
-                          {dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-1 top-8 z-[9] rounded bg-[#a855f7]/90 px-1 py-0.5 text-center text-[8px] font-bold text-white shadow" title="You changed this scene's direction or background - re-shoot/re-animate to apply it to the clip.">⟳ changed - re-render to apply</span>}
-                          {clip.audio_url && clip.synced !== true && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-semibold text-[#7dd3fc]" title="This clip renders silent; her voiceover is overlaid here and baked in at the final stitch.">🔊 voice overlaid</span>}
-                          <button onClick={() => setZoom(clip.url!)} title="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
+                          <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[10px] font-bold text-black">{clip.kind === "a-roll" ? "▶ TALKING SHOT" : "▶ SCENE SHOT"}</span>
+                          {clip.draft && <span className="absolute right-1 bottom-1 rounded bg-[#f59e0b]/90 px-1 py-0.5 text-[10px] font-bold text-black" title="Draft preview (720p talking shots / fast preview scene shots). Render final quality at the Stitch step before delivery.">720p DRAFT</span>}
+                          {dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-1 top-8 z-[9] rounded bg-[#a855f7]/90 px-1 py-0.5 text-center text-[10px] font-bold text-white shadow" title="You changed this scene's direction or background - re-shoot/re-animate to apply it to the clip.">⟳ changed - re-render to apply</span>}
+                          {clip.audio_url && clip.synced !== true && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[10px] font-semibold text-[#7dd3fc]" title="This clip renders silent; her voiceover is overlaid here and baked in at the final stitch.">🔊 voice overlaid</span>}
+                          <button onClick={() => setZoom(clip.url!)} title="Preview full size" aria-label="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
                           {/* RE-ANIMATING this scene (it already has a clip): overlay feedback so it's clearly working.
                               ONLY for an explicit per-scene list (clipScope is an array with this scene) - a whole-board
                               "all" run never re-renders scenes that already have a clip, so it must NOT light them up. */}
@@ -1020,10 +1020,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <img src={shot.url} alt={`scene ${i + 1}`} onClick={() => setZoom(shot.url!)} className="aspect-[9/16] w-full cursor-zoom-in rounded-lg border border-line object-cover transition hover:brightness-110" title="Click to preview full size" />
                           {/* The reference image is the HERO. Only once you're at the animate step do we badge the clip
                               state (pending / failed) - we never hide a good still behind a clip message. */}
-                          {stepReached && <span className={`tabular absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide ${clipFailed ? "bg-alert/85 text-black" : "bg-black/65 text-ink-dim"}`} title={clipFailed ? (clip?.error || "") : ""}>{clipFailed ? "⚠ clip failed - re-animate" : `⏳ ${s.role} clip pending`}</span>}
+                          {stepReached && <span className={`tabular absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${clipFailed ? "bg-alert/85 text-black" : "bg-black/65 text-ink-dim"}`} title={clipFailed ? (clip?.error || "") : ""}>{clipFailed ? "⚠ clip failed - re-animate" : `⏳ ${s.role} clip pending`}</span>}
                         </div>
                       ) : clipFailed ? (
-                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[9px] text-alert" title={clip.error || ""}>clip failed</div>
+                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-alert/30 bg-surface-2 p-1 text-center text-[10px] text-alert" title={clip.error || ""}>clip failed</div>
                       ) : (shooting && (shootScope === "all" ? !anyReshooting : shootScope.includes(i)) && (shootingRole === "" || shootingRole === s.role)) ? (
                         <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#a855f7]/40 border-t-[#a855f7]" />shooting…</div>
                       ) : shot?.error ? (
@@ -1070,7 +1070,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <span className="tabular text-xs font-bold text-ink">Scene {i + 1}</span>
                     <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-faint">{s.start}-{s.end}</span>
                     <span className="text-[11px] font-semibold text-ink-dim">{s.beat}</span>
-                    <span className={`tabular rounded border px-1.5 py-0.5 text-[9px] font-bold ${role.cls}`}>{role.label}</span>
+                    <span className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-bold ${role.cls}`}>{role.label}</span>
                     {s.role !== "graphic" && (
                       <span className="ml-auto flex gap-1.5">
                         {isStudio && <button onClick={() => openCallout(i)} title="Add a frosted-glass offer callout that appears ON this scene (each scene can have its own)" className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${sceneCallouts[String(i)] ? "border-[#ffcb05]/60 bg-[#ffcb05]/10 text-[#ffcb05]" : "border-line text-ink-dim hover:text-ink"}`}>{coOpen === i ? "Close" : sceneCallouts[String(i)] ? "🪟 Callout ✓" : "🪟 Callout"}</button>}
@@ -1369,20 +1369,20 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                                 ? <video src={clip.url} muted playsInline className="h-full w-full object-cover" />
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 : shot?.url ? <img src={shot.url} alt="" className="h-full w-full object-cover" />
-                                : <div className="flex h-full items-center justify-center text-[9px] text-ink-faint">not shot</div>}
+                                : <div className="flex h-full items-center justify-center text-[10px] text-ink-faint">not shot</div>}
                               {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-40m"} /></div>}
-                              {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip.url as string) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
-                              {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[9px] font-bold text-alert">⚠ failed</div>}
+                              {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip.url as string) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} aria-label="Preview full size" className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
+                              {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[10px] font-bold text-alert">⚠ failed</div>}
                               {!isRendering && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
                               {!isRendering && dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b bg-[#a855f7]/90 px-0.5 text-center text-[7px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
                             </div>
                             <div className="mt-1 flex items-center justify-between">
                               <span className="tabular text-[10px] font-bold text-ink">Scene {i + 1}</span>
-                              <span className={`tabular rounded border px-1 text-[8px] font-bold ${rl.cls}`}>{rl.label}</span>
+                              <span className={`tabular rounded border px-1 text-[10px] font-bold ${rl.cls}`}>{rl.label}</span>
                             </div>
                             <div className="mt-1 flex gap-1">
-                              <button onClick={() => editFromStrip(i, s)} className="flex-1 rounded border border-[#a855f7]/40 px-1 py-0.5 text-[9px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
-                              <button onClick={() => animateScene(i)} disabled={animatingScenes.has(i) || !approved.has("voice") || !shot?.url} title={!shot?.url ? "Shoot the keyframe first" : !approved.has("voice") ? "Finish Script & Voice first" : clip?.url ? "Re-animate this scene" : "Animate this scene"} className="flex-1 rounded border border-[#60a5fa]/40 px-1 py-0.5 text-[9px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40">{clip?.url ? "↻ Anim" : "🎞️ Anim"}</button>
+                              <button onClick={() => editFromStrip(i, s)} className="flex-1 rounded border border-[#a855f7]/40 px-1 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
+                              <button onClick={() => animateScene(i)} disabled={animatingScenes.has(i) || !approved.has("voice") || !shot?.url} title={!shot?.url ? "Shoot the keyframe first" : !approved.has("voice") ? "Finish Script & Voice first" : clip?.url ? "Re-animate this scene" : "Animate this scene"} className="flex-1 rounded border border-[#60a5fa]/40 px-1 py-0.5 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40">{clip?.url ? "↻ Anim" : "🎞️ Anim"}</button>
                             </div>
                           </div>
                         );
@@ -1485,10 +1485,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   )}
                   {finalUrl && (
                     <div className="mt-4">
-                      <div className="tabular mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut {draftClipCount > 0 && <span className="rounded bg-[#f59e0b]/85 px-1.5 py-0.5 text-[9px] font-bold text-black">720p DRAFT</span>}</div>
+                      <div className="tabular mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-ready">The finished cut {draftClipCount > 0 && <span className="rounded bg-[#f59e0b]/85 px-1.5 py-0.5 text-[10px] font-bold text-black">720p DRAFT</span>}</div>
                       <div className="relative inline-block">
                         <video src={finalUrl} controls playsInline className={`rounded-xl border border-ready/40 bg-black ${sb.format.includes("1:1") ? "aspect-square w-72" : "aspect-[9/16] w-64"}`} />
-                        {draftClipCount > 0 && <span className="pointer-events-none absolute left-2 top-2 rounded bg-[#f59e0b]/90 px-1.5 py-0.5 text-[9px] font-bold text-black">720p DRAFT</span>}
+                        {draftClipCount > 0 && <span className="pointer-events-none absolute left-2 top-2 rounded bg-[#f59e0b]/90 px-1.5 py-0.5 text-[10px] font-bold text-black">720p DRAFT</span>}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2"><a href={finalUrl} download={draftClipCount > 0 ? "gas-cut-DRAFT.mp4" : "gas-cut.mp4"} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink">↓ Download{draftClipCount > 0 ? " (draft)" : ""}</a>{draftClipCount > 0 && <span className="text-[11px] text-[#fbbf24]">Not client-ready - render final quality + re-stitch first.</span>}</div>
                     </div>
@@ -1521,7 +1521,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       {vzoom && (
         <div onClick={() => setVzoom(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
           <video src={vzoom} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} className="max-h-[90vh] max-w-[90vw] rounded-xl border border-line bg-black" />
-          <button onClick={() => setVzoom(null)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-lg text-white hover:bg-black/90">✕</button>
+          <button onClick={() => setVzoom(null)} aria-label="Close" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-lg text-white hover:bg-black/90">✕</button>
         </div>
       )}
     </div>
@@ -1598,8 +1598,8 @@ function GuidePicker({ role, creatives, selected, onPick, onZoom }: {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={c.url} alt="creative guide" onClick={() => onPick(role, c.url)}
                 className={`h-44 w-28 cursor-pointer rounded-md border-2 object-cover transition ${on ? "border-[#a855f7] shadow-[0_0_14px_rgba(168,85,247,0.5)]" : "border-line opacity-70 hover:opacity-100"}`} />
-              {on && <span className="absolute left-1 top-1 rounded bg-[#a855f7] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Guide</span>}
-              <button onClick={(e) => { e.stopPropagation(); onZoom(c.url); }} title="Preview" className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/40 bg-black/55 text-[9px] text-white backdrop-blur-sm hover:bg-black/80">👁</button>
+              {on && <span className="absolute left-1 top-1 rounded bg-[#a855f7] px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Guide</span>}
+              <button onClick={(e) => { e.stopPropagation(); onZoom(c.url); }} title="Preview" aria-label="Preview" className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/40 bg-black/55 text-[10px] text-white backdrop-blur-sm hover:bg-black/80">👁</button>
             </div>
           );
         })}
@@ -1649,8 +1649,8 @@ function RefGallery({ role, scenes, shots, dropped, shooting, onToggleDrop, onZo
               ) : (
                 <div className="flex aspect-[9/16] w-full items-center justify-center bg-surface-2 px-2 text-center text-[10px] text-ink-faint">not shot yet</div>
               )}
-              <span className="tabular absolute left-1 top-1 max-w-[88%] truncate rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">Scene {i + 1} · {s.beat}</span>
-              {shot?.url && <button onClick={() => onZoom(shot.url!)} title="Expand full size" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-xs text-white/90 hover:bg-black/85">👁</button>}
+              <span className="tabular absolute left-1 top-1 max-w-[88%] truncate rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-dim">Scene {i + 1} · {s.beat}</span>
+              {shot?.url && <button onClick={() => onZoom(shot.url!)} title="Expand full size" aria-label="Expand full size" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-xs text-white/90 hover:bg-black/85">👁</button>}
               {shot?.url && (
                 <button onClick={() => onToggleDrop(i)} className={`absolute inset-x-1 bottom-1 rounded-md px-2 py-1 text-[10px] font-bold transition ${isDropped ? "bg-alert/80 text-white hover:bg-alert" : "bg-ready/85 text-black hover:bg-ready"}`}>
                   {isDropped ? "✕ Rejected - tap to keep" : "✓ Keep"}
@@ -1705,7 +1705,7 @@ function RenderTimer({ start, hint }: { start: number; hint?: string }) {
   return (
     <div className="tabular text-center leading-tight">
       <div className="text-[11px] font-bold">{mm}:{String(ss).padStart(2, "0")}</div>
-      {hint && <div className="mt-0.5 text-[8px] font-normal opacity-60">typically {hint}</div>}
+      {hint && <div className="mt-0.5 text-[10px] font-normal opacity-60">typically {hint}</div>}
     </div>
   );
 }
@@ -1724,12 +1724,12 @@ function ClipStrip({ clips, role, sceneIdx, onExpand }: { clips: Clip[]; role: "
               {c?.url ? (
                 <>
                   <ClipPreview clip={c} className="aspect-[9/16] w-40 rounded-lg border border-ready/40 bg-black object-cover" />
-                  <button onClick={() => onExpand(c.url!)} title="Expand full size" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-xs text-white/90 hover:bg-black/85">👁</button>
+                  <button onClick={() => onExpand(c.url!)} title="Expand full size" aria-label="Expand full size" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-xs text-white/90 hover:bg-black/85">👁</button>
                 </>
               ) : (
                 <div className="flex aspect-[9/16] w-40 items-center justify-center rounded-lg border border-dashed border-line bg-surface-2 px-2 text-center text-[10px] text-ink-faint">not rendered yet</div>
               )}
-              <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-ink-dim">Scene {i + 1}</span>
+              <span className="tabular absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-dim">Scene {i + 1}</span>
             </div>
           );
         })}

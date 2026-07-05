@@ -56,11 +56,11 @@ export default function ConnectTools({
               <div className="flex items-center gap-2">
                 <span className="font-semibold">{c.label}</span>
                 {c.required ? (
-                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-ink-faint">
+                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ink-faint">
                     required
                   </span>
                 ) : (
-                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-ink-faint">
+                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ink-faint">
                     optional
                   </span>
                 )}

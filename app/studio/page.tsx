@@ -96,7 +96,7 @@ export default async function StudioPage() {
                           : <div className="flex h-full w-full items-center justify-center bg-surface-2 text-3xl text-ink-faint">🎭</div>}
                         {/* gradient scrim so the name/status read cleanly over any image */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                        <span className={`tabular absolute right-2 top-2 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide backdrop-blur-sm ${isLocked ? "bg-ready/85 text-white" : "bg-black/55 text-ink-dim"}`}>{isLocked ? "● Ready" : "Building"}</span>
+                        <span className={`tabular absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm ${isLocked ? "bg-ready/85 text-white" : "bg-black/55 text-ink-dim"}`}>{isLocked ? "● Ready" : "Building"}</span>
                         <div className="absolute inset-x-0 bottom-0 p-3">
                           <div className="truncate text-sm font-bold text-white drop-shadow">{inf.name}</div>
                           <div className="mt-0.5 translate-y-1 text-[11px] font-semibold text-[#c79bff] opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">{isLocked ? "Produce →" : "Continue build →"}</div>

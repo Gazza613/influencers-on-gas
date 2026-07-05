@@ -121,7 +121,7 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
                 <span className="flex shrink-0 items-center gap-3 text-[11px]">
                   <span className="text-ink-faint">{s.chunk_count ?? 0} chunks</span>
                   <span className={badge(s.status)}>{s.status === "pending" ? "indexing…" : s.status}</span>
-                  <button onClick={() => removeSource(s)} title="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
+                  <button onClick={() => removeSource(s)} title="Delete this source" aria-label="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
                 </span>
               </li>
             ))}

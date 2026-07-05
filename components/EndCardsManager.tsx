@@ -39,7 +39,7 @@ export default function EndCardsManager({ initial }: { initial: EndCard[] }) {
         ? <video src={c.url} controls playsInline className={`w-full bg-black object-contain ${c.ratio === "1:1" ? "aspect-square" : "aspect-[9/16]"}`} />
         /* eslint-disable-next-line @next/next/no-img-element */
         : <img src={c.url} alt={c.label} className={`w-full bg-black object-contain ${c.ratio === "1:1" ? "aspect-square" : "aspect-[9/16]"}`} />}
-      <button onClick={() => del(c.id)} title="Delete end card" className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-alert/60 bg-black/70 text-xs text-alert transition hover:bg-alert/30">✕</button>
+      <button onClick={() => del(c.id)} title="Delete end card" aria-label="Delete end card" className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-alert/60 bg-black/70 text-xs text-alert transition hover:bg-alert/30">✕</button>
       <div className="p-2.5"><div className="truncate text-[12px] font-semibold text-ink">{c.label || "End card"}</div><div className="tabular text-[10px] uppercase text-ink-faint">{c.kind} · {c.ratio}</div></div>
     </div>
   );

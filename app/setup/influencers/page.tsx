@@ -73,7 +73,7 @@ export default async function InfluencersIndex() {
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-3xl text-ink-faint">🎭</div>
                 )}
-                <span className={`tabular absolute right-2 top-2 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${locked ? "bg-ready/85 text-white" : "bg-black/60 text-ink-dim"}`}>
+                <span className={`tabular absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${locked ? "bg-ready/85 text-white" : "bg-black/60 text-ink-dim"}`}>
                   {locked ? "🔒 Ready" : "Building"}
                 </span>
                 {isSuper && <CastDeleteButton id={inf.id} name={inf.name} />}
@@ -81,7 +81,7 @@ export default async function InfluencersIndex() {
               <div className="p-3">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-bold text-ink">{inf.name}</span>
-                  <span className="tabular shrink-0 text-[9px] uppercase tracking-wide text-ink-faint">{inf.mode === "twin" ? "twin" : "influencer"}</span>
+                  <span className="tabular shrink-0 text-[10px] uppercase tracking-wide text-ink-faint">{inf.mode === "twin" ? "twin" : "influencer"}</span>
                 </div>
                 <p className="mt-1 line-clamp-2 min-h-[2.4em] text-[11px] leading-snug text-ink-dim">{blurb(inf)}</p>
               </div>

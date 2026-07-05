@@ -326,13 +326,13 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
       <div key={id} className={`shimmer group relative overflow-hidden rounded-lg border-2 ${sel ? "border-[#a855f7]" : "border-line"}`}>
         {!c.url ? (
           <div className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint">
-            <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">generation failed</span>
+            <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[10px] font-semibold text-alert">generation failed</span>
             <span>{c.error || "No image returned"}</span>
           </div>
         ) : broken.has(u) ? (
           <button type="button" onClick={() => setBroken((b) => { const n = new Set(b); n.delete(u); return n; })}
             className="flex aspect-square w-full flex-col items-center justify-center bg-surface-2 text-center text-[10px] text-ink-faint transition hover:bg-surface-1">
-            <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[9px] font-semibold text-alert">image failed to load</span>
+            <span className="mb-1 rounded bg-alert/20 px-2 py-0.5 text-[10px] font-semibold text-alert">image failed to load</span>
             <span>{c.error || "tap to retry"}</span>
           </button>
         ) : (
@@ -367,6 +367,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <button
             onClick={(e) => { e.stopPropagation(); togglePick(id); }}
             aria-pressed={sel}
+            aria-label="Select this shot"
             title={sel ? "Selected" : "Select this shot"}
             className={`absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-sm transition active:scale-90 ${sel ? "border-[#a855f7] bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]" : "border-white/80 bg-black/55 text-white/55 hover:bg-black/70 hover:text-white"}`}
           >✓</button>
@@ -374,33 +375,34 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <button
             onClick={(e) => { e.stopPropagation(); removeOne(id); }}
             title="Delete this failed shot"
+            aria-label="Delete this failed shot"
             className="absolute right-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-alert/70 bg-black/60 text-sm text-alert transition hover:bg-alert/20 active:scale-90"
           >✕</button>
         )}
         <div className="absolute left-1.5 top-1.5 flex flex-wrap gap-1">
-          <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">{c.ratio}</span>
-          <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">{c.resolution}</span>
+          <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-white">{c.ratio}</span>
+          <span className="tabular rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">{c.resolution}</span>
           {c.url && (refs.aroll === c.url || refs.broll === c.url) && (
-            <span className="tabular rounded bg-[#a855f7] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]">★ {refs.aroll === c.url ? "Talking shot" : "Scene shot"} ref</span>
+            <span className="tabular rounded bg-[#a855f7] px-1.5 py-0.5 text-[10px] font-bold uppercase text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]">★ {refs.aroll === c.url ? "Talking shot" : "Scene shot"} ref</span>
           )}
         </div>
         {c.url && !broken.has(c.url) && (c.status === "approved" || c.status === "failed_qa") && (
-          <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
+          <span className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${g.cls}`} title={(c.qa?.issues || []).join(" · ") || "AI Vision QA grade"}>
             {g.t}
           </span>
         )}
         {c.url && !broken.has(c.url) && c.status === "failed_generation" && (
-          <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-alert" title={c.error || "Generation failed"}>
+          <span className="absolute bottom-1.5 right-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-alert" title={c.error || "Generation failed"}>
             failed
           </span>
         )}
         {c.url && !broken.has(c.url) && !busy && c.upscale_error && (
-          <span className="absolute bottom-1.5 left-1.5 rounded bg-alert/85 px-1.5 py-0.5 text-[9px] font-semibold text-white" title={c.upscale_error}>
+          <span className="absolute bottom-1.5 left-1.5 rounded bg-alert/85 px-1.5 py-0.5 text-[10px] font-semibold text-white" title={c.upscale_error}>
             4K failed
           </span>
         )}
         {c.url && !broken.has(c.url) && !busy && editingId !== id && (
-          <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="Review full size"
+          <button onClick={(e) => { e.stopPropagation(); setZoom(c.url); }} title="Review full size" aria-label="Review full size"
             className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/40 bg-black/55 text-lg text-white opacity-60 backdrop-blur-sm transition hover:scale-105 hover:bg-black/80 hover:opacity-100 active:scale-95">👁</button>
         )}
         {c.url && !broken.has(c.url) && !busy && editingId !== id && (
@@ -422,7 +424,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               <button onClick={() => applyEdit(c)} disabled={!editText.trim()} className="flex-1 rounded-md bg-[#a855f7] px-2 py-1 text-[11px] font-bold text-white disabled:opacity-40">Apply</button>
               <button onClick={() => { setEditingId(null); setEditText(""); }} className="rounded-md border border-white/25 px-2 py-1 text-[11px] text-white/80">Cancel</button>
             </div>
-            <p className="text-[9px] leading-tight text-white/50">Keeps the location, pose &amp; her - changes only what you say. Adds a new shot beside this one.</p>
+            <p className="text-[10px] leading-tight text-white/50">Keeps the location, pose &amp; her - changes only what you say. Adds a new shot beside this one.</p>
           </div>
         )}
       </div>
@@ -581,7 +583,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
                   <button key={c.id || c.url} onClick={() => setMatchRef(on ? "" : (c.url as string))} title={on ? "Matching this look - tap to clear" : "Match this look"} className={`relative h-16 w-12 shrink-0 overflow-hidden rounded-lg border-2 transition ${on ? "border-[#60a5fa]" : "border-line hover:border-line-strong"}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={c.url as string} alt="" className="h-full w-full object-cover" />
-                    {on && <span className="absolute inset-0 flex items-center justify-center bg-[#60a5fa]/35 text-[8px] font-bold text-white">MATCH</span>}
+                    {on && <span className="absolute inset-0 flex items-center justify-center bg-[#60a5fa]/35 text-[10px] font-bold text-white">MATCH</span>}
                   </button>
                 );
               })}
@@ -620,7 +622,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
                   <span key={u} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={u} alt="location" className="h-10 w-10 rounded border border-line object-cover" />
-                    <button onClick={() => setLocationRefs((p) => p.filter((x) => x !== u))} className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-[9px] text-white">✕</button>
+                    <button onClick={() => setLocationRefs((p) => p.filter((x) => x !== u))} aria-label="Remove reference" className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-[10px] text-white">✕</button>
                   </span>
                 ))}
                 <span className="ml-1 text-[10px] text-ink-faint">{locationRefs.length} location{locationRefs.length === 1 ? "" : "s"} - shots rotate through them</span>
@@ -703,7 +705,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
                       <div className="relative">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={`${role} reference`} className="h-24 w-[3.55rem] rounded-md border border-[#a855f7]/50 object-cover" />
-                        <button onClick={() => setZoom(url)} title="Preview full size" className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white backdrop-blur hover:bg-black/80">👁</button>
+                        <button onClick={() => setZoom(url)} title="Preview full size" aria-label="Preview full size" className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white backdrop-blur hover:bg-black/80">👁</button>
                       </div>
                       <div className="flex flex-col gap-1">
                         {is4k
