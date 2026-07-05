@@ -1143,18 +1143,25 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             <img src={shot.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
                           )}
                           <div className="absolute inset-x-0 top-2.5 flex justify-center px-2">
-                            <div className="w-full rounded-[15px] px-2.5 py-2.5 text-center"
-                              style={{ border: "1.5px solid rgba(255,255,255,0.62)", background: "linear-gradient(135deg,rgba(255,255,255,0.34) 0%,rgba(255,255,255,0.13) 48%,rgba(255,255,255,0.06) 100%)", boxShadow: "0 12px 30px rgba(0,0,0,0.5), inset 0 1.5px 0 rgba(255,255,255,0.85)" }}>
-                              {coDraft.kick && <span className="inline-block rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase leading-none tracking-[0.12em] text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 3px 10px ${coDraft.accent}70` }}>{coDraft.kick}</span>}
-                              {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.line}</div>}
-                              {(coDraft.num || coDraft.suffix) && (
-                                <div className="mt-2">
-                                  {coDraft.num && <span className="rounded-[8px] px-2 py-0.5 text-[17px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 5px 16px ${coDraft.accent}99, inset 0 1px 0 rgba(255,255,255,0.55)` }}>{coDraft.num}</span>}
-                                  {coDraft.suffix && <span className="ml-1 align-middle text-[9px] font-black text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.suffix}</span>}
-                                </div>
-                              )}
+                            <div className="relative w-full overflow-hidden rounded-[15px] px-2.5 py-2.5 text-center"
+                              style={{ border: "1.5px solid rgba(255,255,255,0.62)", background: "linear-gradient(135deg,rgba(255,255,255,0.34) 0%,rgba(255,255,255,0.13) 48%,rgba(255,255,255,0.06) 100%)", boxShadow: `0 12px 30px rgba(0,0,0,0.5), 0 0 30px ${coDraft.accent}30, inset 0 1.5px 0 rgba(255,255,255,0.85)`, animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
+                              {/* glowing accent top-edge line */}
+                              <div style={{ position: "absolute", top: 0, left: "26%", right: "26%", height: 2, borderRadius: "0 0 4px 4px", background: coDraft.accent, boxShadow: `0 0 8px ${coDraft.accent}`, zIndex: 3 }} />
+                              {/* animated sheen sweep */}
+                              <div style={{ position: "absolute", top: 0, left: "-45%", width: "36%", height: "100%", zIndex: 1, background: "linear-gradient(105deg,transparent,rgba(255,255,255,0.5),transparent)", transform: "skewX(-16deg)", animation: "gasCoSheen 3s ease-in-out infinite" }} />
+                              <div className="relative" style={{ zIndex: 2 }}>
+                                {coDraft.kick && <span className="inline-block rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase leading-none tracking-[0.12em] text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 3px 10px ${coDraft.accent}70` }}>{coDraft.kick}</span>}
+                                {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.line}</div>}
+                                {(coDraft.num || coDraft.suffix) && (
+                                  <div className="mt-2">
+                                    {coDraft.num && <span className="rounded-[8px] px-2 py-0.5 text-[17px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 5px 16px ${coDraft.accent}99, inset 0 1px 0 rgba(255,255,255,0.55)` }}>{coDraft.num}</span>}
+                                    {coDraft.suffix && <span className="ml-1 align-middle text-[9px] font-black text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.65)" }}>{coDraft.suffix}</span>}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          <style>{`@keyframes gasCoSheen{0%{left:-45%}55%,100%{left:125%}}@keyframes gasCoPop{0%{opacity:0;transform:scale(0.82) translateY(-6px)}60%{opacity:1;transform:scale(1.05)}100%{transform:scale(1)}}`}</style>
                         </div>
                       </div>
                     </div>
