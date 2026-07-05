@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import DeleteInfluencerButton from "@/components/DeleteInfluencerButton";
+import DeleteCutButton from "@/components/DeleteCutButton";
 import { listConnections } from "@/lib/connections";
 import { listInfluencers, type Influencer } from "@/lib/influencers";
 
@@ -118,7 +119,8 @@ export default async function StudioPage() {
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {cuts.slice(0, 8).map(({ inf, url, title }) => (
-                  <div key={inf.id} className="card lift overflow-hidden rounded-2xl">
+                  <div key={inf.id} className="card lift relative overflow-hidden rounded-2xl">
+                    <DeleteCutButton id={inf.id} name={inf.name} />
                     <video src={url as string} controls playsInline className="aspect-[9/16] w-full bg-black object-cover" />
                     <div className="p-3"><div className="truncate text-sm font-bold">{title || inf.name}</div><div className="text-[11px] text-ink-faint">{inf.name}</div></div>
                   </div>

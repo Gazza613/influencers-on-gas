@@ -19,10 +19,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Optional: drop ALL existing clips + the final cut (leftover videos from earlier testing) so the board
   // is clean keyframes again. Keeps the storyboard, shots, voice and approvals - just the videos go.
   const clearClips = body?.clearClips === true;
+  // Delete just the finished CUT (the stitched final video) - removes it from the studio's Latest cuts
+  // and the showcase, but KEEPS the scenes/clips so it can be re-stitched. (clearClips is the heavier
+  // "wipe the clips too" option.)
+  const clearFinal = body?.clearFinal === true;
   // Also clear any per-scene re-shoot flags left mid-flight. SCOPED write so a genuinely-live concurrent
-  // render's clips/shots aren't clobbered - we only touch the status flags (+ optional clip clear).
+  // render's clips/shots aren't clobbered - we only touch the status flags (+ optional clip/final clear).
   const shots = Array.isArray(production.shots) ? (production.shots as Record<string, unknown>[]).map((s) => ({ ...s, reshooting: false })) : production.shots;
   await updateProductionFields(id, { shots, shots_status: "idle",
-    ...(clearClips ? { clips: [], final_url: null } : {}), clips_status: "idle", assembly_status: "idle", audio_status: "idle" });
+    ...(clearClips ? { clips: [], final_url: null } : clearFinal ? { final_url: null } : {}),
+    clips_status: "idle", assembly_status: "idle", audio_status: "idle" });
   return NextResponse.json({ ok: true });
 }
