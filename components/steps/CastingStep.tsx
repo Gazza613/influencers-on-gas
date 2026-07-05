@@ -22,7 +22,7 @@ const CASTING_NARRATION = [
 
 export default function CastingStep({
   influencerId, name, status: initialStatus, candidates: initialCandidates, chosenUrl, referenceUrl,
-  initialBrief, initialBible,
+  initialBrief, initialBible, missingTools = [],
 }: {
   influencerId: string;
   name: string;
@@ -32,6 +32,7 @@ export default function CastingStep({
   referenceUrl: string | null;
   initialBrief: string | null;
   initialBible: Record<string, unknown> | null;
+  missingTools?: string[]; // required vendor tools not yet connected - block casting until they are
 }) {
   const [st, setSt] = useState(initialStatus);
   const [candidates, setCandidates] = useState<Ref[]>(initialCandidates || []);
@@ -71,7 +72,7 @@ export default function CastingStep({
     // Make sure any in-flight character edits are written before we build the prompt.
     try { await bibleFlush.current?.(); } catch { /* non-fatal */ }
     const r = await fetch(`/api/influencers/${influencerId}/generate`, { method: "POST" });
-    if (!r.ok) { setErr((await r.json().catch(() => ({})))?.error || "Could not start casting"); setBusy(false); return; }
+    if (!r.ok) { setErr(((await r.json().catch(() => ({})))?.error as string) || "Couldn't start casting. Check your tools are connected (Connect Tools) and your Higgsfield balance in Cost Control, then try again."); setBusy(false); return; }
     setSt("casting"); setCandidates([]);
     flex(`${CREW.casting.emoji} ${CREW.casting.name}, your ${CREW.casting.role}: ${CREW.casting.greeting}`);
     poll();
@@ -120,7 +121,16 @@ export default function CastingStep({
               💸 On your Higgsfield <span className="text-ink-dim">Ultra</span> plan these casting images are <span className="text-ink-dim">included</span> (no credit cost) - re-cast as much as you like. Still worth getting the character right first, so the looks land. Live spend is always in <span className="text-ink-dim">Cost Control</span>.
             </p>
 
-            {!casting && (
+            {/* GATE (P0-5): casting is a paid vendor call - if a required tool isn't connected it would fail with
+                a raw error, so we block it with a clear "connect first" path instead of letting it break. */}
+            {!casting && missingTools.length > 0 && (
+              <div className="mt-3 rounded-xl border border-alert/40 bg-alert/5 p-4">
+                <div className="text-sm font-semibold text-alert">Connect your tools before casting</div>
+                <p className="mt-1 text-[13px] text-ink-dim">Casting needs {missingTools.length === 1 ? "this tool" : "these tools"} connected first: <span className="font-semibold text-ink">{missingTools.join(", ")}</span>. It only takes a moment, then come back and cast.</p>
+                <Link href="/setup/connect" className="btn-brand mt-3 inline-block rounded-lg px-4 py-2 text-sm font-bold">→ Connect tools</Link>
+              </div>
+            )}
+            {!casting && missingTools.length === 0 && (
               <button onClick={cast} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold">
                 {candidates.length ? "↻ Re-cast looks" : "✨ Generate looks"}
               </button>
