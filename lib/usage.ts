@@ -1,11 +1,20 @@
 import { db } from "./db";
+import { getZarPerUsd } from "./fx";
 
-// Higgsfield Ultra: $375 / 9,000 credits per month ⇒ ≈ $0.0417 per credit.
-// In Rand at ~R18.5/$ that is ≈ R0.77 (77c) per credit. Per-generation prices live
-// in rate_card; the live $ figures use the daily FX rate (lib/fx.ts).
+// Higgsfield Ultra: $375 / 9,000 credits per month ⇒ ≈ $0.0417 per credit (USD_PER_CREDIT).
+// The Rand value of a credit is now WIRED TO THE LIVE USD/ZAR RATE (lib/fx.ts) via
+// creditZarCents(), so credit valuations track the market instead of a fixed R18.5/$ basis.
 export const MONTHLY_USD = 375;
 export const MONTHLY_CREDITS = 9000;
-export const CREDIT_ZAR_CENTS = 77;
+export const USD_PER_CREDIT = MONTHLY_USD / MONTHLY_CREDITS; // ≈ $0.0417
+
+// ZAR cents for one credit at a given USD/ZAR rate. e.g. at R18.5/$ ⇒ 77c; at R18/$ ⇒ 75c.
+export function creditZarCents(zarPerUsd: number): number {
+  const rate = zarPerUsd > 0 ? zarPerUsd : 18.5;
+  return Math.round(USD_PER_CREDIT * rate * 100);
+}
+// Fixed fallback (~R18.5/$) for the rare code path without a live rate to hand. Prefer creditZarCents(rate).
+export const CREDIT_ZAR_CENTS = creditZarCents(18.5); // 77
 
 type Rate = { credits: number; cents: number };
 
@@ -50,9 +59,11 @@ export async function recordUsage(o: UsageInput): Promise<void> {
   );
 }
 
-// Upsert a rate_card row (used by cost calibration). cents derived from credits.
+// Upsert a rate_card row (used by cost calibration). The ZAR price is derived from credits at the
+// LIVE USD/ZAR rate, so recalibrating re-prices credit-based models at today's rand.
 export async function setRate(provider: string, model: string, unit: string, credits: number): Promise<void> {
-  const cents = Math.round(credits * CREDIT_ZAR_CENTS);
+  const zar = await getZarPerUsd();
+  const cents = Math.round(credits * USD_PER_CREDIT * zar * 100);
   await db().query(
     `insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
      values ($1,$2,$3,$4,$5,true)
