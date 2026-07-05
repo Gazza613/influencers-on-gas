@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { askConfirm } from "@/lib/confirm";
 
 type User = { id: string; email: string; name: string | null; role: string; status: string; created_at: string };
 
@@ -36,7 +37,7 @@ export default function TeamManager() {
   }
 
   async function remove(u: User) {
-    if (!confirm(`Remove ${u.name || u.email}? They will lose access immediately.`)) return;
+    if (!(await askConfirm({ title: `Remove ${u.name || u.email}?`, body: "They will lose access immediately.", tone: "danger", confirmLabel: "Remove" }))) return;
     const r = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
     if (r.ok) load();
   }

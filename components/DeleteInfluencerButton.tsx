@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { askConfirm } from "@/lib/confirm";
+import { flex } from "@/lib/flex";
 
 // Delete an influencer from the Studio card. Overlaid on the card (its own click is stopped so it never
 // triggers the card's navigation). Confirms, calls DELETE (which purges blobs + drops the row), refreshes.
@@ -13,19 +15,19 @@ export default function DeleteInfluencerButton({ id, name }: { id: string; name:
     e.preventDefault();
     e.stopPropagation();
     if (busy) return;
-    if (!confirm(`Delete "${name}"?\n\nThis permanently removes this influencer and everything it owns — reference images, keyframes, clips, voice and the final cut — across the whole platform. This cannot be undone.`)) return;
+    if (!(await askConfirm({ title: `Delete "${name}"?`, body: "This permanently removes this influencer and everything it owns - reference images, keyframes, clips, voice and the final cut - across the whole platform. This cannot be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     setBusy(true);
     try {
       const r = await fetch(`/api/influencers/${id}`, { method: "DELETE" });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
-        alert(d.error || "Could not delete — please try again.");
+        flex(d.error || "Could not delete - please try again.");
         setBusy(false);
         return;
       }
       router.refresh();
     } catch {
-      alert("Could not delete — check your connection.");
+      flex("Could not delete - check your connection.");
       setBusy(false);
     }
   }

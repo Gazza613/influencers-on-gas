@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { askConfirm } from "@/lib/confirm";
+import { flex } from "@/lib/flex";
 
 // Small hover-reveal delete control for a cast card. Stops the card's Link from navigating.
 export default function CastDeleteButton({ id, name }: { id: string; name: string }) {
@@ -9,12 +11,12 @@ export default function CastDeleteButton({ id, name }: { id: string; name: strin
   const [busy, setBusy] = useState(false);
   async function del(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    if (busy || !confirm(`Delete "${name}"? This removes the influencer and all its looks, and it cannot be undone.`)) return;
+    if (busy || !(await askConfirm({ title: `Delete "${name}"?`, body: "This removes the influencer and all its looks, and it cannot be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     setBusy(true);
     const r = await fetch(`/api/influencers/${id}`, { method: "DELETE" }).catch(() => null);
     setBusy(false);
     if (r?.ok) router.refresh();
-    else alert("Couldn't delete that influencer.");
+    else flex("Couldn't delete that influencer.");
   }
   return (
     <button onClick={del} disabled={busy} title={`Delete ${name}`}

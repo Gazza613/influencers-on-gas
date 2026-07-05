@@ -7,6 +7,7 @@ import type { Influencer } from "@/lib/influencers";
 import { buildProgress, ringColour } from "@/lib/build-progress";
 import ConsentGate from "@/components/ConsentGate";
 import Uploader from "@/components/Uploader";
+import { askConfirm } from "@/lib/confirm";
 
 type Mode = "synthetic" | "twin";
 
@@ -44,7 +45,7 @@ export default function InfluencerRoster({ influencers }: { influencers: Influen
 
   async function remove(e: React.MouseEvent, inf: Influencer) {
     e.preventDefault(); e.stopPropagation();
-    if (deleting || !confirm(`Delete "${inf.name}"? This removes the influencer and all its looks. This cannot be undone.`)) return;
+    if (deleting || !(await askConfirm({ title: `Delete "${inf.name}"?`, body: "This removes the influencer and all its looks. This cannot be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     setDeleting(inf.id);
     const r = await fetch(`/api/influencers/${inf.id}`, { method: "DELETE" });
     setDeleting(null);

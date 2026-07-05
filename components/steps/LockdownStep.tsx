@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import WorkingPanel from "@/components/WorkingPanel";
 import { CREW } from "@/lib/crew";
+import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
 
 const LOCKDOWN_NARRATION = [
@@ -60,7 +61,7 @@ export default function LockdownStep({
   }
 
   async function abort() {
-    if (!confirm("Abort this lock-down? You can start it again afterwards.")) return;
+    if (!(await askConfirm({ title: "Abort this lock-down?", body: "You can start it again afterwards.", confirmLabel: "Abort" }))) return;
     await fetch(`/api/influencers/${influencerId}/train`, { method: "DELETE" }).catch(() => {});
     setBusy(false); setErr(""); setSt("frames_ready");
   }

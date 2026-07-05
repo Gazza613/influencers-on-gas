@@ -20,19 +20,27 @@ const BUILDING = new Set(["casting", "generating", "training", "ready"]);
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-// Live running build cost chip with a traffic-light signal.
-function RunningCost({ name, cents }: { name: string; cents: number }) {
-  const tier = cents > 100000 ? "red" : cents >= 50000 ? "amber" : "green";
+// Live running build cost chip with a traffic-light signal. The amber/red thresholds are tied to
+// the team's per-build TARGET (set in Cost Control), not a hardcoded number: amber past 60% of the
+// target, red at/over it. With no target set it falls back to sensible fixed thresholds.
+function RunningCost({ name, cents, budgetCents }: { name: string; cents: number; budgetCents: number | null }) {
+  const amberAt = budgetCents ? budgetCents * 0.6 : 50000;
+  const redAt = budgetCents ? budgetCents : 100000;
+  const tier = cents >= redAt ? "red" : cents >= amberAt ? "amber" : "green";
   const styles: Record<string, string> = {
     green: "border-ready/40 bg-ready/10 text-ready",
     amber: "border-active/50 bg-active/10 text-active",
     red: "border-alert/50 bg-alert/12 text-alert",
   };
+  const title = budgetCents
+    ? `${rand(cents)} of ${rand(budgetCents)} build target - open Cost Control`
+    : "Open Cost Control (set a per-build target here)";
   return (
-    <Link href="/cost-control" title="Open Cost Control"
+    <Link href="/cost-control" title={title}
       className={`tabular ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${styles[tier]} ${tier === "red" ? "pulse-alert" : ""}`}>
       <span className={`inline-block h-1.5 w-1.5 rounded-full ${tier === "red" ? "bg-alert" : tier === "amber" ? "bg-active" : "bg-ready"}`} />
       {name} running build cost <span className="ml-0.5">{rand(cents)}</span>
+      {budgetCents ? <span className="text-ink-faint">/ {rand(budgetCents)}</span> : null}
     </Link>
   );
 }
@@ -45,6 +53,15 @@ export default function BuildHeader({
   const pathname = usePathname();
   const [s, setS] = useState(initial);
   const [spendCents, setSpendCents] = useState<number | null>(null);
+  const [budgetCents, setBudgetCents] = useState<number | null>(null);
+
+  // The team's per-build target (set in Cost Control) - drives the cost chip's amber/red thresholds.
+  useEffect(() => {
+    fetch("/api/cost-control/budget", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (typeof d?.perBuildCents === "number" && d.perBuildCents > 0) setBudgetCents(d.perBuildCents); })
+      .catch(() => {});
+  }, []);
 
   // Poll status + running build cost while jobs run.
   const stop = useRef(false);
@@ -81,23 +98,25 @@ export default function BuildHeader({
   }, [id]);
 
   const building = !s.locked && BUILDING.has(s.status);
-  const step1Done = s.candidates > 0 || s.frames > 0 || s.hasReference || s.locked;
+  // Honest completion: step 1 ("Build my influencer") is done when a real identity look is CHOSEN
+  // (a reference set / kept frames / locked) - NOT merely when audition candidates were generated.
+  const step1Done = s.hasReference || s.frames > 0 || s.locked;
   const step2Done = s.frames > 1 || s.locked;
   const base = `/setup/influencers/${id}`;
-  const tabs: { href: string; label: string; icon: string; done: boolean; warn?: boolean; match: (p: string) => boolean }[] = [
-    { href: base, label: "Build my influencer", icon: "①", done: step1Done, match: (p: string) => p === base },
-    { href: `${base}/photoshoot`, label: "Photoshoot", icon: "②", done: step2Done, match: (p: string) => p.endsWith("/photoshoot") },
-    { href: `${base}/lockdown`, label: "Lock down", icon: "③", done: s.locked, match: (p: string) => p.endsWith("/lockdown") },
-  ];
-  // Creatives unlocks once the identity is locked; it turns green once any shot is rendered. Script & Voice is
-  // now its OWN stage (the foundation) before The Final Cut, where the scenes render to the locked voice timing.
+  // ALL SIX stages are shown from step one so a new user sees the whole arc (the video-making half
+  // included), with the post-lock stages LOCKED (not navigable) until the identity is locked. One
+  // continuous 1..6 spine - no more ①②③ then ✦🎙️🎬 numbering break.
+  const videoLocked = !s.locked;
   const creativesDone = s.creatives > 0;
-  if (s.locked) {
-    const onBuild = pathname.endsWith("/producer") || pathname.endsWith("/voice");
-    tabs.push({ href: `${base}/creatives`, label: "Wardrobe & Set", icon: "✦", done: creativesDone, warn: !creativesDone && onBuild, match: (p: string) => p.endsWith("/creatives") });
-    tabs.push({ href: `${base}/voice`, label: "Script & Voice", icon: "🎙️", done: s.voiceApproved, match: (p: string) => p.endsWith("/voice") });
-    tabs.push({ href: `${base}/producer`, label: "The Final Cut", icon: "🎬", done: s.videoDone, warn: !s.voiceApproved && pathname.endsWith("/producer"), match: (p: string) => p.endsWith("/producer") });
-  }
+  const onBuild = pathname.endsWith("/producer") || pathname.endsWith("/voice");
+  const tabs: { href: string; label: string; done: boolean; warn?: boolean; locked: boolean; match: (p: string) => boolean }[] = [
+    { href: base, label: "Build my influencer", done: step1Done, locked: false, match: (p: string) => p === base },
+    { href: `${base}/photoshoot`, label: "Photoshoot", done: step2Done, locked: false, match: (p: string) => p.endsWith("/photoshoot") },
+    { href: `${base}/lockdown`, label: "Lock down", done: s.locked, locked: false, match: (p: string) => p.endsWith("/lockdown") },
+    { href: `${base}/creatives`, label: "Wardrobe & Set", done: creativesDone, warn: !videoLocked && !creativesDone && onBuild, locked: videoLocked, match: (p: string) => p.endsWith("/creatives") },
+    { href: `${base}/voice`, label: "Script & Voice", done: s.voiceApproved, locked: videoLocked, match: (p: string) => p.endsWith("/voice") },
+    { href: `${base}/producer`, label: "The Final Cut", done: s.videoDone, warn: !videoLocked && !s.voiceApproved && pathname.endsWith("/producer"), locked: videoLocked, match: (p: string) => p.endsWith("/producer") },
+  ];
 
   return (
     <div>
@@ -127,24 +146,39 @@ export default function BuildHeader({
         ) : null}
 
         {/* Running build cost for THIS influencer - green < R500, orange < R1000, red beyond (pulsing). */}
-        {spendCents != null && <RunningCost name={name} cents={spendCents} />}
+        {spendCents != null && <RunningCost name={name} cents={spendCents} budgetCents={budgetCents} />}
       </div>
 
-      {/* Step tabs - real pages */}
+      {/* Step tabs - all 6 stages as one continuous "Step N of 6" spine. Locked stages (the video half,
+          before the identity is locked) render as non-navigable, so the whole arc is visible from day one. */}
       <div className="mt-4 -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
-        {tabs.map((t) => {
+        {tabs.map((t, i) => {
           const active = t.match(pathname);
-          return (
-            <Link key={t.href} href={t.href}
-              aria-current={active ? "page" : undefined}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition ${
-                active ? "step-active border-[#a855f7] bg-[#a855f7]/15 font-bold text-[#c79bff]"
-                : t.done ? "border-ready/40 bg-ready/10 text-ready"
-                : t.warn ? "border-active/50 bg-active/10 text-active"
-                : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"
-              }`}>
-              <span>{t.done && !active ? "✓" : t.warn && !active ? "?" : t.icon}</span>
+          const n = i + 1;
+          // The little leading badge: locked 🔒 · done ✓ · warn ? · otherwise the step number.
+          const badge = t.locked ? "🔒" : active ? n : t.done ? "✓" : t.warn ? "?" : n;
+          const cls = `flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition ${
+            active ? "step-active border-[#a855f7] bg-[#a855f7]/15 font-bold text-[#c79bff]"
+            : t.locked ? "cursor-not-allowed border-line/60 bg-surface-1/40 text-ink-faint/60"
+            : t.done ? "border-ready/40 bg-ready/10 text-ready"
+            : t.warn ? "border-active/50 bg-active/10 text-active"
+            : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"
+          }`;
+          const inner = (
+            <>
+              <span className="tabular flex h-4 w-4 items-center justify-center rounded-full bg-black/20 text-[10px] font-bold">{badge}</span>
               <span className="font-semibold">{t.label}</span>
+            </>
+          );
+          if (t.locked) {
+            return (
+              <div key={t.href} className={cls} aria-disabled="true" title="Unlocks once you lock down the identity (step 3)">{inner}</div>
+            );
+          }
+          return (
+            <Link key={t.href} href={t.href} aria-current={active ? "page" : undefined}
+              aria-label={`Step ${n} of ${tabs.length}: ${t.label}`} className={cls}>
+              {inner}
             </Link>
           );
         })}

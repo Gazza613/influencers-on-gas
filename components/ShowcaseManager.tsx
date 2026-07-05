@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
 import type { ShowcaseVideo } from "@/lib/showcase";
 import Uploader, { capturePoster } from "@/components/Uploader";
+import { askConfirm } from "@/lib/confirm";
+import { flex } from "@/lib/flex";
 
 export default function ShowcaseManager({ token, initial }: { token: string; initial: ShowcaseVideo[] }) {
   const [videos, setVideos] = useState<ShowcaseVideo[]>(initial);
@@ -39,7 +41,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
   }
   // Remove = delete the cut entirely so it disappears (re-publish from the Producer's showreel step).
   async function remove(id: string) {
-    if (typeof window !== "undefined" && !window.confirm("Remove this cut from the showcase? It'll disappear from the reel. You can re-publish it from the Producer's showreel step.")) return;
+    if (!(await askConfirm({ title: "Remove this cut from the showcase?", body: "It'll disappear from the reel. You can re-publish it from the Producer's showreel step.", tone: "danger", confirmLabel: "Remove" }))) return;
     setBusy(id);
     const r = await fetch("/api/showcase", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -83,7 +85,7 @@ export default function ShowcaseManager({ token, initial }: { token: string; ini
       await fetch("/api/showcase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: v.id, poster_url: pf.url }) });
       setVideos((vs) => vs.map((x) => (x.id === v.id ? { ...x, poster_url: `${pf.url}?t=${Date.now()}` } : x)));
     } catch {
-      if (typeof window !== "undefined") window.alert("Couldn't read that video to make a thumbnail. Re-upload it instead and it'll get a fresh poster.");
+      flex("Couldn't read that video to make a thumbnail. Re-upload it instead and it'll get a fresh poster.");
     }
     setBusy(null);
   }

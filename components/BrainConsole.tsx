@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { askConfirm } from "@/lib/confirm";
+import { flex } from "@/lib/flex";
 
 type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number };
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
@@ -45,22 +47,22 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
   }
 
   async function removeSource(s: Source) {
-    if (!confirm(`Delete this source and everything it taught the brain?\n\n${s.uri}\n\nThis wipes its chunks and embeddings. It cannot be undone.`)) return;
+    if (!(await askConfirm({ title: "Delete this source and everything it taught the brain?", body: `${s.uri} - This wipes its chunks and embeddings. It cannot be undone.`, tone: "danger", confirmLabel: "Delete" }))) return;
     await fetch(`/api/brains/${brainId}/sources?sourceId=${encodeURIComponent(s.id)}`, { method: "DELETE" }).catch(() => {});
     setSources((list) => list.filter((x) => x.id !== s.id));
   }
 
   async function nukeAll() {
-    if (!confirm("NUKE all knowledge in this brain?\n\nEvery source, chunk and embedding is permanently deleted. The brain stays but forgets everything. This cannot be undone.")) return;
+    if (!(await askConfirm({ title: "NUKE all knowledge in this brain?", body: "Every source, chunk and embedding is permanently deleted. The brain stays but forgets everything. This cannot be undone.", tone: "danger", confirmLabel: "Nuke" }))) return;
     await fetch(`/api/brains/${brainId}/sources?sourceId=all`, { method: "DELETE" }).catch(() => {});
     setSources([]); setHits(null);
   }
 
   async function deleteBrainNow() {
-    if (!confirm("Delete this entire brain?\n\nThe brain and ALL its data are permanently removed. This cannot be undone.")) return;
+    if (!(await askConfirm({ title: "Delete this entire brain?", body: "The brain and ALL its data are permanently removed. This cannot be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     const r = await fetch(`/api/brains/${brainId}`, { method: "DELETE" }).catch(() => null);
     if (r?.ok) window.location.href = "/setup/brains";
-    else alert("Could not delete the brain. Please try again.");
+    else flex("Could not delete the brain. Please try again.");
   }
 
   async function runQuery() {

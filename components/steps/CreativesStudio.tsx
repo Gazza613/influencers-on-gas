@@ -6,6 +6,7 @@ import Lightbox from "@/components/Lightbox";
 import Uploader from "@/components/Uploader";
 import WorkingPanel from "@/components/WorkingPanel";
 import { CREW } from "@/lib/crew";
+import { askConfirm } from "@/lib/confirm";
 import { flex, pick, QA_LINES } from "@/lib/flex";
 
 type Creative = {
@@ -216,7 +217,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   }
 
   async function abort() {
-    if (!confirm("Abort this render? Anything already finished is kept; you can run again.")) return;
+    if (!(await askConfirm({ title: "Abort this render?", body: "Anything already finished is kept; you can run again.", confirmLabel: "Abort" }))) return;
     await fetch(`/api/influencers/${influencerId}/creatives`, { method: "DELETE" }).catch(() => {});
     setStatus("idle"); setErr("");
   }
@@ -421,7 +422,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               <button onClick={() => applyEdit(c)} disabled={!editText.trim()} className="flex-1 rounded-md bg-[#a855f7] px-2 py-1 text-[11px] font-bold text-white disabled:opacity-40">Apply</button>
               <button onClick={() => { setEditingId(null); setEditText(""); }} className="rounded-md border border-white/25 px-2 py-1 text-[11px] text-white/80">Cancel</button>
             </div>
-            <p className="text-[9px] leading-tight text-white/50">Keeps the location, pose &amp; her — changes only what you say. Adds a new shot beside this one.</p>
+            <p className="text-[9px] leading-tight text-white/50">Keeps the location, pose &amp; her - changes only what you say. Adds a new shot beside this one.</p>
           </div>
         )}
       </div>

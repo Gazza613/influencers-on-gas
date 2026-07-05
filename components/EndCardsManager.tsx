@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Uploader from "@/components/Uploader";
+import { askConfirm } from "@/lib/confirm";
 
 type EndCard = { id: string; label: string; url: string; kind: "image" | "video"; ratio: "9:16" | "1:1"; created_at: string };
 
@@ -24,7 +25,7 @@ export default function EndCardsManager({ initial }: { initial: EndCard[] }) {
     if (r?.endCard) { setCards((c) => [r.endCard, ...c]); setUrl(null); setLabel(""); } else setErr(r?.error || "Couldn't save the end card.");
   }
   async function del(id: string) {
-    if (!confirm("Delete this end card? It can't be undone.")) return;
+    if (!(await askConfirm({ title: "Delete this end card?", body: "It can't be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     setCards((c) => c.filter((x) => x.id !== id));
     await fetch(`/api/end-cards/${id}`, { method: "DELETE" }).catch(() => {});
   }

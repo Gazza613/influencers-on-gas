@@ -7,6 +7,7 @@ import Celebration from "@/components/Celebration";
 import VoicePicker from "@/components/VoicePicker";
 import VoiceoverUpload from "@/components/VoiceoverUpload";
 import { flex } from "@/lib/flex";
+import { askConfirm } from "@/lib/confirm";
 
 type Scene = {
   beat: string; role: "a-roll" | "b-roll" | "graphic"; start: string; end: string; location: string;
@@ -642,9 +643,21 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Batch: animate EVERY kept scene's clip (parallel).
   // force=false (default) only animates scenes that don't already have a good clip (finishes a partial
   // run cheaply); force=true re-animates the whole board (a deliberate, paid redo).
+  // Best-effort ZAR pre-flight estimate from rate_card (server-side, role-aware). Returns "≈ R X"
+  // or undefined - when undefined the confirm simply shows no estimate rather than a wrong number.
+  async function estimateAnimateCost(): Promise<string | undefined> {
+    try {
+      const talking = keptScenes.filter((x) => x.s.role === "a-roll").length;
+      const q = new URLSearchParams({ scenes: String(keptScenes.length), talking: String(talking) });
+      const d = await fetch(`/api/cost-control/estimate?${q.toString()}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (d && typeof d.amount === "number") return `≈ R${(d.amount / 100).toLocaleString("en-ZA", { maximumFractionDigits: 0 })}`;
+    } catch { /* estimate is best-effort */ }
+    return undefined;
+  }
+
   async function animateAll(force = false) {
     if (rendering || shooting || wholeBoardBusy || animatingScenes.size) return;
-    if (force && !confirm("Re-animate EVERY scene from scratch? This re-renders clips you already have and costs more. To just finish the missing ones, use Animate remaining instead.")) return;
+    if (force && !(await askConfirm({ title: "Re-animate EVERY scene from scratch?", body: "This re-renders clips you already have and costs more. To just finish the missing ones, use Animate remaining instead.", tone: "spend", confirmLabel: "Re-animate all", cost: await estimateAnimateCost() }))) return;
     setErr(""); setRenderingRole(""); setClipScope("all"); setWholeBoardBusy(true);
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(force ? { force: true, speed: speedMode } : { speed: speedMode }) }).then((x) => x.json()).catch(() => null);
@@ -665,7 +678,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // reference images again. Keeps the storyboard, shots, voice + approvals - only the videos go.
   async function clearStaleClips() {
     if (busyAny) return;
-    if (!confirm("Clear all existing clips and the final cut? Your storyboard, reference images and voice stay - only the rendered videos are removed, so you can re-animate from clean stills.")) return;
+    if (!(await askConfirm({ title: "Clear all existing clips and the final cut?", body: "Your storyboard, reference images and voice stay - only the rendered videos are removed, so you can re-animate from clean stills.", tone: "danger", confirmLabel: "Clear clips" }))) return;
     setErr("");
     await fetch(`/api/influencers/${influencerId}/production/reset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clearClips: true }) }).catch(() => {});
     const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);

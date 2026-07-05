@@ -77,6 +77,10 @@ export default function CostControlPage() {
   const [isSuper, setIsSuper] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
   const [calMsg, setCalMsg] = useState("");
+  // Per-build cost target (drives the build header's amber/red chip). Rands in the input; cents on the wire.
+  const [buildTarget, setBuildTarget] = useState<string>("");
+  const [targetBusy, setTargetBusy] = useState(false);
+  const [targetMsg, setTargetMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,7 +101,18 @@ export default function CostControlPage() {
   useEffect(() => {
     fetch("/api/balance").then((r) => r.json()).then((d) => setBal({ remaining: d.remaining ?? null, monthly: d.monthly ?? 9000, creditZarCents: d.creditZarCents ?? 64 })).catch(() => {});
     fetch("/api/me").then((r) => (r.ok ? r.json() : { user: null })).then((d) => setIsSuper(d.user?.role === "super_admin")).catch(() => {});
+    fetch("/api/cost-control/budget").then((r) => (r.ok ? r.json() : null)).then((d) => { if (typeof d?.perBuildCents === "number" && d.perBuildCents > 0) setBuildTarget(String(Math.round(d.perBuildCents / 100))); }).catch(() => {});
   }, []);
+
+  async function saveBuildTarget() {
+    if (targetBusy) return;
+    setTargetBusy(true); setTargetMsg("");
+    const rands = Number(buildTarget);
+    const perBuildCents = Number.isFinite(rands) ? Math.round(rands * 100) : 0;
+    const r = await fetch("/api/cost-control/budget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ perBuildCents }) }).then((x) => x.json()).catch(() => null);
+    setTargetBusy(false);
+    setTargetMsg(r?.ok ? (perBuildCents > 0 ? "Target saved" : "Target cleared") : (r?.error || "Could not save"));
+  }
 
   // Self-heal the daily audit: snapshot once a day when someone opens Cost Control,
   // so it stays current even if the cron hasn't fired.
@@ -150,6 +165,16 @@ export default function CostControlPage() {
             <p className="mt-1 text-sm text-ink-dim">Every credit and Rand this platform spends, by member, influencer, tool and function. Audited daily against the live balance.</p>
           </div>
           <div className="flex items-center gap-2">
+            {isSuper && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1" title="Per-build cost target. Colours the running-cost chip on each build: amber past 60%, red at/over it. Leave blank to clear.">
+                <span className="tabular text-[10px] uppercase tracking-wide text-ink-faint">Build target</span>
+                <span className="text-xs text-ink-dim">R</span>
+                <input value={buildTarget} onChange={(e) => setBuildTarget(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="1000"
+                  className="tabular w-16 rounded border border-line bg-surface-2 px-1.5 py-0.5 text-xs text-ink outline-none focus:border-[#a855f7]" />
+                <button onClick={saveBuildTarget} disabled={targetBusy} className="rounded border border-[#a855f7]/30 px-2 py-0.5 text-[11px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{targetBusy ? "…" : "Save"}</button>
+                {targetMsg && <span className="tabular text-[10px] text-ink-faint">{targetMsg}</span>}
+              </div>
+            )}
             {isSuper && (
               <button onClick={calibrate} disabled={calibrating} title="Apply the latest rates (Kling scene shots, ElevenLabs music, Shotstack) and read each model's real credit cost from Higgsfield"
                 className="rounded-lg border border-[#a855f7]/30 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
