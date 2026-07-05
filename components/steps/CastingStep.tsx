@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BibleEditor from "@/components/BibleEditor";
 import Lightbox from "@/components/Lightbox";
 import WorkingPanel from "@/components/WorkingPanel";
@@ -57,6 +57,13 @@ export default function CastingStep({
     }
     return poll(tries + 1);
   }
+
+  // RESUME on refresh: if a cast was already in flight when the page (re)loaded, restart polling so the
+  // looks appear when they land - instead of a spinner that never resolves. (Mirrors LockdownStep.)
+  useEffect(() => {
+    if ((initialStatus === "casting" || initialStatus === "generating") && !chosenUrl) poll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function cast() {
     if (busy) return;

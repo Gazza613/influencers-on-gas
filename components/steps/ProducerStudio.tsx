@@ -259,6 +259,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [speedMode, setSpeedMode] = useState(true);
   const [stitchArmed, setStitchArmed] = useState(false); // two-click confirm to stitch a still-draft cut
   const [showreelArmed, setShowreelArmed] = useState(false); // two-click confirm to accept a still-draft cut
+  const [resetArmed, setResetArmed] = useState(false); // two-click confirm before "Reset if stuck" kills a job
   // ANY work in flight (incl. per-scene shoots that don't flip the global flags) - drives the busy
   // buttons + the red Reset control so it reflects per-scene + b-roll work too.
   const anyReshooting = (production?.shots ?? []).some((s) => s.reshooting);
@@ -886,7 +887,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <div className="tabular mt-1 text-[11px] uppercase tracking-[0.15em] text-ink-faint">{sb.format} · {sb.duration_seconds}s · {sb.scenes.length} scenes · {sb.tone}</div>
               </div>
               <div className="flex gap-2">
-                <button onClick={resetStuck} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${(busyAny || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Clear a stuck job so the buttons unlock (keeps everything already produced)">⟳ Reset if stuck</button>
+                <button onClick={() => { if (!resetArmed) { setResetArmed(true); setTimeout(() => setResetArmed(false), 4000); return; } setResetArmed(false); resetStuck(); }} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${resetArmed ? "border-alert bg-alert/15 text-alert" : (busyAny || assembling || audioBusy) ? "border-alert/50 text-alert hover:bg-alert/10" : "border-line text-ink-faint hover:text-ink"}`} title="Only if a job is genuinely stuck for many minutes: this cancels the CURRENT render (your finished clips are kept). A render often just takes a while - check the timer first.">{resetArmed ? "⚠ Confirm - cancel the current job?" : "⟳ Reset if stuck"}</button>
                 {clips.length > 0 && <button onClick={clearStaleClips} disabled={busyAny} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink-faint hover:text-ink disabled:opacity-40" title="Drop all existing clips + the final cut (leftover videos) and go back to clean reference images. Keeps the storyboard, stills and voice.">🧹 Clear clips</button>}
                 {/* Script edits (New brief / Regenerate) live in the Script & Voice stage - hidden in The Final Cut
                     so a locked script can't be blown away mid-build. */}
@@ -981,11 +982,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               ONLY for an explicit per-scene list (clipScope is an array with this scene) - a whole-board
                               "all" run never re-renders scenes that already have a clip, so it must NOT light them up. */}
                           {animatingScenes.has(i) && (
-                            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/65 text-[10px] font-semibold text-white"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />re-animating…<RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-20 min" : s.role === "a-roll" ? "2-6 min" : String((s as { hero?: string }).hero) === "true" ? "10-25 min" : speedMode ? "3-8 min" : "10-25 min"} /></div>
+                            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 rounded-lg bg-black/65 text-[10px] font-semibold text-white"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />re-animating…<RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25 min" : s.role === "a-roll" ? "2-6 min" : String((s as { hero?: string }).hero) === "true" ? "10-25 min" : speedMode ? "3-8 min" : "10-40 min"} /></div>
                           )}
                         </div>
                       ) : !clip?.url && (animatingScenes.has(i) || (wholeBoardBusy && (renderingRole === "" || renderingRole === s.role))) ? (
-                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…<RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-20 min" : s.role === "a-roll" ? "2-6 min" : String((s as { hero?: string }).hero) === "true" ? "10-25 min" : speedMode ? "3-8 min" : "10-25 min"} /></div>
+                        <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 text-center text-[10px] text-ink-faint"><span className="h-5 w-5 animate-spin rounded-full border-2 border-[#60a5fa]/40 border-t-[#60a5fa]" />rendering…<RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25 min" : s.role === "a-roll" ? "2-6 min" : String((s as { hero?: string }).hero) === "true" ? "10-25 min" : speedMode ? "3-8 min" : "10-40 min"} /></div>
                       ) : shot?.url ? (
                         <div className="relative">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1308,6 +1309,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   </div>
                   {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - previews render fast (a-roll 720p, b-roll on the quick engine) for review. Important: a 720p draft clip STAYS 720p in the final unless you upgrade it - hit <b>🎬 Render final quality</b> at the Stitch step before delivery, or turn Draft speed OFF and re-animate.</p>}
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have).</p>
+                  {(rendering || wholeBoardBusy || animatingScenes.size > 0) && <p className="rounded-md border border-[#38bdf8]/25 bg-[#38bdf8]/[0.06] px-3 py-1.5 text-[11px] text-[#7dd3fc]">🛈 Safe to close this tab or come back later - rendering keeps running on our servers, and everything will be here when you return. A b-roll clip can take up to ~40 min when the queue is busy.</p>}
                   {/* IN-STEP SCENE CAROUSEL: every scene at a glance - edit or re-animate any without scrolling
                       up. ✎ Edit jumps to the scene's card (opens the editor); on Save it returns you here. */}
                   <div id="scenes-strip">
@@ -1327,7 +1329,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 : shot?.url ? <img src={shot.url} alt="" className="h-full w-full object-cover" />
                                 : <div className="flex h-full items-center justify-center text-[9px] text-ink-faint">not shot</div>}
-                              {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-20m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-25m"} /></div>}
+                              {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-40m"} /></div>}
                               {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip.url as string) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
                               {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[9px] font-bold text-alert">⚠ failed</div>}
                               {!isRendering && !failed && clip?.url && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
