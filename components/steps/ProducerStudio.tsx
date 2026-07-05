@@ -6,6 +6,7 @@ import Lightbox from "@/components/Lightbox";
 import Celebration from "@/components/Celebration";
 import VoicePicker from "@/components/VoicePicker";
 import VoiceoverUpload from "@/components/VoiceoverUpload";
+import WorkingPanel from "@/components/WorkingPanel";
 import { flex } from "@/lib/flex";
 import { askConfirm } from "@/lib/confirm";
 
@@ -27,6 +28,22 @@ const ROLE = {
   "b-roll": { label: "SCENE SHOT", cls: "bg-[#60a5fa]/15 text-[#93c5fd] border-[#60a5fa]/30" },
   graphic: { label: "GRAPHIC", cls: "bg-active/15 text-active border-active/30" },
 } as const;
+
+// Reassuring narration for the two long final-delivery jobs (shown in the WorkingPanel at the Stitch step).
+const FINALISE_LINES = [
+  "Conforming every draft scene to full 1080p from your approved keyframe…",
+  "Re-rendering on the premium engines - the exact same shot, no drift…",
+  "Colour-matching and finishing each scene…",
+  "Holding every face, outfit and set identical at delivery quality…",
+  "Almost there - then it stitches into the final cut…",
+];
+const STITCH_LINES = [
+  "Laying the kept scenes in order with clean, seamless cuts…",
+  "Threading your continuous voiceover across the whole cut…",
+  "Mixing the music and ambience underneath the voice…",
+  "Burning in captions, callouts and your brand marks…",
+  "Rendering the finished MP4 - nearly there…",
+];
 
 type CreativeGuide = { url: string; role: string; ratio: string; scene: string; resolution: string };
 export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio" }) {
@@ -255,6 +272,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const markDirty = (i: number) => setDirtyScenes((s) => new Set(s).add(i));
   const clearDirty = (i: number) => setDirtyScenes((s) => { const n = new Set(s); n.delete(i); return n; });
   const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
+  const [finishStart, setFinishStart] = useState<number | null>(null); // when the final-quality render / stitch began (for the reassurance panel clock)
   // EXACT scope of the current animate so only the scenes truly rendering show a spinner: "all" = a
   // whole-board/role animate, an array = just those scene indices (a per-scene re-animate). Never spin the rest.
   const [clipScope, setClipScope] = useState<number[] | "all">("all");
@@ -458,7 +476,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
   async function stitchCut() {
     if (assembling) return;
-    setErr("");
+    setErr(""); setFinishStart(Date.now());
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
@@ -469,7 +487,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // from its already-locked keyframe. Full-quality clips are skipped, so it only re-renders the proxies.
   async function finalizeClips() {
     if (rendering) return;
-    setErr("");
+    setErr(""); setFinishStart(Date.now());
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ finalize: true }) }).then((x) => x.json()).catch(() => null);
     if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
@@ -1492,6 +1510,21 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             <StepShell n={stepNum("stitch")} title="Stitch the cut" desc={`I edit it together for continuity: kept clips in order with clean cuts, a continuous voiceover, the music + ambient mixed underneath${(production?.brief as { logoUrl?: string })?.logoUrl ? " and your uploaded logo" : ""} - one finished ${sb.format} ad. Captions are optional (off by default).`} state={stepState("stitch")} anchor="step-stitch" gate={renderGate("stitch", "Re-stitch if the cut isn't right (you can re-render any clip or the audio first), then Accept.")}>
               {unlocked("stitch") ? (
                 <>
+                  {/* LIVE reassurance while the long delivery jobs run: a crew-at-work panel with a running
+                      clock + a time-based progress bar + cycling narration, so "Render full quality" / "Stitch"
+                      never look frozen (the render can take many minutes). */}
+                  {(rendering || assembling) && (
+                    <div className="mb-4">
+                      <WorkingPanel
+                        title={assembling ? "Stitching your final cut" : "Rendering full quality"}
+                        lines={assembling ? STITCH_LINES : FINALISE_LINES}
+                        estimateSeconds={assembling ? 420 : 1500}
+                        startedAt={finishStart}
+                        eta={assembling ? "usually a few minutes" : "10-40 min when the queue is busy"}
+                        note="Safe to close this tab or come back later - it keeps rendering on our servers, and the finished cut will be here when you return."
+                      />
+                    </div>
+                  )}
                   {/* Optional closing clip / end card - the LAST spot to upload the tail of the video. */}
                   <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
                     <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Closing clip / end card (optional)</div>
