@@ -242,6 +242,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Prefer the SAVED approvals (so returning restores the exact step); else infer from artifacts.
   const [approved, setApproved] = useState<Set<string>>(() => (initialProduction?.wizard_approved?.length ? new Set(initialProduction.wizard_approved) : seedApproved()));
   const [denied, setDenied] = useState<Set<string>>(new Set());
+  // Scenes whose visual direction/toggles were changed but NOT yet re-rendered - their clip is stale, so we
+  // flag "re-shoot to apply" (kills the "I toggled it and nothing happened" trap). Cleared on re-shoot/animate.
+  const [dirtyScenes, setDirtyScenes] = useState<Set<number>>(new Set());
+  const markDirty = (i: number) => setDirtyScenes((s) => new Set(s).add(i));
+  const clearDirty = (i: number) => setDirtyScenes((s) => { const n = new Set(s); n.delete(i); return n; });
   const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
   // EXACT scope of the current animate so only the scenes truly rendering show a spinner: "all" = a
   // whole-board/role animate, an array = just those scene indices (a per-scene re-animate). Never spin the rest.
@@ -516,14 +521,21 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
   async function saveScene(i: number) {
     setErr("");
+    const before = production?.storyboard?.scenes?.[i] as Record<string, string> | undefined;
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref }),
     }).then((x) => x.json()).catch(() => null);
-    if (r?.saved) { applyEditsLocally(i); closeEditKeep(i); } else setErr(r?.error || "Couldn't save.");
+    if (r?.saved) {
+      // A text-only save that changed VISUAL fields means the current keyframe/clip is now stale → flag it so
+      // the user knows to re-shoot to apply (vs a pure script edit, which doesn't need a re-render).
+      const visualChanged = !!before && (ed.location !== (before.location || "") || ed.blocking !== (before.blocking || "") || ed.shot !== (before.shot || "") || ed.performance !== (before.performance || "") || ed.motion !== (before.motion_prompt || "") || ed.hero !== (before.hero || "false") || ed.ref !== (before.ref_url || ""));
+      if (visualChanged) markDirty(i);
+      applyEditsLocally(i); closeEditKeep(i);
+    } else setErr(r?.error || "Couldn't save.");
   }
   async function reshootScene(i: number) {
-    setErr(""); setEditIdx(null);
+    setErr(""); setEditIdx(null); clearDirty(i);
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -549,7 +561,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Shoot ONE scene's REFERENCE IMAGE (keyframe) only - no video. Video comes later (after the voice).
   async function shootRefScene(i: number) {
     if (busyAny) return;
-    setErr(""); setShootingRole(""); setShootScope([i]); // ONLY this scene is shooting
+    setErr(""); setShootingRole(""); setShootScope([i]); clearDirty(i); // ONLY this scene is shooting
     setProduction((p) => {
       if (!p) return p;
       const list = p.shots ?? [];
@@ -586,6 +598,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (!s) return;
     const next = String(s.live_bg) === "true" ? "false" : "true";
     setProduction((p) => (p?.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((sc, idx) => (idx === i ? { ...sc, live_bg: next } : sc)) } } : p));
+    markDirty(i); // the current clip doesn't reflect the new background - flag "re-shoot to apply"
     await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, live_bg: next }) }).catch(() => {});
   }
   // Animate ONE scene's clip from its existing keyframe (no re-shoot). CONCURRENT: fire it and return - you
@@ -595,7 +608,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (animatingScenes.has(i)) return; // only block re-firing THIS scene; a per-scene animate is independent
     // (each clip saves atomically via upsertClip), so you can fire it even while another scene - or a whole-
     // board run - is still rendering.
-    setErr("");
+    setErr(""); clearDirty(i);
     const before = (production?.clips ?? []).find((c) => c.scene === i)?.url || null;
     setAnimatingScenes((s) => new Set(s).add(i));
     // Optimistically clear a prior FAILURE on this scene so the error banner disappears immediately and the
@@ -976,6 +989,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           <ClipPreview clip={clip} className="aspect-[9/16] w-full rounded-lg border border-ready/40 bg-black object-cover" />
                           <span className="absolute left-1 top-1 rounded bg-ready/80 px-1 py-0.5 text-[8px] font-bold text-black">{clip.kind === "a-roll" ? "▶ A-ROLL" : "▶ B-ROLL"}</span>
                           {clip.draft && <span className="absolute right-1 bottom-1 rounded bg-[#f59e0b]/90 px-1 py-0.5 text-[8px] font-bold text-black" title="Draft preview (720p a-roll / fast DoP b-roll). Render final quality at the Stitch step before delivery.">720p DRAFT</span>}
+                          {dirtyScenes.has(i) && <span className="absolute inset-x-1 top-1 z-10 rounded bg-[#a855f7]/90 px-1 py-0.5 text-center text-[8px] font-bold text-white" title="You changed this scene's direction or background - re-shoot/re-animate to apply it to the clip.">⟳ changed - re-render to apply</span>}
                           {clip.audio_url && clip.synced !== true && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-semibold text-[#7dd3fc]" title="This clip renders silent; her voiceover is overlaid here and baked in at the final stitch.">🔊 voice overlaid</span>}
                           <button onClick={() => setZoom(clip.url!)} title="Preview full size" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-[11px] text-white transition hover:bg-black/90">👁</button>
                           {/* RE-ANIMATING this scene (it already has a clip): overlay feedback so it's clearly working.
@@ -1228,7 +1242,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     {/* TEST THE DELIVERY: A/B v2 vs v3 on the real scene copy before committing to the take. */}
                     <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
                       <div className="tabular mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-ink-faint">
-                        <span>🎧 Test the delivery</span>
+                        <span>🎧 Voice preview <span className="font-normal normal-case tracking-normal text-ink-faint">· doesn&apos;t change your script</span></span>
                         {sb && sb.scenes.some((s) => (s.vo_line || "").trim()) && (
                           <select onChange={(e) => { const v = e.target.value; if (v === "") { setPreviewSceneIdx(null); return; } const idx = Number(v); setPreviewSceneIdx(idx); setPreviewText(String(sb?.scenes?.[idx]?.vo_line || "")); setPreviewSaved(false); }} value={previewSceneIdx == null ? "" : String(previewSceneIdx)} className="rounded border border-line bg-surface-1 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-ink-dim">
                             <option value="">Load a scene line…</option>
@@ -1242,12 +1256,18 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <button onClick={() => runPreview("v2")} disabled={!!previewBusy || !previewText.trim()} className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink-dim hover:border-[#a855f7]/40 hover:text-ink disabled:opacity-50">{previewBusy === "v2" ? "Synthesising…" : "▶ Preview v2 (Stable)"}</button>
                         <button onClick={() => runPreview("v3")} disabled={!!previewBusy || !previewText.trim()} className="flex-1 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink-dim hover:border-[#a855f7]/40 hover:text-ink disabled:opacity-50">{previewBusy === "v3" ? "Synthesising…" : "▶ Preview v3 (Expressive)"}</button>
                       </div>
-                      {previewSceneIdx != null && (
-                        <button onClick={savePreviewToScene} disabled={previewSaved || !previewText.trim()} className={`mt-2 w-full rounded-lg border px-3 py-2 text-xs font-semibold transition ${previewSaved ? "border-ready/50 text-ready" : "border-[#a855f7]/50 text-[#c79bff] hover:bg-[#a855f7]/10"} disabled:opacity-60`}>{previewSaved ? `✓ Saved to Scene ${previewSceneIdx + 1} — re-run the voiceover to hear it` : `💾 Save this copy to Scene ${previewSceneIdx + 1} (so it ships)`}</button>
-                      )}
+                      {(() => {
+                        const edited = previewSceneIdx != null && !previewSaved && previewText.trim() !== String(sb?.scenes?.[previewSceneIdx]?.vo_line || "").trim();
+                        return previewSceneIdx != null ? (
+                          <>
+                            {edited && <p className="mt-2 text-[11px] font-semibold text-[#fbbf24]">⚠ You&apos;ve changed this line - it won&apos;t ship until you save it to the scene.</p>}
+                            <button onClick={savePreviewToScene} disabled={previewSaved || !previewText.trim()} className={`mt-1.5 w-full rounded-lg border px-3 py-2 text-xs font-bold transition ${previewSaved ? "border-ready/50 text-ready" : edited ? "border-[#f59e0b] bg-[#f59e0b]/15 text-[#fbbf24]" : "border-[#a855f7]/50 text-[#c79bff] hover:bg-[#a855f7]/10"} disabled:opacity-60`}>{previewSaved ? `✓ Saved to Scene ${previewSceneIdx + 1} — re-run the voiceover to hear it` : `💾 Save this line to Scene ${previewSceneIdx + 1} (so it ships)`}</button>
+                          </>
+                        ) : null;
+                      })()}
                       {previewUrl && <audio key={previewUrl} src={previewUrl} controls autoPlay className="mt-2 h-9 w-full" />}
                       {previewErr && <p className="mt-1.5 text-[11px] text-red-400">{previewErr}</p>}
-                      <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">This box only TESTS the voice — editing the words here does NOT change what ships on its own. To make an edit stick: load its scene, tweak, then <b>Save this copy to the scene</b> (or edit it in ✎ Edit scene). The full voiceover reads each scene&apos;s line, so <b>re-run the voiceover</b> after any copy change. v3 adds expressive tags (+ the accent cue) — which can drift a designed voice.</p>
+                      <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">This is a <b>preview only</b> - to change what ships, load a scene, edit it, then <b>Save this line to the scene</b> (or use ✎ Edit scene), and <b>re-run the voiceover</b>. v3 adds expressive tags (+ the accent cue).</p>
                     </div>
                     {/* Voice SPEED: default + slower/faster. Faster often reads more natural/energetic. */}
                     <div className="mt-3 rounded-lg border border-line bg-surface-2/40 p-3">
@@ -1332,7 +1352,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "10-40m"} /></div>}
                               {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip.url as string) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
                               {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[9px] font-bold text-alert">⚠ failed</div>}
-                              {!isRendering && !failed && clip?.url && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
+                              {!isRendering && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[7px] font-bold text-black">✓</span>}
+                              {!isRendering && dirtyScenes.has(i) && <span className="absolute inset-x-0 top-0 rounded-t bg-[#a855f7]/90 px-0.5 text-center text-[7px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
                             </div>
                             <div className="mt-1 flex items-center justify-between">
                               <span className="tabular text-[10px] font-bold text-ink">Scene {i + 1}</span>
