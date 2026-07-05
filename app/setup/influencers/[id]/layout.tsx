@@ -42,6 +42,7 @@ export default async function InfluencerLayout({
           faceUrl: face,
           creatives: Array.isArray(persona.creatives) ? persona.creatives.length : 0,
           voiceApproved: Array.isArray((persona.production as { wizard_approved?: string[] })?.wizard_approved) && (persona.production as { wizard_approved?: string[] }).wizard_approved!.includes("voice"),
+          videoDone: !!(persona.production as { final_url?: string | null })?.final_url,
         }}
       />
       <div className="mt-6">{children}</div>

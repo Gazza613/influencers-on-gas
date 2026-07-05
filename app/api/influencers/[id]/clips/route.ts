@@ -67,9 +67,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // BUT clear a prior FAILURE on the scenes about to re-render (the target scenes, or failed clips of a role
   // being animated): drop the "failed" status + error so the UI immediately shows progress instead of leaving
   // the old error banner on screen through the whole re-render (the "nothing happens, error still shows" bug).
+  // Only reset a scene that will ACTUALLY re-render - otherwise a good clip in an explicit scene list without
+  // reanimate gets flipped to "pending" but the render filter (force||reanimate||finalize||!hasGoodClip) skips
+  // it, leaving it stuck on "pending" forever. Mirror that predicate here.
+  const willRender = (i: number) => force || reanimate || finalize || !hasGoodClip(i);
   const resetScenes = new Set(targetScenes ?? []);
   const clipsNext = force ? [] : existingClips.map((c) => {
-    const bySceneClear = resetScenes.has(Number(c.scene));
+    const sceneN = Number(c.scene);
+    const bySceneClear = resetScenes.has(sceneN) && willRender(sceneN);
     const byRoleClear = !!roles && roles.length > 0 && roles.includes(String((c as { role?: string }).role)) && (c as { status?: string }).status === "failed";
     return (bySceneClear || byRoleClear) ? { ...c, status: "pending", error: null } : c;
   });

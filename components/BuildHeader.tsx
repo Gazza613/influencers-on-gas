@@ -13,6 +13,7 @@ type Init = {
   faceUrl: string | null;
   creatives: number;
   voiceApproved: boolean;
+  videoDone: boolean;
 };
 
 const BUILDING = new Set(["casting", "generating", "training", "ready"]);
@@ -69,6 +70,7 @@ export default function BuildHeader({
           faceUrl: face,
           creatives: Array.isArray(persona.creatives) ? persona.creatives.length : 0,
           voiceApproved: Array.isArray((persona.production as { wizard_approved?: string[] })?.wizard_approved) && (persona.production as { wizard_approved?: string[] }).wizard_approved!.includes("voice"),
+          videoDone: !!(persona.production as { final_url?: string | null })?.final_url,
         });
       }
       if (c?.ok) { const d = await c.json(); setSpendCents(d.influencer?.cents ?? 0); }
@@ -94,7 +96,7 @@ export default function BuildHeader({
     const onBuild = pathname.endsWith("/producer") || pathname.endsWith("/voice");
     tabs.push({ href: `${base}/creatives`, label: "Wardrobe & Set", icon: "✦", done: creativesDone, warn: !creativesDone && onBuild, match: (p: string) => p.endsWith("/creatives") });
     tabs.push({ href: `${base}/voice`, label: "Script & Voice", icon: "🎙️", done: s.voiceApproved, match: (p: string) => p.endsWith("/voice") });
-    tabs.push({ href: `${base}/producer`, label: "The Studio", icon: "🎬", done: false, warn: !s.voiceApproved && pathname.endsWith("/producer"), match: (p: string) => p.endsWith("/producer") });
+    tabs.push({ href: `${base}/producer`, label: "The Studio", icon: "🎬", done: s.videoDone, warn: !s.voiceApproved && pathname.endsWith("/producer"), match: (p: string) => p.endsWith("/producer") });
   }
 
   return (

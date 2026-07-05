@@ -997,7 +997,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             <button
                               onClick={() => animateScene(i)}
                               disabled={animatingScenes.has(i) || dropped.has(i) || !approved.has("voice") || !!shot?.reshooting}
-                              title={approved.has("voice") ? "Animate this scene into video" : "Set the voice first (Voice step), then animate"}
+                              title={approved.has("voice") ? "Animate this scene into video" : "Finish Script & Voice first (animation lip-syncs + times to the locked voice), then animate"}
                               className="w-full rounded-md border border-[#60a5fa]/40 px-2 py-1 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
                             >{!approved.has("voice") ? "🎞️ Animate (after voice)" : clip?.url ? "↻ Re-animate" : "🎞️ Animate"}</button>
                           )}
@@ -1060,8 +1060,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <Uploader kind="vo" accept="audio" label="Upload my own VO (ElevenLabs file) - recommended" current={ed.voAudio || null} onUploaded={(u) => setEd((e) => ({ ...e, voAudio: u }))} />
                         <p className="text-[10px] text-ink-faint">Optional. If you drop your own read here, I lip-sync the clip to it; otherwise I generate the voice in-platform.</p>
                       </div>
-                      {/* Scene direction (the prompt) */}
-                      <div className="space-y-2 border-t border-line pt-3">
+                      {/* Scene direction (the visual prompt) = The Studio only. In Script & Voice you edit only
+                          the words above (a re-shoot belongs to the visual build, not the script stage). */}
+                      {isStudio && (<div className="space-y-2 border-t border-line pt-3">
                         <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Scene direction - the full prompt (changing these needs a re-shoot)</div>
                         {creatives.length > 0 && (
                           <div>
@@ -1095,13 +1096,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         )}
                         {/* Live background moved to the per-scene controls under the preview image (left) - a
                             cleaner user journey than buried in the edit box. See toggleLiveBg below. */}
-                      </div>
+                      </div>)}
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button onClick={() => saveScene(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save changes</button>
-                        <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>
+                        {isStudio && <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>}
                         <button onClick={() => closeEditKeep(editIdx)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                       </div>
-                      <p className="text-[10px] text-ink-faint">Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched.</p>
+                      <p className="text-[10px] text-ink-faint">{isStudio ? "Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched." : "Edit the words for this scene, then Save changes. The visual build (framing, re-shoot) happens in The Studio."}</p>
                     </div>
                   )}
                   </div>
@@ -1223,7 +1224,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             {/* 3 · Scenes - the scene-by-scene build board (per-scene controls live on the cards above) */}
             {showStep("scenes") && (<>
             {mode === "studio" && !approved.has("voice") && (
-              <a href={`/setup/influencers/${influencerId}/voice`} className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-4 py-3 text-sm font-bold text-[#fbbf24]">⚠ Finish Script &amp; Voice first (the scenes build to the locked voice) →</a>
+              <a href={`/setup/influencers/${influencerId}/voice`} className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#f59e0b]/50 bg-[#f59e0b]/[0.06] px-4 py-3 text-sm font-bold text-[#fbbf24]">🎙️ You can shoot keyframes now, but animation waits for the locked voice - finish Script &amp; Voice →</a>
             )}
             <StepShell n={stepNum("scenes")} title="Build the scenes" desc={`Shoot each scene's keyframe and animate it. Work scene by scene on the cards above (🎬 build · 🎞️ animate · ✎ edit · ✓ keep / ✗ reject), or build the whole board at once here. Talking (a-roll) scenes lip-sync to the voice; scene (b-roll) shots get natural motion.`} state={stepState("scenes")} anchor="step-scenes" gate={renderGate("scenes", "Every kept scene needs a finished clip. Build any that are still missing (or reject a scene), then Accept.")}>
               {unlocked("scenes") ? (

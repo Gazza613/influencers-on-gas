@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     // v3 (Expressive) when the producer chose it - more realistic, dynamic delivery + audio-tag support.
     const expressive = persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1";
-    const { pcm, charEndTimes } = await ttsPcm(voiceId, full, { expressive, speed: Number(persona.voice_speed) || undefined });
+    const { pcm, charEndTimes } = await ttsPcm(voiceId, full, { expressive, speed: Number(persona.voice_speed) || undefined, presayabled: true });
     if (!charEndTimes.length) throw new Error("no timestamps");
     const timeAt = (c: number) => charEndTimes[Math.min(charEndTimes.length - 1, Math.max(0, c))] || 0;
     const totalSec = pcm.length / (44100 * 2);

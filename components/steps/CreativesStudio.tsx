@@ -779,7 +779,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ready/40 bg-ready/8 p-4">
           <div>
             <div className="text-sm font-bold text-ready">Happy with your looks?</div>
-            <div className="text-[13px] text-ink-dim">Your stills are saved. Next: make a video with this influencer in the Producer.</div>
+            <div className="text-[13px] text-ink-dim">Your stills are saved. Next: write the ad in Script &amp; Voice, then build it in The Studio.</div>
           </div>
           <Link href={`/setup/influencers/${influencerId}/voice`} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold">🎙️ Go to Script &amp; Voice →</Link>
         </div>

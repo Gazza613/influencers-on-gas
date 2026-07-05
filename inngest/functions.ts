@@ -1744,7 +1744,9 @@ export const assembleVideo = inngest.createFunction(
       // so a stale/missing stored slice can't shrink it. music/ambient carry any breather past the VO.
       if (role === "b-roll" && vo) {
         const BROLL_FLOOR = Math.max(3, Math.min(15, Number(process.env.BROLL_MIN_SECONDS) || 10));
-        len = Math.max(voRealDur.get(i) ?? sceneAudioDur.get(i) ?? 0, clipDur(i) ?? 0, BROLL_FLOOR);
+        // Ceiling is a SANITY guard only (no real b-roll VO exceeds this) - stops a spurious probeDuration
+        // reading from ballooning the slot + the loop-copy count into a runaway Shotstack render.
+        len = Math.min(Math.max(voRealDur.get(i) ?? sceneAudioDur.get(i) ?? 0, clipDur(i) ?? 0, BROLL_FLOOR), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
       }
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
       else if (role === "b-roll") len = Math.min(len, 2.8);

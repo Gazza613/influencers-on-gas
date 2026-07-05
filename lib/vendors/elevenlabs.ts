@@ -212,8 +212,12 @@ export async function ttsWithDuration(voiceId: string, text: string, opts: { exp
 // so the voice is a single continuous take. We then slice it per scene by the timestamps - that is
 // what makes the voice IDENTICAL across every scene (per-scene generation is why it drifts), and what
 // makes "what we hear" literally "what we get". Returns 16-bit/44.1kHz/mono PCM + char end times.
-export async function ttsPcm(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string; speed?: number } = {}): Promise<{ pcm: Buffer; charEndTimes: number[] }> {
-  text = sayable(text);
+export async function ttsPcm(voiceId: string, text: string, opts: { expressive?: boolean; modelId?: string; speed?: number; presayabled?: boolean } = {}): Promise<{ pcm: Buffer; charEndTimes: number[] }> {
+  // presayabled: the voice-once caller already ran sayable() PER LINE before computing the per-scene slice
+  // spans. Re-running it on the CONCATENATED text could form a match ACROSS a scene boundary (e.g. a line
+  // ending "Grade R" + a line starting "5") and shift every downstream timestamp. Skip it so the spoken text
+  // is byte-for-byte the text the spans were measured on.
+  if (!opts.presayabled) text = sayable(text);
   // v2 (Stable) would SPEAK bracketed audio tags aloud; strip them. v3 (Expressive) reads them as direction.
   if (!opts.expressive) text = text.replace(/\[[^\]]*\]/g, " ").replace(/\s{2,}/g, " ").trim();
   const k = await key();
