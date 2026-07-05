@@ -355,15 +355,25 @@ export default function CostControlPage() {
           ) : <div className="px-4 py-5 text-center text-xs text-ink-faint">No audits yet - the first daily snapshot will appear here.</div>}
         </Section>
 
-        <div className="mt-8 text-xs text-ink-faint">
-          <div className="font-semibold text-ink-dim">Fixed monthly subscriptions (base cost ≈ $573/mo)</div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-            <span>Higgsfield Ultra <span className="text-ink">$375</span> · 9,000 credits · renews 10th</span>
-            <span>HeyGen Pro <span className="text-ink">$99</span> · ~121 video min · renews 29th</span>
-            <span>ElevenLabs Pro <span className="text-ink">$99</span> · 500k chars</span>
-          </div>
-          <div className="mt-1">Per-job prices come from the rate_card table (marginal/overage estimates; usage within each plan&apos;s allotment is covered by the flat fee). {loading ? "Updating…" : ""}</div>
-        </div>
+        {(() => {
+          // Fixed monthly subscriptions are billed in USD; show the ZAR equivalent at the live FX rate
+          // (rate = ZAR per $1, from lib/fx.ts) so this ZA business reads its base cost in Rand.
+          const zar = (u: number) => (rate > 0 ? "R" + Math.round(u * rate).toLocaleString("en-ZA") : "");
+          const line = (u: number) => `$${u}${rate > 0 ? ` ≈ ${zar(u)}` : ""}`;
+          return (
+            <div className="mt-8 text-xs text-ink-faint">
+              <div className="font-semibold text-ink-dim">Fixed monthly subscriptions (base cost ${573}/mo{rate > 0 ? ` ≈ ${zar(573)}/mo` : ""})</div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                <span>Higgsfield Ultra <span className="text-ink">{line(375)}</span> · 9,000 credits · renews 10th</span>
+                <span>HeyGen Pro <span className="text-ink">{line(99)}</span> · ~121 video min · renews 29th</span>
+                <span>ElevenLabs Pro <span className="text-ink">{line(99)}</span> · 500k chars</span>
+              </div>
+              <div className="mt-1">
+                All per-job prices in the rate_card are in <span className="text-ink-dim">Rand</span>; USD subscriptions are converted at the live rate {rate > 0 ? `(~R${rate.toFixed(2)}/$)` : ""}. Usage within each plan&apos;s allotment is covered by the flat fee. {loading ? "Updating…" : ""}
+              </div>
+            </div>
+          );
+        })()}
       </main>
     </div>
   );
