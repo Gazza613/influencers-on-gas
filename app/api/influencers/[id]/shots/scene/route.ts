@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getInfluencer, updateInfluencer } from "@/lib/influencers";
+import { getInfluencer, updateProductionFields } from "@/lib/influencers";
 import { inngest } from "@/lib/inngest";
 
 // THE PRODUCER: re-shoot ONE scene, optionally with edited direction. Persists the edits to the
@@ -36,7 +36,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     else shots.push({ scene: index, role: edited.role, beat: edited.beat, url: null, reshooting: true });
   }
 
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, storyboard: { ...production!.storyboard, scenes: newScenes }, shots } } });
+  // SCOPED write (merge just storyboard + shots) so a concurrent voiceover/clip write can't clobber this
+  // scene edit, and this can't clobber theirs - the "edited a scene, saved, it reverted" bug.
+  await updateProductionFields(id, { storyboard: { ...production!.storyboard, scenes: newScenes }, shots });
   if (!reshoot) return NextResponse.json({ saved: true });
   try {
     // Re-shoot this ONE scene through the SAME path as the whole board (generateShots, scene-filtered) so it

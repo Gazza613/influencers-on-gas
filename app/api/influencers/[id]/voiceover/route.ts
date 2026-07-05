@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getInfluencer, updateInfluencer } from "@/lib/influencers";
+import { getInfluencer, updateProductionFields } from "@/lib/influencers";
 import { ttsPcm, pcmSliceToWav, sayable } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
@@ -40,8 +40,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .map((e) => ({ scene: e.scene as number, url: e.url as string, duration: Number(e.duration) || 0 }));
     if (!clean.length) return NextResponse.json({ error: "No valid sliced audio to save." }, { status: 400 });
     const voUrl = typeof body.voiceover_url === "string" && isSafePublicUrl(body.voiceover_url) ? body.voiceover_url : (clean[0]?.url ?? null);
-    const prod = (persona.production ?? {}) as Record<string, unknown>;
-    await updateInfluencer(id, { persona: { ...persona, production: { ...prod, voiceover_url: voUrl, scene_audio: clean, voiceover_at: Date.now(), voiceover_source: "uploaded" } } });
+    // SCOPED write (merge just these keys) so it can't clobber a concurrent scene edit / render.
+    await updateProductionFields(id, { voiceover_url: voUrl, scene_audio: clean, voiceover_at: Date.now(), voiceover_source: "uploaded" });
     return NextResponse.json({ voiceover_url: voUrl, scenes: clean.length });
   }
 
@@ -91,7 +91,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       scene_audio.push({ scene: p.i, url, duration: endSec - startSec, cues });
     }
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
-    await updateInfluencer(id, { persona: { ...persona, production: { ...production, voiceover_url, scene_audio, voiceover_at: Date.now() } } });
+    // SCOPED write: merge only the voiceover fields, so a slow TTS write can NEVER overwrite scene edits
+    // (e.g. a vo_line you saved while this was generating) - the root of the "my edit reverted" bug.
+    await updateProductionFields(id, { voiceover_url, scene_audio, voiceover_at: Date.now() });
     return NextResponse.json({ voiceover_url, scenes: scene_audio.length, total_seconds: Math.round(totalSec) });
   } catch (e) {
     return NextResponse.json({ error: `Could not generate the voiceover: ${String((e as Error)?.message || e).slice(0, 160)}` }, { status: 502 });

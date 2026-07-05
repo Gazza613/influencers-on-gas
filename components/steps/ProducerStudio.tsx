@@ -1162,24 +1162,6 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Script for this scene</div>
                         <Area label="Voiceover line (spoken)" v={ed.vo} set={(x) => setEd((e) => ({ ...e, vo: x }))} />
                         <Field label="Caption (burned-in)" v={ed.caption} set={(x) => setEd((e) => ({ ...e, caption: x }))} />
-                        {/* PER-SCENE caption placement: a 9-zone map + a show/hide for this scene. The master
-                            "Burn captions" switch still lives at the Stitch step; this only positions each scene's. */}
-                        <div className="rounded-lg border border-line bg-surface-2/40 p-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="tabular text-[10px] uppercase tracking-[0.2em] text-ink-faint">Caption placement</div>
-                            <label className="flex items-center gap-1.5 text-[11px] text-ink-dim">
-                              <input type="checkbox" checked={!ed.captionOff} onChange={(e) => setEd((s) => ({ ...s, captionOff: !e.target.checked }))} />
-                              Show on this scene
-                            </label>
-                          </div>
-                          <div className={`mt-2 grid grid-cols-3 gap-1 ${ed.captionOff ? "pointer-events-none opacity-40" : ""}`} style={{ maxWidth: 138 }}>
-                            {([["topLeft", "↖"], ["topCenter", "↑"], ["topRight", "↗"], ["midLeft", "←"], ["center", "•"], ["midRight", "→"], ["lowerLeft", "↙"], ["lowerCenter", "↓"], ["lowerRight", "↘"]] as const).map(([key, glyph]) => {
-                              const sel = (ed.captionPos || "lowerCenter") === key;
-                              return <button key={key} type="button" onClick={() => setEd((s) => ({ ...s, captionPos: key }))} title={key} aria-label={`Caption ${key}`} className={`flex h-9 items-center justify-center rounded border text-sm ${sel ? "border-[#a855f7] bg-[#a855f7]/20 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"}`}>{glyph}</button>;
-                            })}
-                          </div>
-                          <p className="mt-1.5 text-[10px] text-ink-faint">Where this scene&apos;s caption sits (kept inside the safe zone). Lower-middle is the default. Captions only render if &ldquo;Burn captions&rdquo; is on at the Stitch step.</p>
-                        </div>
                         <div className="flex flex-wrap items-end gap-2">
                           <div className="min-w-[150px] flex-1"><Field label="Ask the producer to rewrite (optional)" v={aiInstr} set={setAiInstr} placeholder="e.g. punchier, lead with the free data" /></div>
                           <button onClick={() => aiRewrite(i)} disabled={aiBusy} className="rounded-lg border border-[#a855f7]/40 px-3 py-2 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{aiBusy ? "✨ Writing…" : "✨ Rewrite with AI"}</button>
@@ -1224,6 +1206,26 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         {/* Live background moved to the per-scene controls under the preview image (left) - a
                             cleaner user journey than buried in the edit box. See toggleLiveBg below. */}
                       </div>)}
+                      {/* ON-SCREEN CAPTION placement - a scene/visual overlay control (not a script/voice one).
+                          Applied at Stitch, so it needs NO re-shoot. 9-zone map + per-scene show/hide. */}
+                      {isStudio && (
+                        <div className="space-y-2 border-t border-line pt-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">On-screen caption placement</div>
+                            <label className="flex items-center gap-1.5 text-[11px] text-ink-dim">
+                              <input type="checkbox" checked={!ed.captionOff} onChange={(e) => setEd((s) => ({ ...s, captionOff: !e.target.checked }))} />
+                              Show on this scene
+                            </label>
+                          </div>
+                          <div className={`grid grid-cols-3 gap-1 ${ed.captionOff ? "pointer-events-none opacity-40" : ""}`} style={{ maxWidth: 138 }}>
+                            {([["topLeft", "↖"], ["topCenter", "↑"], ["topRight", "↗"], ["midLeft", "←"], ["center", "•"], ["midRight", "→"], ["lowerLeft", "↙"], ["lowerCenter", "↓"], ["lowerRight", "↘"]] as const).map(([key, glyph]) => {
+                              const sel = (ed.captionPos || "lowerCenter") === key;
+                              return <button key={key} type="button" onClick={() => setEd((s) => ({ ...s, captionPos: key }))} title={key} aria-label={`Caption ${key}`} className={`flex h-9 items-center justify-center rounded border text-sm ${sel ? "border-[#a855f7] bg-[#a855f7]/20 text-[#c79bff]" : "border-line text-ink-faint hover:border-line-strong hover:text-ink-dim"}`}>{glyph}</button>;
+                            })}
+                          </div>
+                          <p className="text-[10px] text-ink-faint">Where this scene&apos;s caption sits (kept inside the safe zone). Lower-middle is the default. Applied when you Stitch (no re-shoot); captions only render if &ldquo;Burn captions&rdquo; is on at the Stitch step.</p>
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button onClick={() => saveScene(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save changes</button>
                         {isStudio && <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>}
