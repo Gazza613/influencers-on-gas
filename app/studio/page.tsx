@@ -5,6 +5,10 @@ import DeleteCutButton from "@/components/DeleteCutButton";
 import { listConnections } from "@/lib/connections";
 import { listInfluencers, type Influencer } from "@/lib/influencers";
 
+// Render fresh on every visit + on router.refresh() - otherwise a cached page makes a deleted cast
+// member / cut appear not to have gone (the delete DID work server-side; the view just wasn't refetching).
+export const dynamic = "force-dynamic";
+
 type Persona = { locked?: boolean; hero_realism_url?: string; hero_url?: string; reference_url?: string; tagline?: string; bible?: { signature_line?: string }; production?: { final_url?: string | null; storyboard?: { title?: string } } };
 function thumb(inf: Influencer): string | null {
   const p = (inf.persona ?? {}) as Persona;
