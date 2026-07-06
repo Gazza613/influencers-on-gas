@@ -1896,9 +1896,13 @@ export const assembleVideo = inngest.createFunction(
       // 10s = a 2s VO-less gap. We now TRIM a longer clip to the VO (play its first N seconds) and only HOLD when
       // the clip is genuinely shorter than the VO. Either way the scene = the voiceover: no gap, no cut voice.
       // b-roll keeps a tiny 3s min for a very short line; a sanity ceiling stops a bad probe ballooning the cut.
+      // NATURAL BREATH (Gary's call): a small tail pad after the voice so a line lands and settles instead of
+      // cutting abruptly on the last word (the video holds a beat, the next scene doesn't start on the syllable).
+      // Env-tunable SCENE_PAD (default 0.35s); the VO itself is never touched - only the scene gets a short beat.
+      const scenePad = Math.max(0, Number(process.env.SCENE_PAD) || 0.35);
       if (vo && realVo > 0) {
         const floor = role === "b-roll" ? 3 : 0;
-        len = Math.min(Math.max(realVo, floor), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
+        len = Math.min(Math.max(realVo + scenePad, floor), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
       }
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
       else if (role === "b-roll") len = Math.min(len, 2.8);
