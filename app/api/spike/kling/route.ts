@@ -17,7 +17,7 @@ async function probe(method: "GET" | "POST", path: string, body?: unknown) {
   const t0 = Date.now();
   try {
     const r = await fetch(BASE + path, { method, headers: H(), ...(body ? { body: JSON.stringify(body) } : {}), cache: "no-store" });
-    const text = (await r.text()).slice(0, 400).replace(/\s+/g, " ");
+    const text = (await r.text()).slice(0, 900).replace(/\s+/g, " ");
     return { path, method, status: r.status, ms: Date.now() - t0, body: text };
   } catch (e) { return { path, method, status: 0, ms: Date.now() - t0, body: String((e as Error)?.message || e) }; }
 }
@@ -43,25 +43,27 @@ export async function GET(req: Request) {
   out.endpoints = [];
   for (const p of candidates) (out.endpoints as unknown[]).push(await probe("POST", p, { params: {} }));
 
-  // 3) ?go=1 → ONE real timed Kling generation on the first endpoint that accepts a valid submit.
+  // 3) ?go=1 → ONE real timed Kling generation on the first-party REST endpoint /v1/image2video/kling.
   if (new URL(req.url).searchParams.get("go") === "1") {
-    const exists = (out.endpoints as { path: string; status: number }[]).filter((e) => e.status !== 404 && e.status !== 0 && /kling|jobs/.test(e.path)).map((e) => e.path);
+    const path = "/v1/image2video/kling";
     const prompt = "A calm, candid cinematic scene with gentle natural motion; slow subtle push-in.";
+    // First force the model-enum error so we capture EVERY valid model id (name discovery, zero real submit).
+    const enumProbe = await probe("POST", path, { params: { model: "__list__", prompt, input_image: { type: "image_url", image_url: TEST_IMG } } });
+    // Then try real submits: correct field (input_image, singular) + the REST model ids + a few image shapes.
     const shapes = (img: string) => [
-      { model: "kling3_0", prompt, input_images: [{ type: "image_url", image_url: img }], duration: 5 },
-      { model: "kling3_0", prompt, medias: [{ value: img, role: "start_image" }], duration: 5 },
+      { model: "kling-v2-1", prompt, input_image: { type: "image_url", image_url: img }, duration: 5 },
+      { model: "kling-v2-1-master", prompt, input_image: { type: "image_url", image_url: img }, duration: 5 },
+      { model: "kling-v2-1", prompt, input_image: img, duration: 5 },
     ];
-    const gen: Record<string, unknown> = { tried: [] };
-    let jobSetId: string | null = null; let usedPath = ""; let usedShape = -1;
-    for (const path of exists) {
-      for (let s = 0; s < shapes(TEST_IMG).length && !jobSetId; s++) {
-        const r = await probe("POST", path, { params: shapes(TEST_IMG)[s] });
-        (gen.tried as unknown[]).push({ path, shape: s, status: r.status, body: r.body });
-        try { const j = JSON.parse((await fetch(BASE + path, { method: "POST", headers: H(), body: JSON.stringify({ params: shapes(TEST_IMG)[s] }) }).then((x) => x.text()))); if (j?.id) { jobSetId = j.id; usedPath = path; usedShape = s; } } catch { /* keep trying */ }
-      }
-      if (jobSetId) break;
+    const gen: Record<string, unknown> = { enumProbe, tried: [] };
+    let jobSetId: string | null = null; let usedShape = -1;
+    for (let s = 0; s < shapes(TEST_IMG).length && !jobSetId; s++) {
+      const bodyParams = { params: shapes(TEST_IMG)[s] };
+      const raw = await fetch(BASE + path, { method: "POST", headers: H(), body: JSON.stringify(bodyParams) }).then((x) => x.text()).catch((e) => String(e));
+      (gen.tried as unknown[]).push({ shape: s, model: shapes(TEST_IMG)[s].model, body: raw.slice(0, 500) });
+      try { const j = JSON.parse(raw); if (j?.id) { jobSetId = j.id; usedShape = s; } } catch { /* keep trying */ }
     }
-    gen.submitted = { jobSetId, usedPath, usedShape };
+    gen.submitted = { jobSetId, usedPath: path, usedShape };
     // 4) poll the job-set + time it (up to ~4 min so it fits the function window).
     if (jobSetId) {
       const t0 = Date.now(); const timeline: { s: number; status: string }[] = []; let url: string | null = null; let last = "";
