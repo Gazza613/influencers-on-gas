@@ -7,6 +7,7 @@ import Celebration from "@/components/Celebration";
 import VoicePicker from "@/components/VoicePicker";
 import VoiceoverUpload from "@/components/VoiceoverUpload";
 import WorkingPanel from "@/components/WorkingPanel";
+import { CREW } from "@/lib/crew";
 import { flex } from "@/lib/flex";
 import { askConfirm } from "@/lib/confirm";
 
@@ -1690,6 +1691,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             <div className="w-full max-w-lg">
               <WorkingPanel
                 title="Rendering the final cut"
+                crew={CREW.producer}
                 lines={FINAL_HYPE_LINES}
                 pct={finalPct}
                 startedAt={finishStart}
