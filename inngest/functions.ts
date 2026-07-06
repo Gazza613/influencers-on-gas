@@ -1967,10 +1967,10 @@ export const assembleVideo = inngest.createFunction(
     const ambientTrack: Record<string, unknown>[] = [];
     // Ambient sits UNDER the VO + music but must be audible — 0.1 was inaudible. ~0.3 reads as real
     // room tone without competing. Env-tunable (AMBIENT_VOLUME).
-    // The VOICE is the priority and plays at full volume, so the ambient must sit WELL under it - a quiet world
-    // presence, not a competing layer. 0.62 buried the voiceover (Gary: "ambient extremely loud, can't hear the
-    // voice"). 0.18 reads as real room tone under a full-volume voice. Env-tunable (AMBIENT_VOLUME).
-    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.18));
+    // MIX HIERARCHY: voice 1.0 (dominant) > ambient (world presence) > music bed. 0.62 buried the voice (too
+    // loud); 0.18 sat UNDER the music (0.24) so it was masked = "ambient absent". 0.34 puts the world clearly
+    // ABOVE the music bed but well under a full-volume voice - audible presence without competing. Env-tunable.
+    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.34));
     if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: ambientVol }, start: t, length: Math.min(22, total - t) });
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
