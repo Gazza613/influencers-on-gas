@@ -1724,12 +1724,10 @@ export const generateAudio = inngest.createFunction(
     const sa = Array.isArray((production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; duration?: number }[] }).scene_audio : [];
     const droppedA = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
     const voTotal = sa.filter((e) => !droppedA.has(Number(e.scene))).reduce((s, e) => s + (Number(e.duration) || 0), 0);
-    // Run the music/ambient bed to the FULL brief target (a 60s brief → a full-minute bed), matching the stitch,
-    // so the re-run preview doesn't stop ~4s short when the voiceover lands under the target. Capped at
-    // voiceover + 10s so a grossly short script can't request a wildly long bed. END_FILL_TARGET=0 reverts.
-    const targetDur = process.env.END_FILL_TARGET === "0" ? 0 : Number((production?.brief as { durationSeconds?: number })?.durationSeconds) || 0;
-    const runTo = targetDur > 0 ? Math.min(targetDur, Math.ceil(voTotal) + 10) : 0;
-    const total = Math.max(15, Number(sb.duration_seconds) || sb.scenes.length * 5, Math.ceil(voTotal) + 6, runTo);
+    // Music/ambient bed length = the CONTENT (the voiceover total + a small margin so it covers to the last word).
+    // NOT padded to the brief/storyboard target - the cut is exactly its content length, so the bed only needs to
+    // cover that; the soundtrack fades at the timeline end. (Padding to 60 was what left the silent tail.)
+    const total = Math.max(15, Math.ceil(voTotal) + 6);
     await step.run("mark", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, audio_status: "running" } } }));
 
     // Generate music + ambient IN PARALLEL (they're independent) — this halves the wait vs running
@@ -1872,14 +1870,11 @@ export const assembleVideo = inngest.createFunction(
     // Now just a brief beat (0.4s) so the final word fully lands and the cut doesn't clip, then end. The
     // music's fade-out runs over her last line (soundtrack fadeInFadeOut), so it eases out as she finishes.
     const TAIL = Math.max(0, Number(process.env.END_TAIL) || 0.4);
-    // Run the cut to the FULL target length (Gary's call: a 60s brief delivers a full 60s), so the music plays
-    // right out to the end instead of fading ~4s early when the voiceover lands a touch short of the target. The
-    // storyboard's own duration_seconds is only the scene SUM (often ~56s for a 60s brief), so it must ALSO honour
-    // the brief's chosen length. Cap the extra hold (cursor + 10s) so a grossly short script can't freeze the
-    // last frame for ages. Set END_FILL_TARGET=0 to go back to ending on the last word.
-    const targetDur = process.env.END_FILL_TARGET === "0" ? 0 : Number((production?.brief as { durationSeconds?: number })?.durationSeconds) || 0;
-    const runTo = targetDur > 0 ? Math.min(targetDur, cursor + 10) : 0;
-    const total = (Math.max(cursor, Number(sb?.duration_seconds) || 0, runTo) || 30) + TAIL;
+    // The cut is EXACTLY as long as its content: cursor = the sum of scene slots, each of which is already >= its
+    // measured voiceover. We do NOT pad to the brief/storyboard duration - padding left a silent held-frame tail
+    // (video ran to 60s while the voiceover ended at ~52s = "audio cut, video longer"). Verified on Dave:
+    // voTotal 51.5s == slotTotal 51.5s. If a full 60s is wanted the SCRIPT must fill it; we never pad silence.
+    const total = (cursor || 30) + TAIL;
     // Carry the last scene's frame across just that brief beat (no black tail), not a noticeable freeze.
     if (placed.length) placed[placed.length - 1].len = Math.max(placed[placed.length - 1].len, total - placed[placed.length - 1].start);
 
