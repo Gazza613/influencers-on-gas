@@ -1825,7 +1825,14 @@ export const assembleVideo = inngest.createFunction(
     // Now just a brief beat (0.4s) so the final word fully lands and the cut doesn't clip, then end. The
     // music's fade-out runs over her last line (soundtrack fadeInFadeOut), so it eases out as she finishes.
     const TAIL = Math.max(0, Number(process.env.END_TAIL) || 0.4);
-    const total = (Math.max(cursor, Number(sb?.duration_seconds) || cursor) || 30) + TAIL;
+    // Run the cut to the FULL target length (Gary's call: a 60s brief delivers a full 60s), so the music plays
+    // right out to the end instead of fading ~4s early when the voiceover lands a touch short of the target. The
+    // storyboard's own duration_seconds is only the scene SUM (often ~56s for a 60s brief), so it must ALSO honour
+    // the brief's chosen length. Cap the extra hold (cursor + 10s) so a grossly short script can't freeze the
+    // last frame for ages. Set END_FILL_TARGET=0 to go back to ending on the last word.
+    const targetDur = process.env.END_FILL_TARGET === "0" ? 0 : Number((production?.brief as { durationSeconds?: number })?.durationSeconds) || 0;
+    const runTo = targetDur > 0 ? Math.min(targetDur, cursor + 10) : 0;
+    const total = (Math.max(cursor, Number(sb?.duration_seconds) || 0, runTo) || 30) + TAIL;
     // Carry the last scene's frame across just that brief beat (no black tail), not a noticeable freeze.
     if (placed.length) placed[placed.length - 1].len = Math.max(placed[placed.length - 1].len, total - placed[placed.length - 1].start);
 
