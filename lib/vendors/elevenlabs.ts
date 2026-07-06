@@ -137,10 +137,24 @@ function speakData(t: string): string {
     .replace(/\b(\d+(?:\.\d+)?)\s?TB\b/gi, (_m, n) => `${n} ${n === "1" ? "terabyte" : "terabytes"}`)
     .replace(/\b(\d+(?:\.\d+)?)\s?KB\b/gi, (_m, n) => `${n} ${n === "1" ? "kilobyte" : "kilobytes"}`);
 }
+// URLs / domains: read them the way a person would. Strip protocol + www, turn each dot into " dot ", and
+// SPELL OUT short TLD parts (<=2 chars, e.g. co / za / uk / io) as individual letters while keeping word-TLDs
+// (com, net, org, info) as words. So "gasmarketing.co.za" -> "gasmarketing dot c o dot z a" (spoken "dot see-oh
+// dot zed-ay") and "gasmarketing.com" -> "gasmarketing dot com". Only fires on a real domain (last part is a
+// 2-6 letter TLD, dots directly between words) so "e.g."/"3.5"/"Mr. Smith" are untouched.
+function speakUrls(t: string): string {
+  return t.replace(/(https?:\/\/)?(www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)/gi, (whole, _proto, _www, domain) => {
+    const parts = String(domain).split(".");
+    if (parts.length < 2 || !/^[a-z]{2,6}$/i.test(parts[parts.length - 1])) return whole;
+    return parts.map((p, i) => (i === 0 ? p : (p.length <= 2 ? p.split("").join(" ") : p))).join(" dot ");
+  });
+}
+
 export function sayable(t: string): string {
   t = SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t);
   t = speakRand(t);
   t = speakData(t);
+  t = speakUrls(t);
   // HOMOGRAPH: "lead"/"leads" spelled l-e-a-d is "leed(s)" in every sense here (a sales lead, to lead) - only
   // the METAL is "led" (never in these ads). ElevenLabs often says "led"; respell to force the right read.
   // Same length as the original word, so the caption char-span timestamps don't shift.

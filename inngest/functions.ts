@@ -2230,6 +2230,11 @@ export const assembleVideo = inngest.createFunction(
       // distortion. Dark translucent base so it's clearly a card over ANY footage (the white-sheen version
       // vanished over dark scenes). Shotstack-safe: no @keyframes / pseudo-elements.
       const [fw, fh] = ratio === "16:9" ? [1920, 1080] : ratio === "1:1" ? [1080, 1080] : [1080, 1920];
+      // AUTO-SIZE the offer chip to its text so a long word (e.g. "SMARTLEADS") shrinks to fit the card instead
+      // of overflowing it - "1GB" stays big and punchy. The chip stays on ONE line and never exceeds the card.
+      const nLen = cnum.replace(/&[a-z]+;/g, "x").length; // count escaped entities as ~1 char
+      const nFont = nLen <= 4 ? 58 : nLen <= 6 ? 48 : nLen <= 9 ? 38 : nLen <= 12 ? 30 : 24;
+      const fFont = nLen <= 6 ? 32 : nLen <= 12 ? 26 : 22;
       const posKey = String(co.pos || "lowerCenter");
       const vAlign = /^upper/i.test(posKey) ? "flex-start" : /^lower/i.test(posKey) ? "flex-end" : "center";
       const hAlign = /Left$/i.test(posKey) ? "flex-start" : /Right$/i.test(posKey) ? "flex-end" : "center";
@@ -2239,9 +2244,9 @@ export const assembleVideo = inngest.createFunction(
         + `border:1px solid rgba(255,255,255,0.34);box-shadow:0 30px 70px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.28),inset 0 -1px 0 rgba(255,255,255,0.05)}`
         + `.k{display:block;font-weight:700;font-size:22px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.82);margin-bottom:14px}`
         + `.l{display:block;font-weight:800;font-size:46px;line-height:1.16;color:#fff;margin-bottom:24px;text-shadow:0 2px 8px rgba(0,0,0,0.45)}`
-        + `.o{display:block;line-height:1}`
-        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:58px;line-height:1;color:#0c0d10;background:${accent};padding:9px 24px;border-radius:16px;box-shadow:0 8px 28px ${accent}88}`
-        + `.f{display:inline-block;vertical-align:middle;margin-left:18px;font-weight:800;font-size:32px;letter-spacing:1px;color:#fff}`;
+        + `.o{display:block;line-height:1.1}`
+        + `.n{display:inline-block;vertical-align:middle;max-width:100%;white-space:nowrap;font-weight:900;font-size:${nFont}px;line-height:1;color:#0c0d10;background:${accent};padding:9px 22px;border-radius:16px;box-shadow:0 8px 28px ${accent}88}`
+        + `.f{display:inline-block;vertical-align:middle;margin-left:16px;font-weight:800;font-size:${fFont}px;letter-spacing:1px;color:#fff}`;
       // Full-frame overlay centred on the frame (the CSS flexbox above places the card in the chosen zone), so
       // there is no asset scaling and therefore no squash. Zoom-in / fade-out for the pop.
       return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: fw, height: fh, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: "center", offset: { x: 0, y: 0 }, transition: { in: "zoom", out: "fade" } };

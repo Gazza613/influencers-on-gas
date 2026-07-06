@@ -1316,7 +1316,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                                   {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white" style={{ textShadow: "0 1px 5px rgba(0,0,0,0.45)" }}>{coDraft.line}</div>}
                                   {(coDraft.num || coDraft.suffix) && (
                                     <div className="mt-2">
-                                      {coDraft.num && <span className="rounded-[6px] px-1.5 py-0.5 text-[15px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 4px 14px ${coDraft.accent}88` }}>{coDraft.num}</span>}
+                                      {coDraft.num && <span className="inline-block max-w-full whitespace-nowrap rounded-[6px] px-1.5 py-0.5 font-black leading-none text-[#0c0d10]" style={{ fontSize: (coDraft.num.length <= 4 ? 15 : coDraft.num.length <= 6 ? 12.5 : coDraft.num.length <= 9 ? 10 : coDraft.num.length <= 12 ? 8.5 : 7), background: coDraft.accent, boxShadow: `0 4px 14px ${coDraft.accent}88` }}>{coDraft.num}</span>}
                                       {coDraft.suffix && <span className="ml-1.5 align-middle text-[9px] font-black text-white">{coDraft.suffix}</span>}
                                     </div>
                                   )}
