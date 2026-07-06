@@ -44,6 +44,17 @@ const STITCH_LINES = [
   "Burning in captions, callouts and your brand marks…",
   "Rendering the finished MP4 - nearly there…",
 ];
+// Quirky, high-energy copy for the FINAL-QUALITY overlay - keeps the producer invested through a long render.
+const FINAL_HYPE_LINES = [
+  "🎬 Action. Rolling the real cameras now, no more rough sketches.",
+  "🎨 Repainting every scene at full 1080p, pixel by gorgeous pixel…",
+  "☕ Grab a coffee - the good stuff takes a few minutes to bake.",
+  "🎭 Holding every face, outfit and set rock-steady at delivery quality…",
+  "🎞️ Promoting your drafts to the director's cut…",
+  "🌈 Colour-grading and adding the polish a highlight reel deserves…",
+  "💪 The premium engines are flexing - worth the wait, promise.",
+  "🍿 Nearly in the can, then we stitch it all into your final cut.",
+];
 
 type CreativeGuide = { url: string; role: string; ratio: string; scene: string; resolution: string };
 export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio" }) {
@@ -301,6 +312,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const clearDirty = (i: number) => setDirtyScenes((s) => { const n = new Set(s); n.delete(i); return n; });
   const [renderingRole, setRenderingRole] = useState<"" | "a-roll" | "b-roll">("");
   const [finishStart, setFinishStart] = useState<number | null>(null); // when the final-quality render / stitch began (for the reassurance panel clock)
+  const [finalizing, setFinalizing] = useState(false); // Render-Final-Quality is running → show the full-screen hype overlay
   // EXACT scope of the current animate so only the scenes truly rendering show a spinner: "all" = a
   // whole-board/role animate, an array = just those scene indices (a per-scene re-animate). Never spin the rest.
   const [clipScope, setClipScope] = useState<number[] | "all">("all");
@@ -515,12 +527,17 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // from its already-locked keyframe. Full-quality clips are skipped, so it only re-renders the proxies.
   async function finalizeClips() {
     if (rendering) return;
-    setErr(""); setFinishStart(Date.now());
+    setErr(""); setFinishStart(Date.now()); setFinalizing(true);
     setProduction((p) => (p ? { ...p, clips_status: "running" } : p));
     const r = await fetch(`/api/influencers/${influencerId}/clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ finalize: true }) }).then((x) => x.json()).catch(() => null);
-    if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the full-quality render - try again."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); return; }
+    if (r?.nothingToDo) { setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setFinalizing(false); return; }
+    if (!r?.queued) { setErr(r?.error || "Couldn't start the full-quality render - try again."); setProduction((p) => (p ? { ...p, clips_status: "idle" } : p)); setFinalizing(false); return; }
     await poll(setProduction, "clips_status");
+    setFinalizing(false);
+  }
+  async function abortFinalize() {
+    setFinalizing(false);
+    await resetStuck();
   }
 
   const [zoom, setZoom] = useState<string | null>(null);
@@ -1661,6 +1678,35 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
         </div>
       ) : null}
       {celebrate && <Celebration name={name} onDone={() => setCelebrate(false)} />}
+      {/* FINAL-QUALITY overlay: a hype popup with live progress + abort, so a long conform feels exciting, not
+          frozen. Real progress = draft clips flipping to full quality; the time-bar creeps between so 0% never
+          sits dead. "Hide" dismisses the overlay but the render keeps going (the inline panel at Stitch covers it). */}
+      {finalizing && (() => {
+        const finalTotal = keptScenes.length;
+        const finalDone = keptScenes.filter((x) => { const c = (production?.clips ?? []).find((cl) => cl.scene === x.i); return !!c?.url && c.draft !== true && c.status !== "failed"; }).length;
+        const finalPct = finalTotal ? Math.round((finalDone / finalTotal) * 100) : null;
+        return (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg">
+              <WorkingPanel
+                title="Rendering the final cut"
+                lines={FINAL_HYPE_LINES}
+                pct={finalPct}
+                startedAt={finishStart}
+                estimateSeconds={Math.max(480, finalTotal * 120)}
+                sub={`${finalDone}/${finalTotal} scenes at delivery quality`}
+                note="Upgrading every draft to full 1080p from your approved keyframes on the premium engines. This can take a while - grab a coffee, it keeps running even if you step away."
+                eta="10-30 min"
+                onAbort={abortFinalize}
+              />
+              <div className="mt-3 flex items-center justify-center gap-3">
+                <button onClick={() => setFinalizing(false)} className="rounded-lg border border-line px-4 py-1.5 text-xs font-semibold text-ink-dim transition hover:text-ink">Hide (keeps rendering)</button>
+                <span className="text-[11px] text-ink-faint">Only <b>Abort</b> if it&apos;s genuinely stuck for many minutes.</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {zoom && <Lightbox url={zoom} onClose={() => setZoom(null)} fill />}
       {vzoom && (
         <div onClick={() => setVzoom(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
