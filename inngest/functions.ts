@@ -1498,11 +1498,14 @@ export const generateClips = inngest.createFunction(
       // DoP (instant), a FINAL b-roll uses Kling. The voiceover plays its FULL measured length either way (the
       // audio track is independent of the clip), so you hear the whole line on a draft; only the FINAL has
       // full-length video motion. RULE, enforced in the UI: always Render Final Quality before you stitch.
-      // A FINAL scene-shot ALWAYS renders on Kling (native 3-15s = full-length, full motion) - NEVER the fixed
-      // ~5s DoP proxy. Gary's call: a 5-second b-roll is not suitable for delivery. DoP is ONLY the fast DRAFT
-      // preview (role b-roll + speed), or an explicit opt-in (BROLL_ENGINE=dop) / live-bg fast lane. So the slow
-      // Kling queue is the price of a proper full-length scene shot; the wait is mitigated by "notify me" + drafts.
-      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured();
+      // FAST first-party REST Kling (verified: a COMPLETED clip in ~81s, reliable) is the DEFAULT scene-shot
+      // engine now - it renders FULL-LENGTH Kling for BOTH draft AND final, so the 5-second DoP freeze is GONE
+      // (the two-week "b-roll caps at 5s" problem). Eligible = a non-rigid scene shot that fits Kling 2.1 (<=10s).
+      // Rigid scenes keep the MCP path (end_image camera lock); >10s keep MCP Kling 3.0 (up to 15s); any REST miss
+      // falls through to MCP. When REST handles a scene we SKIP the 5s DoP proxy. Set BROLL_KLING_REST=0 to disable.
+      const KLING_REST_ON = process.env.BROLL_KLING_REST !== "0" && klingRestConfigured();
+      const restWouldHandle = KLING_REST_ON && role === "b-roll" && !liveBg && !RIGID && !useVeo && clipSeconds <= 10;
+      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured() && !restWouldHandle;
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
@@ -1550,7 +1553,7 @@ export const generateClips = inngest.createFunction(
       // the MCP path below for the end_image camera lock, and >10s keeps MCP Kling 3.0 for the up-to-15s length.
       // Self-contained: on success it returns a delivery-quality clip (metered); on ANY miss it falls straight
       // through to the MCP Kling loop, so it can never make a scene fail that MCP would have rendered.
-      if (process.env.BROLL_KLING_REST === "1" && role === "b-roll" && !speed && !liveBg && !RIGID && !useVeo && clipSeconds <= 10 && klingRestConfigured()) {
+      if (restWouldHandle && !url) {
         const sub = await step.run(`krsubmit-${i}`, () => submitKlingRest({ imageUrl: img, prompt: motion, seconds: clipSeconds }));
         if (sub.jobSetId) {
           const KR_ROUNDS = Math.max(24, Number(process.env.KLING_REST_POLL_ROUNDS) || 96); // ~96 x 5s ≈ 8 min ceiling
