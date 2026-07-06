@@ -141,6 +141,10 @@ export function sayable(t: string): string {
   t = SAYABLE.reduce((s, [re, rep]) => s.replace(re, rep), t);
   t = speakRand(t);
   t = speakData(t);
+  // HOMOGRAPH: "lead"/"leads" spelled l-e-a-d is "leed(s)" in every sense here (a sales lead, to lead) - only
+  // the METAL is "led" (never in these ads). ElevenLabs often says "led"; respell to force the right read.
+  // Same length as the original word, so the caption char-span timestamps don't shift.
+  t = t.replace(/\bleads\b/gi, (m) => (m[0] === m[0].toUpperCase() ? "Leeds" : "leeds")).replace(/\blead\b/gi, (m) => (m[0] === m[0].toUpperCase() ? "Leed" : "leed"));
   // COMMA/SEMICOLON POP FIX (Gary's): ElevenLabs pops at comma AND semicolon pauses, but DROPPING them merged
   // words and mis-said "not". Swapping each clause comma/semicolon for a spaced hyphen " - " gives the SAME
   // pause WITHOUT the pop, and keeps the words separate so pronunciation stays correct. Number separators
