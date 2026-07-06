@@ -1517,15 +1517,25 @@ export const generateClips = inngest.createFunction(
         if (dop.error) await step.run(`dop-alert-${i}`, async () => { await alertIfCritical("Higgsfield DoP (b-roll video)", dop.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
       }
 
-      const sub = await step.run(`vsubmit-${i}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: clipSeconds, hero: useVeo }));
-      let url: string | null = sub.url;
-      if (!url && sub.jobId) {
-        let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
-        for (let n = 0; n < CLIP_POLL_ROUNDS; n++) { // default ~180 x 8s ≈ 24 min; env-tunable for slow vendor queues
-          const s = await step.run(`vpoll-${i}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
-          if (s.url) { url = s.url; break; }
-          if (s.terminal && grace-- <= 0) break;
-          await step.sleep(`vwait-${i}-${n}`, "8s");
+      // KLING with a RE-SUBMIT retry: the MCP lane can stall or terminally-fail transiently, so a FRESH submit
+      // often lands. We deliberately do NOT fall back to a broken 5s DoP clip (Gary's call) - if Kling can't
+      // deliver a full-length clip after the retries, the scene FAILS cleanly and the user re-animates (another
+      // fresh Kling try), rather than shipping a frozen 5s proxy.
+      let url: string | null = null;
+      let subErr = ""; let subModel = "";
+      const KLING_TRIES = Math.max(1, Number(process.env.BROLL_KLING_TRIES) || 2);
+      for (let attempt = 0; attempt < KLING_TRIES && !url; attempt++) {
+        const sub = await step.run(`vsubmit-${i}-${attempt}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: clipSeconds, hero: useVeo }));
+        subErr = sub.error || subErr; subModel = sub.model || subModel;
+        if (sub.url) { url = sub.url; break; }
+        if (sub.jobId) {
+          let grace = 6; // soft-terminal retry: a job can report "done" a few polls before its URL propagates
+          for (let n = 0; n < CLIP_POLL_ROUNDS; n++) { // default ~240 x 8s ≈ 32 min; env-tunable for slow vendor queues
+            const s = await step.run(`vpoll-${i}-${attempt}-${n}`, () => pollVideoJobOnce(sub.jobId as string));
+            if (s.url) { url = s.url; break; }
+            if (s.terminal && grace-- <= 0) break;
+            await step.sleep(`vwait-${i}-${attempt}-${n}`, "8s");
+          }
         }
       }
       // LIVE-BG A-ROLL did not land in time → fall back to a reliable HeyGen talking-head (frozen background)
@@ -1550,11 +1560,10 @@ export const generateClips = inngest.createFunction(
           return { scene: i, role, beat, kind: role, url: hosted, status: "ready", synced: true, audio_url: audioUrl, duration: audioDur ?? undefined, engine: "heygen:avatar_iv:livebg-fallback", draft: speed };
         }
       }
-      // VEO/KLING did not land in time → for B-ROLL, fall back to the FAST, reliable first-party DoP lane so
-      // the scene is NEVER just lost (a ~5s DoP clip loops to the 8s slot in the stitch). Only when DoP wasn't
-      // already the primary engine for this scene. This is the safety net for "render started (veo3_1) but did
-      // not finish in time" - premium Veo is attempted first, DoP guarantees a clip if it stalls.
-      if (!url && role === "b-roll" && !useDop && dopConfigured()) {
+      // OPT-IN ONLY (BROLL_DOP_FALLBACK=1): fall back to a ~5s DoP clip if Kling didn't land. OFF by default -
+      // Gary's call: a 5s DoP proxy under a longer VO is a frozen/broken clip, so we'd rather FAIL the scene
+      // cleanly (below) and let the user re-animate than ship a freeze. Kept as an escape hatch only.
+      if (process.env.BROLL_DOP_FALLBACK === "1" && !url && role === "b-roll" && !useDop && dopConfigured()) {
         const fb = await step.run(`dopfb-submit-${i}`, () => submitDopVideo({ imageUrl: img as string, prompt: motion, seconds: clipSeconds }));
         if (fb.jobSetId) {
           const FB_ROUNDS = Math.max(60, Number(process.env.DOP_POLL_ROUNDS) || 360);
@@ -1584,7 +1593,7 @@ export const generateClips = inngest.createFunction(
         // regardless of the draft flag, so it's never a proxy and the conform pass must skip it.
         return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : clipSeconds, audio_url: audioUrl || undefined, synced: false, draft: false };
       }
-      return { scene: i, role, beat, kind: role, url: null, status: "failed", error: (sub.error || `render started (${sub.model}) but did not finish in time`) + (role === "b-roll" && !dopConfigured() ? " — B-ROLL is on the flaky Kling fallback because the reliable DoP engine is NOT configured: set HIGGSFIELD_KEY_ID + HIGGSFIELD_KEY_SECRET in the environment." : "") };
+      return { scene: i, role, beat, kind: role, url: null, status: "failed", error: (subErr || `the Kling render (${subModel || "kling"}) stalled and didn't finish in time`) + " — re-animate this scene to try again (Kling stalls are usually transient)." };
     };
 
     // Render EVERY scene CONCURRENTLY (wall-clock ≈ the slowest single clip, not the sum). Each
