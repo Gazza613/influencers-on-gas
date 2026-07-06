@@ -37,9 +37,15 @@ export default function Lightbox({ url, onClose, fill = false }: { url: string; 
           </div>
         )}
         {isVideo
-          // fill = crop the raw clip to a 9:16 frame, exactly like the final stitch does - hides HeyGen Avatar
-          // IV's baked-in pillarbox bars (Avatar IV renders 16:9 only) so the zoom matches the published cut.
-          ? <video src={url} controls autoPlay playsInline preload="auto" className={fill ? "aspect-[9/16] max-h-[82vh] w-auto rounded-lg border border-line bg-black object-cover" : "max-h-[82vh] w-auto rounded-lg border border-line bg-black object-contain"} />
+          // fill = overscan the clip inside a 9:16 box, exactly like the final stitch (AROLL_OVERSCAN). HeyGen
+          // Avatar IV bakes a thin white edge INSIDE its 9:16 frame, so object-cover alone can't remove it (the
+          // video already matches the box) - we must ZOOM slightly to push that baked edge off-frame. The scale
+          // is clipped by the overflow-hidden wrapper. (Non-fill = plain contain, e.g. b-roll with no edge.)
+          ? (fill
+            ? <div className="relative h-[82vh] aspect-[9/16] max-w-[92vw] overflow-hidden rounded-lg border border-line bg-black">
+                <video src={url} controls autoPlay playsInline preload="auto" className="absolute inset-0 h-full w-full object-cover" style={{ transform: "scale(1.1)" }} />
+              </div>
+            : <video src={url} controls autoPlay playsInline preload="auto" className="max-h-[82vh] w-auto rounded-lg border border-line bg-black object-contain" />)
           // eslint-disable-next-line @next/next/no-img-element
           : <img src={url} alt="frame" onLoad={() => setLoaded(true)} className={`max-h-[82vh] w-auto rounded-lg border border-line object-contain ${loaded ? "" : "hidden"}`} />}
         <div className="mt-3 flex items-center justify-center gap-3">

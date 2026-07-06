@@ -1796,7 +1796,7 @@ function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
           controls
           playsInline
           className="absolute inset-0 h-full w-full object-cover"
-          style={aroll ? { transform: "scale(1.06)" } : undefined}
+          style={aroll ? { transform: "scale(1.1)" } : undefined}
           onPlay={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; a.play().catch(() => {}); }) : undefined}
           onPause={overlayVO ? () => sync((_v, a) => a.pause()) : undefined}
           onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; }) : undefined}
