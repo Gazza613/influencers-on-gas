@@ -1440,7 +1440,18 @@ export const generateClips = inngest.createFunction(
       // and it was hanging past the poll window (b-roll spinning for ages, then failing). OFF by default
       // for reliability: b-roll now renders a simple start-frame motion clip that finishes fast. Re-enable
       // the seamless-cut chaining with BROLL_END_FRAME=1 once Kling render times are healthy.
-      const endImageUrl = process.env.BROLL_END_FRAME === "1" && role === "b-roll" && next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined;
+      // CAMERA LOCK (deterministic - the real answer to "make the platform obey"): Kling via Higgsfield exposes
+      // NO camera-control / motion-strength / cfg parameter (the verified generate_video schema is just model +
+      // prompt + aspect + duration + sound + the start/end keyframes). So a prompt is only a REQUEST. The one HARD
+      // lever is the start/end keyframe pair: for scenes with rigid structures (trees, buildings, a landmark) that
+      // warp on any camera move, BOOKEND the clip on its OWN start frame (end_image = start_image). Kling must
+      // resolve the motion back to the identical composition, so the camera physically cannot travel and the fixed
+      // structures cannot warp - only the living things (people, leaves, water) move, driven by the prompt. This
+      // GUARANTEES the lock at the platform level rather than asking for it. Set BROLL_LOCK_RIGID=0 to disable.
+      const lockRigid = role === "b-roll" && RIGID && process.env.BROLL_LOCK_RIGID !== "0";
+      const endImageUrl = lockRigid
+        ? (img || undefined)
+        : (process.env.BROLL_END_FRAME === "1" && role === "b-roll" && next && String(next.role || "a-roll") !== "graphic" ? (shotUrl(i + 1) || undefined) : undefined);
       // Clip length: b-roll is rendered to the length of ITS NARRATION (the approved VO slice), so the
       // video is always at least as long as the audio and never freezes waiting for the voice to finish
       // (Gary's "pause at the end of every b-roll"). We CEIL the narration so clip ≥ audio, then the stitch
