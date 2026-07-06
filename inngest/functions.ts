@@ -3,7 +3,7 @@ import { getInfluencer, updateInfluencer, updateProductionFields, upsertClip } f
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, castLockClause, CLOTHED, HUMANISER } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
-import { submitDopVideo, pollDopOnce, dopConfigured } from "@/lib/vendors/higgsfield-dop";
+import { submitDopVideo, pollDopOnce, dopConfigured, submitKlingRest, klingRestConfigured } from "@/lib/vendors/higgsfield-dop";
 import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
 import { notifyRenderDone } from "@/lib/notify";
 import { bibleWardrobe } from "@/lib/bible";
@@ -1541,12 +1541,41 @@ export const generateClips = inngest.createFunction(
         if (dop.error) await step.run(`dop-alert-${i}`, async () => { await alertIfCritical("Higgsfield DoP (b-roll video)", dop.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
       }
 
+      let url: string | null = null;
+      let subErr = ""; let subModel = "";
+
+      // PHASE 1 (flagged, default OFF via BROLL_KLING_REST=1): FAST first-party REST Kling for eligible scene
+      // shots - a COMPLETED clip in ~1-2 min vs ~40 min on the MCP session (verified: /v1/image2video/kling,
+      // kling-v2-1, 81s). Only for a FINAL, NON-rigid scene-shot that fits Kling 2.1 (<=10s): rigid scenes keep
+      // the MCP path below for the end_image camera lock, and >10s keeps MCP Kling 3.0 for the up-to-15s length.
+      // Self-contained: on success it returns a delivery-quality clip (metered); on ANY miss it falls straight
+      // through to the MCP Kling loop, so it can never make a scene fail that MCP would have rendered.
+      if (process.env.BROLL_KLING_REST === "1" && role === "b-roll" && !speed && !liveBg && !RIGID && !useVeo && clipSeconds <= 10 && klingRestConfigured()) {
+        const sub = await step.run(`krsubmit-${i}`, () => submitKlingRest({ imageUrl: img, prompt: motion, seconds: clipSeconds }));
+        if (sub.jobSetId) {
+          const KR_ROUNDS = Math.max(24, Number(process.env.KLING_REST_POLL_ROUNDS) || 96); // ~96 x 5s ≈ 8 min ceiling
+          let krUrl: string | null = null;
+          for (let n = 0; n < KR_ROUNDS && !krUrl; n++) {
+            const s = await step.run(`krpoll-${i}-${n}`, () => pollDopOnce(sub.jobSetId as string));
+            if (s.url) { krUrl = s.url; break; }
+            if (s.terminal) break;
+            await step.sleep(`krwait-${i}-${n}`, "5s");
+          }
+          if (krUrl) {
+            await step.run(`u-krest-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: sub.model || "kling-v2-1", unit: "video", action: "broll", count: 1 }).catch(() => {}));
+            const hosted = (await step.run(`krhost-${i}`, () => rehostToBlob(krUrl as string, "clips").catch(() => null))) || krUrl;
+            const realDur = await step.run(`krdur-${i}`, () => probeDuration(hosted as string).catch(() => null));
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : clipSeconds, audio_url: audioUrl || undefined, synced: false, engine: `higgsfield:${sub.model || "kling-v2-1"}:rest`, draft: false };
+          }
+        }
+        if (sub.error) await step.run(`kr-alert-${i}`, async () => { await alertIfCritical("Higgsfield Kling REST (b-roll)", sub.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
+        // fall through to the MCP Kling loop below.
+      }
+
       // KLING with a RE-SUBMIT retry: the MCP lane can stall or terminally-fail transiently, so a FRESH submit
       // often lands. We deliberately do NOT fall back to a broken 5s DoP clip (Gary's call) - if Kling can't
       // deliver a full-length clip after the retries, the scene FAILS cleanly and the user re-animates (another
       // fresh Kling try), rather than shipping a frozen 5s proxy.
-      let url: string | null = null;
-      let subErr = ""; let subModel = "";
       const KLING_TRIES = Math.max(1, Number(process.env.BROLL_KLING_TRIES) || 2);
       for (let attempt = 0; attempt < KLING_TRIES && !url; attempt++) {
         const sub = await step.run(`vsubmit-${i}-${attempt}`, () => submitVideoFromImage({ imageUrl: img, prompt: motion, ratio, endImageUrl, duration: clipSeconds, hero: useVeo }));

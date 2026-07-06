@@ -7,6 +7,7 @@
 // caller. The SDK's withPolling blocks one call for the whole render, which outlasts the serverless
 // function window and makes the clip spin forever - never use it inside an Inngest step.
 import { HiggsfieldClient, DoPModel, InputImage } from "@higgsfield/client";
+import { isSafePublicUrl } from "@/lib/safe-url";
 
 const BASE = "https://platform.higgsfield.ai";
 
@@ -60,5 +61,42 @@ export async function pollDopOnce(jobSetId: string): Promise<{ url: string | nul
     return { url, terminal, status };
   } catch {
     return { url: null, terminal: false, status: "error" }; // transient - keep polling
+  }
+}
+
+export function klingRestConfigured(): boolean {
+  return !!(process.env.HIGGSFIELD_KEY_ID && process.env.HIGGSFIELD_KEY_SECRET);
+}
+
+// FIRST-PARTY REST Kling image-to-video (verified 2026-07-06: POST /v1/image2video/kling, model kling-v2-1,
+// a COMPLETED 5s clip in ~81s vs ~40 min on the MCP session). Same first-party auth + the same job-set poll as
+// DoP (use pollDopOnce). Kling 2.1 renders 5s or 10s, so the caller only routes clips <=10s here (longer
+// stays on MCP Kling 3.0, which does up to 15s). Submit non-blocking; poll from short Inngest steps.
+export async function submitKlingRest(opts: { imageUrl: string; prompt: string; seconds?: number }): Promise<{ jobSetId: string | null; model: string; error: string | null }> {
+  const model = process.env.KLING_REST_MODEL || "kling-v2-1"; // or "kling-v2-1-master" (higher quality)
+  if (!klingRestConfigured()) return { jobSetId: null, model, error: "Higgsfield first-party API not configured (HIGGSFIELD_KEY_ID / HIGGSFIELD_KEY_SECRET)" };
+  if (!isSafePublicUrl(opts.imageUrl)) return { jobSetId: null, model, error: "unsafe or non-public image url" };
+  const duration = opts.seconds && opts.seconds > 5 ? 10 : 5; // Kling 2.1 = 5s or 10s only
+  const params: Record<string, unknown> = {
+    model,
+    prompt: opts.prompt,
+    input_image: { type: "image_url", image_url: opts.imageUrl },
+    duration,
+    mode: process.env.KLING_REST_MODE || "pro",
+    // Default OFF so Kling renders OUR exact motion prompt (camera lock / no-warp rules) rather than rewriting it.
+    enhance_prompt: process.env.KLING_REST_ENHANCE === "1",
+  };
+  if (process.env.KLING_REST_CFG) params.cfg_scale = Number(process.env.KLING_REST_CFG);
+  try {
+    const res = await fetch(`${BASE}/v1/image2video/kling`, {
+      method: "POST",
+      headers: { "hf-api-key": process.env.HIGGSFIELD_KEY_ID!, "hf-secret": process.env.HIGGSFIELD_KEY_SECRET!, "Content-Type": "application/json" },
+      body: JSON.stringify({ params }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { id?: string; detail?: unknown };
+    if (data?.id) return { jobSetId: data.id, model, error: null };
+    return { jobSetId: null, model, error: `Kling REST submit ${res.status}: ${JSON.stringify(data?.detail ?? data).slice(0, 200)}` };
+  } catch (e) {
+    return { jobSetId: null, model, error: String((e as Error)?.message || e).slice(0, 220) };
   }
 }
