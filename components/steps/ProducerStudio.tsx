@@ -540,7 +540,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setFinalizing(false);
   }
   async function abortFinalize() {
-    setFinalizing(false);
+    // Stop waiting on a long render/stitch: clear every client render flag AND reset the server status so the
+    // board unlocks immediately. Finished clips are kept; you can re-render just the scenes you need.
+    setFinalizing(false); setWholeBoardBusy(false); setRenderingRole(""); setAnimatingScenes(new Set());
+    setProduction((p) => (p ? { ...p, clips_status: "idle", assembly_status: "idle" } : p));
     await resetStuck();
   }
 
@@ -1598,8 +1601,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         lines={assembling ? STITCH_LINES : FINALISE_LINES}
                         estimateSeconds={assembling ? 420 : 1500}
                         startedAt={assembling ? finishStart : ((production as { clips_started_at?: number })?.clips_started_at ?? finishStart)}
-                        eta={assembling ? "usually a few minutes" : "10-40 min when the queue is busy"}
+                        eta={assembling ? "usually a few minutes" : "usually a few minutes on the fast lane"}
                         note="Safe to close this tab, start another job, or come back later - it keeps rendering on our servers, we email you the moment it's done, and the finished cut will be here when you return."
+                        onAbort={abortFinalize}
                       />
                     </div>
                   )}
