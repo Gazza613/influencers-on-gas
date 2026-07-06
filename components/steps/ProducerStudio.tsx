@@ -332,7 +332,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // DRAFT SPEED: render a-roll clips at 720p (faster) while iterating. A 720p draft STAYS 720p in the final
   // unless "Render final quality" upgrades it, so there are two-click guards on Stitch + Showreel-Accept while
   // draft clips remain (P0-2), to stop an accidental 720p delivery. Default ON for fast iteration.
-  const [speedMode, setSpeedMode] = useState(true);
+  // Draft Speed is retired: with the fast REST lanes, everything renders at delivery quality in one pass, so this
+  // is always OFF (full 1080p talking shots + full-length scene shots, no separate "Render Final Quality" step).
+  // Kept as a constant so the render calls that read `speedMode` still compile; the toggle UI is removed.
+  const speedMode = false;
   const [stitchArmed, setStitchArmed] = useState(false); // two-click confirm to stitch a still-draft cut
   const [showreelArmed, setShowreelArmed] = useState(false); // two-click confirm to accept a still-draft cut
   const [resetArmed, setResetArmed] = useState(false); // two-click confirm before "Reset if stuck" kills a job
@@ -1103,19 +1106,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {isStudio && (<div className="rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/[0.04] px-3 py-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-[12px] font-semibold text-ink">📸 Reference images</span>
-              {/* Priority queue is now ALWAYS ON (the fast paid image model) - a keyframe is the foundation of
-                  every shot and ~1 credit is negligible on the Ultra plan, so there's no reason to sit in the
-                  slow free queue. No toggle needed. */}
-              {/* Draft speed: animation-only proxy (a-roll 720p, b-roll fast DoP). Keyframes stay FULL quality;
-                  the "Render final quality" conform at the Stitch step upgrades drafts to 1080p/Veo, no drift. */}
-              <button
-                onClick={() => setSpeedMode((v) => !v)}
-                title="Draft speed: render your PREVIEW clips fast + cheap (talking shots at 720p, scene shots on the quick preview engine) so your team can review quickly. Your keyframes stay FULL quality, so nothing about the shot is lost. When you're happy, hit 'Render final quality' at the Stitch step - it conforms every draft to full 1080p quality from the SAME keyframe (same shot, no drift). Turn OFF to render at full quality from the start."
-                className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#a855f7] bg-[#a855f7]/15 text-[#d8b4fe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}
-              >
-                <span aria-hidden>⚡</span> Draft speed
-                <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#a855f7] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "ON" : "OFF"}</span>
-              </button>
+              {/* Draft Speed removed: the fast REST lanes render everything at delivery quality in one pass, so
+                  there's no draft/final split any more (full 1080p talking shots + full-length scene shots). */}
               <div className="ml-auto flex items-center gap-2">
                 <RatioPicker value={boardRatio} onChange={setBoardRatio} />
                 <button onClick={() => shootAll(boardRatio)} disabled={busyAny} className="btn-brand rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting references…" : "📸 Shoot all reference images"}</button>
@@ -1564,9 +1556,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <button onClick={() => shootAll(boardRatio)} disabled={shooting || rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting all keyframes…" : "📸 Shoot all keyframes"}</button>
                     <button onClick={() => animateAll(false)} disabled={shooting || wholeBoardBusy || rendering || animatingScenes.size > 0 || builtCount === keptScenes.length} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{(wholeBoardBusy || rendering) ? "🎞️ Animating…" : builtCount === keptScenes.length && keptScenes.length > 0 ? "✓ All scenes animated" : builtCount > 0 ? `🎞️ Animate remaining (${keptScenes.length - builtCount})` : "🎞️ Animate all"}</button>
                     {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || wholeBoardBusy || rendering || animatingScenes.size > 0} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
-                    <button onClick={() => setSpeedMode((v) => !v)} title="Draft speed renders PREVIEW clips fast (talking shots 720p, scene shots on the quick preview engine) for quick team review. Keyframes stay full quality. When happy, 'Render final quality' at the Stitch step conforms every draft to full 1080p quality from the same keyframe - no drift. Turn OFF to render full quality from the start." className={`inline-flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-bold transition ${speedMode ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#bfdbfe]" : "border-line bg-surface-2/50 text-ink-faint hover:text-ink"}`}><span aria-hidden>⚡</span> Draft speed <span className={`tabular ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${speedMode ? "bg-[#60a5fa] text-black" : "bg-surface-2 text-ink-faint"}`}>{speedMode ? "720p" : "1080p"}</span></button>
                   </div>
-                  {speedMode && <p className="text-[11px] text-[#93c5fd]">⚡ Draft speed ON - FAST previews to iterate the look: talking shots at 720p, and <b>scene shots as a quick ~5s clip</b>. The voiceover still plays the FULL line on a draft - only the scene-shot video is short. Before you Stitch, hit <b>🎬 Render final quality</b> so scene shots re-render full-length with motion for the whole line. A draft is a preview, not the deliverable.</p>}
+                  <p className="text-[11px] text-[#93c5fd]">Everything renders at <b>delivery quality</b> in one pass now (full 1080p talking shots + full-length scene shots on the fast lane), so there&apos;s no draft/final step.</p>
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have).</p>
                   {(rendering || wholeBoardBusy || animatingScenes.size > 0) && <p className="rounded-md border border-[#38bdf8]/25 bg-[#38bdf8]/[0.06] px-3 py-1.5 text-[11px] text-[#7dd3fc]">🛈 Safe to close this tab or come back later - rendering keeps running on our servers, and everything will be here when you return. A scene-shot clip can take up to ~40 min when the queue is busy.</p>}
                   {/* IN-STEP SCENE CAROUSEL: every scene at a glance - edit or re-animate any without scrolling
