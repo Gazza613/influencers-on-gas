@@ -1682,7 +1682,12 @@ export const generateAudio = inngest.createFunction(
     const sa = Array.isArray((production as { scene_audio?: { scene: number; duration?: number }[] })?.scene_audio) ? (production as { scene_audio: { scene: number; duration?: number }[] }).scene_audio : [];
     const droppedA = new Set((Array.isArray((production as { dropped_scenes?: number[] })?.dropped_scenes) ? (production as { dropped_scenes?: number[] }).dropped_scenes! : []).map(Number));
     const voTotal = sa.filter((e) => !droppedA.has(Number(e.scene))).reduce((s, e) => s + (Number(e.duration) || 0), 0);
-    const total = Math.max(15, Number(sb.duration_seconds) || sb.scenes.length * 5, Math.ceil(voTotal) + 6);
+    // Run the music/ambient bed to the FULL brief target (a 60s brief → a full-minute bed), matching the stitch,
+    // so the re-run preview doesn't stop ~4s short when the voiceover lands under the target. Capped at
+    // voiceover + 10s so a grossly short script can't request a wildly long bed. END_FILL_TARGET=0 reverts.
+    const targetDur = process.env.END_FILL_TARGET === "0" ? 0 : Number((production?.brief as { durationSeconds?: number })?.durationSeconds) || 0;
+    const runTo = targetDur > 0 ? Math.min(targetDur, Math.ceil(voTotal) + 10) : 0;
+    const total = Math.max(15, Number(sb.duration_seconds) || sb.scenes.length * 5, Math.ceil(voTotal) + 6, runTo);
     await step.run("mark", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, audio_status: "running" } } }));
 
     // Generate music + ambient IN PARALLEL (they're independent) — this halves the wait vs running
