@@ -1242,7 +1242,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             const justify = pos.includes("Left") ? "flex-start" : pos.includes("Right") ? "flex-end" : "center";
                             return (
                               <div className="absolute inset-x-0 flex px-2" style={{ ...vstyle, justifyContent: justify }}>
-                                <div className="rounded-[16px] px-3 py-2.5 text-left" style={{ width: "90%", border: "1px solid rgba(255,255,255,0.42)", background: "linear-gradient(180deg,rgba(255,255,255,0.17) 0%,rgba(255,255,255,0.05) 100%)", boxShadow: "0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(255,255,255,0.06)", animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
+                                <div className="rounded-[16px] px-3 py-2.5 text-left" style={{ width: "90%", border: "1px solid rgba(255,255,255,0.34)", background: "linear-gradient(180deg,rgba(26,30,46,0.72) 0%,rgba(13,15,25,0.66) 100%)", boxShadow: "0 12px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.28)", animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
                                   {coDraft.kick && <div className="text-[6px] font-bold uppercase leading-none tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.85)", textShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>{coDraft.kick}</div>}
                                   {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white" style={{ textShadow: "0 1px 5px rgba(0,0,0,0.45)" }}>{coDraft.line}</div>}
                                   {(coDraft.num || coDraft.suffix) && (

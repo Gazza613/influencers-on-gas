@@ -2183,24 +2183,27 @@ export const assembleVideo = inngest.createFunction(
         line ? `<div class="l">${line}</div>` : "",
         (cnum || suffix) ? `<div class="o">${cnum ? `<span class="n">${cnum}</span>` : ""}${suffix ? `<span class="f">${suffix}</span>` : ""}</div>` : "",
       ].join("");
-      // FROSTED-GLASS CARD (the LOCKED, Gary-approved treatment - matches the "On-screen offer callout" artifact
-      // exactly: translucent white-sheen gradient card, hairline light border, soft drop shadow + inset top/bottom
-      // highlights for the glass edge; muted-bright spaced eyebrow, bold white headline, and the offer in a bright
-      // accent chip beside a light suffix). A live blur of the footage isn't possible in the compositor, so "glass"
-      // is this translucent gradient (how premium ads fake it) - over dark footage it reads as dark glass, over
-      // bright footage as a light frosted card, and the offer chip + text-shadow keep it razor-legible either way.
-      // Shotstack-safe: no @keyframes / pseudo-elements; explicit display:block; motion is the zoom-in transition.
-      const css = `.wrap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}`
-        + `.card{box-sizing:border-box;display:inline-block;text-align:left;max-width:700px;padding:32px 44px 36px;border-radius:34px;`
-        + `background:linear-gradient(180deg,rgba(255,255,255,0.17) 0%,rgba(255,255,255,0.05) 100%);`
-        + `border:1px solid rgba(255,255,255,0.42);box-shadow:0 30px 70px rgba(0,0,0,0.50),inset 0 1px 0 rgba(255,255,255,0.55),inset 0 -1px 0 rgba(255,255,255,0.06)}`
-        + `.k{display:block;font-weight:700;font-size:20px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.85);margin-bottom:14px}`
-        + `.l{display:block;font-weight:800;font-size:44px;line-height:1.18;color:#fff;margin-bottom:24px;text-shadow:0 2px 8px rgba(0,0,0,0.45)}`
+      // DARK NAVY FROSTED GLASS (Gary's approved mockup). The overlay is now the FULL FRAME (matches the output
+      // resolution) with the card positioned by CSS flexbox - the old fixed 1000x680 landscape box was being
+      // stretched onto the 1080x1920 portrait frame, which SQUASHED the card. Full-frame = pixel-for-pixel, no
+      // distortion. Dark translucent base so it's clearly a card over ANY footage (the white-sheen version
+      // vanished over dark scenes). Shotstack-safe: no @keyframes / pseudo-elements.
+      const [fw, fh] = ratio === "16:9" ? [1920, 1080] : ratio === "1:1" ? [1080, 1080] : [1080, 1920];
+      const posKey = String(co.pos || "lowerCenter");
+      const vAlign = /^upper/i.test(posKey) ? "flex-start" : /^lower/i.test(posKey) ? "flex-end" : "center";
+      const hAlign = /Left$/i.test(posKey) ? "flex-start" : /Right$/i.test(posKey) ? "flex-end" : "center";
+      const css = `.wrap{box-sizing:border-box;display:flex;width:${fw}px;height:${fh}px;padding:8% 6%;align-items:${vAlign};justify-content:${hAlign};font-family:'Open Sans',sans-serif}`
+        + `.card{box-sizing:border-box;text-align:left;max-width:82%;padding:34px 46px 38px;border-radius:36px;`
+        + `background:linear-gradient(180deg,rgba(26,30,46,0.66) 0%,rgba(13,15,25,0.60) 100%);`
+        + `border:1px solid rgba(255,255,255,0.34);box-shadow:0 30px 70px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.28),inset 0 -1px 0 rgba(255,255,255,0.05)}`
+        + `.k{display:block;font-weight:700;font-size:22px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.82);margin-bottom:14px}`
+        + `.l{display:block;font-weight:800;font-size:46px;line-height:1.16;color:#fff;margin-bottom:24px;text-shadow:0 2px 8px rgba(0,0,0,0.45)}`
         + `.o{display:block;line-height:1}`
-        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:56px;line-height:1;color:#0c0d10;background:${accent};padding:8px 24px;border-radius:16px;box-shadow:0 8px 28px ${accent}88}`
+        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:58px;line-height:1;color:#0c0d10;background:${accent};padding:9px 24px;border-radius:16px;box-shadow:0 8px 28px ${accent}88}`
         + `.f{display:inline-block;vertical-align:middle;margin-left:18px;font-weight:800;font-size:32px;letter-spacing:1px;color:#fff}`;
-      const cp = placeCaption(String(co.pos || "lowerCenter"), 0); // reuse the 9-zone map for placement + safe-zone offset
-      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
+      // Full-frame overlay centred on the frame (the CSS flexbox above places the card in the chosen zone), so
+      // there is no asset scaling and therefore no squash. Zoom-in / fade-out for the pop.
+      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: fw, height: fh, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: "center", offset: { x: 0, y: 0 }, transition: { in: "zoom", out: "fade" } };
     };
     const calloutClips: Record<string, unknown>[] = [];
     for (const p of placed) {
