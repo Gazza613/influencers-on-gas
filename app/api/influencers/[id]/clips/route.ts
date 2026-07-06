@@ -85,10 +85,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // to "running" (which the UI reads as board-wide "rendering"); a per-scene animate leaves it as-is (its own
   // clip goes to "pending" and the client tracks it per scene). Never downgrade an in-flight whole-board run.
   const perSceneAnimate = !!(explicitScenes && explicitScenes.length && !force && !finalize && !(roles && roles.length));
+  const wasRunning = (production as { clips_status?: string }).clips_status === "running";
   const clipsStatusNext = perSceneAnimate
-    ? ((production as { clips_status?: string }).clips_status === "running" ? "running" : "idle")
+    ? (wasRunning ? "running" : "idle")
     : "running";
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: clipsNext, clips_status: clipsStatusNext } } });
+  // SERVER-SIDE start stamp so the render TIMER shows TRUE elapsed and survives the producer leaving + returning
+  // (the render runs durably on our servers; only the browser clock was resetting to 0 on reload). Stamp ONLY on
+  // the transition into a fresh whole-board/finalize run - a per-scene animate mid-run must NOT reset the clock.
+  const clipsStartedAt = (clipsStatusNext === "running" && !wasRunning) ? Date.now() : (production as { clips_started_at?: number }).clips_started_at;
+  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: clipsNext, clips_status: clipsStatusNext, clips_started_at: clipsStartedAt } } });
   try {
     await inngest.send({ name: "influencer/generate.clips", data: { influencerId: id,
       ...(roles && roles.length ? { roles } : {}),

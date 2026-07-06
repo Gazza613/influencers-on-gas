@@ -1576,7 +1576,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         title={assembling ? "Stitching your final cut" : "Rendering full quality"}
                         lines={assembling ? STITCH_LINES : FINALISE_LINES}
                         estimateSeconds={assembling ? 420 : 1500}
-                        startedAt={finishStart}
+                        startedAt={assembling ? finishStart : ((production as { clips_started_at?: number })?.clips_started_at ?? finishStart)}
                         eta={assembling ? "usually a few minutes" : "10-40 min when the queue is busy"}
                         note="Safe to close this tab or come back later - it keeps rendering on our servers, and the finished cut will be here when you return."
                       />
@@ -1694,7 +1694,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 crew={CREW.producer}
                 lines={FINAL_HYPE_LINES}
                 pct={finalPct}
-                startedAt={finishStart}
+                startedAt={(production as { clips_started_at?: number })?.clips_started_at ?? finishStart}
                 estimateSeconds={Math.max(480, finalTotal * 120)}
                 sub={`${finalDone}/${finalTotal} scenes at delivery quality`}
                 note="Upgrading every draft to full 1080p from your approved keyframes on the premium engines. This can take a while - grab a coffee, it keeps running even if you step away."
