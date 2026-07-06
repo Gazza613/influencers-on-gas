@@ -1696,8 +1696,12 @@ export const generateClips = inngest.createFunction(
 // with a hard negative so ElevenLabs can't invent sirens/alarms/traffic/music/speech (the "why is there a
 // siren at a coffee shop?" bug). One builder shared by the audio step and the stitch so they stay in sync.
 function buildAmbientPrompt(desc: string, setting: string): string {
-  const want = desc && desc.trim() ? desc.trim() : `the natural, characteristic ambient sounds of ${setting}`;
-  return `Immersive, realistic, CONTINUOUS ambient background atmosphere: ${want}. Present and natural, true to this exact place, sitting gently under the voiceover. STRICTLY NO music, NO singing, NO intelligible speech or dialogue, and absolutely NO sirens, alarms, emergency vehicles, police, ambulances, car horns, screeching tyres, whistles or heavy traffic.`;
+  const want = desc && desc.trim() ? desc.trim() : `the natural, characteristic gentle background sounds of ${setting}`;
+  // CRITICAL: ElevenLabs Sound Effects is a text-to-audio model that does NOT understand negation. Listing
+  // "NO sirens / alarms / traffic" made it LATCH onto those words and GENERATE a siren (the recurring bug).
+  // So the prompt must be PURELY POSITIVE - describe ONLY the gentle sounds we WANT, and it fills the bed with
+  // exactly those. No "no ..." clauses, ever.
+  return `Gentle, continuous, realistic ambient background atmosphere of ${want}. Soft, natural environmental room tone that suits the place and sits quietly in the background of a scene.`;
 }
 
 // THE PRODUCER — "music & ambient" (its own gated step): generate the music bed + ambient room
