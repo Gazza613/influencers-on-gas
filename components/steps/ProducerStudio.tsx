@@ -641,7 +641,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // (no edit form) - the reshoot job renders the keyframe then the clip.
   // Shoot ONE scene's REFERENCE IMAGE (keyframe) only - no video. Video comes later (after the voice).
   async function shootRefScene(i: number) {
-    if (busyAny) return;
+    // Don't fail SILENTLY (Gary: "nothing happened on 4, no spinner"). Say what's blocking + the way out.
+    if (busyAny) {
+      setErr(
+        rendering ? `A render is still running, so keyframes are locked. Hit ⟳ Reset if stuck (top of the studio), then re-shoot Scene ${i + 1}.`
+          : shooting ? "A shoot is already running - let it finish first."
+            : anyReshooting ? "Another scene is re-shooting - let that finish, then try again."
+              : "The board is busy right now - give it a moment, or hit ⟳ Reset if stuck."
+      );
+      return;
+    }
     setErr(""); setShootingRole(""); setShootScope([i]); clearDirty(i); // ONLY this scene is shooting
     setProduction((p) => {
       if (!p) return p;
