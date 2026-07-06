@@ -1540,7 +1540,13 @@ export const generateClips = inngest.createFunction(
       // a 10s REST clip with ~1-2s held under the tail of the voice - far better than 30-40 min on the MCP lane
       // (that single >10s scene was gating the whole final render). Rigid scenes still use MCP (end_image lock).
       const KLING_REST_ON = process.env.BROLL_KLING_REST !== "0" && klingRestConfigured();
-      const restWouldHandle = KLING_REST_ON && role === "b-roll" && !liveBg && !RIGID && !useVeo;
+      // INCLUDE rigid-structure scenes (trees / buildings / a mountain / waterfront). They used to be excluded to
+      // keep the MCP end_image camera lock - but that meant a whole waterfront ad (every scene rigid) fell back to
+      // the 5s DoP proxy in draft (Gary's recurring "b-roll caps at 5s"). REST has no end-frame lock, so rigid
+      // scenes rely on the near-locked motion PROMPT (no pan, subtle push-in) to keep structures steady. Speed +
+      // full length win. RIGID_MCP=1 forces the old MCP-lock path for rigid scenes if warping ever returns.
+      const rigidToMcp = RIGID && process.env.RIGID_MCP === "1";
+      const restWouldHandle = KLING_REST_ON && role === "b-roll" && !liveBg && !useVeo && !rigidToMcp;
       const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured() && !restWouldHandle;
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
@@ -2229,27 +2235,26 @@ export const assembleVideo = inngest.createFunction(
       // stretched onto the 1080x1920 portrait frame, which SQUASHED the card. Full-frame = pixel-for-pixel, no
       // distortion. Dark translucent base so it's clearly a card over ANY footage (the white-sheen version
       // vanished over dark scenes). Shotstack-safe: no @keyframes / pseudo-elements.
-      const [fw, fh] = ratio === "16:9" ? [1920, 1080] : ratio === "1:1" ? [1080, 1080] : [1080, 1920];
       // AUTO-SIZE the offer chip to its text so a long word (e.g. "SMARTLEADS") shrinks to fit the card instead
       // of overflowing it - "1GB" stays big and punchy. The chip stays on ONE line and never exceeds the card.
       const nLen = cnum.replace(/&[a-z]+;/g, "x").length; // count escaped entities as ~1 char
-      const nFont = nLen <= 4 ? 58 : nLen <= 6 ? 48 : nLen <= 9 ? 38 : nLen <= 12 ? 30 : 24;
-      const fFont = nLen <= 6 ? 32 : nLen <= 12 ? 26 : 22;
-      const posKey = String(co.pos || "lowerCenter");
-      const vAlign = /^upper/i.test(posKey) ? "flex-start" : /^lower/i.test(posKey) ? "flex-end" : "center";
-      const hAlign = /Left$/i.test(posKey) ? "flex-start" : /Right$/i.test(posKey) ? "flex-end" : "center";
-      const css = `.wrap{box-sizing:border-box;display:flex;width:${fw}px;height:${fh}px;padding:8% 6%;align-items:${vAlign};justify-content:${hAlign};font-family:'Open Sans',sans-serif}`
-        + `.card{box-sizing:border-box;text-align:left;max-width:82%;padding:34px 46px 38px;border-radius:36px;`
-        + `background:linear-gradient(180deg,rgba(26,30,46,0.66) 0%,rgba(13,15,25,0.60) 100%);`
-        + `border:1px solid rgba(255,255,255,0.34);box-shadow:0 30px 70px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.28),inset 0 -1px 0 rgba(255,255,255,0.05)}`
-        + `.k{display:block;font-weight:700;font-size:22px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.82);margin-bottom:14px}`
-        + `.l{display:block;font-weight:800;font-size:46px;line-height:1.16;color:#fff;margin-bottom:24px;text-shadow:0 2px 8px rgba(0,0,0,0.45)}`
+      const nFont = nLen <= 4 ? 52 : nLen <= 6 ? 44 : nLen <= 9 ? 36 : nLen <= 12 ? 28 : 22;
+      const fFont = nLen <= 6 ? 30 : nLen <= 12 ? 25 : 21;
+      // RELIABLE positioning via Shotstack's own position/offset (placeCaption) + a self-sized card - NOT CSS
+      // flexbox on a full-frame asset (Shotstack's HTML renderer ignored the flex + gradient, so the card lost
+      // its glass and stuck top-left). The card is an inline-block that hugs its content; text-align:center in
+      // .wrap centres it horizontally within the asset box, and Shotstack places the box at the chosen zone.
+      const css = `.wrap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}`
+        + `.card{box-sizing:border-box;display:inline-block;text-align:left;max-width:760px;padding:32px 44px 36px;border-radius:34px;`
+        + `background:linear-gradient(180deg,rgba(26,30,46,0.72) 0%,rgba(13,15,25,0.66) 100%);`
+        + `border:1px solid rgba(255,255,255,0.34);box-shadow:0 26px 60px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.28)}`
+        + `.k{display:block;font-weight:700;font-size:20px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.82);margin-bottom:13px}`
+        + `.l{display:block;font-weight:800;font-size:42px;line-height:1.16;color:#fff;margin-bottom:22px;text-shadow:0 2px 8px rgba(0,0,0,0.45)}`
         + `.o{display:block;line-height:1.1}`
-        + `.n{display:inline-block;vertical-align:middle;max-width:100%;white-space:nowrap;font-weight:900;font-size:${nFont}px;line-height:1;color:#0c0d10;background:${accent};padding:9px 22px;border-radius:16px;box-shadow:0 8px 28px ${accent}88}`
+        + `.n{display:inline-block;vertical-align:middle;max-width:100%;white-space:nowrap;font-weight:900;font-size:${nFont}px;line-height:1;color:#0c0d10;background:${accent};padding:8px 22px;border-radius:14px;box-shadow:0 8px 26px ${accent}88}`
         + `.f{display:inline-block;vertical-align:middle;margin-left:16px;font-weight:800;font-size:${fFont}px;letter-spacing:1px;color:#fff}`;
-      // Full-frame overlay centred on the frame (the CSS flexbox above places the card in the chosen zone), so
-      // there is no asset scaling and therefore no squash. Zoom-in / fade-out for the pop.
-      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: fw, height: fh, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: "center", offset: { x: 0, y: 0 }, transition: { in: "zoom", out: "fade" } };
+      const cp = placeCaption(String(co.pos || "lowerCenter"), 0); // Shotstack 9-zone placement + safe-zone offset
+      return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 620, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
     };
     const calloutClips: Record<string, unknown>[] = [];
     for (const p of placed) {
