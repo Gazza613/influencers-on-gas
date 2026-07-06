@@ -1229,8 +1229,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       </div>
                       {/* Scene direction (the visual prompt) = The Final Cut only. In Script & Voice you edit only
                           the words above (a re-shoot belongs to the visual build, not the script stage). */}
-                      {isStudio && (<div className="space-y-2 border-t border-line pt-3">
-                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Scene direction - the full prompt (changing these needs a re-shoot)</div>
+                      {(<div className="space-y-2 border-t border-line pt-3">
+                        <div className="tabular text-[10px] uppercase tracking-[0.2em] text-[#c79bff]">Scene direction - the full prompt {isStudio ? "(changing these needs a re-shoot)" : "(edit the scene now; you'll shoot it in The Final Cut)"}</div>
                         {creatives.length > 0 && (
                           <div>
                             <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Scene reference (optional) - pin a Set &amp; Wardrobe image to lock THIS scene&apos;s face, outfit &amp; set (overrides the global guide here)</div>
@@ -1279,7 +1279,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         {isStudio && <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>}
                         <button onClick={() => closeEditKeep(editIdx)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                       </div>
-                      <p className="text-[10px] text-ink-faint">{isStudio ? "Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched." : "Edit the words for this scene, then Save changes. The visual build (framing, re-shoot) happens in The Final Cut."}</p>
+                      <p className="text-[10px] text-ink-faint">{isStudio ? "Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched." : "Edit the script AND the scene direction (location, framing, blocking, motion) here, then Save changes. It shoots to this plan when you build it in The Final Cut."}</p>
                     </div>
                   )}
                   </div>
