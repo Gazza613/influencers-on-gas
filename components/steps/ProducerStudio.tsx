@@ -773,6 +773,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
 
   async function resetStuck() {
     setErr("");
+    // Clear the CLIENT render flags too, not just the server status - otherwise the per-scene "rendering…" timers
+    // (driven by these) keep spinning after a reset, so it looks like "nothing happened". (Gary's stuck board.)
+    setWholeBoardBusy(false); setRenderingRole(""); setAnimatingScenes(new Set()); setFinalizing(false); setShootingRole("");
     await fetch(`/api/influencers/${influencerId}/production/reset`, { method: "POST" }).catch(() => {});
     const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     if (d?.production) setProduction(d.production);

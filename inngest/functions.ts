@@ -1967,10 +1967,12 @@ export const assembleVideo = inngest.createFunction(
     const ambientTrack: Record<string, unknown>[] = [];
     // Ambient sits UNDER the VO + music but must be audible — 0.1 was inaudible. ~0.3 reads as real
     // room tone without competing. Env-tunable (AMBIENT_VOLUME).
-    // MIX HIERARCHY: voice 1.0 (dominant) > ambient (world presence) > music bed. 0.62 buried the voice (too
-    // loud); 0.18 sat UNDER the music (0.24) so it was masked = "ambient absent". 0.34 puts the world clearly
-    // ABOVE the music bed but well under a full-volume voice - audible presence without competing. Env-tunable.
-    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.34));
+    // MIX HIERARCHY (industry best practice): the VOICE is the loudest element; the MUSIC bed sits ~-18 to -22dB
+    // below it; and AMBIENT/SFX SUPPORT without competing - at or just BELOW the music, never above it. So:
+    // voice 1.0 >> music 0.18 (~-15dB) >= ambient 0.16 (~-16dB). The earlier 0.34 (ambient louder than music)
+    // was wrong; 0.18 was masked because it sat under a louder 0.24 music. Now they're close so ambient reads as
+    // real room tone under the voice without dominating. Env-tunable (AMBIENT_VOLUME / MUSIC_VOLUME).
+    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.16));
     if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: ambientVol }, start: t, length: Math.min(22, total - t) });
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
@@ -2301,7 +2303,7 @@ export const assembleVideo = inngest.createFunction(
     if (endCardClip) tracks.push({ clips: [endCardClip] });
 
     const edit: Record<string, unknown> = {
-      timeline: { background: "#000000", fonts: [{ src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Bold.ttf" }, { src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Regular.ttf" }], ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.24)) } } : {}), tracks },
+      timeline: { background: "#000000", fonts: [{ src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Bold.ttf" }, { src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Regular.ttf" }], ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.18)) } } : {}), tracks },
       output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : ratio === "16:9" ? "16:9" : "9:16", resolution: "1080", fps: 25 },
     };
 
