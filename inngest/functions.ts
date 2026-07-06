@@ -1654,6 +1654,14 @@ export const generateClips = inngest.createFunction(
   },
 );
 
+// Ambient SFX prompt: use the producer's OWN description when they set one, else the scene's setting - ALWAYS
+// with a hard negative so ElevenLabs can't invent sirens/alarms/traffic/music/speech (the "why is there a
+// siren at a coffee shop?" bug). One builder shared by the audio step and the stitch so they stay in sync.
+function buildAmbientPrompt(desc: string, setting: string): string {
+  const want = desc && desc.trim() ? desc.trim() : `the natural, characteristic ambient sounds of ${setting}`;
+  return `Immersive, realistic, CONTINUOUS ambient background atmosphere: ${want}. Present and natural, true to this exact place, sitting gently under the voiceover. STRICTLY NO music, NO singing, NO intelligible speech or dialogue, and absolutely NO sirens, alarms, emergency vehicles, police, ambulances, car horns, screeching tyres, whistles or heavy traffic.`;
+}
+
 // THE PRODUCER — "music & ambient" (its own gated step): generate the music bed + ambient room
 // tone up front so the producer can hear them BEFORE the stitch. Saved to production.music_url /
 // ambient_url; the stitch reuses them instead of regenerating. Durable; both metered.
@@ -1681,12 +1689,17 @@ export const generateAudio = inngest.createFunction(
     // them back-to-back. Each is a single slow ElevenLabs request.
     const brief = sb.music_bed || `${sb.tone || "warm, modern"} background music bed for a social ad, no vocals`;
     const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
+    // Producer overrides: a custom ambient description (what they want to HEAR) and an OFF switch (no ambient).
+    const ambientOff = (production as { ambient_off?: boolean })?.ambient_off === true;
+    const ambientDesc = String((production as { ambient_prompt?: string })?.ambient_prompt || "").trim();
     // CATCH INSIDE each step (return {url,error}) so a failed vendor call NEVER throws the step - with
     // retries:0 a thrown step would fail the whole run and save NOTHING (the "audio step produces nothing"
     // bug). This way whichever bed succeeds still shows, and a real failure surfaces its reason in the UI.
     const [music, ambient] = await Promise.all([
       step.run("music", async () => { try { const m = await generateMusic(brief, total * 1000); return { url: await putBytes(m.buf, "music", m.ext, m.mime), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
-      step.run("ambient", async () => { try { const buf = await generateSfx(`Immersive ambient environmental sound of ${setting}: natural, present room tone and gentle background life, full and characterful in the mix. No music, no speech, no voices.`, 22); return { url: await putBytes(buf, "ambient", "mp3", "audio/mpeg"), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
+      ambientOff
+        ? Promise.resolve({ url: null as string | null, error: null as string | null }) // producer turned ambient OFF
+        : step.run("ambient", async () => { try { const buf = await generateSfx(buildAmbientPrompt(ambientDesc, setting), 22); return { url: await putBytes(buf, "ambient", "mp3", "audio/mpeg"), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
     ]);
     const musicUrl = music.url, ambientUrl = ambient.url;
     if (musicUrl) await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
@@ -1842,10 +1855,14 @@ export const assembleVideo = inngest.createFunction(
 
     // Ambient bed: a continuous low room/location tone under everything (ElevenLabs SFX). SFX clips
     // max ~22s, so tile copies across the full duration. Mixed UNDER the VO + music. Reuse if present.
-    let ambientUrl: string | null = (production as { ambient_url?: string })?.ambient_url || null;
-    if (!ambientUrl) try {
+    // Producer turned ambient OFF → no ambient bed at all (even if one was generated earlier). Else reuse the
+    // pre-generated bed, or build one from their custom description (with the hard no-siren negative).
+    const ambientOff = (production as { ambient_off?: boolean })?.ambient_off === true;
+    let ambientUrl: string | null = ambientOff ? null : ((production as { ambient_url?: string })?.ambient_url || null);
+    if (!ambientOff && !ambientUrl) try {
       const setting = String((production?.brief as { setting?: string })?.setting || scenes[0]?.location || "the location").slice(0, 120);
-      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(`Immersive ambient environmental sound of ${setting}: natural, present room tone and gentle background life, full and characterful in the mix. No music, no speech, no voices.`, 22), "ambient", "mp3", "audio/mpeg"));
+      const ambientDesc = String((production as { ambient_prompt?: string })?.ambient_prompt || "").trim();
+      ambientUrl = await step.run("ambient", async () => putBytes(await generateSfx(buildAmbientPrompt(ambientDesc, setting), 22), "ambient", "mp3", "audio/mpeg"));
       await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
     } catch { ambientUrl = null; }
     const ambientTrack: Record<string, unknown>[] = [];

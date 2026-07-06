@@ -115,6 +115,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setVoiceSpeedState(s); setVoiceoverUrl(""); // speed changed → re-generate to hear it
     await fetch(`/api/influencers/${influencerId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personaPatch: { voice_speed: s } }) }).catch(() => {});
   }
+  // AMBIENT controls: what the world should sound like (free text, auto-matched to the setting if blank) + an
+  // OFF switch. Persisted via /audio on generate; the stitch honours the same values so the final matches.
+  const [ambientPrompt, setAmbientPrompt] = useState<string>(String((initialProduction as { ambient_prompt?: string })?.ambient_prompt || ""));
+  const [ambientOff, setAmbientOff] = useState<boolean>((initialProduction as { ambient_off?: boolean })?.ambient_off === true);
   // TEST-THE-DELIVERY preview box: pull a scene's copy in, A/B v2 vs v3 (v3 gets expressive + accent tags),
   // hear which holds the accent before committing to the full voiceover.
   const firstVoLine = ((initialProduction?.storyboard?.scenes || []).find((s) => (s.vo_line || "").trim())?.vo_line || "").trim();
@@ -493,7 +497,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (audioBusy) return;
     setErr("");
     setProduction((p) => (p ? { ...p, audio_status: "running", music_url: null, ambient_url: null } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/audio`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/audio`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ambientPrompt: ambientPrompt.trim(), ambientOff }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the audio - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, audio_status: "idle" } : p)); return; }
     await poll(setProduction, "audio_status");
   }
@@ -1513,6 +1517,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             <StepShell n={stepNum("audio")} title="Music & ambient" desc="I generate the music bed and the ambient room tone for the world. Have a listen before we cut it together." state={stepState("audio")} anchor="step-audio" gate={renderGate("audio", "Re-generate the audio if it's not right, then Accept. The cut reuses exactly these beds.")}>
               {unlocked("audio") ? (
                 <>
+                  {/* AMBIENT control: say exactly what the world should sound like (or leave blank to auto-match the
+                      setting), or switch it off. Sirens/alarms/traffic/music/speech are always excluded. */}
+                  <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                    <div className="tabular mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                      <span>🌿 Ambient sound</span>
+                      <label className="flex cursor-pointer items-center gap-1.5 normal-case tracking-normal text-ink-dim"><input type="checkbox" checked={ambientOff} onChange={(e) => setAmbientOff(e.target.checked)} className="accent-[#a855f7]" /> No ambient (voice + music only)</label>
+                    </div>
+                    <textarea value={ambientPrompt} onChange={(e) => setAmbientPrompt(e.target.value)} disabled={ambientOff} rows={2} placeholder="What should the world sound like? e.g. Outdoor waterfront café — gentle seagulls, distant boat horns, soft water lapping, relaxed café chatter and clinking cups" className="w-full resize-none rounded-lg border border-line bg-surface-1 px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faint disabled:opacity-50" />
+                    <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">Describe the exact sounds you want, or leave blank to auto-match the scene&apos;s setting. Sirens, alarms, traffic, music and speech are always excluded. Change it, hit <b>Re-generate audio</b>, and the final cut uses exactly this (to remove it from a delivered cut, tick <b>No ambient</b> and re-stitch).</p>
+                  </div>
                   <button onClick={genAudio} disabled={audioBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{audioBusy ? "🎵 Generating audio…" : audioReady ? "↻ Re-generate audio" : "🎵 Generate music & ambient"}</button>
                   {production?.audio_status === "done" ? (
                     <div className="mt-3 space-y-2">
