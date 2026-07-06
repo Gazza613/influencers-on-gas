@@ -5,6 +5,7 @@ import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { submitDopVideo, pollDopOnce, dopConfigured } from "@/lib/vendors/higgsfield-dop";
 import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
+import { notifyRenderDone } from "@/lib/notify";
 import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
@@ -1497,13 +1498,11 @@ export const generateClips = inngest.createFunction(
       // DoP (instant), a FINAL b-roll uses Kling. The voiceover plays its FULL measured length either way (the
       // audio track is independent of the clip), so you hear the whole line on a draft; only the FINAL has
       // full-length video motion. RULE, enforced in the UI: always Render Final Quality before you stitch.
-      // SPEED (option C): a SHORT final scene-shot (its voiceover fits DoP's ~5s output) renders on the FAST
-      // first-party DoP-turbo lane (~1 min, priority queue) instead of the slow Kling MCP queue - so a final with
-      // several short beats finishes far quicker. EXCLUDES rigid-structure scenes (trees/buildings/landmark): those
-      // stay on Kling to keep the deterministic end_image=start_image camera lock so nothing warps. Additive +
-      // reversible: set BROLL_FINAL_DOP_SHORT=0 to go back to all-Kling finals. Long scenes still use Kling.
-      const finalDopShort = role === "b-roll" && !speed && dopFits && !RIGID && process.env.BROLL_FINAL_DOP_SHORT !== "0";
-      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits) || finalDopShort) && !useVeo && dopConfigured();
+      // A FINAL scene-shot ALWAYS renders on Kling (native 3-15s = full-length, full motion) - NEVER the fixed
+      // ~5s DoP proxy. Gary's call: a 5-second b-roll is not suitable for delivery. DoP is ONLY the fast DRAFT
+      // preview (role b-roll + speed), or an explicit opt-in (BROLL_ENGINE=dop) / live-bg fast lane. So the slow
+      // Kling queue is the price of a proper full-length scene shot; the wait is mitigated by "notify me" + drafts.
+      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured();
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
@@ -1656,6 +1655,10 @@ export const generateClips = inngest.createFunction(
     // a bulk write here would clobber a CONCURRENT per-scene run's clip). Order doesn't matter: everything
     // that reads clips looks them up BY SCENE. clips_status="done" is a hint; the UI tracks per-scene finish.
     await step.run("done", () => updateProductionFields(influencerId, { clips_status: "done", status: "clips" }));
+    // NOTIFY (option B): a full-quality "Render final quality" run is the ~40-min job - email the producer that
+    // it's done (ready to stitch) so they don't have to sit and watch. Only on finalize (event.data.notify);
+    // fast draft animates don't email. Guarded + wrapped so it can never fail the render.
+    if ((event.data as { notify?: boolean }).notify) await step.run("notify-render", () => notifyRenderDone({ name: String(inf.name || ""), kind: "final-render" }).catch(() => ({ sent: false })));
     return { ok: true, clips: targets.length };
   },
 );
@@ -2235,6 +2238,10 @@ export const assembleVideo = inngest.createFunction(
     const done = (((await step.run("reload", () => getInfluencer(influencerId)))?.persona as Record<string, unknown>) || persona);
     const prod = (done.production ?? production) as Record<string, unknown>;
     await step.run("save", () => updateInfluencer(influencerId, { persona: { ...done, production: { ...prod, final_url: finalUrl, music_url: musicUrl, ambient_url: ambientUrl, assembly_status: "done", assembly_error: err, status: finalUrl ? "final" : "clips" } } }));
+    // NOTIFY (option B): the finished cut is ready - email a watch link. Only for a FINAL cut (no draft clips
+    // left); a quick draft-preview stitch doesn't email. Guarded + wrapped so mail can never fail the stitch.
+    const anyDraft = Array.isArray((prod as { clips?: { draft?: boolean }[] }).clips) && (prod as { clips: { draft?: boolean }[] }).clips.some((c) => c.draft === true);
+    if (finalUrl && !anyDraft) await step.run("notify-cut", () => notifyRenderDone({ name: String(inf.name || ""), kind: "cut-ready", url: finalUrl }).catch(() => ({ sent: false })));
     return { ok: !!finalUrl, error: err };
   },
 );

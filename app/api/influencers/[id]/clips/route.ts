@@ -102,6 +102,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // (full-quality conform), even if the UI's draft toggle is on.
       ...((reanimate || finalize) ? { reanimate: true } : {}),
       ...((speed && !finalize) ? { speed: true } : {}),
+      // finalize = the long ~40-min render → have the durable job email the producer when it's done (option B).
+      ...(finalize ? { notify: true } : {}),
       ...(force ? { force: true } : {}) } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips_status: "idle" } } });

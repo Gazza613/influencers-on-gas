@@ -1578,7 +1578,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         estimateSeconds={assembling ? 420 : 1500}
                         startedAt={assembling ? finishStart : ((production as { clips_started_at?: number })?.clips_started_at ?? finishStart)}
                         eta={assembling ? "usually a few minutes" : "10-40 min when the queue is busy"}
-                        note="Safe to close this tab or come back later - it keeps rendering on our servers, and the finished cut will be here when you return."
+                        note="Safe to close this tab, start another job, or come back later - it keeps rendering on our servers, we email you the moment it's done, and the finished cut will be here when you return."
                       />
                     </div>
                   )}
