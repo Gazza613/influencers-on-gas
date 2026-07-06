@@ -57,6 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     logo: String(b.logo || "").trim(),
     legal: String(b.legal || "").trim(),
     script: String(b.script || "").trim().slice(0, 6000), // approved script-first read: built into the scenes verbatim
+    storyline: String(b.storyline || "").trim().slice(0, 4000), // STORYLINE-FIRST: the producer's story in their own words; the director infers the brief from it
     // The approved reference creatives (the a-roll + b-roll guides the producer picked) - passed to the
     // director as VISION so it SEES the real cast + action (e.g. the daughter studying on a laptop) and
     // builds the storyboard around them, instead of writing blind and casting the wrong person.
@@ -75,7 +76,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     endCardUrl: safeUrl(b.endCardUrl), // optional closing clip/frame from the End Cards library
     endCardKind: b.endCardKind === "image" ? "image" : "video",
   };
-  if (!brief.brand || !brief.offer) return NextResponse.json({ error: "Add at least a brand/product and the core offer." }, { status: 400 });
+  // Storyline-first: a story is enough on its own (the director infers brand + offer from it). Otherwise the
+  // structured path still needs at least a brand + core offer.
+  if (!brief.storyline && (!brief.brand || !brief.offer)) return NextResponse.json({ error: "Write your story in the box above, or add at least a brand/product and the core offer." }, { status: 400 });
 
   try {
     const storyboard = await generateStoryboard(brief);

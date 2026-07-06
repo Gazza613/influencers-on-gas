@@ -693,10 +693,16 @@ export async function generateStoryboard(brief: {
   influencerName: string; brand: string; goal: string; offer: string; benefits: string;
   cta: string; ctaCode?: string; durationSeconds: number; format: string; talent: string;
   setting: string; tone: string; logo?: string; legal?: string; influencerProfile?: string; script?: string;
-  arollRefImage?: string; brollRefImage?: string;
+  arollRefImage?: string; brollRefImage?: string; storyline?: string;
 }): Promise<Storyboard> {
   const c = await client();
-  const input =
+  // STORYLINE-FIRST: when the producer wrote the ad's story/idea in their own words, that is the HEART of the
+  // brief - honour its intent, characters, beats and feeling, and infer any blank fields from it. You are their
+  // world-class producer (top 1%): shape their story into a directed, high-converting storyboard.
+  const storyPreface = brief.storyline && brief.storyline.trim()
+    ? `THE PRODUCER'S STORY / CREATIVE VISION (their own words - this is the heart of the ad; honour its intent, characters, beats and feeling, then direct it into a world-class storyboard):\n"""${brief.storyline.trim().slice(0, 4000)}"""\nUse the fields below as supporting detail; where a field is blank or thin, INFER it from the story above.\n\n`
+    : "";
+  const input = storyPreface +
     `Brand / product: ${brief.brand}\nCampaign goal: ${brief.goal}\nCore offer / hook: ${brief.offer}\n` +
     `Key benefits: ${brief.benefits}\nPrimary CTA: ${brief.cta}\nCTA mechanic / code: ${brief.ctaCode || "(none)"}\n` +
     `Target duration: ${brief.durationSeconds} seconds\nFormat: ${brief.format}\n` +

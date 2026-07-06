@@ -199,6 +199,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Script-first: write + edit the spoken script before building the scenes.
   const [draftScript, setDraftScript] = useState<string>(String((initialProduction?.brief as { script?: string })?.script || ""));
   const [scriptBusy, setScriptBusy] = useState(false);
+  // STORYLINE-FIRST: the producer writes the ad's story/idea in their own words; the AI producer (top 1%) directs
+  // it into the optimised storyboard, inferring any blank brief fields from it.
+  const [storyline, setStoryline] = useState<string>(String((initialProduction?.brief as { storyline?: string })?.storyline || ""));
   const [err, setErr] = useState("");
 
   const [brand, setBrand] = useState(String((initialProduction?.brief as { brand?: string })?.brand || ""));
@@ -847,7 +850,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, script: draftScript || "", clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
+      body: JSON.stringify({ storyline: storyline || "", brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, script: draftScript || "", clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); persistApproved(new Set()); }
@@ -880,9 +883,24 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
         ) : (
         /* Brief */
         <div className="space-y-4 rounded-xl border border-line bg-surface-1 p-5">
-          <div className="flex items-center justify-between">
-            <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">The brief</div>
-            <span className="text-[10px] text-ink-faint"><span className="text-alert">*</span> required - the rest is optional</span>
+          {/* STORYLINE-FIRST (the primary way in): write the ad's story in your own words and I direct it as your
+              top-1% producer, inferring any blank brief fields. The structured brief below is optional detail. */}
+          <div className="rounded-xl border border-[#a855f7]/35 bg-gradient-to-br from-[#a855f7]/[0.08] to-[#60a5fa]/[0.05] p-4">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-sm font-extrabold text-ink">🎬 Your story</span>
+              <span className="text-[11px] text-ink-faint">tell me the ad in your own words and I&apos;ll direct it, shot by shot, as your producer</span>
+            </div>
+            <textarea value={storyline} onChange={(e) => setStoryline(e.target.value)} rows={5}
+              placeholder={`Tell the story of this ad in your own words - who it's for, the world it lives in, the moments and feeling you want, the offer and the call to action.\n\ne.g. "${name} is at a sunlit V&A Waterfront café. He leans in like he's sharing a secret: most people overthink AI. He shows how one clear prompt gets a world-class result, cuts to the screen, then invites you to book a free strategy call."\n\nThe more vivid, the better - I'll optimise the pacing, shots and voiceover to a top-1% standard.`}
+              className="mt-2 w-full resize-none rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-[14px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
+            <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+              <button onClick={generate} disabled={busy || (!storyline.trim() && !brand.trim())} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold disabled:opacity-50">{busy ? "🎬 Directing your storyboard…" : production?.storyboard ? "↻ Reimagine the storyboard" : "🎬 Direct as my producer →"}</button>
+              <span className="text-[11px] text-ink-faint">Then pick the guides and shoot the reference images. Prefer a form? Fill the optional brief below.</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between border-t border-line pt-4">
+            <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">The brief <span className="normal-case tracking-normal text-ink-faint">· optional detail</span></div>
+            <span className="text-[10px] text-ink-faint"><span className="text-alert">*</span> only if you skip the story box</span>
           </div>
 
           {/* ── Core (required) ── */}
