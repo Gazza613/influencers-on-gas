@@ -1622,6 +1622,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <button onClick={finalizeClips} disabled={rendering} className="ml-auto rounded-lg border-2 border-[#f59e0b] bg-[#f59e0b]/15 px-3 py-1.5 text-xs font-bold text-[#fbbf24] transition hover:bg-[#f59e0b]/25 disabled:opacity-50">{rendering ? "🎬 Rendering full quality…" : "🎬 Render final quality (1080p)"}</button>
                       </div>
                       <p className="mt-2 text-[11px] text-ink-faint">Re-renders every draft scene at full delivery quality (1080p talking shots, premium scene shots) from the exact keyframe you approved - the same shot, properly finished, no drift. Full-quality scenes are skipped, so it only re-does the drafts. This takes longer (full engines), then stitch for a client-ready cut.</p>
+                      <p className="mt-1.5 text-[11px] text-[#93c5fd]">💡 <b>Recommended flow:</b> lock the edit on the FAST draft first - stitch the draft (below) to check pacing, voiceover and copy, tweak scenes, and re-stitch drafts as often as you like. Run this <b>final render just ONCE</b>, when you&apos;re happy, so you never wait on the long render mid-edit. It keeps rendering on our servers if you step away.</p>
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-3">
