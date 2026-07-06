@@ -1495,7 +1495,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <p className="mt-2 text-[11px] text-ink-faint">Optional - generate to preview the beds, or just <b>Accept</b> to skip; the stitch will create the music + ambient for you automatically.</p>
                   )}
                 </>
-              ) : <LockHint />}
+              ) : <LockHint msg={<>🔒 Accept the <b>Scenes</b> step above to unlock Music &amp; ambient. It&apos;s optional - if you skip it, the final stitch still creates the music bed + ambient tone for you automatically.</>} />}
             </StepShell>
 
             {/* 5 · Stitch */}
