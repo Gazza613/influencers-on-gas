@@ -1972,7 +1972,11 @@ export const assembleVideo = inngest.createFunction(
     // voice 1.0 >> music 0.18 (~-15dB) >= ambient 0.16 (~-16dB). The earlier 0.34 (ambient louder than music)
     // was wrong; 0.18 was masked because it sat under a louder 0.24 music. Now they're close so ambient reads as
     // real room tone under the voice without dominating. Env-tunable (AMBIENT_VOLUME / MUSIC_VOLUME).
-    const ambientVol = Math.max(0, Math.min(1, Number(process.env.AMBIENT_VOLUME) || 0.16));
+    // Per-production mix levels (producer-set in the Music step; fall back to the research-backed defaults).
+    const ambientVolSet = (production as { ambient_vol?: number })?.ambient_vol;
+    const ambientVol = Math.max(0, Math.min(1, typeof ambientVolSet === "number" ? ambientVolSet : (Number(process.env.AMBIENT_VOLUME) || 0.16)));
+    const musicVolSet = (production as { music_vol?: number })?.music_vol;
+    const musicVol = Math.max(0, Math.min(1, typeof musicVolSet === "number" ? musicVolSet : (Number(process.env.MUSIC_VOLUME) || 0.18)));
     if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: ambientVol }, start: t, length: Math.min(22, total - t) });
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
@@ -2303,7 +2307,7 @@ export const assembleVideo = inngest.createFunction(
     if (endCardClip) tracks.push({ clips: [endCardClip] });
 
     const edit: Record<string, unknown> = {
-      timeline: { background: "#000000", fonts: [{ src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Bold.ttf" }, { src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Regular.ttf" }], ...(musicUrl ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: Math.max(0, Math.min(1, Number(process.env.MUSIC_VOLUME) || 0.18)) } } : {}), tracks },
+      timeline: { background: "#000000", fonts: [{ src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Bold.ttf" }, { src: "https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/fonts/OpenSans-Regular.ttf" }], ...(musicUrl && musicVol > 0 ? { soundtrack: { src: musicUrl, effect: "fadeInFadeOut", volume: musicVol } } : {}), tracks },
       output: { format: "mp4", aspectRatio: ratio === "1:1" ? "1:1" : ratio === "16:9" ? "16:9" : "9:16", resolution: "1080", fps: 25 },
     };
 

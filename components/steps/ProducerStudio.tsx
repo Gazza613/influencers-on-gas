@@ -131,6 +131,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // OFF switch. Persisted via /audio on generate; the stitch honours the same values so the final matches.
   const [ambientPrompt, setAmbientPrompt] = useState<string>(String((initialProduction as { ambient_prompt?: string })?.ambient_prompt || ""));
   const [ambientOff, setAmbientOff] = useState<boolean>((initialProduction as { ambient_off?: boolean })?.ambient_off === true);
+  // AUDIO MIX levels the producer dials (music + ambient), 0-1. Defaults = the research-backed mix (voice
+  // dominant, music 0.18, ambient 0.16). Saved to production + read by the stitch; applied on the next stitch.
+  const [musicVol, setMusicVol] = useState<number>(typeof (initialProduction as { music_vol?: number })?.music_vol === "number" ? (initialProduction as { music_vol: number }).music_vol : 0.18);
+  const [ambientVol, setAmbientVol] = useState<number>(typeof (initialProduction as { ambient_vol?: number })?.ambient_vol === "number" ? (initialProduction as { ambient_vol: number }).ambient_vol : 0.16);
+  async function saveMix(patch: { music_vol?: number; ambient_vol?: number; ambient_off?: boolean }) {
+    await fetch(`/api/influencers/${influencerId}/mix`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }).catch(() => {});
+  }
   // TEST-THE-DELIVERY preview box: pull a scene's copy in, A/B v2 vs v3 (v3 gets expressive + accent tags),
   // hear which holds the accent before committing to the full voiceover.
   const firstVoLine = ((initialProduction?.storyboard?.scenes || []).find((s) => (s.vo_line || "").trim())?.vo_line || "").trim();
@@ -1613,12 +1620,25 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   {/* AMBIENT control: say exactly what the world should sound like (or leave blank to auto-match the
                       setting), or switch it off. Sirens/alarms/traffic/music/speech are always excluded. */}
                   <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
-                    <div className="tabular mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-ink-faint">
-                      <span>🌿 Ambient sound</span>
-                      <label className="flex cursor-pointer items-center gap-1.5 normal-case tracking-normal text-ink-dim"><input type="checkbox" checked={ambientOff} onChange={(e) => setAmbientOff(e.target.checked)} className="accent-[#a855f7]" /> No ambient (voice + music only)</label>
-                    </div>
+                    <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">🌿 Ambient sound</div>
                     <textarea value={ambientPrompt} onChange={(e) => setAmbientPrompt(e.target.value)} disabled={ambientOff} rows={2} placeholder="What should the world sound like? e.g. Outdoor waterfront café — gentle seagulls, distant boat horns, soft water lapping, relaxed café chatter and clinking cups" className="w-full resize-none rounded-lg border border-line bg-surface-1 px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faint disabled:opacity-50" />
-                    <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">Describe the exact sounds you want to <b>hear</b> (e.g. &quot;seagulls, gentle café chatter, clinking cups, a soft breeze&quot;) - the generator fills the bed with those. Leave blank to auto-match the scene&apos;s setting. In the final cut it plays <b>quietly under the voice</b> (this preview is louder than the mix). Change it, hit <b>Re-generate audio</b>, then <b>re-stitch</b>. To drop it from a delivered cut, tick <b>No ambient</b> and re-stitch.</p>
+                    <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">Describe the exact sounds you want to <b>hear</b> (e.g. &quot;seagulls, gentle café chatter, clinking cups, a soft breeze&quot;) - the generator fills the bed with those. Leave blank to auto-match the scene&apos;s setting. Change it, hit <b>Re-generate audio</b>. Set its level (and turn it off) with the mix below.</p>
+                  </div>
+                  {/* AUDIO MIX: dial music + ambient yourself. Voice always stays dominant. Applied on the next stitch
+                      (no need to re-generate the beds - it's a mix-time volume). Best practice: voice > music >= ambient. */}
+                  <div className="mb-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                    <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ink-faint">🎚 Audio mix <span className="normal-case tracking-normal text-ink-faint">· the voice always stays on top</span></div>
+                    {([["Music", musicVol, (v: number) => { setMusicVol(v); saveMix({ music_vol: v }); }, [["Off", 0], ["Subtle", 0.10], ["Balanced", 0.18], ["Present", 0.28]]],
+                       ["Ambient", ambientOff ? 0 : ambientVol, (v: number) => { const off = v <= 0; setAmbientOff(off); if (!off) setAmbientVol(v); saveMix(off ? { ambient_off: true, ambient_vol: 0 } : { ambient_off: false, ambient_vol: v }); }, [["Off", 0], ["Subtle", 0.10], ["Balanced", 0.16], ["Present", 0.26]]]] as const).map(([label, cur, set, presets]) => (
+                      <div key={label} className="mb-1.5 flex flex-wrap items-center gap-2">
+                        <span className="w-16 shrink-0 text-[11px] font-semibold text-ink-dim">{label}</span>
+                        {presets.map(([name, val]) => {
+                          const sel = Math.abs((cur as number) - (val as number)) < 0.001;
+                          return <button key={name} onClick={() => (set as (v: number) => void)(val as number)} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition ${sel ? "border-[#a855f7] bg-[#a855f7]/15 text-[#c79bff]" : "border-line text-ink-dim hover:text-ink"}`}>{name}</button>;
+                        })}
+                      </div>
+                    ))}
+                    <p className="mt-1 text-[10px] text-ink-faint">Voice stays dominant. Default (best practice): Music <b>Balanced</b>, Ambient <b>Balanced</b>. Change it and <b>re-stitch</b> to hear it.</p>
                   </div>
                   <button onClick={genAudio} disabled={audioBusy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{audioBusy ? "🎵 Generating audio…" : audioReady ? "↻ Re-generate audio" : "🎵 Generate music & ambient"}</button>
                   {production?.audio_status === "done" ? (
