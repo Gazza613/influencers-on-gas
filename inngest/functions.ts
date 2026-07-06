@@ -1623,15 +1623,18 @@ export const generateClips = inngest.createFunction(
           }
         }
         if (krErr) await step.run(`kr-alert-${i}`, async () => { await alertIfCritical("Higgsfield Kling REST (b-roll)", krErr as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
-        // The fast REST lane and the MCP lane bill DIFFERENT accounts (developer API keys vs the OAuth/app Ultra
-        // plan). If REST is credit-blocked (403 / "not enough credits" on the API-key wallet), fall through to the
-        // MCP Kling lane, which spends the app account that DOES have credits - a slow render beats a hard fail.
-        const restCreditBlocked = /not enough credits|insufficient|payment|quota|402|403/i.test(krErr || "");
-        // Otherwise, by DEFAULT don't fall into the slow MCP lane - fail fast so a scene-shot never spins for 40 min.
-        if (process.env.BROLL_MCP_FALLBACK !== "1" && !restCreditBlocked) {
-          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: (krErr || "the scene-shot render stalled on the fast lane") + " - tap Anim to try again (a fresh render usually lands in about 90 seconds)." };
+        // FAIL FAST with a clear, actionable message rather than silently dropping to the slow ~40-min MCP lane.
+        // A credit/403 means the developer-API wallet (which the fast lane bills, separate from the app Ultra
+        // plan) is empty - say so plainly so the fix is obvious. Any other stall just needs a fresh Anim.
+        // (BROLL_MCP_FALLBACK=1 is the escape hatch to grind through on the slow lane if ever needed.)
+        if (process.env.BROLL_MCP_FALLBACK !== "1") {
+          const restCreditBlocked = /not enough credits|insufficient|payment|quota|402|403/i.test(krErr || "");
+          const msg = restCreditBlocked
+            ? "your Higgsfield API credits are empty - top up the API wallet at platform.higgsfield.ai, then tap Anim to render this scene-shot."
+            : (krErr || "the scene-shot render stalled on the fast lane") + " - tap Anim to try again (a fresh render usually lands in about 90 seconds).";
+          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: msg };
         }
-        // else fall through to the MCP Kling loop below (opt-in, or because the fast lane is out of API credits).
+        // else fall through to the MCP Kling loop below (opt-in only).
       }
 
       // KLING with a RE-SUBMIT retry: the MCP lane can stall or terminally-fail transiently, so a FRESH submit
