@@ -78,7 +78,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const byRoleClear = !!roles && roles.length > 0 && roles.includes(String((c as { role?: string }).role)) && (c as { status?: string }).status === "failed";
     return (bySceneClear || byRoleClear) ? { ...c, status: "pending", error: null } : c;
   });
-  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: clipsNext, clips_status: "running" } } });
+  // A genuinely PER-SCENE animate (an explicit scene list, not a forced / finalize / role / whole-board run)
+  // must NOT globally lock the board. Each scene renders independently - a-roll on HeyGen, b-roll on Kling are
+  // different engines and different API calls - and its clip upserts atomically, so every OTHER scene stays
+  // editable, animatable and re-shootable in parallel. Only a whole-board animate flips the global clips_status
+  // to "running" (which the UI reads as board-wide "rendering"); a per-scene animate leaves it as-is (its own
+  // clip goes to "pending" and the client tracks it per scene). Never downgrade an in-flight whole-board run.
+  const perSceneAnimate = !!(explicitScenes && explicitScenes.length && !force && !finalize && !(roles && roles.length));
+  const clipsStatusNext = perSceneAnimate
+    ? ((production as { clips_status?: string }).clips_status === "running" ? "running" : "idle")
+    : "running";
+  await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: clipsNext, clips_status: clipsStatusNext } } });
   try {
     await inngest.send({ name: "influencer/generate.clips", data: { influencerId: id,
       ...(roles && roles.length ? { roles } : {}),

@@ -31,7 +31,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const prod = production as Record<string, unknown>;
     const shots = (Array.isArray(prod.shots) ? prod.shots as { scene: number }[] : []).map((s) => (sceneIdxs.includes(Number(s.scene)) ? { ...s, reshooting: true } : s));
     const clips = (Array.isArray(prod.clips) ? prod.clips as { scene: number }[] : []).filter((c) => !sceneIdxs.includes(Number(c.scene)));
-    await updateInfluencer(id, { persona: { ...persona, production: { ...prod, shots, clips, shots_status: "running" } } });
+    // PER-SCENE re-shoot must NOT globally lock the board: the target scene carries its own `reshooting: true`
+    // flag (which the client polls), so leave the global shots_status as-is instead of flipping it to "running".
+    // Only a whole-board shoot (below) sets the board-wide "shooting" state. This keeps other scenes free to be
+    // animated / edited / re-shot in parallel (different engines, different API calls).
+    const shotsStatusNext = (prod as { shots_status?: string }).shots_status === "running" ? "running" : "idle";
+    await updateInfluencer(id, { persona: { ...persona, production: { ...prod, shots, clips, shots_status: shotsStatusNext } } });
     try {
       await inngest.send({ name: "influencer/generate.shots", data: { influencerId: id, scenes: sceneIdxs, aspectRatio, priority, speed } });
     } catch {
