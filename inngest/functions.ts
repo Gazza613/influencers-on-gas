@@ -1503,8 +1503,11 @@ export const generateClips = inngest.createFunction(
       // (the two-week "b-roll caps at 5s" problem). Eligible = a non-rigid scene shot that fits Kling 2.1 (<=10s).
       // Rigid scenes keep the MCP path (end_image camera lock); >10s keep MCP Kling 3.0 (up to 15s); any REST miss
       // falls through to MCP. When REST handles a scene we SKIP the 5s DoP proxy. Set BROLL_KLING_REST=0 to disable.
+      // Covers ALL non-rigid scene shots, incl. >10s: Kling 2.1 REST maxes at 10s, so a 12s-voiceover scene gets
+      // a 10s REST clip with ~1-2s held under the tail of the voice - far better than 30-40 min on the MCP lane
+      // (that single >10s scene was gating the whole final render). Rigid scenes still use MCP (end_image lock).
       const KLING_REST_ON = process.env.BROLL_KLING_REST !== "0" && klingRestConfigured();
-      const restWouldHandle = KLING_REST_ON && role === "b-roll" && !liveBg && !RIGID && !useVeo && clipSeconds <= 10;
+      const restWouldHandle = KLING_REST_ON && role === "b-roll" && !liveBg && !RIGID && !useVeo;
       const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured() && !restWouldHandle;
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
@@ -1855,13 +1858,14 @@ export const assembleVideo = inngest.createFunction(
       // last-ditch fallback if BOTH are missing. (Taking a max WITH the word estimate over-inflated the slot -
       // an 8.4s VO padded to a 10s slot - which made the b-roll freeze WORSE. Use the true duration.)
       const realVo = voRealDur.get(i) ?? sceneAudioDur.get(i) ?? wordSecs(vo);
-      // A scene with a VO runs EXACTLY as long as its measured voiceover: slot = max(real VO, the clip's own
-      // length). >= the VO so the voice is NEVER cut; >= the clip so the video never freezes past its motion.
-      // No forced floor (a 6s line = a 6s scene, not a padded 10s freeze). b-roll keeps a tiny 3s min for a
-      // very short line; a sanity ceiling stops a bad probe reading ballooning the cut.
+      // A scene runs EXACTLY as long as its measured voiceover - slot = the VO length. NOT max'd with the clip's
+      // own length: a REST Kling clip is a discrete 5s/10s, so a 10s clip under an 8s VO was padding the scene to
+      // 10s = a 2s VO-less gap. We now TRIM a longer clip to the VO (play its first N seconds) and only HOLD when
+      // the clip is genuinely shorter than the VO. Either way the scene = the voiceover: no gap, no cut voice.
+      // b-roll keeps a tiny 3s min for a very short line; a sanity ceiling stops a bad probe ballooning the cut.
       if (vo && realVo > 0) {
         const floor = role === "b-roll" ? 3 : 0;
-        len = Math.min(Math.max(realVo, clipDur(i) ?? 0, floor), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
+        len = Math.min(Math.max(realVo, floor), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
       }
       // Silent b-roll (no narration line + no slice): keep it a BRIEF cutaway, not a long silent hold.
       else if (role === "b-roll") len = Math.min(len, 2.8);
