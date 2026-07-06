@@ -932,10 +932,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               )}
             </div>
           </div>
-          <div className="flex items-center justify-between border-t border-line pt-4">
-            <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">The brief <span className="normal-case tracking-normal text-ink-faint">· optional detail</span></div>
-            <span className="text-[10px] text-ink-faint"><span className="text-alert">*</span> only if you skip the story box</span>
-          </div>
+          {/* Everything below is OPTIONAL fine-tuning - collapsed so the story box is the clear, single primary
+              path. Open it only to hand-set the brand/offer, write a script, or upload a voice. */}
+          <details className="group border-t border-line pt-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between">
+              <span className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">⚙ Fine-tune the brief &amp; script <span className="normal-case tracking-normal text-ink-faint">· optional - the story box above is all you need</span></span>
+              <span className="text-ink-faint transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="mt-4 space-y-4">
 
           {/* ── Core (required) ── */}
           <div className="space-y-3">
@@ -1061,8 +1065,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </div>
             <p className="mt-2 text-[11px] text-ink-faint">🔊 You pick or create the voice (library, design your own, upload or clone) in the very next step, <b>Voice</b> — it runs before any scene is shot. Build the storyboard here first, then set the voice.</p>
           </div>
+            </div>
+          </details>
           {err && <p className="text-xs text-alert">{err}</p>}
-          <button onClick={generate} disabled={busy} className="btn-brand rounded-lg px-5 py-3 text-sm font-bold disabled:opacity-50">{busy ? "Directing the storyboard…" : draftScript ? "🎬 Build the scenes from this script" : "🎬 Direct the storyboard"}</button>
         </div>
         )
       ) : sb ? (
