@@ -1217,8 +1217,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                           </div>
                           <p className="text-[10px] text-ink-faint">Re-stitch after saving to see it. It zooms in at your chosen position, stays ~{(typeof coDraft.hold === "number" ? coDraft.hold : 2).toFixed(1)}s, then fades (capped by the scene length).</p>
                         </div>
-                        {/* live WYSIWYG preview - the DARK-glass callout ON this scene's actual keyframe, at the
-                            chosen position (matches the render: dark legible glass, accent pill + chip, sheen). */}
+                        {/* live WYSIWYG preview - the FROSTED-glass callout ON this scene's actual keyframe, at the
+                            chosen position. Matches buildCalloutClip exactly (the approved artifact treatment). */}
                         <div className="relative h-[268px] w-[151px] shrink-0 overflow-hidden rounded-xl border border-line bg-gradient-to-br from-[#1b2338] via-[#241a2e] to-[#0d1017]">
                           {shot?.url && (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -1230,9 +1230,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             const justify = pos.includes("Left") ? "flex-start" : pos.includes("Right") ? "flex-end" : "center";
                             return (
                               <div className="absolute inset-x-0 flex px-2" style={{ ...vstyle, justifyContent: justify }}>
-                                <div className="rounded-[14px] px-3 py-2.5 text-left" style={{ width: "90%", border: "1px solid rgba(255,255,255,0.24)", background: "linear-gradient(135deg,rgba(38,42,60,0.62) 0%,rgba(17,19,30,0.54) 100%)", boxShadow: "0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.22)", animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
-                                  {coDraft.kick && <div className="text-[6px] font-bold uppercase leading-none tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.6)" }}>{coDraft.kick}</div>}
-                                  {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white">{coDraft.line}</div>}
+                                <div className="rounded-[16px] px-3 py-2.5 text-left" style={{ width: "90%", border: "1px solid rgba(255,255,255,0.42)", background: "linear-gradient(180deg,rgba(255,255,255,0.17) 0%,rgba(255,255,255,0.05) 100%)", boxShadow: "0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(255,255,255,0.06)", animation: "gasCoPop 0.5s cubic-bezier(0.2,0.8,0.3,1.35)" }}>
+                                  {coDraft.kick && <div className="text-[6px] font-bold uppercase leading-none tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.85)", textShadow: "0 1px 4px rgba(0,0,0,0.35)" }}>{coDraft.kick}</div>}
+                                  {coDraft.line && <div className="mt-1.5 text-[11px] font-extrabold leading-tight text-white" style={{ textShadow: "0 1px 5px rgba(0,0,0,0.45)" }}>{coDraft.line}</div>}
                                   {(coDraft.num || coDraft.suffix) && (
                                     <div className="mt-2">
                                       {coDraft.num && <span className="rounded-[6px] px-1.5 py-0.5 text-[15px] font-black leading-none text-[#0c0d10]" style={{ background: coDraft.accent, boxShadow: `0 4px 14px ${coDraft.accent}88` }}>{coDraft.num}</span>}

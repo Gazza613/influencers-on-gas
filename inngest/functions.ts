@@ -2140,19 +2140,22 @@ export const assembleVideo = inngest.createFunction(
         line ? `<div class="l">${line}</div>` : "",
         (cnum || suffix) ? `<div class="o">${cnum ? `<span class="n">${cnum}</span>` : ""}${suffix ? `<span class="f">${suffix}</span>` : ""}</div>` : "",
       ].join("");
-      // FROSTED-GLASS CARD (the design Gary approved): a translucent frosted panel, LEFT-aligned, with a muted
-      // spaced "eyebrow", a bold white headline, and a glowing accent offer chip beside a light suffix. Dark-enough
-      // translucent so white text stays razor-legible over bright footage. Shotstack-safe: no @keyframes /
-      // pseudo-elements (those squashed the layout) - explicit display:block, motion is the zoom transition.
+      // FROSTED-GLASS CARD (the LOCKED, Gary-approved treatment - matches the "On-screen offer callout" artifact
+      // exactly: translucent white-sheen gradient card, hairline light border, soft drop shadow + inset top/bottom
+      // highlights for the glass edge; muted-bright spaced eyebrow, bold white headline, and the offer in a bright
+      // accent chip beside a light suffix). A live blur of the footage isn't possible in the compositor, so "glass"
+      // is this translucent gradient (how premium ads fake it) - over dark footage it reads as dark glass, over
+      // bright footage as a light frosted card, and the offer chip + text-shadow keep it razor-legible either way.
+      // Shotstack-safe: no @keyframes / pseudo-elements; explicit display:block; motion is the zoom-in transition.
       const css = `.wrap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}`
-        + `.card{box-sizing:border-box;display:inline-block;text-align:left;max-width:660px;padding:30px 42px 34px;border-radius:26px;`
-        + `background:linear-gradient(135deg,rgba(38,42,60,0.60) 0%,rgba(17,19,30,0.52) 100%);`
-        + `border:1px solid rgba(255,255,255,0.24);box-shadow:0 30px 70px rgba(0,0,0,0.52),inset 0 1px 0 rgba(255,255,255,0.22)}`
-        + `.k{display:block;font-weight:700;font-size:19px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.62);margin-bottom:14px}`
-        + `.l{display:block;font-weight:800;font-size:42px;line-height:1.16;color:#fff;margin-bottom:22px;text-shadow:0 2px 8px rgba(0,0,0,0.4)}`
+        + `.card{box-sizing:border-box;display:inline-block;text-align:left;max-width:700px;padding:32px 44px 36px;border-radius:34px;`
+        + `background:linear-gradient(180deg,rgba(255,255,255,0.17) 0%,rgba(255,255,255,0.05) 100%);`
+        + `border:1px solid rgba(255,255,255,0.42);box-shadow:0 30px 70px rgba(0,0,0,0.50),inset 0 1px 0 rgba(255,255,255,0.55),inset 0 -1px 0 rgba(255,255,255,0.06)}`
+        + `.k{display:block;font-weight:700;font-size:20px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.85);margin-bottom:14px}`
+        + `.l{display:block;font-weight:800;font-size:44px;line-height:1.18;color:#fff;margin-bottom:24px;text-shadow:0 2px 8px rgba(0,0,0,0.45)}`
         + `.o{display:block;line-height:1}`
-        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:52px;line-height:1;color:#0c0d10;background:${accent};padding:8px 22px;border-radius:14px;box-shadow:0 8px 30px ${accent}88}`
-        + `.f{display:inline-block;vertical-align:middle;margin-left:16px;font-weight:800;font-size:30px;letter-spacing:1px;color:#fff}`;
+        + `.n{display:inline-block;vertical-align:middle;font-weight:900;font-size:56px;line-height:1;color:#0c0d10;background:${accent};padding:8px 24px;border-radius:16px;box-shadow:0 8px 28px ${accent}88}`
+        + `.f{display:inline-block;vertical-align:middle;margin-left:18px;font-weight:800;font-size:32px;letter-spacing:1px;color:#fff}`;
       const cp = placeCaption(String(co.pos || "lowerCenter"), 0); // reuse the 9-zone map for placement + safe-zone offset
       return { asset: { type: "html", html: `<div class="wrap"><div class="card">${inner}</div></div>`, css, width: 1000, height: 680, background: "transparent" }, start: Math.max(0, startSec), length: Math.max(1, lenSec), position: cp.position, offset: cp.offset, transition: { in: "zoom", out: "fade" } };
     };
