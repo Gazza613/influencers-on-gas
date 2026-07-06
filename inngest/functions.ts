@@ -1596,25 +1596,38 @@ export const generateClips = inngest.createFunction(
       // Self-contained: on success it returns a delivery-quality clip (metered); on ANY miss it falls straight
       // through to the MCP Kling loop, so it can never make a scene fail that MCP would have rendered.
       if (restWouldHandle && !url) {
-        const sub = await step.run(`krsubmit-${i}`, () => submitKlingRest({ imageUrl: img, prompt: motion, seconds: clipSeconds }));
-        if (sub.jobSetId) {
-          const KR_ROUNDS = Math.max(24, Number(process.env.KLING_REST_POLL_ROUNDS) || 96); // ~96 x 5s ≈ 8 min ceiling
+        // FAST DELIVERY LANE. Kling REST renders a full-length scene-shot in ~90s. A submit that stalls in the
+        // queue almost always clears on a FRESH submit, so we RETRY the fast lane a couple of times (each with a
+        // ~5 min ceiling) rather than dropping into the ~30-60 min MCP Kling lane below - that slow fall-through
+        // was the "stuck for 40 min" trap. When the fast lane still can't land, we FAIL THE SCENE CLEANLY so the
+        // user just taps Anim for another fast try. (Opt back into the slow lane with BROLL_MCP_FALLBACK=1.)
+        const KR_TRIES = Math.max(1, Number(process.env.KLING_REST_TRIES) || 2);
+        const KR_ROUNDS = Math.max(24, Number(process.env.KLING_REST_POLL_ROUNDS) || 60); // ~60 x 5s ≈ 5 min per try
+        let krErr: string | null = null;
+        for (let attempt = 0; attempt < KR_TRIES && !url; attempt++) {
+          const sub = await step.run(`krsubmit-${i}-${attempt}`, () => submitKlingRest({ imageUrl: img, prompt: motion, seconds: clipSeconds }));
+          krErr = sub.error || krErr;
+          if (!sub.jobSetId) continue; // submit failed - a fresh submit usually lands
           let krUrl: string | null = null;
           for (let n = 0; n < KR_ROUNDS && !krUrl; n++) {
-            const s = await step.run(`krpoll-${i}-${n}`, () => pollDopOnce(sub.jobSetId as string));
+            const s = await step.run(`krpoll-${i}-${attempt}-${n}`, () => pollDopOnce(sub.jobSetId as string));
             if (s.url) { krUrl = s.url; break; }
-            if (s.terminal) break;
-            await step.sleep(`krwait-${i}-${n}`, "5s");
+            if (s.terminal) break; // failed/nsfw/canceled - resubmit on the next attempt
+            await step.sleep(`krwait-${i}-${attempt}-${n}`, "5s");
           }
           if (krUrl) {
-            await step.run(`u-krest-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: sub.model || "kling-v2-1", unit: "video", action: "broll", count: 1 }).catch(() => {}));
-            const hosted = (await step.run(`krhost-${i}`, () => rehostToBlob(krUrl as string, "clips").catch(() => null))) || krUrl;
-            const realDur = await step.run(`krdur-${i}`, () => probeDuration(hosted as string).catch(() => null));
+            await step.run(`u-krest-${i}-${attempt}`, () => recordUsage({ influencerId, provider: "higgsfield", model: sub.model || "kling-v2-1", unit: "video", action: "broll", count: 1 }).catch(() => {}));
+            const hosted = (await step.run(`krhost-${i}-${attempt}`, () => rehostToBlob(krUrl as string, "clips").catch(() => null))) || krUrl;
+            const realDur = await step.run(`krdur-${i}-${attempt}`, () => probeDuration(hosted as string).catch(() => null));
             return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : clipSeconds, audio_url: audioUrl || undefined, synced: false, engine: `higgsfield:${sub.model || "kling-v2-1"}:rest`, draft: false };
           }
         }
-        if (sub.error) await step.run(`kr-alert-${i}`, async () => { await alertIfCritical("Higgsfield Kling REST (b-roll)", sub.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
-        // fall through to the MCP Kling loop below.
+        if (krErr) await step.run(`kr-alert-${i}`, async () => { await alertIfCritical("Higgsfield Kling REST (b-roll)", krErr as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
+        // By DEFAULT don't fall into the slow MCP Kling lane - fail fast so a scene-shot never spins for 40 min.
+        if (process.env.BROLL_MCP_FALLBACK !== "1") {
+          return { scene: i, role, beat, kind: role, url: null, status: "failed", error: (krErr || "the scene-shot render stalled on the fast lane") + " - tap Anim to try again (a fresh render usually lands in about 90 seconds)." };
+        }
+        // else fall through to the MCP Kling loop below (opt-in only).
       }
 
       // KLING with a RE-SUBMIT retry: the MCP lane can stall or terminally-fail transiently, so a FRESH submit
