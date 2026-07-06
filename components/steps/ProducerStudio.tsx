@@ -1669,6 +1669,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <div className="mb-4">
                       <WorkingPanel
                         title={assembling ? "Stitching your final cut" : "Rendering full quality"}
+                        crew={CREW.producer}
                         lines={assembling ? STITCH_LINES : FINALISE_LINES}
                         estimateSeconds={assembling ? 420 : 1500}
                         startedAt={assembling ? finishStart : ((production as { clips_started_at?: number })?.clips_started_at ?? finishStart)}
