@@ -402,12 +402,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     // approved (it's unlocked) AND (b) this step's own work actually exists. A locked step shows only
     // its "🔒 Approve the previous step" message - never an approve button that jumps the queue.
     if (stepState(k as typeof ORDER[number]) === "locked") return null;
-    if (!ready[k]) return null;
+    // An APPROVED step ALWAYS shows its undo - even if it has no artifact (e.g. Music & ambient accepted WITHOUT
+    // generating a bed). Checking `ready` first used to hide the undo there, leaving no way back in (Gary: "no
+    // escape hatch on Music & ambient after refresh"). Un-approving re-opens the step so it can be edited/re-run.
     if (approved.has(k)) return (
       <div className="mt-3 flex items-center gap-2 border-t border-line pt-3 text-[12px] font-semibold text-ready">✓ Approved
-        <button onClick={() => deny(k)} className="ml-1 rounded border border-line px-2 py-0.5 text-[10px] font-medium text-ink-faint hover:text-ink">undo</button>
+        <button onClick={() => deny(k)} className="ml-1 rounded border border-line px-2 py-0.5 text-[10px] font-medium text-ink-faint hover:text-ink">↩ undo / re-open</button>
       </div>
     );
+    if (!ready[k]) return null;
     return (
       <div className="mt-3 border-t border-line pt-3">
         <div className="flex flex-wrap items-center gap-2">
