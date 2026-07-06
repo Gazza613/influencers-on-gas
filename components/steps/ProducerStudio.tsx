@@ -202,6 +202,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // STORYLINE-FIRST: the producer writes the ad's story/idea in their own words; the AI producer (top 1%) directs
   // it into the optimised storyboard, inferring any blank brief fields from it.
   const [storyline, setStoryline] = useState<string>(String((initialProduction?.brief as { storyline?: string })?.storyline || ""));
+  const [storyBusy, setStoryBusy] = useState(false); // AI story helper working
+  const genAbortRef = useRef<AbortController | null>(null); // cancel an in-flight storyboard direction
   const [err, setErr] = useState("");
 
   const [brand, setBrand] = useState(String((initialProduction?.brief as { brand?: string })?.brand || ""));
@@ -840,21 +842,40 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).then((d) => { if (d?.production) setProduction(d.production); }).catch(() => {});
     } else setErr(r?.error || "Couldn't transcribe that recording.");
   }
+  function abortGenerate() { genAbortRef.current?.abort(); genAbortRef.current = null; setBusy(false); setErr(""); }
   async function generate() {
-    if (!brand.trim() || !offer.trim() || busy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer."); return; }
+    if (busy) return;
+    // Storyline-first: a story is enough. Otherwise the structured path needs at least the brand + core offer.
+    if (!storyline.trim() && (!brand.trim() || !offer.trim())) { setErr("Write your story in the box above, or add at least the brand and the core offer below."); return; }
     // Re-directing writes brand-new scenes and REPLACES the whole production. If there's already rendered
     // work, warn first - it clears the keyframes/clips/final cut + per-scene edits (captions, placements).
     // The locked identity, chosen guides and voice are persona-level, so they survive.
     const hasWork = !!production?.final_url || !!production?.clips?.some((c) => c.url) || !!production?.shots?.some((s) => s.url);
-    if (hasWork && !(await askConfirm({ title: "Re-direct the storyboard from scratch?", body: "This writes new scenes and CLEARS the current keyframes, rendered clips, the final cut and your per-scene edits (caption text + placements). Your locked identity, chosen guides and voice are kept. To just re-render the video, use the Stitch step instead.", tone: "danger", confirmLabel: "Re-direct (clears clips)" }))) return;
+    if (hasWork && !(await askConfirm({ title: "Reimagine the storyboard from scratch?", body: "This writes new scenes and CLEARS the current keyframes, rendered clips, the final cut and your per-scene edits (caption text + placements). Your locked identity, chosen guides and voice are kept. To just re-render the video, use the Stitch step instead.", tone: "danger", confirmLabel: "Reimagine (clears clips)" }))) return;
     setBusy(true); setErr("");
-    const r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storyline: storyline || "", brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, script: draftScript || "", clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
-    }).then((x) => x.json()).catch(() => null);
-    setBusy(false);
+    const ctrl = new AbortController(); genAbortRef.current = ctrl;
+    let r: { production?: Production; error?: string } | null = null;
+    try {
+      r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
+        body: JSON.stringify({ storyline: storyline || "", brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, script: draftScript || "", clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
+      }).then((x) => x.json());
+    } catch { if (ctrl.signal.aborted) return; /* aborted: leave the story as-is to edit */ }
+    if (ctrl.signal.aborted) return;
+    genAbortRef.current = null; setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); persistApproved(new Set()); }
     else setErr(r?.error || "Couldn't draft the storyboard. Try again.");
+  }
+  // AI STORY HELPER: turn the producer's rough notes into a vivid, producer-grade story they can then Direct.
+  async function polishStory() {
+    if (storyBusy) return;
+    setStoryBusy(true); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/producer/story`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storyline, brand, offer, benefits, cta, tone, setting, durationSeconds: duration }),
+    }).then((x) => x.json()).catch(() => null);
+    setStoryBusy(false);
+    if (r?.storyline) setStoryline(r.storyline); else setErr(r?.error || "Couldn't shape the story - give it another go.");
   }
 
   return (
@@ -886,16 +907,29 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
           {/* STORYLINE-FIRST (the primary way in): write the ad's story in your own words and I direct it as your
               top-1% producer, inferring any blank brief fields. The structured brief below is optional detail. */}
           <div className="rounded-xl border border-[#a855f7]/35 bg-gradient-to-br from-[#a855f7]/[0.08] to-[#60a5fa]/[0.05] p-4">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-sm font-extrabold text-ink">🎬 Your story</span>
-              <span className="text-[11px] text-ink-faint">tell me the ad in your own words and I&apos;ll direct it, shot by shot, as your producer</span>
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+              <div className="flex flex-wrap items-center gap-x-2">
+                <span className="text-sm font-extrabold text-ink">🎬 Your story</span>
+                <span className="text-[11px] text-ink-faint">tell me the ad in your own words and I&apos;ll direct it, shot by shot, as your producer</span>
+              </div>
+              {/* AI HELPER: shape rough notes into a vivid, producer-grade story you can then Direct. */}
+              <button onClick={polishStory} disabled={storyBusy || busy} title="I'll take your notes (or the brief) and shape them into a vivid, top-1% story you can review, edit, then direct." className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{storyBusy ? "✨ Shaping your story…" : storyline.trim() ? "✨ Sharpen my story" : "✨ Help me write it"}</button>
             </div>
-            <textarea value={storyline} onChange={(e) => setStoryline(e.target.value)} rows={5}
-              placeholder={`Tell the story of this ad in your own words - who it's for, the world it lives in, the moments and feeling you want, the offer and the call to action.\n\ne.g. "${name} is at a sunlit V&A Waterfront café. He leans in like he's sharing a secret: most people overthink AI. He shows how one clear prompt gets a world-class result, cuts to the screen, then invites you to book a free strategy call."\n\nThe more vivid, the better - I'll optimise the pacing, shots and voiceover to a top-1% standard.`}
-              className="mt-2 w-full resize-none rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-[14px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
+            <textarea value={storyline} onChange={(e) => setStoryline(e.target.value)} rows={5} disabled={storyBusy}
+              placeholder={`Tell the story of this ad in your own words - who it's for, the world it lives in, the moments and feeling you want, the offer and the call to action.\n\ne.g. "${name} is at a sunlit V&A Waterfront café. He leans in like he's sharing a secret: most people overthink AI. He shows how one clear prompt gets a world-class result, cuts to the screen, then invites you to book a free strategy call."\n\nThe more vivid, the better - I'll optimise the pacing, shots and voiceover to a top-1% standard. Or hit "Help me write it" and I'll draft one from your brief.`}
+              className="mt-2 w-full resize-none rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-[14px] leading-relaxed text-ink outline-none focus:border-[#a855f7] disabled:opacity-60" />
             <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-              <button onClick={generate} disabled={busy || (!storyline.trim() && !brand.trim())} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold disabled:opacity-50">{busy ? "🎬 Directing your storyboard…" : production?.storyboard ? "↻ Reimagine the storyboard" : "🎬 Direct as my producer →"}</button>
-              <span className="text-[11px] text-ink-faint">Then pick the guides and shoot the reference images. Prefer a form? Fill the optional brief below.</span>
+              {busy ? (
+                <>
+                  <span className="btn-brand inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold opacity-90"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Directing your storyboard…</span>
+                  <button onClick={abortGenerate} className="rounded-lg border border-alert/50 px-3 py-2.5 text-sm font-bold text-alert transition hover:bg-alert/10">✕ Abort &amp; edit</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={generate} disabled={!storyline.trim() && !brand.trim()} className="btn-brand rounded-lg px-5 py-2.5 text-sm font-bold disabled:opacity-50">{production?.storyboard ? "↻ Reimagine the storyboard" : "🎬 Direct as my producer →"}</button>
+                  <span className="text-[11px] text-ink-faint">Then pick the guides and shoot the reference images. Prefer a form? Fill the optional brief below.</span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-center justify-between border-t border-line pt-4">

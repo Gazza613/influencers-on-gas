@@ -805,6 +805,24 @@ export async function draftBrief(o: {
   return { offer: o.offer || "", benefits: o.benefits || "", cta: o.cta || "", tone: o.tone || "" };
 }
 
+// STORY HELPER: shape the producer's rough idea (or the brief) into a vivid, top-1% STORY they then direct.
+export async function shapeStory(o: {
+  influencerName: string; influencerProfile?: string; storyline?: string; brand?: string; offer?: string;
+  benefits?: string; cta?: string; tone?: string; setting?: string; durationSeconds: number;
+}): Promise<{ storyline: string }> {
+  const c = await client();
+  const res = await c.messages.create({
+    model: MODEL,
+    max_tokens: 800,
+    system: `You are a top-1% short-form video producer and creative director. Turn the producer's rough idea into a VIVID, specific STORY for a ${o.durationSeconds}-second AI-influencer ad - the narrative they will then direct into a storyboard. Write cinematic PROSE (never a shot list, never a script with "VO:" labels): the world/setting, the presenter's moment and feeling, the emotional beats (a scroll-stopping hook, the tension or desire, the reveal, the proof, then a clear call to action), with the specific offer and CTA woven in naturally. Concrete, sensory, on-brand. ~120-180 words, one or two short paragraphs. UK spelling, no em dashes, no emojis. Return ONLY the story prose - nothing else.`,
+    messages: [{ role: "user", content: `Presenter: ${o.influencerName}.${o.influencerProfile ? ` ${o.influencerProfile}` : ""}\n` +
+      `Brand / product: ${o.brand || "(infer a fitting one)"}\nOffer / hook: ${o.offer || "(infer)"}\nKey benefits: ${o.benefits || ""}\nCTA: ${o.cta || ""}\nTone: ${o.tone || "warm, confident, effortless"}\nSetting: ${o.setting || "(choose one that fits the presenter)"}\n\n` +
+      `The producer's rough story / notes to shape (if empty, invent a strong one from the brief above):\n"""${(o.storyline || "").slice(0, 3000)}"""\n\nWrite the vivid story now.` }],
+  });
+  const block = res.content.find((b) => b.type === "text");
+  return { storyline: block && block.type === "text" ? block.text.trim() : (o.storyline || "") };
+}
+
 // Continuity pass: after the producer curates (keeps/rejects) the reference shots, re-flow the VO so
 // the KEPT scenes read as ONE coherent narrative (no gaps from dropped scenes). Returns one rewritten
 // vo_line + caption per kept scene (keyed by its scene index). Fails open (callers keep originals).
