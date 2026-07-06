@@ -29,6 +29,7 @@ export default async function CreativesPage({ params }: { params: Promise<{ id: 
     <CreativesStudio
       influencerId={inf.id}
       multiRef={multiRef}
+      gender={String(persona.gender || (persona.bible as { identity?: { gender?: string } })?.identity?.gender || "")}
       arollRef={String(persona.aroll_ref_url || "")}
       brollRef={String(persona.broll_ref_url || "")}
       initial={{

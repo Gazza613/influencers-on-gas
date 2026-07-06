@@ -50,7 +50,10 @@ const CREATIVE_NARRATION = [
   "Re-rolling anything that doesn't make the cut, no compromises…",
 ];
 
-export default function CreativesStudio({ influencerId, initial, multiRef = false, arollRef = "", brollRef = "" }: { influencerId: string; initial: { creatives: Creative[]; status: string; startedAt?: number | null }; multiRef?: boolean; arollRef?: string; brollRef?: string }) {
+export default function CreativesStudio({ influencerId, initial, multiRef = false, arollRef = "", brollRef = "", gender = "" }: { influencerId: string; initial: { creatives: Creative[]; status: string; startedAt?: number | null; scene?: string }; multiRef?: boolean; arollRef?: string; brollRef?: string; gender?: string }) {
+  // Pronouns ANCHORED to the gender chosen on the first screen (male -> he/him/his), so the copy never
+  // calls a male influencer (e.g. Dave) "she/her".
+  const G = gender.toLowerCase() === "male" ? { subj: "he", obj: "him", poss: "his" } : { subj: "she", obj: "her", poss: "her" };
   const [startedAt, setStartedAt] = useState<number | null>(initial.startedAt ?? null);
   // Producer references: a chosen creative becomes the wardrobe + world anchor for a-roll / b-roll
   // keyframes (Phase 1 of Creatives → Producer).
@@ -66,7 +69,10 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const [priority, setPriority] = useState(false); // ⚡ faster, paid render queue (opt-in for speed)
   const [matchRef, setMatchRef] = useState(""); // "Match this look": reproduce people + wardrobe from a chosen creative
   const pickRole = (r: "a-roll" | "b-roll") => { setCreativeRole(r); setExtras(r === "b-roll"); };
-  const [scene, setScene] = useState("");
+  // ANCHOR the scene/brief so it survives leaving + coming back to this screen (was clearing on return).
+  const sceneKey = `gas-creatives-scene-${influencerId}`;
+  const [scene, setScene] = useState<string>(() => (typeof window !== "undefined" ? (initial.scene || localStorage.getItem(sceneKey) || "") : (initial.scene || "")));
+  useEffect(() => { if (typeof window !== "undefined") { try { localStorage.setItem(sceneKey, scene); } catch { /* storage full/blocked */ } } }, [scene, sceneKey]);
   const [refining, setRefining] = useState(false);
   const [clothingRef, setClothingRef] = useState<string | null>(null);
   const [locationRefs, setLocationRefs] = useState<string[]>([]); // multiple scene/location references - shots rotate through them for varied backdrops
@@ -421,13 +427,13 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 bg-black/85 p-2 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
             <input autoFocus value={editText} onChange={(e) => setEditText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") applyEdit(c); if (e.key === "Escape") { setEditingId(null); setEditText(""); } }}
-              placeholder="Change one thing… e.g. make her dress bright MTN-yellow"
+              placeholder={`Change one thing… e.g. make ${G.poss} outfit bright MTN-yellow`}
               className="w-full rounded-md border border-white/20 bg-black/60 px-2 py-1.5 text-[11px] text-white outline-none placeholder:text-white/40 focus:border-[#a855f7]" />
             <div className="flex gap-1.5">
               <button onClick={() => applyEdit(c)} disabled={!editText.trim()} className="flex-1 rounded-md bg-[#a855f7] px-2 py-1 text-[11px] font-bold text-white disabled:opacity-40">Apply</button>
               <button onClick={() => { setEditingId(null); setEditText(""); }} className="rounded-md border border-white/25 px-2 py-1 text-[11px] text-white/80">Cancel</button>
             </div>
-            <p className="text-[10px] leading-tight text-white/50">Keeps the location, pose &amp; her - changes only what you say. Adds a new shot beside this one.</p>
+            <p className="text-[10px] leading-tight text-white/50">Keeps the location, pose &amp; {G.obj} - changes only what you say. Adds a new shot beside this one.</p>
           </div>
         )}
       </div>
@@ -451,7 +457,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Wardrobe &amp; Set · dress her + build the world <span className="ml-2 rounded-full border border-[#a855f7]/60 bg-[#a855f7]/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-[#d8b4fe]">Optional</span></div>
+        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Wardrobe &amp; Set · dress {G.obj} + build the world <span className="ml-2 rounded-full border border-[#a855f7]/60 bg-[#a855f7]/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-[#d8b4fe]">Optional</span></div>
         <p className="mt-2 text-sm text-ink-dim">
           Render social-ready shots of this locked influencer. Pick platforms or formats, optionally steer the wardrobe
           and scene, and we generate <span className="text-ink">{PER_RATIO} different shots per format</span> with the
@@ -497,7 +503,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Shot type</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["a-roll", "Talking shot · presenter", "Front-on, talking to camera - clean presenter shots"], ["b-roll", "Scene shot · lifestyle", "Candid in-scene moments, extras + life around her"]] as const).map(([k, label, hint]) => (
+            {([["a-roll", "Talking shot · presenter", "Front-on, talking to camera - clean presenter shots"], ["b-roll", "Scene shot · lifestyle", "Candid in-scene moments, extras + life around them"]] as const).map(([k, label, hint]) => (
               <button key={k} onClick={() => pickRole(k)} className={`rounded-lg border px-3 py-2 text-left transition ${creativeRole === k ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
                 <div className={`text-sm font-bold ${creativeRole === k ? "text-[#c79bff]" : "text-ink-dim"}`}>{label}</div>
                 <div className="text-[10px] text-ink-faint">{hint}</div>
@@ -542,7 +548,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
         <div className="mt-4">
           <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([["true", "Add background extras", "A diverse crowd around her, in focus"], ["false", "No extras", "Only the people you name in the scene (e.g. 2 friends) - no random crowd"]] as const).map(([k, label, hint]) => {
+            {([["true", "Add background extras", "A diverse crowd around them, in focus"], ["false", "No extras", "Only the people you name in the scene (e.g. 2 friends) - no random crowd"]] as const).map(([k, label, hint]) => {
               const on = (k === "true") === extras;
               return (
                 <button key={k} onClick={() => setExtras(k === "true")} className={`rounded-lg border px-3 py-2 text-left transition ${on ? "border-[#a855f7] bg-[#a855f7]/12" : "border-line hover:border-line-strong"}`}>
@@ -610,7 +616,7 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
               );
             })}
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-faint">Tip: a well-retrained influencer holds her face even on &ldquo;Follow my scene&rdquo;. Use Strong if you see her drifting.</p>
+          <p className="mt-1.5 text-[11px] text-ink-faint">Tip: a well-retrained influencer holds {G.poss} face even on &ldquo;Follow my scene&rdquo;. Use Strong if you see {G.obj} drifting.</p>
         </div>
         )}
 
