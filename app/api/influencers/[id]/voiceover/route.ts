@@ -47,9 +47,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const voiceId = String(persona.voice_id || "");
   if (!voiceId) return NextResponse.json({ error: "Set a voice first." }, { status: 400 });
-  const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[] } } | null;
+  const production = (persona.production ?? null) as { storyboard?: { scenes?: Record<string, string>[] }; scene_audio?: { scene: number; url: string; duration: number; cues?: number[]; locked?: boolean }[] } | null;
   const scenes = production?.storyboard?.scenes;
   if (!Array.isArray(scenes) || !scenes.length) return NextResponse.json({ error: "Direct a storyboard first." }, { status: 400 });
+  // Per-scene RE-TAKES the producer locked (via voice/scene-take) must survive a full re-run - keep them and
+  // regenerate everything else from the fresh continuous take. A locked scene keeps its own independent slice.
+  const lockedSlices = new Map((Array.isArray(production?.scene_audio) ? production!.scene_audio! : []).filter((e) => e?.locked && e?.url).map((e) => [Number(e.scene), e]));
 
   // Build the full read from every scene's line, in order; remember each scene's char span.
   const parts: { i: number; start: number; end: number }[] = [];
@@ -77,8 +80,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Per-scene slices → Animate reuses these (consistent + WYSIWYG). Each slice also carries `cues`: the
     // start time (seconds, relative to the scene's own audio) of every spoken word, from the SAME ElevenLabs
     // timestamps - so the stitch can place each caption chunk at the exact moment she starts speaking it.
-    const scene_audio: { scene: number; url: string; duration: number; cues?: number[] }[] = [];
+    const scene_audio: { scene: number; url: string; duration: number; cues?: number[]; locked?: boolean }[] = [];
     for (const p of parts) {
+      if (lockedSlices.has(p.i)) continue; // a producer-locked re-take keeps its own slice; don't overwrite it
       const startSec = p.start > 0 ? timeAt(p.start - 1) : 0;
       const endSec = timeAt(p.end - 1);
       if (!(endSec > startSec)) continue;
@@ -91,10 +95,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       scene_audio.push({ scene: p.i, url, duration: endSec - startSec, cues });
     }
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
+    // Fold the preserved locked re-takes back in, so the shipped slices = fresh continuous take everywhere
+    // EXCEPT the scenes the producer re-took (those keep their own independent slice).
+    const mergedAudio = [...scene_audio, ...lockedSlices.values()].sort((a, b) => Number(a.scene) - Number(b.scene));
     // SCOPED write: merge only the voiceover fields, so a slow TTS write can NEVER overwrite scene edits
     // (e.g. a vo_line you saved while this was generating) - the root of the "my edit reverted" bug.
-    await updateProductionFields(id, { voiceover_url, scene_audio, voiceover_at: Date.now() });
-    return NextResponse.json({ voiceover_url, scenes: scene_audio.length, total_seconds: Math.round(totalSec) });
+    await updateProductionFields(id, { voiceover_url, scene_audio: mergedAudio, voiceover_at: Date.now() });
+    return NextResponse.json({ voiceover_url, scenes: mergedAudio.length, total_seconds: Math.round(totalSec) });
   } catch (e) {
     return NextResponse.json({ error: `Could not generate the voiceover: ${String((e as Error)?.message || e).slice(0, 160)}` }, { status: 502 });
   }

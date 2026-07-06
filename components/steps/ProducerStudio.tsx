@@ -146,6 +146,30 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       setPreviewSaved(true);
     } else setPreviewErr(r?.error || "Couldn't save the copy to the scene.");
   }
+  // PER-SCENE RE-TAKE: re-generate ONLY this scene's audio with the SAME global voice (a fresh read of the same
+  // line, or the edited line), locked so a later full voiceover run keeps it. Re-animate this scene to apply.
+  const [retakeBusy, setRetakeBusy] = useState<number | null>(null);
+  async function retakeScene() {
+    if (previewSceneIdx == null || retakeBusy != null) return;
+    const i = previewSceneIdx; setRetakeBusy(i); setPreviewErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/voice/scene-take`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, text: previewText.trim() || undefined }),
+    }).then((x) => x.json()).catch(() => null);
+    setRetakeBusy(null);
+    if (r?.ok) {
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+      if (d?.production) setProduction(d.production);
+      setPreviewSaved(true);
+    } else setPreviewErr(r?.error || "Couldn't re-take that scene.");
+  }
+  async function unlockScene(i: number) {
+    setPreviewErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/voice/scene-take`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) { const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null); if (d?.production) setProduction(d.production); }
+    else setPreviewErr(r?.error || "Couldn't revert that scene.");
+  }
   async function genVoiceover() {
     if (voBusy) return;
     setVoBusy(true); setErr("");
@@ -1359,10 +1383,19 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       </div>
                       {(() => {
                         const edited = previewSceneIdx != null && !previewSaved && previewText.trim() !== String(sb?.scenes?.[previewSceneIdx]?.vo_line || "").trim();
+                        const locked = previewSceneIdx != null && ((production as { scene_audio?: { scene: number; locked?: boolean }[] })?.scene_audio ?? []).some((e) => Number(e.scene) === previewSceneIdx && e.locked);
                         return previewSceneIdx != null ? (
                           <>
                             {edited && <p className="mt-2 text-[11px] font-semibold text-[#fbbf24]">⚠ You&apos;ve changed this line - it won&apos;t ship until you save it to the scene.</p>}
                             <button onClick={savePreviewToScene} disabled={previewSaved || !previewText.trim()} className={`mt-1.5 w-full rounded-lg border px-3 py-2 text-xs font-bold transition ${previewSaved ? "border-ready/50 text-ready" : edited ? "border-[#f59e0b] bg-[#f59e0b]/15 text-[#fbbf24]" : "border-[#a855f7]/50 text-[#c79bff] hover:bg-[#a855f7]/10"} disabled:opacity-60`}>{previewSaved ? `✓ Saved to Scene ${previewSceneIdx + 1} — re-run the voiceover to hear it` : `💾 Save this line to Scene ${previewSceneIdx + 1} (so it ships)`}</button>
+                            {/* PER-SCENE RE-TAKE (same voice): re-generate ONLY this scene's audio, without re-running the whole
+                                voiceover, and lock it so a later full re-run keeps it. This is the true "change just this scene". */}
+                            <div className="mt-2 rounded-lg border border-[#60a5fa]/25 bg-[#60a5fa]/[0.05] p-2.5">
+                              <button onClick={retakeScene} disabled={retakeBusy != null || !previewText.trim()} className="w-full rounded-lg border border-[#60a5fa]/50 px-3 py-2 text-xs font-bold text-[#93c5fd] transition hover:bg-[#60a5fa]/10 disabled:opacity-60">{retakeBusy === previewSceneIdx ? "🎙️ Re-taking this scene…" : `🎙️ Re-take Scene ${previewSceneIdx + 1} (same voice, this scene only)`}</button>
+                              {locked
+                                ? <p className="mt-1.5 text-[10px] leading-tight text-[#93c5fd]">🔒 Scene {previewSceneIdx + 1} has its OWN locked take now - it ships this exact read and a full voiceover re-run won&apos;t change it. <b>Re-animate scene {previewSceneIdx + 1}</b> to apply it to the video. <button onClick={() => unlockScene(previewSceneIdx)} className="underline hover:text-ink">Revert to the full take</button>.</p>
+                                : <p className="mt-1.5 text-[10px] leading-tight text-ink-faint">Re-rolls just this line with the SAME voice (fixes a clunky read) and locks it - no need to re-run the whole voiceover. Then re-animate this scene.</p>}
+                            </div>
                           </>
                         ) : null;
                       })()}
