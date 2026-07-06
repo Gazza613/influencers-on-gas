@@ -774,6 +774,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setErr(r?.error || "Couldn't record the decision.");
     return false;
   }
+  // RE-OPEN a finished production: once the showreel is accepted/declined every step is "done" and its controls
+  // hide, so there's no way back in to re-stitch, re-run or delete (Gary: "once approved it won't let me in
+  // again"). This un-approves Showreel + Stitch so those steps go active again - you can re-stitch (e.g. to apply
+  // a fresh mix / new clips), re-render or clear, then re-accept. Nothing is deleted; earlier steps stay approved.
+  function reopenProduction() {
+    setApproved((s) => { const n = new Set([...s].filter((k) => k !== "showreel" && k !== "stitch")); persistApproved(n); return n; });
+    setDenied(new Set()); setShowreelArmed(false); setStitchArmed(false);
+    if (typeof document !== "undefined") document.getElementById("step-stitch")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   // AI BRIEF CO-PILOT: draft/sharpen the offer, key benefits, CTA + tone from the brand + this influencer.
   async function draftBriefAI() {
@@ -1661,7 +1670,13 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
             </StepShell>
 
             {/* 6 · Showreel */}
-            <StepShell n={stepNum("showreel")} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")} anchor="step-showreel">
+            <StepShell n={stepNum("showreel")} title="Showreel" desc={<>My last call with you: accept the cut into the showreel, or decline it. Only accepted cuts reach the <a href="/showcase" className="text-accent">showcase wall</a> and the shareable reel.</>} state={stepState("showreel")} anchor="step-showreel"
+              gate={production?.showreel_status ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                  <span className="text-[11px] text-ink-faint">Need to change something? Re-open the cut to re-stitch, re-render or delete - then re-accept.</span>
+                  <button onClick={reopenProduction} className="rounded-lg border border-[#a855f7]/50 px-3 py-1.5 text-xs font-bold text-[#c79bff] transition hover:bg-[#a855f7]/10">↩ Re-open to edit / re-run</button>
+                </div>
+              ) : undefined}>
               {unlocked("showreel") ? (
                 <>
                 {draftClipCount > 0 && <p className="mb-2 text-[11px] font-semibold text-[#fbbf24]">⚠ This cut still contains 720p draft scenes. Render final quality + re-stitch before accepting it to the showcase wall.</p>}
