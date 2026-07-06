@@ -346,6 +346,7 @@ on conflict (provider, model, unit) do nothing;
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active) values
   ('higgsfield','nano_banana_pro','image', 0, 0, true),
   ('higgsfield','nano_banana_2','image', 1, 77, true),
+  ('higgsfield','nano-banana','image', 1, 77, true),      -- FAST first-party REST keyframe lane (~22s vs ~10min MCP) - ESTIMATE, Recalibrate trues up
   ('anthropic','claude-sonnet-4-6','scene', 0, 30, true),
   ('anthropic','claude-opus-4-8','request', 0, 500, true),
   ('anthropic','claude-haiku-4-5','image', 0, 5, true),

@@ -68,6 +68,31 @@ export function klingRestConfigured(): boolean {
   return !!(process.env.HIGGSFIELD_KEY_ID && process.env.HIGGSFIELD_KEY_SECRET);
 }
 
+// FIRST-PARTY REST image generation (verified 2026-07-06: /v1/text2image/nano-banana + input_images, a COMPLETED
+// image in ~22s vs ~10 min on the MCP generate_image lane). input_images map to @image1, @image2 ... in prompt
+// order, exactly like the MCP `medias`, so our identity/guide/wardrobe/world stack + @image tags carry over.
+// Submit non-blocking; poll with pollDopOnce (same job-set shape). Falls back to MCP in the caller on any miss.
+export async function submitImageRest(opts: { prompt: string; refUrls?: string[]; aspectRatio?: string }): Promise<{ jobSetId: string | null; error: string | null }> {
+  if (!klingRestConfigured()) return { jobSetId: null, error: "Higgsfield first-party API not configured" };
+  const ar = opts.aspectRatio === "1:1" ? "1:1" : opts.aspectRatio === "16:9" ? "16:9" : opts.aspectRatio === "3:4" ? "3:4" : opts.aspectRatio === "4:3" ? "4:3" : "9:16";
+  const refs = (opts.refUrls || []).filter((u) => !!u && isSafePublicUrl(u)).slice(0, 8);
+  if (!refs.length) return { jobSetId: null, error: "no reference images (nano-banana REST requires input_images)" };
+  const path = process.env.IMAGE_REST_ENDPOINT || "/v1/text2image/nano-banana";
+  const params: Record<string, unknown> = { prompt: opts.prompt, aspect_ratio: ar, input_images: refs.map((u) => ({ type: "image_url", image_url: u })) };
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: { "hf-api-key": process.env.HIGGSFIELD_KEY_ID!, "hf-secret": process.env.HIGGSFIELD_KEY_SECRET!, "Content-Type": "application/json" },
+      body: JSON.stringify({ params }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { id?: string; detail?: unknown };
+    if (data?.id) return { jobSetId: data.id, error: null };
+    return { jobSetId: null, error: `Image REST ${res.status}: ${JSON.stringify(data?.detail ?? data).slice(0, 200)}` };
+  } catch (e) {
+    return { jobSetId: null, error: String((e as Error)?.message || e).slice(0, 220) };
+  }
+}
+
 // FIRST-PARTY REST Kling image-to-video (verified 2026-07-06: POST /v1/image2video/kling, model kling-v2-1,
 // a COMPLETED 5s clip in ~81s vs ~40 min on the MCP session). Same first-party auth + the same job-set poll as
 // DoP (use pollDopOnce). Kling 2.1 renders 5s or 10s, so the caller only routes clips <=10s here (longer

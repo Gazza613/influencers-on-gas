@@ -3,7 +3,7 @@ import { getInfluencer, updateInfluencer, updateProductionFields, upsertClip } f
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, castLockClause, CLOTHED, HUMANISER } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
-import { submitDopVideo, pollDopOnce, dopConfigured, submitKlingRest, klingRestConfigured } from "@/lib/vendors/higgsfield-dop";
+import { submitDopVideo, pollDopOnce, dopConfigured, submitKlingRest, klingRestConfigured, submitImageRest } from "@/lib/vendors/higgsfield-dop";
 import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
 import { notifyRenderDone } from "@/lib/notify";
 import { bibleWardrobe } from "@/lib/bible";
@@ -1050,7 +1050,40 @@ export const generateShots = inngest.createFunction(
       const shotExtra = { resolution: process.env.HF_BOARD_RES || "1k" };
       const runGen = (m: { value: string; role: string }[]) => generateBatchDetailed([prompt], shotModel, ratio, { ...shotExtra, ...(m.length ? { medias: m } : {}) }, CREATIVE_FALLBACK).then((a) => a[0] ?? { url: null as string | null, error: "no result", model: shotModel });
       let activeMedias = medias;
-      let res = await step.run(`shot-${i}`, () => runGen(activeMedias));
+      // FAST first-party image lane (default ON; verified ~22s vs ~10 min on MCP): render the keyframe on
+      // nano-banana REST with the SAME reference stack in the SAME @image order (identity face first). On ANY
+      // miss it falls straight through to the MCP path below, so it can't make a scene fail that MCP would render.
+      // Set IMAGE_REST=0 to disable. EYEBALL the first keyframe's face when enabling - identity must hold.
+      let res: { url: string | null; error: string | null; model: string } | null = null;
+      if (process.env.IMAGE_REST !== "0" && klingRestConfigured()) {
+        const refUrls = [
+          ...(guided ? idRefUrls.slice(0, 1) : idRefUrls),
+          ...(featureUrl && !guided ? [featureUrl] : []),
+          ...(clothMediaEff ? [clothSrc] : []),
+          ...(locMedia && brief.locationRef ? [brief.locationRef] : []),
+          ...(worldTagOn && worldRefUrl ? [worldRefUrl] : []),
+          ...(phoneMedia && sc.phone_screen_url ? [String(sc.phone_screen_url)] : []),
+          ...(roleRefMedia ? [String(sceneRefUrl || (role === "a-roll" ? persona.aroll_ref_url : role === "b-roll" ? persona.broll_ref_url : "") || "")] : []),
+          ...(castTag && castAnchorUrl ? [castAnchorUrl] : []),
+        ].map((u) => String(u || "")).filter((u) => u.trim());
+        if (refUrls.length) {
+          const sub = await step.run(`imgrest-${i}`, () => submitImageRest({ prompt, refUrls, aspectRatio: ratio }));
+          if (sub.jobSetId) {
+            let irUrl: string | null = null;
+            for (let n = 0; n < 45 && !irUrl; n++) { // ~45 x 4s ≈ 3 min ceiling
+              const s = await step.run(`imgrest-poll-${i}-${n}`, () => pollDopOnce(sub.jobSetId as string));
+              if (s.url) { irUrl = s.url; break; }
+              if (s.terminal) break;
+              await step.sleep(`imgrest-wait-${i}-${n}`, "4s");
+            }
+            if (irUrl) {
+              await step.run(`u-imgrest-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: "nano-banana", unit: "image", action: "keyframe", count: 1 }).catch(() => {}));
+              res = { url: irUrl, error: null, model: "nano-banana:rest" };
+            }
+          }
+        }
+      }
+      if (!res) res = await step.run(`shot-${i}`, () => runGen(activeMedias));
       // "Media input not found" = a SHARED reference media_id (identity/world/cast/cloth) imported once at the
       // top of the shoot has gone STALE by the time this (later) scene renders - the classic mid-shoot b-roll
       // failure. Re-import EVERY reference this scene uses FRESH from its source URL, then retry once.
