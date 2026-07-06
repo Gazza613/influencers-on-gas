@@ -1497,7 +1497,13 @@ export const generateClips = inngest.createFunction(
       // DoP (instant), a FINAL b-roll uses Kling. The voiceover plays its FULL measured length either way (the
       // audio track is independent of the clip), so you hear the whole line on a draft; only the FINAL has
       // full-length video motion. RULE, enforced in the UI: always Render Final Quality before you stitch.
-      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured();
+      // SPEED (option C): a SHORT final scene-shot (its voiceover fits DoP's ~5s output) renders on the FAST
+      // first-party DoP-turbo lane (~1 min, priority queue) instead of the slow Kling MCP queue - so a final with
+      // several short beats finishes far quicker. EXCLUDES rigid-structure scenes (trees/buildings/landmark): those
+      // stay on Kling to keep the deterministic end_image=start_image camera lock so nothing warps. Additive +
+      // reversible: set BROLL_FINAL_DOP_SHORT=0 to go back to all-Kling finals. Long scenes still use Kling.
+      const finalDopShort = role === "b-roll" && !speed && dopFits && !RIGID && process.env.BROLL_FINAL_DOP_SHORT !== "0";
+      const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits) || finalDopShort) && !useVeo && dopConfigured();
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
         // DoP is a real REST queue that handles parallel submits, but retry on rate-limit with back-off
