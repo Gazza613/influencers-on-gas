@@ -1619,8 +1619,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
         <div onClick={() => setVzoom(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
           {/* Reuse ClipPreview so the expanded player OVERLAYS the VO audio on a silent b-roll clip (press play to
               hear her), exactly like the inline thumbnail - the old raw <video> had no audio track so it was silent. */}
-          <div onClick={(e) => e.stopPropagation()} className="max-h-[90vh] max-w-[90vw]">
-            <ClipPreview clip={vzoom} className="max-h-[90vh] max-w-[90vw] rounded-xl border border-line bg-black" />
+          <div onClick={(e) => e.stopPropagation()} className="relative">
+            <ClipPreview
+              clip={vzoom}
+              className={`rounded-xl border border-line bg-black ${
+                String(sb?.format || "").includes("16:9") ? "aspect-[16/9] w-[90vw] max-h-[85vh]"
+                  : String(sb?.format || "").includes("1:1") ? "aspect-square h-[85vh] max-w-[90vw]"
+                    : "aspect-[9/16] h-[85vh] max-w-[90vw]"
+              }`}
+            />
           </div>
           <button onClick={() => setVzoom(null)} aria-label="Close" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-lg text-white hover:bg-black/90">✕</button>
         </div>
@@ -1775,23 +1782,31 @@ function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
   const aRef = useRef<HTMLAudioElement>(null);
   const overlayVO = !!clip.audio_url && clip.synced !== true; // silent clip + a VO to lay over
   const sync = (fn: (v: HTMLVideoElement, a: HTMLAudioElement) => void) => { const v = vRef.current, a = aRef.current; if (v && a) fn(v, a); };
+  // HeyGen bakes a thin white canvas edge into the talking-shot (a-roll) frame. The final cut hides it by
+  // overscanning the clip (AROLL_OVERSCAN in the stitch); mirror that here so the raw preview doesn't show
+  // the white line either. A small scale inside an overflow-hidden box crops the edge away; b-roll keeps its
+  // exact framing (no scale). object-cover fills the box so nothing letterboxes.
+  const aroll = clip.role === "a-roll";
   return (
     <>
-      <video
-        ref={vRef}
-        src={clip.url || undefined}
-        controls
-        playsInline
-        className={className}
-        onPlay={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; a.play().catch(() => {}); }) : undefined}
-        onPause={overlayVO ? () => sync((_v, a) => a.pause()) : undefined}
-        onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; }) : undefined}
-        onRateChange={overlayVO ? () => sync((v, a) => { a.playbackRate = v.playbackRate; }) : undefined}
-        // When the (draft) video ends but the voiceover is longer, DON'T stop the VO - the video holds its last
-        // frame while the voice plays out, so you hear the FULL line (the final cut renders the clip at the VO
-        // length, so there's no hold there). Only reset once the VO itself has finished.
-        onEnded={undefined}
-      />
+      <div className={`relative overflow-hidden ${className || ""}`}>
+        <video
+          ref={vRef}
+          src={clip.url || undefined}
+          controls
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+          style={aroll ? { transform: "scale(1.06)" } : undefined}
+          onPlay={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; a.play().catch(() => {}); }) : undefined}
+          onPause={overlayVO ? () => sync((_v, a) => a.pause()) : undefined}
+          onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; }) : undefined}
+          onRateChange={overlayVO ? () => sync((v, a) => { a.playbackRate = v.playbackRate; }) : undefined}
+          // When the (draft) video ends but the voiceover is longer, DON'T stop the VO - the video holds its last
+          // frame while the voice plays out, so you hear the FULL line (the final cut renders the clip at the VO
+          // length, so there's no hold there). Only reset once the VO itself has finished.
+          onEnded={undefined}
+        />
+      </div>
       {overlayVO && <audio ref={aRef} src={clip.audio_url || undefined} preload="auto" onEnded={() => { const v = vRef.current; if (v) { v.pause(); try { v.currentTime = 0; } catch { /* noop */ } } }} />}
     </>
   );
