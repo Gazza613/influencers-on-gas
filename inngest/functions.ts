@@ -2085,10 +2085,17 @@ export const assembleVideo = inngest.createFunction(
     const overscanFor = (role: string) => (role === "a-roll" ? AROLL_OVERSCAN : VIDEO_OVERSCAN);
     const videoClips = placed.filter((p) => clipUrl(p.i)).flatMap((p) => {
       const src = clipUrl(p.i) as string;
-      // NO LOOPING (Gary's hard rule). The clip plays ONCE for the slot length. The REAL fix for the "b-roll
-      // pauses" is that the clip is rendered to the full VO length (so clip == slot, no hold at all) - see the
-      // b-roll render path. This just lays it flat.
-      return [{ asset: { type: "video", src, volume: 0 }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role) }];
+      // NO LOOPING (Gary's hard rule). The clip plays ONCE for the slot length.
+      // GUARANTEE the motion covers the WHOLE voice - it is IMPOSSIBLE for a b-roll line to outrun its video.
+      // A scene shot renders on a Kling clip that maxes at 10s; if the voiceover runs longer than the clip, we
+      // gently SLOW the clip (Shotstack `speed`) so its motion stretches to fill the voice instead of freezing
+      // on the last frame (the old "held tail" pause). Clamped to >=0.7x so the slow-mo stays subtle and
+      // cinematic on ambient b-roll; with the ~9.5s b-roll copy cap this is usually ~0.95x (imperceptible), and
+      // it fully covers up to ~14s of voice on a 10s clip without ever touching the slow 15s render lane.
+      // A-ROLL is NEVER slowed (it is lip-synced to the voice - slowing it would desync the mouth).
+      const cd = clipDur(p.i);
+      const speed = (p.role === "b-roll" && cd && p.len > cd + 0.15) ? Math.max(0.7, Math.round((cd / p.len) * 1000) / 1000) : undefined;
+      return [{ asset: { type: "video", src, volume: 0, ...(speed ? { speed } : {}) }, start: p.start, length: p.len, fit: "cover", scale: overscanFor(p.role) }];
     });
     // END CARD (optional, from the End Cards library): append the chosen closing clip/frame after
     // the last scene. Extends the timeline so the music bed carries under it.
