@@ -303,6 +303,28 @@ export function fadeWavEdges(wav: Buffer, fadeMs = 4): Buffer {
   return out;
 }
 
+// Light LOUDNESS normalize for a VO slice so a naturally-quiet scene (e.g. a soft closing line) doesn't drop
+// under the music/ambient bed. ONLY ever boosts toward a target RMS, and clamps the gain so the peak never
+// exceeds a ceiling (no clipping = no crackle). Loud scenes are left alone. Mono 16-bit WAV only.
+export function normalizeWav(wav: Buffer, targetRms = 0.1, ceiling = 0.97): Buffer {
+  if (wav.length <= 46 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return wav;
+  const BPS = 2, dataStart = 44;
+  const nS = Math.floor((wav.length - dataStart) / BPS);
+  if (nS <= 0) return wav;
+  let sumsq = 0, peak = 0;
+  for (let i = 0; i < nS; i++) { const s = wav.readInt16LE(dataStart + i * BPS) / 32768; sumsq += s * s; const a = Math.abs(s); if (a > peak) peak = a; }
+  const rms = Math.sqrt(sumsq / nS);
+  if (rms < 1e-4 || peak < 1e-4) return wav; // silence → leave it
+  const gain = Math.max(1, Math.min(targetRms / rms, ceiling / peak)); // boost-only, never past the no-clip ceiling
+  if (gain <= 1.02) return wav; // already loud enough
+  const out = Buffer.from(wav);
+  for (let i = 0; i < nS; i++) {
+    const a = dataStart + i * BPS;
+    out.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(out.readInt16LE(a) * gain))), a);
+  }
+  return out;
+}
+
 // Crossfade-join two mono 16-bit PCM buffers, overlapping `ov` samples (linear blend) - no click/pop.
 function xfConcatPcm(a: Buffer, b: Buffer, xfSamples: number): Buffer {
   const BPS = 2, as = a.length / BPS, bs = b.length / BPS;
