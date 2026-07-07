@@ -45,7 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind, captionStyle, captionAccent, callout };
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, brief: briefNext, assembly_status: "running", final_url: null, stitch_captions: captions } } });
   try {
-    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, captionStyle, captionAccent, endCardUrl, endCardKind, callout } });
+    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, userEmail: session.user.email ?? undefined, captions, captionStyle, captionAccent, endCardUrl, endCardKind, callout } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, assembly_status: "idle" } } });
     return NextResponse.json({ error: "Could not start the stitch (assembly engine not connected)." }, { status: 503 });

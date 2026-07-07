@@ -96,6 +96,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, clips: clipsNext, clips_status: clipsStatusNext, clips_started_at: clipsStartedAt } } });
   try {
     await inngest.send({ name: "influencer/generate.clips", data: { influencerId: id,
+      userEmail: session.user.email ?? undefined, // notify the producer who built it (BCC Gary)
       ...(roles && roles.length ? { roles } : {}),
       ...(targetScenes && targetScenes.length ? { scenes: targetScenes } : {}),
       // finalize re-animates the same locked keyframes, so it must reanimate; and it NEVER passes speed

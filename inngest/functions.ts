@@ -1770,7 +1770,7 @@ export const generateClips = inngest.createFunction(
     // NOTIFY (option B): a full-quality "Render final quality" run is the ~40-min job - email the producer that
     // it's done (ready to stitch) so they don't have to sit and watch. Only on finalize (event.data.notify);
     // fast draft animates don't email. Guarded + wrapped so it can never fail the render.
-    if ((event.data as { notify?: boolean }).notify) await step.run("notify-render", () => notifyRenderDone({ name: String(inf.name || ""), kind: "final-render" }).catch(() => ({ sent: false })));
+    if ((event.data as { notify?: boolean }).notify) await step.run("notify-render", () => notifyRenderDone({ name: String(inf.name || ""), kind: "final-render", to: (event.data as { userEmail?: string }).userEmail }).catch(() => ({ sent: false })));
     return { ok: true, clips: targets.length };
   },
 );
@@ -2195,11 +2195,11 @@ export const assembleVideo = inngest.createFunction(
         // Active-word pill colour: producer-picked (captionAccent), else env, else brand purple.
         const HL = /^#[0-9a-fA-F]{6}$/.test(String(event.data.captionAccent)) ? String(event.data.captionAccent)
           : /^#[0-9a-fA-F]{6}$/.test(String(process.env.CAPTION_ACCENT)) ? String(process.env.CAPTION_ACCENT) : "#a855f7";
-        // NOTE: each word is display:inline-block with a horizontal margin - the Shotstack HTML renderer collapses
-        // the plain space text-node between inline spans (words ran together: "drowninginWhatsAppthreads"), so the
-        // gap MUST come from margin, not a joining space.
+        // WORD SPACING: the Shotstack HTML renderer collapses BOTH a plain space text-node AND CSS margin between
+        // inline spans (words ran together: "drowninginWhatsAppthreads"). The one separator it can't drop is a
+        // NON-BREAKING SPACE (&nbsp;) as its OWN inline word - so each gap is an explicit   span between words.
         const WS_CSS = ".cap{width:100%;font-family:'Open Sans',sans-serif;line-height:1.45}"
-          + ".w{display:inline-block;margin:0 6px;color:#fff;font-weight:800;font-size:46px;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 2px 9px rgba(0,0,0,0.75),0 6px 28px rgba(0,0,0,0.62)}"
+          + ".w{color:#fff;font-weight:800;font-size:46px;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 2px 9px rgba(0,0,0,0.75),0 6px 28px rgba(0,0,0,0.62)}"
           + `.hl{color:#fff;background:${HL};border-radius:10px;padding:2px 12px;box-shadow:0 3px 14px ${HL}88}`;
         const MAXW = Math.max(2, Number(process.env.CAPTION_PHRASE_WORDS) || 4);
         captionClips = placed.filter((p) => (p.vo || p.caption) && !p.captionOff).flatMap((p) => {
@@ -2236,7 +2236,7 @@ export const assembleVideo = inngest.createFunction(
               const st = starts[wi];
               const end = k < idxs.length - 1 ? starts[idxs[k + 1]] : phraseEnd;
               if (!(end > st)) continue;
-              const html = `<div class="cap">${idxs.map((j) => `<span class="w${j === wi ? " hl" : ""}">${words[j]}</span>`).join("")}</div>`;
+              const html = `<div class="cap">${idxs.map((j) => `<span class="w${j === wi ? " hl" : ""}">${words[j]}</span>`).join("<span class=\"w\">&nbsp;</span>")}</div>`;
               clips.push({ asset: { type: "html", html, css: WS_CSS + `.cap{text-align:${cp.align}}`, width: cp.w, height: 340, background: "transparent" }, start: st, length: Math.max(0.12, end - st), position: cp.position, offset: off });
             }
           }
@@ -2413,7 +2413,7 @@ export const assembleVideo = inngest.createFunction(
     // NOTIFY (option B): the finished cut is ready - email a watch link. Only for a FINAL cut (no draft clips
     // left); a quick draft-preview stitch doesn't email. Guarded + wrapped so mail can never fail the stitch.
     const anyDraft = Array.isArray((prod as { clips?: { draft?: boolean }[] }).clips) && (prod as { clips: { draft?: boolean }[] }).clips.some((c) => c.draft === true);
-    if (finalUrl && !anyDraft) await step.run("notify-cut", () => notifyRenderDone({ name: String(inf.name || ""), kind: "cut-ready", url: finalUrl }).catch(() => ({ sent: false })));
+    if (finalUrl && !anyDraft) await step.run("notify-cut", () => notifyRenderDone({ name: String(inf.name || ""), kind: "cut-ready", url: finalUrl, to: (event.data as { userEmail?: string }).userEmail }).catch(() => ({ sent: false })));
     return { ok: !!finalUrl, error: err };
   },
 );
