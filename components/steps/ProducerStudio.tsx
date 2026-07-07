@@ -362,10 +362,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setRenderStarts((prev) => {
       let next = prev; let touched = false;
       const mut = () => { if (next === prev) next = { ...prev }; };
+      const shArr = production?.shots ?? [];
       scenesArr.forEach((sc, i) => {
         const roleStr = String((sc as { role?: string }).role || "a-roll");
         const c = cl.find((x) => x.scene === i);
-        const rendering = !dropped.has(i) && (animatingScenes.has(i) || (wholeBoardBusy && (renderingRole === "" || renderingRole === roleStr) && !c?.url && c?.status !== "failed"));
+        const reshooting = !!shArr.find((x) => x.scene === i)?.reshooting; // keyframe re-shoot also drives the timer
+        const rendering = !dropped.has(i) && (reshooting || animatingScenes.has(i) || (wholeBoardBusy && (renderingRole === "" || renderingRole === roleStr) && !c?.url && c?.status !== "failed"));
         if (rendering && next[i] == null) { mut(); next[i] = Date.now(); touched = true; }
         else if (!rendering && next[i] != null) { mut(); delete next[i]; touched = true; }
       });
@@ -1581,6 +1583,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         const clip = clipFor(i); const shot = shotFor(i);
                         const failed = clip?.status === "failed";
                         const isRendering = animatingScenes.has(i) || (wholeBoardBusy && !clip?.url && clip?.status !== "failed" && (renderingRole === "" || renderingRole === s.role));
+                        const isReshooting = !!shot?.reshooting; // keyframe re-shoot in flight
+                        const busy = isRendering || isReshooting;
                         return (
                           <div key={i} className="w-[104px] shrink-0 rounded-lg border border-line bg-surface-1 p-1.5">
                             <div className="relative aspect-[9/16] w-full overflow-hidden rounded-md bg-black">
@@ -1589,11 +1593,11 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 : shot?.url ? <img src={shot.url} alt="" className="h-full w-full object-cover" />
                                 : <div className="flex h-full items-center justify-center text-[10px] text-ink-faint">not shot</div>}
-                              {isRendering && <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"><RenderTimer start={renderStarts[i] ?? Date.now()} hint={String((s as { live_bg?: string }).live_bg) === "true" ? "10-25m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "15-30m"} /></div>}
-                              {!isRendering && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} aria-label="Preview full size" className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
-                              {!isRendering && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[10px] font-bold text-alert">⚠ failed</div>}
-                              {!isRendering && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[10px] font-bold text-black">✓</span>}
-                              {!isRendering && dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b bg-[#a855f7]/90 px-0.5 text-center text-[10px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
+                              {busy && <SceneBusy start={renderStarts[i] ?? Date.now()} hint={isReshooting ? "1-3m" : String((s as { live_bg?: string }).live_bg) === "true" ? "10-25m" : s.role === "a-roll" ? "2-6m" : speedMode ? "3-8m" : "15-30m"} />}
+                              {!busy && (clip?.url || shot?.url) && <button onClick={() => (clip?.url ? setVzoom(clip) : setZoom(shot!.url as string))} title={clip?.url ? "Play this scene full size" : "Preview the keyframe full size"} aria-label="Preview full size" className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-[10px] text-white transition hover:bg-black/90">👁</button>}
+                              {!busy && failed && <div className="absolute inset-0 flex items-center justify-center bg-alert/25 text-[10px] font-bold text-alert">⚠ failed</div>}
+                              {!busy && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[10px] font-bold text-black">✓</span>}
+                              {!busy && dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b bg-[#a855f7]/90 px-0.5 text-center text-[10px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
                             </div>
                             <div className="mt-1 flex items-center justify-between">
                               <span className="tabular text-[10px] font-bold text-ink">Scene {i + 1}</span>
@@ -2021,6 +2025,22 @@ function RenderTimer({ start, hint }: { start: number; hint?: string }) {
     <div className="tabular text-center leading-tight">
       <div className="text-[11px] font-bold">{mm}:{String(ss).padStart(2, "0")}</div>
       {hint && <div className="mt-0.5 text-[10px] font-normal opacity-60">typically {hint}</div>}
+    </div>
+  );
+}
+// Quirky per-scene "at work" overlay for a re-shoot / re-animate on the scene tile: a spinner, a cycling
+// playful line, a reassuring "result on its way", and the live elapsed clock - so the tile reads ALIVE and
+// fun, never a dead freeze. Kept short for the small (~104px) tile.
+const SCENE_QUIPS = ["🎬 Rolling…", "✨ On it…", "🎥 Action!", "🍿 Cooking…", "🪄 Working magic…", "🎞️ In the edit…", "⚡ Almost there…", "🎬 Take one…", "🎨 Painting it…"];
+function SceneBusy({ start, hint }: { start: number; hint?: string }) {
+  const [q, setQ] = useState(() => Math.floor((start / 2200) % 9)); // vary the opening line per scene (no Math.random in render)
+  useEffect(() => { const t = setInterval(() => setQ((v) => (v + 1) % SCENE_QUIPS.length), 2200); return () => clearInterval(t); }, []);
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 bg-black/72 px-1 text-center text-white">
+      <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#c79bff]/40 border-t-[#c79bff]" />
+      <div className="text-[10px] font-bold leading-tight">{SCENE_QUIPS[q]}</div>
+      <div className="text-[9px] font-semibold leading-tight text-[#c79bff]">result on its way</div>
+      <RenderTimer start={start} hint={hint} />
     </div>
   );
 }
