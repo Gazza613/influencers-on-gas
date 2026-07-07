@@ -263,7 +263,7 @@ export async function describeOutfit(url: string): Promise<string> {
       messages: [{
         role: "user",
         content: [
-          { type: "text", text: "Describe ONLY the OUTFIT of the main foreground adult in this image, head to toe, in ONE concise sentence (about 25-35 words): the top, the bottoms (trousers/skirt/dress), the footwear, their colours and fabric, and any worn accessories (glasses, watch, jewellery, bag, scarf). Do NOT mention the person's face, hair, body, age, pose, or the background. Reply with just the outfit description, no preamble." },
+          { type: "text", text: "Describe ONLY the OUTFIT of the main foreground adult in this image, head to toe, in ONE concise sentence (about 25-35 words): the top, the bottoms (trousers/skirt/dress), the footwear, their colours and fabric, and any worn accessories (glasses, watch, jewellery, bag, scarf). Name each COLOUR PRECISELY and do not confuse similar tones - navy blue is NOT grey, beige/cream is NOT white, olive is NOT grey; look carefully and state the exact colour you actually see for the top, the bottoms and the footwear separately. If the bottoms or footwear are not visible in the image, say 'bottoms not visible' rather than guessing. Do NOT mention the person's face, hair, body, age, pose, or the background. Reply with just the outfit description, no preamble." },
           { type: "image", source: { type: "base64", media_type: mt as "image/jpeg", data: b64 } },
         ],
       }],

@@ -1896,7 +1896,7 @@ function GuidePicker({ role, creatives, selected, onPick, onZoom }: {
   return (
     <div className="mb-3 rounded-lg border border-line bg-surface-2 p-3">
       <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Guide from your creatives (optional)</div>
-      <p className="mb-2 text-[11px] text-ink-faint">Pick a {role} shot you made in Creatives to steer the look, wardrobe and world. Her locked face stays the same. Tap again to clear.</p>
+      <p className="mb-2 text-[11px] text-ink-faint">{role === "a-roll" ? "Pick an a-roll shot you made in Creatives to set the look, wardrobe and world. This outfit becomes the ONE wardrobe used across the whole ad." : "Pick a b-roll shot you made in Creatives to steer this scene's world & framing. The wardrobe stays locked to one outfit for the whole ad (from your a-roll guide), so the clothing never changes between shots."} Her locked face stays the same. Tap again to clear.</p>
       <div className="flex gap-2.5 overflow-x-auto pb-1">
         {mine.map((c) => {
           const on = selected === c.url;

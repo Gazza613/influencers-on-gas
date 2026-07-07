@@ -921,20 +921,26 @@ export const generateShots = inngest.createFunction(
     // WARDROBE LOCK value first (it drives the cloth reference below). One concrete outfit, head to toe,
     // read once from the chosen A-ROLL guide (else B-ROLL guide, else bible) and persisted, so every scene +
     // every re-shoot uses the IDENTICAL outfit even when a scene's anchor frame hides the bottoms/shoes.
+    // ONE canonical wardrobe source for the WHOLE production (explicit upload, else the A-ROLL guide, else the
+    // B-ROLL guide). Its outfit governs EVERY scene of both roles. We re-read the lock whenever this source
+    // CHANGES (not only when it's missing), so swapping to a matching-outfit guide actually updates the lock
+    // instead of the shoot obeying a stale one (the bug: a re-picked guide still came out in the old trousers).
+    const wardrobeSrcUrl = String(brief.clothingRef || persona.aroll_ref_url || persona.broll_ref_url || "").trim();
+    const storedLockSrc = String((production as { wardrobe_ref_url?: string })?.wardrobe_ref_url || "").trim();
     let wardrobeLock = String((production as { wardrobe_lock?: string })?.wardrobe_lock || "").trim();
-    if (!wardrobeLock) {
-      const guideUrl = String(persona.aroll_ref_url || persona.broll_ref_url || "").trim();
-      if (guideUrl) wardrobeLock = await step.run("wardrobe-extract", async () => {
-        const d = await describeOutfit(guideUrl).catch(() => "");
-        if (d) await recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "wardrobe", count: 1 }).catch(() => {});
-        return d;
+    if (wardrobeSrcUrl && wardrobeSrcUrl !== storedLockSrc) {
+      const d = await step.run("wardrobe-extract", async () => {
+        const out = await describeOutfit(wardrobeSrcUrl).catch(() => "");
+        if (out) await recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "wardrobe", count: 1 }).catch(() => {});
+        return out;
       });
-      if (!wardrobeLock) wardrobeLock = bibleLook;
+      if (d) wardrobeLock = d;
     }
-    // CLOTH reference = an explicit upload, ELSE (when a wardrobe is locked) the guide the lock came from - a
-    // CORRECT-COLOUR (e.g. cream) image of HER outfit, passed to EVERY scene so it beats a teal b-roll guide
-    // or cast-anchor frame. Images beat text, so we fight a wrong-colour image with a right-colour image.
-    const clothSrc = String(brief.clothingRef || (wardrobeLock ? (persona.aroll_ref_url || persona.broll_ref_url || "") : "")).trim();
+    if (!wardrobeLock) wardrobeLock = bibleLook;
+    // CLOTH reference = the ONE canonical wardrobe image, passed to EVERY scene of BOTH roles so it beats a
+    // role guide (or cast-anchor frame) that shows a DIFFERENT outfit. Images beat text, so we fight a
+    // wrong-colour image with the right-colour wardrobe image.
+    const clothSrc = wardrobeSrcUrl;
     const clothMedia = clothSrc ? await step.run("import-cloth", () => importMediaUrl(clothSrc).catch(() => null)) : null;
     const clothIsLock = !brief.clothingRef && !!wardrobeLock && !!clothMedia; // the cloth ref IS the wardrobe lock, not an upload
     const locMedia = brief.locationRef ? await step.run("import-loc", () => importMediaUrl(brief.locationRef).catch(() => null)) : null;
@@ -942,7 +948,7 @@ export const generateShots = inngest.createFunction(
     const arollRefMedia = persona.aroll_ref_url ? await step.run("import-aroll-ref", () => importMediaUrl(String(persona.aroll_ref_url)).catch(() => null)) : null;
     const brollRefMedia = persona.broll_ref_url ? await step.run("import-broll-ref", () => importMediaUrl(String(persona.broll_ref_url)).catch(() => null)) : null;
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running", wardrobe_lock: wardrobeLock || undefined } } }));
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running", wardrobe_lock: wardrobeLock || undefined, wardrobe_ref_url: wardrobeSrcUrl || undefined } } }));
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
     let castAnchor: string | null = null; // first b-roll frame WITH companions - locks the daughter/companion look + outfit across every b-roll scene
@@ -989,6 +995,12 @@ export const generateShots = inngest.createFunction(
       const roleRefMedia = sceneRefMedia || (role === "a-roll" ? arollRefMedia : role === "b-roll" ? brollRefMedia : null);
       const lockEff = sceneRefMedia ? "" : wardrobeLock; // scene ref defines the outfit → drop the global lock here
       const clothMediaEff = sceneRefMedia ? null : clothMedia; // …and the global cloth anchor
+      // Is THIS role's guide the ONE canonical wardrobe source? If yes, its clothing IS the wardrobe. If no
+      // (e.g. a b-roll world guide showing DIFFERENT trousers while the a-roll guide is the wardrobe), the guide
+      // steers only the WORLD/pose here and the outfit comes from the locked wardrobe - so BOTH roles wear one
+      // outfit. A per-scene ref stays authoritative for its own outfit (its lock was already dropped above).
+      const roleGuideUrl = String(sceneRefUrl || (role === "a-roll" ? persona.aroll_ref_url : role === "b-roll" ? persona.broll_ref_url : "") || "").trim();
+      const roleGuideIsWardrobe = !!sceneRefMedia || (!!roleRefMedia && !!wardrobeSrcUrl && roleGuideUrl === wardrobeSrcUrl);
       // When a GUIDE is chosen for this role it IS the character (her right face, right outfit, right set), so
       // it becomes the AUTHORITATIVE reference: pass only ONE identity crop (a light face-confirm) and DROP the
       // separate world anchor, so no other image fights the guide's face, clothing or location. This is the
@@ -1009,12 +1021,18 @@ export const generateShots = inngest.createFunction(
       // and only once one has been shot. It locks the daughter/companion's look + outfit across b-roll.
       const hasCompanions = role === "b-roll" && Array.isArray((sc as Record<string, unknown>).talent) && (sc as unknown as { talent: string[] }).talent.length > 1;
       const castTag = (castAnchor && hasCompanions) ? `@image${++n}` : "";
+      // Clause (b) of the guide instruction. If the guide IS the wardrobe source, take clothing from it; if it
+      // is only a WORLD guide (different outfit), take clothing from the LOCKED wardrobe + wardrobe reference so
+      // both roles wear ONE outfit and the guide's different trousers/colour never leak in.
+      const guideClothingClause = roleGuideIsWardrobe
+        ? `(b) her CLOTHING EXACTLY as in ${roleRefTag} - every garment, colour, fabric and footwear${lockEff ? ` (her locked outfit: ${lockEff})` : ""} - and do NOT take clothing from any identity image, which may show a DIFFERENT outfit${clothTag ? `; and if ${roleRefTag} shows only her BACK or side (so the front of the outfit is not visible in it), take the FRONT of her garment - the exact neckline, collar and front detailing - from the wardrobe reference ${clothTag}, and NEVER invent or restyle a front that ${roleRefTag} doesn't show` : ""}`
+        : `(b) do NOT take her CLOTHING from ${roleRefTag} - it may show a DIFFERENT outfit and is used here ONLY for the location and framing. Her outfit is her ONE LOCKED wardrobe${lockEff ? `: ${lockEff}` : ""}${clothTag ? `, shown in the wardrobe reference ${clothTag}` : ""} - dress her in that EXACT outfit, IDENTICAL to every other scene, and IGNORE whatever ${roleRefTag} shows her wearing (any different colour or garment)`;
       const refInstruction = [
         faceTags.length ? `IDENTITY LOCK: ${faceTags.join(", ")} are the SAME real person, replicate them EXACTLY (face shape, bone structure, eyes, nose, lips, ETHNICITY and heritage, skin tone and texture, AND her exact hair colour, length and style, AND her apparent AGE); zero drift, unmistakably the same individual. Her ethnicity and skin tone are FIXED by these references and must be identical in EVERY scene — never lighten, darken or change her race/ethnicity to match a companion, a guide image or the scene. She looks IDENTICAL in every scene whether she is alone or beside another person — NEVER make her look younger or older, never change or darken her hair, and never soften or blend her features to match a companion or the scene.${guided ? " The chosen GUIDE below shows her TRUE current look - match her face to the guide exactly; this identity image only confirms she is the same person." : " These face references are the ONLY source of her face, hair, age and identity — take NOTHING about her from any wardrobe, world, location, companion or reference-look image."} EYEWEAR (critical): if she wears optical/prescription glasses in ANY reference, those glasses are a PERMANENT part of her identity — she MUST wear them in EVERY scene, never removed, omitted, swapped or restyled (real optical glasses, not sunglasses). IGNORE their clothing, background and pose; take those from the direction below. ONE PERSON ONLY: this identity belongs to the single MAIN subject (the influencer) — she is the PRIMARY adult in the frame and the locked face is hers. Every OTHER person in the scene — a daughter, friend, companion, anyone in the background — is a COMPLETELY DIFFERENT individual with their own distinct face, age, build and styling (a daughter is clearly YOUNGER). NEVER duplicate her face, hair or look onto anyone else, and never swap her identity onto the companion: absolutely no twins, clones or look-alikes.` : "",
         // WARDROBE LOCK (text): her ONE outfit, head to toe, identical every scene - the durable fix for
         // clothing drifting between scenes (the image anchor alone misses the bottoms/shoes on tight shots).
         lockEff ? `LOCKED OUTFIT - the influencer wears the SAME single outfit in EVERY scene of this production, head to toe: ${lockEff}. Identical garments, colours, fabric, footwear and accessories every time; never change, swap, recolour, add or restyle ANY part of her clothing between scenes, whether she is talking to camera or in a wider scene - only her pose, action and the framing change. This is her established wardrobe and overrides any different outfit implied by the scene text.` : "",
-        roleRefTag ? `${roleRefTag} is the CHOSEN ${role.toUpperCase()} GUIDE and the DEFINITIVE reference for this influencer - it shows HER exact face, HER exact outfit and the exact SET/LOCATION for this ad, so reproduce ALL THREE from ${roleRefTag} precisely: (a) her FACE and features EXACTLY as in ${roleRefTag}${faceTags.length ? ` (${faceTags.join(", ")} is the same person and only confirms her identity; if they differ at all, ${roleRefTag} wins for her current look)` : ""}; (b) her CLOTHING EXACTLY as in ${roleRefTag} - every garment, colour, fabric and footwear${lockEff ? ` (her locked outfit: ${lockEff})` : ""} - and do NOT take clothing from any identity image, which may show a DIFFERENT outfit${clothTag ? `; and if ${roleRefTag} shows only her BACK or side (so the front of the outfit is not visible in it), take the FRONT of her garment - the exact neckline, collar and front detailing - from the wardrobe reference ${clothTag}, and NEVER invent or restyle a front that ${roleRefTag} doesn't show` : ""}; (c) the LOCATION, set dressing, lighting, time of day and colour grade EXACTLY as in ${roleRefTag} - and if the scene direction below names a DIFFERENT place (for example an office when ${roleRefTag} is an outdoor waterfront café), ${roleRefTag}'s location WINS: reproduce the guide's real place, never the scene text's. ONLY her pose, action and framing change per the direction below - never her face, her outfit or the place.${role === "b-roll" ? ` Also REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter) EXACTLY - the SAME person: same face, age, build, hair AND the same outfit - identical in every b-roll scene.` : ` Do NOT copy any other person from it.`}` : "",
+        roleRefTag ? `${roleRefTag} is the CHOSEN ${role.toUpperCase()} GUIDE and the DEFINITIVE reference for this influencer's FACE and the SET/LOCATION of this ad, so reproduce those from ${roleRefTag} precisely: (a) her FACE and features EXACTLY as in ${roleRefTag}${faceTags.length ? ` (${faceTags.join(", ")} is the same person and only confirms her identity; if they differ at all, ${roleRefTag} wins for her current look)` : ""}; ${guideClothingClause}; (c) the LOCATION, set dressing, lighting, time of day and colour grade EXACTLY as in ${roleRefTag} - and if the scene direction below names a DIFFERENT place (for example an office when ${roleRefTag} is an outdoor waterfront café), ${roleRefTag}'s location WINS: reproduce the guide's real place, never the scene text's. ONLY her pose, action and framing change per the direction below - never her face, her outfit or the place.${role === "b-roll" ? ` Also REPRODUCE any COMPANION shown in ${roleRefTag} (for example her daughter) EXACTLY - the SAME person: same face, age, build, hair AND the same outfit - identical in every b-roll scene.` : ` Do NOT copy any other person from it.`}` : "",
         clothTag ? `${clothTag} is the WARDROBE reference and shows the FRONT of her outfit: dress the influencer in this EXACT outfit (silhouette, fabric, COLOUR, styling) and treat ${clothTag} as the DEFINITIVE source for the FRONT of her garment — its exact neckline shape and depth, collar, lapels, straps, buttons, zips, closures and any front detailing. Apply this front in EVERY shot, INCLUDING shots where the ${role} guide, world anchor or cast anchor shows only her BACK, her side, or a partial view: in those shots you must NEVER invent, guess, restyle, raise, lower or change the neckline/front — reconstruct it EXACTLY as in ${clothTag} so the front of the outfit is identical in every scene whether she faces camera or is turned away. (A back-turned reference does not show the front, so the front comes ONLY from ${clothTag}, never from imagination.)${clothIsLock ? ` This is her ONE LOCKED outfit and it OVERRIDES her clothing in EVERY other reference image here (the world anchor, the ${role} guide, and the cast-anchor frame) AND in the scene text — if any other image shows her in a different colour or garment (e.g. teal/green), IGNORE that and dress her in THIS outfit's colour and garments.` : ""} Do NOT copy any face or person from it.` : "",
         locTag ? `${locTag} is a LOCATION reference: set this scene in that exact place, matching its environment, architecture, lighting and mood. Do NOT copy any face or person from it.` : "",
         worldTag ? `${worldTag} is the ESTABLISHED world of this production: match its location, set dressing, lighting, time of day and colour grade exactly for seamless continuity — but take the influencer's FACE only from the identity references, never from ${worldTag}. ${wardrobeLock
