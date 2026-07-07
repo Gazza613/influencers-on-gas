@@ -2002,7 +2002,7 @@ function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
           className="absolute inset-0 h-full w-full object-cover"
           style={aroll ? { transform: "scale(1.1)" } : undefined}
           onPlay={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; a.play().catch(() => {}); }) : undefined}
-          onPause={overlayVO ? () => sync((_v, a) => a.pause()) : undefined}
+          onPause={overlayVO ? () => sync((v, a) => { if (!v.ended) a.pause(); }) : undefined}
           onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; }) : undefined}
           onRateChange={overlayVO ? () => sync((v, a) => { a.playbackRate = v.playbackRate; }) : undefined}
           // When the (draft) video ends but the voiceover is longer, DON'T stop the VO - the video holds its last
