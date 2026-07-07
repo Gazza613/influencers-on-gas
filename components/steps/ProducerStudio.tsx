@@ -378,7 +378,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // Captions are opt-in at stitch (default OFF - they were appearing unrequested). The optional closing
   // clip/image reuses the brief's endCardUrl/endCardKind state so there's one source of truth.
   const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
-  const [stitchCaptionStyle, setStitchCaptionStyle] = useState<string>(String((initialProduction?.brief as { captionStyle?: string })?.captionStyle || "bold"));
+  const [stitchCaptionStyle, setStitchCaptionStyle] = useState<string>(String((initialProduction?.brief as { captionStyle?: string })?.captionStyle || "karaoke"));
   // Offer callouts are now PER-SCENE (production.scene_callouts) - see openCallout/saveCallout below. The old
   // single global callout is gone; the stitch still honours a legacy brief.callout as a fallback only.
   async function toggleDrop(scene: number) {
@@ -1738,7 +1738,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   {stitchCaptions && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-ink-faint">Caption style:</span>
-                      {([["bold", "Bold (default)", "Big uppercase, thick black outline — punchy social look. The house default on all productions."], ["clean", "Clean", "White text with a soft shadow, no box — elegant"], ["highlight", "Highlight", "White on a purple highlight bar — on-brand"], ["sunny", "Sunny", "Bright yellow uppercase with a black outline — energetic"], ["karaoke", "Word-pop ✨", "Word-by-word — each word pops to yellow as it's spoken (TikTok karaoke)"], ["pill", "Pill", "Classic dark rounded pill (the original)"]] as const).map(([k, label, desc]) => (
+                      {([["karaoke", "Word-sync ✨ (default)", "Word-by-word — each word lights up in an accent pill EXACTLY when it's spoken, from the real voice timings. Short phrases, the modern TikTok/Reels look."], ["bold", "Bold", "Big uppercase, thick black outline — punchy social look, whole lines (not word-synced)."], ["clean", "Clean", "White text with a soft shadow, no box — elegant"], ["highlight", "Highlight", "White on a purple highlight bar — on-brand"], ["sunny", "Sunny", "Bright yellow uppercase with a black outline — energetic"], ["pill", "Pill", "Classic dark rounded pill (the original)"]] as const).map(([k, label, desc]) => (
                         <button key={k} onClick={() => setStitchCaptionStyle(k)} title={desc} className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${stitchCaptionStyle === k ? "border-[#a855f7] bg-[#a855f7]/12 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>{label}</button>
                       ))}
                     </div>

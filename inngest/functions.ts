@@ -2170,37 +2170,57 @@ export const assembleVideo = inngest.createFunction(
     const capSel = String(event.data.captionStyle || "");
     let captionClips: Record<string, unknown>[] = [];
     if (captionsOn) {
-      if (capSel === "karaoke") {
-        // WORD-BY-WORD "karaoke": the full line shows, each word POPS to yellow as it's spoken. Word timings
-        // are length-weighted across the scene's duration (approx sync). One clip per word, each highlighting
-        // a different word. Big bold outlined for punch, in the safe zone.
-        const KARAOKE_CSS = ".cap{width:100%;text-align:center;font-family:'Open Sans',sans-serif}.w{color:#FFFFFF;font-weight:800;font-size:46px;line-height:1.32;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 2px 9px rgba(0,0,0,0.75),0 6px 28px rgba(0,0,0,0.62)}.hl{color:#FFE14D}";
-        captionClips = placed.filter((p) => p.caption && !p.captionOff).flatMap((p) => {
-          const words = esc(p.caption).split(/\s+/).filter(Boolean);
+      const STATIC = new Set(["pill", "bold", "highlight", "clean", "sunny"]);
+      if (!STATIC.has(capSel)) {
+        // WORD-SYNCED captions (DEFAULT + "karaoke"): each word highlights EXACTLY when it's spoken, using the
+        // REAL per-word ElevenLabs timestamps (scene_audio `cues`), driven by the VOICEOVER text so the words
+        // map 1:1 to the cues (the old path used the caption text + a ratio guess = drift). Short 3-4 word
+        // phrases show at a time (modern social style); the active word gets an accent pill. Big bold outline +
+        // haze for legibility on any footage. Falls back to even spacing only if a scene has no cues.
+        const HL = /^#[0-9a-fA-F]{6}$/.test(String(process.env.CAPTION_ACCENT)) ? String(process.env.CAPTION_ACCENT) : "#a855f7";
+        const WS_CSS = ".cap{width:100%;font-family:'Open Sans',sans-serif;line-height:1.4}"
+          + ".w{color:#fff;font-weight:800;font-size:46px;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 2px 9px rgba(0,0,0,0.75),0 6px 28px rgba(0,0,0,0.62)}"
+          + `.hl{color:#fff;background:${HL};border-radius:10px;padding:2px 12px;box-shadow:0 3px 14px ${HL}88}`;
+        const MAXW = Math.max(2, Number(process.env.CAPTION_PHRASE_WORDS) || 4);
+        captionClips = placed.filter((p) => (p.vo || p.caption) && !p.captionOff).flatMap((p) => {
+          const src = String(p.vo || p.caption || "").trim();
+          const rawWords = src.split(/\s+/).filter(Boolean); // keeps punctuation, for phrase breaks
+          const words = rawWords.map((w) => esc(w)).filter(Boolean); // display words (escaped, tags stripped)
           if (!words.length) return [];
-          const cp = placeCaption("lowerCenter", capW); // captions ALWAYS sit in the bottom safe zone (consistent for social)
-          // Each word POPS exactly when she speaks it: START times come from the REAL per-word speech
-          // timestamps (cues) when present, else fall back to length-weighting across the scene.
-          const cues = sceneCues.get(p.i);
-          const starts: number[] = new Array(words.length);
-          if (cues && cues.length) {
-            for (let wi = 0; wi < words.length; wi++) {
-              const si = Math.min(cues.length - 1, Math.max(0, Math.round((wi / words.length) * cues.length)));
-              let st = p.start + (cues[si] || 0);
-              if (wi && st <= starts[wi - 1]) st = starts[wi - 1] + 0.08;
-              starts[wi] = Math.min(st, p.start + p.len - 0.08);
-            }
-          } else {
-            const totalChars = words.reduce((s, w) => s + w.length, 0) || 1;
-            let acc = 0;
-            for (let wi = 0; wi < words.length; wi++) { starts[wi] = p.start + acc; acc += Math.max(0.12, (p.len * words[wi].length) / totalChars); }
+          const sceneEnd = p.start + p.len;
+          // Per-word ABSOLUTE start times from the real cues (relative to the scene). If the count matches,
+          // it's exact; if not, resample proportionally; if there are no cues, even-space across the scene.
+          const cues = sceneCues.get(p.i) || [];
+          const starts: number[] = cues.length === words.length
+            ? words.map((_, i) => p.start + (cues[i] || 0))
+            : cues.length
+              ? words.map((_, i) => p.start + (cues[Math.min(cues.length - 1, Math.round((i / words.length) * cues.length))] || 0))
+              : words.map((_, i) => p.start + (p.len * i) / words.length);
+          for (let i = 1; i < starts.length; i++) if (starts[i] <= starts[i - 1]) starts[i] = starts[i - 1] + 0.08;
+          for (let i = 0; i < starts.length; i++) starts[i] = Math.min(starts[i], sceneEnd - 0.1);
+          // Group into short phrases: break after MAXW words OR after clause/sentence punctuation (natural read).
+          const groups: number[][] = []; let cur: number[] = [];
+          for (let i = 0; i < words.length; i++) {
+            cur.push(i);
+            if (cur.length >= MAXW || /[.!?,:;]$/.test(rawWords[i] || "")) { groups.push(cur); cur = []; }
           }
-          return words.map((w, wi) => {
-            const st = starts[wi];
-            const end = wi < words.length - 1 ? starts[wi + 1] : p.start + p.len;
-            const html = `<div class="cap">${words.map((ww, j) => `<span class="w${j === wi ? " hl" : ""}">${ww}</span>`).join(" ")}</div>`;
-            return { asset: { type: "html", html, css: KARAOKE_CSS + `.cap{text-align:${cp.align}}`, width: cp.w, height: 340, background: "transparent" }, start: st, length: Math.max(0.1, end - st), position: cp.position, offset: cp.offset };
-          });
+          if (cur.length) groups.push(cur);
+          const cp = placeCaption("lowerCenter", capW); // captions ALWAYS sit in the bottom safe zone (consistent for social)
+          const off = { ...cp.offset, y: Math.max(CAP_Y, 0.13) };
+          const clips: Record<string, unknown>[] = [];
+          for (let g = 0; g < groups.length; g++) {
+            const idxs = groups[g];
+            const phraseEnd = g < groups.length - 1 ? starts[groups[g + 1][0]] : sceneEnd;
+            for (let k = 0; k < idxs.length; k++) {
+              const wi = idxs[k];
+              const st = starts[wi];
+              const end = k < idxs.length - 1 ? starts[idxs[k + 1]] : phraseEnd;
+              if (!(end > st)) continue;
+              const html = `<div class="cap">${idxs.map((j) => `<span class="w${j === wi ? " hl" : ""}">${words[j]}</span>`).join(" ")}</div>`;
+              clips.push({ asset: { type: "html", html, css: WS_CSS + `.cap{text-align:${cp.align}}`, width: cp.w, height: 340, background: "transparent" }, start: st, length: Math.max(0.12, end - st), position: cp.position, offset: off });
+            }
+          }
+          return clips;
         });
       } else {
         const capStyle = CAPTION_STYLES[capSel] || CAPTION_STYLES.bold;
