@@ -1945,10 +1945,15 @@ export const assembleVideo = inngest.createFunction(
       // the next scene (a continuation - ends on a comma or no terminal mark), keep the gap near-zero so the two
       // scenes flow as one unbroken thought. The VO itself is never touched - only the length of the scene's beat.
       // Env-tunable: SCENE_PAD (sentence end, default 0.35s) and SCENE_CONT_PAD (continuation, default 0.05s).
+      // A-ROLL can't be slowed (it's lip-synced), so a pad beyond the clip becomes a FROZEN presenter frame - a
+      // visible mid-video pause. B-ROLL is slowed to fill its slot, so a pad there stays smooth motion. So the
+      // sentence-end breath is FULL on b-roll but only a tiny micro-settle on a-roll (below freeze-perception, so
+      // it doesn't cut ON the syllable yet never reads as a pause). Continuations stay near-seamless for both.
       const endsSentence = /[.!?]["'”’)\]]*$/.test(vo);
-      const scenePad = endsSentence
-        ? Math.max(0, Number(process.env.SCENE_PAD) || 0.35)
-        : Math.max(0, process.env.SCENE_CONT_PAD != null ? Number(process.env.SCENE_CONT_PAD) : 0.05);
+      const contPad = Math.max(0, process.env.SCENE_CONT_PAD != null ? Number(process.env.SCENE_CONT_PAD) : 0.05);
+      const scenePad = !endsSentence ? contPad
+        : role === "a-roll" ? Math.max(0, process.env.AROLL_SCENE_PAD != null ? Number(process.env.AROLL_SCENE_PAD) : 0.1)
+        : Math.max(0, Number(process.env.SCENE_PAD) || 0.35);
       if (vo && realVo > 0) {
         const floor = role === "b-roll" ? 3 : 0;
         len = Math.min(Math.max(realVo + scenePad, floor), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
