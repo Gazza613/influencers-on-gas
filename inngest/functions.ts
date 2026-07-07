@@ -9,7 +9,7 @@ import { notifyRenderDone } from "@/lib/notify";
 import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
-import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, normalizeWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
+import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, normalizeWav, highpassWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
@@ -2045,7 +2045,10 @@ export const assembleVideo = inngest.createFunction(
             const r = await fetch(synced as string);
             if (!r.ok) return synced as string;
             const buf = Buffer.from(await r.arrayBuffer());
-            const faded = fadeWavEdges(normalizeWav(buf), fadeMs); // even out quiet scenes so the voice never drops under the bed, then de-click the edges
+            // Clean the voice: high-pass the sub-bass rumble (the "background" exposed when ambient is off),
+            // then even out quiet scenes (so the voice never drops under the bed), then de-click the edges.
+            const hpHz = process.env.VO_HIGHPASS_HZ != null ? Number(process.env.VO_HIGHPASS_HZ) : 90;
+            const faded = fadeWavEdges(normalizeWav(highpassWav(buf, hpHz)), fadeMs);
             if (faded === buf) return synced as string; // not a WAV we can fade (e.g. MP3) → leave as-is
             return await putBytes(faded, "vo-faded", "wav", "audio/wav");
           } catch { return synced as string; }

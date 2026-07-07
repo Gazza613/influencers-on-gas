@@ -303,6 +303,31 @@ export function fadeWavEdges(wav: Buffer, fadeMs = 4): Buffer {
   return out;
 }
 
+// HIGH-PASS the VO to strip the sub-bass rumble/hum that sits under a TTS take (measured ~-37 to -40dB, almost
+// entirely below ~200Hz). Inaudible under an ambient bed, but it reads as "background on the voice" when ambient
+// is off. A gentle 2nd-order Butterworth high-pass at ~85Hz removes the rumble while fully preserving the voice
+// (a male fundamental is ~100Hz+; broadcast voice is routinely high-passed here). Mono 16-bit WAV only.
+export function highpassWav(wav: Buffer, cutoffHz = 85): Buffer {
+  if (cutoffHz <= 0 || wav.length <= 46 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return wav;
+  const SR = 44100, BPS = 2, dataStart = 44;
+  const nS = Math.floor((wav.length - dataStart) / BPS);
+  if (nS <= 0) return wav;
+  // RBJ biquad high-pass coefficients (Q = 0.707).
+  const w0 = (2 * Math.PI * cutoffHz) / SR, cw = Math.cos(w0), sw = Math.sin(w0), alpha = sw / (2 * 0.7071);
+  const a0 = 1 + alpha;
+  const b0 = ((1 + cw) / 2) / a0, b1 = (-(1 + cw)) / a0, b2 = ((1 + cw) / 2) / a0, a1 = (-2 * cw) / a0, a2 = (1 - alpha) / a0;
+  const out = Buffer.from(wav);
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < nS; i++) {
+    const a = dataStart + i * BPS;
+    const x0 = out.readInt16LE(a) / 32768;
+    const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1; x1 = x0; y2 = y1; y1 = y0;
+    out.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(y0 * 32768))), a);
+  }
+  return out;
+}
+
 // Light LOUDNESS normalize for a VO slice so a naturally-quiet scene (e.g. a soft closing line) doesn't drop
 // under the music/ambient bed. ONLY ever boosts toward a target RMS, and clamps the gain so the peak never
 // exceeds a ceiling (no clipping = no crackle). Loud scenes are left alone. Mono 16-bit WAV only.
