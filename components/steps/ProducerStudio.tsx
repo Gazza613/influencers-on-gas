@@ -25,9 +25,9 @@ type SceneCallout = { on?: boolean; kick?: string; line?: string; num?: string; 
 type Production = { brief?: Record<string, unknown>; storyboard?: Storyboard; status?: string; shots?: Shot[]; shots_status?: string; clips?: Clip[]; clips_status?: string; final_url?: string | null; assembly_status?: string; assembly_error?: string | null; showreel_status?: string; music_url?: string | null; ambient_url?: string | null; audio_status?: string; audio_error?: string | null; wizard_approved?: string[]; dropped_scenes?: number[]; scene_callouts?: Record<string, SceneCallout> } | null;
 
 const ROLE = {
-  "a-roll": { label: "TALKING SHOT · presenter", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
-  "b-roll": { label: "SCENE SHOT", cls: "bg-[#60a5fa]/15 text-[#93c5fd] border-[#60a5fa]/30" },
-  graphic: { label: "GRAPHIC", cls: "bg-active/15 text-active border-active/30" },
+  "a-roll": { label: "TALKING SHOT · presenter", short: "Talking", dot: "#c084fc", cls: "bg-[#a855f7]/15 text-[#c79bff] border-[#a855f7]/30" },
+  "b-roll": { label: "SCENE SHOT", short: "Scene", dot: "#60a5fa", cls: "bg-[#60a5fa]/15 text-[#93c5fd] border-[#60a5fa]/30" },
+  graphic: { label: "GRAPHIC", short: "Graphic", dot: "#f59e0b", cls: "bg-active/15 text-active border-active/30" },
 } as const;
 
 // Reassuring narration for the two long final-delivery jobs (shown in the WorkingPanel at the Stitch step).
@@ -1575,8 +1575,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   {/* IN-STEP SCENE CAROUSEL: every scene at a glance - edit or re-animate any without scrolling
                       up. ✎ Edit jumps to the scene's card (opens the editor); on Save it returns you here. */}
                   <div id="scenes-strip">
-                    <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Every scene - edit or re-animate right here</div>
-                    <div className="flex gap-2 overflow-x-auto pb-2">
+                    <div className="tabular mb-2 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Every scene - edit or re-animate right here</div>
+                    <div className="flex gap-2.5 overflow-x-auto pb-2">
                       {sb.scenes.map((s, i) => {
                         if (dropped.has(i) || s.role === "graphic") return null;
                         const rl = ROLE[s.role] ?? ROLE["a-roll"];
@@ -1586,8 +1586,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         const isReshooting = !!shot?.reshooting; // keyframe re-shoot in flight
                         const busy = isRendering || isReshooting;
                         return (
-                          <div key={i} className="w-[104px] shrink-0 rounded-lg border border-line bg-surface-1 p-1.5">
-                            <div className="relative aspect-[9/16] w-full overflow-hidden rounded-md bg-black">
+                          <div key={i} className="w-[122px] shrink-0 rounded-xl border border-line bg-surface-1 p-2 transition hover:border-[#a855f7]/30">
+                            <div className="relative aspect-[9/16] w-full overflow-hidden rounded-lg bg-black">
                               {clip?.url
                                 ? <video src={clip.url} muted playsInline className="h-full w-full object-cover" />
                                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -1599,13 +1599,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               {!busy && !failed && clip?.url && !dirtyScenes.has(i) && <span className="absolute bottom-0.5 left-0.5 rounded bg-ready/80 px-1 text-[10px] font-bold text-black">✓</span>}
                               {!busy && dirtyScenes.has(i) && <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b bg-[#a855f7]/90 px-0.5 text-center text-[10px] font-bold text-white" title="Changed - re-animate to apply">⟳ re-render</span>}
                             </div>
-                            <div className="mt-1 flex items-center justify-between">
-                              <span className="tabular text-[10px] font-bold text-ink">Scene {i + 1}</span>
-                              <span className={`tabular rounded border px-1 text-[10px] font-bold ${rl.cls}`}>{rl.label}</span>
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: rl.dot }} />
+                              <span className="text-[11px] font-bold text-ink">Scene {i + 1}</span>
+                              <span className="ml-auto truncate text-[10px] font-semibold uppercase tracking-wide text-ink-faint" title={rl.label}>{rl.short}</span>
                             </div>
-                            <div className="mt-1 flex gap-1">
-                              <button onClick={() => editFromStrip(i, s)} className="flex-1 rounded border border-[#a855f7]/40 px-1 py-0.5 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">✎ Edit</button>
-                              <button onClick={() => animateScene(i)} disabled={animatingScenes.has(i) || !approved.has("voice") || !shot?.url} title={!shot?.url ? "Shoot the keyframe first" : !approved.has("voice") ? "Finish Script & Voice first" : clip?.url ? "Re-animate this scene" : "Animate this scene"} className="flex-1 rounded border border-[#60a5fa]/40 px-1 py-0.5 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40">{clip?.url ? "↻ Anim" : "🎞️ Anim"}</button>
+                            <div className="mt-2 grid grid-cols-2 gap-1.5">
+                              <button onClick={() => editFromStrip(i, s)} title="Edit this scene's direction + script" className="flex items-center justify-center gap-1 rounded-lg bg-[#a855f7]/12 py-1.5 text-[11px] font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/22">✎ Edit</button>
+                              <button onClick={() => animateScene(i)} disabled={animatingScenes.has(i) || !approved.has("voice") || !shot?.url} title={!shot?.url ? "Shoot the keyframe first" : !approved.has("voice") ? "Finish Script & Voice first" : clip?.url ? "Re-animate this scene" : "Animate this scene"} className="flex items-center justify-center gap-1 rounded-lg bg-[#60a5fa]/12 py-1.5 text-[11px] font-semibold text-[#93c5fd] transition hover:bg-[#60a5fa]/22 disabled:opacity-40 disabled:hover:bg-[#60a5fa]/12">{clip?.url ? "↻ Anim" : "▶ Anim"}</button>
                             </div>
                           </div>
                         );
