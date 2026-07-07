@@ -1984,8 +1984,20 @@ function RefGallery({ role, scenes, shots, dropped, shooting, onToggleDrop, onZo
 function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
   const vRef = useRef<HTMLVideoElement>(null);
   const aRef = useRef<HTMLAudioElement>(null);
+  const rateRef = useRef(1); // the video's slow-mo factor when the VO outruns the clip (matches the final cut)
   const overlayVO = !!clip.audio_url && clip.synced !== true; // silent clip + a VO to lay over
   const sync = (fn: (v: HTMLVideoElement, a: HTMLAudioElement) => void) => { const v = vRef.current, a = aRef.current; if (v && a) fn(v, a); };
+  // MATCH THE FINAL CUT: if the b-roll voiceover is longer than its (10s) clip, SLOW the video so its motion
+  // fills the whole line - smooth slow-mo, no held/frozen frame - while the voice plays at NORMAL speed. Both
+  // start and end together. The final stitch does the same via Shotstack `speed`, so the preview is accurate.
+  // Constant rates → they stay in lockstep by wall-clock with no drift; we only re-seat the audio on play/seek.
+  const computeRate = () => sync((v, a) => {
+    if (!overlayVO) return;
+    const vd = v.duration, ad = a.duration;
+    if (!isFinite(vd) || !isFinite(ad) || vd <= 0 || ad <= 0) return;
+    const r = ad > vd + 0.15 ? Math.max(0.7, vd / ad) : 1; // clamp 0.7x, same floor as the stitch
+    rateRef.current = r; v.playbackRate = r; a.playbackRate = 1;
+  });
   // HeyGen bakes a thin white canvas edge into the talking-shot (a-roll) frame. The final cut hides it by
   // overscanning the clip (AROLL_OVERSCAN in the stitch); mirror that here so the raw preview doesn't show
   // the white line either. A small scale inside an overflow-hidden box crops the edge away; b-roll keeps its
@@ -2001,17 +2013,16 @@ function ClipPreview({ clip, className }: { clip: Clip; className?: string }) {
           playsInline
           className="absolute inset-0 h-full w-full object-cover"
           style={aroll ? { transform: "scale(1.1)" } : undefined}
-          onPlay={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; a.play().catch(() => {}); }) : undefined}
+          onLoadedMetadata={overlayVO ? computeRate : undefined}
+          onPlay={overlayVO ? () => sync((v, a) => { a.playbackRate = 1; a.currentTime = v.currentTime / (rateRef.current || 1); a.play().catch(() => {}); }) : undefined}
           onPause={overlayVO ? () => sync((v, a) => { if (!v.ended) a.pause(); }) : undefined}
-          onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime; }) : undefined}
-          onRateChange={overlayVO ? () => sync((v, a) => { a.playbackRate = v.playbackRate; }) : undefined}
-          // When the (draft) video ends but the voiceover is longer, DON'T stop the VO - the video holds its last
-          // frame while the voice plays out, so you hear the FULL line (the final cut renders the clip at the VO
-          // length, so there's no hold there). Only reset once the VO itself has finished.
+          onSeeked={overlayVO ? () => sync((v, a) => { a.currentTime = v.currentTime / (rateRef.current || 1); }) : undefined}
+          // With the video slowed to the VO length, its motion plays smoothly across the whole line and ends
+          // ~together with the voice - so there's no held/frozen frame, matching the final cut.
           onEnded={undefined}
         />
       </div>
-      {overlayVO && <audio ref={aRef} src={clip.audio_url || undefined} preload="auto" onEnded={() => { const v = vRef.current; if (v) { v.pause(); try { v.currentTime = 0; } catch { /* noop */ } } }} />}
+      {overlayVO && <audio ref={aRef} src={clip.audio_url || undefined} preload="auto" onLoadedMetadata={computeRate} onEnded={() => { const v = vRef.current; if (v) { v.pause(); try { v.currentTime = 0; } catch { /* noop */ } } }} />}
     </>
   );
 }
