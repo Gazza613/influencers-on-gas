@@ -381,6 +381,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // clip/image reuses the brief's endCardUrl/endCardKind state so there's one source of truth.
   const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
   const [stitchCaptionStyle, setStitchCaptionStyle] = useState<string>(String((initialProduction?.brief as { captionStyle?: string })?.captionStyle || "karaoke"));
+  // Active-word pill colour for the word-sync captions ("" = default brand purple).
+  const [stitchCaptionAccent, setStitchCaptionAccent] = useState<string>(String((initialProduction?.brief as { captionAccent?: string })?.captionAccent || ""));
   // Offer callouts are now PER-SCENE (production.scene_callouts) - see openCallout/saveCallout below. The old
   // single global callout is gone; the stitch still honours a legacy brief.callout as a fallback only.
   async function toggleDrop(scene: number) {
@@ -539,7 +541,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     if (assembling) return;
     setErr(""); setFinishStart(Date.now());
     setProduction((p) => (p ? { ...p, final_url: null, assembly_status: "running" } : p));
-    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/influencers/${influencerId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ captions: stitchCaptions, captionStyle: stitchCaptionStyle, captionAccent: stitchCaptionAccent, endCardUrl, endCardKind }) }).then((x) => x.json()).catch(() => null);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the stitch - try again, or use ⟳ Reset if stuck above."); setProduction((p) => (p ? { ...p, assembly_status: "idle" } : p)); return; }
     await poll(setProduction, "assembly_status");
   }
@@ -1678,7 +1680,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         lines={assembling ? STITCH_LINES : FINALISE_LINES}
                         estimateSeconds={assembling ? 420 : 1500}
                         startedAt={assembling ? finishStart : ((production as { clips_started_at?: number })?.clips_started_at ?? finishStart)}
-                        eta={assembling ? "usually a few minutes" : "usually a few minutes on the fast lane"}
+                        eta={assembling ? "a few minutes" : "a few minutes on the fast lane"}
                         note="Safe to close this tab, start another job, or come back later - it keeps rendering on our servers, we email you the moment it's done, and the finished cut will be here when you return."
                         onAbort={abortFinalize}
                       />
@@ -1746,6 +1748,16 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       {([["karaoke", "Word-sync ✨ (default)", "Word-by-word — each word lights up in an accent pill EXACTLY when it's spoken, from the real voice timings. Short phrases, the modern TikTok/Reels look."], ["bold", "Bold", "Big uppercase, thick black outline — punchy social look, whole lines (not word-synced)."], ["clean", "Clean", "White text with a soft shadow, no box — elegant"], ["highlight", "Highlight", "White on a purple highlight bar — on-brand"], ["sunny", "Sunny", "Bright yellow uppercase with a black outline — energetic"], ["pill", "Pill", "Classic dark rounded pill (the original)"]] as const).map(([k, label, desc]) => (
                         <button key={k} onClick={() => setStitchCaptionStyle(k)} title={desc} className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${stitchCaptionStyle === k ? "border-[#a855f7] bg-[#a855f7]/12 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>{label}</button>
                       ))}
+                    </div>
+                  )}
+                  {stitchCaptions && stitchCaptionStyle === "karaoke" && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] text-ink-faint">Highlight colour:</span>
+                      {([["Purple", "#a855f7"], ["Pink", "#ec4899"], ["Blue", "#2563eb"], ["Navy", "#1e3a8a"], ["Orange", "#f97316"], ["Red", "#dc2626"], ["Green", "#16a34a"], ["Black", "#111111"]] as const).map(([nm, hex]) => {
+                        const sel = (stitchCaptionAccent || "#a855f7").toLowerCase() === hex.toLowerCase();
+                        return <button key={hex} onClick={() => setStitchCaptionAccent(hex)} title={nm} aria-label={nm} className={`h-6 w-6 rounded-full border-2 transition ${sel ? "scale-110 border-white" : "border-line hover:border-white/60"}`} style={{ background: hex }} />;
+                      })}
+                      <span className="text-[10px] text-ink-faint">(the box behind the word being spoken)</span>
                     </div>
                   )}
                   {finalUrl && (

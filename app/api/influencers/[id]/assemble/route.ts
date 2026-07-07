@@ -23,6 +23,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = await req.json().catch(() => ({}));
   const captions = body.captions === true;
   const captionStyle = ["pill", "bold", "highlight", "clean", "sunny", "karaoke"].includes(body.captionStyle) ? body.captionStyle : "bold";
+  // Active-word pill colour for the word-sync captions (validated hex; blank = the default brand purple).
+  const captionAccent = /^#[0-9a-fA-F]{6}$/.test(String(body.captionAccent)) ? String(body.captionAccent) : "";
   const endCardUrl = typeof body.endCardUrl === "string" && isSafePublicUrl(body.endCardUrl) ? body.endCardUrl : "";
   const endCardKind = body.endCardKind === "image" ? "image" : "video";
   // ON-SCREEN OFFER CALLOUT (frosted glass): an optional animated overlay of the client's hook offer. Sanitise
@@ -40,10 +42,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     start: num(cbRaw.start, 0.6, 0, 60),
     duration: num(cbRaw.duration, 4, 1.5, 12),
   } : { on: false };
-  const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind, captionStyle, callout };
+  const briefNext = { ...(production as { brief?: Record<string, unknown> }).brief, endCardUrl, endCardKind, captionStyle, captionAccent, callout };
   await updateInfluencer(id, { persona: { ...persona, production: { ...production, brief: briefNext, assembly_status: "running", final_url: null, stitch_captions: captions } } });
   try {
-    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, captionStyle, endCardUrl, endCardKind, callout } });
+    await inngest.send({ name: "influencer/assemble.video", data: { influencerId: id, captions, captionStyle, captionAccent, endCardUrl, endCardKind, callout } });
   } catch {
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, assembly_status: "idle" } } });
     return NextResponse.json({ error: "Could not start the stitch (assembly engine not connected)." }, { status: 503 });
