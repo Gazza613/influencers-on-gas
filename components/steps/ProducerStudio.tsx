@@ -442,6 +442,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
 
   const activePolls = useRef<Set<string>>(new Set());
+  // Passive server-sync that PRESERVES the client-owned STORYBOARD (scene text/edits). A running poll used to
+  // replace the WHOLE production every few seconds, clobbering an in-progress or just-saved scene-copy edit with
+  // server data mid-flight (the "I save the copy and it reverts" bug). Render state (status/shots/clips/media)
+  // still syncs; the storyboard only changes via explicit user actions (edit/reflow/regenerate) which
+  // setProduction directly, so keeping the client's storyboard here is always the freshest for that text.
+  const syncProduction = (server: Production) => setProduction((prev) => (prev?.storyboard ? { ...server, storyboard: prev.storyboard } : server));
   async function poll(setter: (d: Production) => void, statusKey: "shots_status" | "clips_status" | "assembly_status" | "audio_status") {
     if (activePolls.current.has(statusKey)) return; // already polling this - don't double up
     activePolls.current.add(statusKey);
@@ -452,7 +458,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       for (let i = 0; i < 320; i++) {
         await new Promise((res) => setTimeout(res, i < 60 ? 6000 : 12000));
         const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
-        if (d?.production) { setter(d.production); if (d.production[statusKey] !== "running") break; }
+        if (d?.production) { syncProduction(d.production); if (d.production[statusKey] !== "running") break; }
       }
     } finally { activePolls.current.delete(statusKey); }
   }
@@ -466,10 +472,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     resume(initialProduction);
     // Also re-sync from the LIVE production on mount (the SSR snapshot can be a beat stale on a hard
     // refresh) so an in-flight stitch/render resumes its progress instead of looking stalled.
-    fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); resume(d.production); } }).catch(() => {});
+    fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { syncProduction(d.production); resume(d.production); } }).catch(() => {});
     function onVisible() {
       if (document.visibilityState !== "visible") return;
-      fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { setProduction(d.production); resume(d.production); } }).catch(() => {});
+      fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.production) { syncProduction(d.production); resume(d.production); } }).catch(() => {});
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -651,7 +657,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     for (let k = 0; k < 45; k++) {
       await new Promise((res) => setTimeout(res, 6000));
       const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
-      if (d?.production) { setProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
+      if (d?.production) { syncProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
     }
     // 2) the re-shoot auto-renders this scene's clip too - wait for it and drop it into the preview
     setRenderingRole(role);
