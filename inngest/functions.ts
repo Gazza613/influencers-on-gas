@@ -562,6 +562,10 @@ export const generateCreatives = inngest.createFunction(
       });
       const idMedias = imported.ids;
       const medias = [...idMedias, imported.feat, imported.cloth, ...imported.locs, imported.match].filter((v): v is string => !!v).map((value) => ({ value, role: "image" }));
+      // Source URLs in the SAME @image order (identity, feature, cloth, locations, match) for the FAST REST image
+      // lane (nano-banana ~22s vs ~10 min on the MCP lane). `medias` above are MCP media-ids; submitImageRest
+      // needs the original URLs. Only the count of imported refs that survived is used, but order is preserved.
+      const restRefUrls = [...idRefUrls, featureUrl, clothingRef, ...locationRefs, matchRefUrl].map((u) => String(u || "")).filter((u) => u.trim());
       // Render the preview pass at 1K (env-tunable) — these are for SELECTION; the keepers upscale to
       // 4K after. 1K generates much faster and the tiles stop trickling in. Explicit-4K requests keep a
       // 2K working base for the upscale.
@@ -643,7 +647,31 @@ export const generateCreatives = inngest.createFunction(
         const prompts = Array.from({ length: shotCount }, (_, i) => buildPrompt(i, ratio));
         // Detailed gen captures the failure REASON and the model ACTUALLY used per shot (it
         // also retries once internally and self-heals to the fallback model).
-        const detailed = await step.run(`gen-${rid}`, () => generateBatchDetailed(prompts, genModel, ratio, extra, CREATIVE_FALLBACK));
+        // FAST lane (default ON): render each creative on nano-banana REST (~22s) with the SAME @image ref stack,
+        // instead of the ~10-min MCP lane. Per-shot: submit → poll ~3 min → on ANY miss fall back to the MCP
+        // generateBatchDetailed for that one shot, so it's strictly no slower than before. Needs >=1 reference.
+        const IMAGE_REST_ON = process.env.IMAGE_REST !== "0" && klingRestConfigured() && restRefUrls.length > 0;
+        const detailed = IMAGE_REST_ON
+          ? await Promise.all(prompts.map(async (prompt, k) => {
+              const sub = await step.run(`crest-${rid}-${k}`, () => submitImageRest({ prompt, refUrls: restRefUrls, aspectRatio: ratio }));
+              if (sub.jobSetId) {
+                let url: string | null = null;
+                for (let n2 = 0; n2 < 45 && !url; n2++) { // ~45 x 4s ≈ 3 min ceiling
+                  const s = await step.run(`crest-poll-${rid}-${k}-${n2}`, () => pollDopOnce(sub.jobSetId as string));
+                  if (s.url) { url = s.url; break; }
+                  if (s.terminal) break;
+                  await step.sleep(`crest-wait-${rid}-${k}-${n2}`, "4s");
+                }
+                if (url) {
+                  const hosted = (await step.run(`crest-host-${rid}-${k}`, () => rehostToBlob(url as string, "creatives").catch(() => null))) || url;
+                  return { url: hosted, error: null, model: "nano-banana" };
+                }
+              }
+              // REST miss (submit failed / timed out / terminal) → MCP fallback for THIS shot only.
+              const fb = await step.run(`gen-${rid}-${k}`, () => generateBatchDetailed([prompt], genModel, ratio, extra, CREATIVE_FALLBACK));
+              return fb[0] ?? { url: null as string | null, error: "no result", model: genModel };
+            }))
+          : await step.run(`gen-${rid}`, () => generateBatchDetailed(prompts, genModel, ratio, extra, CREATIVE_FALLBACK));
         const rawProduced = detailed.map((d) => d.url);
         const genErrors = detailed.map((d) => d.error);
         const produced = rawProduced.filter((u): u is string => !!u);
