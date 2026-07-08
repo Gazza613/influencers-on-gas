@@ -43,8 +43,8 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
             <span className="brand-flow">brought to life.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base text-white/60 sm:text-lg">
-            Scroll-stopping, publish-ready AI video response ads.
-            Concept to final cut, produced end-to-end by GAS Marketing.
+            Real strategists at the wheel, AI under the hood. Human insight decides what to say,
+            AI tech decides how fast it gets to your audience.
           </p>
         </div>
       </div>
