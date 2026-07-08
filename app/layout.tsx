@@ -27,7 +27,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=(performance&&performance.navigation&&performance.navigation.type);var r=(t===1);if(!r&&performance.getEntriesByType){var e=performance.getEntriesByType('navigation')[0];r=!!(e&&e.type==='reload');}var p=location.pathname;if(r&&p!=='/'&&p!=='/login'&&p.lastIndexOf('/api/',0)!==0){location.replace('/api/relogin?to='+encodeURIComponent(location.pathname+location.search));}}catch(_){}})();",
+              "(function(){try{var t=(performance&&performance.navigation&&performance.navigation.type);var r=(t===1);if(!r&&performance.getEntriesByType){var e=performance.getEntriesByType('navigation')[0];r=!!(e&&e.type==='reload');}var p=location.pathname;if(r&&p!=='/'&&p!=='/login'&&p.lastIndexOf('/api/',0)!==0&&p.lastIndexOf('/s/',0)!==0){location.replace('/api/relogin?to='+encodeURIComponent(location.pathname+location.search));}}catch(_){}})();",
           }}
         />
       </head>

@@ -14,7 +14,9 @@ export default function HardRefreshGate() {
   useEffect(() => {
     if (handled) return;
     handled = true;
-    if (pathname === "/login") return; // reloading the login page is fine
+    // Public routes must NOT re-gate on reload: the homepage, the login page, and the PUBLIC showcase share
+    // links (/s/[token]) - reloading a public brag link should just refresh it, never bounce to login.
+    if (pathname === "/login" || pathname === "/" || pathname.startsWith("/s/")) return;
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     if (nav?.type === "reload") {
       // Fallback if the pre-paint head script didn't catch it: fast cookie-clearing hop that keeps place.
