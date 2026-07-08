@@ -25,15 +25,14 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
     >
       {/* Hero with an accent glow */}
       <div className="relative overflow-hidden border-b border-white/5">
-        <header className="relative mx-auto flex max-w-6xl items-center gap-3 px-6 py-5">
-          <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#60a5fa] p-px shadow-[0_0_28px_rgba(168,85,247,0.55)]">
-            <span className="pointer-events-none absolute inset-0 animate-pulse rounded-full bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#60a5fa] opacity-40 blur-md" />
+        <div className="relative mx-auto max-w-3xl px-6 pb-14 pt-16 text-center sm:pt-24">
+          {/* GAS mark - the brand anchor, with a SUBTLE animated ORANGE glow (orange is reserved for the GAS mark) */}
+          <style>{`@keyframes gasGlow{0%,100%{opacity:.30;transform:translate(-50%,-50%) scale(1.35)}50%{opacity:.55;transform:translate(-50%,-50%) scale(1.6)}}`}</style>
+          <div className="relative mx-auto mb-8 h-24 w-24">
+            <span className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-full w-full rounded-full bg-[#FF6A00] blur-2xl" style={{ animation: "gasGlow 3.6s ease-in-out infinite" }} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/gas-logo.png" alt="GAS" className="relative h-full w-full rounded-full object-cover ring-1 ring-black/50" />
-          </span>
-          <span className="text-lg font-extrabold tracking-tight">Influencers <span className="brand-flow">on</span> GAS</span>
-        </header>
-        <div className="relative mx-auto max-w-3xl px-6 pb-14 pt-8 text-center sm:pt-12">
+            <img src="/gas-logo.png" alt="GAS" className="relative h-24 w-24 rounded-full object-cover ring-1 ring-white/10" style={{ boxShadow: "0 0 36px rgba(255,106,0,0.55)" }} />
+          </div>
           <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">AI Influencer Studio</span>
           <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
             AI influencers,<br />
