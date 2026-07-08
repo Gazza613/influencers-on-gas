@@ -720,6 +720,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     markDirty(i); // the current clip doesn't reflect the new background - flag "re-shoot to apply"
     await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, live_bg: next }) }).catch(() => {});
   }
+  // Background strangers on/off for a b-roll scene, straight from the header chip (no need to open the editor).
+  // Off = a private/closed space (studio, podcast room, office, boardroom, home) with no passers-by. Re-shoot to apply.
+  async function toggleExtras(i: number, s: Scene) {
+    const next = !(s.crowd_extras === true);
+    setProduction((p) => (p?.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((sc, idx) => (idx === i ? { ...sc, crowd_extras: next } : sc)) } } : p));
+    markDirty(i); // the current keyframe/clip doesn't reflect it yet - flag "re-shoot to apply"
+    await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, crowd_extras: next }) }).catch(() => {});
+  }
   // Animate ONE scene's clip from its existing keyframe (no re-shoot). CONCURRENT: fire it and return - you
   // can immediately fire the NEXT scene without waiting (the backend saves each clip atomically). Each scene
   // self-polls until ITS clip lands, so several can render at once, each with its own spinner.
@@ -1257,6 +1265,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     })()}</span>
                     <span className="text-[11px] font-semibold text-ink-dim">{s.beat}</span>
                     <span className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-bold ${role.cls}`}>{role.label}</span>
+                    {s.role === "b-roll" && (
+                      <button onClick={() => toggleExtras(i, s)} title="Background strangers ON/OFF for this scene. Turn OFF for a private/closed space (studio, podcast room, office, boardroom, home) so no passers-by appear. Re-shoot the scene to apply." className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-bold ${s.crowd_extras === true ? "border-[#60a5fa]/40 bg-[#60a5fa]/10 text-[#93c5fd]" : "border-line text-ink-faint hover:text-ink"}`}>{s.crowd_extras === true ? "👥 Extras" : "🚫 No extras"}</button>
+                    )}
                     {s.role !== "graphic" && (
                       <span className="ml-auto flex gap-1.5">
                         {isStudio && <button onClick={() => openCallout(i)} title="Add a frosted-glass offer callout that appears ON this scene (each scene can have its own)" className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${sceneCallouts[String(i)] ? "border-[#ffcb05]/60 bg-[#ffcb05]/10 text-[#ffcb05]" : "border-line text-ink-dim hover:text-ink"}`}>{coOpen === i ? "Close" : sceneCallouts[String(i)] ? "🪟 Callout ✓" : "🪟 Callout"}</button>}
