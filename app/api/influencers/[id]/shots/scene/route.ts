@@ -26,6 +26,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   for (const k of ["location", "blocking", "shot", "performance", "motion_prompt", "vo_line", "caption", "vo_audio_url", "phone_screen_url", "hero", "ref_url", "live_bg", "caption_pos", "caption_off"] as const) {
     if (typeof b[k] === "string") edited[k] = String(b[k]).trim();
   }
+  // crowd_extras is a BOOLEAN (per-scene "background strangers on/off") - a podcast studio / private room = false.
+  if (typeof b.crowd_extras === "boolean") (edited as Record<string, unknown>).crowd_extras = b.crowd_extras;
   const newScenes = scenes.map((s, i) => (i === index ? edited : s));
   const reshoot = b.reshoot !== false; // false = save text only, no image regeneration
 

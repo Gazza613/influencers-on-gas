@@ -16,7 +16,7 @@ type Scene = {
   talent: string[]; shot: string; blocking: string; performance: string; graphics: string[];
   vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
   vo_audio_url?: string; phone_screen_url?: string; hero?: string; ref_url?: string; live_bg?: string;
-  caption_pos?: string; caption_off?: string;
+  caption_pos?: string; caption_off?: string; crowd_extras?: boolean;
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
@@ -583,7 +583,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     prevFinal.current = f;
   }, [production?.final_url]);
   const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "", captionPos: "", captionOff: false });
+  const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "", captionPos: "", captionOff: false, extras: false });
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   // Close the edit panel but KEEP the scene you were on in view - collapsing the panel otherwise slides the
@@ -614,10 +614,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   function openEdit(i: number, s: Scene) {
     if (editIdx === i) { closeEditKeep(i); return; }
     setEditIdx(i); setAiInstr("");
-    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false", ref: s.ref_url || "", captionPos: s.caption_pos || "", captionOff: s.caption_off === "true" });
+    setEd({ location: s.location || "", blocking: s.blocking || "", shot: s.shot || "", performance: s.performance || "", motion: s.motion_prompt || "", vo: s.vo_line || "", caption: s.caption || "", voAudio: s.vo_audio_url || "", phone: s.phone_screen_url || "", hero: s.hero || "false", ref: s.ref_url || "", captionPos: s.caption_pos || "", captionOff: s.caption_off === "true", extras: s.crowd_extras === true });
   }
   function applyEditsLocally(i: number) {
-    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false" } : s)) } } : p));
+    setProduction((p) => (p && p.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((s, idx) => (idx === i ? { ...s, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false", crowd_extras: ed.extras } : s)) } } : p));
   }
   async function aiRewrite(i: number) {
     setAiBusy(true); setErr("");
@@ -633,7 +633,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     const before = production?.storyboard?.scenes?.[i] as Record<string, string> | undefined;
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false" }),
+      body: JSON.stringify({ scene: i, reshoot: false, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false", crowd_extras: ed.extras }),
     }).then((x) => x.json()).catch(() => null);
     if (r?.saved) {
       // A text-only save that changed VISUAL fields means the current keyframe/clip is now stale → flag it so
@@ -648,7 +648,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false" }),
+      body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false", crowd_extras: ed.extras }),
     }).then((x) => x.json()).catch(() => null);
     applyEditsLocally(i);
     if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
@@ -1398,6 +1398,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                             <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Quality</div>
                             <button onClick={() => setEd((e) => ({ ...e, hero: e.hero === "true" ? "false" : "true" }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.hero === "true" ? "border-[#60a5fa] bg-[#60a5fa]/15 text-[#93c5fd]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.hero === "true" ? "✨ Hero shot · Premium 4K ✓" : "✨ Make this a Hero shot (Premium 4K)"}</button>
                             <p className="mt-1 text-[10px] text-ink-faint">Renders this scene shot on the premium 4K engine (with natural ambient audio) - richer + slower + pricier. Needs a re-shoot.</p>
+                          </div>
+                        )}
+                        {/* BACKGROUND EXTRAS (b-roll only): turn strangers off for a private/closed space so nobody
+                            walks through (a podcast studio, office, boardroom, home). */}
+                        {s.role === "b-roll" && (
+                          <div>
+                            <div className="tabular mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Background extras</div>
+                            <button onClick={() => setEd((e) => ({ ...e, extras: !e.extras }))} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${ed.extras ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:border-line-strong"}`}>{ed.extras ? "👥 Background people ON" : "🚫 No extras — just the cast"}</button>
+                            <p className="mt-1 text-[10px] text-ink-faint">Turn OFF for a private/closed space (a podcast or recording studio, office, boardroom, home) so no strangers appear or walk through. Turn ON only for a genuinely busy public place. Re-shoot the scene to apply.</p>
                           </div>
                         )}
                         {/* Live background moved to the per-scene controls under the preview image (left) - a
