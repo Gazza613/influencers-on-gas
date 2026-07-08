@@ -728,6 +728,22 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     markDirty(i); // the current keyframe/clip doesn't reflect it yet - flag "re-shoot to apply"
     await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, crowd_extras: next }) }).catch(() => {});
   }
+  // RE-RUN VOICE for ONE scene right here in the build board (same voice, this scene only). Re-rolls a clunky
+  // read or applies an edited line without re-running the whole voiceover. Talking shots (a-roll) are lip-synced,
+  // so they're flagged to re-animate; scene shots (b-roll) just need a re-stitch to pick up the new narration.
+  async function retakeSceneVoice(i: number) {
+    if (retakeBusy != null) return;
+    setRetakeBusy(i); setErr("");
+    const r = await fetch(`/api/influencers/${influencerId}/voice/scene-take`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i }),
+    }).then((x) => x.json()).catch(() => null);
+    setRetakeBusy(null);
+    if (!r?.ok) { setErr(r?.error || "Couldn't re-run the voice for that scene."); return; }
+    // Pull the fresh scene_audio (syncProduction keeps the client storyboard, updates the VO slices).
+    const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+    if (d?.production) syncProduction(d.production);
+    if (sb?.scenes?.[i]?.role === "a-roll") markDirty(i); // lip-sync now stale → re-animate this talking shot
+  }
   // Animate ONE scene's clip from its existing keyframe (no re-shoot). CONCURRENT: fire it and return - you
   // can immediately fire the NEXT scene without waiting (the backend saves each clip atomically). Each scene
   // self-polls until ITS clip lands, so several can render at once, each with its own spinner.
@@ -1233,6 +1249,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                               title={approved.has("voice") ? "Animate this scene into video" : "Finish Script & Voice first (animation lip-syncs + times to the locked voice), then animate"}
                               className="w-full rounded-md border border-[#60a5fa]/40 px-2 py-1 text-[10px] font-semibold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
                             >{!approved.has("voice") ? "🎞️ Animate (after voice)" : clip?.url ? "↻ Re-animate" : "🎞️ Animate"}</button>
+                          )}
+                          {approved.has("voice") && (s.vo_line || "").trim() && (
+                            <button
+                              onClick={() => retakeSceneVoice(i)}
+                              disabled={retakeBusy != null || dropped.has(i) || !!shot?.reshooting}
+                              title="Re-run JUST this scene's voiceover with the same voice (e.g. after editing its line, or a clunky read). Other scenes stay untouched. Talking shots then need a re-animate; scene shots just need a re-stitch."
+                              className="w-full rounded-md border border-[#a855f7]/40 px-2 py-1 text-[10px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40"
+                            >{retakeBusy === i ? "🎙️ Re-running voice…" : "🎙️ Re-run voice (this scene)"}</button>
                           )}
                           {/* LIVE BACKGROUND (a-roll only) - moved here from the edit box for a cleaner journey.
                               Off by default; it's the slow/flaky Kling lane, so opt in per scene for hero beats. */}
