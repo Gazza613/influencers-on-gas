@@ -111,6 +111,9 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
   const [zoom, setZoom] = useState<string | null>(null);
 
   const running = status === "running";
+  // Show the Abort/Reset control whenever there's something to clear - while RUNNING and also when a run FAILED
+  // or the server is stuck at running (so it never disappears mid-error, leaving tiles spinning with no way out).
+  const canReset = running || status === "failed";
 
   function normalize(list: Creative[]): Creative[] {
     return list.map((c, i) => ({
@@ -645,8 +648,8 @@ export default function CreativesStudio({ influencerId, initial, multiRef = fals
           <button onClick={generate} disabled={!nFormats} className="btn-brand rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50">
             {running ? `✨ Generate ${images} more (runs alongside)` : creatives.length ? `✨ Generate ${images} more` : `✨ Generate ${images} looks`}
           </button>
-          {running && (
-            <button onClick={abort} className="rounded-lg border border-alert/60 px-4 py-2.5 text-sm font-bold text-alert hover:bg-alert/10">■ Abort</button>
+          {canReset && (
+            <button onClick={abort} className="rounded-lg border border-alert/60 px-4 py-2.5 text-sm font-bold text-alert hover:bg-alert/10">{running ? "■ Abort" : "↻ Reset if stuck"}</button>
           )}
           {rates && nFormats > 0 && (
             <span className="tabular flex items-center gap-2 rounded-full border border-[#a855f7]/45 bg-[#a855f7]/12 px-3 py-1.5 text-xs font-semibold text-[#c79bff]">
