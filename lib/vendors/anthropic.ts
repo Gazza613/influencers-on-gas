@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "../connections";
 import { PLATFORM_STATE } from "../platform-state";
+import { isSafePublicUrl } from "../safe-url";
 
 // Claude (Anthropic), the producer co-pilot brain. Vendor-neutral in the UI.
 // Sonnet 4.6 designs the Character Casting + refines prompts: near-Opus quality for a
@@ -247,6 +248,7 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; score10:
 // concise sentence. Used to LOCK the influencer's clothing as consistent TEXT across every scene (the image
 // anchor alone drifts when a scene's anchor frame is a tight head-shot that hides the bottoms/shoes).
 export async function describeOutfit(url: string): Promise<string> {
+  if (!isSafePublicUrl(url)) return ""; // SSRF: never fetch a private/internal/metadata URL
   let b64: string, mt: string;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
@@ -278,8 +280,10 @@ export async function describeOutfit(url: string): Promise<string> {
 // OPEN (returns true) on any error so a QA hiccup can never empty the set.
 const QA_MEDIA2 = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 export async function matchesIdentity(frameUrl: string, refUrl: string): Promise<boolean> {
+  if (!isSafePublicUrl(frameUrl) || !isSafePublicUrl(refUrl)) return true; // SSRF: don't fetch internal URLs (fail open, as this QA does on any error)
   const grab = async (u: string): Promise<{ mt: "image/jpeg"; data: string } | null> => {
     try {
+      if (!isSafePublicUrl(u)) return null;
       const r = await fetch(u, { signal: AbortSignal.timeout(15000) }); // timeout: a hung image fetch must NOT stall the photoshoot
       if (!r.ok) return null;
       let mt = (r.headers.get("content-type") || "image/jpeg").split(";")[0];

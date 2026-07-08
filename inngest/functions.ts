@@ -928,13 +928,20 @@ export const generateShots = inngest.createFunction(
     const wardrobeSrcUrl = String(brief.clothingRef || persona.aroll_ref_url || persona.broll_ref_url || "").trim();
     const storedLockSrc = String((production as { wardrobe_ref_url?: string })?.wardrobe_ref_url || "").trim();
     let wardrobeLock = String((production as { wardrobe_lock?: string })?.wardrobe_lock || "").trim();
+    // Only ADVANCE the stored source-marker when we actually read a lock from it. If describeOutfit fails
+    // transiently, we must NOT record the new source (else storedLockSrc==wardrobeSrcUrl on the next run and it
+    // never retries → the ad stays stuck on the fallback bible text forever). Leave the marker on failure so a
+    // later run re-extracts this source.
+    let lockSrcToStore = storedLockSrc;
     if (wardrobeSrcUrl && wardrobeSrcUrl !== storedLockSrc) {
       const d = await step.run("wardrobe-extract", async () => {
         const out = await describeOutfit(wardrobeSrcUrl).catch(() => "");
         if (out) await recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "wardrobe", count: 1 }).catch(() => {});
         return out;
       });
-      if (d) wardrobeLock = d;
+      if (d) { wardrobeLock = d; lockSrcToStore = wardrobeSrcUrl; }
+    } else if (wardrobeSrcUrl) {
+      lockSrcToStore = wardrobeSrcUrl; // unchanged source that already has a lock - keep the marker current
     }
     if (!wardrobeLock) wardrobeLock = bibleLook;
     // CLOTH reference = the ONE canonical wardrobe image, passed to EVERY scene of BOTH roles so it beats a
@@ -948,7 +955,7 @@ export const generateShots = inngest.createFunction(
     const arollRefMedia = persona.aroll_ref_url ? await step.run("import-aroll-ref", () => importMediaUrl(String(persona.aroll_ref_url)).catch(() => null)) : null;
     const brollRefMedia = persona.broll_ref_url ? await step.run("import-broll-ref", () => importMediaUrl(String(persona.broll_ref_url)).catch(() => null)) : null;
 
-    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running", wardrobe_lock: wardrobeLock || undefined, wardrobe_ref_url: wardrobeSrcUrl || undefined } } }));
+    await step.run("mark-running", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, shots_status: "running", wardrobe_lock: wardrobeLock || undefined, wardrobe_ref_url: lockSrcToStore || undefined } } }));
 
     let worldRef: string | null = null; // first good frame, imported, reused to lock the world
     let castAnchor: string | null = null; // first b-roll frame WITH companions - locks the daughter/companion look + outfit across every b-roll scene
@@ -1950,10 +1957,13 @@ export const assembleVideo = inngest.createFunction(
       // sentence-end breath is FULL on b-roll but only a tiny micro-settle on a-roll (below freeze-perception, so
       // it doesn't cut ON the syllable yet never reads as a pause). Continuations stay near-seamless for both.
       const endsSentence = /[.!?]["'”’)\]]*$/.test(vo);
-      const contPad = Math.max(0, process.env.SCENE_CONT_PAD != null ? Number(process.env.SCENE_CONT_PAD) : 0.05);
+      // NaN-safe env read: a mis-set (non-numeric) pad must fall back to the default, not corrupt the timeline
+      // (Number("x") → NaN → NaN scene length). Allows an explicit 0.
+      const padEnv = (v: string | undefined, def: number) => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, n) : def; };
+      const contPad = padEnv(process.env.SCENE_CONT_PAD, 0.05);
       const scenePad = !endsSentence ? contPad
-        : role === "a-roll" ? Math.max(0, process.env.AROLL_SCENE_PAD != null ? Number(process.env.AROLL_SCENE_PAD) : 0.1)
-        : Math.max(0, Number(process.env.SCENE_PAD) || 0.35);
+        : role === "a-roll" ? padEnv(process.env.AROLL_SCENE_PAD, 0.1)
+        : padEnv(process.env.SCENE_PAD, 0.35);
       if (vo && realVo > 0) {
         const floor = role === "b-roll" ? 3 : 0;
         len = Math.min(Math.max(realVo + scenePad, floor), Math.max(20, Number(process.env.BROLL_MAX_SECONDS) || 30));
@@ -2239,10 +2249,13 @@ export const assembleVideo = inngest.createFunction(
             for (let k = 0; k < idxs.length; k++) {
               const wi = idxs[k];
               const st = starts[wi];
-              const end = k < idxs.length - 1 ? starts[idxs[k + 1]] : phraseEnd;
-              if (!(end > st)) continue;
+              const rawEnd = k < idxs.length - 1 ? starts[idxs[k + 1]] : phraseEnd;
+              // Guarantee a visible beat for EVERY word: on a run-on (continuation-padded) scene the last word's
+              // start can clamp onto the previous one, giving a zero-length window that used to be dropped - so the
+              // word showed with NO highlight pill. Floor the window at 0.12s so its accent pill always renders.
+              const end = Math.max(rawEnd, st + 0.12);
               const html = `<div class="cap">${idxs.map((j) => `<span class="w${j === wi ? " hl" : ""}">${words[j]}</span>`).join("<span class=\"w\">&nbsp;</span>")}</div>`;
-              clips.push({ asset: { type: "html", html, css: WS_CSS + `.cap{text-align:${cp.align}}`, width: cp.w, height: 340, background: "transparent" }, start: st, length: Math.max(0.12, end - st), position: cp.position, offset: off });
+              clips.push({ asset: { type: "html", html, css: WS_CSS + `.cap{text-align:${cp.align}}`, width: cp.w, height: 340, background: "transparent" }, start: st, length: end - st, position: cp.position, offset: off });
             }
           }
           return clips;
