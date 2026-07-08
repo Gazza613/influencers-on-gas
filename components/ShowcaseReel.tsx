@@ -49,23 +49,34 @@ export default function ShowcaseReel({ videos }: { videos: ShowcaseVideo[] }) {
 
 function Tile({ v, onOpen, soundOn, onSound }: { v: ShowcaseVideo; onOpen: () => void; soundOn: boolean; onSound: (on: boolean) => void }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  // LAZY-LOAD: only attach the video source once the tile is near the viewport, so landing on the page doesn't
+  // fetch every video at once (the "all black until they pop in" problem). The poster image shows instantly.
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || near) return;
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) { setNear(true); io.disconnect(); } }, { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
   // Keep the element's muted state in sync with the single-sound selection; when sound turns on, play it.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.muted = !soundOn;
-    if (soundOn) el.play().catch(() => {});
+    if (soundOn) { setNear(true); el.play().catch(() => {}); }
   }, [soundOn]);
   return (
-    <div className="group relative aspect-[9/16] overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition duration-300 hover:-translate-y-1 hover:border-[#a855f7]/60 hover:shadow-[0_24px_70px_rgba(168,85,247,0.3)]">
+    <div ref={box} className="group relative aspect-[9/16] overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition duration-300 hover:-translate-y-1 hover:border-[#a855f7]/60 hover:shadow-[0_24px_70px_rgba(168,85,247,0.3)]">
       <video
         ref={ref}
-        src={v.final_video_url ?? undefined}
+        src={near ? (v.final_video_url ?? undefined) : undefined}
         poster={v.poster_url || undefined}
-        muted playsInline preload={v.poster_url ? "metadata" : "auto"}
+        muted playsInline preload="metadata"
         onLoadedMetadata={v.poster_url ? undefined : (e) => { const el = e.currentTarget; el.currentTime = POSTER_T(el); }}
         onLoadedData={v.poster_url ? undefined : (e) => { const el = e.currentTarget; if (el.currentTime < 0.05) el.currentTime = POSTER_T(el); }}
-        onMouseEnter={() => { const el = ref.current; if (el) el.play().catch(() => {}); }}
+        onMouseEnter={() => { setNear(true); const el = ref.current; if (el) el.play().catch(() => {}); }}
         onMouseLeave={() => { const el = ref.current; if (el && !soundOn) { el.pause(); el.currentTime = POSTER_T(el); } }}
         onEnded={(e) => {
           // Finished: rest on a CONTENT frame (never a black start/end frame). A muted hover-preview

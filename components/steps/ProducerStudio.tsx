@@ -58,6 +58,19 @@ const FINAL_HYPE_LINES = [
 ];
 
 type CreativeGuide = { url: string; role: string; ratio: string; scene: string; resolution: string };
+// Persist a prompt/draft to localStorage (per key) so navigating away before submitting doesn't lose what was
+// typed, and restore it on return. The typed draft wins over an empty/older initial. Drop-in for useState<string>.
+function usePersistedDraft(key: string, initial: string) {
+  const [v, setV] = useState(initial);
+  const loaded = useRef(false);
+  useEffect(() => {
+    try { const d = localStorage.getItem(key); if (d != null && d.trim() && d !== initial) setV(d); } catch { /* no localStorage */ }
+    loaded.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  useEffect(() => { if (loaded.current) { try { localStorage.setItem(key, v); } catch { /* ignore */ } } }, [key, v]);
+  return [v, setV] as const;
+}
 export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio" }) {
   // STAGE SPLIT: "foundation" = Script & Voice stage (brief -> storyboard -> voice); "studio" = The Final Cut
   // stage (shoot -> animate -> music -> stitch -> showreel). "all" = the legacy single page (unchanged).
@@ -129,7 +142,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }
   // AMBIENT controls: what the world should sound like (free text, auto-matched to the setting if blank) + an
   // OFF switch. Persisted via /audio on generate; the stitch honours the same values so the final matches.
-  const [ambientPrompt, setAmbientPrompt] = useState<string>(String((initialProduction as { ambient_prompt?: string })?.ambient_prompt || ""));
+  const [ambientPrompt, setAmbientPrompt] = usePersistedDraft(`gas:ambient:${influencerId}`, String((initialProduction as { ambient_prompt?: string })?.ambient_prompt || ""));
   const [ambientOff, setAmbientOff] = useState<boolean>((initialProduction as { ambient_off?: boolean })?.ambient_off === true);
   // AUDIO MIX levels the producer dials (music + ambient), 0-1. Defaults = the research-backed mix (voice
   // dominant, music 0.18, ambient 0.16). Saved to production + read by the stitch; applied on the next stitch.
@@ -208,7 +221,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [scriptBusy, setScriptBusy] = useState(false);
   // STORYLINE-FIRST: the producer writes the ad's story/idea in their own words; the AI producer (top 1%) directs
   // it into the optimised storyboard, inferring any blank brief fields from it.
-  const [storyline, setStoryline] = useState<string>(String((initialProduction?.brief as { storyline?: string })?.storyline || ""));
+  const [storyline, setStoryline] = usePersistedDraft(`gas:storyline:${influencerId}`, String((initialProduction?.brief as { storyline?: string })?.storyline || ""));
   const [storyBusy, setStoryBusy] = useState(false); // AI story helper working
   const genAbortRef = useRef<AbortController | null>(null); // cancel an in-flight storyboard direction
   const [err, setErr] = useState("");
@@ -584,7 +597,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   }, [production?.final_url]);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [ed, setEd] = useState({ location: "", blocking: "", shot: "", performance: "", motion: "", vo: "", caption: "", voAudio: "", phone: "", hero: "false", ref: "", captionPos: "", captionOff: false, extras: false });
-  const [aiInstr, setAiInstr] = useState("");
+  const [aiInstr, setAiInstr] = usePersistedDraft(`gas:aiinstr:${influencerId}`, "");
   const [aiBusy, setAiBusy] = useState(false);
   // Close the edit panel but KEEP the scene you were on in view - collapsing the panel otherwise slides the
   // viewport onto a later scene (Gary's "Save jumps me to scene 6"). We stash the scene and scroll it back in
