@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer } from "@/lib/influencers";
-import { tts } from "@/lib/vendors/elevenlabs";
+import { tts, ttsErrorMessage } from "@/lib/vendors/elevenlabs";
 import { expressifyScript } from "@/lib/vendors/anthropic";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
@@ -42,6 +42,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: model === "v3" ? "eleven_v3" : "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
     return NextResponse.json({ url, model, tagged: model === "v3" ? readText : undefined });
   } catch (e) {
-    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 502 });
+    return NextResponse.json({ error: ttsErrorMessage(e) }, { status: 502 });
   }
 }

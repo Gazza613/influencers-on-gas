@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateProductionFields } from "@/lib/influencers";
-import { ttsPcm, pcmSliceToWav, sayable } from "@/lib/vendors/elevenlabs";
+import { ttsPcm, pcmSliceToWav, sayable, ttsErrorMessage } from "@/lib/vendors/elevenlabs";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 import { isSafePublicUrl } from "@/lib/safe-url";
@@ -103,6 +103,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await updateProductionFields(id, { voiceover_url, scene_audio: mergedAudio, voiceover_at: Date.now() });
     return NextResponse.json({ voiceover_url, scenes: mergedAudio.length, total_seconds: Math.round(totalSec) });
   } catch (e) {
-    return NextResponse.json({ error: `Could not generate the voiceover: ${String((e as Error)?.message || e).slice(0, 160)}` }, { status: 502 });
+    return NextResponse.json({ error: ttsErrorMessage(e) }, { status: 502 });
   }
 }

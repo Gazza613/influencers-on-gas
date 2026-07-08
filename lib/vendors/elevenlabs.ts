@@ -198,6 +198,17 @@ export async function tts(voiceId: string, text: string, opts: { expressive?: bo
   catch (e) { if (expressive && modelId !== STABLE_MODEL) return call(STABLE_MODEL); throw e; }
 }
 
+// Map a raw ElevenLabs TTS error to a producer-friendly message. The common one is a shared LIBRARY voice the
+// owner has DISABLED (403 voice_access_denied) - no retry can fix it, the only fix is to pick another voice.
+export function ttsErrorMessage(e: unknown): string {
+  const s = String((e as Error)?.message || e || "");
+  if (/voice_disabled|voice_access_denied|disabled by the owner|voice_not_found|does not exist/i.test(s))
+    return "This voice is no longer available - its owner removed or disabled it in the ElevenLabs voice library. Please pick a different voice.";
+  if (/quota|credit|429|too many requests/i.test(s)) return "The ElevenLabs voice quota is exhausted right now - try again shortly, or check the plan.";
+  if (/401|invalid.?api.?key|unauthor|missing.*key|not connected/i.test(s)) return "ElevenLabs isn't connected - add the API key in Setup.";
+  return s.slice(0, 200);
+}
+
 // Same synthesis as tts(), but via the WITH-TIMESTAMPS endpoint so we also get the EXACT audio
 // duration (last character end time). The a-roll timeline uses this real length instead of estimated
 // storyboard timecodes - that estimate mismatch was the root of the scene-switch pause + the audio

@@ -1465,7 +1465,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <div className="rounded-lg border border-line bg-surface-2/40 p-3">
                       <div className="tabular mb-1.5 text-[10px] uppercase tracking-[0.2em] text-ink-faint">Voice model</div>
                       <div className="flex gap-2">
-                        {([["v2", "Stable", "Rock-solid + consistent. What you hear is exactly what ships."], ["v3", "Expressive", "More realistic, dynamic delivery + audio tags. Best on Designed/Instant voices (not a PVC)."]] as const).map(([m, label, desc]) => (
+                        {([["v2", "Stable", "Rock-solid + consistent - what you hear is EXACTLY what ships, and it faithfully keeps a voice you designed. Recommended."], ["v3", "Expressive", "A different, more dynamic ElevenLabs model with audio tags. It RE-RENDERS the voice, so the timbre can drift and sound different from your designed voice - always preview it, and if it doesn't match, use Stable (v2)."]] as const).map(([m, label, desc]) => (
                           <button key={m} onClick={() => setVoiceModel(m)} className={`flex-1 rounded-lg border px-3 py-2 text-left text-xs ${voiceModel === m ? "border-[#a855f7] bg-[#a855f7]/10 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>
                             <div className="font-bold">{label} <span className="text-ink-faint">({m})</span></div>
                             <div className="mt-0.5 text-[10px] leading-tight text-ink-faint">{desc}</div>
