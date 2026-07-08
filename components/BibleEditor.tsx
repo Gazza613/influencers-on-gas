@@ -49,6 +49,16 @@ function Regen({ section, busy, onClick }: { section: string; busy: string | nul
 
 export default function BibleEditor({ influencerId, initialBrief, initialBible, flushRef }: { influencerId: string; initialBrief: string | null; initialBible: Bible | null; flushRef?: React.MutableRefObject<(() => Promise<void>) | null> }) {
   const [brief, setBrief] = useState(initialBrief || "");
+  // Keep the design prompt if the user navigates away before generating: persist it to localStorage (per
+  // influencer) and restore it on return. The typed draft wins over an empty/older server brief.
+  const briefKey = `gas:brief:${influencerId}`;
+  const briefLoaded = useRef(false);
+  useEffect(() => {
+    try { const d = localStorage.getItem(briefKey); if (d != null && d.trim() && d !== (initialBrief || "")) setBrief(d); } catch { /* localStorage unavailable */ }
+    briefLoaded.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { if (briefLoaded.current) { try { localStorage.setItem(briefKey, brief); } catch { /* ignore */ } } }, [briefKey, brief]);
   const [bible, setBible] = useState<Bible | null>(initialBible);
   const [open, setOpen] = useState(!initialBible);
   const [busy, setBusy] = useState(false);

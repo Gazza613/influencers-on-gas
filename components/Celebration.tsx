@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 // A one-shot confetti + streamers celebration that fills the screen when a cut is finished.
 const QUIRKS = [
@@ -15,11 +15,8 @@ const COLORS = ["#a855f7", "#60a5fa", "#ec4899", "#f59e0b", "#34c759", "#ffffff"
 
 export default function Celebration({ name, onDone }: { name: string; onDone: () => void }) {
   const [line] = useState(() => QUIRKS[Math.floor(Math.random() * QUIRKS.length)].replace("{name}", name));
-  useEffect(() => {
-    const t = setTimeout(onDone, 5000);
-    return () => clearTimeout(t);
-  }, [onDone]);
-
+  // Stays on screen until the user dismisses it (tap anywhere) - NO auto-timeout, so a finished cut celebration
+  // is never missed if they stepped away while it rendered.
   return (
     <div onClick={onDone} className="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-black/45 backdrop-blur-[1px]">
       <style>{`
