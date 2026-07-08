@@ -26,13 +26,11 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
       {/* Hero with an accent glow */}
       <div className="relative overflow-hidden border-b border-white/5">
         <div className="relative mx-auto max-w-3xl px-6 pb-14 pt-16 text-center sm:pt-24">
-          {/* GAS mark - the brand anchor, with a SUBTLE animated ORANGE glow on its outskirts (orange is reserved for the GAS mark) */}
-          <style>{`@keyframes gasGlow{0%,100%{opacity:.26;transform:translate(-50%,-50%) scale(1.3)}50%{opacity:.5;transform:translate(-50%,-50%) scale(1.55)}}@keyframes gasSpin{to{transform:rotate(360deg)}}`}</style>
+          {/* GAS mark - the brand anchor, with a SUBTLE breathing ORANGE glow (orange is reserved for the GAS mark) */}
+          <style>{`@keyframes gasGlow{0%,100%{opacity:.24;transform:translate(-50%,-50%) scale(1.25)}50%{opacity:.44;transform:translate(-50%,-50%) scale(1.5)}}`}</style>
           <div className="relative mx-auto mb-8 h-[115px] w-[115px]">
-            {/* soft pulsing orange halo */}
-            <span className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-full w-full rounded-full bg-[#FF6A00] blur-2xl" style={{ animation: "gasGlow 3.6s ease-in-out infinite" }} />
-            {/* animated glow ring rotating on the logo's outskirts */}
-            <span className="pointer-events-none absolute -inset-1.5 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0deg, rgba(255,106,0,0.85) 60deg, transparent 150deg, rgba(255,150,60,0.6) 240deg, transparent 330deg)", animation: "gasSpin 6s linear infinite", filter: "blur(3px)" }} />
+            {/* soft, gently breathing orange halo (no rotation) */}
+            <span className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-full w-full rounded-full bg-[#FF6A00] blur-2xl" style={{ animation: "gasGlow 4s ease-in-out infinite" }} />
             {/* logo: crop the dark PNG edge (scale + overflow) and only a hairline rim, so no hard black border */}
             <span className="relative block h-[115px] w-[115px] overflow-hidden rounded-full ring-1 ring-white/5" style={{ boxShadow: "0 0 30px rgba(255,106,0,0.5)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
