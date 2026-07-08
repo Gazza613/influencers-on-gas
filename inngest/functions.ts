@@ -1819,7 +1819,20 @@ function buildAmbientPrompt(desc: string, setting: string): string {
   // "NO sirens / alarms / traffic" made it LATCH onto those words and GENERATE a siren (the recurring bug).
   // So the prompt must be PURELY POSITIVE - describe ONLY the gentle sounds we WANT, and it fills the bed with
   // exactly those. No "no ..." clauses, ever.
-  return `Gentle, continuous, realistic ambient background atmosphere of ${want}. Soft, natural environmental room tone that suits the place and sits quietly in the background of a scene.`;
+  // Generate at a NATURAL, clearly AUDIBLE level. The stitch already mixes ambient softly under the voice
+  // (ambientVol ~0.16), so telling the model "quiet / sits quietly in the background" here made a DOUBLE-quiet,
+  // near-silent bed (measured rms ~0.001 = inaudible). Describe a full, present room tone; the mix lowers it.
+  return `Realistic, continuous ambient background atmosphere of ${want}. The true environmental room tone of that place, natural and clearly PRESENT at a normal recording level - render it audible and full (it gets mixed softly under the voice later, so it must NOT be faint or near-silent).`;
+}
+
+// Music bed prompt: force a REAL, STRUCTURED corporate / brand-video TRACK, not a vibe-only description. Pure
+// mood words ("warm, confident, unhurried") made ElevenLabs Music compose a slow low sustained PAD - a drone/
+// hum with ~all its energy below 250Hz. So we always pin concrete musical structure (groove, percussion, a
+// bright melodic hook, bass, airy highs) + an explicit "not a low droning pad". Any storyboard music_bed / tone
+// rides along as the flavour.
+function buildMusicPrompt(sb?: { music_bed?: string; tone?: string } | null): string {
+  const flavour = String(sb?.music_bed || sb?.tone || "warm, confident, modern").trim();
+  return `Polished, upbeat MODERN CORPORATE / brand-video background music - a real instrumental TRACK with clear structure, not a mood pad. Flavour: ${flavour}. Production: a steady, light, positive groove with gentle percussion and a soft kick, a simple BRIGHT melodic hook (piano or plucked synth), a warm smooth bassline and airy pads; confident, professional and forward-moving. Instrumental only, no vocals. Keep it LIGHT and AIRY with clearly present mids and highs so it sits cleanly under a voiceover - it must NOT be a slow, low, sustained pad or drone.`;
 }
 
 // THE PRODUCER — "music & ambient" (its own gated step): generate the music bed + ambient room
@@ -1850,7 +1863,7 @@ export const generateAudio = inngest.createFunction(
 
     // Generate music + ambient IN PARALLEL (they're independent) — this halves the wait vs running
     // them back-to-back. Each is a single slow ElevenLabs request.
-    const brief = sb.music_bed || `${sb.tone || "warm, modern"} background music bed for a social ad, no vocals`;
+    const brief = buildMusicPrompt(sb);
     const setting = String(production?.brief?.setting || sb.scenes[0]?.location || "the location").slice(0, 120);
     // Producer overrides: a custom ambient description (what they want to HEAR) and an OFF switch (no ambient).
     const ambientOff = (production as { ambient_off?: boolean })?.ambient_off === true;
@@ -2033,7 +2046,7 @@ export const assembleVideo = inngest.createFunction(
       if (typeof realMusic === "number" && realMusic + 0.5 < musicLen) musicUrl = null;
     }
     if (!musicUrl) try {
-      const brief = sb?.music_bed || `${sb?.tone || "warm, modern"} background music bed for a social ad, no vocals`;
+      const brief = buildMusicPrompt(sb);
       musicUrl = await step.run("music", async () => { const m = await generateMusic(brief, (musicLen + MUSIC_MARGIN) * 1000); return putBytes(m.buf, "music", m.ext, m.mime); }); // request timeline + margin so it covers to the last second even if the render comes back short
       await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
     } catch { musicUrl = null; }
