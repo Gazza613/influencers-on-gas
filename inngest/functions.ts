@@ -2258,9 +2258,18 @@ export const assembleVideo = inngest.createFunction(
         // WORD SPACING: the Shotstack HTML renderer collapses BOTH a plain space text-node AND CSS margin between
         // inline spans (words ran together: "drowninginWhatsAppthreads"). The one separator it can't drop is a
         // NON-BREAKING SPACE (&nbsp;) as its OWN inline word - so each gap is an explicit   span between words.
-        const WS_CSS = ".cap{width:100%;font-family:'Open Sans',sans-serif;line-height:1.45}"
-          + ".w{color:#fff;font-weight:800;font-size:46px;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 2px 9px rgba(0,0,0,0.75),0 6px 28px rgba(0,0,0,0.62)}"
-          + `.hl{color:#fff;background:${HL};border-radius:10px;padding:2px 12px;box-shadow:0 3px 14px ${HL}88}`;
+        // "Bold Extra": big UPPERCASE words each on a solid black box, the SPOKEN word in the picked colour
+        // (TikTok/Reels look the team liked). Default word-sync: white words + an accent PILL on the active word.
+        const boldX = capSel === "boldextra";
+        const WS_CSS = boldX
+          ? ".cap{width:100%;font-family:'Open Sans',sans-serif;line-height:1.55;text-transform:uppercase}"
+            + ".sp{display:inline-block;font-size:52px;width:.28em}"
+            + ".w{display:inline-block;color:#fff;font-weight:900;font-size:52px;letter-spacing:.5px;background:rgba(0,0,0,0.85);border-radius:7px;padding:1px 11px;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000}"
+            + `.hl{color:${HL}}`
+          : ".cap{width:100%;font-family:'Open Sans',sans-serif;line-height:1.45}"
+            + ".sp{display:inline-block;font-size:46px;width:.28em}"
+            + ".w{color:#fff;font-weight:800;font-size:46px;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 -3px 0 #000,0 3px 0 #000,-3px 0 0 #000,3px 0 0 #000,0 2px 9px rgba(0,0,0,0.75),0 6px 28px rgba(0,0,0,0.62)}"
+            + `.hl{color:#fff;background:${HL};border-radius:10px;padding:2px 12px;box-shadow:0 3px 14px ${HL}88}`;
         const MAXW = Math.max(2, Number(process.env.CAPTION_PHRASE_WORDS) || 4);
         captionClips = placed.filter((p) => (p.vo || p.caption) && !p.captionOff).flatMap((p) => {
           const src = String(p.vo || p.caption || "").trim();
@@ -2299,7 +2308,7 @@ export const assembleVideo = inngest.createFunction(
               // start can clamp onto the previous one, giving a zero-length window that used to be dropped - so the
               // word showed with NO highlight pill. Floor the window at 0.12s so its accent pill always renders.
               const end = Math.max(rawEnd, st + 0.12);
-              const html = `<div class="cap">${idxs.map((j) => `<span class="w${j === wi ? " hl" : ""}">${words[j]}</span>`).join("<span class=\"w\">&nbsp;</span>")}</div>`;
+              const html = `<div class="cap">${idxs.map((j) => `<span class="w${j === wi ? " hl" : ""}">${words[j]}</span>`).join("<span class=\"sp\">&nbsp;</span>")}</div>`;
               clips.push({ asset: { type: "html", html, css: WS_CSS + `.cap{text-align:${cp.align}}`, width: cp.w, height: 340, background: "transparent" }, start: st, length: end - st, position: cp.position, offset: off });
             }
           }

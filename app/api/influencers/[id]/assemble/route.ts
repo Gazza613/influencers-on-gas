@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // resume re-stitches the same way. URL is SSRF-guarded (Shotstack fetches it).
   const body = await req.json().catch(() => ({}));
   const captions = body.captions === true;
-  const captionStyle = ["pill", "bold", "highlight", "clean", "sunny", "karaoke"].includes(body.captionStyle) ? body.captionStyle : "bold";
+  const captionStyle = ["pill", "bold", "highlight", "clean", "sunny", "karaoke", "boldextra"].includes(body.captionStyle) ? body.captionStyle : "bold";
   // Active-word pill colour for the word-sync captions (validated hex; blank = the default brand purple).
   const captionAccent = /^#[0-9a-fA-F]{6}$/.test(String(body.captionAccent)) ? String(body.captionAccent) : "";
   const endCardUrl = typeof body.endCardUrl === "string" && isSafePublicUrl(body.endCardUrl) ? body.endCardUrl : "";

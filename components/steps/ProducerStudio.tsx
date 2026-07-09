@@ -1819,12 +1819,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                   {stitchCaptions && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-ink-faint">Caption style:</span>
-                      {([["karaoke", "Word-sync ✨ (default)", "Word-by-word — each word lights up in an accent pill EXACTLY when it's spoken, from the real voice timings. Short phrases, the modern TikTok/Reels look."], ["bold", "Bold", "Big uppercase, thick black outline — punchy social look, whole lines (not word-synced)."], ["clean", "Clean", "White text with a soft shadow, no box — elegant"], ["highlight", "Highlight", "White on a purple highlight bar — on-brand"], ["sunny", "Sunny", "Bright yellow uppercase with a black outline — energetic"], ["pill", "Pill", "Classic dark rounded pill (the original)"]] as const).map(([k, label, desc]) => (
+                      {([["karaoke", "Word-sync ✨ (default)", "Word-by-word — each word lights up in an accent pill EXACTLY when it's spoken, from the real voice timings. Short phrases, the modern TikTok/Reels look."], ["boldextra", "Bold Extra 🔥", "Big UPPERCASE words each on a solid black box; the SPOKEN word pops in your chosen colour — the punchy TikTok/Reels highlight look. Word-synced."], ["bold", "Bold", "Big uppercase, thick black outline — punchy social look, whole lines (not word-synced)."], ["clean", "Clean", "White text with a soft shadow, no box — elegant"], ["highlight", "Highlight", "White on a purple highlight bar — on-brand"], ["sunny", "Sunny", "Bright yellow uppercase with a black outline — energetic"], ["pill", "Pill", "Classic dark rounded pill (the original)"]] as const).map(([k, label, desc]) => (
                         <button key={k} onClick={() => setStitchCaptionStyle(k)} title={desc} className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${stitchCaptionStyle === k ? "border-[#a855f7] bg-[#a855f7]/12 text-ink" : "border-line text-ink-dim hover:border-[#a855f7]/40"}`}>{label}</button>
                       ))}
                     </div>
                   )}
-                  {stitchCaptions && stitchCaptionStyle === "karaoke" && (
+                  {stitchCaptions && (stitchCaptionStyle === "karaoke" || stitchCaptionStyle === "boldextra") && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-ink-faint">Highlight colour:</span>
                       {([["Purple", "#a855f7"], ["Pink", "#ec4899"], ["Blue", "#2563eb"], ["Navy", "#1e3a8a"], ["Orange", "#f97316"], ["Red", "#dc2626"], ["Green", "#16a34a"], ["Black", "#111111"]] as const).map(([nm, hex]) => {
