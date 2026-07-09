@@ -28,6 +28,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   // crowd_extras is a BOOLEAN (per-scene "background strangers on/off") - a podcast studio / private room = false.
   if (typeof b.crowd_extras === "boolean") (edited as Record<string, unknown>).crowd_extras = b.crowd_extras;
+  // mic is a BOOLEAN (per-scene "hold a handheld microphone" for a-roll talking shots).
+  if (typeof b.mic === "boolean") (edited as Record<string, unknown>).mic = b.mic;
   const newScenes = scenes.map((s, i) => (i === index ? edited : s));
   const reshoot = b.reshoot !== false; // false = save text only, no image regeneration
 

@@ -16,7 +16,7 @@ type Scene = {
   talent: string[]; shot: string; blocking: string; performance: string; graphics: string[];
   vo_line: string; caption: string; motion_prompt: string; music_sfx: string; transition: string;
   vo_audio_url?: string; phone_screen_url?: string; hero?: string; ref_url?: string; live_bg?: string;
-  caption_pos?: string; caption_off?: string; crowd_extras?: boolean;
+  caption_pos?: string; caption_off?: string; crowd_extras?: boolean; mic?: boolean;
 };
 type Storyboard = { title: string; format: string; duration_seconds: number; tone: string; music_bed: string; full_vo: string; legal: string; scenes: Scene[] };
 type Shot = { scene: number; role: string; beat: string; url: string | null; error?: string | null; reshooting?: boolean };
@@ -741,6 +741,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     markDirty(i); // the current keyframe/clip doesn't reflect it yet - flag "re-shoot to apply"
     await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, crowd_extras: next }) }).catch(() => {});
   }
+  // Handheld MICROPHONE on/off for a talking shot (a-roll) - places a content-creator mic in her hand for a
+  // piece-to-camera look. Re-shoot to apply.
+  async function toggleMic(i: number, s: Scene) {
+    const next = !(s.mic === true);
+    setProduction((p) => (p?.storyboard ? { ...p, storyboard: { ...p.storyboard, scenes: p.storyboard.scenes.map((sc, idx) => (idx === i ? { ...sc, mic: next } : sc)) } } : p));
+    markDirty(i);
+    await fetch(`/api/influencers/${influencerId}/shots/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene: i, reshoot: false, mic: next }) }).catch(() => {});
+  }
   // RE-RUN VOICE for ONE scene right here in the build board (same voice, this scene only). Re-rolls a clunky
   // read or applies an edited line without re-running the whole voiceover. Talking shots (a-roll) are lip-synced,
   // so they're flagged to re-animate; scene shots (b-roll) just need a re-stitch to pick up the new narration.
@@ -1304,6 +1312,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <span className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-bold ${role.cls}`}>{role.label}</span>
                     {s.role === "b-roll" && (
                       <button onClick={() => toggleExtras(i, s)} title="Background strangers ON/OFF for this scene. Turn OFF for a private/closed space (studio, podcast room, office, boardroom, home) so no passers-by appear. Re-shoot the scene to apply." className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-bold ${s.crowd_extras === true ? "border-[#60a5fa]/40 bg-[#60a5fa]/10 text-[#93c5fd]" : "border-line text-ink-faint hover:text-ink"}`}>{s.crowd_extras === true ? "👥 Extras" : "🚫 No extras"}</button>
+                    )}
+                    {s.role === "a-roll" && (
+                      <button onClick={() => toggleMic(i, s)} title="Put a handheld content-creator microphone in her hand for this talking shot (a vlogger / interview mic held to camera). Re-shoot the scene to apply." className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-bold ${s.mic === true ? "border-[#a855f7]/45 bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-faint hover:text-ink"}`}>{s.mic === true ? "🎤 Mic" : "🎤 No mic"}</button>
                     )}
                     {s.role !== "graphic" && (
                       <span className="ml-auto flex gap-1.5">
