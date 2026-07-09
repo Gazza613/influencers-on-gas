@@ -809,24 +809,107 @@ export async function draftBrief(o: {
   return { offer: o.offer || "", benefits: o.benefits || "", cta: o.cta || "", tone: o.tone || "" };
 }
 
-// STORY HELPER: shape the producer's rough idea (or the brief) into a vivid, top-1% STORY they then direct.
+// STORY HELPER ("Sharpen my story"): shape the producer's rough idea into the vivid STORY they then direct.
+// This is the CEILING of the whole pipeline - every scene, VO line, keyframe and clip is derived from it, and
+// generateStoryboard is instructed to honour its intent, so a generic story is faithfully rendered into a
+// generic ad. It therefore runs on PREMIUM and carries real craft. Built on evidence, not vibes:
+//
+//  • Plan-then-write (Plan-and-Write, Yao AAAI'19; Re3 EMNLP'22; DOME NAACL'25) - a short beat plan before the
+//    prose measurably lifts narrative coherence. So: angles -> beat plan -> prose, in one call.
+//  • Verbalized Sampling (arXiv 2510.01171) - generic "AI slop" is a documented RLHF typicality-bias artifact
+//    (mode collapse); the best-supported training-free fix is forcing N genuinely DISTINCT candidates before
+//    committing, rather than letting the model emit its first modal answer. So: 3 hook angles, then pick.
+//  • Free-form prose, never a JSON/tool schema (arXiv 2408.02442 - rigid schemas degrade generation). The
+//    downstream generateStoryboard call owns the structure; this one only has to write well.
+//  • Anti-slop persona + explicit banned-cliche list (Anthropic prompting best practices).
+//  • Craft rules: brand present from the FIRST beat (Google ABCD, validated across 17k campaigns w/ Kantar +
+//    Ipsos; Facebook IQ: brand in first 3s -> 23% more likely recalled vs 13% at 4s+); land the idea inside
+//    ~2s of active attention (Nelson-Field attention-memory threshold); but/therefore momentum (Parker/Stone);
+//    open a loop at the hook and close it at the proof (Zeigarnik); ~2.4 spoken words/sec (NCVS: ad reads
+//    150-180wpm); ONE ask, phrased as an instruction.
+//
+// Deliberately NOT used: a raised temperature (arXiv 2405.00492 - temperature is not the creativity parameter:
+// weakly correlated with novelty, moderately with INCOHERENCE) and an extended-thinking budget (gains are
+// reasoning-specific, not creative). The lift here comes from the plan + the diverse-angle pass.
+const STORY_BANNED = `"in today's fast-paced world", "imagine a world where", "picture this", "unlock", "elevate", "supercharge", "game-changer", "revolutionary", "seamless", "cutting-edge", "take it to the next level", "look no further", "little did they know", "the secret to", "level up"`;
+
 export async function shapeStory(o: {
   influencerName: string; influencerProfile?: string; storyline?: string; brand?: string; offer?: string;
   benefits?: string; cta?: string; tone?: string; setting?: string; durationSeconds: number;
 }): Promise<{ storyline: string }> {
   const c = await client();
+  const dur = Math.max(10, Math.min(90, Math.round(o.durationSeconds || 45)));
+  const spokenWords = Math.round(dur * 2.4); // NCVS-backed ad-read pace, the same constant PRODUCER_SYSTEM uses
+  const beats = dur <= 15 ? 3 : dur <= 30 ? 5 : 6;
+  const given = (o.storyline || "").trim().slice(0, 3000);
+
   const res = await c.messages.create({
-    model: MODEL,
-    max_tokens: 800,
-    system: `You are a top-1% short-form video producer. Your job is to SHARPEN the producer's OWN story into vivid, specific prose for a ${o.durationSeconds}-second AI-influencer ad - the narrative they will direct into a storyboard.
-CRITICAL - HONOUR THEIR DIRECTION: the story they wrote is your brief. Read it carefully first and understand EXACTLY what they want to say. KEEP every specific they gave - the brand and product names, the exact mechanism / how-it-works, the claims and numbers, and their key terms and phrases (e.g. a named product, a scoring system, a channel like WhatsApp) - and build the story AROUND them. You EXPAND, structure and make it cinematic and scroll-stopping; you do NOT replace their idea, swap their product, drop their mechanism, or generalise their details away. Only invent a story from scratch if they gave none.
-Write cinematic PROSE (never a shot list, never "VO:" labels): the world/setting, the presenter's moment and feeling, the emotional beats (a scroll-stopping hook, the tension or desire, the reveal, the proof, then a clear call to action), with their specific offer + CTA woven in naturally. Concrete, sensory, on-brand. ~120-180 words, one or two short paragraphs. UK spelling, no em dashes, no emojis. Return ONLY the story prose - nothing else.`,
+    model: PREMIUM,
+    max_tokens: 2000,
+    system:
+`You are Kiara, an elite short-form ad producer. You have shipped hundreds of vertical spots and you think in images, sound and one human truth. You do not write copy that sounds like an advert wrote itself.
+
+<why_this_matters>
+Your narrative is the blueprint. A downstream director breaks it into ${beats} filmed scenes with a continuous voiceover for a ${dur}-second vertical ad, and is instructed to honour your intent exactly. Whatever you write is what gets shot. A vague story becomes a vague film that nobody watches.
+</why_this_matters>
+
+<honour_the_producer_first>
+This is the most important rule. The producer's own story is your brief, not a suggestion. Before you write a single word, READ it and work out what they actually want to say and why. Then KEEP every specific they gave you, spelled exactly as they spelled it: the brand and product names, the mechanism and how it works, their numbers and claims, their key terms and named channels (a scoring system, a WhatsApp conversation, a named tool). Build the story AROUND those specifics.
+You SHARPEN: structure, pace, imagery, momentum. You do NOT replace their idea, swap their product, quietly drop their mechanism, or blur their details into something generic. If they named it, it survives. Invent a story from scratch ONLY when they gave you none.
+</honour_the_producer_first>
+
+<craft>
+- ARC in ${beats} beats: hook, ${beats >= 6 ? "problem, agitate, mechanism, proof, CTA" : beats === 5 ? "problem, solution, proof, CTA" : "benefit, CTA"}. Each beat is a real filmed moment.
+- THE HOOK carries the brand or the product idea from the very first beat. Do not save the reveal for the end. Most viewers give an ad under two seconds of real attention, so the idea has to land inside it.
+- OPEN A LOOP in the hook (a question, a tension, a claim that demands evidence) and CLOSE it at the proof beat. The viewer should feel pulled, not lectured.
+- MOMENTUM: between any two beats you must be able to say "but" or "therefore", never "and then". If a beat could be swapped with another without breaking the story, it is dead. Rewrite it.
+- CONCRETE OVER ABSTRACT: every beat needs one nameable thing a camera can actually photograph - an object, a number, a place, a gesture, a face doing something. Specifics persuade; adjectives do not. "Cuts a three-day follow-up to four minutes" beats "saves valuable time".
+- PROOF is shown, not asserted: a demonstration, a real number, a before and after.
+- ONE ASK. The CTA is an instruction with a verb ("tap the link and book your slot"), never a vibe ("learn more about how we can help"). Never two competing asks.
+- WRITE FOR THE EAR. This is spoken aloud, so the whole story must be tellable in about ${spokenWords} words of speech. Short sentences, one idea each, plain confident English.
+</craft>
+
+<avoid_generic_output>
+Left alone you will drift towards safe, on-distribution ad copy: the "AI slop" register. Refuse it. These are banned unless the producer used them first: ${STORY_BANNED}. No adjective soup. No feature lists. No abstraction a camera cannot shoot. No generic rhetorical opener ("Ever wondered...?"). Make at least ONE distinctive, unexpected creative choice that could only belong to THIS brand and THIS story.
+</avoid_generic_output>
+
+<process>
+1. In <angles> tags, propose 3 genuinely DIFFERENT hook angles for this exact story, one line each, each a different type (for example a curiosity gap, a contrarian line, a direct callout to the viewer, the cost of doing nothing, dropping into the middle of a moment, or one specific arresting number). They must be real alternatives, not the same idea reworded. Say in a clause which is strongest and why.
+2. In <plan> tags, write the ${beats}-beat plan, one short line per beat, and check it passes the but/therefore test.
+3. In <narrative> tags, write the final story as flowing cinematic prose: the world and setting, the presenter's moment and feeling, the beats in order, the producer's specifics intact, the offer and the one CTA woven in naturally. Never a shot list, never "VO:" labels, never headings. 120 to 180 words, one or two short paragraphs.
+</process>
+
+UK spelling. No em dashes. No emojis. Output only the three tagged blocks.`,
     messages: [{ role: "user", content:
-      `MY STORY / DIRECTION (this is the brief - honour it, keep its specifics, and sharpen it):\n"""${(o.storyline || "").slice(0, 3000).trim() || "(none given - invent a strong one from the supporting details below)"}"""\n\n` +
-      `Supporting details (use to enrich, never to override my story above):\nPresenter: ${o.influencerName}.${o.influencerProfile ? ` ${o.influencerProfile}` : ""}\nBrand / product: ${o.brand || "(take from my story, else infer)"}\nOffer / hook: ${o.offer || "(take from my story)"}\nKey benefits: ${o.benefits || ""}\nCTA: ${o.cta || ""}\nTone: ${o.tone || "warm, confident, effortless"}\nSetting: ${o.setting || "(one that fits the presenter)"}\n\nNow sharpen MY story - keep my exact direction and every specific, just make it vivid and well-structured.` }],
+`<brief>
+  <presenter>${o.influencerName}.${o.influencerProfile ? ` ${o.influencerProfile}` : ""}</presenter>
+  <brand>${o.brand || "(take it from my story below, else infer)"}</brand>
+  <offer>${o.offer || "(take it from my story below)"}</offer>
+  <benefits>${o.benefits || "(take them from my story below)"}</benefits>
+  <cta>${o.cta || "(take it from my story below)"}</cta>
+  <tone>${o.tone || "warm, confident, effortless"}</tone>
+  <setting>${o.setting || "(choose one that fits the presenter and the story)"}</setting>
+  <duration>${dur} seconds, roughly ${spokenWords} spoken words, ${beats} beats</duration>
+</brief>
+
+<my_story>
+${given || "(I gave no story. Invent a strong one from the brief above.)"}
+</my_story>
+
+${given
+  ? "Read my story above. Understand my direction and keep every specific I gave you. Now sharpen it."
+  : "I gave no story, so write me a strong one from the brief."}` }],
   });
+
   const block = res.content.find((b) => b.type === "text");
-  return { storyline: block && block.type === "text" ? block.text.trim() : (o.storyline || "") };
+  const raw = block && block.type === "text" ? block.text : "";
+  // Return ONLY the narrative: the angles + beat plan are the model's scaffolding (plan-then-write), not the
+  // producer's story. Fail open at every step so a missing tag can never blank the producer's storyline box.
+  const tagged = raw.match(/<narrative>([\s\S]*?)<\/narrative>/i);
+  const cleaned = (tagged ? tagged[1] : raw.replace(/<angles>[\s\S]*?<\/angles>/gi, "").replace(/<plan>[\s\S]*?<\/plan>/gi, ""))
+    .replace(/<\/?[a-z_]+>/gi, "")
+    .trim();
+  return { storyline: cleaned || given || "" };
 }
 
 // Continuity pass: after the producer curates (keeps/rejects) the reference shots, re-flow the VO so
