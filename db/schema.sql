@@ -358,6 +358,7 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('higgsfield','kling-v2-1','video', 5, 385, true),          -- FAST first-party REST Kling 2.1 (Phase 1) - ESTIMATE, Recalibrate trues it up
   ('higgsfield','kling-v2-1-master','video', 6, 462, true),   -- REST Kling 2.1 master (higher quality) - ESTIMATE
   ('higgsfield','seedance_2_0','video', 6, 462, true),        -- a-roll fallback, from the Ultra credit pool
+  ('higgsfield','seedance1_5','video', 5, 385, true),         -- Seedance 1.5 Pro b-roll (producer-selectable engine) - ESTIMATE, Recalibrate trues it up
   ('higgsfield','veo3_1','video', 40, 3080, true),            -- Veo 3.1 HERO b-roll (4K + native audio) - pricey; recalibrate
   -- PRIMARY b-roll engine on the Producer path (DoP-turbo, fast first-party). Draws from the Ultra
   -- credit POOL. ESTIMATE below - "Recalibrate costs" trues this up from Higgsfield get_cost.

@@ -125,3 +125,41 @@ export async function submitKlingRest(opts: { imageUrl: string; prompt: string; 
     return { jobSetId: null, model, error: String((e as Error)?.message || e).slice(0, 220) };
   }
 }
+
+// FIRST-PARTY REST SEEDANCE image-to-video (Seedance 1.5 Pro). Team-requested alternative b-roll engine. Takes a
+// START IMAGE (our keyframe) + prompt; durations 4/8/12s, up to 1080p, 9:16. The old "Seedance blocks faces" note
+// was about using a face as an IDENTITY reference - animating a start image that contains a face is fine (same as
+// Kling/DoP). Endpoint + model + field names are env-tunable (SEEDANCE_ENDPOINT / SEEDANCE_MODEL / SEEDANCE_IMG_KEY)
+// so the exact Higgsfield REST shape can be confirmed on the live deploy without a redeploy. Poll with pollDopOnce.
+export function seedanceRestConfigured(): boolean { return klingRestConfigured(); }
+export async function submitSeedanceRest(opts: { imageUrl: string; prompt: string; seconds?: number }): Promise<{ jobSetId: string | null; model: string; error: string | null }> {
+  const model = process.env.SEEDANCE_MODEL || "seedance1_5";
+  if (!klingRestConfigured()) return { jobSetId: null, model, error: "Higgsfield first-party API not configured (HIGGSFIELD_KEY_ID / HIGGSFIELD_KEY_SECRET)" };
+  if (!isSafePublicUrl(opts.imageUrl)) return { jobSetId: null, model, error: "unsafe or non-public image url" };
+  // Seedance durations are 4 / 8 / 12 - pick the smallest that covers the voiceover so the clip never falls short.
+  const s = opts.seconds || 5;
+  const duration = s <= 4 ? 4 : s <= 8 ? 8 : 12;
+  const imgKey = process.env.SEEDANCE_IMG_KEY || "start_image"; // Seedance uses a start-image (CLI: --start-image)
+  const params: Record<string, unknown> = {
+    model,
+    prompt: opts.prompt,
+    [imgKey]: { type: "image_url", image_url: opts.imageUrl },
+    duration,
+    resolution: process.env.SEEDANCE_RES || "1080p",
+    aspect_ratio: process.env.SEEDANCE_AR || "9:16",
+    generate_audio: false, // we lay our own voiceover/music; a Seedance-generated track would clash
+  };
+  const endpoint = process.env.SEEDANCE_ENDPOINT || "/v1/image2video/seedance";
+  try {
+    const res = await fetch(`${BASE}${endpoint}`, {
+      method: "POST",
+      headers: { "hf-api-key": process.env.HIGGSFIELD_KEY_ID!, "hf-secret": process.env.HIGGSFIELD_KEY_SECRET!, "Content-Type": "application/json" },
+      body: JSON.stringify({ params }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { id?: string; detail?: unknown };
+    if (data?.id) return { jobSetId: data.id, model, error: null };
+    return { jobSetId: null, model, error: `Seedance REST submit ${res.status}: ${JSON.stringify(data?.detail ?? data).slice(0, 200)}` };
+  } catch (e) {
+    return { jobSetId: null, model, error: String((e as Error)?.message || e).slice(0, 220) };
+  }
+}

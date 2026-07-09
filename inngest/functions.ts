@@ -3,7 +3,7 @@ import { getInfluencer, updateInfluencer, updateProductionFields, upsertClip } f
 import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_REALISM, SCENE_PEOPLE, NO_EXTRAS, buildCreativeImagePrompt, buildIdentityCardPrompt, buildFeatureSheetPrompt, buildTurnaroundPrompt, buildShotPrompt, castLockClause, CLOTHED, HUMANISER } from "@/lib/realism";
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
-import { submitDopVideo, pollDopOnce, dopConfigured, submitKlingRest, klingRestConfigured, submitImageRest } from "@/lib/vendors/higgsfield-dop";
+import { submitDopVideo, pollDopOnce, dopConfigured, submitKlingRest, klingRestConfigured, submitImageRest, submitSeedanceRest, seedanceRestConfigured } from "@/lib/vendors/higgsfield-dop";
 import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
 import { notifyRenderDone } from "@/lib/notify";
 import { bibleWardrobe } from "@/lib/bible";
@@ -1570,7 +1570,9 @@ export const generateClips = inngest.createFunction(
       // opt-in (BROLL_ENGINE=veo) or forced by a HERO shot. CRITICAL: DRAFT b-roll always uses the FAST DoP
       // proxy (looped to the 8s slot in the stitch) regardless of the chosen final engine, so iteration stays
       // quick - only the FINAL (non-draft) render uses Kling/Veo. BROLL_ENGINE=dop keeps DoP for the final too.
-      const brollEngine = (process.env.BROLL_ENGINE || "kling").toLowerCase();
+      // Per-production override (producer-selected in the UI) wins over the env default. "seedance" routes b-roll
+      // to the Seedance 1.5 REST lane; anything else keeps the default Kling fast lane.
+      const brollEngine = String((production as { broll_engine?: string })?.broll_engine || process.env.BROLL_ENGINE || "kling").toLowerCase();
       // LIVE-BG ENGINE (tunable for A/B): dop = fast first-party lane (~5 min, scene-not-lips); kling/veo = MCP
       // lane (slower, but a fuller talking-moving look). Default KLING now for the scene-3 quality test vs DoP;
       // set LIVEBG_ENGINE=dop to switch back to the fast lane. (First-party only exposes DoP, so Kling is MCP.)
@@ -1604,6 +1606,9 @@ export const generateClips = inngest.createFunction(
       // full length win. RIGID_MCP=1 forces the old MCP-lock path for rigid scenes if warping ever returns.
       const rigidToMcp = RIGID && process.env.RIGID_MCP === "1";
       const restWouldHandle = KLING_REST_ON && role === "b-roll" && !liveBg && !useVeo && !rigidToMcp;
+      // SEEDANCE (producer-selected b-roll engine): try it FIRST on the same fast REST lane; on any miss it falls
+      // through to the Kling REST block below, so switching engines can never make a scene fail to render.
+      const seedanceWouldHandle = brollEngine === "seedance" && seedanceRestConfigured() && role === "b-roll" && !liveBg && !useVeo && !rigidToMcp;
       const useDop = ((liveBg && LIVEBG_ENGINE === "dop") || (role === "b-roll" && speed) || (role === "b-roll" && !speed && brollEngine === "dop" && dopFits)) && !useVeo && dopConfigured() && !restWouldHandle;
       if (useDop) {
         // SUBMIT non-blocking, then poll in SHORT steps (never block one step on the whole render).
@@ -1652,6 +1657,29 @@ export const generateClips = inngest.createFunction(
       // the MCP path below for the end_image camera lock, and >10s keeps MCP Kling 3.0 for the up-to-15s length.
       // Self-contained: on success it returns a delivery-quality clip (metered); on ANY miss it falls straight
       // through to the MCP Kling loop, so it can never make a scene fail that MCP would have rendered.
+      // SEEDANCE lane (producer-selected). Submit → poll (~5 min ceiling) → on success return the clip; on any
+      // miss, DON'T return, so control falls through to the Kling REST lane below (Seedance never blocks a render).
+      if (seedanceWouldHandle && !url) {
+        const sd = await step.run(`sdsubmit-${i}`, () => submitSeedanceRest({ imageUrl: img, prompt: motion, seconds: clipSeconds }));
+        if (sd.jobSetId) {
+          const SD_ROUNDS = Math.max(24, Number(process.env.SEEDANCE_POLL_ROUNDS) || 75); // ~75 x 4s ≈ 5 min
+          let sdUrl: string | null = null;
+          for (let n = 0; n < SD_ROUNDS && !sdUrl; n++) {
+            const s = await step.run(`sdpoll-${i}-${n}`, () => pollDopOnce(sd.jobSetId as string));
+            if (s.url) { sdUrl = s.url; break; }
+            if (s.terminal) break;
+            await step.sleep(`sdwait-${i}-${n}`, "4s");
+          }
+          if (sdUrl) {
+            await step.run(`u-seedance-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: sd.model || "seedance1_5", unit: "video", action: "broll", count: 1 }).catch(() => {}));
+            const hosted = (await step.run(`sdhost-${i}`, () => rehostToBlob(sdUrl as string, "clips").catch(() => null))) || sdUrl;
+            const realDur = await step.run(`sddur-${i}`, () => probeDuration(hosted as string).catch(() => null));
+            return { scene: i, role, beat, kind: role, url: hosted, status: "ready", duration: (typeof realDur === "number" && realDur > 0.5) ? realDur : clipSeconds, audio_url: audioUrl || undefined, synced: false, engine: `higgsfield:${sd.model || "seedance1_5"}:rest`, draft: false };
+          }
+        }
+        if (sd.error) await step.run(`sd-alert-${i}`, async () => { await alertIfCritical("Higgsfield Seedance (b-roll)", sd.error as string, { Influencer: influencerId, Scene: i }); return { checked: true }; });
+        // fall through to the Kling REST lane below (Seedance miss → Kling covers the scene).
+      }
       if (restWouldHandle && !url) {
         // FAST DELIVERY LANE. Kling REST renders a full-length scene-shot in ~90s. A submit that stalls in the
         // queue almost always clears on a FRESH submit, so we RETRY the fast lane a couple of times (each with a

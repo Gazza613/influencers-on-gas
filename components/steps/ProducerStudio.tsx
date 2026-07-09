@@ -390,6 +390,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   const [arollRatio, setArollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [brollRatio, setBrollRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
   const [boardRatio, setBoardRatio] = useState<"9:16" | "1:1" | "16:9">("9:16"); // one ratio for the whole scene board
+  // SCENE-SHOT (b-roll) video engine: Kling (fast default) or Seedance 1.5 Pro. Applies to the next animate.
+  const [brollEngine, setBrollEngineState] = useState<string>(String((initialProduction as { broll_engine?: string })?.broll_engine || "kling"));
+  async function setBrollEngine(e: "kling" | "seedance") {
+    setBrollEngineState(e);
+    await fetch(`/api/influencers/${influencerId}/broll-engine`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ engine: e }) }).catch(() => {});
+  }
   // Captions are opt-in at stitch (default OFF - they were appearing unrequested). The optional closing
   // clip/image reuses the brief's endCardUrl/endCardKind state so there's one source of truth.
   const [stitchCaptions, setStitchCaptions] = useState<boolean>(false);
@@ -1644,7 +1650,14 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                     <button onClick={() => shootAll(boardRatio)} disabled={shooting || rendering} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{shooting && shootingRole === "" ? "📸 Shooting all keyframes…" : "📸 Shoot all keyframes"}</button>
                     <button onClick={() => animateAll(false)} disabled={shooting || wholeBoardBusy || rendering || animatingScenes.size > 0 || builtCount === keptScenes.length} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{(wholeBoardBusy || rendering) ? "🎞️ Animating…" : builtCount === keptScenes.length && keptScenes.length > 0 ? "✓ All scenes animated" : builtCount > 0 ? `🎞️ Animate remaining (${keptScenes.length - builtCount})` : "🎞️ Animate all"}</button>
                     {builtCount > 0 && <button onClick={() => animateAll(true)} disabled={shooting || wholeBoardBusy || rendering || animatingScenes.size > 0} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink-dim hover:text-ink disabled:opacity-50" title="Re-render EVERY clip from scratch (costs more) - only if you want a full redo">↻ Re-animate all</button>}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <span className="text-[11px] text-ink-faint">Scene-shot engine:</span>
+                      {(["kling", "seedance"] as const).map((e) => (
+                        <button key={e} onClick={() => setBrollEngine(e)} title={e === "seedance" ? "Seedance 1.5 Pro for scene shots (b-roll). Applies to the NEXT animate; falls back to Kling automatically if a scene can't render on it." : "Kling 2.1 — the fast default scene-shot engine (~90s)."} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition ${brollEngine === e ? "border-[#a855f7] bg-[#a855f7]/12 text-[#c79bff]" : "border-line text-ink-dim hover:text-ink"}`}>{e === "kling" ? "Kling (default)" : "Seedance ✨"}</button>
+                      ))}
+                    </div>
                   </div>
+                  {brollEngine === "seedance" && <p className="text-[11px] text-[#c79bff]">🎬 Scene shots will render on <b>Seedance 1.5 Pro</b> on the next animate. Talking shots stay on HeyGen. If a scene can&apos;t render on Seedance it automatically falls back to Kling, so nothing ever fails.</p>}
                   <p className="text-[11px] text-[#93c5fd]">Everything renders at <b>delivery quality</b> in one pass now (full 1080p talking shots + full-length scene shots on the fast lane), so there&apos;s no draft/final step.</p>
                   <p className="text-[12px] text-ink-faint"><b className="text-ready">{builtCount}/{keptScenes.length}</b> kept scenes have a finished clip. <b>Animate remaining</b> only renders the missing ones (it never re-runs clips you already have).</p>
                   {(rendering || wholeBoardBusy || animatingScenes.size > 0) && <p className="rounded-md border border-[#38bdf8]/25 bg-[#38bdf8]/[0.06] px-3 py-1.5 text-[11px] text-[#7dd3fc]">🛈 Safe to close this tab or come back later - rendering keeps running on our servers, and everything will be here when you return. A scene-shot clip can take up to ~40 min when the queue is busy.</p>}
