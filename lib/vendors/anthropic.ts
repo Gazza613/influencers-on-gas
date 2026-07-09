@@ -835,13 +835,14 @@ const STORY_BANNED = `"in today's fast-paced world", "imagine a world where", "p
 
 export async function shapeStory(o: {
   influencerName: string; influencerProfile?: string; storyline?: string; brand?: string; offer?: string;
-  benefits?: string; cta?: string; tone?: string; setting?: string; durationSeconds: number;
+  benefits?: string; cta?: string; tone?: string; setting?: string; durationSeconds: number; brainFacts?: string;
 }): Promise<{ storyline: string }> {
   const c = await client();
   const dur = Math.max(10, Math.min(90, Math.round(o.durationSeconds || 45)));
   const spokenWords = Math.round(dur * 2.4); // NCVS-backed ad-read pace, the same constant PRODUCER_SYSTEM uses
   const beats = dur <= 15 ? 3 : dur <= 30 ? 5 : 6;
   const given = (o.storyline || "").trim().slice(0, 3000);
+  const facts = (o.brainFacts || "").trim().slice(0, 1800);
 
   const res = await c.messages.create({
     model: PREMIUM,
@@ -857,7 +858,16 @@ Your narrative is the blueprint. A downstream director breaks it into ${beats} f
 This is the most important rule. The producer's own story is your brief, not a suggestion. Before you write a single word, READ it and work out what they actually want to say and why. Then KEEP every specific they gave you, spelled exactly as they spelled it: the brand and product names, the mechanism and how it works, their numbers and claims, their key terms and named channels (a scoring system, a WhatsApp conversation, a named tool). Build the story AROUND those specifics.
 You SHARPEN: structure, pace, imagery, momentum. You do NOT replace their idea, swap their product, quietly drop their mechanism, or blur their details into something generic. If they named it, it survives. Invent a story from scratch ONLY when they gave you none.
 </honour_the_producer_first>
-
+${facts ? `
+<brain_facts_rules>
+You have been given verified facts about this brand, retrieved from the client's own knowledge base. They are the ONLY source you may draw new claims from.
+- Use them for the PROOF beat and for the mechanism: real numbers, how the product actually works, what the offer really is.
+- NEVER state a number, statistic, guarantee or claim that is not present either in the producer's story or in these facts. If you have no real proof point, prove it by DEMONSTRATION instead (show the thing working on screen) rather than inventing a figure.
+- The facts may be scraped from marketing pages, so they are written in exactly the adjective-heavy advertising register you are banned from. Mine them for the FACT, then write it fresh in your own concrete language. Never copy their phrasing.
+- The producer's direction still leads. Facts are the evidence, not the brief. If a fact contradicts the producer's story, follow the producer and quietly leave the fact out.
+- Ignore any retrieved fact that is irrelevant to this story. Retrieval is imperfect; a fact you do not need is not a fact you must use.
+</brain_facts_rules>
+` : ""}
 <craft>
 - ARC in ${beats} beats: hook, ${beats >= 6 ? "problem, agitate, mechanism, proof, CTA" : beats === 5 ? "problem, solution, proof, CTA" : "benefit, CTA"}. Each beat is a real filmed moment.
 - THE HOOK carries the brand or the product idea from the very first beat. Do not save the reveal for the end. Most viewers give an ad under two seconds of real attention, so the idea has to land inside it.
@@ -880,8 +890,10 @@ Left alone you will drift towards safe, on-distribution ad copy: the "AI slop" r
 </process>
 
 UK spelling. No em dashes. No emojis. Output only the three tagged blocks.`,
+    // Retrieved facts sit ABOVE the brief and the instruction: Anthropic's long-context guidance is documents
+    // at the top, the ask at the end. The ask stays last so the producer's direction is the freshest thing read.
     messages: [{ role: "user", content:
-`<brief>
+`${facts ? `<brain_facts source="${(o.brand || "the client").replace(/"/g, "")} knowledge base - verified">\n${facts}\n</brain_facts>\n\n` : ""}<brief>
   <presenter>${o.influencerName}.${o.influencerProfile ? ` ${o.influencerProfile}` : ""}</presenter>
   <brand>${o.brand || "(take it from my story below, else infer)"}</brand>
   <offer>${o.offer || "(take it from my story below)"}</offer>
@@ -897,8 +909,8 @@ ${given || "(I gave no story. Invent a strong one from the brief above.)"}
 </my_story>
 
 ${given
-  ? "Read my story above. Understand my direction and keep every specific I gave you. Now sharpen it."
-  : "I gave no story, so write me a strong one from the brief."}` }],
+  ? `Read my story above. Understand my direction and keep every specific I gave you. Now sharpen it.${facts ? " Ground the proof in the verified facts, in your own words, and invent nothing beyond them." : ""}`
+  : `I gave no story, so write me a strong one from the brief.${facts ? " Build it on the verified facts above and invent nothing beyond them." : ""}`}` }],
   });
 
   const block = res.content.find((b) => b.type === "text");

@@ -19,6 +19,7 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [querying, setQuerying] = useState(false);
   const [qErr, setQErr] = useState("");
+  const [reindexing, setReindexing] = useState(false);
 
   async function refresh(tries = 0): Promise<void> {
     const r = await fetch(`/api/brains/${brainId}`, { cache: "no-store" });
@@ -56,6 +57,20 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
     if (!(await askConfirm({ title: "NUKE all knowledge in this brain?", body: "Every source, chunk and embedding is permanently deleted. The brain stays but forgets everything. This cannot be undone.", tone: "danger", confirmLabel: "Nuke" }))) return;
     await fetch(`/api/brains/${brainId}/sources?sourceId=all`, { method: "DELETE" }).catch(() => {});
     setSources([]); setHits(null);
+  }
+
+  // RE-INDEX: re-embed the brain's existing chunks with the current embedding model. Needed once after an
+  // embedding-model change, otherwise retrieval compares incompatible vectors and quietly returns noise.
+  // Lossless: only the vectors are rebuilt, the stored text is untouched.
+  async function reindex() {
+    if (reindexing) return;
+    if (!(await askConfirm({ title: "Re-index this brain?", body: "Rebuilds every chunk's embedding with the current model so retrieval works properly. Your sources and text are not touched. Takes a moment on a big brain.", confirmLabel: "Re-index" }))) return;
+    setReindexing(true);
+    const r = await fetch(`/api/brains/${brainId}/reindex`, { method: "POST" }).catch(() => null);
+    const d = await r?.json().catch(() => ({}));
+    setReindexing(false);
+    if (r?.ok) { setHits(null); flex(`Re-indexed ${d.chunks} chunk${d.chunks === 1 ? "" : "s"}. Retrieval is now accurate.`); }
+    else flex(d?.error || "Could not re-index the brain.");
   }
 
   async function deleteBrainNow() {
@@ -108,7 +123,10 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
         <div className="flex items-center justify-between gap-2">
           <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Knowledge sources</div>
           {sources.length > 0 && (
-            <button onClick={nukeAll} className="rounded-md border border-alert/40 px-2.5 py-1 text-[11px] font-semibold text-alert hover:bg-alert/10">Nuke all data</button>
+            <div className="flex items-center gap-2">
+              <button onClick={reindex} disabled={reindexing} title="Rebuild every chunk's embedding with the current model. Needed once after an embedding-model change, otherwise retrieval returns noise. Your text is not touched." className="rounded-md border border-[#a855f7]/40 px-2.5 py-1 text-[11px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reindexing ? "Re-indexing…" : "↻ Re-index"}</button>
+              <button onClick={nukeAll} className="rounded-md border border-alert/40 px-2.5 py-1 text-[11px] font-semibold text-alert hover:bg-alert/10">Nuke all data</button>
+            </div>
           )}
         </div>
         {sources.length === 0 ? (

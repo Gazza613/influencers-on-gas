@@ -71,7 +71,7 @@ function usePersistedDraft(key: string, initial: string) {
   useEffect(() => { if (loaded.current) { try { localStorage.setItem(key, v); } catch { /* ignore */ } } }, [key, v]);
   return [v, setV] as const;
 }
-export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio" }) {
+export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all", brains = [], initialClientId = "" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio"; brains?: { id: string; name: string }[]; initialClientId?: string }) {
   // STAGE SPLIT: "foundation" = Script & Voice stage (brief -> storyboard -> voice); "studio" = The Final Cut
   // stage (shoot -> animate -> music -> stitch -> showreel). "all" = the legacy single page (unchanged).
   const isFoundation = mode !== "studio"; // show brief + concept + voice
@@ -223,6 +223,15 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // it into the optimised storyboard, inferring any blank brief fields from it.
   const [storyline, setStoryline] = usePersistedDraft(`gas:storyline:${influencerId}`, String((initialProduction?.brief as { storyline?: string })?.storyline || ""));
   const [storyBusy, setStoryBusy] = useState(false); // AI story helper working
+  // BRAIN: which client brain (if any) grounds "Sharpen my story" in verified facts. Empty = no brain, and the
+  // sharpener works purely from what the producer typed (pasting a brief straight in is a first-class path).
+  const [clientId, setClientId] = useState(initialClientId);
+  const [usedBrain, setUsedBrain] = useState(false);
+  const pickBrain = async (next: string) => {
+    setClientId(next);
+    setUsedBrain(false);
+    await fetch(`/api/influencers/${influencerId}/brain`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: next || null }) }).catch(() => {});
+  };
   const genAbortRef = useRef<AbortController | null>(null); // cancel an in-flight storyboard direction
   const [err, setErr] = useState("");
 
@@ -949,7 +958,8 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       body: JSON.stringify({ storyline, brand, offer, benefits, cta, tone, setting, durationSeconds: duration }),
     }).then((x) => x.json()).catch(() => null);
     setStoryBusy(false);
-    if (r?.storyline) setStoryline(r.storyline); else setErr(r?.error || "Couldn't shape the story - give it another go.");
+    if (r?.storyline) { setStoryline(r.storyline); setUsedBrain(!!r.usedBrain); }
+    else setErr(r?.error || "Couldn't shape the story - give it another go.");
   }
 
   return (
@@ -986,8 +996,23 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 <span className="text-sm font-extrabold text-ink">🎬 Your story</span>
                 <span className="text-[11px] text-ink-faint">tell me the ad in your own words and I&apos;ll direct it, shot by shot, as your producer</span>
               </div>
-              {/* AI HELPER: shape rough notes into a vivid, producer-grade story you can then Direct. */}
-              <button onClick={polishStory} disabled={storyBusy || busy} title="I'll take your notes (or the brief) and shape them into a vivid, top-1% story you can review, edit, then direct." className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{storyBusy ? "✨ Shaping your story…" : storyline.trim() ? "✨ Sharpen my story" : "✨ Help me write it"}</button>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* BRAIN (optional): ground the sharpened story on a client's verified facts. "No brain" keeps
+                    the sharpener working purely from what the producer typed. */}
+                {brains.length > 0 && (
+                  <label className="flex items-center gap-1.5" title="Ground the story on a client brain's verified facts. Without one, I work only from what you've written.">
+                    <span className="text-[11px] text-ink-faint">🧠 Brain</span>
+                    <select value={clientId} onChange={(e) => pickBrain(e.target.value)} disabled={storyBusy || busy}
+                      className="rounded-lg border border-line bg-surface-1 px-2 py-1.5 text-[11px] font-semibold text-ink outline-none focus:border-[#a855f7] disabled:opacity-50">
+                      <option value="">No brain</option>
+                      {brains.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </label>
+                )}
+                {usedBrain && <span className="rounded-full border border-[#4ade80]/40 bg-[#4ade80]/10 px-2 py-1 text-[10px] font-semibold text-[#86efac]">grounded on the brain</span>}
+                {/* AI HELPER: shape rough notes into a vivid, producer-grade story you can then Direct. */}
+                <button onClick={polishStory} disabled={storyBusy || busy} title="I'll take your notes (or the brief) and shape them into a vivid, top-1% story you can review, edit, then direct." className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{storyBusy ? "✨ Shaping your story…" : storyline.trim() ? "✨ Sharpen my story" : "✨ Help me write it"}</button>
+              </div>
             </div>
             <textarea value={storyline} onChange={(e) => setStoryline(e.target.value)} rows={5} disabled={storyBusy}
               placeholder={`Tell the story of this ad in your own words - who it's for, the world it lives in, the moments and feeling you want, the offer and the call to action.\n\ne.g. "${name} is at a sunlit V&A Waterfront café. He leans in like he's sharing a secret: most people overthink AI. He shows how one clear prompt gets a world-class result, cuts to the screen, then invites you to book a free strategy call."\n\nThe more vivid, the better - I'll optimise the pacing, shots and voiceover to a top-1% standard. Or hit "Help me write it" and I'll draft one from your brief.`}

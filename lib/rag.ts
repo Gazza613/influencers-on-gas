@@ -49,6 +49,36 @@ export async function ingestChunks(
   return stored;
 }
 
+// RE-INDEX a brain: recompute every chunk's embedding with the CURRENT model, in place.
+//
+// Vectors from different Voyage models are not comparable. Embedding a query with voyage-4-lite and comparing
+// it to documents embedded with voyage-3.5 yields meaningless similarity - both are 1024-dim, so nothing errors,
+// the retrieval just silently returns noise. Every brain ingested before the model switch is in exactly that
+// state and must be re-embedded once. The chunk CONTENT is stored, so this is lossless: no re-crawl, no need to
+// re-paste a note, nothing to lose. Scoped to one client_id, which is the brain-isolation guarantee.
+export async function reembedBrain(clientId: string): Promise<number> {
+  const rows = (await db().query(
+    `select id, content from knowledge_chunks where client_id = $1 order by created_at`,
+    [clientId],
+  )) as { id: string; content: string }[];
+  if (!rows.length) return 0;
+
+  let done = 0;
+  const BATCH = 32;
+  for (let b = 0; b < rows.length; b += BATCH) {
+    const batch = rows.slice(b, b + BATCH);
+    const vectors = await embed(batch.map((r) => r.content), "document");
+    for (let j = 0; j < batch.length; j++) {
+      await db().query(
+        `update knowledge_chunks set embedding = $1::vector where id = $2 and client_id = $3`,
+        [toVectorLiteral(vectors[j]), batch[j].id, clientId],
+      );
+      done++;
+    }
+  }
+  return done;
+}
+
 export type Retrieved = { content: string; metadata: Record<string, unknown>; score: number };
 
 // Retrieve the top-k most relevant chunks for a query, HARD-SCOPED to one brain.

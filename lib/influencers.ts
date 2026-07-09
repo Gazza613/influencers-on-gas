@@ -46,12 +46,14 @@ export async function createInfluencer(input: {
 
 export async function updateInfluencer(
   id: string,
-  fields: { name?: string; voice_id?: string | null; status?: string; persona?: Record<string, unknown>; higgsfield_soul_id?: string | null; heygen_avatar_id?: string | null; look_refs?: unknown[] },
+  fields: { name?: string; voice_id?: string | null; status?: string; persona?: Record<string, unknown>; higgsfield_soul_id?: string | null; heygen_avatar_id?: string | null; look_refs?: unknown[]; client_id?: string | null },
 ): Promise<void> {
   const sets: string[] = [];
   const vals: unknown[] = [];
   let i = 1;
   if (fields.name !== undefined) { sets.push(`name = $${i++}`); vals.push(fields.name); }
+  // client_id is the brain / tenancy key: it decides which brain (if any) grounds this influencer's story.
+  if (fields.client_id !== undefined) { sets.push(`client_id = $${i++}`); vals.push(fields.client_id); }
   if (fields.voice_id !== undefined) { sets.push(`voice_id = $${i++}`); vals.push(fields.voice_id); }
   if (fields.status !== undefined) { sets.push(`status = $${i++}`); vals.push(fields.status); }
   if (fields.persona !== undefined) { sets.push(`persona = $${i++}`); vals.push(JSON.stringify(fields.persona)); }

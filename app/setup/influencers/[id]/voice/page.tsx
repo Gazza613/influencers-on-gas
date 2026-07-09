@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getInfluencer } from "@/lib/influencers";
+import { listBrains } from "@/lib/brains";
 import ProducerStudio from "@/components/steps/ProducerStudio";
 
 export const dynamic = "force-dynamic";
@@ -27,5 +28,8 @@ export default async function ScriptVoicePage({ params }: { params: Promise<{ id
     .filter((c) => typeof c.url === "string" && c.url)
     .map((c) => ({ url: c.url as string, role: c.role === "b-roll" ? "b-roll" : "a-roll", ratio: String(c.ratio || ""), scene: String(c.scene || ""), resolution: String(c.resolution || "") }));
 
-  return <ProducerStudio mode="foundation" influencerId={inf.id} name={inf.name} initialVoiceId={String(persona.voice_id || "")} initialVoiceName={String(persona.voice_name || "")} initialProduction={(persona.production as Record<string, unknown>) ?? null} creatives={creatives} arollRef={String(persona.aroll_ref_url || "")} brollRef={String(persona.broll_ref_url || "")} voiceModel={persona.voice_model === "v3" ? "v3" : "v2"} />;
+  // Client brains available to ground "Sharpen my story". Empty list simply hides the picker.
+  const brains = (await listBrains().catch(() => [])).map((b) => ({ id: b.id, name: b.name }));
+
+  return <ProducerStudio mode="foundation" influencerId={inf.id} name={inf.name} initialVoiceId={String(persona.voice_id || "")} initialVoiceName={String(persona.voice_name || "")} initialProduction={(persona.production as Record<string, unknown>) ?? null} creatives={creatives} arollRef={String(persona.aroll_ref_url || "")} brollRef={String(persona.broll_ref_url || "")} voiceModel={persona.voice_model === "v3" ? "v3" : "v2"} brains={brains} initialClientId={inf.client_id ?? ""} />;
 }
