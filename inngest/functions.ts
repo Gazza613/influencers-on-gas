@@ -10,6 +10,7 @@ import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { texturiseClip, texturePassEnabled } from "@/lib/texture";
+import { normaliseToLufs, bedVolume, BED_REFERENCE_LUFS, VO_REFERENCE_LUFS, MUSIC_UNDER_VO_DB, AMBIENT_UNDER_VO_DB } from "@/lib/loudness";
 import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, normalizeWav, highpassWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
@@ -1908,11 +1909,16 @@ export const generateAudio = inngest.createFunction(
     // CATCH INSIDE each step (return {url,error}) so a failed vendor call NEVER throws the step - with
     // retries:0 a thrown step would fail the whole run and save NOTHING (the "audio step produces nothing"
     // bug). This way whichever bed succeeds still shows, and a real failure surfaces its reason in the UI.
+    // LOUDNESS-NORMALISE BOTH BEDS to a known reference before they are stored (see lib/loudness.ts).
+    // ElevenLabs hands back wildly different absolute levels per generation - on Dave's cut the ambient stem
+    // arrived 29 dB quieter than the music - so a fixed Shotstack volume like 0.16 means something different
+    // on every render. The gain MUST be baked into the file: Shotstack caps volume at 1.0, so a -47.8 LUFS
+    // ambient bed can never be lifted to its target at the mixer. Fails open (returns the original buffer).
     const [music, ambient] = await Promise.all([
-      step.run("music", async () => { try { const m = await generateMusic(brief, total * 1000); return { url: await putBytes(m.buf, "music", m.ext, m.mime), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
+      step.run("music", async () => { try { const m = await generateMusic(brief, total * 1000); const buf = await normaliseToLufs(m.buf, m.ext, BED_REFERENCE_LUFS); return { url: await putBytes(buf, "music", m.ext, m.mime), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
       ambientOff
         ? Promise.resolve({ url: null as string | null, error: null as string | null }) // producer turned ambient OFF
-        : step.run("ambient", async () => { try { const buf = await generateSfx(buildAmbientPrompt(ambientDesc, setting), 22); return { url: await putBytes(buf, "ambient", "mp3", "audio/mpeg"), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
+        : step.run("ambient", async () => { try { const raw = await generateSfx(buildAmbientPrompt(ambientDesc, setting), 22); const buf = await normaliseToLufs(raw, "mp3", BED_REFERENCE_LUFS); return { url: await putBytes(buf, "ambient", "mp3", "audio/mpeg"), error: null as string | null }; } catch (e) { return { url: null as string | null, error: String((e as Error)?.message || e).slice(0, 180) }; } }),
     ]);
     const musicUrl = music.url, ambientUrl = ambient.url;
     if (musicUrl) await step.run("u-music", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "music", count: 1 }).catch(() => {}));
@@ -2118,18 +2124,21 @@ export const assembleVideo = inngest.createFunction(
       await step.run("u-ambient", () => recordUsage({ influencerId, provider: "elevenlabs", model: "music", unit: "music", action: "ambient", count: 1 }).catch(() => {}));
     } catch { ambientUrl = null; }
     const ambientTrack: Record<string, unknown>[] = [];
-    // Ambient sits UNDER the VO + music but must be audible — 0.1 was inaudible. ~0.3 reads as real
-    // room tone without competing. Env-tunable (AMBIENT_VOLUME).
-    // MIX HIERARCHY (industry best practice): the VOICE is the loudest element; the MUSIC bed sits ~-18 to -22dB
-    // below it; and AMBIENT/SFX SUPPORT without competing - at or just BELOW the music, never above it. So:
-    // voice 1.0 >> music 0.18 (~-15dB) >= ambient 0.16 (~-16dB). The earlier 0.34 (ambient louder than music)
-    // was wrong; 0.18 was masked because it sat under a louder 0.24 music. Now they're close so ambient reads as
-    // real room tone under the voice without dominating. Env-tunable (AMBIENT_VOLUME / MUSIC_VOLUME).
-    // Per-production mix levels (producer-set in the Music step; fall back to the research-backed defaults).
-    const ambientVolSet = (production as { ambient_vol?: number })?.ambient_vol;
-    const ambientVol = Math.max(0, Math.min(1, typeof ambientVolSet === "number" ? ambientVolSet : (Number(process.env.AMBIENT_VOLUME) || 0.16)));
-    const musicVolSet = (production as { music_vol?: number })?.music_vol;
-    const musicVol = Math.max(0, Math.min(1, typeof musicVolSet === "number" ? musicVolSet : (Number(process.env.MUSIC_VOLUME) || 0.18)));
+    // MIX (see lib/loudness.ts). The VOICE is the anchor element - ATSC A/85 anchors programme loudness to
+    // dialogue - so both beds are placed a fixed dB OFFSET below the voiceover's MEASURED loudness, not at a
+    // blind multiplier. Music sits 12-18 dB under speech, ambient 18-26 dB under (broadcast/post practice).
+    // The beds were normalised to a known reference when they were generated, so this arithmetic is honest
+    // whatever level ElevenLabs happened to output. If the VO can't be measured we fall back to the reference,
+    // which reproduces the old behaviour rather than silencing anything.
+    // Every scene's voice is normalised to VO_REFERENCE_LUFS and both beds to BED_REFERENCE_LUFS, so the mixer
+    // needs no measurement: the offsets are exact constants. That is the whole point - the balance is now
+    // reproducible on every render instead of depending on whatever level ElevenLabs happened to output.
+    // The producer's sliders stay meaningful: they TRIM around the calibrated level (1.0 = calibrated,
+    // >1 louder, <1 softer) rather than setting an absolute gain against an unknown source.
+    const trim = (set: unknown, legacyDefault: number) =>
+      typeof set === "number" && set >= 0 ? Math.min(3, set / legacyDefault) : 1;
+    const musicVol = bedVolume(null, MUSIC_UNDER_VO_DB, trim((production as { music_vol?: number })?.music_vol, 0.18));
+    const ambientVol = bedVolume(null, AMBIENT_UNDER_VO_DB, trim((production as { ambient_vol?: number })?.ambient_vol, 0.16));
     if (ambientUrl) for (let t = 0; t < total; t += 22) ambientTrack.push({ asset: { type: "audio", src: ambientUrl, volume: ambientVol }, start: t, length: Math.min(22, total - t) });
 
     // Voiceover track. A-roll: lay back the EXACT audio we lip-synced to (Seedance video is silent),
@@ -2160,11 +2169,21 @@ export const assembleVideo = inngest.createFunction(
             const r = await fetch(synced as string);
             if (!r.ok) return synced as string;
             const buf = Buffer.from(await r.arrayBuffer());
+            if (buf.subarray(0, 4).toString("latin1") !== "RIFF") return synced as string; // not a WAV → leave as-is
             // Clean the voice: high-pass the sub-bass rumble (the "background" exposed when ambient is off),
-            // then even out quiet scenes (so the voice never drops under the bed), then de-click the edges.
+            // then bring the scene to the VOICE ANCHOR loudness, then de-click the edges.
+            //
+            // The voice is the anchor element the whole mix is balanced against (ATSC A/85 anchors programme
+            // loudness to dialogue), so it must land on a KNOWN loudness, not a peak/RMS approximation. Dave's
+            // cut measured -22.2 LUFS: about 6 dB under target, which is why the whole ad sounded quiet and the
+            // beds felt soft under it. It also matters for delivery - YouTube (and Spotify's default) only turn
+            // audio DOWN, never up, so shipping quieter than the platform target is the one mistake with no
+            // recovery. Normalising every scene to the same anchor also evens out quiet scenes, which is what
+            // the old RMS normalizeWav was reaching for. Fails open: on any error the buffer passes through.
             const hpHz = process.env.VO_HIGHPASS_HZ != null ? Number(process.env.VO_HIGHPASS_HZ) : 90;
-            const faded = fadeWavEdges(normalizeWav(highpassWav(buf, hpHz)), fadeMs);
-            if (faded === buf) return synced as string; // not a WAV we can fade (e.g. MP3) → leave as-is
+            const cleaned = highpassWav(buf, hpHz);
+            const anchored = await normaliseToLufs(cleaned, "wav", VO_REFERENCE_LUFS);
+            const faded = fadeWavEdges(anchored === cleaned ? normalizeWav(cleaned) : anchored, fadeMs);
             return await putBytes(faded, "vo-faded", "wav", "audio/wav");
           } catch { return synced as string; }
         });
