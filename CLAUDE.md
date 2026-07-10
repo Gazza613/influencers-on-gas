@@ -23,7 +23,7 @@ master brief).
 - **Neon Postgres + pgvector** (`@neondatabase/serverless`; never `@vercel/kv`/`@vercel/postgres`)
 - **Auth.js v5** (`auth.ts` / `auth.config.ts` / `proxy.ts`) — v1 is a single super-admin (Gary) from env; moves to the `users` table in Phase 1b
 - **Inngest** (durable pipeline — not yet added), **Vercel Blob** (storage)
-- Vendors (GAS-funded, GAS's own accounts): **Anthropic** (Sonnet 4.6 default / Opus 4.8 premium / Haiku 4.5 ingestion), **ElevenLabs** (TTS/Music/SFX/Scribe), **HeyGen** (a-roll), **Higgsfield** (Soul/Seedance b-roll), **Magnific** (skin realism), **Shotstack** (assembly), **Voyage** `voyage-3.5` embeddings (1024-dim), **Firecrawl** (crawl)
+- Vendors (GAS-funded, GAS's own accounts): **Anthropic** (Sonnet 4.6 default / Opus 4.8 premium / Haiku 4.5 ingestion), **ElevenLabs** (TTS/Music/SFX/Scribe), **HeyGen** (a-roll), **Higgsfield** (Soul/Seedance b-roll, `nano_banana_pro` humaniser), **Shotstack** (assembly), **Voyage** `voyage-3.5` embeddings (1024-dim), **Firecrawl** (crawl)
 
 ## Key files (current — Phase 1 foundation)
 
@@ -52,7 +52,7 @@ master brief).
   (`/cost-control`): record via `recordUsage()` / `metered()` in `lib/usage.ts`
   (durable jobs use a dedicated `step.run("usage-…")`), and add a `rate_card` row
   for its `(provider, model, unit)`. A step that spends money without a usage event
-  is a bug. Tracked today: Higgsfield (casting/photoshoot/soul), Magnific (humaniser),
+  is a bug. Tracked today: Higgsfield (casting/photoshoot/soul + `nano_banana_pro` humaniser),
   HeyGen (presenter), Claude (Character Casting), Voyage + Firecrawl (brain ingestion).
   ElevenLabs / Shotstack land metered as they're built.
 
