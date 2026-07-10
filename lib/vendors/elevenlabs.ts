@@ -294,13 +294,32 @@ export function pcmSliceToWav(pcm: Buffer, startSec: number, endSec: number): Bu
   return Buffer.concat([h, data]);
 }
 
-// Apply a ~4ms fade in/out to the EDGES of an already-encoded 16-bit PCM WAV (our slice format: 44-byte
-// header). Used at stitch time so any voice clip - even one cut/animated before the slice-fade existed -
-// starts and ends at zero amplitude, killing the click where two clips butt up at a scene cut. Returns the
-// input unchanged if it isn't a WAV we recognise (e.g. an MP3 from a one-off TTS).
+// Find where a WAV's sample data actually begins by WALKING the RIFF chunks.
+//
+// These helpers used to hard-code dataStart = 44, which holds for our own slices (fmt + data, nothing else)
+// but NOT for a WAV written by ffmpeg: it inserts a LIST/INFO chunk, pushing `data` to byte 78. Writing
+// samples at 44 then overwrote the header and produced a file Shotstack rejected as "not a valid media file".
+// Any WAV from outside this module must be parsed, never assumed. Returns -1 if there is no data chunk.
+export function wavDataStart(wav: Buffer): number {
+  if (wav.length < 12 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return -1;
+  let i = 12;
+  while (i + 8 <= wav.length) {
+    const id = wav.toString("ascii", i, i + 4);
+    const size = wav.readUInt32LE(i + 4);
+    if (id === "data") return i + 8;
+    i += 8 + size + (size % 2); // chunks are word-aligned
+  }
+  return -1;
+}
+
+// Apply a ~4ms fade in/out to the EDGES of an already-encoded 16-bit PCM WAV. Used at stitch time so any
+// voice clip - even one cut/animated before the slice-fade existed - starts and ends at zero amplitude,
+// killing the click where two clips butt up at a scene cut. Returns the input unchanged if it isn't a WAV
+// we recognise (e.g. an MP3 from a one-off TTS).
 export function fadeWavEdges(wav: Buffer, fadeMs = 4): Buffer {
-  if (wav.length <= 46 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return wav;
-  const SR = 44100, BPS = 2, dataStart = 44;
+  const dataStart = wavDataStart(wav);
+  if (dataStart < 0 || wav.length <= dataStart + 2) return wav;
+  const SR = 44100, BPS = 2;
   const out = Buffer.from(wav);
   const nS = Math.floor((out.length - dataStart) / BPS);
   const fadeN = Math.min(Math.floor(nS / 2), Math.floor((SR * fadeMs) / 1000));
@@ -319,8 +338,10 @@ export function fadeWavEdges(wav: Buffer, fadeMs = 4): Buffer {
 // is off. A gentle 2nd-order Butterworth high-pass at ~85Hz removes the rumble while fully preserving the voice
 // (a male fundamental is ~100Hz+; broadcast voice is routinely high-passed here). Mono 16-bit WAV only.
 export function highpassWav(wav: Buffer, cutoffHz = 85): Buffer {
-  if (cutoffHz <= 0 || wav.length <= 46 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return wav;
-  const SR = 44100, BPS = 2, dataStart = 44;
+  if (cutoffHz <= 0) return wav;
+  const dataStart = wavDataStart(wav);
+  if (dataStart < 0) return wav;
+  const SR = 44100, BPS = 2;
   const nS = Math.floor((wav.length - dataStart) / BPS);
   if (nS <= 0) return wav;
   // RBJ biquad high-pass coefficients (Q = 0.707).
@@ -343,8 +364,9 @@ export function highpassWav(wav: Buffer, cutoffHz = 85): Buffer {
 // under the music/ambient bed. ONLY ever boosts toward a target RMS, and clamps the gain so the peak never
 // exceeds a ceiling (no clipping = no crackle). Loud scenes are left alone. Mono 16-bit WAV only.
 export function normalizeWav(wav: Buffer, targetRms = 0.1, ceiling = 0.97): Buffer {
-  if (wav.length <= 46 || wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return wav;
-  const BPS = 2, dataStart = 44;
+  const dataStart = wavDataStart(wav);
+  if (dataStart < 0) return wav;
+  const BPS = 2;
   const nS = Math.floor((wav.length - dataStart) / BPS);
   if (nS <= 0) return wav;
   let sumsq = 0, peak = 0;

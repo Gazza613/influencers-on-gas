@@ -61,14 +61,29 @@ export async function pollRender(id: string, rounds = 80): Promise<{ url: string
 
 // ONE quick status check (returns fast) so the caller can poll across short durable steps with
 // step.sleep - never blocking a single serverless invocation for minutes.
+// Coerce whatever a vendor calls an "error" into a display-safe string.
+function errorText(e: unknown): string {
+  if (typeof e === "string" && e.trim()) return e.slice(0, 220);
+  if (e && typeof e === "object") {
+    const m = (e as { message?: unknown }).message;
+    if (typeof m === "string" && m.trim()) return m.slice(0, 220);
+    try { return JSON.stringify(e).slice(0, 220); } catch { /* fall through */ }
+  }
+  return "render failed";
+}
+
 export async function pollRenderOnce(id: string): Promise<{ url: string | null; terminal: boolean; error: string | null }> {
   try {
     const res = await fetch(`${BASE}/render/${id}`, { headers: { "x-api-key": await key() }, cache: "no-store" });
     if (!res.ok) return { url: null, terminal: false, error: null };
-    const data = (await res.json()) as { response?: { status?: string; url?: string; error?: string } };
+    // Shotstack's `error` is NOT always a string: a failed render returns an object ({ name, message }).
+    // Persisting that object put a non-string into production.assembly_error, which the UI renders directly -
+    // React then threw "Objects are not valid as a React child" and the whole Producer page crashed. Always
+    // hand callers a plain string.
+    const data = (await res.json()) as { response?: { status?: string; url?: string; error?: unknown } };
     const status = String(data?.response?.status || "").toLowerCase();
     if (status === "done" && data.response?.url) return { url: data.response.url, terminal: true, error: null };
-    if (status === "failed") return { url: null, terminal: true, error: data.response?.error || "render failed" };
+    if (status === "failed") return { url: null, terminal: true, error: errorText(data.response?.error) };
     return { url: null, terminal: false, error: null };
   } catch { return { url: null, terminal: false, error: null }; }
 }

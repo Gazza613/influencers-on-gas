@@ -71,6 +71,19 @@ function usePersistedDraft(key: string, initial: string) {
   useEffect(() => { if (loaded.current) { try { localStorage.setItem(key, v); } catch { /* ignore */ } } }, [key, v]);
   return [v, setV] as const;
 }
+
+// NEVER render a raw error value. A vendor (Shotstack) returns a failed render's error as an OBJECT, which
+// got persisted into production.assembly_error - rendering it threw "Objects are not valid as a React child"
+// and took the whole Producer page down mid-build. Coerce anything to display-safe text.
+function errText(e: unknown): string {
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object") {
+    const m = (e as { message?: unknown }).message;
+    if (typeof m === "string") return m;
+    try { return JSON.stringify(e); } catch { /* fall through */ }
+  }
+  return "Something went wrong.";
+}
 export default function ProducerStudio({ influencerId, name, initialProduction, initialVoiceId = "", initialVoiceName = "", creatives = [], arollRef = "", brollRef = "", voiceModel: initialVoiceModel = "v2", mode = "all", brains = [], initialClientId = "" }: { influencerId: string; name: string; initialProduction: Production; initialVoiceId?: string; initialVoiceName?: string; creatives?: CreativeGuide[]; arollRef?: string; brollRef?: string; voiceModel?: "v2" | "v3"; mode?: "all" | "foundation" | "studio"; brains?: { id: string; name: string }[]; initialClientId?: string }) {
   // STAGE SPLIT: "foundation" = Script & Voice stage (brief -> storyboard -> voice); "studio" = The Final Cut
   // stage (shoot -> animate -> music -> stitch -> showreel). "all" = the legacy single page (unchanged).
@@ -1851,7 +1864,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       <button onClick={stitchCut} disabled={assembling} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{assembling ? "✂️ Stitching the cut…" : finalUrl ? "↻ Re-stitch" : "✂️ Stitch the cut"}</button>
                     )}
                     <label className="flex cursor-pointer items-center gap-2 text-[12px] text-ink-dim"><input type="checkbox" checked={stitchCaptions} onChange={(e) => setStitchCaptions(e.target.checked)} className="h-4 w-4 accent-[#a855f7]" /> Burn in captions</label>
-                    {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{production.assembly_error}</span>}
+                    {production?.assembly_error && !assembling && <span className="text-[11px] text-alert">{errText(production.assembly_error)}</span>}
                   </div>
                   {draftClipCount > 0 && <p className="mt-1.5 text-[11px] text-[#fbbf24]">This cut is a <b>draft</b> - talking shots are 720p and <b>scene shots are the short ~5s preview</b> (they'd hold/freeze under a longer voiceover). Hit <b>🎬 Render final quality</b> above so scene shots re-render full-length on Kling and talking shots go 1080p, THEN stitch.{stitchArmed ? " (Click the amber button again to ship the draft anyway.)" : ""}</p>}
                   {stitchCaptions && (

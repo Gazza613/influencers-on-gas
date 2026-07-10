@@ -91,7 +91,12 @@ export async function normaliseToLufs(input: Buffer, ext: string, targetLufs: nu
     // Nothing worth doing for a sub-dB correction; avoid a needless re-encode.
     if (Math.abs(gainDb) < 0.5) return input;
 
-    const codec = ext === "wav" ? ["-c:a", "pcm_s16le"] : ["-c:a", "libmp3lame", "-b:a", "192k"];
+    // WAV: write a CANONICAL header (fmt + data, no LIST/INFO chunk). ffmpeg normally inserts a LIST chunk,
+    // which pushes the sample data from byte 44 to byte 78. Our in-house WAV DSP now walks the chunks properly,
+    // but emitting the plain header keeps these buffers byte-compatible with every other WAV in the pipeline.
+    const codec = ext === "wav"
+      ? ["-c:a", "pcm_s16le", "-fflags", "+bitexact", "-flags:a", "+bitexact", "-map_metadata", "-1"]
+      : ["-c:a", "libmp3lame", "-b:a", "192k"];
     await exec([
       "-hide_banner", "-loglevel", "error", "-y", "-i", inPath,
       "-af", `volume=${gainDb.toFixed(2)}dB,alimiter=limit=${linearFromDb(TRUE_PEAK_DB).toFixed(4)}:level=disabled`,
