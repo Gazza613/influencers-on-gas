@@ -9,6 +9,7 @@ import { notifyRenderDone } from "@/lib/notify";
 import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
+import { texturiseClip, texturePassEnabled } from "@/lib/texture";
 import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, normalizeWav, highpassWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
@@ -33,6 +34,10 @@ const CANDIDATE_COUNT = 6;
 // the board/photoshoot manually. Set PRODUCER_QA=1 to re-enable automatic QA + re-roll.
 const QA_ON = process.env.PRODUCER_QA === "1";
 const IMAGE_MODEL = process.env.HF_IMAGE_MODEL || "gpt_image_2";
+// The Humaniser always renders through nano_banana_pro (hard-coded in humaniseUrl), NOT the general image
+// model. Metering it as IMAGE_MODEL billed every humanise at gpt_image_2's rate (4 credits / 308c) when the
+// real call is free on the Ultra plan - it over-charged Cost Control on every keyframe.
+const HUMANISER_MODEL = "nano_banana_pro";
 const IMAGE_FALLBACK = "nano_banana_pro"; // free fallback (also covers gpt_image_2's only weak spot: 1:1/square)
 // PRIORITY (faster, PAID) image model: jumps Higgsfield's queue when the producer opts in for speed.
 // Metered at its rate_card cost (nano_banana_2 ≈ 1 credit). Env-tunable.
@@ -225,7 +230,7 @@ export const buildIdentity = inngest.createFunction(
           const h = await step.run("humanise-face", () => humaniseUrl(collected[0], { prompt: HUMANISER, ratio: "9:16" }).catch(() => null));
           if (h && (await step.run("vhuman-face", () => filterLoadable([h]))).length) {
             collected = [h, ...collected.slice(1)];
-            await step.run("u-humanise-face", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
+            await step.run("u-humanise-face", () => recordUsage({ influencerId, provider: "higgsfield", model: HUMANISER_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
           }
         }
         await saveProgress("done", true);
@@ -306,7 +311,7 @@ export const buildIdentity = inngest.createFunction(
         const h = await step.run("humanise-face", () => humaniseUrl(closeUpUrl as string, { prompt: HUMANISER, ratio: "9:16" }).catch(() => null));
         if (h && (await step.run("vhuman-face", () => filterLoadable([h]))).length) {
           validFrames[validFrames.indexOf(closeUpUrl)] = h; closeUpUrl = h;
-          await step.run("u-humanise-face", () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
+          await step.run("u-humanise-face", () => recordUsage({ influencerId, provider: "higgsfield", model: HUMANISER_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
         }
       }
       for (const url of validFrames) if (!frames.some((f) => f.url === url)) frames.push({ url, ...(url === closeUpUrl ? { face: true } : {}) });
@@ -1179,7 +1184,7 @@ export const generateShots = inngest.createFunction(
         const human = await step.run(`humanise-${i}`, () => humaniseUrl(usable as string, { prompt: HUMANISER, ratio }).catch(() => null));
         if (human && (await step.run(`vhuman-${i}`, () => filterLoadable([human]))).length > 0) {
           usable = human;
-          await step.run(`uhuman-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: IMAGE_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
+          await step.run(`uhuman-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: HUMANISER_MODEL, unit: "image", action: "humaniser", count: 1 }).catch(() => {}));
         }
       }
       let hosted: string | null = null;
@@ -1940,7 +1945,7 @@ export const assembleVideo = inngest.createFunction(
     const production = (persona.production ?? null) as {
       brief?: { brand?: string; logo?: string; logoUrl?: string; promoUrl?: string; logoPosition?: string };
       storyboard?: { scenes?: Record<string, string>[]; format?: string; music_bed?: string; tone?: string; duration_seconds?: number; legal?: string };
-      clips?: { scene: number; role: string; url: string | null; kind?: string; synced?: boolean; audio_url?: string | null; duration?: number }[];
+      clips?: { scene: number; role: string; url: string | null; kind?: string; synced?: boolean; audio_url?: string | null; duration?: number; textured?: boolean }[];
     } | null;
     const sb = production?.storyboard;
     const scenes = sb?.scenes ?? [];
@@ -1964,6 +1969,23 @@ export const assembleVideo = inngest.createFunction(
       }
     }
     if (fixedAny) await step.run("save-fixed-clips", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips } } }));
+
+    // TEXTURE PASS (see lib/texture.ts): the animators smooth away the Humaniser's skin detail (HeyGen -24%
+    // on the face, Kling -35% whole-frame). Restore it here, once, on the way into the stitch - this is the
+    // single place every engine's clips converge (Kling, Seedance, DoP, HeyGen and per-scene re-takes).
+    // Idempotent: a clip carries `textured` so a re-stitch never re-processes (or re-sharpens) it. Each clip
+    // is its own step, so a long encode can't blow the function's window. Fails open: on any error the
+    // original clip is kept and the cut still ships.
+    if (texturePassEnabled()) {
+      let texturedAny = false;
+      for (const c of clips) {
+        if (!c.url || c.textured) continue;
+        const better = await step.run(`texture-${c.scene}`, () => texturiseClip(c.url as string, String(c.role)));
+        if (better) { c.url = better; c.textured = true; texturedAny = true; }
+      }
+      if (texturedAny) await step.run("save-textured-clips", () => updateInfluencer(influencerId, { persona: { ...persona, production: { ...production, clips } } }));
+    }
+
     const clipUrl = (i: number) => clips.find((c) => c.scene === i)?.url || null;
 
     // Rejected references: scenes the producer dropped from the galleries — leave them out of the cut.

@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The texture pass (lib/texture.ts) shells out to the real ffmpeg binary, so keep ffmpeg-static OUT of the
+  // bundler (it ships a native binary, not JS) and make sure file tracing copies that binary into the Inngest
+  // function - the only route that runs it.
+  serverExternalPackages: ["ffmpeg-static"],
+  outputFileTracingIncludes: {
+    "/api/inngest": ["./node_modules/ffmpeg-static/ffmpeg"],
+  },
   images: {
     // Let the image optimiser fetch + downsize hero images from our two known hosts so the
     // home-page cards serve small fast WebP instead of full-resolution source. Scoped hosts,
