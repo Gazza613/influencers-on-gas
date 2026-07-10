@@ -11,7 +11,7 @@ import { compressForFal } from "@/lib/image";
 import { rehostToBlob, putBytes } from "@/lib/blob";
 import { texturiseClip, texturePassEnabled } from "@/lib/texture";
 import { normaliseToLufs, bedVolume, BED_REFERENCE_LUFS, VO_REFERENCE_LUFS, MUSIC_UNDER_VO_DB, AMBIENT_UNDER_VO_DB } from "@/lib/loudness";
-import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, normalizeWav, highpassWav, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
+import { tts, ttsWithDuration, ttsPcm, pcmSliceToWav, fadeWavEdges, normalizeWav, highpassWav, wavDataStart, generateMusic, generateSfx } from "@/lib/vendors/elevenlabs";
 import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotstack";
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
@@ -2184,6 +2184,10 @@ export const assembleVideo = inngest.createFunction(
             const cleaned = highpassWav(buf, hpHz);
             const anchored = await normaliseToLufs(cleaned, "wav", VO_REFERENCE_LUFS);
             const faded = fadeWavEdges(anchored === cleaned ? normalizeWav(cleaned) : anchored, fadeMs);
+            // GUARD: never hand Shotstack a WAV whose `data` chunk we can't find. A header-offset bug once
+            // wrote samples over the header here and the whole render died with "not a valid media file".
+            // If the processed buffer doesn't parse, ship the untouched original instead of a corrupt file.
+            if (wavDataStart(faded) < 0) return synced as string;
             return await putBytes(faded, "vo-faded", "wav", "audio/wav");
           } catch { return synced as string; }
         });
