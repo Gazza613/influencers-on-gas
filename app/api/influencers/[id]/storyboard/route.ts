@@ -10,7 +10,11 @@ const safeUrl = (v: unknown): string => (typeof v === "string" && isSafePublicUr
 
 // THE PRODUCER step 1: turn a brief into a directed 6-beat storyboard (house style), stored on
 // the influencer as the current production. The UI reviews/edits it, then drives shot + clip gen.
-export const maxDuration = 120;
+// A storyboard is ONE Opus call over a long system prompt plus two reference images: ~46s, and it retries once
+// if the a-roll/b-roll alternation slips. At the old 120s ceiling a retry blew the budget, the function was
+// killed mid-flight, no JSON came back, and the UI could only say "Couldn't draft the storyboard. Try again."
+// (which is exactly where Tumi got stuck). 300s is Vercel's default function ceiling and leaves real headroom.
+export const maxDuration = 300;
 export const dynamic = "force-dynamic"; // never cache - the UI polls this live for shot/clip progress
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

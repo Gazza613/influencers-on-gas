@@ -763,8 +763,13 @@ export async function generateStoryboard(brief: {
     for (let i = 1; i < roles.length; i++) if (roles[i] === roles[i - 1]) return false;
     return true;
   };
+  // ONE retry, not two. A storyboard takes ~46s on Opus, so three attempts is ~138s - past the route's time
+  // budget, which killed the request and surfaced as the generic "Couldn't draft the storyboard. Try again."
+  // (Tumi could never get past it.) The retry is a nice-to-have anyway: the deterministic backstop below
+  // ALWAYS fixes the role pattern, so a second full regeneration buys a prettier first draft at the cost of
+  // the whole request timing out. Worth 46s, never 92.
   let sb = await genOnce();
-  for (let attempt = 0; attempt < 2 && !alternates(sb); attempt++) sb = await genOnce();
+  if (!alternates(sb)) sb = await genOnce();
   if (!alternates(sb)) {
     // Backstop: force a-roll, b-roll, a-roll, … (even index = a-roll) so it starts + ends on a-roll.
     (sb.scenes || []).forEach((s, i) => { if (String(s.role) !== "graphic") s.role = (i % 2 === 0 ? "a-roll" : "b-roll") as StoryScene["role"]; });

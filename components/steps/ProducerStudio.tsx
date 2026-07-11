@@ -1003,16 +1003,26 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
     setBusy(true); setErr("");
     const ctrl = new AbortController(); genAbortRef.current = ctrl;
     let r: { production?: Production; error?: string } | null = null;
+    let hardErr = "";
     try {
-      r = await fetch(`/api/influencers/${influencerId}/storyboard`, {
+      const res = await fetch(`/api/influencers/${influencerId}/storyboard`, {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
         body: JSON.stringify({ storyline: storyline || "", brand, offer, benefits, cta, ctaCode, durationSeconds: duration, format, setting, tone, logo, legal, script: draftScript || "", clothingRef: clothingRef || "", locationRef: locationRef || "", logoUrl: logoUrl || "", promoUrl: promoUrl || "", captions, endCardUrl, endCardKind }),
-      }).then((x) => x.json());
-    } catch { if (ctrl.signal.aborted) return; /* aborted: leave the story as-is to edit */ }
+      });
+      // A killed/timed-out function returns a non-JSON body (or nothing), so .json() throws and the old code
+      // silently swallowed it - every failure looked like the same generic message. Say what actually happened.
+      r = await res.json().catch(() => null);
+      if (!r) hardErr = res.status === 504 || res.status === 408
+        ? "The director ran out of time drafting the storyboard. Give it another go - it usually lands on the second attempt."
+        : `The storyboard request failed (${res.status}). Try again.`;
+    } catch (e) {
+      if (ctrl.signal.aborted) return; /* aborted: leave the story as-is to edit */
+      hardErr = `Couldn't reach the director: ${String((e as Error)?.message || e).slice(0, 120)}`;
+    }
     if (ctrl.signal.aborted) return;
     genAbortRef.current = null; setBusy(false);
     if (r?.production?.storyboard) { setProduction(r.production); setEditing(false); setApproved(new Set()); setDenied(new Set()); persistApproved(new Set()); }
-    else setErr(r?.error || "Couldn't draft the storyboard. Try again.");
+    else setErr(r?.error || hardErr || "Couldn't draft the storyboard. Try again.");
   }
   // AI STORY HELPER: turn the producer's rough notes into a vivid, producer-grade story they can then Direct.
   async function polishStory() {
