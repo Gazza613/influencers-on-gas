@@ -367,6 +367,9 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // CONCURRENT per-scene animate: which scenes are animating RIGHT NOW (fire one, then fire the next without
   // waiting). wholeBoardBusy = a whole-board Animate-all / role batch is running (blocks per-scene during it).
   const [animatingScenes, setAnimatingScenes] = useState<Set<number>>(new Set());
+  // Scenes whose KEYFRAME is being re-shot right now. Per-scene, like animatingScenes, so one re-shoot never
+  // blocks another scene - the producer can queue several and watch them land.
+  const [reshootingScenes, setReshootingScenes] = useState<Set<number>>(new Set());
   const [wholeBoardBusy, setWholeBoardBusy] = useState(false);
   // When each scene's render was first OBSERVED (ms), for the live elapsed timer on the rendering card.
   // Reconciled from the render state below, so it survives a refresh (starts from when we re-observe it).
@@ -384,7 +387,12 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
   // ANY work in flight (incl. per-scene shoots that don't flip the global flags) - drives the busy
   // buttons + the red Reset control so it reflects per-scene + b-roll work too.
   const anyReshooting = (production?.shots ?? []).some((s) => s.reshooting);
+  // busyAny gates WHOLE-BOARD actions (shoot all, animate all, stitch) - not per-scene work. A single scene
+  // re-shooting must NOT lock the rest of the board: each per-scene job saves its own row atomically, so the
+  // producer can queue scene 3 while scene 1 is still working. Previously any in-flight re-shoot set
+  // anyReshooting, which set busyAny, which disabled every other scene's controls.
   const busyAny = shooting || rendering || !!renderingRole || anyReshooting;
+  const boardBusy = shooting || rendering || !!renderingRole; // whole-board jobs only
   // Curated reference galleries: keep the dropped set in sync with the server + chosen aspect ratio per role.
   useEffect(() => { setDropped(new Set(production?.dropped_scenes ?? [])); }, [production?.dropped_scenes]);
   // Record when each rendering scene STARTED (for the live elapsed timer). A scene reads as rendering if it's
@@ -684,55 +692,92 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       applyEditsLocally(i); closeEditKeep(i);
     } else setErr(r?.error || "Couldn't save.");
   }
+  // RE-SHOOT ONE SCENE'S KEYFRAME - the still ONLY, never the video.
+  //
+  // The producer must SEE the new reference image and then decide: accept it, re-shoot it again, or send it
+  // to video. Auto-rendering the clip took that decision away (and burned a video credit on an image they had
+  // not even looked at yet). The backend (reshootShot) was always keyframe-only and drops the scene's stale
+  // clip; it was this handler that then chased the render. Now it stops at the image, exactly like
+  // shootRefScene, and the producer hits Animate when they are happy.
+  //
+  // It also no longer locks the board: each scene re-shoots independently (the job saves its own shot row), so
+  // you can queue another scene while this one is still working - same as animateScene already allowed.
   async function reshootScene(i: number) {
+    if (reshootingScenes.has(i)) return; // only block re-firing THIS scene
     setErr(""); setEditIdx(null); clearDirty(i);
+    const before = (production?.shots ?? []).find((s) => s.scene === i)?.url || null;
+    setReshootingScenes((s) => new Set(s).add(i));
     setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: true } : s)) } : p));
     const r = await fetch(`/api/influencers/${influencerId}/shots/scene`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scene: i, location: ed.location, blocking: ed.blocking, shot: ed.shot, performance: ed.performance, motion_prompt: ed.motion, vo_line: ed.vo, caption: ed.caption, vo_audio_url: ed.voAudio, phone_screen_url: ed.phone, hero: ed.hero, ref_url: ed.ref, caption_pos: ed.captionPos, caption_off: ed.captionOff ? "true" : "false", crowd_extras: ed.extras }),
     }).then((x) => x.json()).catch(() => null);
     applyEditsLocally(i);
-    if (!r?.queued) { setErr(r?.error || "Couldn't start the re-shoot."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p)); return; }
-    const role: "a-roll" | "b-roll" = sb?.scenes?.[i]?.role === "b-roll" ? "b-roll" : "a-roll";
-    // 1) wait for the new keyframe
-    for (let k = 0; k < 45; k++) {
-      await new Promise((res) => setTimeout(res, 6000));
-      const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
-      if (d?.production) { syncProduction(d.production); const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i); if (!sh?.reshooting) break; }
+    if (!r?.queued) {
+      setErr(r?.error || "Couldn't start the re-shoot.");
+      setReshootingScenes((s) => { const n = new Set(s); n.delete(i); return n; });
+      setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p));
+      return;
     }
-    // 2) the re-shoot auto-renders this scene's clip too - wait for it and drop it into the preview
-    setRenderingRole(role);
-    await poll(setProduction, "clips_status");
-    setRenderingRole("");
+    // Poll THIS scene only, and poll FAST (a keyframe often lands in seconds - a 6s tick made it feel dead).
+    for (let k = 0; k < 300; k++) {
+      await new Promise((res) => setTimeout(res, k < 30 ? 2000 : 5000));
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+      if (d?.production) {
+        syncProduction(d.production);
+        const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i);
+        if (sh && !sh.reshooting && (sh.url !== before || sh.error)) break;
+      }
+    }
+    setReshootingScenes((s) => { const n = new Set(s); n.delete(i); return n; });
+    // STOP HERE. The new keyframe is on screen; the producer decides what happens to it.
   }
 
   // SCENE-BY-SCENE: build ONE scene (shoot its keyframe AND animate its clip) using its STORED direction
   // (no edit form) - the reshoot job renders the keyframe then the clip.
   // Shoot ONE scene's REFERENCE IMAGE (keyframe) only - no video. Video comes later (after the voice).
   async function shootRefScene(i: number) {
+    if (reshootingScenes.has(i)) return; // re-firing THIS scene only
     // Don't fail SILENTLY (Gary: "nothing happened on 4, no spinner"). Say what's blocking + the way out.
-    if (busyAny) {
+    // Only WHOLE-BOARD work blocks a single-scene keyframe now; another scene re-shooting does not.
+    if (boardBusy) {
       setErr(
         rendering ? `A render is still running, so keyframes are locked. Hit ⟳ Reset if stuck (top of the studio), then re-shoot Scene ${i + 1}.`
-          : shooting ? "A shoot is already running - let it finish first."
-            : anyReshooting ? "Another scene is re-shooting - let that finish, then try again."
-              : "The board is busy right now - give it a moment, or hit ⟳ Reset if stuck."
+          : shooting ? "A whole-board shoot is running - let it finish first."
+            : "The board is busy right now - give it a moment, or hit ⟳ Reset if stuck."
       );
       return;
     }
     setErr(""); setShootingRole(""); setShootScope([i]); clearDirty(i); // ONLY this scene is shooting
+    const before = (production?.shots ?? []).find((s) => s.scene === i)?.url || null;
+    setReshootingScenes((s) => new Set(s).add(i));
     setProduction((p) => {
       if (!p) return p;
       const list = p.shots ?? [];
       const shots = list.some((s) => s.scene === i)
         ? list.map((s) => (s.scene === i ? { ...s, reshooting: true } : s))
         : [...list, { scene: i, role: String(sb?.scenes?.[i]?.role || "a-roll"), beat: String(sb?.scenes?.[i]?.beat || ""), url: null, reshooting: true }];
-      return { ...p, shots, shots_status: "running" };
+      return { ...p, shots }; // NOT shots_status: a single-scene keyframe must not flip the whole-board flag
     });
     await awaitGuideSave(); // never shoot before the chosen guide + wardrobe lock have persisted
     const r = await fetch(`/api/influencers/${influencerId}/shots`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenes: [i], aspectRatio: boardRatio, priority, speed: speedMode }) }).then((x) => x.json()).catch(() => null);
-    if (!r?.queued) { setErr(r?.error || "Couldn't shoot that reference image."); setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)), shots_status: "idle" } : p)); return; }
-    await poll(setProduction, "shots_status");
+    if (!r?.queued) {
+      setErr(r?.error || "Couldn't shoot that reference image.");
+      setReshootingScenes((s) => { const n = new Set(s); n.delete(i); return n; });
+      setProduction((p) => (p ? { ...p, shots: (p.shots ?? []).map((s) => (s.scene === i ? { ...s, reshooting: false } : s)) } : p));
+      return;
+    }
+    // Poll THIS scene only, fast, so the keyframe appears the moment it lands (was a 6s global tick).
+    for (let k = 0; k < 300; k++) {
+      await new Promise((res) => setTimeout(res, k < 30 ? 2000 : 5000));
+      const d = await fetch(`/api/influencers/${influencerId}/storyboard`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+      if (d?.production) {
+        syncProduction(d.production);
+        const sh = (d.production.shots ?? []).find((s: Shot) => s.scene === i);
+        if (sh && !sh.reshooting && (sh.url !== before || sh.error)) break;
+      }
+    }
+    setReshootingScenes((s) => { const n = new Set(s); n.delete(i); return n; });
   }
   // PER-SCENE offer callouts (frosted glass). Source of truth = production.scene_callouts, keyed by scene idx.
   const sceneCallouts = (production?.scene_callouts) || {};
@@ -1304,7 +1349,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                         <div className="mt-1.5 space-y-1">
                           <button
                             onClick={() => shootRefScene(i)}
-                            disabled={busyAny || dropped.has(i)}
+                            disabled={boardBusy || reshootingScenes.has(i) || dropped.has(i)}
                             className="w-full rounded-md btn-brand px-2 py-1 text-[10px] font-bold disabled:opacity-40"
                           >{shot?.url ? "↻ Re-shoot reference" : "📸 Shoot reference"}</button>
                           {shot?.url && (
@@ -1527,10 +1572,10 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                       )}
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button onClick={() => saveScene(i)} className="rounded-lg border border-ready/50 px-3 py-1.5 text-xs font-bold text-ready hover:bg-ready/10">Save changes</button>
-                        {isStudio && <button onClick={() => reshootScene(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold">↻ Re-shoot this scene</button>}
+                        {isStudio && <button onClick={() => reshootScene(i)} disabled={reshootingScenes.has(i)} className="btn-brand rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-40">{reshootingScenes.has(i) ? "↻ Re-shooting…" : "↻ Re-shoot the image"}</button>}
                         <button onClick={() => closeEditKeep(editIdx)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink">Cancel</button>
                       </div>
-                      <p className="text-[10px] text-ink-faint">{isStudio ? "Save changes keeps the image and just updates the script. Re-shoot re-renders only this scene. The rest stay untouched." : "Edit the script AND the scene direction (location, framing, blocking, motion) here, then Save changes. It shoots to this plan when you build it in The Final Cut."}</p>
+                      <p className="text-[10px] text-ink-faint">{isStudio ? "Save changes keeps the image and just updates the script. Re-shoot renders a new REFERENCE IMAGE for this scene only - no video. Look at it, re-shoot again if you want, then hit Animate when you're happy." : "Edit the script AND the scene direction (location, framing, blocking, motion) here, then Save changes. It shoots to this plan when you build it in The Final Cut."}</p>
                     </div>
                   )}
                   </div>
