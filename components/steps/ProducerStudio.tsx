@@ -960,12 +960,19 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
       setBriefUsedBrain(!!r.usedBrain); setBriefOpen(false);
     } else setErr(r?.error || "Couldn't draft the brief - give it another go.");
   }
+  // Describe your vision in the story box and the AI writes the spoken script from it. The storyline is the
+  // BRIEF (it used to be ignored entirely, so the writer could only see the structured fields and wrote a
+  // generic ad). Brand + offer are only required when there is no vision to work from.
   async function writeScript() {
-    if (!brand.trim() || !offer.trim() || scriptBusy) { if (!brand.trim() || !offer.trim()) setErr("I need at least the brand and the core offer to write the script."); return; }
+    if (scriptBusy) return;
+    if (!storyline.trim() && (!brand.trim() || !offer.trim())) {
+      setErr("Describe the ad in the story box above, or fill in the brand and the core offer.");
+      return;
+    }
     setScriptBusy(true); setErr("");
     const r = await fetch(`/api/influencers/${influencerId}/script`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand, offer, benefits, cta, ctaCode, durationSeconds: duration, tone, setting }),
+      body: JSON.stringify({ storyline, brand, offer, benefits, cta, ctaCode, durationSeconds: duration, tone, setting }),
     }).then((x) => x.json()).catch(() => null);
     setScriptBusy(false);
     if (r?.script) setDraftScript(r.script); else setErr(r?.error || "Couldn't write the script. Try again.");
@@ -1288,6 +1295,21 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
               </div>
             )}
           </div>)}
+
+          {/* SCRIPT, ALL SCENES AT ONCE. Per-scene "✨ Rewrite with AI" lives in each scene's edit form; this is
+              the whole-script pass, which re-flows every scene's VO so they read as ONE continuous narrative
+              (essential after you drop or re-order scenes, or the script reads with holes in it). */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#a855f7]/30 bg-gradient-to-r from-[#a855f7]/[0.07] to-[#60a5fa]/[0.04] px-3 py-2">
+            <span className="text-[11px] text-ink-dim">
+              <b className="text-ink">The script</b> - open any scene to edit its words, or <b className="text-ink">✨ Rewrite with AI</b> just that scene. To fix the whole read at once, re-flow it.
+            </span>
+            <button
+              onClick={reflowScript}
+              disabled={reflowBusy || busyAny}
+              title="Rewrite every scene's voiceover so the kept scenes read as one seamless script, start to finish. Use this after dropping or re-ordering scenes."
+              className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-40"
+            >{reflowBusy ? "✨ Re-flowing the script…" : "✨ Re-flow the whole script"}</button>
+          </div>
 
           <div className="space-y-3">
             {sb.scenes.map((s, i) => {

@@ -653,9 +653,15 @@ UK spelling. No em dashes. Be specific and art-directed, never generic. Return t
 export async function generateScript(brief: {
   influencerName: string; brand: string; goal: string; offer: string; benefits: string;
   cta: string; ctaCode?: string; durationSeconds: number; tone: string; setting?: string; influencerProfile?: string; expressive?: boolean;
+  storyline?: string; brainFacts?: string;
 }): Promise<string> {
   const c = await client();
   const words = Math.round(brief.durationSeconds * 2.5);
+  // The producer's own vision is the BRIEF, not a hint - same rule as shapeStory. Without this the script
+  // writer could only see the structured fields and wrote a generic ad, ignoring what the producer actually
+  // described. Their specifics (brand, mechanism, key terms, numbers) must survive into the spoken words.
+  const story = (brief.storyline || "").trim().slice(0, 3000);
+  const facts = (brief.brainFacts || "").trim().slice(0, 1600);
   // v3 (Expressive) reads ElevenLabs audio tags; v2 (Stable) would speak them aloud, so only tag for v3.
   const tagRule = brief.expressive
     ? `This script is voiced on ElevenLabs Eleven v3, so add a FEW inline AUDIO TAGS for natural, expressive delivery - bracketed lowercase tags such as [warm], [excited], [curious], [reassuring], [laughs softly], [whispers], [pause], [emphasis]. Use at most 1-2 per sentence, matched to the meaning and a ${brief.tone} tone; do NOT over-tag. Keep every spoken word.`
@@ -686,8 +692,15 @@ BANNED - these instantly read as cheap, AI, or salesy; NEVER use: "Introducing",
 
 TONE: ${brief.tone}. Confident but real, persuasive without pressure, warm without cheese.
 LENGTH: about ${words} words (~2.5/second for ${brief.durationSeconds}s) - fill the runtime at a natural speaking pace, no dead air, no padding.
-RULES: UK spelling. NO em dashes. NEVER name a real artist, band or song. ${tagRule}`;
-  const input = `Influencer: ${brief.influencerName}. ${brief.influencerProfile || ""}\nBrand / product: ${brief.brand}\nGoal: ${brief.goal}\nCore offer / hook: ${brief.offer}\nKey benefits: ${brief.benefits}\nCTA: ${brief.cta}${brief.ctaCode ? ` (code: ${brief.ctaCode})` : ""}\nTone: ${brief.tone}\nSetting: ${brief.setting || "(her natural world)"}\n\nWrite the ${brief.durationSeconds}-second voiceover script now.`;
+RULES: UK spelling. NO em dashes. NEVER name a real artist, band or song. ${tagRule}${story ? `
+
+HONOUR THE PRODUCER'S VISION (this is the most important rule): they have described the ad in their own words below. Read it FIRST and work out exactly what they want to say. KEEP every specific they gave - the brand and product names, the mechanism and how it works, their numbers, and their key terms - and write the spoken script around them, spelled as they spelled them. You SHARPEN their idea into words that land; you do NOT replace it, swap their product, or generalise their details away.` : ""}${facts ? `
+
+VERIFIED FACTS: you are also given facts from the client's own knowledge base. Draw any new claim ONLY from them or the producer's vision - never state a number or claim that appears in neither. Mine them for the fact, then say it in your own concrete words; never copy their marketing phrasing.` : ""}`;
+  const input = (story ? `THE PRODUCER'S VISION FOR THIS AD (their own words - this is the brief):\n"""${story}"""\n\n` : "")
+    + (facts ? `VERIFIED FACTS FROM THE CLIENT'S BRAIN:\n${facts}\n\n` : "")
+    + `Influencer: ${brief.influencerName}. ${brief.influencerProfile || ""}\nBrand / product: ${brief.brand || "(take it from the vision above)"}\nGoal: ${brief.goal}\nCore offer / hook: ${brief.offer || "(take it from the vision above)"}\nKey benefits: ${brief.benefits}\nCTA: ${brief.cta}${brief.ctaCode ? ` (code: ${brief.ctaCode})` : ""}\nTone: ${brief.tone}\nSetting: ${brief.setting || "(her natural world)"}\n\n`
+    + (story ? `Write the ${brief.durationSeconds}-second voiceover script now, honouring my vision above and keeping every specific in it.` : `Write the ${brief.durationSeconds}-second voiceover script now.`);
   const res = await c.messages.create({ model: MODEL, max_tokens: 1200, system, messages: [{ role: "user", content: input }] });
   const b = res.content.find((x) => x.type === "text");
   return (b && b.type === "text" ? b.text : "").trim();

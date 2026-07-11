@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getInfluencer } from "@/lib/influencers";
 import { generateScript } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
+import { retrieve } from "@/lib/rag";
 
 // SCRIPT-FIRST: write the spoken voiceover from the concept + length, for the producer to review/edit
 // BEFORE the scenes are built. Returns the script text; the client edits it, then sends it to /storyboard
@@ -18,16 +19,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!inf) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const persona = (inf.persona ?? {}) as Record<string, unknown>;
   const b = await req.json().catch(() => ({}));
-  if (!String(b.brand || "").trim() || !String(b.offer || "").trim()) {
-    return NextResponse.json({ error: "Add at least a brand/product and the core offer." }, { status: 400 });
+  // The producer's VISION (the storyline box) is a first-class input: describing the ad in your own words is
+  // enough to get a script. Only demand the structured fields when there is no vision to work from.
+  const storyline = typeof b.storyline === "string" ? b.storyline.trim().slice(0, 3000) : "";
+  if (!storyline && (!String(b.brand || "").trim() || !String(b.offer || "").trim())) {
+    return NextResponse.json({ error: "Describe the ad in the story box, or add a brand/product and the core offer." }, { status: 400 });
   }
   const bibleId = ((persona.bible as { identity?: Record<string, string> })?.identity) ?? {};
   const influencerProfile = [bibleId.age && `age ${bibleId.age}`, bibleId.profession, bibleId.ethnicity_design, bibleId.build]
     .filter(Boolean).join(", ") || String((persona.bible as { signature_line?: string })?.signature_line || "");
+
+  // BRAIN (optional): ground the script's claims on the client's verified facts, exactly as shapeStory does.
+  let brainFacts = "";
+  if (inf.client_id) {
+    const query = [storyline, b.brand, b.offer].filter(Boolean).join(" ").slice(0, 1000);
+    const chunks = await retrieve(inf.client_id, query, 5).catch(() => []);
+    brainFacts = chunks.filter((c) => (c.score ?? 0) > 0.2)
+      .map((c) => `- ${String(c.content).replace(/\s+/g, " ").trim().slice(0, 320)}`).join("\n").slice(0, 1600);
+    if (brainFacts) await recordUsage({ influencerId: id, clientId: inf.client_id, userEmail: session.user.email ?? null, provider: "voyage", model: "voyage-3.5", unit: "embedding", action: "script-retrieve", count: 1 }).catch(() => {});
+  }
+
   try {
     const script = await generateScript({
       influencerName: inf.name,
       influencerProfile,
+      storyline,
+      brainFacts,
       brand: String(b.brand || "").trim(),
       goal: String(b.goal || "drive awareness and action").trim(),
       offer: String(b.offer || "").trim(),
