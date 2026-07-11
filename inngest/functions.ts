@@ -1027,12 +1027,20 @@ export const generateShots = inngest.createFunction(
     // Render ONE scene to a keyframe (pure — reads worldRef which is set by the anchor pass first).
     const renderShot = async (i: number, sc: Record<string, string>): Promise<ShotRow> => {
       const beat = String(sc.beat || ""); const role = String(sc.role || "a-roll");
-      // BACKGROUND LIFE. A scene has background people when the producer asked for them (crowd_extras), or when
-      // it is a live-background a-roll. Used both to steer the keyframe AND to strip strangers the guide photo
-      // would otherwise smuggle in as "set dressing" (see the guide clause below).
+      // BACKGROUND LIFE, and the engine that has to animate it.
+      //
+      // A-ROLL renders on HeyGen, which animates the PERSON and not the scene: anything else in the frame is a
+      // still photograph it never touches. So a background person in an a-roll keyframe CANNOT move - they hover
+      // and smear (Gary, scene 7: "2 people hovering unnaturally and on fast forward"). Keeping HeyGen is the
+      // right call (its lip-sync beats the full-scene engines, and sync is what a viewer notices on a talking
+      // shot), so the answer is to never bake a stranger into an a-roll still in the first place. The ONE
+      // exception is the explicit live_bg opt-in, which routes that scene to a full-scene engine on purpose.
+      //
+      // B-ROLL is a real video model (Kling/Seedance/DoP/Veo) which animates the WHOLE frame, so background
+      // people there genuinely move and crowd_extras works as intended.
       const crowdOn = (sc as Record<string, unknown>).crowd_extras === true;
-      const liveBg = role === "a-roll" && (String((sc as Record<string, unknown>).live_bg) === "true" || crowdOn); // presenter + moving venue
-      const hasBackgroundPeople = crowdOn || liveBg;
+      const liveBg = role === "a-roll" && String((sc as Record<string, unknown>).live_bg) === "true"; // presenter + moving venue
+      const hasBackgroundPeople = liveBg || (role === "b-roll" && crowdOn);
       const phoneMedia = sc.phone_screen_url ? await step.run(`phone-${i}`, () => importMediaUrl(String(sc.phone_screen_url)).catch(() => null)) : null;
       // PER-SCENE reference: a gallery image the producer pinned to THIS scene overrides the production-wide
       // guide + wardrobe lock, so the scene's chosen Set & Wardrobe image is the single source of truth here.
@@ -1087,7 +1095,7 @@ export const generateShots = inngest.createFunction(
           // This strips them ONLY when the scene is set to have no crowd. A scene that WANTS background life
           // keeps it (and is routed to a full-scene engine below, so that life actually moves).
           !hasBackgroundPeople
-            ? ` PEOPLE ARE NOT PART OF THE SET: reproduce ${roleRefTag}'s PLACE (architecture, furniture, bar, rail, view, light) but NOT the people standing in it. Any bystander, barman, waiter, staff member, diner, passer-by or background figure visible in ${roleRefTag} must be REMOVED and the space behind her left EMPTY - rebuild whatever they were standing in front of. She is ALONE in this frame apart from anyone the scene direction explicitly names. Do not add, keep, blur or silhouette a single stranger.`
+            ? ` PEOPLE ARE NOT PART OF THE SET: reproduce ${roleRefTag}'s PLACE (architecture, furniture, bar, rail, view, light) but NOT the people standing in it. Any bystander, barman, waiter, staff member, diner, passer-by or background figure visible in ${roleRefTag} must be REMOVED and the space behind her left EMPTY - rebuild whatever they were standing in front of. She is ALONE in this frame apart from anyone the scene direction explicitly names. Do not add, keep, blur or silhouette a single stranger.${role === "a-roll" ? ` The room must still feel LIVED-IN and real, not sterile or abandoned: keep the venue's warmth and evidence of life (glasses and bottles on the bar, a cloth over a rail, a half-finished drink, a chair pulled out, steam, warm practical lights) and hold it in genuinely SHALLOW depth of field so the backdrop reads as a real out-of-focus place. A quiet, believable, softly blurred room - never an empty white void.` : ""}`
             : ` The background people in ${roleRefTag} are REAL LIFE in this venue and belong here: keep them, but render them as believable individuals mid-action (a barman actually pouring, a couple genuinely mid-conversation), each with a natural posture and their own clear activity - never vacant, stiff, hovering or staring figures standing about doing nothing. They sit BEHIND her in soft focus and never crowd, overlap or upstage her.`
         }` : "",
         clothTag ? `${clothTag} is the WARDROBE reference and shows the FRONT of her outfit: dress the influencer in this EXACT outfit (silhouette, fabric, COLOUR, styling) and treat ${clothTag} as the DEFINITIVE source for the FRONT of her garment — its exact neckline shape and depth, collar, lapels, straps, buttons, zips, closures and any front detailing. Apply this front in EVERY shot, INCLUDING shots where the ${role} guide, world anchor or cast anchor shows only her BACK, her side, or a partial view: in those shots you must NEVER invent, guess, restyle, raise, lower or change the neckline/front — reconstruct it EXACTLY as in ${clothTag} so the front of the outfit is identical in every scene whether she faces camera or is turned away. (A back-turned reference does not show the front, so the front comes ONLY from ${clothTag}, never from imagination.)${clothIsLock ? ` This is her ONE LOCKED outfit and it OVERRIDES her clothing in EVERY other reference image here (the world anchor, the ${role} guide, and the cast-anchor frame) AND in the scene text — if any other image shows her in a different colour or garment (e.g. teal/green), IGNORE that and dress her in THIS outfit's colour and garments.` : ""} Do NOT copy any face or person from it.` : "",
@@ -1380,15 +1388,17 @@ export const generateClips = inngest.createFunction(
       // racing behind her) instead of HeyGen (which freezes the background). Veo generates the mouth movement;
       // her real ElevenLabs voice is laid OVER it in the stitch (approximate lip-sync, moving world - the
       // documented pro workflow). Opt-in per scene; HeyGen stays the default for tight-sync clean talking heads.
-      // ENGINE ROUTING for background life (Gary: "even on an a-roll, movement in the background helps realism -
-      // but if that movement is not real and humanised it screams AI").
-      // He is right, and it is an ENGINE problem, not a prompt problem. Normal a-roll renders on HeyGen, which
-      // animates ONLY her face: every background person is a still photograph the engine never touches, so they
-      // smear and hover - the "on fast forward" tell. No motion prompt can fix that; HeyGen has no concept of the
-      // scene, so it silently ignores the scene motion we write. A scene that WANTS living background people must
-      // therefore render on a FULL-SCENE engine (the liveBg path: Veo/DoP), which animates the whole frame and
-      // actually honours the motion prompt. So crowd_extras on an a-roll now implies a live background.
-      const liveBg = role === "a-roll" && (String((sc as Record<string, unknown>).live_bg) === "true" || (sc as Record<string, unknown>).crowd_extras === true);
+      // A-ROLL STAYS ON HEYGEN. Its lip-sync is materially better than the full-scene engines (Veo/DoP), and on
+      // a talking shot the sync is the thing a viewer notices first - so we do NOT trade it away for background
+      // motion. crowd_extras on an a-roll therefore does NOT reroute the engine; only the explicit live_bg
+      // opt-in does (that switch exists for the rare "living venue behind her" hero shot, and it knowingly
+      // accepts looser sync in exchange).
+      //
+      // The consequence is a hard constraint, and it is honest: HeyGen animates the PERSON, not the scene, so
+      // an a-roll background is a still photograph. A background person in that still cannot move, and if we let
+      // one in it hovers and smears. So realism on a-roll is won in the KEYFRAME (a naturally quiet backdrop with
+      // real depth of field), never by asking HeyGen for motion it cannot produce. See the keyframe rules.
+      const liveBg = role === "a-roll" && String((sc as Record<string, unknown>).live_bg) === "true";
       const presetAudio = String(sc.vo_audio_url || "").trim(); // producer's own uploaded VO for this scene
       // Steer the video model away from its two worst tells: shaky camera + people clipping through
       // the world. Appended to every clip prompt.
@@ -1549,11 +1559,12 @@ export const generateClips = inngest.createFunction(
       const motion = (liveBg
         ? `${base}. She looks STRAIGHT INTO THE LENS and talks to camera, her lips moving naturally as she clearly speaks the line: "${line}". Behind and around her the WHOLE SCENE is fully ALIVE and moving in real time - the signature life of this exact place actually happening (e.g. racehorses thundering down the track, the grandstand crowd reacting, flags moving). ANY PERSON IN THE BACKGROUND MOVES LIKE A REAL HUMAN BEING, at a normal, unhurried, real-world pace: each one is genuinely DOING something with a clear purpose and follows it through for the whole shot (a barman pouring and setting down a glass, two friends talking and gesturing to each other, someone walking a steady straight line across the frame and out of it). Their weight shifts, their limbs and gait are anatomically correct, their feet stay on the ground and they never glide, hover, drift, twitch, jitter, stutter, teleport, morph, warp, duplicate, walk in place, move in fast-forward or stand frozen and vacant. NOBODY in the background looks at or reacts to the camera. If a background person cannot be animated convincingly and naturally, leave that part of the background EMPTY instead - a believable empty space always beats an uncanny figure. She is the sharp foreground subject addressing the viewer while the living world plays out softly behind her. Calm, warm, natural delivery; hands mostly at rest. A steady, gentle, essentially locked frame - only a very slow, subtle push-in at most.`
         : role === "a-roll"
-        // NOTE: this branch is HeyGen (talking photo). It animates HER FACE ONLY - it cannot move anything else
-        // in the frame, so we must NOT ask it to. The old prompt said "background people... move", which HeyGen
-        // silently ignored: any bystander stayed a frozen photo and smeared. Scenes that want living background
-        // people are routed to the full-scene engine above (liveBg) instead.
-        ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. ONLY she moves: her face, her expression and her natural micro-movement. The background is a STILL, calm, softly out-of-focus backdrop and nothing in it moves.`
+        // NOTE: this branch is HeyGen (talking photo), kept because its lip-sync beats the full-scene engines.
+        // It animates HER ONLY - it cannot move anything else in the frame, so we must not ask it to. The old
+        // prompt promised "background people... move", which HeyGen silently ignored: any bystander stayed a
+        // frozen photo and smeared (the hovering barmen). The keyframe now keeps strangers OUT of an a-roll, so
+        // there is nobody left to mangle, and the background is a real, lived-in, softly blurred place.
+        ? `${base}. She is front-on, looking into the lens, talking to camera. CAMERA holds a steady, locked frame on her — no pan, tilt, push, zoom or crane; she stays centred and fully in frame the whole time. ONLY SHE MOVES: her face, expression, gentle head movement and natural micro-motion. The background is a real, lived-in place held in soft focus, and it stays CALM and essentially STILL - do NOT animate, warp, duplicate, fast-forward or invent movement anywhere in it, and never add a person to it.`
         : `${base}. A natural, candid video SCENE: she is IN the environment doing something real (sitting, using or showing the product, a relaxed glance or small gesture) and is NOT looking at or talking to the camera — observed b-roll, not a piece to camera. NOBODY in the scene looks at, mouths words to, or addresses the camera; her mouth is NOT moving as if speaking to camera (her voice is a voiceover laid over the top).${soloBroll ? " The subject is ALONE in this scene, so their mouth stays RELAXED and CLOSED for the whole clip - they do NOT talk, mouth words, chew or move their lips as if speaking to themselves (a person talking to no one on screen looks broken); they are quietly, naturally focused on what they are doing - a calm, wordless moment." : " A named companion is present in this scene, so natural, relaxed conversation between them is fine - they may talk and react to each other (never to the camera), lips moving naturally as real people chatting."} The scene has GENTLE, restrained life: she moves naturally at a calm real-life pace with only SUBTLE ambient motion (a soft breeze, light shifting, any water or leaves). The CAMERA is almost locked off: at most a very slow, subtle straight PUSH-IN, otherwise STATIC - NO pan, lateral dolly, sideways drift, arc, crane, whip-pan or zoom (sideways moves are where trees and buildings warp).${RIGID ? " Prominent fixed structures here (trees/buildings/landmark) - keep the camera essentially STILL." : ""}`) + MOTION_SAFE + WATER;
       // SEAMLESS FLOW: end this clip on the NEXT scene's frame (when the next scene is in the same
       // world, i.e. not a graphic card), so the motion resolves there and the cut is seamless — and
