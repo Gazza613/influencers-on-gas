@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { planCampaign } from "@/lib/studio-producer";
+import { planCampaign, sharpenBrief } from "@/lib/studio-producer";
+import { listDeals } from "@/lib/studio-deals";
 import { latestRun } from "@/lib/studio-campaign";
 
 // THE PLAN. The Producer reads the brief and designs the whole funnel campaign. FREE - one Claude call.
@@ -28,16 +29,37 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as { clientId?: string; brief?: string };
+  const body = (await req.json().catch(() => ({}))) as { clientId?: string; brief?: string; action?: string };
   const clientId = String(body.clientId || "");
   const brief = String(body.brief || "").trim();
   if (!clientId) return NextResponse.json({ error: "Pick a client first." }, { status: 400 });
-  if (brief.length < 12) return NextResponse.json({ error: "Tell the Producer what the campaign is about." }, { status: 400 });
+  if (brief.length < 4) return NextResponse.json({ error: "Tell the Producer what the campaign is about." }, { status: 400 });
 
   try {
+    // THE BRIEF COACH. Free, and it runs BEFORE any planning: a thin brief does not produce a bad campaign,
+    // it produces a plausible generic one, which is worse because it looks finished.
+    if (body.action === "sharpen") {
+      const deals = await listDeals(clientId).catch(() => []);
+      const lines = deals.map((d) => `${d.label} - ${d.amount}${d.amountSuffix || ""} for ${d.price} (${d.validity})`);
+      const sharpened = await sharpenBrief(clientId, brief, lines);
+      return NextResponse.json({ ok: true, sharpened });
+    }
+
     const plan = await planCampaign(clientId, brief);
     return NextResponse.json({ ok: true, plan });
   } catch (e) {
-    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 220) }, { status: 500 });
+    return NextResponse.json({ error: friendly(e) }, { status: 500 });
   }
+}
+
+// Say what actually happened. An out-of-credit Anthropic account returns a 400 with a wall of JSON, and the
+// user should not have to read a stack trace to learn that the bill needs paying.
+function friendly(e: unknown): string {
+  const m = String((e as Error)?.message || e);
+  if (/credit balance is too low/i.test(m)) {
+    return "Claude is out of credit. Top up the Anthropic account (Plans & Billing) and this will work again - nothing is broken.";
+  }
+  if (/rate.?limit|429/i.test(m)) return "Claude is rate-limited right now. Wait a moment and try again.";
+  if (/overloaded|529/i.test(m)) return "Claude is overloaded right now. Try again in a minute.";
+  return m.slice(0, 240);
 }

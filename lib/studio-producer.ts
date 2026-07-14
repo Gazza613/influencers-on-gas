@@ -267,11 +267,58 @@ export async function planCampaign(clientId: string, brief: string): Promise<Cam
 
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("The Producer returned nothing.");
-  const plan = block.input as CampaignPlan;
+  const plan = coercePlan(block.input);
 
   plan.sms = await fitSms(client, plan.sms, plan.theme);
   assertNoBannedEntity(plan);
   return plan;
+}
+
+// THE SCHEMA IS A REQUEST, NOT AN ENFORCEMENT.
+//
+// This took the whole page down: the tool schema declared complianceCheck as an array of strings, and the
+// model returned a STRING. The page did `(plan.complianceCheck || []).map(...)`, which LOOKS like a guard and
+// is not one - a string is truthy, so it sails past `|| []` and explodes on .map.
+//
+// The nastiest part is that it is non-deterministic. The same brief gave me an eleven-item array locally and
+// a string in production. So it cannot be caught by testing once and declaring it fine.
+//
+// Fixed HERE, at the source, rather than in the page - because produceCampaign() also iterates plan.sliders,
+// and would have died exactly the same way, except server-side and after spending money on the images.
+// Anything that leaves this function has the shape it promised.
+function coercePlan(raw: unknown): CampaignPlan {
+  const o = (raw ?? {}) as Record<string, any>;
+  const list = <T,>(v: unknown): T[] => Array.isArray(v) ? v as T[] : v == null || v === "" ? [] : [v as T];
+  const str = (v: unknown): string => v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+
+  const deal = (d: any): Deal => ({
+    label: str(d?.label), amount: str(d?.amount), price: str(d?.price), validity: str(d?.validity),
+    amountSuffix: d?.amountSuffix ? str(d.amountSuffix) : undefined,
+    amountSub: d?.amountSub ? str(d.amountSub) : undefined,
+    footnote: d?.footnote ? str(d.footnote) : undefined,
+  });
+
+  return {
+    theme: str(o.theme),
+    rationale: str(o.rationale),
+    masthead: { subjectPrompt: str(o.masthead?.subjectPrompt), phoneScreen: str(o.masthead?.phoneScreen) || "none" },
+    section1: { subjectPrompt: str(o.section1?.subjectPrompt), deals: list<any>(o.section1?.deals).map(deal) },
+    sliders: list<any>(o.sliders).map((s) => ({
+      headline1: str(s?.headline1),
+      headline2: str(s?.headline2),
+      scenePrompt: str(s?.scenePrompt),
+      deal: deal(s?.deal),
+    })),
+    webflow: {
+      heroHeadline: str(o.webflow?.heroHeadline),
+      heroSubheads: list<unknown>(o.webflow?.heroSubheads).map(str),
+      section1Headline: str(o.webflow?.section1Headline),
+      section1Body: str(o.webflow?.section1Body),
+      sliderSubhead: str(o.webflow?.sliderSubhead),
+    },
+    sms: o.sms as CampaignPlan["sms"],   // fitSms rebuilds this immediately below, and counts it itself
+    complianceCheck: list<unknown>(o.complianceCheck).map(str),
+  };
 }
 
 // THE SMS MUST FIT, AND THE FURNITURE IS NOT OPTIONAL.
@@ -356,4 +403,109 @@ function assertNoBannedEntity(plan: CampaignPlan): void {
       "on a creative. Nothing was produced. Re-plan, and if a disclosure genuinely needs it, raise it with the client.",
     );
   }
+}
+
+// ── THE BRIEF COACH ─────────────────────────────────────────────────────────────────────────────────────
+//
+// Gary: "we should add an AI producer that assists in redoing the prompt as the expert."
+//
+// The plan is only ever as good as the brief. "mothers day promotion" is three words, and everything the
+// Producer then invents to fill the gaps - who the customer is, which deal we are pushing, what the emotional
+// frame is - is a guess wearing confidence. Garbage in is not a cliche here, it is the actual failure mode:
+// a vague brief produces a plausible, generic campaign, which is the worst possible output because it looks
+// finished.
+//
+// So this sits BEFORE planning. It takes the rough brief, looks at the client's best-performing work and their
+// REAL deal library, and writes the brief a senior creative director would actually hand over. Then it tells
+// you, plainly, what it had to assume and what it still does not know - because a brief coach that silently
+// invents the missing half is just the same problem one step earlier.
+//
+// It is FREE to run and it is EDITABLE. The output is a starting point you argue with, never a decision.
+
+export type SharpenedBrief = {
+  brief: string;          // the expert rewrite - this is what goes to the Producer
+  reasoning: string;      // what it changed and why
+  assumptions: string[];  // what it had to invent. THE MOST IMPORTANT FIELD - these are its guesses, exposed.
+  questions: string[];    // what it genuinely cannot know and you should answer
+  suggestedDeals: string[]; // real deals from the library that fit this campaign
+};
+
+const SHARPEN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    brief: { type: "string", description: "The rewritten expert brief. Written as a brief TO a creative team, not as a plan. 120-220 words. Concrete." },
+    reasoning: { type: "string", description: "What you changed and why. Two or three sentences." },
+    assumptions: { type: "array", items: { type: "string" }, description: "Everything you had to invent because the brief did not say. Be honest and specific - these are your guesses, and the producer must be able to overrule them." },
+    questions: { type: "array", items: { type: "string" }, description: "What you genuinely cannot know and a human should answer. Ask only what would CHANGE the work." },
+    suggestedDeals: { type: "array", items: { type: "string" }, description: "Deals from the client's real library that fit this campaign, quoted exactly as listed. Only real ones." },
+  },
+  required: ["brief", "reasoning", "assumptions", "questions", "suggestedDeals"],
+} as unknown as Anthropic.Tool["input_schema"];
+
+export async function sharpenBrief(clientId: string, rough: string, dealList: string[] = []): Promise<SharpenedBrief> {
+  const kit = await getBrandKit(clientId);
+  if (!kit) throw new Error("This client has no brand kit yet - run Template intake first.");
+  const key = await getSecret("anthropic");
+  if (!key) throw new Error("Claude isn't connected");
+
+  const refs = (await listAssets(clientId, "reference")).slice(0, REFERENCE_LIMIT);
+  const client = new Anthropic({ apiKey: key });
+
+  const content: Anthropic.ContentBlockParam[] = [];
+  if (refs.length) {
+    content.push({
+      type: "text",
+      text: "These are the client's own best-performing funnel creatives - the campaigns that actually ran and actually worked. Look at them properly before you write anything. Your brief has to be answerable INSIDE this world.",
+    });
+    for (const r of refs) content.push({ type: "image", source: { type: "url", url: r.url } });
+  }
+
+  content.push({
+    type: "text",
+    text:
+      `THE CLIENT'S REAL DEAL LIBRARY (read off their own artwork - these are the only deals that exist):\n` +
+      (dealList.length ? dealList.map((d) => `  - ${d}`).join("\n") : "  (none on file)") +
+      `\n\nTHE PRODUCER'S ROUGH BRIEF, exactly as they typed it:\n"""${rough.slice(0, 2000)}"""\n\n` +
+      `Rewrite this as the brief a senior creative director would hand to their team.\n\n` +
+      `A GOOD BRIEF ANSWERS: who exactly is this for and what is true about their week; what ONE thing we want ` +
+      `them to feel; which specific deal is the hero and why THAT one; what the emotional frame is; what we are ` +
+      `deliberately NOT doing. It is concrete about the offer and generous about the human being.\n\n` +
+      `DO NOT write the campaign. Do not write headlines, do not write image prompts. Write the BRIEF - the ` +
+      `thinking that a campaign is answerable to. The Producer will do the making.\n\n` +
+      `Then be scrupulously honest in assumptions[] about everything you invented, because the producer typed ` +
+      `a few words and you are about to spend their money on the strength of your interpretation of them.`,
+  });
+
+  const res = await client.messages.create({
+    model: PREMIUM,
+    max_tokens: 2500,
+    system:
+      `You are a senior creative director at the agency that makes MTN MoMo's work. You do not write campaigns here - you write the BRIEF, and you interrogate a thin one until it is worth answering.\n\n` +
+      `You know this account cold:\n\n=== THE DOCTRINE ===\n${(kit.tone_notes || "").slice(0, 7000)}\n\n` +
+      `Hard rules that a brief must never ask the team to break: no urgency devices of any kind (FAIS s14(3)(n) ` +
+      `prohibits them outright, and they are the grammar of the scam SMS this customer already receives every ` +
+      `week); never the word FREE; never name African Bank; every price must name what it buys. The customer is ` +
+      `a competent adult making a careful purchase from a real bank, never a lucky winner.\n\n` +
+      `UK spelling. No em dashes.`,
+    tools: [{ name: "sharpen", description: "The expert brief.", input_schema: SHARPEN_SCHEMA }],
+    tool_choice: { type: "tool", name: "sharpen" },
+    messages: [{ role: "user", content }],
+  });
+
+  const b = res.content.find((x) => x.type === "tool_use");
+  if (!b || b.type !== "tool_use") throw new Error("The brief coach returned nothing.");
+  const raw = b.input as Record<string, unknown>;
+  const list = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map((x) => typeof x === "string" ? x : JSON.stringify(x))
+      : v == null || v === "" ? [] : [typeof v === "string" ? v : JSON.stringify(v)];
+  const out: SharpenedBrief = {
+    brief: String(raw.brief ?? ""),
+    reasoning: String(raw.reasoning ?? ""),
+    assumptions: list(raw.assumptions),
+    questions: list(raw.questions),
+    suggestedDeals: list(raw.suggestedDeals),
+  };
+  assertNoBannedEntity({ ...out } as unknown as CampaignPlan);
+  return out;
 }

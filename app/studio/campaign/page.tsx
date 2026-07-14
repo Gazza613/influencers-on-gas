@@ -23,11 +23,20 @@ type Plan = {
   complianceCheck: string[];
 };
 type Creative = { kind: string; index: number; url: string; bytes: number; width: number; height: number; error?: string };
+type Sharpened = { brief: string; reasoning: string; assumptions: string[]; questions: string[]; suggestedDeals: string[] };
 
 // Never hand React something that might be an object. One non-string field should degrade a line of text,
 // not destroy the page and take an Opus-priced plan with it.
 const txt = (v: unknown): string =>
   v == null ? "" : typeof v === "string" ? v : typeof v === "object" ? JSON.stringify(v) : String(v);
+
+// AND NEVER ASSUME A LIST IS A LIST. `(v || []).map(...)` looks like a guard and is not one: a string is
+// truthy, so it sails past `|| []` and then explodes on .map - which is precisely what took the page down
+// ("complianceCheck.map is not a function"). The tool schema asked for an array and the model returned a
+// string, and it does that non-deterministically: the same brief gave me an 11-item array locally and a
+// string in production. Coerce, do not hope.
+const arr = <T,>(v: unknown): T[] =>
+  Array.isArray(v) ? (v as T[]) : v == null || v === "" ? [] : ([v] as T[]);
 
 const dealLine = (d: Deal) => `${txt(d?.label)} · ${txt(d?.amount)}${txt(d?.amountSuffix)}${d?.amountSub ? ` ${txt(d.amountSub)}` : ""} · ${txt(d?.price)} · ${txt(d?.validity)}`;
 
@@ -38,14 +47,15 @@ export default function CampaignPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [busy, setBusy] = useState<"" | "plan" | "produce">("");
+  const [sharp, setSharp] = useState<Sharpened | null>(null);
+  const [busy, setBusy] = useState<"" | "sharpen" | "plan" | "produce">("");
   const [err, setErr] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [restored, setRestored] = useState(false);
 
   useEffect(() => {
     fetch("/api/studio").then((r) => r.json()).then((d) => {
-      const cs = d.clients || [];
+      const cs = arr<{ id: string; name: string }>(d.clients);
       setClients(cs);
       if (cs[0]) setClientId(cs[0].id);
     }).catch(() => {});
@@ -81,25 +91,27 @@ export default function CampaignPage() {
     return () => clearInterval(t);
   }, [busy]);
 
-  async function post(action: "plan" | "produce") {
+  async function post(action: "sharpen" | "plan" | "produce") {
     setBusy(action); setErr("");
+    if (action === "sharpen") setSharp(null);
     if (action === "plan") { setPlan(null); setCreatives([]); setWarnings([]); }
     try {
       // Two routes, not one action flag: planning is free and must never load the 67MB renderer, so it
       // cannot be taken down by a rendering problem.
-      const r = await fetch(action === "plan" ? "/api/studio/campaign" : "/api/studio/campaign/produce", {
+      const r = await fetch(action === "produce" ? "/api/studio/campaign/produce" : "/api/studio/campaign", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, brief, plan }),
+        body: JSON.stringify({ action, clientId, brief, plan }),
       });
       // A crashed function returns Vercel's HTML error page, not JSON. Say so plainly instead of throwing
       // "Unexpected token '<'", which tells the user nothing about what broke.
       const text = await r.text();
-      let d: { error?: string; plan?: Plan; creatives?: Creative[]; warnings?: string[] };
+      let d: { error?: string; plan?: Plan; sharpened?: Sharpened; creatives?: Creative[]; warnings?: string[] };
       try { d = JSON.parse(text); }
       catch { throw new Error(`The server returned an error page (${r.status}), not a result. The function itself failed.`); }
       if (!r.ok) throw new Error(d.error || "That did not work.");
-      if (action === "plan") setPlan(d.plan ?? null);
-      else { setCreatives(d.creatives || []); setWarnings(d.warnings || []); }
+      if (action === "sharpen") setSharp((d as { sharpened?: Sharpened }).sharpened ?? null);
+      else if (action === "plan") setPlan(d.plan ?? null);
+      else { setCreatives(arr<Creative>(d.creatives)); setWarnings(arr<string>(d.warnings).map(txt)); }
     } catch (e) {
       setErr(String((e as Error)?.message || e));
     } finally { setBusy(""); }
@@ -132,12 +144,77 @@ export default function CampaignPage() {
             placeholder="Winter campaign. Cosy indoors, staying connected when it is cold outside. Push the voice bundles - R5 for 30 minutes, R10 for unlimited all-net calls. We want people talking to family."
             className="mt-3 w-full rounded-xl border border-line bg-surface-2 p-4 text-base leading-relaxed outline-none focus:border-accent"
           />
-          <button onClick={() => post("plan")} disabled={!!busy || !clientId || brief.trim().length < 12}
-            className="mt-3 rounded-lg bg-accent px-5 py-2.5 text-[15px] font-bold text-black disabled:opacity-40">
-            {busy === "plan" ? "The Producer is thinking…" : "Plan the campaign"}
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {/* THE BRIEF COACH. Free, and it runs first: a thin brief does not produce a bad campaign, it
+                produces a plausible generic one - which is worse, because it looks finished. */}
+            <button onClick={() => post("sharpen")} disabled={!!busy || !clientId || brief.trim().length < 4}
+              className="rounded-lg border border-[#818cf8]/60 bg-[#818cf8]/10 px-5 py-2.5 text-[15px] font-bold text-ink transition hover:bg-[#818cf8]/20 disabled:opacity-40">
+              {busy === "sharpen" ? `The Producer is reading your brief… ${elapsed}s` : "Sharpen the brief"}
+            </button>
+            <button onClick={() => post("plan")} disabled={!!busy || !clientId || brief.trim().length < 12}
+              className="rounded-lg bg-accent px-5 py-2.5 text-[15px] font-bold text-black disabled:opacity-40">
+              {busy === "plan" ? `The Producer is thinking… ${elapsed}s` : "Plan the campaign"}
+            </button>
+            <span className="text-sm text-ink-dim">Sharpening is free, and it makes the plan better.</span>
+          </div>
           {err && <p className="mt-3 text-sm font-semibold text-red-400">{err}</p>}
         </section>
+
+        {/* ── THE SHARPENED BRIEF ───────────────────────────────────────────────── */}
+        {sharp && (
+          <section className="mt-5 rounded-2xl border border-[#818cf8]/40 bg-[#818cf8]/[0.06] p-5">
+            <p className="text-[13px] font-semibold uppercase tracking-widest text-[#a5b4fc]">The Producer&apos;s brief</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">{txt(sharp.reasoning)}</p>
+
+            <textarea
+              value={txt(sharp.brief)}
+              onChange={(e) => setSharp({ ...sharp, brief: e.target.value })}
+              rows={8}
+              className="mt-3 w-full rounded-xl border border-line bg-surface-2 p-4 text-[15px] leading-relaxed outline-none focus:border-accent"
+            />
+
+            {arr<string>(sharp.assumptions).length > 0 && (
+              <div className="mt-4">
+                {/* THE ASSUMPTIONS ARE THE POINT. You typed a few words; it is about to spend your money on its
+                    reading of them. It has to show its guesses so you can overrule them. */}
+                <p className="text-[13px] font-semibold uppercase tracking-widest text-amber-400">What it had to assume</p>
+                <ul className="mt-2 space-y-1.5 text-[15px] leading-relaxed text-ink-dim">
+                  {arr<unknown>(sharp.assumptions).map((a, i) => <li key={i}>• {txt(a)}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {arr<string>(sharp.questions).length > 0 && (
+              <div className="mt-4">
+                <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">What it still needs from you</p>
+                <ul className="mt-2 space-y-1.5 text-[15px] leading-relaxed text-ink-dim">
+                  {arr<unknown>(sharp.questions).map((q, i) => <li key={i}>• {txt(q)}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {arr<string>(sharp.suggestedDeals).length > 0 && (
+              <div className="mt-4">
+                <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">Deals from your library that fit</p>
+                <ul className="mt-2 space-y-1 text-[15px] text-ink-dim tabular">
+                  {arr<unknown>(sharp.suggestedDeals).map((d, i) => <li key={i}>• {txt(d)}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                onClick={() => { setBrief(txt(sharp.brief)); setSharp(null); }}
+                className="rounded-lg bg-accent px-5 py-2.5 text-[15px] font-bold text-black">
+                Use this brief
+              </button>
+              <button onClick={() => setSharp(null)}
+                className="rounded-lg border border-line px-5 py-2.5 text-[15px] font-semibold text-ink-dim hover:text-ink">
+                Keep mine
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* ── THE PLAN ──────────────────────────────────────────────────────────── */}
         {plan && (
@@ -161,7 +238,7 @@ export default function CampaignPage() {
               { key: "masthead", title: "Masthead · 1080×811", prompt: plan.masthead?.subjectPrompt || "",
                 set: (v: string) => edit((p) => { p.masthead.subjectPrompt = v; }), deals: [] as Deal[] },
               { key: "section1", title: "Section 1 · 1239×1080", prompt: plan.section1?.subjectPrompt || "",
-                set: (v: string) => edit((p) => { p.section1.subjectPrompt = v; }), deals: plan.section1?.deals || [] },
+                set: (v: string) => edit((p) => { p.section1.subjectPrompt = v; }), deals: arr<Deal>(plan.section1?.deals) },
             ]).map((c) => (
               <div key={c.key} className="rounded-2xl border border-line bg-surface-1 p-5">
                 <div className="flex items-baseline justify-between">
@@ -179,7 +256,7 @@ export default function CampaignPage() {
             ))}
 
             {/* The three sliders. These DO carry baked copy. */}
-            {(plan.sliders || []).map((s, i) => (
+            {arr<Plan["sliders"][number]>(plan.sliders).map((s, i) => (
               <div key={i} className="rounded-2xl border border-line bg-surface-1 p-5">
                 <div className="flex items-baseline justify-between">
                   <p className="text-base font-bold">Slider {i + 1} · 1080×1080</p>
@@ -199,7 +276,7 @@ export default function CampaignPage() {
             <div className="rounded-2xl border border-line bg-surface-1 p-5">
               <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">Page copy (Webflow)</p>
               <p className="mt-2 text-lg font-bold">{txt(plan.webflow?.heroHeadline)}</p>
-              <ul className="mt-1 list-disc pl-5 text-[15px] leading-relaxed text-ink-dim">{(plan.webflow?.heroSubheads || []).map((h, i) => <li key={i}>{txt(h)}</li>)}</ul>
+              <ul className="mt-1 list-disc pl-5 text-[15px] leading-relaxed text-ink-dim">{arr<unknown>(plan.webflow?.heroSubheads).map((h, i) => <li key={i}>{txt(h)}</li>)}</ul>
               <p className="mt-4 text-lg font-bold">{txt(plan.webflow?.section1Headline)}</p>
               <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">{txt(plan.webflow?.section1Body)}</p>
             </div>
@@ -226,7 +303,7 @@ export default function CampaignPage() {
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
               <p className="text-[13px] font-semibold uppercase tracking-widest text-amber-400">Compliance check</p>
               <ul className="mt-2 space-y-2 text-[15px] leading-relaxed text-ink-dim">
-                {(plan.complianceCheck || []).map((c, i) => <li key={i}>• {txt(c)}</li>)}
+                {arr<unknown>(plan.complianceCheck).map((c, i) => <li key={i}>• {txt(c)}</li>)}
               </ul>
             </div>
 
