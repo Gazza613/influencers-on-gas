@@ -14,7 +14,7 @@ import { flex } from "@/lib/flex";
 type Client = { id: string; name: string };
 type Template = { id: string; name: string; block: string; placement: string; width: number; height: number; status: string; reference_url: string | null };
 type Asset = { id: string; kind: string; name: string | null; url: string; meta: { width?: number; height?: number; bytes?: number } };
-type BrandKit = { colors: Record<string, string>; fonts: { family: string; url: string }[]; logos: { variant: string; url: string }[] } | null;
+type BrandKit = { colors: Record<string, string>; fonts: { family: string; url: string }[]; logos: { variant: string; url: string }[]; compliance_text?: string | null } | null;
 
 const FUNNEL_PLACEMENTS = [
   { key: "funnel_banner", label: "Masthead", hint: "1:1 · the banner at the top of the funnel" },
@@ -30,12 +30,29 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
   const [brandKit, setBrandKit] = useState<BrandKit>(null);
   const [busy, setBusy] = useState("");
   const [progress, setProgress] = useState("");
+  const [compliance, setCompliance] = useState("");
+  const [savedCompliance, setSavedCompliance] = useState(false);
 
   const refresh = useCallback(async (id: string) => {
     if (!id) return;
     const d = await fetch(`/api/studio?clientId=${id}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-    if (d) { setTemplates(d.templates || []); setAssets(d.assets || []); setBrandKit(d.brandKit || null); }
+    if (d) {
+      setTemplates(d.templates || []); setAssets(d.assets || []); setBrandKit(d.brandKit || null);
+      setCompliance(String(d.brandKit?.compliance_text || ""));
+    }
   }, []);
+
+  async function saveCompliance() {
+    if (!clientId) return;
+    setBusy("compliance");
+    const r = await fetch("/api/studio/brand-kit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, compliance_text: compliance }),
+    }).then((x) => x.json()).catch(() => null);
+    setBusy("");
+    if (r?.ok) { setSavedCompliance(true); await refresh(clientId); }
+    else flex(r?.error || "Couldn't save the compliance line.");
+  }
 
   useEffect(() => { refresh(clientId); }, [clientId, refresh]);
 
@@ -228,6 +245,33 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
             );
           })}
         </div>
+      </div>
+
+      {/* CLIENT COMPLIANCE LINE. Stored once at client level and reproduced VERBATIM on any creative that
+          needs it. It is deliberately NOT given to the copy engine to rewrite: a financial-services
+          disclosure that gets paraphrased is a compliance breach, so this text is a fixed block. */}
+      <div className="rounded-xl border border-line bg-surface-1 p-5">
+        <div className="flex items-center justify-between">
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Compliance line</div>
+          {savedCompliance && <span className="tabular text-[11px] text-[#86efac]">saved ✓</span>}
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+          Paste the client&apos;s compliance sentence here (for example: <span className="text-ink-faint">Ts&amp;Cs Apply · Queries? 083135 · MTN JR AUTH FSP 46094</span>).
+          It gets reproduced word for word on any creative that needs it. The copy engine can never rewrite
+          or shorten it, so the disclosure stays intact on every asset.
+        </p>
+        <textarea
+          value={compliance}
+          onChange={(e) => { setCompliance(e.target.value); setSavedCompliance(false); }}
+          rows={3}
+          placeholder="Copy the compliance sentence here…"
+          className="mt-3 w-full resize-none rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[14px] leading-relaxed text-ink outline-none focus:border-[#60a5fa]"
+        />
+        <button
+          onClick={saveCompliance}
+          disabled={busy === "compliance" || !clientId}
+          className="mt-2 rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
+        >{busy === "compliance" ? "Saving…" : "Save compliance line"}</button>
       </div>
 
       {/* DEAL CARDS (the client's name for them; spec 5b calls them callouts). A designed deal card arrives

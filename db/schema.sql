@@ -448,3 +448,8 @@ create index if not exists idx_studio_assets_client on studio_assets(client_id, 
 alter table studio_assets drop constraint if exists studio_assets_kind_check;
 alter table studio_assets add constraint studio_assets_kind_check
   check (kind in ('reference','image','logo','font','video','ci_doc','deal_card'));
+
+-- Client compliance line (e.g. MTN's "Ts&Cs Apply · Queries? 083135 · MTN JR AUTH FSP 46094"). It is
+-- client-level, not per-template, and must be reproducible VERBATIM on any creative that needs it - a
+-- financial-services disclosure can never be paraphrased or half-remembered by a copy engine.
+alter table studio_brand_kits add column if not exists compliance_text text;

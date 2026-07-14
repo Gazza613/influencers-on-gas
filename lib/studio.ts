@@ -12,6 +12,7 @@ export type BrandKit = {
   fonts: { family: string; weight?: string; style?: string; url: string; file?: string }[];
   logos: { variant: string; url: string; name?: string }[];
   tone_notes: string | null;
+  compliance_text: string | null; // reproduced VERBATIM on creatives that need it - never paraphrased
   locked: boolean;
 };
 
@@ -43,7 +44,7 @@ export type StudioAsset = {
 
 export async function getBrandKit(clientId: string): Promise<BrandKit | null> {
   const rows = (await db().query(
-    `select id, client_id, name, colors, fonts, logos, tone_notes, locked
+    `select id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, locked
      from studio_brand_kits where client_id = $1 order by created_at limit 1`,
     [clientId],
   )) as BrandKit[];
@@ -57,7 +58,7 @@ export async function upsertBrandKit(clientId: string, name: string, patch: Part
     const rows = (await db().query(
       `insert into studio_brand_kits (client_id, name, colors, fonts, logos, tone_notes)
        values ($1, $2, $3, $4, $5, $6)
-       returning id, client_id, name, colors, fonts, logos, tone_notes, locked`,
+       returning id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, locked`,
       [clientId, name, JSON.stringify(patch.colors ?? {}), JSON.stringify(patch.fonts ?? []), JSON.stringify(patch.logos ?? []), patch.tone_notes ?? null],
     )) as BrandKit[];
     return rows[0];
@@ -69,12 +70,13 @@ export async function upsertBrandKit(clientId: string, name: string, patch: Part
   if (patch.fonts !== undefined) { sets.push(`fonts = $${i++}`); vals.push(JSON.stringify(patch.fonts)); }
   if (patch.logos !== undefined) { sets.push(`logos = $${i++}`); vals.push(JSON.stringify(patch.logos)); }
   if (patch.tone_notes !== undefined) { sets.push(`tone_notes = $${i++}`); vals.push(patch.tone_notes); }
+  if (patch.compliance_text !== undefined) { sets.push(`compliance_text = $${i++}`); vals.push(patch.compliance_text); }
   if (patch.locked !== undefined) { sets.push(`locked = $${i++}`); vals.push(patch.locked); }
   if (!sets.length) return existing;
   vals.push(existing.id);
   const rows = (await db().query(
     `update studio_brand_kits set ${sets.join(", ")} where id = $${i}
-     returning id, client_id, name, colors, fonts, logos, tone_notes, locked`,
+     returning id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, locked`,
     vals,
   )) as BrandKit[];
   return rows[0];

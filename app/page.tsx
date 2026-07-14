@@ -37,13 +37,18 @@ function useTypewriter() {
 }
 
 // Six floating card slots (position, rotation, size, float timing).
+//
+// SIZES: scaled up ~40% from the originals (158/138/146/160/140/148), which came straight across from the
+// archived Vite build and always read small on a desktop monitor. They are declared in `vw` with a px floor
+// and ceiling, so they now GROW with the viewport instead of staying a fixed 158px on a 27-inch screen -
+// which is what made them feel like they had shrunk.
 const CARDS = [
-  { left: "-28px", top: "6%", w: 158, rot: "-9deg", opacity: 0.92, period: 8, sway: 11, delay: 0.0 },
-  { left: "28px", top: "43%", w: 138, rot: "5deg", opacity: 0.78, period: 10, sway: 14, delay: 1.6 },
-  { left: "-14px", top: "74%", w: 146, rot: "-5deg", opacity: 0.84, period: 12, sway: 16, delay: 0.8 },
-  { right: "-28px", top: "4%", w: 160, rot: "10deg", opacity: 0.92, period: 9, sway: 13, delay: 0.4 },
-  { right: "24px", top: "42%", w: 140, rot: "-7deg", opacity: 0.78, period: 11, sway: 15, delay: 2.0 },
-  { right: "-16px", top: "72%", w: 148, rot: "6deg", opacity: 0.86, period: 13, sway: 17, delay: 1.2 },
+  { left: "-30px", top: "6%", w: "clamp(158px, 15vw, 232px)", rot: "-9deg", opacity: 0.92, period: 8, sway: 11, delay: 0.0 },
+  { left: "26px", top: "43%", w: "clamp(138px, 13vw, 202px)", rot: "5deg", opacity: 0.78, period: 10, sway: 14, delay: 1.6 },
+  { left: "-16px", top: "74%", w: "clamp(146px, 14vw, 214px)", rot: "-5deg", opacity: 0.84, period: 12, sway: 16, delay: 0.8 },
+  { right: "-30px", top: "4%", w: "clamp(160px, 15vw, 236px)", rot: "10deg", opacity: 0.92, period: 9, sway: 13, delay: 0.4 },
+  { right: "22px", top: "42%", w: "clamp(140px, 13vw, 206px)", rot: "-7deg", opacity: 0.78, period: 11, sway: 15, delay: 2.0 },
+  { right: "-18px", top: "72%", w: "clamp(148px, 14vw, 218px)", rot: "6deg", opacity: 0.86, period: 13, sway: 17, delay: 1.2 },
 ] as const;
 
 type Inf = { status?: string; persona?: { hero_url?: string; hero_realism_url?: string; locked?: boolean } | null; look_refs?: { url: string; hero?: boolean }[] | null };
@@ -122,7 +127,7 @@ export default function Landing() {
       {CARDS.map((card, i) => {
         const pick = cardSrcs[i];
         if (!pick) return null;
-        const opt = (u: string) => `/_next/image?url=${encodeURIComponent(u)}&w=384&q=75`;
+        const opt = (u: string) => `/_next/image?url=${encodeURIComponent(u)}&w=640&q=75`;
         const pos: Record<string, string> = {};
         if ("left" in card) pos.left = card.left as string;
         if ("right" in card) pos.right = card.right as string;
@@ -190,8 +195,8 @@ export default function Landing() {
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         @keyframes orb3 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(35px,-55px) scale(0.90)} 70%{transform:translate(-55px,22px) scale(1.08)} }
-        @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-18px)} }
-        @keyframes cardSway { 0%,100%{transform:translateX(0px)} 25%{transform:translateX(5px)} 75%{transform:translateX(-4px)} }
+        @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-26px)} }
+        @keyframes cardSway { 0%,100%{transform:translateX(0px)} 25%{transform:translateX(8px)} 75%{transform:translateX(-7px)} }
         @keyframes cardAppear { from{opacity:0} to{opacity:var(--target-opacity,0.44)} }
         .landing-card { display:block }
         @media (max-width: 860px) { .landing-card { display:none } }
