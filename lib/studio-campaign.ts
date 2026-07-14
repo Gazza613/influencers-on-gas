@@ -53,7 +53,16 @@ export async function produceCampaign(clientId: string, plan: CampaignPlan): Pro
   if (!kit) throw new Error("No brand kit for this client.");
   const fonts = (kit.fonts || []) as { family: string; url: string }[];
   const logo = pickLogo(kit.logos as { name: string; url: string }[] | undefined);
-  const compliance = kit.compliance_text || "";
+  // THE LEGAL LINE ON A CREATIVE IS NOT THE LEGAL LINE ON THE PAGE.
+  //
+  // Gary, locked: "never reference African Bank in any creative or copy... we can keep African Bank on the
+  // compliance copy but not on any creatives." I added creative_legal_text for precisely this and then never
+  // wired it in - so the first live run printed "Banking services by African Bank Ltd" across the foot of a
+  // slider. The brand lock was in the prompt, in the code, and in the database, and still shipped, because
+  // the renderer was reading the wrong field.
+  //
+  // Falls back to the full compliance text with the bank clause STRIPPED, never to the raw text.
+  const compliance = kit.creative_legal_text?.trim() || stripBank(kit.compliance_text || "");
   const warnings: string[] = [];
 
   // ── 1. GENERATE, AGAINST THE CLIENT'S OWN BEST-PERFORMING WORK.
@@ -77,8 +86,8 @@ export async function produceCampaign(clientId: string, plan: CampaignPlan): Pro
   // Cut-outs are generated at 3:4 (a standing person), scenes at 1:1 (the slider canvas), so nothing is
   // generated at an aspect it will only be cropped out of.
   const [cutShots, sceneShots] = await Promise.all([
-    Promise.all(cutoutPrompts.map((p) => generateStyled({ prompt: p, references: refs, aspectRatio: "3:4", model: IMAGE_MODEL }))),
-    Promise.all(scenePrompts.map((p) => generateStyled({ prompt: p, references: refs, aspectRatio: "1:1", model: IMAGE_MODEL }))),
+    Promise.all(cutoutPrompts.map((p) => generateStyled({ prompt: p, references: refs, aspectRatio: "3:4", model: IMAGE_MODEL, mode: "cutout" }))),
+    Promise.all(scenePrompts.map((p) => generateStyled({ prompt: p, references: refs, aspectRatio: "1:1", model: IMAGE_MODEL, mode: "scene" }))),
   ]);
 
   const shots = [...cutShots, ...sceneShots];
@@ -138,6 +147,16 @@ export async function produceCampaign(clientId: string, plan: CampaignPlan): Pro
   }
 
   return { creatives: out, warnings };
+}
+
+// Last line of defence. If nobody has set a creative-safe legal line, remove the bank clause rather than
+// print it: on a creative the bank is never named, full stop.
+function stripBank(text: string): string {
+  return text
+    .replace(/banking services (are )?(provided |issued )?by [^.]*?african bank[^.]*\.\s*/gi, "")
+    .replace(/[^.]*african bank[^.]*\.\s*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // The logo the templates want: the horizontal full-colour lockup, which is what the reference creatives use.

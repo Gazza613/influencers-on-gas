@@ -269,9 +269,38 @@ export async function planCampaign(clientId: string, brief: string): Promise<Cam
   if (!block || block.type !== "tool_use") throw new Error("The Producer returned nothing.");
   const plan = coercePlan(block.input);
 
+  // COERCION IS NOT VALIDATION, AND I CONFLATED THEM.
+  //
+  // The first live run produced ONE slider instead of three, and a deal card containing nothing but the word
+  // "Only" - because every deal field came back as an empty string. There were ZERO warnings, because
+  // coercePlan had dutifully turned a broken plan into a well-shaped empty one and handed it downstream.
+  //
+  // I built the coercion to stop a crash and it became a way to ship rubbish quietly. A plan that cannot be
+  // produced must SAY SO, before we spend money generating images for it.
+  const faults = validate(plan);
+  if (faults.length) throw new Error(`The Producer returned an unusable plan: ${faults.join(" ")} Nothing was produced. Try planning again.`);
+
   plan.sms = await fitSms(client, plan.sms, plan.theme);
   assertNoBannedEntity(plan);
   return plan;
+}
+
+function validate(p: CampaignPlan): string[] {
+  const f: string[] = [];
+  const dealOk = (d: Deal | undefined) => !!(d?.label && d?.amount && d?.price && d?.validity);
+
+  if (p.sliders.length !== 3) f.push(`It planned ${p.sliders.length} slider${p.sliders.length === 1 ? "" : "s"}, not 3.`);
+  p.sliders.forEach((s, i) => {
+    if (!s.headline1 || !s.headline2) f.push(`Slider ${i + 1} has no headline.`);
+    if (!s.scenePrompt) f.push(`Slider ${i + 1} has no image prompt.`);
+    // An empty deal renders as a navy pill containing the word "Only" and nothing else. It also strips the
+    // validity line, which FAIS s14(3)(m) requires beside the price - so it is not merely ugly, it is illegal.
+    if (!dealOk(s.deal)) f.push(`Slider ${i + 1} has no usable deal.`);
+  });
+  if (!p.section1.deals.length) f.push("Section 1 has no deal cards.");
+  if (!p.masthead.subjectPrompt) f.push("The masthead has no image prompt.");
+  if (!p.section1.subjectPrompt) f.push("Section 1 has no image prompt.");
+  return f;
 }
 
 // THE SCHEMA IS A REQUEST, NOT AN ENFORCEMENT.

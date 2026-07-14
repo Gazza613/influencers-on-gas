@@ -835,39 +835,62 @@ export async function generateStyled(opts: {
   aspectRatio?: string;
   model?: string;
   resolution?: "1k" | "2k" | "4k";
+  /** "cutout" = an isolated person for compositing. "scene" = a full-bleed photograph. */
+  mode?: "cutout" | "scene";
 }): Promise<{ url: string | null; error: string | null; model: string }> {
   const model = opts.model || "nano_banana_pro";
   const ar = opts.aspectRatio || "1:1";
-  const refs = opts.references.filter(isSafePublicUrl).slice(0, 4); // past ~4 the model averages them into mush
+  const mode = opts.mode || "scene";
+  const refs = opts.references.filter(isSafePublicUrl).slice(0, 3);
 
-  if (!refs.length) {
-    const [r] = await generateBatchDetailed([opts.prompt], model, ar, {}, "gpt_image_2");
-    return r;
-  }
+  // THE HARD NEGATIVE. This is the whole lesson from the first live run.
+  //
+  // I fed the model FINISHED ADVERTS as style references and asked it for a photograph. So it produced an
+  // advert: it drew a MoMo logo, a yellow disc, a light streak, a headline, and a strip of invented legal
+  // text - and the template then composited OUR real chrome on top of its fake chrome. Two logos, two rings,
+  // garbled type reading "Data Deals for".
+  //
+  // My prompt did politely say "do not copy their composition". A polite request loses to eight finished
+  // layouts. The instruction has to be a wall, and it has to lead.
+  const NO_GRAPHICS =
+    "ABSOLUTE CONSTRAINT, THIS OVERRIDES EVERYTHING ELSE: produce a PHOTOGRAPH and nothing but a photograph. " +
+    "The output must contain NO text, NO letters, NO words, NO numbers, NO logos, NO watermarks, NO circles or " +
+    "discs, NO rings or arcs, NO light trails or glowing swooshes, NO icons, NO badges, NO price tags, NO user " +
+    "interface, NO borders, NO frames, NO graphic design of any kind. Nothing drawn, nothing added. If you are " +
+    "shown reference images that contain any of those things, they are there ONLY so you can copy the " +
+    "PHOTOGRAPHY - the light, the colour grade, the casting, the lens. Every graphic element in them is applied " +
+    "afterwards by a designer and MUST NOT appear in what you make. A single letter or circle makes the image " +
+    "unusable.";
+
+  const framing = mode === "cutout"
+    ? "Frame: a single person, waist-up, alone, centred, against a completely plain seamless neutral mid-grey " +
+      "studio background with nothing behind them at all - no room, no props, no scenery. The background will " +
+      "be removed, so it must be clean, even and empty."
+    : "Frame: a real photographic moment in a real place. Keep the lower third of the frame calm and " +
+      "uncluttered, and keep the top-right corner clear.";
+
+  const build = (refCount: number) => {
+    const names = Array.from({ length: refCount }, (_, i) => `@image${i + 1}`).join(", ");
+    const style = refCount
+      ? `${names} ${refCount > 1 ? "are" : "is"} the client's own advertising. Copy ONLY their PHOTOGRAPHIC ` +
+        `qualities: the warmth and direction of the light, the colour grade, the depth of field, how the skin ` +
+        `is rendered, how the people are cast and styled. Copy NOTHING else from them - not their subject, not ` +
+        `their pose, not their location, and above all none of their graphics, type or logos.\n\n`
+      : "";
+    return `${NO_GRAPHICS}\n\n${style}${framing}\n\nPhotograph this:\n${opts.prompt}`;
+  };
 
   try {
-    const ids = (await Promise.all(refs.map((u) => importMediaUrl(u).catch(() => null)))).filter(Boolean) as string[];
-    if (!ids.length) {
-      const [r] = await generateBatchDetailed([opts.prompt], model, ar, {}, "gpt_image_2");
-      return { ...r, error: r.error || "references could not be imported; generated unstyled" };
-    }
-
-    const names = ids.map((_, i) => `@image${i + 1}`).join(", ");
-    const styled =
-      `${names} ${ids.length > 1 ? "are" : "is"} the client's own best-performing advertising photography. ` +
-      `Match their LOOK precisely: the colour grading and warmth, the quality and direction of the light, the ` +
-      `depth of field, the skin rendering, the casting and styling of the people, the framing and how much air ` +
-      `sits around the subject. The finished image must look like it came from the same shoot.\n\n` +
-      `Do NOT copy their subject, their pose, their location or their composition. Do not reproduce any person ` +
-      `from them. They are a reference for STYLE ONLY.\n\n` +
-      `Now photograph THIS, in that style:\n${opts.prompt}`;
+    const ids = refs.length
+      ? (await Promise.all(refs.map((u) => importMediaUrl(u).catch(() => null)))).filter(Boolean) as string[]
+      : [];
 
     const { call } = await openSession();
     const params: AnyObj = {
       ...baseParams(model, ar),
-      prompt: styled,
-      medias: ids.map((value) => ({ value, role: "image" })),
+      prompt: build(ids.length),
     };
+    if (ids.length) params.medias = ids.map((value) => ({ value, role: "image" }));
     if (opts.resolution) params.resolution = opts.resolution;
 
     const r = await call("generate_image", { params });
