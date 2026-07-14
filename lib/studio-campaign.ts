@@ -1,10 +1,10 @@
-import { generateBatchDetailed } from "./vendors/higgsfield";
+import { generateStyled } from "./vendors/higgsfield";
 import { removeBackground } from "./vendors/fal";
 import { renderPng, encodeForDelivery } from "./studio-render";
 import { renderMomoSlider } from "./templates/momo-slider";
 import { renderMomoMasthead } from "./templates/momo-masthead";
 import { renderMomoSection1 } from "./templates/momo-section1";
-import { getBrandKit } from "./studio";
+import { getBrandKit, listAssets } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
 import type { CampaignPlan } from "./studio-producer";
@@ -55,18 +55,29 @@ export async function produceCampaign(clientId: string, plan: CampaignPlan): Pro
   const compliance = kit.compliance_text || "";
   const warnings: string[] = [];
 
-  // ── 1. GENERATE. All five frames at once - the batch is concurrency-capped inside the vendor, so five
-  // prompts cost roughly the wall-clock of one. Cut-outs are generated at 3:4 (a standing person), scenes
-  // at 1:1 (the slider canvas), so nothing is generated at an aspect it will only be cropped out of.
+  // ── 1. GENERATE, AGAINST THE CLIENT'S OWN BEST-PERFORMING WORK.
+  //
+  // Every frame is now generated WITH their reference creatives attached as style references, not from a text
+  // prompt alone. This was the single biggest gap in the studio: the reference set was read once at intake,
+  // paraphrased into prose, and the generator only ever saw the prose. That is why the output did not look
+  // like theirs - a paraphrase cannot carry grading, casting, light or focal length.
+  //
+  // Gary: "the intake images are the campaigns that performed - best performing." So they are the standard,
+  // not a mood board.
+  const refs = (await listAssets(clientId, "reference")).map((a) => a.url);
+  if (!refs.length) warnings.push("No reference creatives on file, so the imagery was generated without a style reference and will not match the client's look.");
+
   const cutoutPrompts = [
     `${plan.masthead.subjectPrompt}. ${CAMERA}`,
     `${plan.section1.subjectPrompt}. ${CAMERA}`,
   ];
   const scenePrompts = plan.sliders.map((s) => `${s.scenePrompt}. ${CAMERA}`);
 
+  // Cut-outs are generated at 3:4 (a standing person), scenes at 1:1 (the slider canvas), so nothing is
+  // generated at an aspect it will only be cropped out of.
   const [cutShots, sceneShots] = await Promise.all([
-    generateBatchDetailed(cutoutPrompts, IMAGE_MODEL, "3:4", {}, FALLBACK_MODEL),
-    generateBatchDetailed(scenePrompts, IMAGE_MODEL, "1:1", {}, FALLBACK_MODEL),
+    Promise.all(cutoutPrompts.map((p) => generateStyled({ prompt: p, references: refs, aspectRatio: "3:4", model: IMAGE_MODEL }))),
+    Promise.all(scenePrompts.map((p) => generateStyled({ prompt: p, references: refs, aspectRatio: "1:1", model: IMAGE_MODEL }))),
   ]);
 
   const shots = [...cutShots, ...sceneShots];

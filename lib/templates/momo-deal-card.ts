@@ -8,8 +8,9 @@ import type { Deal } from "../studio-producer";
 // the same company, and on a money product that doubt is the whole ballgame.
 //
 // MEASURED OFF THE REAL FILES (2250x2250 vertical, 9280x4888 horizontal), not guessed:
-//   card fill   #0B405B   (a deep petrol navy - NOT the #004F71 MoMo web blue)
-//   accent      #FFCE0B   (NOT #F9CB0F, MoMo's web yellow - the deal cards run warmer, near MTN's own yellow)
+//   card fill   #0B405B   (a deep petrol navy, darker than the #004F71 MoMo web blue)
+//   accent      #FFCE0B   (measured off the artwork; only ~2 deltaE from MoMo's web yellow, so this is a
+//                          precision fix, not a correction - the colours were never the thing that was wrong)
 //   white       #FFFFFF   outer stroke, label text, the column rule
 //
 // THE TYPE IS THE DESIGN. Heavy italic, and every yellow glyph carries a WHITE OUTLINE plus a soft dark drop

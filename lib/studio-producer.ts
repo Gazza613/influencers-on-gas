@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "./connections";
 import { PREMIUM } from "./vendors/anthropic";
-import { getBrandKit } from "./studio";
+import { getBrandKit, listAssets } from "./studio";
 
 // THE STUDIO PRODUCER — a brief in plain English, a whole funnel campaign out.
 //
@@ -216,24 +216,53 @@ const SCHEMA = {
   required: ["theme", "rationale", "masthead", "section1", "sliders", "webflow", "sms", "complianceCheck"],
 } as unknown as Anthropic.Tool["input_schema"];
 
+// How many reference creatives the Producer is shown. These are the client's BEST PERFORMERS - Gary:
+// "the intake images are the campaigns that performed". Enough to read a house style from, few enough that
+// the Producer is looking at each one rather than skimming a gallery.
+const REFERENCE_LIMIT = Number(process.env.STUDIO_REFERENCE_LIMIT) || 8;
+
 export async function planCampaign(clientId: string, brief: string): Promise<CampaignPlan> {
   const kit = await getBrandKit(clientId);
   if (!kit) throw new Error("This client has no brand kit yet - run Template intake first.");
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
 
+  // THE PRODUCER NOW LOOKS AT THE WORK. It used to plan blind - reading a text paraphrase of the reference
+  // set and never seeing a single creative. That is why the output did not look like theirs: you cannot
+  // describe a house style accurately enough in prose for someone to reproduce it, and I had proved that on
+  // myself by getting the deal-card yellow wrong from a written description.
+  const refs = (await listAssets(clientId, "reference")).slice(0, REFERENCE_LIMIT);
+
   const client = new Anthropic({ apiKey: key });
+  const content: Anthropic.ContentBlockParam[] = [];
+
+  if (refs.length) {
+    content.push({
+      type: "text",
+      text: `First, LOOK at the client's own best-performing creatives. These are not inspiration - they are ` +
+        `the standard. The campaigns below actually ran and actually performed, and the client is happy with ` +
+        `this creative direction. Your job is to work INSIDE it and improve on it, never to depart from it.\n\n` +
+        `Study: how they cast and light their people, their colour grading, how much air sits around a subject, ` +
+        `where the type sits, how loud or quiet the whole thing feels. Your image prompts must be written so ` +
+        `that what comes back could sit in this set without looking like an outsider.`,
+    });
+    for (const r of refs) content.push({ type: "image", source: { type: "url", url: r.url } });
+  }
+
+  content.push({
+    type: "text",
+    text: `The producer's brief, in their own words:\n"""${brief.slice(0, 3000)}"""\n\n` +
+      `Plan the full funnel campaign. Improve on the brief where you can - that is what you are for - but keep ` +
+      `every specific they gave you, and stay inside the look you have just been shown.`,
+  });
+
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
     system: SYSTEM(kit.design_system || "", kit.tone_notes || "", kit.compliance_text || ""),
     tools: [{ name: "plan", description: "The complete funnel campaign order.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "plan" },
-    messages: [{
-      role: "user",
-      content: `The producer's brief, in their own words:\n"""${brief.slice(0, 3000)}"""\n\n` +
-        `Plan the full funnel campaign. Improve on the brief where you can - that is what you are for - but keep every specific they gave you.`,
-    }],
+    messages: [{ role: "user", content }],
   });
 
   const block = res.content.find((b) => b.type === "tool_use");

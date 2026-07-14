@@ -807,3 +807,78 @@ export async function pollVideoJobOnce(jobId: string): Promise<{ url: string | n
     return { url: null, terminal: false };
   } catch { return { url: null, terminal: false }; }
 }
+
+// GENERATE **AGAINST THE CLIENT'S OWN BEST-PERFORMING WORK**.
+//
+// Gary, and he was right: "you are not matching reference images that I gave you in the intake to get the
+// desired look and feel on how we currently produce our creatives - why?"
+//
+// Because I wasn't passing them. The reference set was read ONCE at intake, paraphrased into a text
+// description, and the generator only ever saw the text. A paraphrase cannot carry look and feel - it cannot
+// carry the grading, the casting, the focal length, the way their people are lit.
+//
+// AND IT IS NOT THE PALETTE. I first assumed the colours had drifted, then measured it (lib/studio-verify.ts):
+// our blue is 3.7 deltaE from theirs and our yellow 1.5 - both well inside "the same colour". The palette was
+// never the problem. What a text paraphrase actually loses is everything a colour picker CANNOT capture: how
+// they cast and light a person, the grade, the focal length, how much air sits around a subject. That is the
+// gap, and only the images themselves can close it.
+//
+// So the reference creatives are now fed to the image model AS IMAGES, the same way the Humaniser feeds a
+// frame back to itself: imported to media ids and addressed as @image1, @image2 ... in the prompt.
+//
+// STYLE, NOT CONTENT. The instruction is explicit that the references are there to be matched for LOOK and
+// never copied for subject - otherwise the model helpfully reproduces the reference's person and we have
+// generated the same advert again.
+export async function generateStyled(opts: {
+  prompt: string;
+  references: string[];          // the client's own best-performing creatives
+  aspectRatio?: string;
+  model?: string;
+  resolution?: "1k" | "2k" | "4k";
+}): Promise<{ url: string | null; error: string | null; model: string }> {
+  const model = opts.model || "nano_banana_pro";
+  const ar = opts.aspectRatio || "1:1";
+  const refs = opts.references.filter(isSafePublicUrl).slice(0, 4); // past ~4 the model averages them into mush
+
+  if (!refs.length) {
+    const [r] = await generateBatchDetailed([opts.prompt], model, ar, {}, "gpt_image_2");
+    return r;
+  }
+
+  try {
+    const ids = (await Promise.all(refs.map((u) => importMediaUrl(u).catch(() => null)))).filter(Boolean) as string[];
+    if (!ids.length) {
+      const [r] = await generateBatchDetailed([opts.prompt], model, ar, {}, "gpt_image_2");
+      return { ...r, error: r.error || "references could not be imported; generated unstyled" };
+    }
+
+    const names = ids.map((_, i) => `@image${i + 1}`).join(", ");
+    const styled =
+      `${names} ${ids.length > 1 ? "are" : "is"} the client's own best-performing advertising photography. ` +
+      `Match their LOOK precisely: the colour grading and warmth, the quality and direction of the light, the ` +
+      `depth of field, the skin rendering, the casting and styling of the people, the framing and how much air ` +
+      `sits around the subject. The finished image must look like it came from the same shoot.\n\n` +
+      `Do NOT copy their subject, their pose, their location or their composition. Do not reproduce any person ` +
+      `from them. They are a reference for STYLE ONLY.\n\n` +
+      `Now photograph THIS, in that style:\n${opts.prompt}`;
+
+    const { call } = await openSession();
+    const params: AnyObj = {
+      ...baseParams(model, ar),
+      prompt: styled,
+      medias: ids.map((value) => ({ value, role: "image" })),
+    };
+    if (opts.resolution) params.resolution = opts.resolution;
+
+    const r = await call("generate_image", { params });
+    let url: string | null = extractImageUrls(r)[0] ?? null;
+    const jobId = extractJobIds(r)[0] ?? null;
+    if (!url && jobId) url = await pollJob(call, jobId, 60);
+    if (url) return { url, error: null, model };
+
+    const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+    return { url: null, error: `no image [${model} ${ar} +${ids.length} refs]: ${raw}`.slice(0, 280), model };
+  } catch (e) {
+    return { url: null, error: String((e as Error)?.message || e).slice(0, 200), model };
+  }
+}
