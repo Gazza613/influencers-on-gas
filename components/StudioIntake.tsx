@@ -16,10 +16,12 @@ type Template = { id: string; name: string; block: string; placement: string; wi
 type Asset = { id: string; kind: string; name: string | null; url: string; meta: { width?: number; height?: number; bytes?: number } };
 type BrandKit = { colors: Record<string, string>; fonts: { family: string; url: string }[]; logos: { variant: string; url: string }[]; compliance_text?: string | null } | null;
 
+// LOCKED CANVASES, read off Gary's real exports and confirmed by him - NOT the sizes in the build spec,
+// which said all five funnel statics were 1:1. They are not. The reference always wins over the spec.
 const FUNNEL_PLACEMENTS = [
-  { key: "funnel_banner", label: "Masthead", hint: "1:1 · the banner at the top of the funnel" },
-  { key: "funnel_section1", label: "Section 1 hero", hint: "1:1 · the first hero image" },
-  { key: "funnel_section2", label: "Section 2 heroes", hint: "1:1 · the 3 slider heroes (upload all 3)" },
+  { key: "funnel_banner", label: "Masthead", w: 1080, h: 811, hint: "the banner at the top of the funnel" },
+  { key: "funnel_section1", label: "Section 1 hero", w: 1239, h: 1080, hint: "the first hero image" },
+  { key: "funnel_section2", label: "Section 2 heroes", w: 1080, h: 1080, hint: "the 3 slider heroes" },
 ];
 
 export default function StudioIntake({ initialClients }: { initialClients: Client[] }) {
@@ -89,6 +91,17 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
     setBusy(""); setProgress("");
     if (failed.length) flex(failed[0]);
     else if (list.length) flex(`Uploaded ${list.length} file${list.length === 1 ? "" : "s"}.`);
+    await refresh(clientId);
+  }
+
+  // Mark the ONE current, approved version of a layout. It becomes the design contract: the file the coded
+  // template must be pixel-equivalent to at lock time. Approving one stands the others down.
+  async function approveRef(templateId: string, approve: boolean) {
+    const r = await fetch("/api/studio/approve", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, templateId, approve }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { flex(r?.error || "Couldn't set the approved design."); return; }
     await refresh(clientId);
   }
 
@@ -205,20 +218,26 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           <span className="tabular text-[11px] text-ink-faint">{templates.length} ingested</span>
         </div>
         <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
-          Upload the set your team designed by hand. The system reads each file&apos;s real pixel size and
-          keeps the original attached forever as the design contract. I then recreate each layout as code
-          and we lock it side by side against the reference.
+          Many versions of a layout pile up over time. Mark the ONE that is current and approved with ★ - that
+          file becomes the design contract, the thing the coded template must match pixel for pixel at lock
+          time. Recreating a stale version would bake a dead design into the contract, so it&apos;s your call,
+          never a guess at whichever file is newest.
         </p>
 
         <div className="mt-4 space-y-3">
           {FUNNEL_PLACEMENTS.map((p) => {
             const got = refsFor(p.key);
+            const approved = got.filter((t) => t.status === "locked").length;
             return (
               <div key={p.key} className="rounded-lg border border-line bg-surface-2 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-bold text-ink">{p.label}</p>
-                    <p className="text-[12px] text-ink-faint">{p.hint}</p>
+                    <p className="text-sm font-bold text-ink">
+                      {p.label}
+                      <span className="tabular ml-2 text-[11px] font-normal text-[#93c5fd]">{p.w}×{p.h} locked</span>
+                      {approved > 0 && <span className="ml-2 text-[11px] font-bold text-[#86efac]">★ approved</span>}
+                    </p>
+                    <p className="text-[12px] text-ink-faint">{p.hint} · {got.length} uploaded</p>
                   </div>
                   <label className="cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
                     {busy === "reference" ? "Uploading…" : got.length ? "＋ Add more" : "＋ Upload"}
@@ -228,17 +247,32 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
                 </div>
                 {got.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-3">
-                    {got.map((t) => (
-                      <div key={t.id} className="w-[132px]">
-                        {t.reference_url && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={t.reference_url} alt={t.name} className="aspect-square w-full rounded-md border border-line object-cover" />
-                        )}
-                        <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={t.name}>{t.name}</p>
-                        <p className="tabular text-[10px] text-ink-faint">{t.width}×{t.height}</p>
-                        <button onClick={() => remove("template", t.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
-                      </div>
-                    ))}
+                    {got.map((t) => {
+                      const isApproved = t.status === "locked";
+                      const wrongSize = t.width !== p.w || t.height !== p.h;
+                      return (
+                        <div key={t.id} className={`w-[132px] rounded-md p-1 ${isApproved ? "bg-[#4ade80]/10 ring-2 ring-[#4ade80]/60" : ""}`}>
+                          {t.reference_url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={t.reference_url} alt={t.name} className="w-full rounded-md border border-line bg-surface-1 object-contain" style={{ aspectRatio: `${p.w}/${p.h}` }} />
+                          )}
+                          <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={t.name}>{t.name}</p>
+                          {/* A file that isn't on the locked canvas can't be the contract - say so plainly. */}
+                          <p className={`tabular text-[10px] ${wrongSize ? "font-bold text-[#fca5a5]" : "text-ink-faint"}`}>
+                            {t.width}×{t.height}{wrongSize ? " ⚠ off-canvas" : ""}
+                          </p>
+                          <div className="mt-0.5 flex items-center gap-2">
+                            <button
+                              onClick={() => approveRef(t.id, !isApproved)}
+                              disabled={wrongSize && !isApproved}
+                              title={wrongSize ? `This isn't ${p.w}×${p.h}, so it can't be the design contract.` : isApproved ? "Approved - this is the design contract" : "Make this the approved design"}
+                              className={`text-[10px] font-bold disabled:opacity-30 ${isApproved ? "text-[#86efac]" : "text-[#93c5fd] hover:underline"}`}
+                            >{isApproved ? "★ approved" : "☆ approve"}</button>
+                            <button onClick={() => remove("template", t.id)} className="text-[10px] text-alert hover:underline">remove</button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
