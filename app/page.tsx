@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const WORDS = ["Influencer", "Creator", "Avatar", "Celebrity"];
+// The landing headline cycles "Create Your ___". It now covers BOTH products behind the login:
+// the AI-influencer video studio (Influencer / Creator / Avatar / Celebrity) and the creative
+// factory (Designs / Ads / Campaign). Interleaved rather than grouped, so the line never reads as
+// two separate lists.
+const WORDS = ["Influencer", "Designs", "Creator", "Ads", "Avatar", "Campaign", "Celebrity"];
 const TYPE_SPEED = 75;
 const DELETE_SPEED = 45;
 const PAUSE_MS = 1800;
@@ -162,7 +166,7 @@ export default function Landing() {
         </div>
 
         <p style={{ fontSize: 20, color: "rgba(255,255,255,0.38)", lineHeight: 1.65, margin: "0 auto 52px", maxWidth: 440, fontWeight: 400, letterSpacing: "-0.1px" }}>
-          Build, manage, and grow your AI influencers.
+          Build, manage, and grow your AI creatives.
         </p>
 
         <button
