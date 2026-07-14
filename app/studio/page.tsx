@@ -53,18 +53,23 @@ export default function GasStudioPage() {
           </p>
         </Link>
 
-        <div className="mt-4 rounded-xl border border-line bg-surface-1 px-4 py-3">
-          <p className="text-sm font-bold text-ink-dim">Everything else is still being built</p>
-          <p className="mt-1 text-[14px] leading-relaxed text-ink-faint">
-            Nothing beyond intake runs, spends money or renders anything yet. Influencers on GAS is
-            untouched and works exactly as before.
+        <Link
+          href="/studio/campaign"
+          className="group mt-4 block rounded-xl border border-[#818cf8]/40 bg-gradient-to-br from-[#818cf8]/[0.12] to-[#f472b6]/[0.05] px-5 py-4 transition hover:border-[#818cf8]/75"
+        >
+          <p className="text-[15px] font-bold text-ink">Funnel campaign →</p>
+          <p className="mt-1 text-[14px] leading-relaxed text-ink-dim">
+            Describe the campaign in a sentence. The Producer designs the whole funnel - 1 masthead,
+            1 section 1, 3 sliders, the page copy and the SMS - and shows you the plan before anything
+            is generated.
           </p>
-        </div>
+        </Link>
 
         <p className="mt-6 text-[15px] leading-relaxed text-ink-dim">
-          One campaign order will render every static, motion cut, funnel and SMS a client needs - off
-          designs locked as code, so the layout can never drift between campaigns. The team supplies the
-          offer, the copy and the images. The system produces, and a human approves before anything ships.
+          One campaign order renders every static, motion cut, funnel and SMS a client needs - off designs
+          locked as code, so the layout can never drift between campaigns. You supply the brief. The system
+          designs the creatives, writes the copy and generates the imagery, and a human approves before
+          anything ships.
         </p>
 
         <h2 className="mt-8 text-xs font-bold uppercase tracking-[0.2em] text-ink-faint">What&apos;s coming, in order</h2>

@@ -1,0 +1,205 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import AppHeader from "@/components/AppHeader";
+
+// THE FUNNEL CAMPAIGN ORDER. A brief in plain English, a whole funnel out:
+//   1 masthead + 1 section 1 + 3 sliders + the Webflow copy + the SMS.
+//
+// THE PLAN IS SHOWN BEFORE ANYTHING IS PAID FOR. You read the Producer's whole campaign - every headline,
+// every image prompt, every deal, and its own compliance check - and can edit it, before a single image is
+// generated. That gate is the cost control AND the quality control: the image prompt IS the art direction,
+// so the place to fix a creative is here, not after paying to render it.
+
+type Deal = { label: string; amount: string; amountSuffix?: string; amountSub?: string; price: string; validity: string; footnote?: string };
+type Plan = {
+  theme: string; rationale: string;
+  masthead: { subjectPrompt: string; phoneScreen: string };
+  section1: { subjectPrompt: string; deals: Deal[] };
+  sliders: { headline1: string; headline2: string; scenePrompt: string; deal: Deal }[];
+  webflow: { heroHeadline: string; heroSubheads: string[]; section1Headline: string; section1Body: string; sliderSubhead: string };
+  sms: { copy: string; segments: number };
+  complianceCheck: string[];
+};
+type Creative = { kind: string; index: number; url: string; bytes: number; width: number; height: number; error?: string };
+
+const dealLine = (d: Deal) => `${d.label} · ${d.amount}${d.amountSuffix || ""}${d.amountSub ? ` ${d.amountSub}` : ""} · ${d.price} · ${d.validity}`;
+
+export default function CampaignPage() {
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clientId, setClientId] = useState("");
+  const [brief, setBrief] = useState("");
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [busy, setBusy] = useState<"" | "plan" | "produce">("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    fetch("/api/studio").then((r) => r.json()).then((d) => {
+      const cs = d.clients || [];
+      setClients(cs);
+      if (cs[0]) setClientId(cs[0].id);
+    }).catch(() => {});
+  }, []);
+
+  async function post(action: "plan" | "produce") {
+    setBusy(action); setErr("");
+    if (action === "plan") { setPlan(null); setCreatives([]); setWarnings([]); }
+    try {
+      const r = await fetch("/api/studio/campaign", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, clientId, brief, plan }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "That did not work.");
+      if (action === "plan") setPlan(d.plan);
+      else { setCreatives(d.creatives || []); setWarnings(d.warnings || []); }
+    } catch (e) {
+      setErr(String((e as Error)?.message || e));
+    } finally { setBusy(""); }
+  }
+
+  const edit = (fn: (p: Plan) => void) => { if (!plan) return; const p = structuredClone(plan); fn(p); setPlan(p); };
+
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <AppHeader />
+      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+        <Link href="/studio" className="text-xs font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
+        <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Funnel campaign</h1>
+        <p className="mt-1 text-sm text-ink-dim">
+          Tell the Producer what the campaign is. It designs the whole funnel: 1 masthead, 1 section 1, 3 sliders,
+          the page copy and the SMS. Nothing is generated until you have read the plan.
+        </p>
+
+        {/* ── THE BRIEF ─────────────────────────────────────────────────────────── */}
+        <section className="mt-6 rounded-2xl border border-line bg-surface-1 p-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <select value={clientId} onChange={(e) => setClientId(e.target.value)}
+              className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm">
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <span className="text-xs text-ink-dim">Planning is free. Producing spends: 5 generated images + 2 cut-outs.</span>
+          </div>
+          <textarea
+            value={brief} onChange={(e) => setBrief(e.target.value)} rows={4}
+            placeholder="Winter campaign. Cosy indoors, staying connected when it is cold outside. Push the voice bundles - R5 for 30 minutes, R10 for unlimited all-net calls. We want people talking to family."
+            className="mt-3 w-full rounded-xl border border-line bg-surface-2 p-3 text-sm leading-relaxed outline-none focus:border-accent"
+          />
+          <button onClick={() => post("plan")} disabled={!!busy || !clientId || brief.trim().length < 12}
+            className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-black disabled:opacity-40">
+            {busy === "plan" ? "The Producer is thinking…" : "Plan the campaign"}
+          </button>
+          {err && <p className="mt-3 text-sm font-semibold text-red-400">{err}</p>}
+        </section>
+
+        {/* ── THE PLAN ──────────────────────────────────────────────────────────── */}
+        {plan && (
+          <section className="mt-6 space-y-4">
+            <div className="rounded-2xl border border-line bg-surface-1 p-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-ink-dim">The idea</p>
+              <h2 className="mt-1 text-lg font-bold">{plan.theme}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-ink-dim">{plan.rationale}</p>
+            </div>
+
+            {/* The two cut-out canvases. No baked headline - Webflow supplies the words beside them. */}
+            {([
+              { key: "masthead", title: "Masthead · 1080×811", prompt: plan.masthead.subjectPrompt,
+                set: (v: string) => edit((p) => { p.masthead.subjectPrompt = v; }), deals: [] as Deal[] },
+              { key: "section1", title: "Section 1 · 1239×1080", prompt: plan.section1.subjectPrompt,
+                set: (v: string) => edit((p) => { p.section1.subjectPrompt = v; }), deals: plan.section1.deals },
+            ]).map((c) => (
+              <div key={c.key} className="rounded-2xl border border-line bg-surface-1 p-5">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-bold">{c.title}</p>
+                  <span className="text-[11px] text-ink-dim">no baked headline · Webflow supplies the copy</span>
+                </div>
+                <textarea value={c.prompt} onChange={(e) => c.set(e.target.value)} rows={3}
+                  className="mt-2 w-full rounded-lg border border-line bg-surface-2 p-2.5 text-xs leading-relaxed outline-none focus:border-accent" />
+                {c.deals.length > 0 && (
+                  <p className="mt-2 text-xs text-ink-dim">
+                    Deal cards: {c.deals.map((d) => <span key={d.label} className="mr-2 rounded bg-surface-2 px-1.5 py-0.5 tabular">{dealLine(d)}</span>)}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            {/* The three sliders. These DO carry baked copy. */}
+            {plan.sliders.map((s, i) => (
+              <div key={i} className="rounded-2xl border border-line bg-surface-1 p-5">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-bold">Slider {i + 1} · 1080×1080</p>
+                  <span className="text-[11px] text-ink-dim tabular">{dealLine(s.deal)}</span>
+                </div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <input value={s.headline1} onChange={(e) => edit((p) => { p.sliders[i].headline1 = e.target.value; })}
+                    className="rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-sm font-bold outline-none focus:border-accent" />
+                  <input value={s.headline2} onChange={(e) => edit((p) => { p.sliders[i].headline2 = e.target.value; })}
+                    className="rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-sm font-bold text-[#F9CB0F] outline-none focus:border-accent" />
+                </div>
+                <textarea value={s.scenePrompt} onChange={(e) => edit((p) => { p.sliders[i].scenePrompt = e.target.value; })} rows={3}
+                  className="mt-2 w-full rounded-lg border border-line bg-surface-2 p-2.5 text-xs leading-relaxed outline-none focus:border-accent" />
+              </div>
+            ))}
+
+            <div className="rounded-2xl border border-line bg-surface-1 p-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-ink-dim">Page copy (Webflow)</p>
+              <p className="mt-2 text-base font-bold">{plan.webflow.heroHeadline}</p>
+              <ul className="mt-1 list-disc pl-5 text-sm text-ink-dim">{plan.webflow.heroSubheads.map((h, i) => <li key={i}>{h}</li>)}</ul>
+              <p className="mt-3 text-sm font-bold">{plan.webflow.section1Headline}</p>
+              <p className="mt-1 text-sm leading-relaxed text-ink-dim">{plan.webflow.section1Body}</p>
+            </div>
+
+            <div className="rounded-2xl border border-line bg-surface-1 p-5">
+              <div className="flex items-baseline justify-between">
+                <p className="text-xs font-semibold uppercase tracking-widest text-ink-dim">SMS</p>
+                {/* Segments matter in rand: one non-GSM-7 character drops the segment from 160 chars to 70. */}
+                <span className="text-[11px] text-ink-dim tabular">{plan.sms.copy.length} chars · {plan.sms.segments} segment{plan.sms.segments === 1 ? "" : "s"}</span>
+              </div>
+              <p className="mt-2 font-mono text-xs leading-relaxed">{plan.sms.copy}</p>
+            </div>
+
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-amber-400">Compliance check</p>
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-ink-dim">
+                {plan.complianceCheck.map((c, i) => <li key={i}>• {c}</li>)}
+              </ul>
+            </div>
+
+            <button onClick={() => post("produce")} disabled={!!busy}
+              className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-bold text-black disabled:opacity-40">
+              {busy === "produce" ? "Generating and rendering… this takes a couple of minutes" : "Final production · generate the 5 creatives"}
+            </button>
+          </section>
+        )}
+
+        {/* ── THE CREATIVES ─────────────────────────────────────────────────────── */}
+        {creatives.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-lg font-bold">The creatives</h2>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {creatives.map((c, i) => (
+                <div key={i} className="rounded-2xl border border-line bg-surface-1 p-3">
+                  {c.url
+                    ? <a href={c.url} target="_blank" rel="noreferrer"><img src={c.url} alt="" className="w-full rounded-lg" /></a>
+                    : <p className="p-6 text-center text-xs text-red-400">{c.error || "did not render"}</p>}
+                  <p className="mt-2 flex items-baseline justify-between text-[11px] text-ink-dim">
+                    <span className="font-semibold uppercase tracking-wider">{c.kind}{c.kind === "slider" ? ` ${c.index + 1}` : ""}</span>
+                    <span className="tabular">{c.width}×{c.height} · {(c.bytes / 1024).toFixed(0)}KB</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+            {warnings.length > 0 && (
+              <ul className="mt-4 space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-300">
+                {warnings.map((w, i) => <li key={i}>• {w}</li>)}
+              </ul>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}

@@ -492,3 +492,13 @@ alter table studio_intel add column if not exists sources jsonb not null default
 -- "calendar 2024"), because a report published this month can describe a year that is already old.
 alter table studio_intel add column if not exists published_at date;
 alter table studio_intel add column if not exists period text;
+
+-- ── GAS Studio: final production ────────────────────────────────────────────
+-- Background removal for the masthead / section-1 cut-outs. fal bills per COMPUTE SECOND, not per image,
+-- and will not quote the GPU rate without a logged-in dashboard - so this row is seeded UNPRICED on purpose
+-- rather than with an invented number. The usage event still lands with the right (provider, model, unit),
+-- so the call is visible in Cost Control the moment it happens; only the rand figure needs calibrating from
+-- fal's own billing page. A wrong price is worse than a missing one.
+insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
+values ('fal','fal-ai/birefnet/v2','image', 0, 0, true)
+on conflict (provider, model, unit) do nothing;

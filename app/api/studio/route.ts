@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { listBrains } from "@/lib/brains"; // clients ARE brains - one client record, one brand, one brain
-import { getBrandKit, listAssets, listTemplates, deleteAsset, deleteTemplate } from "@/lib/studio";
+import { getBrandKit, listAssets, listTemplates, deleteAsset, deleteTemplate, listStudioClients } from "@/lib/studio";
 
 // What GAS Studio knows about a client: its brand kit (logos, licensed fonts, colours), the templates
 // ingested from its reference set, and its asset library. `clients` is the single tenancy key across the
@@ -14,7 +13,9 @@ export async function GET(req: Request) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const clientId = new URL(req.url).searchParams.get("clientId") || "";
-  const clients = (await listBrains().catch(() => [])).map((b) => ({ id: b.id, name: b.name }));
+  // Clients WITH a brand kit come first. The picker defaults to clients[0], so ordering by "any brain"
+  // silently landed on a client the Studio knows nothing about and every panel came back empty.
+  const clients = await listStudioClients().catch(() => []);
   if (!clientId) return NextResponse.json({ clients });
 
   const [brandKit, templates, assets] = await Promise.all([

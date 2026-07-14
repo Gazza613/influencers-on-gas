@@ -91,3 +91,33 @@ export async function pollOmniHumanOnce(statusUrl: string, responseUrl: string):
     return { url: null, terminal: false, seconds: null };
   } catch { return { url: null, terminal: false, seconds: null }; }
 }
+
+// BACKGROUND REMOVAL — the cut-out.
+//
+// MoMo's masthead and section-1 creatives are a cut-out subject composited on the yellow disc. The subject is
+// GENERATED, so it arrives with a background that has to come off cleanly.
+//
+// Edge quality is not cosmetic here. It is the fraud-differentiator: Stanford's credibility work found visual
+// design drives ~46% of trust judgements, and in a market where the thing our ad most resembles is a scam, a
+// ragged 0px magic-wand edge reads as counterfeit. BiRefNet gives a genuine alpha matte with soft hair edges,
+// which a chroma key cannot.
+const REMBG_MODEL = process.env.FAL_REMBG_MODEL || "fal-ai/birefnet/v2";
+
+export async function removeBackground(imageUrl: string): Promise<{ url: string | null; error: string | null }> {
+  const k = await key();
+  if (!key) return { url: null, error: "fal is not connected" };
+  try {
+    const res = await fetch(`https://fal.run/${REMBG_MODEL}`, {
+      method: "POST",
+      headers: { Authorization: `Key ${k}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ image_url: imageUrl, output_format: "png" }), // PNG: alpha survives
+      signal: AbortSignal.timeout(120_000),
+    });
+    const data = (await res.json().catch(() => ({}))) as { image?: { url?: string }; detail?: unknown };
+    const url = data?.image?.url || null;
+    if (url) return { url, error: null };
+    return { url: null, error: `background removal ${res.status}: ${JSON.stringify(data?.detail ?? data).slice(0, 160)}` };
+  } catch (e) {
+    return { url: null, error: String((e as Error)?.message || e).slice(0, 180) };
+  }
+}
