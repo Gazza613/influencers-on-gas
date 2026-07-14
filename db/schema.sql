@@ -385,3 +385,59 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   -- Shotstack render: PAY-AS-YOU-GO (not a subscription) ~$0.30/rendered min => ~$0.24 per 45s cut.
   ('shotstack','edit','render', 0, 450, true)
 on conflict (provider, model, unit) do nothing;
+
+-- ============================================================================
+-- GAS STUDIO (the template creative factory). Net-new, `studio_`-prefixed, additive only:
+-- nothing here touches the influencer video pipeline. See docs STUDIO_BUILD_INSTRUCTION.
+--
+-- Design lock: templates are RECREATED from the client's own reference creatives and then
+-- frozen. The reference file stays attached to the template record forever as the design
+-- contract with the client - that is the audit trail proving the design never drifted.
+-- ============================================================================
+
+-- Brand kit: the client's locked visual identity (colours, licensed fonts, approved logos).
+create table if not exists studio_brand_kits (
+  id          uuid primary key default gen_random_uuid(),
+  client_id   uuid not null references clients(id) on delete cascade,
+  name        text not null,
+  colors      jsonb not null default '{}'::jsonb,   -- token map: primary, secondary, bg, text, accent
+  fonts       jsonb not null default '[]'::jsonb,   -- [{family, weight, style, url}] - licensed files we render with
+  logos       jsonb not null default '[]'::jsonb,   -- [{variant: light|dark|icon|primary, url}]
+  tone_notes  text,                                 -- feeds the copy engine
+  locked      boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_studio_brand_kits_client on studio_brand_kits(client_id);
+
+-- Template: ONE locked layout per placement/size, recreated from a reference creative.
+create table if not exists studio_templates (
+  id            uuid primary key default gen_random_uuid(),
+  client_id     uuid not null references clients(id) on delete cascade,
+  brand_kit_id  uuid references studio_brand_kits(id) on delete set null,
+  name          text not null,
+  block         text not null default 'funnel',      -- 'funnel' | 'social' - the production set it belongs to
+  placement     text not null,                       -- funnel_banner | funnel_section1 | funnel_section2 | meta_feed_4x5 | ...
+  width         int  not null,                       -- READ from the uploaded reference, never typed by hand
+  height        int  not null,
+  engine        text not null default 'playwright' check (engine in ('playwright','shotstack','image')),
+  component_key text,                                -- maps to the React template component once recreated
+  slot_schema   jsonb not null default '{}'::jsonb,  -- editable slots + maxChars + image requirements
+  reference_url text,                                -- THE DESIGN CONTRACT: the original file, kept forever
+  analysis      jsonb not null default '{}'::jsonb,  -- what vision read off the reference (layout, slots, colours)
+  version       int  not null default 1,
+  status        text not null default 'draft' check (status in ('draft','locked','archived')),
+  created_at    timestamptz not null default now()
+);
+create index if not exists idx_studio_templates_client on studio_templates(client_id, block);
+
+-- Client asset library: reference creatives, logos, product shots, generated images.
+create table if not exists studio_assets (
+  id         uuid primary key default gen_random_uuid(),
+  client_id  uuid not null references clients(id) on delete cascade,
+  kind       text not null check (kind in ('reference','image','logo','font','video','ci_doc')),
+  name       text,
+  url        text not null,
+  meta       jsonb not null default '{}'::jsonb,     -- width, height, bytes, mime, tags
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_studio_assets_client on studio_assets(client_id, kind);

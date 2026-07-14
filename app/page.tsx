@@ -128,7 +128,12 @@ export default function Landing() {
         if ("right" in card) pos.right = card.right as string;
         return (
           <div key={i} className="landing-card" style={{ position: "absolute", top: card.top, ...pos, width: card.w, transform: `rotate(${card.rot})`, opacity: 0, ["--target-opacity" as string]: card.opacity, animation: `cardAppear 1s ease ${card.delay + 0.2}s forwards`, pointerEvents: "none", zIndex: 0 }}>
-            <div style={{ position: "relative", animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`, borderRadius: 18, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)" }}>
+            {/* FLOAT and SWAY must live on SEPARATE elements. Both animate `transform`, so when they shared
+                one element CSS let the last one win: cardSway (±5px sideways) silently cancelled cardFloat
+                (-18px of drift), and the cards looked almost static. Nested, both transforms compose and the
+                cards drift AND sway - on different periods, so the motion stays organic rather than in lockstep. */}
+            <div style={{ animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite` }}>
+              <div style={{ position: "relative", animation: `cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`, borderRadius: 18, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={opt(pick.url)} alt="" loading="lazy" decoding="async"
                 onError={(e) => {
@@ -139,6 +144,7 @@ export default function Landing() {
                 }}
                 style={{ width: "100%", aspectRatio: "2/3", objectFit: "cover", display: "block" }} />
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,14,0.16) 0%, transparent 42%)" }} />
+              </div>
             </div>
           </div>
         );

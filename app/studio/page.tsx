@@ -42,11 +42,22 @@ export default function GasStudioPage() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-xl border border-[#60a5fa]/35 bg-[#60a5fa]/[0.07] px-4 py-3">
-          <p className="text-sm font-bold text-[#93c5fd]">Not built yet</p>
+        <Link
+          href="/studio/intake"
+          className="group mt-6 block rounded-xl border border-[#60a5fa]/40 bg-gradient-to-br from-[#60a5fa]/[0.12] to-[#22d3ee]/[0.05] px-5 py-4 transition hover:border-[#60a5fa]/75"
+        >
+          <p className="text-[15px] font-bold text-ink">Template intake →</p>
           <p className="mt-1 text-[14px] leading-relaxed text-ink-dim">
-            The door is open but the factory is empty. Nothing behind this page runs, spends money or
-            renders anything. Influencers on GAS is untouched and works exactly as before.
+            Start here. Upload the reference set your team designed by hand, plus the licensed fonts and
+            approved logos. Every template is recreated from your reference and locked against it.
+          </p>
+        </Link>
+
+        <div className="mt-4 rounded-xl border border-line bg-surface-1 px-4 py-3">
+          <p className="text-sm font-bold text-ink-dim">Everything else is still being built</p>
+          <p className="mt-1 text-[14px] leading-relaxed text-ink-faint">
+            Nothing beyond intake runs, spends money or renders anything yet. Influencers on GAS is
+            untouched and works exactly as before.
           </p>
         </div>
 
