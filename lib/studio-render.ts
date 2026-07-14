@@ -1,6 +1,10 @@
 import sharp from "sharp";
-import chromium from "@sparticuz/chromium";
-import { chromium as playwright, type Browser } from "playwright-core";
+import type { Browser } from "playwright-core";
+
+// Chromium and Playwright are loaded LAZILY, inside browser(). Imported at module scope, a failure to load
+// them kills the whole route at cold start and Vercel serves an HTML error page - which surfaces to the user
+// as "Unexpected token '<'" and tells nobody anything. Deferred, the same failure is a catchable exception
+// that we can return as readable JSON.
 
 // THE STATIC RENDERER. HTML/CSS in, a pixel-exact PNG out.
 //
@@ -19,14 +23,28 @@ import { chromium as playwright, type Browser } from "playwright-core";
 
 let _browser: Browser | null = null;
 
+// @sparticuz/chromium's default args are tuned for PUPPETEER. Playwright drives the browser over a pipe to a
+// separate process, so --single-process (and its companions) are at best pointless here and are widely
+// reported to hang Playwright on Lambda. PRECAUTIONARY, not a diagnosed fix: I tested launching with these
+// args present and Playwright started fine, so they were NOT the cause of the production crash - that was a
+// missing playwright-core/browsers.json (see next.config.ts). Dropping them costs nothing and removes a
+// known-hostile variable from a lane that is expensive to debug in the cloud.
+const PUPPETEER_ONLY = /^--(single-process|no-zygote|in-process-gpu)$/;
+
 async function browser(): Promise<Browser> {
   if (_browser?.isConnected()) return _browser;
+  const { chromium: playwright } = await import("playwright-core");
   const local = process.env.CHROME_PATH; // set locally to use a system Chrome
-  _browser = await playwright.launch({
-    args: local ? [] : chromium.args,
-    executablePath: local || (await chromium.executablePath()),
-    headless: true,
-  });
+
+  let args: string[] = [];
+  let executablePath = local || "";
+  if (!local) {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    args = chromium.args.filter((a) => !PUPPETEER_ONLY.test(a));
+    executablePath = await chromium.executablePath();
+  }
+
+  _browser = await playwright.launch({ args, executablePath, headless: true });
   return _browser;
 }
 
