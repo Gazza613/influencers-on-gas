@@ -105,6 +105,21 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
     await refresh(clientId);
   }
 
+  // READ THE SET AND DERIVE THE TEMPLATE. The uploads for a placement are CAMPAIGN VARIANTS, not drafts of
+  // one design - so what is constant across them IS the locked design, and what changes between them IS the
+  // slot list. The system works that out from the files rather than asking the team to describe it.
+  async function analyse(placement: string) {
+    setBusy(`analyse-${placement}`);
+    const r = await fetch("/api/studio/analyse", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, placement }),
+    }).then((x) => x.json()).catch(() => null);
+    setBusy("");
+    if (!r?.ok) { flex(r?.error || "Couldn't read that set."); return; }
+    flex(`Read ${r.analysed} creatives and derived the template.`);
+    await refresh(clientId);
+  }
+
   async function remove(kind: "asset" | "template", id: string) {
     const q = kind === "template" ? `templateId=${id}` : `assetId=${id}`;
     await fetch(`/api/studio?clientId=${clientId}&${q}`, { method: "DELETE" }).catch(() => {});
@@ -239,11 +254,21 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
                     </p>
                     <p className="text-[12px] text-ink-faint">{p.hint} · {got.length} uploaded</p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {got.length > 1 && (
+                      <button
+                        onClick={() => analyse(p.key)}
+                        disabled={!!busy}
+                        title="Read every creative in this set and work out the locked design vs the editable slots"
+                        className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40"
+                      >{busy === `analyse-${p.key}` ? "✨ Reading the set…" : "✨ Read the set"}</button>
+                    )}
                   <label className="cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
                     {busy === "reference" ? "Uploading…" : got.length ? "＋ Add more" : "＋ Upload"}
                     <input type="file" multiple accept="image/png,image/jpeg" className="hidden"
                       onChange={(e) => send(e.target.files, "reference", p.key)} />
                   </label>
+                  </div>
                 </div>
                 {got.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-3">
