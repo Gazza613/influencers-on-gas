@@ -29,6 +29,8 @@ export type Intel = {
   source_url: string | null;
   source_name: string | null;
   sources: { name: string; url: string }[];
+  published_at: string | null;
+  period: string | null;
   confidence: string;
   material: boolean;
   status: string;
@@ -40,11 +42,14 @@ IN SCOPE: mobile money, payments, wallets, financial inclusion, fintech regulati
 OUT OF SCOPE: MTN network/telco strategy, spectrum, coverage, MTN corporate brand campaigns, MTN Group subscriber numbers, telco competitor sets. MTN Group appears ONLY as the endorsement brand behind "MoMo from MTN".
 CRITICAL: MoMo's fintech offers are OFTEN DIFFERENT from MTN's own offers. NEVER infer a MoMo price, bundle or product from an MTN source. If you cannot source it to MoMo directly, do not assert it.`;
 
-const HONESTY = `HONESTY RULES:
+const HONESTY = () => `HONESTY RULES:
 - Every finding must carry a REAL source URL you actually read. If you cannot source it, do not report it.
 - Grade confidence honestly: high (primary source - regulator, company results, statute), medium (credible secondary - law firm, trade press, fact-checker), low (single source, thin, or inferred).
 - Mark material=true ONLY if this would actually change what we say or do. Most news is not material. A quiet day with nothing material is a CORRECT result - say so rather than padding.
 - There is NO published creative-performance data for MoMo South Africa. Anyone quoting SA fintech creative benchmarks is inventing them. Never repeat one.
+- RECENCY IS A HARD GATE. This is a DAILY intelligence run: you report WHAT CHANGED. Only report things published or announced in the LAST ${WINDOW_DAYS} DAYS. Older material - however good - is BACKGROUND, not news, and it already lives in our doctrine. Do not report it. A stale finding presented as current is worse than no finding.
+- DATE EVERY FINDING. Give published_at as the date the SOURCE was published or the event happened - NOT today. If you cannot establish the date, leave it empty rather than guessing - but know that an undated finding will be REJECTED, because we cannot claim it is current.
+- Also give 'period' when the data covers a span that differs from the publication date (e.g. a report published this month describing FY2025). Recency of PUBLICATION is not recency of DATA.
 - If something contradicts what we already believe, say so loudly. That is the most valuable thing you can find.`;
 
 const ROLE_BRIEF: Record<string, string> = {
@@ -81,16 +86,27 @@ const SCHEMA = {
               required: ["name", "url"],
             },
           },
+          published_at: { type: "string", description: "The date the SOURCE was published, or the event happened, as YYYY-MM-DD. NOT today's date. If you genuinely cannot establish it, return an empty string - never guess." },
+          period: { type: "string", description: "What the DATA actually covers, if different from the publication date (e.g. 'FY2025', 'calendar 2024', 'Q1 2026'). A report published this month can describe a year that is already old. Empty if not applicable." },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           material: { type: "boolean", description: "Would this actually change what we say or do? Most things are not." },
         },
-        required: ["headline", "why_it_matters", "detail", "sources", "confidence", "material"],
+        required: ["headline", "why_it_matters", "detail", "sources", "published_at", "period", "confidence", "material"],
       },
     },
     quiet_day: { type: "boolean", description: "True if nothing material was found. That is a correct result, not a failure." },
   },
   required: ["findings", "quiet_day"],
 } as unknown as Anthropic.Tool["input_schema"];
+
+// HARD RECENCY WINDOW. Gary: "I cannot have stale research or articles, makes no sense." He is right, and
+// flagging staleness was not enough - a daily intelligence run exists to report WHAT CHANGED, so anything
+// outside the window is not news, it is background. Foundational work (the Competition Commission's data, the
+// GSMA trust study) is still authoritative and already lives in the doctrine on the brand kit; it does not
+// belong in a daily queue pretending to be new.
+// So: findings outside the window, or that cannot be dated at all, are REJECTED before they are stored - and
+// the count of what was dropped is reported, never silently swallowed.
+const WINDOW_DAYS = Number(process.env.INTEL_WINDOW_DAYS) || 90;
 
 // Run one role's daily research. Returns the findings it PROPOSES (already stored, status 'new').
 export async function runIntel(clientId: string, role: "journalist" | "strategist", today: string): Promise<Intel[]> {
@@ -114,7 +130,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
-    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${HONESTY}\n\nUK spelling. No em dashes.`,
+    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${HONESTY()}\n\nUK spelling. No em dashes.`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -124,7 +140,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 4000,
-    system: `${RINGFENCE}\n\n${HONESTY}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${RINGFENCE}\n\n${HONESTY()}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
@@ -136,18 +152,35 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const findings = Array.isArray(out.findings) ? out.findings : [];
   if (!findings.length) return [];
 
+  // THE GATE. Reject anything we cannot prove is current, before it is ever stored.
+  const cutoff = Date.now() - WINDOW_DAYS * 86_400_000;
+  const dropped: string[] = [];
+  const fresh = findings.filter((f) => {
+    const d = String(f.published_at || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { dropped.push(`${String(f.headline || "?").slice(0, 60)} — undated`); return false; }
+    const t = new Date(d).getTime();
+    if (!Number.isFinite(t) || t < cutoff) {
+      dropped.push(`${String(f.headline || "?").slice(0, 60)} — ${d}, older than ${WINDOW_DAYS} days`);
+      return false;
+    }
+    return true;
+  });
+  if (dropped.length) console.warn(`[intel:${role}] dropped ${dropped.length} stale/undated finding(s): ${dropped.join(" | ")}`);
+
   const saved: Intel[] = [];
-  for (const f of findings) {
+  for (const f of fresh) {
     const srcs = (Array.isArray(f.sources) ? f.sources : [])
       .filter((s): s is { name: string; url: string } => !!s && typeof (s as { url?: string }).url === "string" && /^https?:\/\//i.test((s as { url: string }).url))
       .slice(0, 8);
     const rows = (await db().query(
-      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, confidence, material)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, confidence, material, status, found_at`,
+      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, status, found_at`,
       [clientId, role, String(f.headline || "").slice(0, 300), String(f.why_it_matters || "").slice(0, 1200),
        String(f.detail || "").slice(0, 4000), JSON.stringify(srcs),
        srcs[0]?.url ?? null, srcs.map((s) => s.name).join(" · ").slice(0, 200) || null,
+       /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? f.published_at : null,
+       String(f.period || "").slice(0, 60) || null,
        ["high", "medium", "low"].includes(String(f.confidence)) ? f.confidence : "medium", f.material === true],
     )) as Intel[];
     saved.push(rows[0]);
@@ -157,7 +190,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
 export async function listIntel(clientId: string, status = "new"): Promise<Intel[]> {
   return (await db().query(
-    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, confidence, material, status, found_at
+    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, status, found_at
      from studio_intel where client_id = $1 and status = $2 order by material desc, found_at desc limit 80`,
     [clientId, status],
   )) as Intel[];

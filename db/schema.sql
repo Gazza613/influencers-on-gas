@@ -484,3 +484,11 @@ create index if not exists idx_studio_intel_client on studio_intel(client_id, st
 -- Findings routinely rest on SEVERAL sources ("TechCentral / ITWeb", "BioCatch via IOL / TransUnion via eNCA").
 -- A single source_url threw the rest away, so an item could not be fully checked. Store them all.
 alter table studio_intel add column if not exists sources jsonb not null default '[]'::jsonb;
+
+-- TWO dates matter on a finding, and conflating them is how stale information becomes "current":
+--   found_at     - when WE researched it (already present)
+--   published_at - when the SOURCE was published / the thing actually happened
+-- A 2019 article discovered today is not news. `period` carries what the data actually covers (e.g. "FY2025",
+-- "calendar 2024"), because a report published this month can describe a year that is already old.
+alter table studio_intel add column if not exists published_at date;
+alter table studio_intel add column if not exists period text;

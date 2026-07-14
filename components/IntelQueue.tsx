@@ -13,8 +13,23 @@ type Intel = {
   id: string; role: string; headline: string; why_it_matters: string; detail: string | null;
   source_url: string | null; source_name: string | null;
   sources: { name: string; url: string }[];
+  published_at: string | null; period: string | null;
   confidence: string; material: boolean; status: string; found_at: string;
 };
+
+// TWO dates, and conflating them is how stale information becomes "current":
+//   found_at     - when WE researched it
+//   published_at - when the SOURCE was published / the thing actually happened
+// A 2019 article discovered today is not news. Anything older than ~90 days is flagged, so it can never sit in
+// the queue looking as fresh as something published this morning.
+const STALE_DAYS = 90;
+function dateBits(i: Intel): { published: string; found: string; ageDays: number | null; stale: boolean } {
+  const fmt = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const found = i.found_at ? fmt(i.found_at) : "";
+  if (!i.published_at) return { published: "", found, ageDays: null, stale: false };
+  const ageDays = Math.floor((Date.now() - new Date(i.published_at).getTime()) / 86_400_000);
+  return { published: fmt(i.published_at), found, ageDays, stale: ageDays > STALE_DAYS };
+}
 type Client = { id: string; name: string };
 
 const CONF: Record<string, string> = {
@@ -122,6 +137,32 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
         <p className="text-[15px] font-bold leading-snug text-ink">{i.headline}</p>
         <span className={`tabular shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${CONF[i.confidence] || CONF.medium}`}>{i.confidence}</span>
       </div>
+
+      {/* DATE TAGS. When the source was published, and when we found it. They are not the same thing, and
+          treating them as one is how something from 2019 ends up being read as this morning's news. */}
+      {(() => {
+        const d = dateBits(i);
+        return (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {d.published ? (
+              <span className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-semibold ${d.stale ? "border-[#fbbf24]/45 bg-[#fbbf24]/10 text-[#fcd34d]" : "border-line text-ink-dim"}`}>
+                📅 {d.published}{d.stale && d.ageDays !== null ? ` · ${d.ageDays} days old` : ""}
+              </span>
+            ) : (
+              <span className="tabular rounded border border-[#f87171]/45 bg-[#f87171]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#fca5a5]">
+                📅 undated
+              </span>
+            )}
+            {i.period && (
+              <span className="tabular rounded border border-line px-1.5 py-0.5 text-[10px] font-semibold text-ink-faint">
+                data: {i.period}
+              </span>
+            )}
+            <span className="tabular text-[10px] text-ink-faint">found {d.found}</span>
+          </div>
+        );
+      })()}
+
       <p className="mt-2 text-[14px] leading-relaxed text-ink-dim"><b className="text-ink">Why it matters:</b> {i.why_it_matters}</p>
       {i.detail && <p className="mt-2 text-[13px] leading-relaxed text-ink-faint">{i.detail}</p>}
 

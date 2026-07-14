@@ -44,9 +44,21 @@ function buildEmail(client: string, journalist: Intel[], strategist: Intel[], to
            <ol style="margin:4px 0 0;padding-left:18px">${srcs.map((s) =>
              `<li style="font-size:12px;line-height:1.6"><a href="${esc(s.url)}" style="color:#2563eb">${esc(s.name || s.url)}</a></li>`).join("")}</ol>`
         : `<p style="margin:10px 0 0;font-size:12px;font-weight:700;color:#b91c1c">⚠ No source. Do not treat this as verified.</p>`;
+      // DATE TAGS. When the source was published vs when we found it - a 2019 article discovered today is not
+      // news, and anything over 90 days old is flagged so it can never read as this morning's intelligence.
+      const fmt = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      const age = i.published_at ? Math.floor((Date.now() - new Date(i.published_at).getTime()) / 86_400_000) : null;
+      const stale = age !== null && age > 90;
+      const dateHtml = i.published_at
+        ? `<span style="display:inline-block;border:1px solid ${stale ? "#fcd34d" : "#e2e8f0"};background:${stale ? "#fffbeb" : "#fff"};color:${stale ? "#92400e" : "#64748b"};border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600">📅 ${esc(fmt(i.published_at))}${stale ? ` · ${age} days old` : ""}</span>`
+        : `<span style="display:inline-block;border:1px solid #fca5a5;background:#fef2f2;color:#b91c1c;border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600">📅 undated</span>`;
+      const periodHtml = i.period
+        ? ` <span style="display:inline-block;border:1px solid #e2e8f0;color:#64748b;border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600">data: ${esc(i.period)}</span>`
+        : "";
       return `
       <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px">
         <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a">${esc(i.headline)} ${badge(i.confidence)}</p>
+        <p style="margin:0 0 8px">${dateHtml}${periodHtml}</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#334155"><b>Why it matters:</b> ${esc(i.why_it_matters)}</p>
         <p style="margin:0;font-size:13px;line-height:1.55;color:#475569">${esc(String(i.detail || "").slice(0, 700))}</p>
         ${sourceHtml}
