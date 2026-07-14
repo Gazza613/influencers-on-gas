@@ -85,6 +85,17 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
   const logos = brandKit?.logos ?? [];
   const refsFor = (p: string) => templates.filter((t) => t.placement === p);
 
+  // 48 font files listed one per line is a wall. Group them by FAMILY (the bit before the weight suffix,
+  // e.g. MTNBrighterSans-BoldItalic -> MTNBrighterSans) and show the weight count, so you can see at a
+  // glance that we hold the whole family rather than scrolling a list.
+  const fontFamilies = Object.entries(
+    fonts.reduce<Record<string, number>>((acc, f) => {
+      const family = String(f.family || "").split("-")[0] || "Unknown";
+      acc[family] = (acc[family] ?? 0) + 1;
+      return acc;
+    }, {}),
+  ).sort((a, b) => b[1] - a[1]);
+
   return (
     <div className="mt-6 space-y-6">
       {/* CLIENT */}
@@ -105,7 +116,24 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
 
       {/* BRAND KIT - fonts first: without the licensed files, server-rendered text can never match the design. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Brand kit</div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Brand kit</div>
+          {/* A standing receipt of what we hold, so you never have to wonder whether an upload landed. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${fonts.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]"}`}>
+              {fonts.length} font{fonts.length === 1 ? "" : "s"}
+            </span>
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${logos.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
+              {logos.length} logo{logos.length === 1 ? "" : "s"}
+            </span>
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${assets.filter((a) => a.kind === "deal_card").length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
+              {assets.filter((a) => a.kind === "deal_card").length} deal card{assets.filter((a) => a.kind === "deal_card").length === 1 ? "" : "s"}
+            </span>
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${templates.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
+              {templates.length} reference{templates.length === 1 ? "" : "s"}
+            </span>
+          </div>
+        </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
@@ -119,9 +147,13 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
               <input type="file" multiple accept=".woff2,.woff,.otf,.ttf" className="hidden"
                 onChange={(e) => send(e.target.files, "font")} />
             </label>
-            {fonts.length > 0 && (
+            {fontFamilies.length > 0 && (
               <ul className="mt-2 space-y-1">
-                {fonts.map((f, i) => <li key={i} className="tabular text-[11px] text-ink-dim">✓ {f.family}</li>)}
+                {fontFamilies.map(([family, count]) => (
+                  <li key={family} className="tabular text-[11px] text-[#86efac]">
+                    ✓ {family} <span className="text-ink-faint">· {count} weight{count === 1 ? "" : "s"}</span>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
