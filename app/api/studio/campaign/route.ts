@@ -1,46 +1,30 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { planCampaign } from "@/lib/studio-producer";
-import { produceCampaign } from "@/lib/studio-campaign";
-import type { CampaignPlan } from "@/lib/studio-producer";
 
-// THE FUNNEL CAMPAIGN ORDER. Two steps, deliberately separate.
+// THE PLAN. The Producer reads the brief and designs the whole funnel campaign. FREE - one Claude call.
 //
-//   POST { action: "plan" }     -> the Producer reads the brief and plans the campaign. FREE (one Claude call).
-//   POST { action: "produce" }  -> final production. This SPENDS: 5 generated images + 2 cut-outs.
-//
-// The split is the cost gate. You see the whole campaign - every headline, every image prompt, every deal,
-// and the Producer's own compliance check - and you can edit it, BEFORE a single paid image is generated.
-// Nothing renders off an unread plan.
-
-export const maxDuration = 800;
+// THIS ROUTE DELIBERATELY DOES NOT IMPORT THE RENDERER. It used to sit in the same route as production,
+// which meant it also pulled in @sparticuz/chromium at module scope - so when Chromium failed to load, the
+// function died before it ever read the brief, and "plan my campaign" returned an HTML error page. Planning
+// is the step you use most and it costs nothing; it must not be able to fail for a reason that belongs to
+// rendering. Production lives at ./produce, on its own function, with its own 67MB of Chromium.
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as {
-    action?: string; clientId?: string; brief?: string; plan?: CampaignPlan;
-  };
+  const body = (await req.json().catch(() => ({}))) as { clientId?: string; brief?: string };
   const clientId = String(body.clientId || "");
+  const brief = String(body.brief || "").trim();
   if (!clientId) return NextResponse.json({ error: "Pick a client first." }, { status: 400 });
+  if (brief.length < 12) return NextResponse.json({ error: "Tell the Producer what the campaign is about." }, { status: 400 });
 
   try {
-    if (body.action === "plan") {
-      const brief = String(body.brief || "").trim();
-      if (brief.length < 12) return NextResponse.json({ error: "Tell the Producer what the campaign is about." }, { status: 400 });
-      const plan = await planCampaign(clientId, brief);
-      return NextResponse.json({ ok: true, plan });
-    }
-
-    if (body.action === "produce") {
-      if (!body.plan?.sliders?.length) return NextResponse.json({ error: "There is no plan to produce." }, { status: 400 });
-      const out = await produceCampaign(clientId, body.plan);
-      return NextResponse.json({ ok: true, ...out });
-    }
-
-    return NextResponse.json({ error: "unknown action" }, { status: 400 });
+    const plan = await planCampaign(clientId, brief);
+    return NextResponse.json({ ok: true, plan });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 220) }, { status: 500 });
   }

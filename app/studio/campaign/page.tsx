@@ -48,13 +48,20 @@ export default function CampaignPage() {
     setBusy(action); setErr("");
     if (action === "plan") { setPlan(null); setCreatives([]); setWarnings([]); }
     try {
-      const r = await fetch("/api/studio/campaign", {
+      // Two routes, not one action flag: planning is free and must never load the 67MB renderer, so it
+      // cannot be taken down by a rendering problem.
+      const r = await fetch(action === "plan" ? "/api/studio/campaign" : "/api/studio/campaign/produce", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, clientId, brief, plan }),
+        body: JSON.stringify({ clientId, brief, plan }),
       });
-      const d = await r.json();
+      // A crashed function returns Vercel's HTML error page, not JSON. Say so plainly instead of throwing
+      // "Unexpected token '<'", which tells the user nothing about what broke.
+      const text = await r.text();
+      let d: { error?: string; plan?: Plan; creatives?: Creative[]; warnings?: string[] };
+      try { d = JSON.parse(text); }
+      catch { throw new Error(`The server returned an error page (${r.status}), not a result. The function itself failed.`); }
       if (!r.ok) throw new Error(d.error || "That did not work.");
-      if (action === "plan") setPlan(d.plan);
+      if (action === "plan") setPlan(d.plan ?? null);
       else { setCreatives(d.creatives || []); setWarnings(d.warnings || []); }
     } catch (e) {
       setErr(String((e as Error)?.message || e));

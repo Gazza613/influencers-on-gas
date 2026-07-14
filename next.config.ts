@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["ffmpeg-static", "@sparticuz/chromium", "playwright-core"],
   outputFileTracingIncludes: {
     "/api/inngest": ["./node_modules/ffmpeg-static/ffmpeg"],
+    // Chromium ships its BROWSER as brotli data files (bin/chromium.br, fonts, swiftshader). Nothing
+    // statically imports them, so the tracer cannot infer them - they have to be named, or the require
+    // fails at cold start and the route returns an HTML error page instead of JSON. Scoped to the produce
+    // function only: 67MB has no business riding along in every other route.
+    "/api/studio/campaign/produce": ["./node_modules/@sparticuz/chromium/bin/**"],
   },
   images: {
     // Let the image optimiser fetch + downsize hero images from our two known hosts so the
