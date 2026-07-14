@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import chromium from "@sparticuz/chromium";
 import { chromium as playwright, type Browser } from "playwright-core";
 
@@ -81,4 +82,44 @@ export function fontFaceCss(fonts: { family: string; url: string }[]): string {
     const weight = WEIGHT[weightKey] ?? 400;
     return `@font-face{font-family:'${family}';src:url('${f.url}') format('woff2');font-weight:${weight};font-style:${italic ? "italic" : "normal"};font-display:block;}`;
   }).join("\n");
+}
+
+// ── DELIVERY ENCODING ────────────────────────────────────────────────────────────────────────────────────
+//
+// The renderer emits PNG. What we DELIVER depends on where it is going, and the difference is real money.
+//
+// MEASURED on the MoMo slider (1080x1080, photo + text):
+//   source PNG                1030KB   costs the user R0.082 of their own airtime
+//   PNG "max effort" lossless 1628KB   BIGGER. Chromium's encoder already beats sharp's - compressing harder
+//                                      actively backfires. A genuine trap.
+//   WebP LOSSLESS              735KB   byte-for-byte identical pixels, and under the 1MB budget
+//   WebP q95                   188KB   visually indistinguishable, 4x smaller
+//   AVIF q80                   108KB   visually indistinguishable
+//
+// At ICASA's R0.08/MB (MTN prepaid, 2025), lossless costs the customer R0.057 per load and q95 costs R0.015.
+// That gap is real money from someone whose entire monthly telecoms spend is R55-R77. Visually identical, four
+// times cheaper for them: q95 is the right default, and "lossless" here is vanity, not quality.
+//
+// FUNNEL vs SOCIAL matters:
+//   FUNNEL - Webflow re-encodes everything to AVIF on upload (every image on the live funnel is .avif). So we
+//            hand it a high-quality master and let Webflow optimise. Shipping a pre-crushed file just means it
+//            gets crushed twice.
+//   SOCIAL - we upload directly, so what we ship IS what the user downloads. Encode for delivery here.
+
+export type Delivery = "master" | "web" | "smallest";
+
+export async function encodeForDelivery(png: Buffer, mode: Delivery = "web"): Promise<{ buf: Buffer; ext: string; mime: string; bytes: number }> {
+  if (mode === "master") {
+    // Byte-for-byte identical pixels. For Webflow, which will re-encode anyway, and for the archive/design contract.
+    const buf = await sharp(png).webp({ lossless: true, effort: 6 }).toBuffer();
+    return { buf, ext: "webp", mime: "image/webp", bytes: buf.length };
+  }
+  if (mode === "smallest") {
+    const buf = await sharp(png).avif({ quality: 80, effort: 6 }).toBuffer();
+    return { buf, ext: "avif", mime: "image/avif", bytes: buf.length };
+  }
+  // Default. Visually indistinguishable from lossless, ~4x smaller, and it does not cost the customer money
+  // they do not have.
+  const buf = await sharp(png).webp({ quality: 95, effort: 6 }).toBuffer();
+  return { buf, ext: "webp", mime: "image/webp", bytes: buf.length };
 }
