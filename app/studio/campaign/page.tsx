@@ -24,7 +24,12 @@ type Plan = {
 };
 type Creative = { kind: string; index: number; url: string; bytes: number; width: number; height: number; error?: string };
 
-const dealLine = (d: Deal) => `${d.label} · ${d.amount}${d.amountSuffix || ""}${d.amountSub ? ` ${d.amountSub}` : ""} · ${d.price} · ${d.validity}`;
+// Never hand React something that might be an object. One non-string field should degrade a line of text,
+// not destroy the page and take an Opus-priced plan with it.
+const txt = (v: unknown): string =>
+  v == null ? "" : typeof v === "string" ? v : typeof v === "object" ? JSON.stringify(v) : String(v);
+
+const dealLine = (d: Deal) => `${txt(d?.label)} · ${txt(d?.amount)}${txt(d?.amountSuffix)}${d?.amountSub ? ` ${txt(d.amountSub)}` : ""} · ${txt(d?.price)} · ${txt(d?.validity)}`;
 
 export default function CampaignPage() {
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -36,6 +41,7 @@ export default function CampaignPage() {
   const [busy, setBusy] = useState<"" | "plan" | "produce">("");
   const [err, setErr] = useState("");
   const [elapsed, setElapsed] = useState(0);
+  const [restored, setRestored] = useState(false);
 
   useEffect(() => {
     fetch("/api/studio").then((r) => r.json()).then((d) => {
@@ -44,6 +50,28 @@ export default function CampaignPage() {
       if (cs[0]) setClientId(cs[0].id);
     }).catch(() => {});
   }, []);
+
+  // THE PLAN SURVIVES A RELOAD. It is the expensive artefact on this page - an Opus call, then however long
+  // you spent editing the headlines - and it was living in React state alone. A stray reload, a chunk error
+  // after a deploy, a mis-hit back button, and it was simply gone. Nothing that costs money and takes thought
+  // should be that easy to lose.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("gas-studio-campaign");
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { clientId?: string; brief?: string; plan?: Plan; creatives?: Creative[] };
+      if (saved.brief) setBrief(saved.brief);
+      if (saved.plan) { setPlan(saved.plan); setRestored(true); }
+      if (saved.creatives?.length) setCreatives(saved.creatives);
+    } catch { /* a corrupt cache is not worth crashing the page for */ }
+  }, []);
+
+  useEffect(() => {
+    if (!plan && !brief) return;
+    try {
+      localStorage.setItem("gas-studio-campaign", JSON.stringify({ clientId, brief, plan, creatives }));
+    } catch { /* quota or private mode - the page still works, it just will not remember */ }
+  }, [clientId, brief, plan, creatives]);
 
   // A run that takes minutes must LOOK like it is running. Without this the button reads as dead.
   useEffect(() => {
@@ -114,81 +142,91 @@ export default function CampaignPage() {
         {/* ── THE PLAN ──────────────────────────────────────────────────────────── */}
         {plan && (
           <section className="mt-6 space-y-4">
+            {restored && (
+              <div className="flex items-center justify-between rounded-xl border border-line bg-surface-2 px-4 py-2.5">
+                <p className="text-sm text-ink-dim">Restored the plan you were working on.</p>
+                <button
+                  onClick={() => { localStorage.removeItem("gas-studio-campaign"); setPlan(null); setCreatives([]); setRestored(false); }}
+                  className="text-sm font-semibold text-ink-dim underline hover:text-ink">Start fresh</button>
+              </div>
+            )}
             <div className="rounded-2xl border border-line bg-surface-1 p-5">
               <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">The idea</p>
-              <h2 className="mt-1 text-xl font-bold">{plan.theme}</h2>
-              <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">{plan.rationale}</p>
+              <h2 className="mt-1 text-xl font-bold">{txt(plan.theme)}</h2>
+              <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">{txt(plan.rationale)}</p>
             </div>
 
             {/* The two cut-out canvases. No baked headline - Webflow supplies the words beside them. */}
             {([
-              { key: "masthead", title: "Masthead · 1080×811", prompt: plan.masthead.subjectPrompt,
+              { key: "masthead", title: "Masthead · 1080×811", prompt: plan.masthead?.subjectPrompt || "",
                 set: (v: string) => edit((p) => { p.masthead.subjectPrompt = v; }), deals: [] as Deal[] },
-              { key: "section1", title: "Section 1 · 1239×1080", prompt: plan.section1.subjectPrompt,
-                set: (v: string) => edit((p) => { p.section1.subjectPrompt = v; }), deals: plan.section1.deals },
+              { key: "section1", title: "Section 1 · 1239×1080", prompt: plan.section1?.subjectPrompt || "",
+                set: (v: string) => edit((p) => { p.section1.subjectPrompt = v; }), deals: plan.section1?.deals || [] },
             ]).map((c) => (
               <div key={c.key} className="rounded-2xl border border-line bg-surface-1 p-5">
                 <div className="flex items-baseline justify-between">
                   <p className="text-base font-bold">{c.title}</p>
                   <span className="text-xs text-ink-dim">no baked headline · Webflow supplies the copy</span>
                 </div>
-                <textarea value={c.prompt} onChange={(e) => c.set(e.target.value)} rows={3}
+                <textarea value={txt(c.prompt)} onChange={(e) => c.set(e.target.value)} rows={3}
                   className="mt-2 w-full rounded-lg border border-line bg-surface-2 p-3 text-[15px] leading-relaxed outline-none focus:border-accent" />
                 {c.deals.length > 0 && (
                   <p className="mt-2 text-sm text-ink-dim">
-                    Deal cards: {c.deals.map((d) => <span key={d.label} className="mr-2 rounded bg-surface-2 px-1.5 py-0.5 tabular">{dealLine(d)}</span>)}
+                    Deal cards: {c.deals.map((d) => <span key={`${txt(d?.label)}-${txt(d?.price)}`} className="mr-2 rounded bg-surface-2 px-1.5 py-0.5 tabular">{dealLine(d)}</span>)}
                   </p>
                 )}
               </div>
             ))}
 
             {/* The three sliders. These DO carry baked copy. */}
-            {plan.sliders.map((s, i) => (
+            {(plan.sliders || []).map((s, i) => (
               <div key={i} className="rounded-2xl border border-line bg-surface-1 p-5">
                 <div className="flex items-baseline justify-between">
                   <p className="text-base font-bold">Slider {i + 1} · 1080×1080</p>
                   <span className="text-xs text-ink-dim tabular">{dealLine(s.deal)}</span>
                 </div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <input value={s.headline1} onChange={(e) => edit((p) => { p.sliders[i].headline1 = e.target.value; })}
+                  <input value={txt(s.headline1)} onChange={(e) => edit((p) => { p.sliders[i].headline1 = e.target.value; })}
                     className="rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-base font-bold outline-none focus:border-accent" />
-                  <input value={s.headline2} onChange={(e) => edit((p) => { p.sliders[i].headline2 = e.target.value; })}
+                  <input value={txt(s.headline2)} onChange={(e) => edit((p) => { p.sliders[i].headline2 = e.target.value; })}
                     className="rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-base font-bold text-[#F9CB0F] outline-none focus:border-accent" />
                 </div>
-                <textarea value={s.scenePrompt} onChange={(e) => edit((p) => { p.sliders[i].scenePrompt = e.target.value; })} rows={3}
+                <textarea value={txt(s.scenePrompt)} onChange={(e) => edit((p) => { p.sliders[i].scenePrompt = e.target.value; })} rows={3}
                   className="mt-2 w-full rounded-lg border border-line bg-surface-2 p-3 text-[15px] leading-relaxed outline-none focus:border-accent" />
               </div>
             ))}
 
             <div className="rounded-2xl border border-line bg-surface-1 p-5">
               <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">Page copy (Webflow)</p>
-              <p className="mt-2 text-lg font-bold">{plan.webflow.heroHeadline}</p>
-              <ul className="mt-1 list-disc pl-5 text-[15px] leading-relaxed text-ink-dim">{plan.webflow.heroSubheads.map((h, i) => <li key={i}>{h}</li>)}</ul>
-              <p className="mt-4 text-lg font-bold">{plan.webflow.section1Headline}</p>
-              <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">{plan.webflow.section1Body}</p>
+              <p className="mt-2 text-lg font-bold">{txt(plan.webflow?.heroHeadline)}</p>
+              <ul className="mt-1 list-disc pl-5 text-[15px] leading-relaxed text-ink-dim">{(plan.webflow?.heroSubheads || []).map((h, i) => <li key={i}>{txt(h)}</li>)}</ul>
+              <p className="mt-4 text-lg font-bold">{txt(plan.webflow?.section1Headline)}</p>
+              <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">{txt(plan.webflow?.section1Body)}</p>
             </div>
 
+            {plan.sms && (
             <div className="rounded-2xl border border-line bg-surface-1 p-5">
               <div className="flex items-baseline justify-between">
                 <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">SMS</p>
                 {/* Segments matter in rand: one non-GSM-7 character drops the segment from 160 chars to 70. */}
                 {/* The count is of the ASSEMBLED message - link, queries number and FSP tail included -
                     because that is what actually gets billed. 190 is the client's ceiling. */}
-                <span className={`text-xs tabular ${plan.sms.chars > 190 || !plan.sms.gsm7 ? "font-bold text-red-400" : "text-ink-dim"}`}>
-                  {plan.sms.chars}/190 chars · {plan.sms.chars <= 160 ? "1 segment" : "2 segments"}{plan.sms.gsm7 ? "" : " · NOT GSM-7"}
+                <span className={`text-xs tabular ${(Number(plan.sms?.chars) || 0) > 190 || !plan.sms?.gsm7 ? "font-bold text-red-400" : "text-ink-dim"}`}>
+                  {Number(plan.sms?.chars) || 0}/190 chars · {(Number(plan.sms?.chars) || 0) <= 160 ? "1 segment" : "2 segments"}{plan.sms?.gsm7 ? "" : " · NOT GSM-7"}
                 </span>
               </div>
-              <p className="mt-2 font-mono text-[15px] leading-relaxed">{plan.sms.assembled}</p>
+              <p className="mt-2 font-mono text-[15px] leading-relaxed">{txt(plan.sms?.assembled)}</p>
               <p className="mt-2 text-xs text-ink-dim">
                 Only the selling line is written by the Producer. The link, the queries number and the
                 FSP tail are fixed furniture and are appended automatically.
               </p>
             </div>
+            )}
 
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
               <p className="text-[13px] font-semibold uppercase tracking-widest text-amber-400">Compliance check</p>
               <ul className="mt-2 space-y-2 text-[15px] leading-relaxed text-ink-dim">
-                {plan.complianceCheck.map((c, i) => <li key={i}>• {c}</li>)}
+                {(plan.complianceCheck || []).map((c, i) => <li key={i}>• {txt(c)}</li>)}
               </ul>
             </div>
 
@@ -221,7 +259,7 @@ export default function CampaignPage() {
                 <div key={i} className="rounded-2xl border border-line bg-surface-1 p-3">
                   {c.url
                     ? <a href={c.url} target="_blank" rel="noreferrer"><img src={c.url} alt="" className="w-full rounded-lg" /></a>
-                    : <p className="p-6 text-center text-xs text-red-400">{c.error || "did not render"}</p>}
+                    : <p className="p-6 text-center text-xs text-red-400">{txt(c.error) || "did not render"}</p>}
                   <p className="mt-2 flex items-baseline justify-between text-xs text-ink-dim">
                     <span className="font-semibold uppercase tracking-wider">{c.kind}{c.kind === "slider" ? ` ${c.index + 1}` : ""}</span>
                     <span className="tabular">{c.width}×{c.height} · {(c.bytes / 1024).toFixed(0)}KB</span>
@@ -231,7 +269,7 @@ export default function CampaignPage() {
             </div>
             {warnings.length > 0 && (
               <ul className="mt-4 space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-300">
-                {warnings.map((w, i) => <li key={i}>• {w}</li>)}
+                {warnings.map((w, i) => <li key={i}>• {txt(w)}</li>)}
               </ul>
             )}
           </section>

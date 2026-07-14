@@ -177,7 +177,7 @@ export default function Landing() {
         </div>
 
         <p style={{ fontSize: 20, color: "rgba(255,255,255,0.38)", lineHeight: 1.65, margin: "0 auto 52px", maxWidth: 440, fontWeight: 400, letterSpacing: "-0.1px" }}>
-          Build, manage, and grow your AI creatives.
+          Build, manage, and grow your AI production.
         </p>
 
         <button

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { planCampaign } from "@/lib/studio-producer";
+import { latestRun } from "@/lib/studio-campaign";
 
 // THE PLAN. The Producer reads the brief and designs the whole funnel campaign. FREE - one Claude call.
 //
@@ -11,6 +12,17 @@ import { planCampaign } from "@/lib/studio-producer";
 // rendering. Production lives at ./produce, on its own function, with its own 67MB of Chromium.
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
+
+// Recover the last production run for a client. This is what makes navigating away safe: the creatives you
+// paid for are fetched back rather than lost with the tab.
+export async function GET(req: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
+  const clientId = new URL(req.url).searchParams.get("clientId") || "";
+  if (!clientId) return NextResponse.json({ run: null });
+  const run = await latestRun(clientId).catch(() => null);
+  return NextResponse.json({ run });
+}
 
 export async function POST(req: Request) {
   const session = await auth();

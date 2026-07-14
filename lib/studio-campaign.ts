@@ -7,6 +7,7 @@ import { renderMomoSection1 } from "./templates/momo-section1";
 import { getBrandKit, listAssets } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
+import { db } from "./db";
 import type { CampaignPlan } from "./studio-producer";
 
 // FINAL PRODUCTION. The plan goes in, five finished files come out.
@@ -161,4 +162,33 @@ async function meter(clientId: string, provider: string, models: string[], actio
   await Promise.all([...counts].map(([model, count]) =>
     recordUsage({ clientId, provider, model, unit: "image", action, count }).catch(() => {}),
   ));
+}
+
+// SAVE THE RUN. A production run spends money and takes minutes; its output must not live only in the tab
+// that started it. Written the moment production completes, so the creatives survive navigating away, a
+// stale chunk after a deploy, or a closed laptop - all of which used to lose the work but not the invoice.
+export async function saveRun(clientId: string, brief: string, plan: CampaignPlan, out: CampaignOutput): Promise<string | null> {
+  try {
+    const rows = (await db().query(
+      `insert into studio_campaigns (client_id, brief, plan, creatives, warnings)
+       values ($1,$2,$3,$4,$5) returning id`,
+      [clientId, brief || null, JSON.stringify(plan), JSON.stringify(out.creatives), JSON.stringify(out.warnings)],
+    )) as unknown as { id: string }[];
+    return rows?.[0]?.id ?? null;
+  } catch (e) {
+    // Never fail a completed run because we could not file it. The creatives exist; say so loudly and move on.
+    console.error("[studio-campaign] could not save the run", e);
+    return null;
+  }
+}
+
+export type SavedRun = { id: string; brief: string | null; plan: CampaignPlan; creatives: Creative[]; warnings: string[]; created_at: string };
+
+export async function latestRun(clientId: string): Promise<SavedRun | null> {
+  const rows = (await db().query(
+    `select id, brief, plan, creatives, warnings, created_at
+       from studio_campaigns where client_id = $1 order by created_at desc limit 1`,
+    [clientId],
+  )) as unknown as SavedRun[];
+  return rows?.[0] ?? null;
 }

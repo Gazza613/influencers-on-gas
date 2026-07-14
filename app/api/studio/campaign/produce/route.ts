@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { produceCampaign } from "@/lib/studio-campaign";
+import { produceCampaign, saveRun } from "@/lib/studio-campaign";
 import type { CampaignPlan } from "@/lib/studio-producer";
 
 // FINAL PRODUCTION. This SPENDS: 5 generated images + 2 background cut-outs, then renders five canvases.
@@ -40,14 +40,17 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as { clientId?: string; plan?: CampaignPlan };
+  const body = (await req.json().catch(() => ({}))) as { clientId?: string; brief?: string; plan?: CampaignPlan };
   const clientId = String(body.clientId || "");
   if (!clientId) return NextResponse.json({ error: "Pick a client first." }, { status: 400 });
   if (!body.plan?.sliders?.length) return NextResponse.json({ error: "There is no plan to produce." }, { status: 400 });
 
   try {
     const out = await produceCampaign(clientId, body.plan);
-    return NextResponse.json({ ok: true, ...out });
+    // Filed BEFORE we reply. If the browser has already navigated away, the creatives are still recoverable -
+    // the money was spent either way.
+    const runId = await saveRun(clientId, String(body.brief || ""), body.plan, out);
+    return NextResponse.json({ ok: true, runId, ...out });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 240) }, { status: 500 });
   }

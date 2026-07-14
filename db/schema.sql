@@ -537,3 +537,21 @@ create table if not exists studio_deals (
   unique (client_id, label, amount, price)
 );
 create index if not exists studio_deals_client on studio_deals (client_id);
+
+-- ── Campaign runs ───────────────────────────────────────────────────────────
+-- A production run SPENDS MONEY (5 generated images + 2 cut-outs) and takes minutes. Until now its output
+-- existed only in the browser tab that started it: navigate away, hit a stale chunk after a deploy, or close
+-- the laptop, and the creatives were gone while the invoice was not. That is indefensible.
+--
+-- Every run is now written here the moment it completes, so the work is recoverable from any tab, and the
+-- plan that produced it is kept alongside so a re-shoot knows what it was re-shooting.
+create table if not exists studio_campaigns (
+  id         uuid primary key default gen_random_uuid(),
+  client_id  uuid not null references clients(id) on delete cascade,
+  brief      text,
+  plan       jsonb not null,
+  creatives  jsonb not null default '[]'::jsonb,
+  warnings   jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists studio_campaigns_client on studio_campaigns (client_id, created_at desc);
