@@ -453,3 +453,10 @@ alter table studio_assets add constraint studio_assets_kind_check
 -- client-level, not per-template, and must be reproducible VERBATIM on any creative that needs it - a
 -- financial-services disclosure can never be paraphrased or half-remembered by a copy engine.
 alter table studio_brand_kits add column if not exists compliance_text text;
+
+-- The client's DESIGN SYSTEM, reverse-engineered from their best-performing creatives: the rules their
+-- designers actually follow (panel hierarchy ratios, the disc/glow layer build, what is never broken, the
+-- allowed degrees of freedom). This is the locked grammar the Creative Director composes WITHIN - it is
+-- derived from proven work, never invented, and it is what stops a generated creative drifting out of the
+-- family. Client-level, because it spans every placement.
+alter table studio_brand_kits add column if not exists design_system text;
