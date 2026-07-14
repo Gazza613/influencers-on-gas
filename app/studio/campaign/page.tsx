@@ -38,6 +38,19 @@ const txt = (v: unknown): string =>
 const arr = <T,>(v: unknown): T[] =>
   Array.isArray(v) ? (v as T[]) : v == null || v === "" ? [] : ([v] as T[]);
 
+// One block your team can paste straight into Webflow, in the order the page reads. The copy is spread across
+// five fields on screen because each one lands somewhere different on the funnel; nobody wants to copy them
+// out one at a time.
+const webflowText = (p: Plan): string => [
+  `HERO HEADLINE\n${txt(p.webflow?.heroHeadline)}`,
+  `HERO SUBHEADS\n${arr<unknown>(p.webflow?.heroSubheads).map(txt).map((h) => `- ${h}`).join("\n")}`,
+  `SECTION 1 HEADLINE\n${txt(p.webflow?.section1Headline)}`,
+  `SECTION 1 BODY\n${txt(p.webflow?.section1Body)}`,
+  `SLIDER SUBHEAD\n${txt(p.webflow?.sliderSubhead)}`,
+  `SLIDER HEADLINES (baked into the images)\n${arr<Plan["sliders"][number]>(p.sliders).map((s, i) => `${i + 1}. ${txt(s.headline1)} / ${txt(s.headline2)}`).join("\n")}`,
+  `SMS\n${txt(p.sms?.assembled)}`,
+].join("\n\n");
+
 const dealLine = (d: Deal) => `${txt(d?.label)} · ${txt(d?.amount)}${txt(d?.amountSuffix)}${d?.amountSub ? ` ${txt(d.amountSub)}` : ""} · ${txt(d?.price)} · ${txt(d?.validity)}`;
 
 export default function CampaignPage() {
@@ -273,12 +286,46 @@ export default function CampaignPage() {
               </div>
             ))}
 
+            {/* PAGE COPY. This is the HTML text that sits BESIDE the images on the funnel - the masthead and
+                section 1 carry no baked headline, so these words ARE the headline the visitor reads. It is the
+                copy your team pastes into Webflow, so it has to be editable here, not just readable. It used
+                to be read-only, which meant the one thing a copywriter would want to change was the one thing
+                they could not. */}
             <div className="rounded-2xl border border-line bg-surface-1 p-5">
-              <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">Page copy (Webflow)</p>
-              <p className="mt-2 text-lg font-bold">{txt(plan.webflow?.heroHeadline)}</p>
-              <ul className="mt-1 list-disc pl-5 text-[15px] leading-relaxed text-ink-dim">{arr<unknown>(plan.webflow?.heroSubheads).map((h, i) => <li key={i}>{txt(h)}</li>)}</ul>
-              <p className="mt-4 text-lg font-bold">{txt(plan.webflow?.section1Headline)}</p>
-              <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">{txt(plan.webflow?.section1Body)}</p>
+              <div className="flex items-baseline justify-between">
+                <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">Page copy (Webflow)</p>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(webflowText(plan))}
+                  className="text-xs font-semibold text-ink-dim underline hover:text-ink">Copy all</button>
+              </div>
+
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-faint">Hero headline · sits beside the masthead</p>
+              <input value={txt(plan.webflow?.heroHeadline)}
+                onChange={(e) => edit((p) => { p.webflow.heroHeadline = e.target.value; })}
+                className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg font-bold outline-none focus:border-accent" />
+
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-faint">Hero subheads</p>
+              {arr<unknown>(plan.webflow?.heroSubheads).map((h, i) => (
+                <input key={i} value={txt(h)}
+                  onChange={(e) => edit((p) => { p.webflow.heroSubheads[i] = e.target.value; })}
+                  className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-[15px] leading-relaxed outline-none focus:border-accent" />
+              ))}
+
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-faint">Section 1 headline · sits beside the deal cards</p>
+              <input value={txt(plan.webflow?.section1Headline)}
+                onChange={(e) => edit((p) => { p.webflow.section1Headline = e.target.value; })}
+                className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg font-bold outline-none focus:border-accent" />
+
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-faint">Section 1 body</p>
+              <textarea value={txt(plan.webflow?.section1Body)} rows={4}
+                onChange={(e) => edit((p) => { p.webflow.section1Body = e.target.value; })}
+                className="mt-1 w-full rounded-lg border border-line bg-surface-2 p-3 text-[15px] leading-relaxed outline-none focus:border-accent" />
+
+              {/* The Producer has always written this and the page silently threw it away. */}
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-faint">Slider subhead · introduces the three sliders</p>
+              <input value={txt(plan.webflow?.sliderSubhead)}
+                onChange={(e) => edit((p) => { p.webflow.sliderSubhead = e.target.value; })}
+                className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-[15px] outline-none focus:border-accent" />
             </div>
 
             {plan.sms && (
