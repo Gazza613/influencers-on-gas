@@ -86,40 +86,42 @@ export function fontFaceCss(fonts: { family: string; url: string }[]): string {
 
 // ── DELIVERY ENCODING ────────────────────────────────────────────────────────────────────────────────────
 //
-// The renderer emits PNG. What we DELIVER depends on where it is going, and the difference is real money.
+// I HAD THIS BACKWARDS AND GARY CAUGHT IT. My first pass said "on social, what we ship IS what the user
+// downloads, so encode small". That is FALSE. Meta, Instagram and TikTok RE-ENCODE every upload to their own
+// formats and sizes - what the viewer sees is THEIR compression of our file, not our file. Webflow does the
+// same, converting to AVIF (every image on the live MoMo funnel is already .avif).
 //
-// MEASURED on the MoMo slider (1080x1080, photo + text):
-//   source PNG                1030KB   costs the user R0.082 of their own airtime
-//   PNG "max effort" lossless 1628KB   BIGGER. Chromium's encoder already beats sharp's - compressing harder
-//                                      actively backfires. A genuine trap.
-//   WebP LOSSLESS              735KB   byte-for-byte identical pixels, and under the 1MB budget
-//   WebP q95                   188KB   visually indistinguishable, 4x smaller
+// So pre-compressing before upload is actively HARMFUL: our compression, then theirs, is double compression -
+// visible artefacts, for no benefit, because they were going to re-encode regardless. Handing a platform a
+// degraded input can only make its output worse.
+//
+// THE RULE: give the platform the best source it will accept and let IT compress. That is nearly everywhere -
+// Webflow, Meta, Instagram, TikTok.
+//
+// The R0.08/MB data cost (ICASA 2025, MTN prepaid) is still real - a heavy page genuinely costs a prepaid
+// customer their own money. But that cost lands on what the PLATFORM serves, which is downstream of us and
+// optimised by them. The only place raw weight is ours to control is where WE serve the file with no
+// intermediary: a direct download, an email attachment, an asset we host.
+//
+// MEASURED on the MoMo slider (1080x1080, photo + baked text), for the record:
+//   source PNG                1030KB
+//   PNG "max effort" lossless 1628KB   BIGGER. Chromium's encoder already beats sharp's, so compressing
+//                                      harder actively backfires. A genuine trap.
+//   WebP LOSSLESS              735KB   byte-for-byte identical pixels
+//   WebP q95                   188KB   visually indistinguishable
 //   AVIF q80                   108KB   visually indistinguishable
-//
-// At ICASA's R0.08/MB (MTN prepaid, 2025), lossless costs the customer R0.057 per load and q95 costs R0.015.
-// That gap is real money from someone whose entire monthly telecoms spend is R55-R77. Visually identical, four
-// times cheaper for them: q95 is the right default, and "lossless" here is vanity, not quality.
-//
-// FUNNEL vs SOCIAL matters:
-//   FUNNEL - Webflow re-encodes everything to AVIF on upload (every image on the live funnel is .avif). So we
-//            hand it a high-quality master and let Webflow optimise. Shipping a pre-crushed file just means it
-//            gets crushed twice.
-//   SOCIAL - we upload directly, so what we ship IS what the user downloads. Encode for delivery here.
 
-export type Delivery = "master" | "web" | "smallest";
+export type Delivery = "master" | "hosted";
 
-export async function encodeForDelivery(png: Buffer, mode: Delivery = "web"): Promise<{ buf: Buffer; ext: string; mime: string; bytes: number }> {
-  if (mode === "master") {
-    // Byte-for-byte identical pixels. For Webflow, which will re-encode anyway, and for the archive/design contract.
-    const buf = await sharp(png).webp({ lossless: true, effort: 6 }).toBuffer();
+export async function encodeForDelivery(png: Buffer, mode: Delivery = "master"): Promise<{ buf: Buffer; ext: string; mime: string; bytes: number }> {
+  if (mode === "hosted") {
+    // ONLY for files WE serve directly, with no platform re-encode in front of them. Visually indistinguishable
+    // from lossless and ~4x smaller, so it does not cost a prepaid customer money they do not have.
+    const buf = await sharp(png).webp({ quality: 95, effort: 6 }).toBuffer();
     return { buf, ext: "webp", mime: "image/webp", bytes: buf.length };
   }
-  if (mode === "smallest") {
-    const buf = await sharp(png).avif({ quality: 80, effort: 6 }).toBuffer();
-    return { buf, ext: "avif", mime: "image/avif", bytes: buf.length };
-  }
-  // Default. Visually indistinguishable from lossless, ~4x smaller, and it does not cost the customer money
-  // they do not have.
-  const buf = await sharp(png).webp({ quality: 95, effort: 6 }).toBuffer();
-  return { buf, ext: "webp", mime: "image/webp", bytes: buf.length };
+  // DEFAULT: the master. Lossless, byte-for-byte identical to what we rendered. This is what goes to Webflow,
+  // Meta, Instagram and TikTok - all of which re-encode - and what is archived as the design contract.
+  const buf = await sharp(png).png({ compressionLevel: 9 }).toBuffer();
+  return { buf: buf.length < png.length ? buf : png, ext: "png", mime: "image/png", bytes: Math.min(buf.length, png.length) };
 }
