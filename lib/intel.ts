@@ -28,6 +28,7 @@ export type Intel = {
   detail: string | null;
   source_url: string | null;
   source_name: string | null;
+  sources: { name: string; url: string }[];
   confidence: string;
   material: boolean;
   status: string;
@@ -71,12 +72,19 @@ const SCHEMA = {
           headline: { type: "string", description: "One line. What changed." },
           why_it_matters: { type: "string", description: "The SO WHAT for MTN MoMo specifically. Be concrete." },
           detail: { type: "string", description: "The substance, with the real numbers." },
-          source_url: { type: "string" },
-          source_name: { type: "string" },
+          sources: {
+            type: "array",
+            description: "EVERY source you actually read for this finding. A real URL each - never invent one.",
+            items: {
+              type: "object", additionalProperties: false,
+              properties: { name: { type: "string" }, url: { type: "string" } },
+              required: ["name", "url"],
+            },
+          },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           material: { type: "boolean", description: "Would this actually change what we say or do? Most things are not." },
         },
-        required: ["headline", "why_it_matters", "detail", "source_url", "source_name", "confidence", "material"],
+        required: ["headline", "why_it_matters", "detail", "sources", "confidence", "material"],
       },
     },
     quiet_day: { type: "boolean", description: "True if nothing material was found. That is a correct result, not a failure." },
@@ -130,12 +138,16 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
   const saved: Intel[] = [];
   for (const f of findings) {
+    const srcs = (Array.isArray(f.sources) ? f.sources : [])
+      .filter((s): s is { name: string; url: string } => !!s && typeof (s as { url?: string }).url === "string" && /^https?:\/\//i.test((s as { url: string }).url))
+      .slice(0, 8);
     const rows = (await db().query(
-      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, source_url, source_name, confidence, material)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       returning id, role, headline, why_it_matters, detail, source_url, source_name, confidence, material, status, found_at`,
+      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, confidence, material)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, confidence, material, status, found_at`,
       [clientId, role, String(f.headline || "").slice(0, 300), String(f.why_it_matters || "").slice(0, 1200),
-       String(f.detail || "").slice(0, 4000), String(f.source_url || "").slice(0, 600), String(f.source_name || "").slice(0, 200),
+       String(f.detail || "").slice(0, 4000), JSON.stringify(srcs),
+       srcs[0]?.url ?? null, srcs.map((s) => s.name).join(" · ").slice(0, 200) || null,
        ["high", "medium", "low"].includes(String(f.confidence)) ? f.confidence : "medium", f.material === true],
     )) as Intel[];
     saved.push(rows[0]);
@@ -145,7 +157,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
 export async function listIntel(clientId: string, status = "new"): Promise<Intel[]> {
   return (await db().query(
-    `select id, role, headline, why_it_matters, detail, source_url, source_name, confidence, material, status, found_at
+    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, confidence, material, status, found_at
      from studio_intel where client_id = $1 and status = $2 order by material desc, found_at desc limit 80`,
     [clientId, status],
   )) as Intel[];

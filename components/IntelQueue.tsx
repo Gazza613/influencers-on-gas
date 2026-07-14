@@ -11,8 +11,9 @@ import { flex } from "@/lib/flex";
 
 type Intel = {
   id: string; role: string; headline: string; why_it_matters: string; detail: string | null;
-  source_url: string | null; source_name: string | null; confidence: string; material: boolean;
-  status: string; found_at: string;
+  source_url: string | null; source_name: string | null;
+  sources: { name: string; url: string }[];
+  confidence: string; material: boolean; status: string; found_at: string;
 };
 type Client = { id: string; name: string };
 
@@ -123,13 +124,30 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
       </div>
       <p className="mt-2 text-[14px] leading-relaxed text-ink-dim"><b className="text-ink">Why it matters:</b> {i.why_it_matters}</p>
       {i.detail && <p className="mt-2 text-[13px] leading-relaxed text-ink-faint">{i.detail}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        {i.source_url && (
-          <a href={i.source_url} target="_blank" rel="noreferrer" className="text-[11px] text-[#93c5fd] underline">
-            {i.source_name || "source"}
-          </a>
+
+      {/* SOURCES. Every finding shows where it came from. An unsourced "insight" is worse than no insight - it
+          becomes a fact nobody can trace, and every future article and strategy inherits it. If a finding has
+          no source, say so plainly rather than letting it pass as verified. */}
+      <div className="mt-3 border-t border-line pt-2.5">
+        <p className="tabular text-[10px] uppercase tracking-[0.16em] text-ink-faint">Sources</p>
+        {sourcesOf(i).length === 0 ? (
+          <p className="mt-1 text-[11px] font-bold text-[#fca5a5]">⚠ No source. Do not treat this as verified.</p>
+        ) : (
+          <ol className="mt-1 space-y-0.5">
+            {sourcesOf(i).map((s, n) => (
+              <li key={s.url + n} className="text-[11px] leading-relaxed">
+                <span className="tabular text-ink-faint">{n + 1}.</span>{" "}
+                <a href={s.url} target="_blank" rel="noreferrer" className="text-[#93c5fd] underline decoration-[#93c5fd]/40 hover:decoration-[#93c5fd]">
+                  {s.name || s.url}
+                </a>
+                <span className="ml-1.5 text-ink-faint">{host(s.url)}</span>
+              </li>
+            ))}
+          </ol>
         )}
-        <span className="flex-1" />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
         <button onClick={() => decide(i.id, "accepted")} disabled={busy}
           className="rounded-lg border border-[#4ade80]/40 px-3 py-1 text-[11px] font-bold text-[#86efac] hover:bg-[#4ade80]/10 disabled:opacity-40">
           ✓ Accept into the brain
@@ -141,4 +159,15 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
       </div>
     </div>
   );
+}
+
+// Older findings were stored with a single source; newer ones carry the full list. Read both.
+function sourcesOf(i: Intel): { name: string; url: string }[] {
+  if (Array.isArray(i.sources) && i.sources.length) return i.sources;
+  if (i.source_url) return [{ name: i.source_name || i.source_url, url: i.source_url }];
+  return [];
+}
+
+function host(url: string): string {
+  try { return `· ${new URL(url).hostname.replace(/^www\./, "")}`; } catch { return ""; }
 }

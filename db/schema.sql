@@ -480,3 +480,7 @@ create table if not exists studio_intel (
   found_at       timestamptz not null default now()
 );
 create index if not exists idx_studio_intel_client on studio_intel(client_id, status, found_at desc);
+
+-- Findings routinely rest on SEVERAL sources ("TechCentral / ITWeb", "BioCatch via IOL / TransUnion via eNCA").
+-- A single source_url threw the rest away, so an item could not be fully checked. Store them all.
+alter table studio_intel add column if not exists sources jsonb not null default '[]'::jsonb;

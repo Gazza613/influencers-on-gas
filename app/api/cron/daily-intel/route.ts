@@ -33,13 +33,25 @@ function buildEmail(client: string, journalist: Intel[], strategist: Intel[], to
       return `<h3 style="margin:26px 0 6px;font-size:15px;color:#0f172a">${title}</h3>
         <p style="margin:0;color:#64748b;font-size:14px">Nothing material today. That is a real answer, not a gap.</p>`;
     }
-    return `<h3 style="margin:26px 0 10px;font-size:15px;color:#0f172a">${title}</h3>` + items.map((i) => `
+    return `<h3 style="margin:26px 0 10px;font-size:15px;color:#0f172a">${title}</h3>` + items.map((i) => {
+      // Every finding carries its sources into the inbox, so you can check it without opening the platform.
+      // An unsourced claim is flagged, never quietly passed off as verified.
+      const srcs = (Array.isArray(i.sources) && i.sources.length)
+        ? i.sources
+        : i.source_url ? [{ name: i.source_name || i.source_url, url: i.source_url }] : [];
+      const sourceHtml = srcs.length
+        ? `<p style="margin:10px 0 0;padding-top:8px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8">SOURCES</p>
+           <ol style="margin:4px 0 0;padding-left:18px">${srcs.map((s) =>
+             `<li style="font-size:12px;line-height:1.6"><a href="${esc(s.url)}" style="color:#2563eb">${esc(s.name || s.url)}</a></li>`).join("")}</ol>`
+        : `<p style="margin:10px 0 0;font-size:12px;font-weight:700;color:#b91c1c">⚠ No source. Do not treat this as verified.</p>`;
+      return `
       <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px">
         <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a">${esc(i.headline)} ${badge(i.confidence)}</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#334155"><b>Why it matters:</b> ${esc(i.why_it_matters)}</p>
-        <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#475569">${esc(String(i.detail || "").slice(0, 700))}</p>
-        ${i.source_url ? `<a href="${esc(i.source_url)}" style="font-size:12px;color:#2563eb">${esc(i.source_name || i.source_url)}</a>` : ""}
-      </div>`).join("");
+        <p style="margin:0;font-size:13px;line-height:1.55;color:#475569">${esc(String(i.detail || "").slice(0, 700))}</p>
+        ${sourceHtml}
+      </div>`;
+    }).join("");
   };
 
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#0f172a">
