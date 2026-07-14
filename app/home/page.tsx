@@ -48,6 +48,38 @@ function StudioMark() {
   );
 }
 
+// A nib — writing, with authority.
+function JournalistMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+      <defs>
+        <linearGradient id="jr-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#22D3EE" /><stop offset="0.55" stopColor="#60A5FA" /><stop offset="1" stopColor="#818CF8" />
+        </linearGradient>
+      </defs>
+      <path d="M8 40l4.5-12.5L32 8a4.2 4.2 0 0 1 6 6L18.5 33.5 8 40Z" stroke="url(#jr-g)" strokeWidth="2.6" strokeLinejoin="round" />
+      <path d="M28 12l8 8M12.5 27.5l8 8" stroke="url(#jr-g)" strokeWidth="2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A rising line with a plotted turn — reading the market.
+function StrategistMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+      <defs>
+        <linearGradient id="st-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#818CF8" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#EC4899" />
+        </linearGradient>
+      </defs>
+      <path d="M6 42V6M6 42h36" stroke="url(#st-g)" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M13 32l8-9 7 5 12-15" stroke="url(#st-g)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="21" cy="23" r="2.8" stroke="url(#st-g)" strokeWidth="2.4" />
+      <circle cx="40" cy="13" r="2.8" stroke="url(#st-g)" strokeWidth="2.4" />
+    </svg>
+  );
+}
+
 export default function HomePage() {
   return (
     <div className="flex min-h-dvh flex-col">
@@ -62,7 +94,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2">
           {/* DOOR 1 - the existing, shipped product. */}
           <Link
             href="/influencers"
@@ -95,6 +127,39 @@ export default function HomePage() {
             </p>
             <span className="mt-5 inline-block text-sm font-bold text-[#93c5fd] transition group-hover:translate-x-0.5">
               Open the factory →
+            </span>
+          </Link>
+
+          {/* DOOR 3 - thought leadership. Industry commentary only: a post that promotes the client's financial
+              services becomes a regulated advertisement, so this stays deliberately on the category. */}
+          <Link
+            href="/journalist"
+            className="group relative overflow-hidden rounded-2xl border border-[#22d3ee]/35 bg-gradient-to-br from-[#22d3ee]/[0.09] to-[#818cf8]/[0.05] p-7 transition hover:border-[#22d3ee]/70 hover:from-[#22d3ee]/[0.15]"
+          >
+            <JournalistMark />
+            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">The Journalist</h2>
+            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
+              Thought leadership a client CEO can put his name to. It researches the category daily and builds
+              a defensible argument from primary sources, never from opinion.
+            </p>
+            <span className="mt-5 inline-block text-sm font-bold text-[#67e8f9] transition group-hover:translate-x-0.5">
+              Open the desk →
+            </span>
+          </Link>
+
+          {/* DOOR 4 - market intelligence. Proposes, never asserts; a human accepts each finding into the brain. */}
+          <Link
+            href="/strategist"
+            className="group relative overflow-hidden rounded-2xl border border-[#818cf8]/35 bg-gradient-to-br from-[#818cf8]/[0.10] to-[#a855f7]/[0.05] p-7 transition hover:border-[#818cf8]/70 hover:from-[#818cf8]/[0.16]"
+          >
+            <StrategistMark />
+            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">The Strategist</h2>
+            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
+              Daily market and competitor intelligence. It hunts for what makes a current assumption wrong, and
+              files it with a source and an honest confidence grade.
+            </p>
+            <span className="mt-5 inline-block text-sm font-bold text-[#a5b4fc] transition group-hover:translate-x-0.5">
+              Open the desk →
             </span>
           </Link>
         </div>

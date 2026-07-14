@@ -460,3 +460,23 @@ alter table studio_brand_kits add column if not exists compliance_text text;
 -- derived from proven work, never invented, and it is what stops a generated creative drifting out of the
 -- family. Client-level, because it spans every placement.
 alter table studio_brand_kits add column if not exists design_system text;
+
+-- THE "WORTH REVIEWING" QUEUE. The Journalist and Strategist research daily and PROPOSE findings here; a human
+-- accepts or bins each one. They never silently write to the client brain - otherwise a bad source quietly
+-- becomes "fact" and every future article and strategy inherits it. `material` marks the ones that actually
+-- change something, which is what gets emailed. Every row carries its source and a confidence grade.
+create table if not exists studio_intel (
+  id             uuid primary key default gen_random_uuid(),
+  client_id      uuid not null references clients(id) on delete cascade,
+  role           text not null check (role in ('journalist','strategist')),
+  headline       text not null,
+  why_it_matters text not null,
+  detail         text,
+  source_url     text,
+  source_name    text,
+  confidence     text not null default 'medium' check (confidence in ('high','medium','low')),
+  material       boolean not null default false,
+  status         text not null default 'new' check (status in ('new','accepted','binned')),
+  found_at       timestamptz not null default now()
+);
+create index if not exists idx_studio_intel_client on studio_intel(client_id, status, found_at desc);
