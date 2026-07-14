@@ -41,34 +41,38 @@ html,body{width:1080px;height:811px;overflow:hidden}
   font-family:'MTNBrighterSans',sans-serif;-webkit-font-smoothing:antialiased}
 
 /* 2. The glow. Warm, off-centre, sitting under the disc - it stops the flat blue reading as a colour swatch. */
-.glow{position:absolute;left:50%;top:46%;width:1020px;height:1020px;transform:translate(-50%,-50%);
-  background:radial-gradient(circle,rgba(249,203,15,.30) 0%,rgba(249,203,15,.10) 42%,transparent 68%)}
+.glow{position:absolute;left:50%;top:46%;width:1300px;height:1300px;transform:translate(-50%,-50%);
+  background:radial-gradient(circle,rgba(0,120,166,.55) 0%,rgba(0,90,128,.22) 45%,transparent 70%)}
 
-/* 3. THE YELLOW DISC. The brand's signature shape. The subject stands in front of it. */
-.disc{position:absolute;left:50%;top:50%;width:660px;height:660px;transform:translate(-50%,-50%);
-  border-radius:50%;background:radial-gradient(circle at 38% 32%, #FFE45C 0%, ${MOMO_YELLOW} 46%, #E0AE00 100%)}
+/* 3. THE YELLOW DISC. FLAT. The brand's signature shape is a disc, not a sphere - a radial 3D gradient turns
+   it into a lemon, which is the single fastest way to make this look like clip art. One flat brand yellow,
+   with only the faintest warm lift so it does not read as a colour swatch. */
+.disc{position:absolute;left:50%;top:50%;width:604px;height:604px;transform:translate(-50%,-50%);
+  border-radius:50%;background:${MOMO_YELLOW}}
 
-/* 4. THE LIGHT STREAK - BACK HALF. Passes behind the subject. */
-.streak-back{position:absolute;left:50%;top:50%;width:900px;height:900px;transform:translate(-50%,-50%) rotate(-18deg);
-  border-radius:50%;border:16px solid transparent;
-  background:conic-gradient(from 200deg, transparent 0deg, rgba(255,196,60,0) 40deg, #FFC83C 96deg, #FFF2B8 132deg, rgba(255,200,60,0) 170deg, transparent 360deg);
-  -webkit-mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  filter:blur(2px) drop-shadow(0 0 26px rgba(255,190,50,.65))}
+/* 4. THE LIGHT STREAK. A ring ORBITING the disc, sitting outside its edge - not a highlight ON it. Radius is
+   set so the ring clears the 330px disc with room to read as a separate object. The conic gradient makes it a
+   short arc rather than a full circle: it is a streak of light passing through the frame. */
+.streak-back{position:absolute;left:50%;top:50%;width:812px;height:812px;transform:translate(-50%,-50%) rotate(-16deg);
+  border-radius:50%;
+  background:conic-gradient(from 118deg, rgba(255,200,60,0) 0deg, #FFC83C 34deg, #FFF3BC 62deg, #FFC83C 86deg, rgba(255,200,60,0) 116deg, transparent 360deg);
+  -webkit-mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  filter:blur(1.5px) drop-shadow(0 0 30px rgba(255,190,50,.75))}
 
 /* 5. THE SUBJECT. Cut out, anchored to the foot of the canvas so they stand ON the layout, not float in it. */
-.subject{position:absolute;left:50%;bottom:0;height:96%;width:auto;transform:translateX(-50%);
+.subject{position:absolute;left:50%;bottom:0;height:93%;width:auto;transform:translateX(-50%);
   filter:drop-shadow(0 26px 50px rgba(0,20,32,.42))}
 
-/* 4b. THE LIGHT STREAK - FRONT HALF. Crosses IN FRONT of the torso and hands. This overlap is what welds the
-   cut-out to the disc; without it the subject reads as a sticker. Deliberately short - it is a highlight
-   passing over them, not a ribbon wrapped around them. */
-.streak-front{position:absolute;left:50%;top:50%;width:900px;height:900px;transform:translate(-50%,-50%) rotate(-18deg);
+/* 4b. THE SAME RING, FRONT HALF. Identical geometry, a different arc of it - so it is visibly ONE ring that
+   passes behind the subject on one side and in front of them on the other. That single overlap is what welds
+   the cut-out to the disc; without it the subject reads as a sticker. */
+.streak-front{position:absolute;left:50%;top:50%;width:812px;height:812px;transform:translate(-50%,-50%) rotate(-16deg);
   border-radius:50%;pointer-events:none;
-  background:conic-gradient(from 20deg, transparent 0deg, rgba(255,200,60,0) 26deg, #FFC83C 62deg, #FFF2B8 88deg, rgba(255,200,60,0) 120deg, transparent 360deg);
-  -webkit-mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  filter:blur(2px) drop-shadow(0 0 26px rgba(255,190,50,.7))}
+  background:conic-gradient(from 300deg, rgba(255,200,60,0) 0deg, #FFC83C 26deg, #FFF3BC 50deg, #FFC83C 72deg, rgba(255,200,60,0) 98deg, transparent 360deg);
+  -webkit-mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  filter:blur(1.5px) drop-shadow(0 0 30px rgba(255,190,50,.8))}
 
 /* The phone screen. SUPPLIED artwork, sized and skewed onto the device the subject is holding. */
 .phone{position:absolute;left:50%;bottom:6%;width:196px;transform:translateX(96px) rotate(-6deg);

@@ -28,11 +28,14 @@ export type Section1Slots = {
 
 // Where each card lands. Alternating sides, staggered heights, so they read as orbiting the subject rather
 // than as a list bolted to the edge.
+// The logo occupies the top-left to y=128px. Card 1 used to start at y=96 and printed straight over
+// "from MTN" - the brand's own endorsement line, which is the last thing on this canvas allowed to be
+// obscured. Every spot now clears the logo band.
 const SPOTS = [
-  "top:96px;left:44px",
-  "top:150px;right:44px",
-  "bottom:110px;left:60px",
-  "bottom:160px;right:60px",
+  "top:172px;left:44px",
+  "top:118px;right:44px",
+  "bottom:104px;left:56px",
+  "bottom:150px;right:56px",
 ];
 
 function card(d: Deal, i: number): string {
@@ -56,24 +59,27 @@ html,body{width:1239px;height:1080px;overflow:hidden}
   font-family:'MTNBrighterSans',sans-serif;-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums lining-nums}
 
-.glow{position:absolute;left:50%;top:48%;width:1180px;height:1180px;transform:translate(-50%,-50%);
-  background:radial-gradient(circle,rgba(249,203,15,.28) 0%,rgba(249,203,15,.09) 44%,transparent 68%)}
-.disc{position:absolute;left:50%;top:52%;width:720px;height:720px;transform:translate(-50%,-50%);
-  border-radius:50%;background:radial-gradient(circle at 38% 32%, #FFE45C 0%, ${MOMO_YELLOW} 46%, #E0AE00 100%)}
-.streak-back{position:absolute;left:50%;top:52%;width:980px;height:980px;transform:translate(-50%,-50%) rotate(-14deg);
+.glow{position:absolute;left:50%;top:48%;width:1500px;height:1500px;transform:translate(-50%,-50%);
+  background:radial-gradient(circle,rgba(0,120,166,.55) 0%,rgba(0,90,128,.22) 45%,transparent 70%)}
+ /* FLAT. A radial 3D gradient turns the brand's signature disc into a lemon - the fastest route to clip art. */
+.disc{position:absolute;left:50%;top:52%;width:640px;height:640px;transform:translate(-50%,-50%);
+  border-radius:50%;background:${MOMO_YELLOW}}
+/* The ring ORBITS the disc, outside its edge - it is not a highlight on it. Same object, two arcs: one behind
+   the subject, one in front. That overlap is what welds the cut-out to the disc. */
+.streak-back{position:absolute;left:50%;top:52%;width:862px;height:862px;transform:translate(-50%,-50%) rotate(-13deg);
   border-radius:50%;
-  background:conic-gradient(from 200deg, transparent 0deg, rgba(255,200,60,0) 40deg, #FFC83C 96deg, #FFF2B8 132deg, rgba(255,200,60,0) 170deg, transparent 360deg);
-  -webkit-mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  filter:blur(2px) drop-shadow(0 0 26px rgba(255,190,50,.6))}
-.subject{position:absolute;left:50%;bottom:0;height:94%;width:auto;transform:translateX(-50%);
+  background:conic-gradient(from 118deg, rgba(255,200,60,0) 0deg, #FFC83C 34deg, #FFF3BC 62deg, #FFC83C 86deg, rgba(255,200,60,0) 116deg, transparent 360deg);
+  -webkit-mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  filter:blur(1.5px) drop-shadow(0 0 30px rgba(255,190,50,.7))}
+.subject{position:absolute;left:50%;bottom:0;height:92%;width:auto;transform:translateX(-50%);
   filter:drop-shadow(0 26px 50px rgba(0,20,32,.42))}
-.streak-front{position:absolute;left:50%;top:52%;width:980px;height:980px;transform:translate(-50%,-50%) rotate(-14deg);
+.streak-front{position:absolute;left:50%;top:52%;width:862px;height:862px;transform:translate(-50%,-50%) rotate(-13deg);
   border-radius:50%;pointer-events:none;
-  background:conic-gradient(from 22deg, transparent 0deg, rgba(255,200,60,0) 26deg, #FFC83C 60deg, #FFF2B8 86deg, rgba(255,200,60,0) 118deg, transparent 360deg);
-  -webkit-mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  mask:radial-gradient(circle, transparent 0 47%, #000 47.6% 50%, transparent 50.6%);
-  filter:blur(2px) drop-shadow(0 0 26px rgba(255,190,50,.65))}
+  background:conic-gradient(from 300deg, rgba(255,200,60,0) 0deg, #FFC83C 26deg, #FFF3BC 50deg, #FFC83C 72deg, rgba(255,200,60,0) 98deg, transparent 360deg);
+  -webkit-mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  mask:radial-gradient(circle closest-side, transparent 0 91.5%, #000 92.5% 98.5%, transparent 99.5%);
+  filter:blur(1.5px) drop-shadow(0 0 30px rgba(255,190,50,.75))}
 
 /* THE DEAL CARDS. Identical anatomy to the slider's, scaled for this canvas. Validity stays INSIDE the card,
    adjacent to the price - FAIS s14(3)(m) makes that proximity a legal requirement, not a layout choice. */
