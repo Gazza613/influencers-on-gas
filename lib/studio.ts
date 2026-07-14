@@ -9,8 +9,8 @@ export type BrandKit = {
   client_id: string;
   name: string;
   colors: Record<string, string>;
-  fonts: { family: string; weight?: string; style?: string; url: string }[];
-  logos: { variant: string; url: string }[];
+  fonts: { family: string; weight?: string; style?: string; url: string; file?: string }[];
+  logos: { variant: string; url: string; name?: string }[];
   tone_notes: string | null;
   locked: boolean;
 };

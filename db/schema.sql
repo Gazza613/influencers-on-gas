@@ -434,10 +434,17 @@ create index if not exists idx_studio_templates_client on studio_templates(clien
 create table if not exists studio_assets (
   id         uuid primary key default gen_random_uuid(),
   client_id  uuid not null references clients(id) on delete cascade,
-  kind       text not null check (kind in ('reference','image','logo','font','video','ci_doc')),
+  kind       text not null check (kind in ('reference','image','logo','font','video','ci_doc','deal_card')),
   name       text,
   url        text not null,
   meta       jsonb not null default '{}'::jsonb,     -- width, height, bytes, mime, tags
   created_at timestamptz not null default now()
 );
 create index if not exists idx_studio_assets_client on studio_assets(client_id, kind);
+
+-- Deal cards (the client's promo callouts) are an asset kind too (spec 5b): the team uploads the designed pill, we recreate
+-- it once as a pixel-matched component with the offer text as an editable slot, and the design is locked.
+-- Widen the constraint on tables that already exist (no data touched - a CHECK, not a row).
+alter table studio_assets drop constraint if exists studio_assets_kind_check;
+alter table studio_assets add constraint studio_assets_kind_check
+  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card'));

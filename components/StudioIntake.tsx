@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { flex } from "@/lib/flex";
 
 // TEMPLATE INTAKE. The team's hand-designed reference set comes in here and the system reads what it
@@ -28,6 +29,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
   const [assets, setAssets] = useState<Asset[]>([]);
   const [brandKit, setBrandKit] = useState<BrandKit>(null);
   const [busy, setBusy] = useState("");
+  const [progress, setProgress] = useState("");
 
   const refresh = useCallback(async (id: string) => {
     if (!id) return;
@@ -37,21 +39,39 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
 
   useEffect(() => { refresh(clientId); }, [clientId, refresh]);
 
-  async function upload(files: FileList | null, kind: string, placement = "", variant = "") {
+  // DIRECT-TO-STORAGE. A Vercel function's request body is capped at ~4.5MB, so posting a
+  // full-resolution design export THROUGH our API failed before our code even ran (fonts and logos are
+  // small, which is why only the masthead broke). The browser now uploads straight to Blob and we
+  // register the finished file afterwards - so file size stops being a limit, and the server still reads
+  // the real pixel dimensions off the bytes.
+  async function send(files: FileList | null, kind: string, placement = "", variant = "") {
     if (!files?.length || !clientId) return;
     setBusy(kind);
-    const fd = new FormData();
-    fd.append("clientId", clientId);
-    fd.append("kind", kind);
-    fd.append("block", "funnel");
-    if (placement) fd.append("placement", placement);
-    if (variant) fd.append("variant", variant);
-    for (const f of Array.from(files)) fd.append("files", f);
-    const r = await fetch("/api/studio/upload", { method: "POST", body: fd }).then((x) => x.json()).catch(() => null);
-    setBusy("");
-    if (!r?.ok) { flex(r?.error || "Upload failed."); return; }
-    const bad = (r.uploaded as { name: string; error?: string }[]).filter((u) => u.error);
-    if (bad.length) flex(`${bad.length} file(s) had a problem: ${bad[0].error}`);
+    const list = Array.from(files);
+    let done = 0;
+    const failed: string[] = [];
+
+    for (const f of list) {
+      setProgress(`${f.name} (${done + 1}/${list.length})`);
+      try {
+        const blob = await upload(`studio/${kind}/${f.name}`, f, {
+          access: "public",
+          handleUploadUrl: "/api/studio/blob-upload",
+        });
+        const r = await fetch("/api/studio/register", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId, kind, block: "funnel", placement, variant, url: blob.url, name: f.name, bytes: f.size }),
+        }).then((x) => x.json()).catch(() => null);
+        if (!r?.ok) failed.push(`${f.name}: ${r?.error || "could not register"}`);
+      } catch (e) {
+        failed.push(`${f.name}: ${String((e as Error)?.message || e).slice(0, 90)}`);
+      }
+      done++;
+    }
+
+    setBusy(""); setProgress("");
+    if (failed.length) flex(failed[0]);
+    else if (list.length) flex(`Uploaded ${list.length} file${list.length === 1 ? "" : "s"}.`);
     await refresh(clientId);
   }
 
@@ -70,6 +90,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
       {/* CLIENT */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Client</div>
+        {progress && <p className="mt-2 text-[12px] text-[#93c5fd]">Uploading {progress}…</p>}
         {clients.length === 0 ? (
           <p className="mt-3 text-sm text-ink-dim">
             No clients yet. A client is created in <a href="/setup/brains" className="text-[#93c5fd] underline">Brains</a> - one client record carries the brand, the brain and the Studio templates.
@@ -96,7 +117,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
             <label className="mt-2 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
               {busy === "font" ? "Uploading…" : "＋ Add font files"}
               <input type="file" multiple accept=".woff2,.woff,.otf,.ttf" className="hidden"
-                onChange={(e) => upload(e.target.files, "font")} />
+                onChange={(e) => send(e.target.files, "font")} />
             </label>
             {fonts.length > 0 && (
               <ul className="mt-2 space-y-1">
@@ -114,7 +135,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
             <label className="mt-2 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
               {busy === "logo" ? "Uploading…" : "＋ Add logos"}
               <input type="file" multiple accept="image/png,image/svg+xml,image/jpeg" className="hidden"
-                onChange={(e) => upload(e.target.files, "logo")} />
+                onChange={(e) => send(e.target.files, "logo")} />
             </label>
             {logos.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
@@ -153,7 +174,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
                   <label className="cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
                     {busy === "reference" ? "Uploading…" : got.length ? "＋ Add more" : "＋ Upload"}
                     <input type="file" multiple accept="image/png,image/jpeg" className="hidden"
-                      onChange={(e) => upload(e.target.files, "reference", p.key)} />
+                      onChange={(e) => send(e.target.files, "reference", p.key)} />
                   </label>
                 </div>
                 {got.length > 0 && (
@@ -177,6 +198,42 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
         </div>
       </div>
 
+      {/* DEAL CARDS (the client's name for them; spec 5b calls them callouts). A designed deal card arrives
+          as a flat image, and text baked into an image cannot be reliably edited by any system. So it is
+          converted ONCE into a pixel-matched component with the offer text as an editable slot: after that
+          the team changes the offer forever with zero design work, and the design stays locked to this
+          reference. Deal cards serve the funnel AND the social sets. */}
+      <div className="rounded-xl border border-line bg-surface-1 p-5">
+        <div className="flex items-center justify-between">
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Deal cards</div>
+          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "deal_card").length} uploaded</span>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+          Your deal card designs. Upload each one and I recreate it as a pixel-matched component with the
+          offer text as an editable slot, so the team can change &quot;R50 cashback&quot; to anything without a
+          designer touching it, and the card still looks exactly like this reference. They&apos;re shared across
+          the funnel and the social sets.
+        </p>
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+          {busy === "deal_card" ? "Uploading…" : "＋ Add deal cards"}
+          <input type="file" multiple accept="image/png,image/jpeg,image/svg+xml" className="hidden"
+            onChange={(e) => send(e.target.files, "deal_card")} />
+        </label>
+        {assets.filter((a) => a.kind === "deal_card").length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            {assets.filter((a) => a.kind === "deal_card").map((a) => (
+              <div key={a.id} className="w-[150px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.url} alt={a.name ?? "deal card"} className="w-full rounded-md border border-line bg-surface-2 object-contain p-2" />
+                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <p className="tabular text-[10px] text-ink-faint">{a.meta?.width}×{a.meta?.height}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* CI DOCUMENT */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">CI document</div>
@@ -184,7 +241,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
         <label className="mt-2 inline-block cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-ink-dim hover:text-ink">
           {busy === "ci_doc" ? "Uploading…" : "＋ Add CI document"}
           <input type="file" multiple accept=".pdf,image/png,image/jpeg" className="hidden"
-            onChange={(e) => upload(e.target.files, "ci_doc")} />
+            onChange={(e) => send(e.target.files, "ci_doc")} />
         </label>
         <ul className="mt-2 space-y-1">
           {assets.filter((a) => a.kind === "ci_doc").map((a) => (
