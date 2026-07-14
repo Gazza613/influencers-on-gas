@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 // the AI-influencer video studio (Influencer / Creator / Avatar / Celebrity) and the creative
 // factory (Designs / Ads / Campaign). Interleaved rather than grouped, so the line never reads as
 // two separate lists.
-const WORDS = ["Influencer", "Designs", "Avatar", "Social Ads", "Celebrity", "Campaign"];
+const WORDS = ["Influencers", "Designs", "Avatars", "Social Ads", "Campaigns"];
 const TYPE_SPEED = 75;
 const DELETE_SPEED = 45;
 const PAUSE_MS = 1800;
