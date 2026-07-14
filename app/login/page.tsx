@@ -53,10 +53,10 @@ export default function LoginPage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/gas-logo.png" alt="GAS" width={104} height={104} className="login-logo rounded-full" style={{ filter: "drop-shadow(0 12px 40px rgba(255,90,30,0.55))" }} />
         <h1 className="mt-7 inline-flex items-baseline gap-[0.32em] font-extrabold" style={{ fontSize: "clamp(22px, 3.2vw, 30px)", letterSpacing: "-0.6px" }}>
-          <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Influencers on</span>
+          <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Studio on</span>
           <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
         </h1>
-        <p className="tabular mt-2 text-[11px] uppercase tracking-[0.42em]" style={{ color: "rgba(255,255,255,0.42)" }}>Influence that matters</p>
+        <p className="tabular mt-2 text-[11px] uppercase tracking-[0.42em]" style={{ color: "rgba(255,255,255,0.42)" }}>Human led · AI powered</p>
 
         <form onSubmit={submit} className="login-card relative mt-9 w-full rounded-2xl p-8">
           <div className="tabular mb-6 text-center text-[11px] font-semibold uppercase tracking-[0.36em]" style={{ color: "rgba(168,85,247,0.85)" }}>Studio Access</div>

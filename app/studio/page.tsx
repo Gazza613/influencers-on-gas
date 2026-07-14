@@ -26,22 +26,31 @@ export default function GasStudioPage() {
         <Link href="/home" className="text-xs font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
 
         <div className="mt-4 flex items-center gap-3">
-          <span className="text-3xl">🏭</span>
+          <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
+            <defs>
+              <linearGradient id="hdr-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#60A5FA" /><stop offset="0.5" stopColor="#818CF8" /><stop offset="1" stopColor="#22D3EE" />
+              </linearGradient>
+            </defs>
+            <rect x="4" y="10" width="16" height="22" rx="3" stroke="url(#hdr-g)" strokeWidth="2.6" />
+            <rect x="24" y="6" width="20" height="20" rx="3" stroke="url(#hdr-g)" strokeWidth="2.6" />
+            <rect x="16" y="30" width="28" height="13" rx="3" stroke="url(#hdr-g)" strokeWidth="2.6" />
+          </svg>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight">GAS Studio</h1>
             <p className="text-sm text-ink-dim">The template creative factory</p>
           </div>
         </div>
 
-        <div className="mt-6 rounded-xl border border-[#f59e0b]/35 bg-[#f59e0b]/[0.06] px-4 py-3">
-          <p className="text-sm font-bold text-[#fbbf24]">Not built yet</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-dim">
+        <div className="mt-6 rounded-xl border border-[#60a5fa]/35 bg-[#60a5fa]/[0.07] px-4 py-3">
+          <p className="text-sm font-bold text-[#93c5fd]">Not built yet</p>
+          <p className="mt-1 text-[14px] leading-relaxed text-ink-dim">
             The door is open but the factory is empty. Nothing behind this page runs, spends money or
             renders anything. Influencers on GAS is untouched and works exactly as before.
           </p>
         </div>
 
-        <p className="mt-6 text-[13px] leading-relaxed text-ink-dim">
+        <p className="mt-6 text-[15px] leading-relaxed text-ink-dim">
           One campaign order will render every static, motion cut, funnel and SMS a client needs - off
           designs locked as code, so the layout can never drift between campaigns. The team supplies the
           offer, the copy and the images. The system produces, and a human approves before anything ships.
@@ -53,8 +62,8 @@ export default function GasStudioPage() {
             <li key={p.n} className="flex gap-3 rounded-xl border border-line bg-surface-1 px-4 py-3">
               <span className="tabular mt-0.5 h-6 w-6 shrink-0 rounded-full border border-line text-center text-xs font-bold leading-6 text-ink-faint">{p.n}</span>
               <div>
-                <p className="text-sm font-bold text-ink">{p.title}</p>
-                <p className="mt-0.5 text-[13px] leading-relaxed text-ink-dim">{p.detail}</p>
+                <p className="text-[15px] font-bold text-ink">{p.title}</p>
+                <p className="mt-0.5 text-[14px] leading-relaxed text-ink-dim">{p.detail}</p>
               </div>
             </li>
           ))}

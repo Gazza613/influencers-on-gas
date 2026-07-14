@@ -5,7 +5,48 @@ import AppHeader from "@/components/AppHeader";
 //   • Influencers on GAS - the AI-influencer video studio (cast, script, voice, shoot, cut).
 //   • GAS Studio        - the template creative factory (batch statics, motion, funnel, SMS).
 // This is the first screen after sign-in. It deliberately does nothing else: pick a door.
+//
+// Palette note: both doors stay in the pink/purple/blue accent family (orange is reserved for the GAS
+// mark alone - never a background wash). The two are separated by hue within that family, not by
+// introducing a new colour: Influencers leans pink/violet, GAS Studio leans blue/cyan.
 export const dynamic = "force-dynamic";
+
+// Custom marks, not emoji. Influencers = a face framed in a viewfinder (someone on camera).
+// GAS Studio = stacked frames in different ratios (one order, every size).
+function InfluencerMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+      <defs>
+        <linearGradient id="inf-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#EC4899" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#60A5FA" />
+        </linearGradient>
+      </defs>
+      {/* viewfinder corners */}
+      <path d="M4 15V8a4 4 0 0 1 4-4h7M44 15V8a4 4 0 0 0-4-4h-7M4 33v7a4 4 0 0 0 4 4h7M44 33v7a4 4 0 0 1-4 4h-7"
+        stroke="url(#inf-g)" strokeWidth="2.6" strokeLinecap="round" />
+      {/* head + shoulders */}
+      <circle cx="24" cy="20.5" r="6.2" stroke="url(#inf-g)" strokeWidth="2.6" />
+      <path d="M13.5 38c1.6-5.7 5.6-8.6 10.5-8.6S32.9 32.3 34.5 38"
+        stroke="url(#inf-g)" strokeWidth="2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function StudioMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+      <defs>
+        <linearGradient id="std-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#60A5FA" /><stop offset="0.5" stopColor="#818CF8" /><stop offset="1" stopColor="#22D3EE" />
+        </linearGradient>
+      </defs>
+      {/* three frames, three ratios - the same design rendered at every size */}
+      <rect x="4" y="10" width="16" height="22" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
+      <rect x="24" y="6" width="20" height="20" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
+      <rect x="16" y="30" width="28" height="13" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
+    </svg>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -16,7 +57,7 @@ export default function HomePage() {
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
             Studio <span className="brand-grad">on</span> GAS
           </h1>
-          <p className="mt-3 text-sm text-ink-dim">
+          <p className="mt-3 text-base text-ink-dim sm:text-lg">
             Human-led strategy, AI execution. Pick where you&apos;re working today.
           </p>
         </div>
@@ -25,34 +66,34 @@ export default function HomePage() {
           {/* DOOR 1 - the existing, shipped product. */}
           <Link
             href="/influencers"
-            className="group relative overflow-hidden rounded-2xl border border-[#a855f7]/35 bg-gradient-to-br from-[#a855f7]/[0.10] to-[#60a5fa]/[0.06] p-6 transition hover:border-[#a855f7]/70"
+            className="group relative overflow-hidden rounded-2xl border border-[#a855f7]/35 bg-gradient-to-br from-[#a855f7]/[0.10] to-[#ec4899]/[0.05] p-7 transition hover:border-[#a855f7]/70 hover:from-[#a855f7]/[0.16]"
           >
-            <div className="text-3xl">🎬</div>
-            <h2 className="mt-3 text-xl font-extrabold tracking-tight text-ink">
+            <InfluencerMark />
+            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">
               Influencers <span className="brand-grad">on</span> GAS
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink-dim">
+            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
               Build an AI influencer and take them from a brief to a publish-ready video. Cast and
               lock the identity, write the script, design the voice, shoot the scenes, then cut.
             </p>
-            <span className="mt-4 inline-block text-xs font-bold text-[#c79bff] transition group-hover:translate-x-0.5">
+            <span className="mt-5 inline-block text-sm font-bold text-[#c79bff] transition group-hover:translate-x-0.5">
               Open the video studio →
             </span>
           </Link>
 
-          {/* DOOR 2 - the template creative factory. Being built in phases; the shell is honest
-              about what is and isn't live yet rather than pretending to be finished. */}
+          {/* DOOR 2 - the template creative factory. Being built in phases; the shell behind this door
+              is honest about what is and isn't live yet rather than pretending to be finished. */}
           <Link
             href="/studio"
-            className="group relative overflow-hidden rounded-2xl border border-[#f59e0b]/30 bg-gradient-to-br from-[#f59e0b]/[0.08] to-[#ec4899]/[0.05] p-6 transition hover:border-[#f59e0b]/60"
+            className="group relative overflow-hidden rounded-2xl border border-[#60a5fa]/35 bg-gradient-to-br from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.05] p-7 transition hover:border-[#60a5fa]/70 hover:from-[#60a5fa]/[0.16]"
           >
-            <div className="text-3xl">🏭</div>
-            <h2 className="mt-3 text-xl font-extrabold tracking-tight text-ink">GAS Studio</h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink-dim">
+            <StudioMark />
+            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">GAS Studio</h2>
+            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
               The template creative factory. One campaign order renders every static, motion cut,
               funnel and SMS a client needs, off locked designs that can never drift.
             </p>
-            <span className="mt-4 inline-block text-xs font-bold text-[#fbbf24] transition group-hover:translate-x-0.5">
+            <span className="mt-5 inline-block text-sm font-bold text-[#93c5fd] transition group-hover:translate-x-0.5">
               Open the factory →
             </span>
           </Link>
