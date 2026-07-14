@@ -105,7 +105,7 @@ export async function extractDeals(clientId: string): Promise<{ found: number; a
 
   for (const { card, deal: raw } of results) {
     const deal = raw ? normalise(raw) : null;
-    if (!deal) { skipped.push(card.name); continue; }
+    if (!deal) { skipped.push(card.name || "(unnamed card)"); continue; }
     const ins = (await db().query(
       `insert into studio_deals (client_id, label, amount, amount_suffix, amount_sub, price, validity, footnote, source_asset)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
