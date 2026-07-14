@@ -12,7 +12,12 @@ export type BrandKit = {
   fonts: { family: string; weight?: string; style?: string; url: string; file?: string }[];
   logos: { variant: string; url: string; name?: string }[];
   tone_notes: string | null;
-  compliance_text: string | null; // reproduced VERBATIM on creatives that need it - never paraphrased
+  // TWO LEGAL SLOTS, NOT ONE. compliance_text is the full legal copy and MAY name the bank (funnel page,
+  // SMS footer). creative_legal_text is what gets BAKED INTO AN IMAGE, where the bank is never named -
+  // "we can keep African Bank on the compliance copy but not in any suggested copy done by the producer
+  // and not on any creatives". Both reproduced VERBATIM, never paraphrased.
+  compliance_text: string | null;
+  creative_legal_text: string | null;
   design_system: string | null;  // the locked grammar, reverse-engineered from the best-performing set
   locked: boolean;
 };
@@ -45,7 +50,7 @@ export type StudioAsset = {
 
 export async function getBrandKit(clientId: string): Promise<BrandKit | null> {
   const rows = (await db().query(
-    `select id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, design_system, locked
+    `select id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, creative_legal_text, design_system, locked
      from studio_brand_kits where client_id = $1 order by created_at limit 1`,
     [clientId],
   )) as BrandKit[];
@@ -59,7 +64,7 @@ export async function upsertBrandKit(clientId: string, name: string, patch: Part
     const rows = (await db().query(
       `insert into studio_brand_kits (client_id, name, colors, fonts, logos, tone_notes)
        values ($1, $2, $3, $4, $5, $6)
-       returning id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, design_system, locked`,
+       returning id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, creative_legal_text, design_system, locked`,
       [clientId, name, JSON.stringify(patch.colors ?? {}), JSON.stringify(patch.fonts ?? []), JSON.stringify(patch.logos ?? []), patch.tone_notes ?? null],
     )) as BrandKit[];
     return rows[0];
@@ -72,13 +77,14 @@ export async function upsertBrandKit(clientId: string, name: string, patch: Part
   if (patch.logos !== undefined) { sets.push(`logos = $${i++}`); vals.push(JSON.stringify(patch.logos)); }
   if (patch.tone_notes !== undefined) { sets.push(`tone_notes = $${i++}`); vals.push(patch.tone_notes); }
   if (patch.compliance_text !== undefined) { sets.push(`compliance_text = $${i++}`); vals.push(patch.compliance_text); }
+  if (patch.creative_legal_text !== undefined) { sets.push(`creative_legal_text = $${i++}`); vals.push(patch.creative_legal_text); }
   if (patch.design_system !== undefined) { sets.push(`design_system = $${i++}`); vals.push(patch.design_system); }
   if (patch.locked !== undefined) { sets.push(`locked = $${i++}`); vals.push(patch.locked); }
   if (!sets.length) return existing;
   vals.push(existing.id);
   const rows = (await db().query(
     `update studio_brand_kits set ${sets.join(", ")} where id = $${i}
-     returning id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, design_system, locked`,
+     returning id, client_id, name, colors, fonts, logos, tone_notes, compliance_text, creative_legal_text, design_system, locked`,
     vals,
   )) as BrandKit[];
   return rows[0];

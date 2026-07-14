@@ -502,3 +502,15 @@ alter table studio_intel add column if not exists period text;
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
 values ('fal','fal-ai/birefnet/v2','image', 0, 0, true)
 on conflict (provider, model, unit) do nothing;
+
+-- ── The two legal slots are NOT the same slot ────────────────────────────────
+-- Gary, locked: "we can keep African Bank on the compliance copy but not in any suggested copy done by the
+-- producer and not on any creatives."
+--
+-- So there are two distinct things, and the code was treating them as one:
+--   compliance_text        the full legal copy. MAY name the bank. Lives on the funnel page, the SMS footer,
+--                          anywhere legal text is required in HTML.
+--   creative_legal_text    what is BAKED INTO A CREATIVE. The bank is never named here. Keeps the FSP number,
+--                          which is the cheapest anti-scam signal we have - a scammer never carries a real
+--                          licence number - without putting the bank's name in the brand's shop window.
+alter table studio_brand_kits add column if not exists creative_legal_text text;

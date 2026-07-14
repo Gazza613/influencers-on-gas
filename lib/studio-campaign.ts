@@ -96,6 +96,11 @@ export async function produceCampaign(clientId: string, plan: CampaignPlan): Pro
       const url = await putBytes(enc.buf, `studio/${clientId}/${kind}`, enc.ext, enc.mime);
       out.push({ kind, index, url, bytes: enc.bytes, width: w, height: h, imagePrompt: prompt, sourceImage: src });
     } catch (e) {
+      // LOG THE WHOLE THING. Catching a render failure into a 160-character warning meant that when the
+      // browser died in production there was NOTHING in the Vercel log to read - the stack, which is the only
+      // thing that identifies why Chromium fell over, had been thrown away by my own error handling. A
+      // swallowed error is worse than a crash: a crash at least tells you something.
+      console.error(`[studio-campaign] ${kind} ${index + 1} failed to render`, e);
       const msg = String((e as Error)?.message || e).slice(0, 160);
       warnings.push(`${kind} ${index + 1} did not render: ${msg}`);
       out.push({ kind, index, url: "", bytes: 0, width: w, height: h, imagePrompt: prompt, sourceImage: src, error: msg });

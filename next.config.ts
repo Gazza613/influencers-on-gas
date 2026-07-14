@@ -7,19 +7,19 @@ const nextConfig: NextConfig = {
   // Native binaries: keep them out of the bundler, and keep them in SEPARATE functions. ffmpeg (77MB) is
   // traced only into /api/inngest; Chromium (67MB) only into the Studio render lane. Together in one function
   // they would blow Vercel's 250MB limit.
-  serverExternalPackages: ["ffmpeg-static", "@sparticuz/chromium", "playwright-core"],
+  serverExternalPackages: ["ffmpeg-static", "@sparticuz/chromium", "puppeteer-core"],
   outputFileTracingIncludes: {
     "/api/inngest": ["./node_modules/ffmpeg-static/ffmpeg"],
     // THE RENDER LANE. Both of these packages read DATA files at runtime that nothing statically imports,
     // so Next's tracer cannot infer them and silently ships a function that dies on first use:
     //   - @sparticuz/chromium keeps the browser itself as brotli blobs (bin/chromium.br, fonts, swiftshader)
-    //   - playwright-core reads browsers.json via a dynamic require. This one actually bit us: production
-    //     failed with "Cannot find module /var/task/node_modules/playwright-core/browsers.json", which
-    //     surfaced to the user as a blank HTML 500.
+    //   - the browser driver reads data files via dynamic require. This bit us as
+    //     "Cannot find module /var/task/node_modules/playwright-core/browsers.json", a blank HTML 500.
+    //     (We are on puppeteer-core now - see lib/studio-render.ts for why - but the same trap applies.)
     // Scoped to the produce function only - 80MB has no business riding along in every other route.
     "/api/studio/campaign/produce": [
       "./node_modules/@sparticuz/chromium/bin/**",
-      "./node_modules/playwright-core/**",
+      "./node_modules/puppeteer-core/**",
     ],
   },
   images: {

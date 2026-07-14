@@ -1,50 +1,58 @@
 import sharp from "sharp";
-import type { Browser } from "playwright-core";
-
-// Chromium and Playwright are loaded LAZILY, inside browser(). Imported at module scope, a failure to load
-// them kills the whole route at cold start and Vercel serves an HTML error page - which surfaces to the user
-// as "Unexpected token '<'" and tells nobody anything. Deferred, the same failure is a catchable exception
-// that we can return as readable JSON.
+import type { Browser } from "puppeteer-core";
 
 // THE STATIC RENDERER. HTML/CSS in, a pixel-exact PNG out.
 //
-// WHY PLAYWRIGHT AND NOT A SAAS TEMPLATE TOOL: the design lock IS the product. A locked React/CSS template
-// versioned in git can be diffed, reviewed and proven pixel-equivalent to the client's own reference. A
-// per-render SaaS API cannot, and it charges per asset for the privilege.
+// WHY WE RENDER OURSELVES AND NOT VIA A SAAS TEMPLATE TOOL: the design lock IS the product. A locked
+// HTML/CSS template versioned in git can be diffed, reviewed and proven pixel-equivalent to the client's own
+// reference. A per-render SaaS API cannot, and it charges per asset for the privilege.
 //
 // WHY @sparticuz/chromium: full Chromium (~280MB) exceeds Vercel's 250MB function limit. This is the slimmed
 // build made for exactly this. It MUST stay isolated from the ffmpeg lane (77MB, traced only into
 // /api/inngest) or the two together blow the budget - see next.config.ts.
 //
+// WHY PUPPETEER AND NOT PLAYWRIGHT - I GOT THIS WRONG FIRST AND IT COST US.
+// I reached for Playwright out of habit. It launched, then every page died instantly with "Target page,
+// context or browser has been closed". @sparticuz/chromium is a FOREIGN Chromium build, and puppeteer-core
+// is the pairing it is built, tested and documented against; Playwright expects to drive the exact browser
+// binary it ships with, and driving someone else's is unsupported. The version numbers even matched
+// (Playwright 1.61 wants Chromium 149, sparticuz IS 149), which is what makes this trap so expensive: every
+// surface check says it should work. Use the supported pair.
+//
 // FONTS ARE THE WHOLE GAME. Risk #1 on the spec's own register: if the render container does not have MTN
-// Brighter Sans, server-rendered text cannot match the design and no CSS fixes it. We hold all seven weights
+// Brighter Sans, server-rendered text cannot match the design and no CSS fixes it. We hold all the weights
 // as woff2 in blob storage, so the page loads them by @font-face and we WAIT for them to be ready before the
 // screenshot - otherwise Chromium silently falls back to a system sans and the render is quietly wrong.
+//
+// Chromium is loaded LAZILY, inside browser(). Imported at module scope, a failure to load it kills the whole
+// route at cold start and Vercel serves an HTML error page - which surfaces to the user as "Unexpected token
+// '<'" and tells nobody anything. Deferred, the same failure is a catchable exception we can return as JSON.
 
 let _browser: Browser | null = null;
 
-// @sparticuz/chromium's default args are tuned for PUPPETEER. Playwright drives the browser over a pipe to a
-// separate process, so --single-process (and its companions) are at best pointless here and are widely
-// reported to hang Playwright on Lambda. PRECAUTIONARY, not a diagnosed fix: I tested launching with these
-// args present and Playwright started fine, so they were NOT the cause of the production crash - that was a
-// missing playwright-core/browsers.json (see next.config.ts). Dropping them costs nothing and removes a
-// known-hostile variable from a lane that is expensive to debug in the cloud.
-const PUPPETEER_ONLY = /^--(single-process|no-zygote|in-process-gpu)$/;
-
 async function browser(): Promise<Browser> {
-  if (_browser?.isConnected()) return _browser;
-  const { chromium: playwright } = await import("playwright-core");
+  if (_browser?.connected) return _browser;
+  _browser = null;
+
+  const puppeteer = (await import("puppeteer-core")).default;
   const local = process.env.CHROME_PATH; // set locally to use a system Chrome
 
-  let args: string[] = [];
-  let executablePath = local || "";
-  if (!local) {
-    const chromium = (await import("@sparticuz/chromium")).default;
-    args = chromium.args.filter((a) => !PUPPETEER_ONLY.test(a));
-    executablePath = await chromium.executablePath();
+  if (local) {
+    _browser = await puppeteer.launch({ executablePath: local, headless: true, args: [] });
+    return _browser;
   }
 
-  _browser = await playwright.launch({ args, executablePath, headless: true });
+  const chromium = (await import("@sparticuz/chromium")).default;
+  // Skip the swiftshader/WebGL stack. We are screenshotting flat HTML - there is nothing to accelerate, and
+  // initialising the graphics layer is memory and cold-start time spent for nothing.
+  chromium.setGraphicsMode = false;
+
+  _browser = await puppeteer.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath(),
+    headless: true,
+    defaultViewport: null,
+  });
   return _browser;
 }
 
@@ -60,19 +68,28 @@ export type RenderOpts = {
 
 export async function renderPng(o: RenderOpts): Promise<{ png: Buffer; bytes: number; overBudget: boolean }> {
   const b = await browser();
-  const page = await b.newPage({
-    viewport: { width: o.width, height: o.height },
-    deviceScaleFactor: o.scale ?? 2,
-  });
+  const page = await b.newPage();
   try {
-    await page.setContent(o.html, { waitUntil: "networkidle" });
+    await page.setViewport({ width: o.width, height: o.height, deviceScaleFactor: o.scale ?? 2 });
+    await page.setContent(o.html, { waitUntil: "load", timeout: 60_000 });
 
-    // WAIT FOR THE REAL FONTS. Without this Chromium screenshots whatever is ready - which on a cold container
-    // is the fallback sans, and the render is wrong in a way that looks almost right. That is the worst kind.
-    await page.evaluate(() => (document as unknown as { fonts: { ready: Promise<unknown> } }).fonts.ready);
-    await page.waitForTimeout(120); // let the last paint settle
+    // WAIT FOR THE THINGS THAT ACTUALLY MATTER, not for a network-idle heuristic.
+    //
+    // FONTS: if the licensed font has not decoded, Chromium screenshots the fallback sans and the render is
+    // wrong in a way that looks almost right. That is the worst kind of wrong.
+    // IMAGES: the subject cut-out and the photograph are remote blobs. Screenshotting before they decode
+    // yields a beautifully composed layout with a hole where the person should be.
+    await page.evaluate(async () => {
+      const d = document as unknown as { fonts: { ready: Promise<unknown> }; images: HTMLImageElement[] };
+      await d.fonts.ready;
+      await Promise.all([...document.images].map((img) => img.complete
+        ? null
+        : new Promise((res) => { img.onload = res; img.onerror = res; })));
+    });
+    await new Promise((r) => setTimeout(r, 150)); // let the last paint settle
 
-    const png = (await page.screenshot({ type: "png" })) as Buffer;
+    const shot = await page.screenshot({ type: "png" });
+    const png = Buffer.from(shot);
     const maxBytes = o.maxBytes ?? 1_000_000;
     return { png, bytes: png.length, overBudget: png.length > maxBytes };
   } finally {

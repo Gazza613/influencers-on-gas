@@ -19,7 +19,7 @@ type Plan = {
   section1: { subjectPrompt: string; deals: Deal[] };
   sliders: { headline1: string; headline2: string; scenePrompt: string; deal: Deal }[];
   webflow: { heroHeadline: string; heroSubheads: string[]; section1Headline: string; section1Body: string; sliderSubhead: string };
-  sms: { copy: string; segments: number };
+  sms: { copy: string; slug: string; assembled: string; chars: number; gsm7: boolean };
   complianceCheck: string[];
 };
 type Creative = { kind: string; index: number; url: string; bytes: number; width: number; height: number; error?: string };
@@ -172,9 +172,17 @@ export default function CampaignPage() {
               <div className="flex items-baseline justify-between">
                 <p className="text-[13px] font-semibold uppercase tracking-widest text-ink-dim">SMS</p>
                 {/* Segments matter in rand: one non-GSM-7 character drops the segment from 160 chars to 70. */}
-                <span className="text-xs text-ink-dim tabular">{plan.sms.copy.length} chars · {plan.sms.segments} segment{plan.sms.segments === 1 ? "" : "s"}</span>
+                {/* The count is of the ASSEMBLED message - link, queries number and FSP tail included -
+                    because that is what actually gets billed. 190 is the client's ceiling. */}
+                <span className={`text-xs tabular ${plan.sms.chars > 190 || !plan.sms.gsm7 ? "font-bold text-red-400" : "text-ink-dim"}`}>
+                  {plan.sms.chars}/190 chars · {plan.sms.chars <= 160 ? "1 segment" : "2 segments"}{plan.sms.gsm7 ? "" : " · NOT GSM-7"}
+                </span>
               </div>
-              <p className="mt-2 font-mono text-[15px] leading-relaxed">{plan.sms.copy}</p>
+              <p className="mt-2 font-mono text-[15px] leading-relaxed">{plan.sms.assembled}</p>
+              <p className="mt-2 text-xs text-ink-dim">
+                Only the selling line is written by the Producer. The link, the queries number and the
+                FSP tail are fixed furniture and are appended automatically.
+              </p>
             </div>
 
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
