@@ -91,25 +91,38 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const client = new Anthropic({ apiKey: key });
   const kit = await getBrandKit(clientId).catch(() => null);
 
+  // TWO STEPS, deliberately.
+  //
+  // Step 1 researches with web search. Step 2 files the report with the schema FORCED.
+  // Doing both in one call means giving the model web_search AND report under tool_choice:auto - and it can
+  // then simply finish after searching without ever filing. That is exactly what happened on the first live
+  // run: the Strategist filed 6 findings, the Journalist filed NOTHING, silently. Forcing the report tool in
+  // its own call makes a missing report impossible rather than merely unlikely.
+  const brief = `Today is ${today}. Research what has changed that matters to MTN MoMo.\n\n` +
+    `WHAT WE ALREADY KNOW (do NOT report these back as new - only report what ADDS to or CONTRADICTS this):\n` +
+    `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n\n` +
+    `Search the web now. Then set out what is genuinely new and worth our attention, with the real source for each.`;
+
+  const research = await client.messages.create({
+    model: PREMIUM,
+    max_tokens: 6000,
+    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${HONESTY}\n\nUK spelling. No em dashes.`,
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
+    messages: [{ role: "user", content: brief }],
+  });
+  const notes = research.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
+  if (!notes) return [];
+
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 4000,
-    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${HONESTY}\n\nUK spelling. No em dashes. Return findings via the tool.`,
-    tools: [
-      { type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool,
-      { name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA },
-    ],
-    tool_choice: { type: "auto" },
-    messages: [{
-      role: "user",
-      content: `Today is ${today}. Research what has changed that matters to MTN MoMo.\n\n` +
-        `WHAT WE ALREADY KNOW (do not report these back as new - only report things that ADD to or CONTRADICT this):\n` +
-        `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n\n` +
-        `Search the web. Then report ONLY what is genuinely new and worth our attention. A quiet day is a correct answer.`,
-    }],
+    system: `${RINGFENCE}\n\n${HONESTY}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
+    tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
+    messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
   });
 
-  const block = res.content.find((b) => b.type === "tool_use" && b.name === "report");
+  const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") return [];
   const out = block.input as { findings?: Record<string, unknown>[]; quiet_day?: boolean };
   const findings = Array.isArray(out.findings) ? out.findings : [];

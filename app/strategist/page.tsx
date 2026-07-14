@@ -1,7 +1,7 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import IntelQueue from "@/components/IntelQueue";
-import { listBrains } from "@/lib/brains";
+import { listStudioClients } from "@/lib/studio";
 
 // THE STRATEGIST. Daily market and competitor intelligence, so GAS's head strategist can advise MTN MoMo from
 // something better than yesterday's assumptions.
@@ -13,7 +13,7 @@ import { listBrains } from "@/lib/brains";
 export const dynamic = "force-dynamic";
 
 export default async function StrategistPage() {
-  const clients = (await listBrains().catch(() => [])).map((b) => ({ id: b.id, name: b.name }));
+  const clients = await listStudioClients().catch(() => []);
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />

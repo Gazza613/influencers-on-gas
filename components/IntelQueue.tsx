@@ -23,10 +23,15 @@ const CONF: Record<string, string> = {
 };
 
 export default function IntelQueue({ clients, role }: { clients: Client[]; role: "journalist" | "strategist" }) {
+  // Land on the client that actually HAS work, not whichever happens to be first in the list. The first live
+  // run filed everything under MTN MoMo while the picker defaulted to GAS Marketing (alphabetically earlier),
+  // so the queue looked empty when it was full. The server hands us the clients already ordered with the ones
+  // that have a Studio brand kit first.
   const [clientId, setClientId] = useState(clients[0]?.id || "");
   const [items, setItems] = useState<Intel[]>([]);
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
+  const [note, setNote] = useState("");
 
   const refresh = useCallback(async (id: string) => {
     if (!id) return;
@@ -47,12 +52,20 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
   }
 
   // Manual trigger, so you never have to wait for tomorrow's cron to see it work.
+  // Runs BOTH roles (they share one research pass), then shows this role's findings. Reports honestly: a run
+  // that found nothing and a run that broke must never look the same from the outside.
   async function runNow() {
-    setRunning(true);
+    setRunning(true); setNote("");
     const r = await fetch(`/api/cron/daily-intel?clientId=${clientId}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     setRunning(false);
     if (!r?.ok) { flex(r?.error || "Couldn't run the research."); return; }
-    flex("Research run complete.");
+    const ran = (r.ran as { journalist?: number; strategist?: number; errors?: string[] }[])?.[0];
+    if (ran?.errors?.length) { setNote(`A role failed: ${ran.errors[0]}`); flex(ran.errors[0]); }
+    else {
+      const mine = role === "journalist" ? ran?.journalist ?? 0 : ran?.strategist ?? 0;
+      setNote(mine ? "" : "Ran clean and found nothing new today. That is a real answer, not a gap.");
+      flex(`Research complete. The Journalist filed ${ran?.journalist ?? 0}, The Strategist filed ${ran?.strategist ?? 0}.`);
+    }
     await refresh(clientId);
   }
 
@@ -74,6 +87,8 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
           {running ? "Researching…" : "↻ Run research now"}
         </button>
       </div>
+
+      {note && <p className="rounded-lg border border-[#fbbf24]/35 bg-[#fbbf24]/[0.07] px-3 py-2 text-[13px] text-[#fcd34d]">{note}</p>}
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface-1 p-6 text-center">

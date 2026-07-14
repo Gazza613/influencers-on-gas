@@ -146,3 +146,15 @@ export async function saveTemplateAnalysis(id: string, clientId: string, analysi
 export async function deleteTemplate(clientId: string, id: string): Promise<void> {
   await db().query(`delete from studio_templates where id = $1 and client_id = $2`, [id, clientId]);
 }
+
+// Clients ordered so the ones with actual Studio work come FIRST. The intel pages default to clients[0], and
+// on the first live run that was "GAS Marketing" (alphabetically earlier) while every finding was filed under
+// MTN MoMo - so a full queue looked empty. Order by whether a brand kit exists, then by name.
+export async function listStudioClients(): Promise<{ id: string; name: string }[]> {
+  return (await db().query(
+    `select c.id, c.name
+     from clients c
+     left join studio_brand_kits k on k.client_id = c.id
+     order by (k.id is null), c.name`,
+  )) as { id: string; name: string }[];
+}

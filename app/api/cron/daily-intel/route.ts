@@ -71,9 +71,13 @@ export async function GET(req: Request) {
   const out: Record<string, unknown>[] = [];
   for (const c of clients) {
     try {
+      // Do NOT swallow a role's failure. On the first live run the Journalist returned nothing and said
+      // nothing about why - which is the worst possible outcome, because "no findings" and "it broke" look
+      // identical from the outside. Capture the error and report it.
+      const errors: string[] = [];
       const [journalist, strategist] = await Promise.all([
-        runIntel(c.id, "journalist", today).catch(() => [] as Intel[]),
-        runIntel(c.id, "strategist", today).catch(() => [] as Intel[]),
+        runIntel(c.id, "journalist", today).catch((e) => { errors.push(`journalist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; }),
+        runIntel(c.id, "strategist", today).catch((e) => { errors.push(`strategist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; }),
       ]);
       await recordUsage({ clientId: c.id, provider: "anthropic", model: PREMIUM, unit: "request", action: "daily-intel", count: 2 }).catch(() => {});
 
@@ -90,7 +94,7 @@ export async function GET(req: Request) {
         }).catch(() => {});
         emailed = true;
       }
-      out.push({ client: c.name, journalist: journalist.length, strategist: strategist.length, material: jm.length + sm.length, emailed });
+      out.push({ client: c.name, journalist: journalist.length, strategist: strategist.length, material: jm.length + sm.length, emailed, errors: errors.length ? errors : undefined });
     } catch (e) {
       out.push({ client: c.name, error: String((e as Error)?.message || e).slice(0, 160) });
     }
