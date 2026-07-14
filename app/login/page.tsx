@@ -24,7 +24,7 @@ export default function LoginPage() {
       // Return the user to where they were before the reload re-gate (?next=), if it's a safe SAME-ORIGIN
       // path; otherwise the studio hub. Resolve with `new URL` (normalises control-char tricks) + an origin
       // check, so this can't be turned into an open redirect. This is what makes a refresh keep your place.
-      let dest = "/studio";
+      let dest = "/home"; // the two doors (Influencers on GAS / GAS Studio)
       try {
         const raw = new URLSearchParams(window.location.search).get("next") || "";
         if (raw) {
@@ -33,7 +33,7 @@ export default function LoginPage() {
             dest = u.pathname + u.search;
           }
         }
-      } catch { dest = "/studio"; }
+      } catch { dest = "/home"; }
       window.location.href = dest;
     } catch {
       setError("Something went wrong signing in. Please try again.");

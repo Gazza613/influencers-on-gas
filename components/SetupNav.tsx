@@ -4,8 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+// The influencer-side nav. Its first item used to be "Studio" -> /studio (the cast list). That page is
+// now /influencers, and the word "Studio" belongs to GAS Studio (the creative factory), so it is renamed
+// here to what it actually is: the cast and their cuts.
 const LINKS = [
-  { href: "/studio", label: "Studio" },
+  { href: "/influencers", label: "Cast & Cuts" },
   { href: "/setup/influencers", label: "Influencers" },
   { href: "/setup/brains", label: "Brains" },
   { href: "/setup/connect", label: "Connect Tools" },

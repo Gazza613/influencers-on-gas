@@ -68,7 +68,7 @@ export default function Landing() {
     let cancelled = false;
     fetch("/api/auth/session", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => { if (cancelled) return; if (s?.user) router.replace("/studio"); else setAuthChecked(true); })
+      .then((s) => { if (cancelled) return; if (s?.user) router.replace("/home"); else setAuthChecked(true); })
       .catch(() => { if (!cancelled) setAuthChecked(true); });
     return () => { cancelled = true; };
   }, [router]);
@@ -102,7 +102,7 @@ export default function Landing() {
       .catch(() => {});
   }, []);
 
-  // Signed-in users are being redirected to /studio; don't flash the marketing CTA at them.
+  // Signed-in users are being redirected to /home (the two doors); don't flash the marketing CTA at them.
   if (!authChecked) return <div style={{ minHeight: "100vh", background: "#07070E" }} />;
 
   return (

@@ -10,8 +10,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Influencers on GAS",
-  description: "GAS Marketing's AI influencer video studio.",
+  title: "Studio on GAS",
+  description: "GAS Marketing's creative platform: Influencers on GAS (AI influencer video) and GAS Studio (template creative factory).",
 };
 
 export default function RootLayout({
