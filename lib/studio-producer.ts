@@ -286,10 +286,23 @@ export async function planCampaign(clientId: string, brief: string): Promise<Cam
 // Fixed HERE, at the source, rather than in the page - because produceCampaign() also iterates plan.sliders,
 // and would have died exactly the same way, except server-side and after spending money on the images.
 // Anything that leaves this function has the shape it promised.
+// The model sometimes leaks its own tool-call scaffolding INTO the values - array items came back as
+// literal `<parameter name="0">the actual text`. It is an artefact of how tool input is emitted, it appears
+// intermittently, and it would print verbatim on a creative. Scrub it: strip any XML-ish tag wrapper and
+// return the text that was meant.
+export function scrub(v: unknown): string {
+  const raw = v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+  return raw
+    .replace(/<\/?(?:parameter|antml:parameter)[^>]*>/gi, "")
+    .replace(/^\s*["']|["']\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function coercePlan(raw: unknown): CampaignPlan {
   const o = (raw ?? {}) as Record<string, any>;
   const list = <T,>(v: unknown): T[] => Array.isArray(v) ? v as T[] : v == null || v === "" ? [] : [v as T];
-  const str = (v: unknown): string => v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+  const str = scrub;
 
   const deal = (d: any): Deal => ({
     label: str(d?.label), amount: str(d?.amount), price: str(d?.price), validity: str(d?.validity),
@@ -497,11 +510,11 @@ export async function sharpenBrief(clientId: string, rough: string, dealList: st
   if (!b || b.type !== "tool_use") throw new Error("The brief coach returned nothing.");
   const raw = b.input as Record<string, unknown>;
   const list = (v: unknown): string[] =>
-    Array.isArray(v) ? v.map((x) => typeof x === "string" ? x : JSON.stringify(x))
-      : v == null || v === "" ? [] : [typeof v === "string" ? v : JSON.stringify(v)];
+    (Array.isArray(v) ? v : v == null || v === "" ? [] : [v]).map(scrub).filter(Boolean);
   const out: SharpenedBrief = {
-    brief: String(raw.brief ?? ""),
-    reasoning: String(raw.reasoning ?? ""),
+    // The brief keeps its paragraph breaks - it is prose meant to be read, not a one-line field.
+    brief: String(raw.brief ?? "").replace(/<\/?(?:parameter|antml:parameter)[^>]*>/gi, "").trim(),
+    reasoning: scrub(raw.reasoning),
     assumptions: list(raw.assumptions),
     questions: list(raw.questions),
     suggestedDeals: list(raw.suggestedDeals),
