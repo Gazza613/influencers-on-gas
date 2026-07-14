@@ -514,3 +514,26 @@ on conflict (provider, model, unit) do nothing;
 --                          which is the cheapest anti-scam signal we have - a scammer never carries a real
 --                          licence number - without putting the bank's name in the brand's shop window.
 alter table studio_brand_kits add column if not exists creative_legal_text text;
+
+-- ── The deal library ────────────────────────────────────────────────────────
+-- Gary: "the deal list is in fact with you already ... we would type in the deal then select a card design".
+--
+-- It was - baked into the 68 deal-card PNGs the team uploaded. 61 of those 68 are the SAME design; they differ
+-- only by the DEAL printed on them. So the reference set is not a library of designs, it is a library of deals
+-- wearing one design. We read the deals out of the artwork once, store them here, and rebuild the card as code
+-- with slots - which is the whole point of the studio: the design is locked, the deal is the variable.
+create table if not exists studio_deals (
+  id            uuid primary key default gen_random_uuid(),
+  client_id     uuid not null references clients(id) on delete cascade,
+  label         text not null,          -- "Night Express", "Social Pass", "WhatsApp Deal"
+  amount        text not null,          -- "1GB", "Unlimited", "30"
+  amount_suffix text,                   -- "Min", "MB" - set smaller, inline
+  amount_sub    text,                   -- the smaller line under the big word
+  price         text not null,          -- "R10"
+  validity      text not null,          -- "*Valid for 3 Days"
+  footnote      text,
+  source_asset  uuid references studio_assets(id) on delete set null,
+  created_at    timestamptz not null default now(),
+  unique (client_id, label, amount, price)
+);
+create index if not exists studio_deals_client on studio_deals (client_id);

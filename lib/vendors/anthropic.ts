@@ -10,6 +10,9 @@ const MODEL = "claude-sonnet-4-6";
 // The DIRECTOR runs on the premium model: the storyboard is the highest-leverage reasoning step
 // (it must stay context-aware about who does what, and read the reference creatives), so it's worth it.
 export const PREMIUM = "claude-opus-4-8";
+// Ingestion: reading printed text off a card is not a judgement call. Running 68 of those on a premium model
+// is paying Opus prices to do OCR.
+export const INGEST = "claude-haiku-4-5";
 
 async function client(): Promise<Anthropic> {
   const key = await getSecret("anthropic");
