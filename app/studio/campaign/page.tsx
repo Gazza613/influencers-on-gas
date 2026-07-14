@@ -35,6 +35,7 @@ export default function CampaignPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState<"" | "plan" | "produce">("");
   const [err, setErr] = useState("");
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     fetch("/api/studio").then((r) => r.json()).then((d) => {
@@ -43,6 +44,14 @@ export default function CampaignPage() {
       if (cs[0]) setClientId(cs[0].id);
     }).catch(() => {});
   }, []);
+
+  // A run that takes minutes must LOOK like it is running. Without this the button reads as dead.
+  useEffect(() => {
+    if (!busy) return;
+    setElapsed(0);
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
 
   async function post(action: "plan" | "produce") {
     setBusy(action); setErr("");
@@ -177,8 +186,21 @@ export default function CampaignPage() {
 
             <button onClick={() => post("produce")} disabled={!!busy}
               className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-bold text-black disabled:opacity-40">
-              {busy === "produce" ? "Generating and rendering… this takes a couple of minutes" : "Final production · generate the 5 creatives"}
+              {busy === "produce"
+                ? `Generating and rendering… ${elapsed}s`
+                : "Final production · generate the 5 creatives"}
             </button>
+
+            {/* THE ERROR BELONGS WHERE THE CLICK WAS. It used to render only inside the brief card at the top
+                of the page, so a failure here appeared far above the fold and the button looked simply dead. */}
+            {busy === "produce" && (
+              <p className="text-center text-xs text-ink-dim">
+                Five images are generating, two are being cut out, then five canvases render. Two to four minutes. Leave this tab open.
+              </p>
+            )}
+            {err && !busy && (
+              <p className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm font-semibold text-red-300">{err}</p>
+            )}
           </section>
         )}
 

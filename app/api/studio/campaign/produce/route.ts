@@ -12,6 +12,30 @@ import type { CampaignPlan } from "@/lib/studio-producer";
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
+// A FREE SELF-TEST. GET this route and it renders one trivial canvas - no image generation, no vendor calls,
+// no money. It answers the one question the POST cannot answer cheaply: does Chromium actually load and
+// screenshot on Vercel? Chromium's brotli payload is unpacked at cold start, and when that fails the function
+// dies with an HTML error page, which tells you nothing. This tells you.
+export async function GET() {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
+  const t0 = Date.now();
+  try {
+    const { renderPng } = await import("@/lib/studio-render");
+    const { png } = await renderPng({
+      html: `<html><body style="margin:0;width:200px;height:100px;background:#004F71"></body></html>`,
+      width: 200, height: 100, scale: 1,
+    });
+    return NextResponse.json({ ok: true, chromium: "loaded and rendered", bytes: png.length, ms: Date.now() - t0 });
+  } catch (e) {
+    return NextResponse.json({
+      ok: false, chromium: "FAILED",
+      error: String((e as Error)?.message || e).slice(0, 500),
+      ms: Date.now() - t0,
+    }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
