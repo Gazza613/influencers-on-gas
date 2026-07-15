@@ -38,13 +38,26 @@ export default function BuilderPage() {
   const [busy, setBusy] = useState<Record<string, boolean>>({});      // slotKey -> generating
   const [concept, setConcept] = useState<Record<string, string>>({}); // slotKey -> creative-director note
   const [flags, setFlags] = useState<string[]>([]);                    // Producer's soft compliance flags
+  const [phone, setPhone] = useState<Record<string, string>>({});      // slotKey -> phone treatment
+  const [dealSel, setDealSel] = useState<Record<string, string>>({});  // slotKey -> deal id ("" = none)
+  const [callout, setCallout] = useState<Record<string, string>>({});  // slotKey -> callout text to feature
   const [lightbox, setLightbox] = useState("");                        // url of the creative opened full-screen
   const [err, setErr] = useState("");
 
   // Start a clean campaign - clear everything from the previous one.
   function startNext() {
-    setBrief(""); setTheme(""); setPicked({}); setSubject({}); setShot({}); setConcept({}); setFlags([]); setErr("");
+    setBrief(""); setTheme(""); setPicked({}); setSubject({}); setShot({}); setConcept({});
+    setFlags([]); setPhone({}); setDealSel({}); setCallout({}); setErr("");
   }
+
+  // Phone treatment -> a line appended to the person direction. Gary: if they hold a phone to the screen, or
+  // point at it, showing the MoMo app on that screen (added or invented) is fine.
+  const PHONE_MAP: Record<string, string> = {
+    app: " They hold up a phone with its screen facing the viewer, showing the MoMo app interface.",
+    looking: " They look at the phone in their hand; its screen shows the MoMo app.",
+    pointing: " They point at the phone screen, which shows the MoMo app.",
+    none: " No phone in shot.",
+  };
 
   useEffect(() => {
     fetch("/api/studio").then((r) => r.json()).then((d) => {
@@ -106,6 +119,14 @@ export default function BuilderPage() {
         "slider-1": p.sliders?.[1]?.concept || "",
         "slider-2": p.sliders?.[2]?.concept || "",
       });
+      setCallout((x) => ({
+        ...x,
+        masthead: p.masthead?.callout || x.masthead || "",
+        section1: p.section1?.callout || x.section1 || "",
+        "slider-0": p.sliders?.[0] ? `${p.sliders[0].headline1} / ${p.sliders[0].headline2}` : x["slider-0"] || "",
+        "slider-1": p.sliders?.[1] ? `${p.sliders[1].headline1} / ${p.sliders[1].headline2}` : x["slider-1"] || "",
+        "slider-2": p.sliders?.[2] ? `${p.sliders[2].headline1} / ${p.sliders[2].headline2}` : x["slider-2"] || "",
+      }));
       setFlags(Array.isArray(p.complianceCheck) ? p.complianceCheck : []);
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, plan: false })); }
@@ -113,14 +134,16 @@ export default function BuilderPage() {
 
   async function generate(slotKey: string, kind: string) {
     const referenceUrl = picked[slotKey];
-    const subj = (subject[slotKey] || "").trim();
+    let subj = (subject[slotKey] || "").trim();
     if (!referenceUrl) { setErr("Pick a design for this section first."); return; }
     if (!subj) { setErr("Say who should be in it."); return; }
+    subj += PHONE_MAP[phone[slotKey]] || ""; // fold the phone treatment into the direction
+    const deal = deals.find((d) => d.id === dealSel[slotKey]) || null;
     setErr(""); setBusy((b) => ({ ...b, [slotKey]: true }));
     try {
       const d = await fetch("/api/studio/build", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj }),
+        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "" }),
       }).then((r) => r.json());
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, status: "new" } }));
       else setErr(d.error || "generation failed");
@@ -226,6 +249,35 @@ export default function BuilderPage() {
                     <input value={subject[slotKey] || ""} onChange={(e) => setSubject((x) => ({ ...x, [slotKey]: e.target.value }))}
                       placeholder="e.g. a mother and her adult daughter smiling together"
                       className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[15px] outline-none focus:border-accent" />
+
+                    {/* per-creative controls: deal, callout, phone */}
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Deal to feature</label>
+                        <select value={dealSel[slotKey] || ""} onChange={(e) => setDealSel((x) => ({ ...x, [slotKey]: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent">
+                          <option value="">No deal</option>
+                          {deals.map((d) => <option key={d.id} value={d.id}>{d.label} · {d.amount}{d.amountSuffix || ""} · {d.price}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Phone in shot</label>
+                        <select value={phone[slotKey] || ""} onChange={(e) => setPhone((x) => ({ ...x, [slotKey]: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent">
+                          <option value="">Keep the design&apos;s</option>
+                          <option value="app">Phone screen to camera (app)</option>
+                          <option value="looking">Looking at the screen</option>
+                          <option value="pointing">Pointing at the screen</option>
+                          <option value="none">No phone</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Callout to change</label>
+                        <input value={callout[slotKey] || ""} onChange={(e) => setCallout((x) => ({ ...x, [slotKey]: e.target.value }))}
+                          placeholder="e.g. Happy Mother's Day"
+                          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent" />
+                      </div>
+                    </div>
 
                     <div className="mt-3 flex items-center gap-2">
                       <button onClick={() => generate(slotKey, sec.key)} disabled={!!busy[slotKey] || !chosen}

@@ -22,8 +22,8 @@ import { getBrandKit, listAssets } from "./studio";
 export type CampaignPlan = {
   theme: string;
   rationale: string;
-  masthead: { concept: string; subjectPrompt: string; phoneScreen: string };
-  section1: { concept: string; subjectPrompt: string; deals: Deal[] };
+  masthead: { concept: string; callout: string; subjectPrompt: string; phoneScreen: string };
+  section1: { concept: string; callout: string; subjectPrompt: string; deals: Deal[] };
   sliders: { concept: string; subject: string; headline1: string; headline2: string; scenePrompt: string; deal: Deal }[];
   webflow: { heroHeadline: string; heroSubheads: string[]; section1Headline: string; section1Body: string; sliderSubhead: string };
   sms: { copy: string; slug: string; assembled: string; chars: number; gsm7: boolean };
@@ -144,15 +144,17 @@ const SCHEMA = {
       type: "object", additionalProperties: false,
       properties: {
         concept: { type: "string", description: "The CREATIVE DIRECTOR's note: one or two sentences summarising the scene and the creative idea, so the team can read, approve or edit it. Plain English, not a prompt." },
+        callout: { type: "string", description: "The CAMPAIGN-ALIGNED copy for the masthead's callout element (the pill), replacing the reference's copy. Short, on-theme (e.g. for Mother's Day: 'Happy Mother's Day / Send love with MoMo'). This is typeset onto the design's own callout element - the element stays, the words become the campaign's." },
         subjectPrompt: { type: "string", description: "The concrete art direction for the subject the team can run: who is in shot (embodying the theme), their mood and framing." },
         phoneScreen: { type: "string", enum: ["deals", "app", "none"], description: "What the phone in their hand shows." },
       },
-      required: ["concept", "subjectPrompt", "phoneScreen"],
+      required: ["concept", "callout", "subjectPrompt", "phoneScreen"],
     },
     section1: {
       type: "object", additionalProperties: false,
       properties: {
         concept: { type: "string", description: "The creative director's note for section 1: a sentence or two on the scene + idea. Must feel DIFFERENT from the masthead - it is the supporting beat." },
+        callout: { type: "string", description: "The CAMPAIGN-ALIGNED copy for section 1's callout element (the pill), replacing the reference's copy. Short, on-theme, and different from the masthead's callout." },
         subjectPrompt: { type: "string" },
         deals: { type: "array", items: {
               type: "object", additionalProperties: false,
@@ -168,7 +170,7 @@ const SCHEMA = {
               required: ["label", "amount", "price", "validity"],
             }, description: "The deals floating around them. Usually 2 to 4." },
       },
-      required: ["concept", "subjectPrompt", "deals"],
+      required: ["concept", "callout", "subjectPrompt", "deals"],
     },
     sliders: {
       type: "array",
@@ -349,8 +351,8 @@ function coercePlan(raw: unknown): CampaignPlan {
   return {
     theme: str(o.theme),
     rationale: str(o.rationale),
-    masthead: { concept: str(o.masthead?.concept), subjectPrompt: str(o.masthead?.subjectPrompt), phoneScreen: str(o.masthead?.phoneScreen) || "none" },
-    section1: { concept: str(o.section1?.concept), subjectPrompt: str(o.section1?.subjectPrompt), deals: list<any>(o.section1?.deals).map(deal) },
+    masthead: { concept: str(o.masthead?.concept), callout: str(o.masthead?.callout), subjectPrompt: str(o.masthead?.subjectPrompt), phoneScreen: str(o.masthead?.phoneScreen) || "none" },
+    section1: { concept: str(o.section1?.concept), callout: str(o.section1?.callout), subjectPrompt: str(o.section1?.subjectPrompt), deals: list<any>(o.section1?.deals).map(deal) },
     sliders: list<any>(o.sliders).map((s) => ({
       concept: str(s?.concept),
       subject: str(s?.subject),
