@@ -450,8 +450,8 @@ export async function forensicSwap(url: string, opts: {
     // showing a video call of another face.
     `ANATOMY MUST BE CORRECT: every arm, hand and finger natural, in proportion and properly ATTACHED to the ` +
     `body - no detached, floating, extra, missing or malformed limbs, correct number of fingers. If a person ` +
-    `holds a phone, the phone screen faces the viewer showing a MoMo app interface - never a video call of ` +
-    `another person's face.`;
+    `holds up a phone, its bright SCREEN faces the viewer showing the MoMo app interface - NEVER the back of ` +
+    `the phone, never the camera side, never a blank or dark screen, never a video call of another face.`;
   try {
     const imageId = await importMediaUrl(url);
     if (!imageId) return { url: null, rawUrl: null, error: "could not import the reference into Higgsfield", humanised: false };

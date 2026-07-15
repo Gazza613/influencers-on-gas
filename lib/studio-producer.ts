@@ -22,9 +22,9 @@ import { getBrandKit, listAssets } from "./studio";
 export type CampaignPlan = {
   theme: string;
   rationale: string;
-  masthead: { subjectPrompt: string; phoneScreen: string };
-  section1: { subjectPrompt: string; deals: Deal[] };
-  sliders: { subject: string; headline1: string; headline2: string; scenePrompt: string; deal: Deal }[];
+  masthead: { concept: string; subjectPrompt: string; phoneScreen: string };
+  section1: { concept: string; subjectPrompt: string; deals: Deal[] };
+  sliders: { concept: string; subject: string; headline1: string; headline2: string; scenePrompt: string; deal: Deal }[];
   webflow: { heroHeadline: string; heroSubheads: string[]; section1Headline: string; section1Body: string; sliderSubhead: string };
   sms: { copy: string; slug: string; assembled: string; chars: number; gsm7: boolean };
   complianceCheck: string[];
@@ -86,6 +86,7 @@ A funnel campaign order:
 - Never describe text, logos, prices or UI in an image prompt. Those are rendered by the template, not generated.
 
 === HOW TO WRITE THE HEADLINES ===
+- THE THREE SLIDERS ARE ONE STORY, TOLD IN SEQUENCE. They must NEVER share a headline. Slider 1 OPENS (the situation, the hook), slider 2 DEVELOPS (the offer, the turn), slider 3 LANDS (the payoff, the feeling of having done it). Each headline is distinct and moves the story forward; read in order they are a narrative with a beginning, middle and end. Three variations of the same line is a fail.
 - Two lines. Line 1 sets it up, line 2 (in MoMo yellow) lands it. Short - each line must fit on one line of a 1080px canvas, so roughly 22 characters maximum.
 - Emotional frame carrying a concrete functional promise. That is the formula that built this category ("Send Money Home").
 - ENGLISH, with authentic South African texture. Do NOT sprinkle in isiZulu to signal authenticity - the research names that "linguistic tokenism" and says audiences catch it.
@@ -142,14 +143,16 @@ const SCHEMA = {
     masthead: {
       type: "object", additionalProperties: false,
       properties: {
-        subjectPrompt: { type: "string", description: "Image prompt for the cut-out subject. Plain neutral background so it can be cut out." },
+        concept: { type: "string", description: "The CREATIVE DIRECTOR's note: one or two sentences summarising the scene and the creative idea, so the team can read, approve or edit it. Plain English, not a prompt." },
+        subjectPrompt: { type: "string", description: "The concrete art direction for the subject the team can run: who is in shot (embodying the theme), their mood and framing." },
         phoneScreen: { type: "string", enum: ["deals", "app", "none"], description: "What the phone in their hand shows." },
       },
-      required: ["subjectPrompt", "phoneScreen"],
+      required: ["concept", "subjectPrompt", "phoneScreen"],
     },
     section1: {
       type: "object", additionalProperties: false,
       properties: {
+        concept: { type: "string", description: "The creative director's note for section 1: a sentence or two on the scene + idea. Must feel DIFFERENT from the masthead - it is the supporting beat." },
         subjectPrompt: { type: "string" },
         deals: { type: "array", items: {
               type: "object", additionalProperties: false,
@@ -165,7 +168,7 @@ const SCHEMA = {
               required: ["label", "amount", "price", "validity"],
             }, description: "The deals floating around them. Usually 2 to 4." },
       },
-      required: ["subjectPrompt", "deals"],
+      required: ["concept", "subjectPrompt", "deals"],
     },
     sliders: {
       type: "array",
@@ -173,6 +176,7 @@ const SCHEMA = {
       items: {
         type: "object", additionalProperties: false,
         properties: {
+          concept: { type: "string", description: "The creative director's note for this slider: a sentence on the scene + idea, for the team to read/edit/run." },
           subject: { type: "string", description: "WHO is in this slider, embodying the campaign theme and their relationship (e.g. 'a mother and her adult daughter laughing together'). The theme must be visible in the people." },
           headline1: { type: "string", description: "Line 1, white. Max ~22 characters." },
           headline2: { type: "string", description: "Line 2, MoMo yellow. Max ~22 characters." },
@@ -191,7 +195,7 @@ const SCHEMA = {
               required: ["label", "amount", "price", "validity"],
             },
         },
-        required: ["subject", "headline1", "headline2", "scenePrompt", "deal"],
+        required: ["concept", "subject", "headline1", "headline2", "scenePrompt", "deal"],
       },
     },
     webflow: {
@@ -346,9 +350,10 @@ function coercePlan(raw: unknown): CampaignPlan {
   return {
     theme: str(o.theme),
     rationale: str(o.rationale),
-    masthead: { subjectPrompt: str(o.masthead?.subjectPrompt), phoneScreen: str(o.masthead?.phoneScreen) || "none" },
-    section1: { subjectPrompt: str(o.section1?.subjectPrompt), deals: list<any>(o.section1?.deals).map(deal) },
+    masthead: { concept: str(o.masthead?.concept), subjectPrompt: str(o.masthead?.subjectPrompt), phoneScreen: str(o.masthead?.phoneScreen) || "none" },
+    section1: { concept: str(o.section1?.concept), subjectPrompt: str(o.section1?.subjectPrompt), deals: list<any>(o.section1?.deals).map(deal) },
     sliders: list<any>(o.sliders).map((s) => ({
+      concept: str(s?.concept),
       subject: str(s?.subject),
       headline1: str(s?.headline1),
       headline2: str(s?.headline2),

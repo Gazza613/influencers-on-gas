@@ -36,6 +36,8 @@ export default function BuilderPage() {
   const [subject, setSubject] = useState<Record<string, string>>({}); // slotKey -> what to see
   const [shot, setShot] = useState<Record<string, Shot>>({});         // slotKey -> generated
   const [busy, setBusy] = useState<Record<string, boolean>>({});      // slotKey -> generating
+  const [concept, setConcept] = useState<Record<string, string>>({}); // slotKey -> creative-director note
+  const [lightbox, setLightbox] = useState("");                        // url of the creative opened full-screen
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -91,6 +93,13 @@ export default function BuilderPage() {
         "slider-1": p.sliders?.[1]?.subject || x["slider-1"] || "",
         "slider-2": p.sliders?.[2]?.subject || x["slider-2"] || "",
       }));
+      setConcept({
+        masthead: p.masthead?.concept || "",
+        section1: p.section1?.concept || "",
+        "slider-0": p.sliders?.[0]?.concept || "",
+        "slider-1": p.sliders?.[1]?.concept || "",
+        "slider-2": p.sliders?.[2]?.concept || "",
+      });
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, plan: false })); }
   }
@@ -174,6 +183,14 @@ export default function BuilderPage() {
                   <div key={slotKey} className="mt-4 rounded-2xl border border-line bg-surface-1 p-5">
                     {sec.count > 1 && <p className="mb-2 text-sm font-bold text-ink-dim">Slider {slot + 1}</p>}
 
+                    {/* the Producer's creative-director note for this creative */}
+                    {concept[slotKey] && (
+                      <div className="mb-3 rounded-lg border border-[#818cf8]/30 bg-[#818cf8]/[0.06] px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a5b4fc]">Producer&apos;s direction</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-ink-dim">{concept[slotKey]}</p>
+                      </div>
+                    )}
+
                     {/* carousel of this section's references */}
                     <div className="flex gap-3 overflow-x-auto pb-2">
                       {options.length === 0 && <p className="text-sm text-ink-faint">No {sec.title.toLowerCase()} designs uploaded at intake.</p>}
@@ -205,8 +222,11 @@ export default function BuilderPage() {
 
                     {s && (
                       <div className="mt-3">
-                        <img src={s.url} alt="" className={`w-full max-w-md rounded-lg border-2 ${s.status === "accepted" ? "border-[#4ade80]" : "border-line"}`}
-                          style={sec.key === "section1" ? { background: "#fff" } : undefined} />
+                        <button onClick={() => setLightbox(s.url)} className="group relative block w-full max-w-md" title="Open full screen">
+                          <img src={s.url} alt="" className={`w-full rounded-lg border-2 ${s.status === "accepted" ? "border-[#4ade80]" : "border-line"}`}
+                            style={sec.key === "section1" ? { background: "#fff" } : undefined} />
+                          <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">⤢ Open</span>
+                        </button>
                         {s.status === "accepted" && <p className="mt-1 text-xs font-bold text-[#86efac]">✓ Accepted</p>}
                       </div>
                     )}
@@ -227,6 +247,15 @@ export default function BuilderPage() {
           )}
         </div>
       </main>
+
+      {/* PREVIEW / OPEN IN SCREEN - click any rendered creative to see it full size. */}
+      {lightbox && (
+        <div onClick={() => setLightbox("")} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6" role="dialog">
+          <img src={lightbox} alt="" className="max-h-[92vh] max-w-[95vw] rounded-lg" style={{ background: "#0b0f14" }} />
+          <button onClick={() => setLightbox("")} className="absolute right-5 top-5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-bold text-white hover:bg-white/20">Close ✕</button>
+          <a href={lightbox} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="absolute bottom-5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-bold text-white hover:bg-white/20">Open in new tab ↗</a>
+        </div>
+      )}
     </div>
   );
 }
