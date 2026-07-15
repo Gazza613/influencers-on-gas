@@ -256,29 +256,30 @@ export async function planCampaign(clientId: string, brief: string): Promise<Cam
       `every specific they gave you, and stay inside the look you have just been shown.`,
   });
 
-  const res = await client.messages.create({
-    model: PREMIUM,
-    max_tokens: 6000,
-    system: SYSTEM(kit.design_system || "", kit.tone_notes || "", kit.compliance_text || ""),
-    tools: [{ name: "plan", description: "The complete funnel campaign order.", input_schema: SCHEMA }],
-    tool_choice: { type: "tool", name: "plan" },
-    messages: [{ role: "user", content }],
-  });
-
-  const block = res.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") throw new Error("The Producer returned nothing.");
-  const plan = coercePlan(block.input);
-
-  // COERCION IS NOT VALIDATION, AND I CONFLATED THEM.
-  //
-  // The first live run produced ONE slider instead of three, and a deal card containing nothing but the word
-  // "Only" - because every deal field came back as an empty string. There were ZERO warnings, because
-  // coercePlan had dutifully turned a broken plan into a well-shaped empty one and handed it downstream.
-  //
-  // I built the coercion to stop a crash and it became a way to ship rubbish quietly. A plan that cannot be
-  // produced must SAY SO, before we spend money generating images for it.
-  const faults = validate(plan);
-  if (faults.length) throw new Error(`The Producer returned an unusable plan: ${faults.join(" ")} Nothing was produced. Try planning again.`);
+  // RETRY ON A BROKEN PLAN. The failure is intermittent: with the reference images plus the large doctrine
+  // prompt, the Producer occasionally returns a truncated or degenerate tool call - one slider, empty fields.
+  // Locally the same brief plans perfectly, so it is non-determinism, not a code fault. coercePlan guarantees
+  // the SHAPE; validate() judges whether it is USABLE; and if it is not, we simply ask again rather than fail
+  // the whole run. max_tokens is up from 6000 to reduce truncation, the likeliest cause.
+  let plan: CampaignPlan | null = null;
+  let lastFaults: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await client.messages.create({
+      model: PREMIUM,
+      max_tokens: 8000,
+      system: SYSTEM(kit.design_system || "", kit.tone_notes || "", kit.compliance_text || ""),
+      tools: [{ name: "plan", description: "The complete funnel campaign order.", input_schema: SCHEMA }],
+      tool_choice: { type: "tool", name: "plan" },
+      messages: [{ role: "user", content }],
+    });
+    const block = res.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") { lastFaults = ["the Producer returned no plan at all"]; continue; }
+    const candidate = coercePlan(block.input);
+    const faults = validate(candidate);
+    if (!faults.length) { plan = candidate; break; }
+    lastFaults = faults;
+  }
+  if (!plan) throw new Error(`The Producer could not produce a usable plan after 3 attempts: ${lastFaults.join(" ")} Try again.`);
 
   plan.sms = await fitSms(client, plan.sms, plan.theme);
   assertNoBannedEntity(plan);
