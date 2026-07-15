@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { auth } from "@/auth";
 import { listStudioClients, listAssets } from "@/lib/studio";
 import { forensicSwap, stripPerson } from "@/lib/vendors/higgsfield";
@@ -36,6 +37,15 @@ function page(body: string): Response {
     `code{background:#111827;padding:1px 5px;border-radius:4px}</style>${body}`,
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );
+}
+
+// Map a reference's real dimensions to the nearest aspect the image model accepts, so we generate at the
+// masthead's 4:3 (1080x811) rather than square-then-squish. The final PNG is written at the exact reference
+// pixel size regardless; this just avoids distorting the person to get there.
+function nearestRatio(w: number, h: number): string {
+  const t = w / h;
+  const opts: [string, number][] = [["1:1", 1], ["4:3", 4 / 3], ["3:4", 3 / 4], ["3:2", 3 / 2], ["2:3", 2 / 3], ["16:9", 16 / 9], ["9:16", 9 / 16]];
+  return opts.reduce((best, o) => (Math.abs(o[1] - t) < Math.abs(best[1] - t) ? o : best))[0];
 }
 
 export async function GET(req: Request) {
@@ -113,10 +123,32 @@ export async function GET(req: Request) {
     );
   }
 
+  // IS THE REFERENCE A TRANSPARENT PNG? If so it is a masthead/section-1 and the output MUST end up transparent,
+  // regardless of any checkbox. This is detected, not left to the user - the last run failed precisely because
+  // the checkbox was off, so it ran the slider path and skipped the mask. A transparent reference also forces
+  // the disc construction (keep the disc, don't invent a scene).
+  const refBuf = await fetch(ref.url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b)).catch(() => null);
+  let refTransparent = false, refW = 1080, refH = 1080;
+  if (refBuf) {
+    const m = await sharp(refBuf).metadata().catch(() => null);
+    if (m) {
+      refW = m.width || refW; refH = m.height || refH;
+      if (m.hasAlpha) {
+        const { data, info } = await sharp(refBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+        for (let i = 3; i < data.length; i += info.channels) { if (data[i] < 250) { refTransparent = true; break; } }
+      }
+    }
+  }
+  const effective = refTransparent ? "disc" : construction;
+  // Generate at the reference's OWN aspect, not always square. A masthead is 1080x811 (4:3); generating 1:1 and
+  // fitting it squished the person and changed the size. The final PNG is then written at the reference's exact
+  // pixel dimensions.
+  const ratio = nearestRatio(refW, refH);
+
   const t0 = Date.now();
   // 4K + humaniser pass, per Gary: clarity must match the reference and the skin must read real. The humanise
   // pass is a second image, so this run meters 2.
-  const { url, rawUrl, error, humanised } = await forensicSwap(ref.url, { person, scene, construction, ratio: "1:1", resolution: "4k", humanise: true });
+  const { url, rawUrl, error, humanised } = await forensicSwap(ref.url, { person, scene, construction: effective, ratio, resolution: "4k", humanise: true });
   await recordUsage({ clientId: client.id, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "forensic-swap-test", count: humanised ? 2 : 1 }).catch(() => {});
   const secs = ((Date.now() - t0) / 1000).toFixed(0);
 
@@ -125,28 +157,37 @@ export async function GET(req: Request) {
       `<p><a href="?">Back to the gallery</a></p>`);
   }
 
-  // MASTHEAD/SECTION-1 must be TRANSPARENT. The swap comes back opaque (with an invented surround); stamp the
+  // MASTHEAD/SECTION-1 must be TRANSPARENT. The swap comes back opaque (an invented surround); stamp the
   // reference's own alpha onto it so the surround becomes transparent again, then preview on the funnel navy.
+  // Failures are SHOWN, not swallowed - a silent fallback to the opaque result is exactly why the last run
+  // looked like nothing had happened.
   let shown = url;
   let transparentUrl: string | null = null;
-  if (construction === "disc") {
+  let maskNote = refTransparent ? "" : "reference is opaque (a slider) - left full-bleed, no transparency needed";
+  if (refTransparent && refBuf) {
     try {
-      const [resBuf, refBuf] = await Promise.all([
-        fetch(url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b)),
-        fetch(ref.url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b)),
-      ]);
+      const resBuf = await fetch(url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b));
       const transparent = await applyReferenceAlpha(resBuf, refBuf);
+      // Verify the surround actually became transparent - if not, say so loudly.
+      const { data, info } = await sharp(transparent).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      let transp = 0, tot = 0;
+      for (let i = 3; i < data.length; i += info.channels) { tot++; if (data[i] < 20) transp++; }
+      const pct = Math.round((transp / tot) * 100);
       transparentUrl = await putBytes(transparent, `studio/${client.id}/masthead`, "png", "image/png");
       const navy = await onBackground(transparent, "#0a3a52");
       shown = await putBytes(navy, `studio/${client.id}/masthead-preview`, "png", "image/png");
-    } catch { /* fall back to the opaque result if the alpha stamp fails */ }
+      maskNote = `masked to transparent using the reference's own alpha (${pct}% of the frame is now transparent)`;
+    } catch (e) {
+      maskNote = `TRANSPARENCY STEP FAILED: ${String((e as Error)?.message || e).slice(0, 160)}`;
+    }
   }
-  const sceneLine = construction === "disc" ? " · masthead, transparent PNG on funnel navy" : (scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural");
+  const sceneLine = refTransparent ? " · masthead, on funnel navy" : (scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural");
   return page(
     `<h1>Forensic swap - reference #${idx} - ${secs}s${humanised ? " · humanised" : ""}</h1>` +
     `<p style="color:#9aa4b2">Lifestyle: "${person.replace(/</g, "&lt;")}"${sceneLine}. ` +
     `The swish, the logo and the callouts should be unchanged. The person and the scene are meant to differ. ` +
     `Judge the skin, the clarity, and whether the brand furniture held.</p>` +
+    (maskNote ? `<p style="color:${maskNote.startsWith("TRANSPARENCY STEP FAILED")?"#fca5a5":"#86efac"};font-size:13px;margin:-4px 0 8px">${maskNote}</p>` : "") +
     `<div class="cmp">` +
     `<figure style="margin:0"><h2>REFERENCE (your design)</h2><img src="${ref.url}"></figure>` +
     `<figure style="margin:0"><h2>RESULT (4K${humanised ? " + humaniser" : ""})</h2><img src="${shown}"></figure>` +
