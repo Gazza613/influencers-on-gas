@@ -90,7 +90,7 @@ export async function renderPng(o: RenderOpts): Promise<{ png: Buffer; bytes: nu
     });
     await new Promise((r) => setTimeout(r, 150)); // let the last paint settle
 
-    const shot = await page.screenshot({ type: "png" });
+    const shot = await page.screenshot({ type: "png", omitBackground: !!o.transparent });
     const png = Buffer.from(shot);
     const maxBytes = o.maxBytes ?? 1_000_000;
     return { png, bytes: png.length, overBudget: png.length > maxBytes };

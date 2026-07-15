@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import sharp from "sharp";
 import { buildDiscCreative } from "@/lib/studio-refmatch";
 import { forensicSwap } from "@/lib/vendors/higgsfield";
+import { finishSlider } from "@/lib/studio-slider";
 import { recordUsage } from "@/lib/usage";
 
 // GENERATE ONE CREATIVE for the wizard. The user picked a reference for this section and typed what they want
@@ -22,11 +23,12 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
   const referenceUrl = String(b.referenceUrl || "");
   const subject = String(b.subject || "").trim();
+  const callout = String(b.callout || "").trim();
   if (!clientId || !referenceUrl || !subject) return NextResponse.json({ error: "Pick a design and describe who should be in it." }, { status: 400 });
 
   try {
@@ -39,11 +41,13 @@ export async function POST(req: Request) {
       if (!r.url) return NextResponse.json({ error: r.error || "generation failed" }, { status: 500 });
       return NextResponse.json({ ok: true, url: r.url });
     }
-    // slider
+    // SLIDER: swap person + scene, then FINISH it - typeset the campaign headline over the baked one, and
+    // stamp the REAL logo over whatever img2img drew (fixes the "from HTN" garble - a critical brand issue).
     const sw = await forensicSwap(referenceUrl, { person: subject, scene: String(b.scene || ""), construction: "scene", ratio, resolution: "4k", humanise: true });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "wizard-build", count: sw.humanised ? 2 : 1 }).catch(() => {});
     if (!sw.url) return NextResponse.json({ error: sw.error || "generation failed" }, { status: 500 });
-    return NextResponse.json({ ok: true, url: sw.url });
+    const finished = await finishSlider(clientId, referenceUrl, sw.url, callout);
+    return NextResponse.json({ ok: true, url: finished });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
   }
