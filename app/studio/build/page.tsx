@@ -37,8 +37,14 @@ export default function BuilderPage() {
   const [shot, setShot] = useState<Record<string, Shot>>({});         // slotKey -> generated
   const [busy, setBusy] = useState<Record<string, boolean>>({});      // slotKey -> generating
   const [concept, setConcept] = useState<Record<string, string>>({}); // slotKey -> creative-director note
+  const [flags, setFlags] = useState<string[]>([]);                    // Producer's soft compliance flags
   const [lightbox, setLightbox] = useState("");                        // url of the creative opened full-screen
   const [err, setErr] = useState("");
+
+  // Start a clean campaign - clear everything from the previous one.
+  function startNext() {
+    setBrief(""); setTheme(""); setPicked({}); setSubject({}); setShot({}); setConcept({}); setFlags([]); setErr("");
+  }
 
   useEffect(() => {
     fetch("/api/studio").then((r) => r.json()).then((d) => {
@@ -100,6 +106,7 @@ export default function BuilderPage() {
         "slider-1": p.sliders?.[1]?.concept || "",
         "slider-2": p.sliders?.[2]?.concept || "",
       });
+      setFlags(Array.isArray(p.complianceCheck) ? p.complianceCheck : []);
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, plan: false })); }
   }
@@ -129,7 +136,10 @@ export default function BuilderPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-        <Link href="/studio" className="text-xs font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
+        <div className="flex items-center justify-between">
+          <Link href="/studio" className="text-xs font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
+          <button onClick={startNext} className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-ink-dim hover:border-ink-dim hover:text-ink">↻ Start next campaign</button>
+        </div>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Funnel builder</h1>
         <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">
           Build the funnel one section at a time. For each, pick one of your own proven designs, say who should
@@ -166,6 +176,16 @@ export default function BuilderPage() {
         </section>
 
         {err && <p className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm font-semibold text-red-300">{err}</p>}
+
+        {/* Producer's flags - advisory only, never a block. The team reads and decides. */}
+        {flags.length > 0 && (
+          <details className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
+            <summary className="cursor-pointer text-sm font-bold text-amber-300">{flags.length} thing{flags.length === 1 ? "" : "s"} the Producer flagged for your team to check</summary>
+            <ul className="mt-2 space-y-1.5 text-[13px] leading-relaxed text-ink-dim">
+              {flags.map((f, i) => <li key={i}>• {f}</li>)}
+            </ul>
+          </details>
+        )}
 
         {/* SECTIONS */}
         {SECTIONS.map((sec) => {

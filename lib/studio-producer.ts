@@ -288,7 +288,6 @@ export async function planCampaign(clientId: string, brief: string): Promise<Cam
   if (!plan) throw new Error(`The Producer could not produce a usable plan after 3 attempts: ${lastFaults.join(" ")} Try again.`);
 
   plan.sms = await fitSms(client, plan.sms, plan.theme);
-  assertNoBannedEntity(plan);
   return plan;
 }
 
@@ -440,21 +439,11 @@ async function fitSms(client: Anthropic, first: { copy?: string; slug?: string }
 //
 // complianceCheck is deliberately EXEMPT: that is the Producer talking to a human about the law, not copy
 // that ships. It is allowed to say "a disclosure may require the bank's name" so a person can decide.
-const BANNED = /african\s*bank/i;
-
-function assertNoBannedEntity(plan: CampaignPlan): void {
-  const shipped = {
-    ...plan,
-    complianceCheck: undefined,  // notes to a human, not copy on a creative
-    rationale: undefined,        // ditto: the Producer's reasoning, never rendered
-  };
-  if (BANNED.test(JSON.stringify(shipped))) {
-    throw new Error(
-      "The Producer put African Bank into the campaign. That is a hard brand lock - the bank is never named " +
-      "on a creative. Nothing was produced. Re-plan, and if a disclosure genuinely needs it, raise it with the client.",
-    );
-  }
-}
+// NO HARD BRAND LOCKS. Gary (2026-07-15): "no hard brand locks, just flag for the user or my team", and
+// "African Bank is in the compliance and that's ok." So nothing blocks a plan. African Bank is allowed
+// (it belongs in the compliance context), and the on-CREATIVE legal line stays bank-free only because it is a
+// separate, human-set field (brand kit creative_legal_text = MTN JR, FSP 46094). Anything the Producer wants
+// a human to double-check comes back as a soft flag in complianceCheck, which the team reads and edits.
 
 // ── THE BRIEF COACH ─────────────────────────────────────────────────────────────────────────────────────
 //
@@ -557,6 +546,5 @@ export async function sharpenBrief(clientId: string, rough: string, dealList: st
     questions: list(raw.questions),
     suggestedDeals: list(raw.suggestedDeals),
   };
-  assertNoBannedEntity({ ...out } as unknown as CampaignPlan);
   return out;
 }
