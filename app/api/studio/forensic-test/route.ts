@@ -174,9 +174,11 @@ export async function GET(req: Request) {
       for (let i = 3; i < data.length; i += info.channels) { tot++; if (data[i] < 20) transp++; }
       const pct = Math.round((transp / tot) * 100);
       transparentUrl = await putBytes(transparent, `studio/${client.id}/masthead`, "png", "image/png");
-      const navy = await onBackground(transparent, "#0a3a52");
-      shown = await putBytes(navy, `studio/${client.id}/masthead-preview`, "png", "image/png");
-      maskNote = `masked to transparent using the reference's own alpha (${pct}% of the frame is now transparent)`;
+      // Show the transparent PNG on BLACK, per Gary - so any edge bleed on the transparent surround is visible,
+      // rather than hidden against the navy preview.
+      const black = await onBackground(transparent, "#000000");
+      shown = await putBytes(black, `studio/${client.id}/masthead-preview`, "png", "image/png");
+      maskNote = `masked to transparent using the reference's own alpha (${pct}% of the frame is now transparent) · shown on black so bleeds are visible`;
     } catch (e) {
       maskNote = `TRANSPARENCY STEP FAILED: ${String((e as Error)?.message || e).slice(0, 160)}`;
     }
