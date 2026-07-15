@@ -484,23 +484,20 @@ export async function forensicSwap(url: string, opts: {
       `on its OWN with NO hand holding it. A person holding a phone uses their own two hands and no more. Do a ` +
       `final check and remove any hand that is not clearly attached to a visible arm of a person in the scene. ${skin}`;
 
-    // SCENE construction (slider): produce a CLEAN PHOTOGRAPH ONLY. We used to ask the model to KEEP the logo,
-    // swish and deal cards - but it REDRAWS them, which is exactly how the logo garbled to "from HTN" and the
-    // deal card drifted. Instead we ask for the bare photograph with NO graphics at all, then composite every
-    // brand element ourselves from the real assets (finishSlider). The AI never touches a letter or a lockup,
-    // so nothing can garble. The reference is used only for its COMPOSITION (where the person sits, the crop),
-    // and we keep the lower third + top corners clear for the headline, logo and deal card we add.
-    const scene = opts.scene?.trim() ? `a real setting: ${opts.scene.trim()}` : `a real, natural setting that suits the brand and the person`;
+    // SCENE construction (slider): KEEP the reference advert and its signature SWISH; change the people (and
+    // scene) faithfully to what was asked. We do NOT strip the design - Gary: "keep swish" - and we do NOT let
+    // the model fuss over the logo/deal/headline text (it garbles those); we overlay real, clean versions of
+    // those ourselves afterwards (finishSlider). So the model's only job is a great photograph of the right
+    // people in the scene, with the swish and overall look intact.
+    const scene = opts.scene?.trim() ? `, in a real setting: ${opts.scene.trim()}` : "";
     const scenePrompt =
-      `@image1 is a reference advert - use it ONLY for its photographic composition: the camera framing, the crop, ` +
-      `and roughly where the person sits in the frame. ` +
-      `\n\nOUTPUT A CLEAN, FULL-BLEED PHOTOGRAPH WITH NO GRAPHICS OF ANY KIND. This is critical: there must be ` +
-      `NO logo, NO badge, NO deal card, NO price bubble, NO callout, NO headline, NO caption, NO watermark, NO ` +
-      `swish/ring/light-streak graphic and NO text or lettering ANYWHERE in the image. Just a real photograph. ` +
-      `Any branding will be added afterwards - your job is only the photograph. ` +
-      `\n\nThe PERSON is ${person(opts.person)}. The SCENE is ${scene}. Compose it naturally and cinematically - ` +
-      `the person believably placed and well lit. Keep the LOWER THIRD and the TOP-LEFT and TOP-RIGHT corners ` +
-      `relatively clean and uncluttered (plain background there), so a headline, logo and offer can sit over them. ${skin}`;
+      `@image1 is a FINISHED MTN MoMo advert. KEEP its overall look and, EXACTLY as they are, the signature ` +
+      `curved light SWISH / glowing ribbon graphic and the background style. ` +
+      `\n\nCHANGE ONLY the PEOPLE in it to ${person(opts.person)}${scene}, as a natural, cinematic photograph - ` +
+      `believably placed, well lit, matching the reference's framing and mood. ` +
+      `\n\nDo NOT worry about the logo, the deal card or the headline text - we overlay clean versions of those ` +
+      `afterwards, so you do not need to reproduce or perfect any lettering; just make the photograph and keep ` +
+      `the swish. ${skin}`;
 
     const params: AnyObj = {
       ...baseParams("nano_banana_pro", ar),
