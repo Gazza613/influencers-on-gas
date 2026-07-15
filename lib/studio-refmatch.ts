@@ -30,8 +30,10 @@ export async function buildDiscCreative(clientId: string, kind: string, refUrl: 
 
     // Already a complete image on the funnel colour - just normalise to the reference's exact pixel size.
     const meta = await sharp(await bufOf(refUrl)).metadata().catch(() => null);
-    let out = await bufOf(swap.url);
-    if (meta?.width && meta?.height) out = await sharp(out).resize(meta.width, meta.height, { fit: "fill" }).png().toBuffer();
+    const swapBuf = await bufOf(swap.url);
+    const out: Buffer = (meta?.width && meta?.height)
+      ? await sharp(swapBuf).resize(meta.width, meta.height, { fit: "fill" }).png().toBuffer()
+      : swapBuf;
     const url = await putBytes(out, `studio/${clientId}/${kind}`, "png", "image/png");
     return { url, error: null, calls };
   } catch (e) {
