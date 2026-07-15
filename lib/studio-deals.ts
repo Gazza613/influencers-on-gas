@@ -153,13 +153,15 @@ function normalise(d: Deal): Deal | null {
   if (m) { amount = m[1]; amountSuffix = m[2]; }
   else if (amountSuffix && new RegExp(`${amountSuffix}$`, "i").test(amount)) amountSuffix = "";
 
-  const price = clean(d.price).replace(/^R\s+/i, "R");                    // "R 2" -> "R2"
+  let price = clean(d.price).replace(/^R\s+/i, "R");                      // "R 2" -> "R2"
   const validity = clean(d.validity);
 
   if (!label || !amount) return null;
-  // A PRICE IS A RAND FIGURE. "FREE" is not one - and it is banned from our copy anyway, because a free-data
-  // promise in an SMS is the single most common shape of the scam this brand competes with.
-  if (!/^R\s?[\d.,]+$/i.test(price)) return null;
+  // A PRICE IS A RAND FIGURE, with ONE exception: MoMo's evergreen acquisition offer prices at "FREE" (1GB FREE
+  // when you download and register). Gary locked that as allowed - the download+register condition makes it a
+  // real offer, not bait. So FREE is accepted here and normalised; every other non-rand price is still rejected.
+  if (/^free$/i.test(price)) price = "FREE";
+  else if (!/^R\s?[\d.,]+$/i.test(price)) return null;
   // The validity is the one field that cannot be guessed. FAIS s14(3)(m) requires it ADJACENT to the price,
   // so a deal whose validity we could not read is not a deal we are allowed to print. Drop it.
   if (!validity || /unknown|n\/?a/i.test(validity) || !/^\*/.test(validity)) return null;

@@ -90,7 +90,8 @@ A funnel campaign order:
 - Two lines. Line 1 sets it up, line 2 (in MoMo yellow) lands it. Short - each line must fit on one line of a 1080px canvas, so roughly 22 characters maximum.
 - Emotional frame carrying a concrete functional promise. That is the formula that built this category ("Send Money Home").
 - ENGLISH, with authentic South African texture. Do NOT sprinkle in isiZulu to signal authenticity - the research names that "linguistic tokenism" and says audiences catch it.
-- NEVER: "FREE", countdowns, "hurry", "limited time", exclamation stacking, prize framing, "you've won". Some of these are illegal here (FAIS s14(3)(n) prohibits urgency devices), and all of them are the grammar of the scam we compete with.
+- AVOID: countdowns, "hurry", "limited time", exclamation stacking, prize framing, "you've won". Some are illegal here (FAIS s14(3)(n) prohibits urgency devices), and all are the grammar of the scam we compete with.
+- "FREE" is banned AS BAIT - a bare, unconditional "FREE" is the exact shape of the scam. But there is ONE permitted exception, and it is important: MoMo's EVERGREEN ACQUISITION OFFER - "1GB FREE when you download and register on MoMo" - IS allowed, because the condition (download + register) makes it a genuine, honest offer, not bait. When you use it, always state the condition beside it (download and register), and it passes through the compliance gate. So: FREE tied to download-and-register = fine; FREE floating alone = never.
 
 === THE DEALS ===
 Use the deals the producer gives you. If they give you a rough idea, shape it into the card's fixed anatomy: label / amount / "Only" / price / validity. Always name WHAT the price buys - a bare "R5" floating alone is the shape of bait, and R5 is a contested number in this market (Shoprite's headline is "R5 withdrawal").
@@ -527,8 +528,13 @@ export async function sharpenBrief(clientId: string, rough: string, dealList: st
       `You know this account cold:\n\n=== THE DOCTRINE ===\n${(kit.tone_notes || "").slice(0, 7000)}\n\n` +
       `Hard rules that a brief must never ask the team to break: no urgency devices of any kind (FAIS s14(3)(n) ` +
       `prohibits them outright, and they are the grammar of the scam SMS this customer already receives every ` +
-      `week); never the word FREE; never name African Bank; every price must name what it buys. The customer is ` +
-      `a competent adult making a careful purchase from a real bank, never a lucky winner.\n\n` +
+      `week); every price must name what it buys. The customer is a competent adult making a careful purchase ` +
+      `from a real bank, never a lucky winner.\n\n` +
+      `ON "FREE": a bare, unconditional FREE is banned - it is the exact shape of the scam. BUT MoMo's EVERGREEN ` +
+      `ACQUISITION OFFER is a permitted exception: "1GB FREE when you download and register on MoMo" IS allowed, ` +
+      `because the download-and-register condition makes it a genuine, honest offer, not bait. Do NOT strip that ` +
+      `offer or swap it for a paid deal - keep it, and state the condition (download and register) beside it. ` +
+      `Only flag it, never block it. African Bank may appear in compliance copy - do not police it in the brief.\n\n` +
       `UK spelling. No em dashes.`,
     tools: [{ name: "sharpen", description: "The expert brief.", input_schema: SHARPEN_SCHEMA }],
     tool_choice: { type: "tool", name: "sharpen" },
