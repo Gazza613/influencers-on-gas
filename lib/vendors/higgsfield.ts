@@ -512,6 +512,46 @@ function person(p: string): string {
   return t || "a real South African person";
 }
 
+// STRIP THE PERSON, KEEP THE SET. Gary's challenge: a pro should be able to remove the person from a finished
+// masthead himself rather than asking the design team for a person-hidden export.
+//
+// So: erase the central figure and rebuild the disc/rays that were behind them, while keeping every other
+// piece of furniture (bubbles, swish, callout, logo) exactly. If nano_banana holds the furniture through this,
+// we can derive the "empty set" from any reference ourselves and composite a fresh person onto it - no layered
+// file needed. If it drifts, the layered export is justified by evidence. Returns the error for the same
+// reason the swap does - this is a test, not a black box.
+export async function stripPerson(url: string, opts: { ratio?: string; resolution?: "2k" | "4k" } = {}): Promise<{ url: string | null; error: string | null }> {
+  if (!isSafePublicUrl(url)) return { url: null, error: "reference url is not a safe public url" };
+  try {
+    const imageId = await importMediaUrl(url);
+    if (!imageId) return { url: null, error: "could not import the reference into Higgsfield" };
+    const { call } = await openSession();
+    const ar = opts.ratio || "1:1";
+    const params: AnyObj = {
+      ...baseParams("nano_banana_pro", ar),
+      prompt:
+        `@image1 is a finished MTN MoMo advert: a person in the centre, standing on a yellow disc with blue ` +
+        `rays, surrounded by floating 3D icon bubbles, a light swish, and a callout badge. ` +
+        `\n\nREMOVE THE PERSON COMPLETELY. Rebuild whatever was behind them - the yellow disc and the blue rays - ` +
+        `so the disc looks whole and natural with NObody in it, as if the person had never been there. ` +
+        `\n\nKEEP EVERYTHING ELSE EXACTLY as it is, same shape, size, position, colour and wording: every floating ` +
+        `icon bubble, the swish, the callout badge, the logo. Do not move, resize, restyle or regenerate any of ` +
+        `that furniture. The result is the same advert with an empty disc where the person was.`,
+      medias: [{ value: imageId, role: "image" }],
+      resolution: opts.resolution || "4k",
+    };
+    const r = await call("generate_image", { params });
+    let out: string | null = extractImageUrls(r)[0] ?? null;
+    const jobId = extractJobIds(r)[0] ?? null;
+    if (!out && jobId) out = await pollJob(call, jobId, 60);
+    if (out) return { url: out, error: null };
+    const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+    return { url: null, error: `no image back: ${raw}`.slice(0, 280) };
+  } catch (e) {
+    return { url: null, error: String((e as Error)?.message || e).slice(0, 200) };
+  }
+}
+
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
 export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
   const token = await getValidHFAccessToken();

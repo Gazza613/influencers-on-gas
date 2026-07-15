@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { listStudioClients, listAssets } from "@/lib/studio";
-import { forensicSwap } from "@/lib/vendors/higgsfield";
+import { forensicSwap, stripPerson } from "@/lib/vendors/higgsfield";
 import { recordUsage } from "@/lib/usage";
 
 // STEP 1 OF THE REFERENCE-MATCH STUDIO: a viewable fidelity gate, before any UI is built on top.
@@ -53,6 +53,7 @@ export async function GET(req: Request) {
   const scene = (u.searchParams.get("scene") || "").trim();
   // "disc" keeps the yellow disc + dark background (masthead / section 1); "scene" changes the setting (slider).
   const construction = u.searchParams.get("disc") === "1" ? "disc" : "scene";
+  const strip = u.searchParams.get("strip") === "1";  // remove the person, show the empty set
 
   // No reference chosen: show the gallery. CLICK a reference to run the swap - Gary should never have to hand-
   // edit a URL. The person box carries whatever he types straight into the click.
@@ -73,11 +74,13 @@ export async function GET(req: Request) {
       `style="width:100%;max-width:640px;padding:11px 13px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:15px">` +
       `<label style="display:flex;gap:8px;align-items:center;margin:12px 0 2px;font-size:14px;color:#e5e7eb;cursor:pointer">` +
       `<input type="checkbox" id="disc" style="width:17px;height:17px"> This is a Masthead / Section 1 - keep the yellow disc and dark background, do not change the scene</label>` +
+      `<label style="display:flex;gap:8px;align-items:center;margin:8px 0 2px;font-size:14px;color:#facc15;cursor:pointer">` +
+      `<input type="checkbox" id="strip" style="width:17px;height:17px"> Just REMOVE the person and show me the empty set (the furniture-only design)</label>` +
       `<div class="grid">${cards}</div>` +
       `<script>function run(i){var p=encodeURIComponent(document.getElementById('person').value||'a smiling person');` +
       `var s=encodeURIComponent(document.getElementById('scene').value||'');` +
-      `var d=document.getElementById('disc').checked?'1':'0';` +
-      `document.body.style.opacity=.5;location.href='?ref='+i+'&person='+p+'&scene='+s+'&disc='+d;}</script>` +
+      `var d=document.getElementById('disc').checked?'1':'0';var st=document.getElementById('strip').checked?'1':'0';` +
+      `document.body.style.opacity=.5;location.href='?ref='+i+'&person='+p+'&scene='+s+'&disc='+d+'&strip='+st;}</script>` +
       `<style>.card{all:unset;cursor:pointer;display:block}.card img{width:100%;border-radius:8px;border:1px solid #1f2937;transition:border-color .12s}` +
       `.card:hover img{border-color:#8ab4ff}.card span{display:block;font-size:11px;color:#9aa4b2;margin-top:4px}</style>`,
     );
@@ -87,6 +90,26 @@ export async function GET(req: Request) {
   const ref = refs[idx];
   if (!ref) return page(`<h1>No reference #${refIdx}.</h1><p><a href="?">Back to the gallery</a></p>`);
   if (!person) return page(`<h1>Add a person.</h1><p><code>?ref=${idx}&person=a smiling young woman</code></p>`);
+
+  // STRIP MODE: remove the person and show the empty set, to prove we can derive the furniture-only design
+  // from a finished reference ourselves.
+  if (strip) {
+    const t = Date.now();
+    const { url: empty, error: e } = await stripPerson(ref.url, { ratio: "1:1", resolution: "4k" });
+    await recordUsage({ clientId: client.id, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "strip-person-test", count: 1 }).catch(() => {});
+    const s2 = ((Date.now() - t) / 1000).toFixed(0);
+    if (!empty) return page(`<h1>Strip failed (${s2}s)</h1><div class="err">${(e || "no url").replace(/</g, "&lt;")}</div><p><a href="?">Back</a></p>`);
+    return page(
+      `<h1>Empty set - person removed from #${idx} - ${s2}s</h1>` +
+      `<p style="color:#9aa4b2">This is me deriving the furniture-only design MYSELF from your reference. ` +
+      `Judge whether the disc rebuilt cleanly and the bubbles / swish / callout stayed put. If yes, we never ` +
+      `need a person-hidden export from your team.</p>` +
+      `<div class="cmp">` +
+      `<figure style="margin:0"><h2>REFERENCE (with person)</h2><img src="${ref.url}"></figure>` +
+      `<figure style="margin:0"><h2>EMPTY SET (person removed by me)</h2><img src="${empty}"></figure>` +
+      `</div><p style="margin-top:14px"><a href="?">Back to the gallery</a></p>`,
+    );
+  }
 
   const t0 = Date.now();
   // 4K + humaniser pass, per Gary: clarity must match the reference and the skin must read real. The humanise
