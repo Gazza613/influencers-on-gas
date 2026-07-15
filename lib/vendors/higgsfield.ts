@@ -414,6 +414,51 @@ export async function editImageUrl(url: string, opts: { instruction: string; rat
   return out;
 }
 
+// FORENSIC RETHEME (Gary's exact ask): "select this image, change ONLY the bottom copy and the promo pill copy
+// to the campaign theme, everything else forensically remains - including that yellow line under the callout."
+//
+// This is a surgical text/people edit of the REAL reference, not a rebuild. We hold EVERYTHING (people unless a
+// change asks otherwise, background, the signature swish, the logo, the layout, the fonts, colours and every
+// graphic detail like the yellow underline) and apply only the listed changes, matched to the design's own
+// style so the new words look native. This is the "any image platform" behaviour Gary wants.
+export async function forensicRetheme(url: string, opts: { changes: string[]; ratio?: string; resolution?: "2k" | "4k" }): Promise<{ url: string | null; error: string | null }> {
+  if (!isSafePublicUrl(url)) return { url: null, error: "reference url is not a safe public url" };
+  const changeList = opts.changes.map((c) => c.trim()).filter(Boolean);
+  if (!changeList.length) return { url: null, error: "no changes given" };
+  try {
+    const imageId = await importMediaUrl(url);
+    if (!imageId) return { url: null, error: "could not import the reference into Higgsfield" };
+    const { call } = await openSession();
+    const ar = opts.ratio || "1:1";
+    const changes = changeList.map((c, i) => `${i + 1}. ${c}`).join("  ");
+    const params: AnyObj = {
+      ...baseParams("nano_banana_pro", ar),
+      prompt:
+        `@image1 is a FINISHED MTN MoMo advert. Reproduce it EXACTLY and identically, pixel-for-pixel: the SAME ` +
+        `people and faces, the SAME poses and framing, the SAME background and scene, the SAME signature curved ` +
+        `light SWISH / glowing ribbons, the SAME MoMo logo, the SAME layout and spacing, the SAME fonts, sizes, ` +
+        `weights, colours and EVERY graphic detail - including any yellow underline, rule or banner. ` +
+        `\n\nChange ONLY the following, and change NOTHING else at all: ${changes} ` +
+        `\n\nFor any text you change, match the ORIGINAL's exact font, weight, size, position, alignment and ` +
+        `colour so the new words look native to the design (MoMo headlines are usually a white line then a ` +
+        `yellow line; keep any yellow underline beneath the headline exactly where it is). Do NOT move, restyle, ` +
+        `relight, recolour, regenerate, add or remove anything the changes did not explicitly ask for. Keep it a ` +
+        `real, natural photograph, never plastic or over-rendered, sharp and high-resolution.`,
+      medias: [{ value: imageId, role: "image" }],
+      resolution: opts.resolution || "4k",
+    };
+    const r = await call("generate_image", { params });
+    let out: string | null = extractImageUrls(r)[0] ?? null;
+    const jobId = extractJobIds(r)[0] ?? null;
+    if (!out && jobId) out = await pollJob(call, jobId, 60);
+    if (out) return { url: out, error: null };
+    const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+    return { url: null, error: `no image back: ${raw}`.slice(0, 280) };
+  } catch (e) {
+    return { url: null, error: String((e as Error)?.message || e).slice(0, 200) };
+  }
+}
+
 // FORENSIC BRAND-FURNITURE SWAP. Take a FINISHED reference advert and keep only what makes it MoMo's -
 // Gary: "we are only locking in the swish, the logo, the callouts. You can change the scene."
 //

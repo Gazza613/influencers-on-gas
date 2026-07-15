@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import sharp from "sharp";
-import { buildDiscCreative } from "@/lib/studio-refmatch";
-import { forensicSwap } from "@/lib/vendors/higgsfield";
-import { finishSlider } from "@/lib/studio-slider";
+import { forensicRetheme } from "@/lib/vendors/higgsfield";
+import { balanceHeadline } from "@/lib/studio-slider";
 import { listAssets } from "@/lib/studio";
 import { recordUsage } from "@/lib/usage";
 
-// GENERATE ONE CREATIVE for the wizard. The user picked a reference for this section and typed what they want
-// in it (the subject/callout, theme-embodying). We swap the person on their chosen design. THIS SPENDS.
-//   masthead/section1 -> buildDiscCreative (on the funnel background, no cut-out)
-//   slider            -> full-bleed person + scene swap
+// GENERATE ONE CREATIVE for the wizard. The user picks a reference and says what to change (the callout copy,
+// and who should be in it). We FORENSICALLY RETHEME that reference - keep everything, change only the copy
+// (and people/deal if asked) to the campaign theme. Same strategy for masthead, section 1 and slider. THIS SPENDS.
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
@@ -46,19 +44,30 @@ export async function POST(req: Request) {
     const meta = await sharp(refBuf).metadata().catch(() => null);
     const ratio = meta ? nearestRatio(meta.width || 1080, meta.height || 1080) : "1:1";
 
-    if (kind === "masthead" || kind === "section1") {
-      // The callout the user typed (or the Producer pre-filled) becomes the themed pill copy.
-      const r = await buildDiscCreative(clientId, kind, referenceUrl, subject, ratio, callout);
-      if (!r.url) return NextResponse.json({ error: r.error || "generation failed" }, { status: 500 });
-      return NextResponse.json({ ok: true, url: r.url });
+    // FORENSIC RETHEME (Gary's locked strategy, same for all three): keep the selected reference EXACTLY - its
+    // people (unless asked), background, signature swish, logo, layout and every graphic detail incl. the yellow
+    // underline - and change ONLY the copy (and people/deal if asked) to the campaign theme, in the design's own
+    // style. On the masthead this preserves the reference's exact funnel navy, so it drops into Webflow with no
+    // seam.
+    const changes: string[] = [];
+    if (kind === "slider") {
+      if (callout) {
+        const [hl1, hl2] = balanceHeadline(callout);
+        changes.push(`Change the main bottom HEADLINE to read "${hl1}"${hl2 ? ` then "${hl2}"` : ""} - a white line then a yellow line - keeping any yellow underline beneath it exactly where it is.`);
+      }
+    } else {
+      // masthead / section 1: the callout is the copy on the design's CALLOUT PILL.
+      if (callout) changes.push(`Change the CALLOUT PILL / lozenge copy to "${callout}", keeping the pill's exact shape, colour, 3D style and any yellow banner or underline, matched to the design's own font.`);
     }
-    // SLIDER: swap person + scene, then FINISH it - typeset the campaign headline over the baked one, and
-    // stamp the REAL logo over whatever img2img drew (fixes the "from HTN" garble - a critical brand issue).
-    const sw = await forensicSwap(referenceUrl, { person: subject, scene: String(b.scene || ""), construction: "scene", ratio, resolution: "4k", humanise: true });
-    await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "wizard-build", count: sw.humanised ? 2 : 1 }).catch(() => {});
-    if (!sw.url) return NextResponse.json({ error: sw.error || "generation failed" }, { status: 500 });
-    const finished = await finishSlider(clientId, referenceUrl, sw.url, callout, b.deal || null);
-    return NextResponse.json({ ok: true, url: finished });
+    // The "who should be in it" field: a people change (or a verbatim instruction if it reads like one).
+    if (subject) changes.push(/^\s*(change|keep|replace|make|remove|add|use)\b/i.test(subject) ? subject : `Change the people in the advert to: ${subject}.`);
+    // A selected deal updates the deal-card numbers in place (kept forensic to the design).
+    if (b.deal && b.deal.label) changes.push(`Change the deal/offer text to "${[b.deal.label, b.deal.amount, b.deal.price].filter(Boolean).join(" ")}", in the same deal-card style.`);
+
+    const ed = await forensicRetheme(referenceUrl, { changes, ratio, resolution: "4k" });
+    await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `retheme-${kind}`, count: 1 }).catch(() => {});
+    if (!ed.url) return NextResponse.json({ error: ed.error || "generation failed" }, { status: 500 });
+    return NextResponse.json({ ok: true, url: ed.url });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
   }
