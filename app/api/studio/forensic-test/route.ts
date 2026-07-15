@@ -2,7 +2,8 @@ import sharp from "sharp";
 import { auth } from "@/auth";
 import { listStudioClients, listAssets } from "@/lib/studio";
 import { forensicSwap, stripPerson } from "@/lib/vendors/higgsfield";
-import { applyReferenceAlpha, onBackground } from "@/lib/studio-cutout";
+import { onBackground } from "@/lib/studio-cutout";
+import { buildDiscCreative } from "@/lib/studio-refmatch";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 
@@ -146,44 +147,30 @@ export async function GET(req: Request) {
   const ratio = nearestRatio(refW, refH);
 
   const t0 = Date.now();
-  // 4K + humaniser pass, per Gary: clarity must match the reference and the skin must read real. The humanise
-  // pass is a second image, so this run meters 2.
-  const { url, rawUrl, error, humanised } = await forensicSwap(ref.url, { person, scene, construction: effective, ratio, resolution: "4k", humanise: true });
-  await recordUsage({ clientId: client.id, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "forensic-swap-test", count: humanised ? 2 : 1 }).catch(() => {});
-  const secs = ((Date.now() - t0) / 1000).toFixed(0);
-
-  if (!url) {
-    return page(`<h1>The swap failed (${secs}s)</h1><div class="err">${(error || "no url and no error").replace(/</g, "&lt;")}</div>` +
-      `<p><a href="?">Back to the gallery</a></p>`);
-  }
-
-  // MASTHEAD/SECTION-1 must be TRANSPARENT. The swap comes back opaque (an invented surround); stamp the
-  // reference's own alpha onto it so the surround becomes transparent again, then preview on the funnel navy.
-  // Failures are SHOWN, not swallowed - a silent fallback to the opaque result is exactly why the last run
-  // looked like nothing had happened.
-  let shown = url;
+  let shown = "";
   let transparentUrl: string | null = null;
-  let maskNote = refTransparent ? "" : "reference is opaque (a slider) - left full-bleed, no transparency needed";
-  if (refTransparent && refBuf) {
-    try {
-      const resBuf = await fetch(url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b));
-      const transparent = await applyReferenceAlpha(resBuf, refBuf);
-      // Verify the surround actually became transparent - if not, say so loudly.
-      const { data, info } = await sharp(transparent).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-      let transp = 0, tot = 0;
-      for (let i = 3; i < data.length; i += info.channels) { tot++; if (data[i] < 20) transp++; }
-      const pct = Math.round((transp / tot) * 100);
-      transparentUrl = await putBytes(transparent, `studio/${client.id}/masthead`, "png", "image/png");
-      // Show the transparent PNG on BLACK, per Gary - so any edge bleed on the transparent surround is visible,
-      // rather than hidden against the navy preview.
-      const black = await onBackground(transparent, "#000000");
-      shown = await putBytes(black, `studio/${client.id}/masthead-preview`, "png", "image/png");
-      maskNote = `masked to transparent using the reference's own alpha (${pct}% of the frame is now transparent) · shown on black so bleeds are visible`;
-    } catch (e) {
-      maskNote = `TRANSPARENCY STEP FAILED: ${String((e as Error)?.message || e).slice(0, 160)}`;
+  let maskNote = "";
+  let humanised = false, rawUrl: string | null = null;
+
+  if (refTransparent) {
+    // MASTHEAD/SECTION-1: the full forensic path - swap the person, strip the person, then stamp the
+    // reference's REAL furniture back (fixes the warped icons) with a tight eroded edge, transparent surround.
+    const r = await buildDiscCreative(client.id, "masthead", ref.url, person, ratio);
+    if (!r.url) {
+      return page(`<h1>Failed (${((Date.now() - t0) / 1000).toFixed(0)}s)</h1><div class="err">${(r.error || "no image").replace(/</g, "&lt;")}</div><p><a href="?">Back</a></p>`);
     }
+    transparentUrl = r.url;
+    shown = await putBytes(await onBackground(await fetch(r.url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b)), "#000000"), `studio/${client.id}/masthead-preview`, "png", "image/png");
+    maskNote = r.error ? `note: ${r.error}` : "forensic: real furniture composited, person swapped, edge eroded, transparent surround - shown on black";
+  } else {
+    // SLIDER: full-bleed swap.
+    const sw = await forensicSwap(ref.url, { person, scene, construction: effective, ratio, resolution: "4k", humanise: true });
+    await recordUsage({ clientId: client.id, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "forensic-swap-test", count: sw.humanised ? 2 : 1 }).catch(() => {});
+    if (!sw.url) return page(`<h1>The swap failed</h1><div class="err">${(sw.error || "no image").replace(/</g, "&lt;")}</div><p><a href="?">Back to the gallery</a></p>`);
+    shown = sw.url; rawUrl = sw.rawUrl; humanised = sw.humanised;
   }
-  const sceneLine = refTransparent ? " · masthead, on funnel navy" : (scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural");
+  const secs = ((Date.now() - t0) / 1000).toFixed(0);
+  const sceneLine = refTransparent ? " · masthead, forensic furniture, on black" : (scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural");
   return page(
     `<h1>Forensic swap - reference #${idx} - ${secs}s${humanised ? " · humanised" : ""}</h1>` +
     `<p style="color:#9aa4b2">Lifestyle: "${person.replace(/</g, "&lt;")}"${sceneLine}. ` +
@@ -195,7 +182,7 @@ export async function GET(req: Request) {
     `<figure style="margin:0"><h2>RESULT (4K${humanised ? " + humaniser" : ""})</h2><img src="${shown}"></figure>` +
     `</div>` +
     (transparentUrl ? `<p style="margin-top:8px;font-size:12px"><a href="${transparentUrl}" target="_blank">download the transparent PNG</a> (this is what embeds into the funnel column)</p>` : "") +
-    (rawUrl && rawUrl !== url ? `<p style="margin-top:6px;font-size:12px"><a href="${rawUrl}" target="_blank">view the pre-humaniser version</a></p>` : "") +
+    (rawUrl && rawUrl !== shown ? `<p style="margin-top:6px;font-size:12px"><a href="${rawUrl}" target="_blank">view the pre-humaniser version</a></p>` : "") +
     `<div style="margin-top:16px;display:grid;gap:8px;max-width:680px">` +
     `<input id="person" value="${person.replace(/"/g, "&quot;")}" placeholder="lifestyle" style="padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
     `<input id="scene" value="${scene.replace(/"/g, "&quot;")}" placeholder="scenery (blank = natural)" style="padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +

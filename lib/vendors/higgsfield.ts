@@ -445,7 +445,13 @@ export async function forensicSwap(url: string, opts: {
   const construction = opts.construction || "scene";
   const skin = `The person must be a REAL South African person photographed on a real camera: authentic skin with ` +
     `visible pores and natural texture and true, even skin tone - never plastic, never waxy, never airbrushed, ` +
-    `never an over-smoothed 3D render. Sharp, clean, high-resolution, editorial quality.`;
+    `never an over-smoothed 3D render. Sharp, clean, high-resolution, editorial quality. ` +
+    // Anatomy + phone guardrails - from Gary's live notes: a detached arm on one slider, and a phone screen
+    // showing a video call of another face.
+    `ANATOMY MUST BE CORRECT: every arm, hand and finger natural, in proportion and properly ATTACHED to the ` +
+    `body - no detached, floating, extra, missing or malformed limbs, correct number of fingers. If a person ` +
+    `holds a phone, the phone screen faces the viewer showing a MoMo app interface - never a video call of ` +
+    `another person's face.`;
   try {
     const imageId = await importMediaUrl(url);
     if (!imageId) return { url: null, rawUrl: null, error: "could not import the reference into Higgsfield", humanised: false };

@@ -18,8 +18,16 @@ export async function applyReferenceAlpha(resultBuf: Buffer, referenceBuf: Buffe
   const W = meta.width || 1080;
   const H = meta.height || 811;
 
-  // The reference's alpha, as a single-channel raw mask at the reference's size.
-  const alphaRaw = await sharp(referenceBuf).ensureAlpha().extractChannel(3).resize(W, H, { fit: "fill" }).raw().toBuffer();
+  // THE EDGE MUST BE TIGHT. The reference alpha is anti-aliased, so its soft edge pixels (alpha 1-254) blend
+  // whatever colour the SWAP put there - which at the design boundary is the grey studio background, showing
+  // as a halo around the hair and along the disc. Gary flagged exactly this.
+  //
+  // So we ERODE the alpha: blur then threshold HIGH, which pulls the opaque region in by ~1px and drops the
+  // half-transparent fringe to fully transparent; a light re-blur restores a clean anti-aliased edge without
+  // the halo. It trims a hair of the design edge, which is invisible, in exchange for killing the bleed.
+  const alphaRaw = await sharp(referenceBuf).ensureAlpha().extractChannel(3).resize(W, H, { fit: "fill" })
+    .blur(1.4).threshold(210).blur(0.6)
+    .raw().toBuffer();
   // The result's colour, stripped of its own (opaque) alpha, at the same size.
   const rgbRaw = await sharp(resultBuf).resize(W, H, { fit: "fill" }).removeAlpha().raw().toBuffer();
 

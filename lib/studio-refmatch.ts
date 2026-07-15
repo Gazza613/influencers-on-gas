@@ -1,10 +1,43 @@
 import sharp from "sharp";
 import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
-import { forensicSwap } from "./vendors/higgsfield";
-import { applyReferenceAlpha } from "./studio-cutout";
+import { forensicSwap, stripPerson } from "./vendors/higgsfield";
+import { applyReferenceAlpha, personMaskFromStrip, compositeForensicFurniture } from "./studio-cutout";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
+
+const bufOf = (u: string) => fetch(u).then((r) => r.arrayBuffer()).then((b) => Buffer.from(b));
+
+// BUILD ONE MASTHEAD / SECTION-1. The forensic path, because img2img warps the furniture (Gary: "icons
+// warped"). We SWAP the person and, in parallel, STRIP the person off the reference to recover a clean
+// silhouette; then we keep the swap's person inside that silhouette and stamp the reference's ACTUAL furniture
+// (bubbles, pill, disc) over everything else, with a tight eroded edge. The furniture is then pixel-identical,
+// never a redraw. Returns the finished transparent PNG url (or an error + a fallback that at least masks clean).
+export async function buildDiscCreative(clientId: string, kind: string, refUrl: string, person: string, ratio: string): Promise<{ url: string; error: string | null; calls: number }> {
+  // Swap and strip are independent - run them together.
+  const [swap, strip] = await Promise.all([
+    forensicSwap(refUrl, { person, construction: "disc", ratio, resolution: "4k", humanise: true }),
+    stripPerson(refUrl, { ratio, resolution: "4k" }),
+  ]);
+  let calls = 1 + (swap.humanised ? 1 : 0) + (strip.url ? 1 : 0);
+  if (!swap.url) return { url: "", error: swap.error || "swap failed", calls };
+
+  const refBuf = await bufOf(refUrl);
+  const swapBuf = await bufOf(swap.url);
+  try {
+    let finalBuf: Buffer;
+    if (strip.url) {
+      const mask = await personMaskFromStrip(refBuf, await bufOf(strip.url));
+      finalBuf = await compositeForensicFurniture(swapBuf, refBuf, mask); // furniture pixel-perfect + eroded edge
+    } else {
+      finalBuf = await applyReferenceAlpha(swapBuf, refBuf); // fallback: clean edge, furniture as the swap gave it
+    }
+    const url = await putBytes(finalBuf, `studio/${clientId}/${kind}`, "png", "image/png");
+    return { url, error: strip.url ? null : "person-strip failed, furniture not re-composited", calls };
+  } catch (e) {
+    return { url: "", error: String((e as Error)?.message || e).slice(0, 160), calls };
+  }
+}
 
 // THE REFERENCE-MATCH CAMPAIGN. A brief in, a full funnel set out - 1 masthead, 1 section-1, 3 sliders - each
 // built by SWAPPING THE PERSON on one of the client's own proven designs, never generated from scratch.
@@ -59,29 +92,31 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     })),
   ];
 
-  const models: string[] = [];
+  let totalCalls = 0;
   const creatives = await Promise.all(jobs.map(async (j): Promise<RefCreative> => {
     if (!j.ref) { warnings.push(`No ${j.kind} reference on file.`); return { kind: j.kind, index: j.index, refName: "", refUrl: "", url: "", error: "no reference of this type" }; }
-    const meta = await sharp(await buf(j.ref.url)).metadata().catch(() => null);
+    const meta = await sharp(await bufOf(j.ref.url)).metadata().catch(() => null);
     const ratio = meta ? nearestRatio(meta.width || 1080, meta.height || 1080) : "1:1";
 
+    // DISC (masthead + section-1): the forensic path - swap the person, then stamp the reference's real
+    // furniture back, so the bubbles and pill are pixel-perfect instead of the img2img warp Gary flagged.
+    if (j.construction === "disc") {
+      const r = await buildDiscCreative(clientId, j.kind, j.ref.url, j.person, ratio);
+      totalCalls += r.calls;
+      if (r.error) warnings.push(`${j.kind}: ${r.error}`);
+      if (!r.url) return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: r.error || "failed" };
+      return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: r.url, headline: j.headline };
+    }
+
+    // SCENE (slider): full-bleed swap. Furniture holds well on a photo, so no re-composite needed.
     const { url, error, humanised } = await forensicSwap(j.ref.url, {
       person: j.person, scene: j.scene, construction: j.construction, ratio, resolution: "4k", humanise: true,
     });
-    models.push("nano_banana_pro"); if (humanised) models.push("nano_banana_pro");
+    totalCalls += 1 + (humanised ? 1 : 0);
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "swap failed" }; }
-
-    // Masthead + section-1 must be transparent PNGs: stamp the reference's own alpha.
-    let finalUrl = url;
-    if (j.construction === "disc") {
-      try {
-        const transparent = await applyReferenceAlpha(await buf(url), await buf(j.ref.url));
-        finalUrl = await putBytes(transparent, `studio/${clientId}/${j.kind}`, "png", "image/png");
-      } catch (e) { warnings.push(`${j.kind} transparency failed: ${String((e as Error)?.message || e).slice(0, 100)}`); }
-    }
-    return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: finalUrl, headline: j.headline };
+    return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url, headline: j.headline };
   }));
 
-  await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "refmatch-campaign", count: models.length }).catch(() => {});
+  await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "refmatch-campaign", count: totalCalls }).catch(() => {});
   return { plan, creatives, warnings };
 }
