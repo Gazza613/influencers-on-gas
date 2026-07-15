@@ -1,8 +1,9 @@
 import sharp from "sharp";
 import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
-import { forensicSwap, stripPerson } from "./vendors/higgsfield";
-import { applyReferenceAlpha, onFunnelBackground } from "./studio-cutout";
+import { forensicSwap } from "./vendors/higgsfield";
+import { onFunnelBackground } from "./studio-cutout";
+import { finishSlider } from "./studio-slider";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
 
@@ -108,13 +109,15 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
       return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: r.url, headline: j.headline };
     }
 
-    // SCENE (slider): full-bleed swap. Furniture holds well on a photo, so no re-composite needed.
+    // SCENE (slider): swap, then FINISH - typeset the campaign headline over the baked one and stamp the real
+    // logo (never AI-drawn). The three sliders then read as the campaign's story, not the reference's copy.
     const { url, error, humanised } = await forensicSwap(j.ref.url, {
       person: j.person, scene: j.scene, construction: j.construction, ratio, resolution: "4k", humanise: true,
     });
     totalCalls += 1 + (humanised ? 1 : 0);
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "swap failed" }; }
-    return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url, headline: j.headline };
+    const finished = await finishSlider(clientId, j.ref.url, url, j.headline || "").catch(() => url);
+    return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: finished, headline: j.headline };
   }));
 
   await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "refmatch-campaign", count: totalCalls }).catch(() => {});

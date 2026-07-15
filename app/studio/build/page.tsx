@@ -132,11 +132,38 @@ export default function BuilderPage() {
     finally { setBusy((b) => ({ ...b, plan: false })); }
   }
 
+  // LET THE EXPERTS BUILD THE WHOLE STACK. One click: the Producer plans, the creative expert picks references
+  // and generates all five, finished. The team then co-pilots (rerun / edit / accept). Gary's core philosophy.
+  async function buildAll() {
+    if (brief.trim().length < 6) { setErr("Give the experts a brief."); return; }
+    setErr(""); setBusy((b) => ({ ...b, all: true }));
+    try {
+      const d = await fetch("/api/studio/build-all", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, brief }),
+      }).then((r) => r.json());
+      const p = d.plan;
+      if (p) {
+        setTheme(p.theme || "");
+        setSubject({ masthead: p.masthead?.subjectPrompt || "", section1: p.section1?.subjectPrompt || "", "slider-0": p.sliders?.[0]?.subject || "", "slider-1": p.sliders?.[1]?.subject || "", "slider-2": p.sliders?.[2]?.subject || "" });
+        setConcept({ masthead: p.masthead?.concept || "", section1: p.section1?.concept || "", "slider-0": p.sliders?.[0]?.concept || "", "slider-1": p.sliders?.[1]?.concept || "", "slider-2": p.sliders?.[2]?.concept || "" });
+        setCallout({ masthead: p.masthead?.callout || "", section1: p.section1?.callout || "", "slider-0": p.sliders?.[0] ? `${p.sliders[0].headline1} / ${p.sliders[0].headline2}` : "", "slider-1": p.sliders?.[1] ? `${p.sliders[1].headline1} / ${p.sliders[1].headline2}` : "", "slider-2": p.sliders?.[2] ? `${p.sliders[2].headline1} / ${p.sliders[2].headline2}` : "" });
+        setFlags(Array.isArray(p.complianceCheck) ? p.complianceCheck : []);
+      }
+      for (const c of (d.creatives || []) as { kind: string; index: number; url: string; refUrl: string }[]) {
+        const slotKey = c.kind === "slider" ? `slider-${c.index}` : c.kind;
+        if (c.url) setShot((s) => ({ ...s, [slotKey]: { url: c.url, status: "new" } }));
+        if (c.refUrl) setPicked((x) => ({ ...x, [slotKey]: c.refUrl }));
+      }
+      if (d.error && !p) setErr(d.error);
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setBusy((b) => ({ ...b, all: false })); }
+  }
+
   async function generate(slotKey: string, kind: string) {
-    const referenceUrl = picked[slotKey];
+    const referenceUrl = picked[slotKey] || ""; // optional - the expert picks one if none chosen
     let subj = (subject[slotKey] || "").trim();
-    if (!referenceUrl) { setErr("Pick a design for this section first."); return; }
-    if (!subj) { setErr("Say who should be in it."); return; }
+    if (!subj) { setErr("Say who should be in it (or let the Producer plan it)."); return; }
     subj += PHONE_MAP[phone[slotKey]] || ""; // fold the phone treatment into the direction
     const deal = deals.find((d) => d.id === dealSel[slotKey]) || null;
     setErr(""); setBusy((b) => ({ ...b, [slotKey]: true }));
@@ -202,15 +229,20 @@ export default function BuilderPage() {
             placeholder="What is the campaign? e.g. Mother's Day - celebrate mums, send money and airtime to your mother through MoMo, zero fees."
             className="mt-3 w-full rounded-xl border border-line bg-surface-2 p-4 text-base leading-relaxed outline-none focus:border-accent" />
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button onClick={plan} disabled={!!busy.plan || brief.trim().length < 6}
-              className="rounded-lg bg-accent px-5 py-2 text-sm font-bold text-black disabled:opacity-40">
-              {busy.plan ? "The Producer is planning… (about a minute)" : "Let the Producer plan it"}
+            <button onClick={buildAll} disabled={!!busy.all || brief.trim().length < 6}
+              className="rounded-lg bg-gradient-to-r from-[#818cf8] to-[#f472b6] px-5 py-2.5 text-sm font-bold text-black disabled:opacity-40">
+              {busy.all ? "The experts are building the full funnel… (a few minutes)" : "✦ Let the experts build the whole funnel"}
             </button>
-            <button onClick={sharpen} disabled={!!busy.brief || brief.trim().length < 6}
-              className="rounded-lg border border-[#818cf8]/60 bg-[#818cf8]/10 px-4 py-2 text-sm font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
-              {busy.brief ? "Reading…" : "Sharpen the brief first"}
+            <button onClick={plan} disabled={!!busy.plan || !!busy.all || brief.trim().length < 6}
+              className="rounded-lg border border-line px-4 py-2 text-sm font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+              {busy.plan ? "Planning…" : "Just plan it (I'll pick + generate)"}
+            </button>
+            <button onClick={sharpen} disabled={!!busy.brief || !!busy.all || brief.trim().length < 6}
+              className="rounded-lg border border-line px-4 py-2 text-sm font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+              {busy.brief ? "Reading…" : "Sharpen the brief"}
             </button>
           </div>
+          <p className="mt-2 text-xs text-ink-faint">The experts plan, pick your best designs, generate and finish all five. Your team co-pilots below - rerun, edit or accept any creative.</p>
           {theme && (
             <p className="mt-3 text-sm text-ink-dim">
               <span className="font-bold text-ink">{theme}</span> — the Producer has filled in who should be in
@@ -301,9 +333,9 @@ export default function BuilderPage() {
                     </div>
 
                     <div className="mt-3 flex items-center gap-2">
-                      <button onClick={() => generate(slotKey, sec.key)} disabled={!!busy[slotKey] || !chosen}
+                      <button onClick={() => generate(slotKey, sec.key)} disabled={!!busy[slotKey]}
                         className="rounded-lg bg-accent px-5 py-2 text-sm font-bold text-black disabled:opacity-40">
-                        {busy[slotKey] ? "Generating… (a few min)" : s ? "Rerun" : "Generate"}
+                        {busy[slotKey] ? "Generating… (a few min)" : s ? "Rerun" : chosen ? "Generate" : "Generate (expert picks a design)"}
                       </button>
                       {s && s.status !== "accepted" && (
                         <button onClick={() => setShot((x) => ({ ...x, [slotKey]: { ...s, status: "accepted" } }))}

@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { buildDiscCreative } from "@/lib/studio-refmatch";
 import { forensicSwap } from "@/lib/vendors/higgsfield";
 import { finishSlider } from "@/lib/studio-slider";
+import { listAssets } from "@/lib/studio";
 import { recordUsage } from "@/lib/usage";
 
 // GENERATE ONE CREATIVE for the wizard. The user picked a reference for this section and typed what they want
@@ -26,12 +27,21 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
-  const referenceUrl = String(b.referenceUrl || "");
+  let referenceUrl = String(b.referenceUrl || "");
   const subject = String(b.subject || "").trim();
   const callout = String(b.callout || "").trim();
-  if (!clientId || !referenceUrl || !subject) return NextResponse.json({ error: "Pick a design and describe who should be in it." }, { status: 400 });
+  if (!clientId || !subject) return NextResponse.json({ error: "Describe who should be in it." }, { status: 400 });
 
   try {
+    // REFERENCE IS OPTIONAL. Gary: the creative expert should nail it whether or not a reference is picked.
+    // If none was chosen, the expert picks one for this section itself (Hero=masthead, Supporting=section1,
+    // Slider=slider) - a pick is never compulsory.
+    if (!referenceUrl) {
+      const match = kind === "masthead" ? /hero/i : kind === "section1" ? /supporting/i : /slider|slide/i;
+      const pool = (await listAssets(clientId, "reference")).filter((a) => match.test(a.name || "") && !(kind !== "section1" && /supporting/i.test(a.name || "")));
+      if (!pool.length) return NextResponse.json({ error: `No ${kind} designs on file to work from.` }, { status: 400 });
+      referenceUrl = pool[Math.floor(Date.now() / 1000) % pool.length].url; // vary the pick between runs
+    }
     const refBuf: Buffer = Buffer.from(await (await fetch(referenceUrl)).arrayBuffer());
     const meta = await sharp(refBuf).metadata().catch(() => null);
     const ratio = meta ? nearestRatio(meta.width || 1080, meta.height || 1080) : "1:1";
