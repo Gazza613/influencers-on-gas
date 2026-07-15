@@ -414,6 +414,52 @@ export async function editImageUrl(url: string, opts: { instruction: string; rat
   return out;
 }
 
+// FORENSIC PERSON-SWAP. Take a FINISHED reference advert and reproduce it identically, changing ONLY the
+// human. This is the core of the reference-match studio: the design you picked is the design you get, with a
+// different person in it.
+//
+// It is a person-swap and NOT a "generate in the style of", which is the whole lesson from the fake-advert
+// run. The model is handed one finished layout and told to leave every graphic, letter, logo and pixel of
+// background exactly where it is - it is not composing anything. nano_banana_pro is strong at precisely this.
+//
+// Returns the error too, because the first live run is a fidelity check and "it just came back null" tells us
+// nothing about why.
+export async function forensicPersonSwap(url: string, person: string, opts: { ratio?: string; resolution?: "2k" | "4k" } = {}): Promise<{ url: string | null; error: string | null }> {
+  if (!isSafePublicUrl(url)) return { url: null, error: "reference url is not a safe public url" };
+  try {
+    const imageId = await importMediaUrl(url);
+    if (!imageId) return { url: null, error: "could not import the reference into Higgsfield" };
+    const { call } = await openSession();
+    const ar = opts.ratio || "1:1";
+    const params: AnyObj = {
+      ...baseParams("nano_banana_pro", ar),
+      prompt:
+        `@image1 is a FINISHED, APPROVED advertisement. Reproduce it EXACTLY and identically, pixel for pixel: ` +
+        `the same layout and composition, the same background, the same yellow disc and light ring, the same ` +
+        `logo at the same size and position, ALL text and legal wording at the same size, font, colour and ` +
+        `position, the same deal cards, the same colour grade. ` +
+        `\n\nChange ONE thing only: the human person. Replace them with ${person}. The new person must sit in ` +
+        `the SAME position, at the SAME scale, in the SAME pose and crop as the original person, lit to match ` +
+        `the existing light exactly, holding or interacting with anything they hold the same way. A real, ` +
+        `natural photograph of a real South African person - authentic skin with visible texture, never plastic. ` +
+        `\n\nDo NOT move, resize, recolour, restyle, re-typeset or regenerate the logo, any text, the legal ` +
+        `strip, the disc, the ring, the deal cards or the background. If it is not the person, it does not ` +
+        `change. Every letter and every graphic stays exactly as it is in @image1.`,
+      medias: [{ value: imageId, role: "image" }],
+    };
+    if (opts.resolution) params.resolution = opts.resolution;
+    const r = await call("generate_image", { params });
+    let out: string | null = extractImageUrls(r)[0] ?? null;
+    const jobId = extractJobIds(r)[0] ?? null;
+    if (!out && jobId) out = await pollJob(call, jobId, 60);
+    if (out) return { url: out, error: null };
+    const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+    return { url: null, error: `no image back: ${raw}`.slice(0, 280) };
+  } catch (e) {
+    return { url: null, error: String((e as Error)?.message || e).slice(0, 200) };
+  }
+}
+
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
 export async function listTools(): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
   const token = await getValidHFAccessToken();
