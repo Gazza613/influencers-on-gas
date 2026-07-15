@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { listStudioClients, listAssets } from "@/lib/studio";
-import { forensicPersonSwap } from "@/lib/vendors/higgsfield";
+import { forensicSwap } from "@/lib/vendors/higgsfield";
 import { recordUsage } from "@/lib/usage";
 
 // STEP 1 OF THE REFERENCE-MATCH STUDIO: a viewable fidelity gate, before any UI is built on top.
@@ -50,6 +50,7 @@ export async function GET(req: Request) {
 
   const refIdx = u.searchParams.get("ref");
   const person = (u.searchParams.get("person") || "").trim();
+  const scene = (u.searchParams.get("scene") || "").trim();
 
   // No reference chosen: show the gallery. CLICK a reference to run the swap - Gary should never have to hand-
   // edit a URL. The person box carries whatever he types straight into the click.
@@ -62,12 +63,16 @@ export async function GET(req: Request) {
       `<h1>Forensic swap test - ${client.name}</h1>` +
       `<p style="color:#9aa4b2">Type who you want in the picture, then CLICK a design to swap the person into it. ` +
       `Each click spends one image. Everything except the person should stay exactly where it is.</p>` +
-      `<label style="display:block;margin:14px 0 6px;font-size:13px;color:#9aa4b2">Who should be in the picture?</label>` +
+      `<label style="display:block;margin:14px 0 6px;font-size:13px;color:#9aa4b2">Who should be in the picture? (lifestyle)</label>` +
       `<input id="person" value="a smiling middle-aged South African woman in a mustard jumper" ` +
+      `style="width:100%;max-width:640px;padding:11px 13px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:15px">` +
+      `<label style="display:block;margin:12px 0 6px;font-size:13px;color:#9aa4b2">Where are they? (scenery - leave blank to keep it natural)</label>` +
+      `<input id="scene" placeholder="e.g. a warm township kitchen on a winter morning" ` +
       `style="width:100%;max-width:640px;padding:11px 13px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:15px">` +
       `<div class="grid">${cards}</div>` +
       `<script>function run(i){var p=encodeURIComponent(document.getElementById('person').value||'a smiling person');` +
-      `document.body.style.opacity=.5;location.href='?ref='+i+'&person='+p;}</script>` +
+      `var s=encodeURIComponent(document.getElementById('scene').value||'');` +
+      `document.body.style.opacity=.5;location.href='?ref='+i+'&person='+p+'&scene='+s;}</script>` +
       `<style>.card{all:unset;cursor:pointer;display:block}.card img{width:100%;border-radius:8px;border:1px solid #1f2937;transition:border-color .12s}` +
       `.card:hover img{border-color:#8ab4ff}.card span{display:block;font-size:11px;color:#9aa4b2;margin-top:4px}</style>`,
     );
@@ -79,8 +84,10 @@ export async function GET(req: Request) {
   if (!person) return page(`<h1>Add a person.</h1><p><code>?ref=${idx}&person=a smiling young woman</code></p>`);
 
   const t0 = Date.now();
-  const { url, error } = await forensicPersonSwap(ref.url, person, { ratio: "1:1", resolution: "2k" });
-  await recordUsage({ clientId: client.id, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "forensic-swap-test", count: 1 }).catch(() => {});
+  // 4K + humaniser pass, per Gary: clarity must match the reference and the skin must read real. The humanise
+  // pass is a second image, so this run meters 2.
+  const { url, rawUrl, error, humanised } = await forensicSwap(ref.url, { person, scene, ratio: "1:1", resolution: "4k", humanise: true });
+  await recordUsage({ clientId: client.id, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "forensic-swap-test", count: humanised ? 2 : 1 }).catch(() => {});
   const secs = ((Date.now() - t0) / 1000).toFixed(0);
 
   if (!url) {
@@ -88,18 +95,24 @@ export async function GET(req: Request) {
       `<p><a href="?">Back to the gallery</a></p>`);
   }
 
+  const sceneLine = scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural";
   return page(
-    `<h1>Forensic swap - reference #${idx} - ${secs}s</h1>` +
-    `<p style="color:#9aa4b2">Person: "${person.replace(/</g, "&lt;")}". The right image should differ from the left ONLY in the person. ` +
-    `Check the logo, the legal strip, the disc and any text are unchanged.</p>` +
+    `<h1>Forensic swap - reference #${idx} - ${secs}s${humanised ? " · humanised" : ""}</h1>` +
+    `<p style="color:#9aa4b2">Lifestyle: "${person.replace(/</g, "&lt;")}"${sceneLine}. ` +
+    `The swish, the logo and the callouts should be unchanged. The person and the scene are meant to differ. ` +
+    `Judge the skin, the clarity, and whether the brand furniture held.</p>` +
     `<div class="cmp">` +
     `<figure style="margin:0"><h2>REFERENCE (your design)</h2><img src="${ref.url}"></figure>` +
-    `<figure style="margin:0"><h2>RESULT (person swapped)</h2><img src="${url}"></figure>` +
+    `<figure style="margin:0"><h2>RESULT (4K${humanised ? " + humaniser" : ""})</h2><img src="${url}"></figure>` +
     `</div>` +
-    `<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">` +
-    `<input id="person" value="${person.replace(/"/g, "&quot;")}" style="flex:1;min-width:280px;padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
-    `<button onclick="go()" style="padding:10px 18px;border-radius:9px;border:0;background:#8ab4ff;color:#0b0f14;font-weight:700;cursor:pointer">Run again</button>` +
-    `<a href="?" style="padding:10px 4px">Back to the gallery</a></div>` +
-    `<script>function go(){var p=encodeURIComponent(document.getElementById('person').value||'a person');document.body.style.opacity=.5;location.href='?ref=${idx}&person='+p;}</script>`,
+    (rawUrl && rawUrl !== url ? `<p style="margin-top:8px;font-size:12px"><a href="${rawUrl}" target="_blank">view the pre-humaniser version</a> (so you can tell me if the humaniser pass helped or hurt)</p>` : "") +
+    `<div style="margin-top:16px;display:grid;gap:8px;max-width:680px">` +
+    `<input id="person" value="${person.replace(/"/g, "&quot;")}" placeholder="lifestyle" style="padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
+    `<input id="scene" value="${scene.replace(/"/g, "&quot;")}" placeholder="scenery (blank = natural)" style="padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
+    `<div style="display:flex;gap:8px;align-items:center"><button onclick="go()" style="padding:10px 18px;border-radius:9px;border:0;background:#8ab4ff;color:#0b0f14;font-weight:700;cursor:pointer">Run again</button>` +
+    `<a href="?" style="padding:10px 4px">Back to the gallery</a></div></div>` +
+    `<script>function go(){var p=encodeURIComponent(document.getElementById('person').value||'a person');` +
+    `var s=encodeURIComponent(document.getElementById('scene').value||'');` +
+    `document.body.style.opacity=.5;location.href='?ref=${idx}&person='+p+'&scene='+s;}</script>`,
   );
 }

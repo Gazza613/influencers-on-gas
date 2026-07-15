@@ -414,50 +414,84 @@ export async function editImageUrl(url: string, opts: { instruction: string; rat
   return out;
 }
 
-// FORENSIC PERSON-SWAP. Take a FINISHED reference advert and reproduce it identically, changing ONLY the
-// human. This is the core of the reference-match studio: the design you picked is the design you get, with a
-// different person in it.
+// FORENSIC BRAND-FURNITURE SWAP. Take a FINISHED reference advert and keep only what makes it MoMo's -
+// Gary: "we are only locking in the swish, the logo, the callouts. You can change the scene."
 //
-// It is a person-swap and NOT a "generate in the style of", which is the whole lesson from the fake-advert
-// run. The model is handed one finished layout and told to leave every graphic, letter, logo and pixel of
-// background exactly where it is - it is not composing anything. nano_banana_pro is strong at precisely this.
+// So the LOCK set is deliberately narrow: the light swish, the MoMo logo, and the callouts (deal cards + their
+// text). Everything photographic - the person AND the scene around them - is free to change. That is the whole
+// value: the Producer puts the right person in the right setting while the brand furniture stays exactly put.
 //
-// Returns the error too, because the first live run is a fidelity check and "it just came back null" tells us
-// nothing about why.
-export async function forensicPersonSwap(url: string, person: string, opts: { ratio?: string; resolution?: "2k" | "4k" } = {}): Promise<{ url: string | null; error: string | null }> {
-  if (!isSafePublicUrl(url)) return { url: null, error: "reference url is not a safe public url" };
+// It is still a targeted EDIT of one finished layout, never a "generate in the style of" - which is the lesson
+// from the fake-advert run, where too much freedom produced a ghost logo and garbled type.
+//
+// SKIN. Gary: "humaniser and skin tone needs to be better." The swap prompt pushes hard for real skin, and
+// when humanise=true we then run the dedicated Humaniser pass over the result - the same tool that kills the
+// plastic look on the influencer side. Returned as a separate stage url so the effect can be judged, not
+// assumed.
+export async function forensicSwap(url: string, opts: {
+  person: string;
+  scene?: string;
+  ratio?: string;
+  resolution?: "2k" | "4k";
+  humanise?: boolean;
+}): Promise<{ url: string | null; rawUrl: string | null; error: string | null; humanised: boolean }> {
+  if (!isSafePublicUrl(url)) return { url: null, rawUrl: null, error: "reference url is not a safe public url", humanised: false };
+  const resolution = opts.resolution || "4k"; // clarity: the reference is high-res; match it, do not soften it
   try {
     const imageId = await importMediaUrl(url);
-    if (!imageId) return { url: null, error: "could not import the reference into Higgsfield" };
+    if (!imageId) return { url: null, rawUrl: null, error: "could not import the reference into Higgsfield", humanised: false };
     const { call } = await openSession();
     const ar = opts.ratio || "1:1";
+    const scene = opts.scene?.trim()
+      ? `a real setting: ${opts.scene.trim()}`
+      : `a real, natural setting that suits the brand and the person`;
+
     const params: AnyObj = {
       ...baseParams("nano_banana_pro", ar),
       prompt:
-        `@image1 is a FINISHED, APPROVED advertisement. Reproduce it EXACTLY and identically, pixel for pixel: ` +
-        `the same layout and composition, the same background, the same yellow disc and light ring, the same ` +
-        `logo at the same size and position, ALL text and legal wording at the same size, font, colour and ` +
-        `position, the same deal cards, the same colour grade. ` +
-        `\n\nChange ONE thing only: the human person. Replace them with ${person}. The new person must sit in ` +
-        `the SAME position, at the SAME scale, in the SAME pose and crop as the original person, lit to match ` +
-        `the existing light exactly, holding or interacting with anything they hold the same way. A real, ` +
-        `natural photograph of a real South African person - authentic skin with visible texture, never plastic. ` +
-        `\n\nDo NOT move, resize, recolour, restyle, re-typeset or regenerate the logo, any text, the legal ` +
-        `strip, the disc, the ring, the deal cards or the background. If it is not the person, it does not ` +
-        `change. Every letter and every graphic stays exactly as it is in @image1.`,
+        `@image1 is a FINISHED MTN MoMo advertisement. ` +
+        `KEEP THESE THREE THINGS EXACTLY as they are in @image1 - same shape, size, position, colour and wording, ` +
+        `do NOT move, resize, restyle, re-typeset or regenerate them: ` +
+        `(1) the curved light SWISH / ring graphic, ` +
+        `(2) the MoMo LOGO, ` +
+        `(3) the CALLOUTS - the deal cards and every word of text on them. ` +
+        `\n\nCHANGE the photographic content beneath and around that furniture: ` +
+        `the PERSON becomes ${person(opts.person)}, and the SCENE becomes ${scene}. ` +
+        `Compose it naturally - the person believably placed in the scene, well lit, the brand furniture sitting ` +
+        `cleanly on top exactly as before. ` +
+        `\n\nThe person must be a REAL South African person photographed on a real camera: authentic skin with ` +
+        `visible pores and natural texture and true, even skin tone - never plastic, never waxy, never airbrushed, ` +
+        `never an over-smoothed 3D render. Sharp, clean, high-resolution, editorial quality.`,
       medias: [{ value: imageId, role: "image" }],
+      resolution,
     };
-    if (opts.resolution) params.resolution = opts.resolution;
     const r = await call("generate_image", { params });
     let out: string | null = extractImageUrls(r)[0] ?? null;
     const jobId = extractJobIds(r)[0] ?? null;
     if (!out && jobId) out = await pollJob(call, jobId, 60);
-    if (out) return { url: out, error: null };
-    const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
-    return { url: null, error: `no image back: ${raw}`.slice(0, 280) };
+    if (!out) {
+      const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+      return { url: null, rawUrl: null, error: `no image back: ${raw}`.slice(0, 280), humanised: false };
+    }
+
+    // THE HUMANISER PASS. Refines ONLY the skin so the person reads real, holding the rest of the frame.
+    if (opts.humanise) {
+      const skinned = await humaniseUrl(out, {
+        prompt: "real photographic skin with visible pores, fine texture and even, natural tone; remove any plastic, waxy or airbrushed look.",
+        ratio: ar,
+        resolution,
+      }).catch(() => null);
+      if (skinned) return { url: skinned, rawUrl: out, error: null, humanised: true };
+    }
+    return { url: out, rawUrl: out, error: null, humanised: false };
   } catch (e) {
-    return { url: null, error: String((e as Error)?.message || e).slice(0, 200) };
+    return { url: null, rawUrl: null, error: String((e as Error)?.message || e).slice(0, 200), humanised: false };
   }
+}
+
+function person(p: string): string {
+  const t = p.trim();
+  return t || "a real South African person";
 }
 
 // Enumerate the Higgsfield MCP tools + their input schemas (discovery).
