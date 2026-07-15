@@ -15,6 +15,27 @@ import type { Deal } from "./studio-producer";
 const MOMO_YELLOW = "#F9CB0F";
 const MOMO_BLUE = "#004F71";
 
+// Split a headline into two BALANCED lines. If the copy already carries a "/", honour it. Otherwise break it
+// at the word boundary nearest the middle, so a long single phrase ("Share in the joy this mothers day") becomes
+// two lines instead of one that runs off the edge (Gary: "cut off").
+export function balanceHeadline(callout: string): [string, string] {
+  const raw = String(callout || "").trim();
+  if (raw.includes("/")) {
+    const [a, ...rest] = raw.split("/");
+    return [a.trim(), rest.join("/").trim()];
+  }
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return [raw, ""];
+  const total = raw.length;
+  let best = 1, bestDiff = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const left = words.slice(0, i).join(" ").length;
+    const diff = Math.abs(left - (total - left));
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  }
+  return [words.slice(0, best).join(" "), words.slice(best).join(" ")];
+}
+
 export async function typesetSliderHeadline(
   baseBuf: Buffer,
   line1: string,
@@ -24,28 +45,37 @@ export async function typesetSliderHeadline(
 ): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
-  const size = Math.round(H * 0.082); // ~88px on a 1080 canvas
+  // Auto-fit: size the headline so the LONGEST line fits inside ~86% of the width, capped to a sane band. A
+  // heavy italic glyph averages ~0.54*fontSize wide, so this keeps even a long line on-canvas (no clipping).
+  const longest = Math.max(line1.length, line2.length, 1);
+  const fitW = W * 0.86;
+  const size = Math.max(Math.round(H * 0.045), Math.min(Math.round(H * 0.09), Math.floor(fitW / (longest * 0.54))));
 
   const esc = (t: string) => String(t).replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const legalLine = (legal || "").trim();
+  // Match the gold-standard slider: NOT a heavy blue bar. A SOFT gradient for headline legibility over the
+  // photo, plus a THIN solid navy footer at the very bottom that carries the two-line legal disclaimer.
+  const footH = legalLine ? 9 : 0;            // % height of the navy legal footer
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${fontFaceCss(fonts)}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
-/* The dark foot of the slider. It carries the headline and the legal line. Anchored to the very bottom so both
-   have a solid navy backing, but kept short (top ~36%) so it does not creep up the photo (Gary: "too high"). */
-.scrim{position:absolute;left:0;right:0;bottom:0;height:36%;
-  background:linear-gradient(to top, ${MOMO_BLUE} 0%, ${MOMO_BLUE} 42%, ${MOMO_BLUE}AA 70%, transparent 100%)}
-.head{position:absolute;left:0;right:0;bottom:${legalLine ? "12%" : "9%"};text-align:center;padding:0 7%;
+/* Soft gradient for the headline - the photo shows through, no hard bar (Gary: "blue shading too high"). */
+.grad{position:absolute;left:0;right:0;bottom:${footH}%;height:26%;
+  background:linear-gradient(to top, ${MOMO_BLUE}D9 0%, ${MOMO_BLUE}7A 44%, transparent 100%)}
+/* The thin solid navy footer, only as tall as the legal needs. */
+.foot{position:absolute;left:0;right:0;bottom:0;height:${footH}%;background:${MOMO_BLUE}}
+.head{position:absolute;left:0;right:0;bottom:${footH + 3}%;text-align:center;padding:0 7%;
   font-family:'MTNBrighterSans',sans-serif;font-weight:800;line-height:1.04;-webkit-font-smoothing:antialiased}
-.head .l1,.head .l2{font-size:${size}px;letter-spacing:-1px;text-shadow:0 3px 16px rgba(0,0,0,.55);white-space:nowrap}
+.head .l1,.head .l2{font-size:${size}px;letter-spacing:-1px;text-shadow:0 3px 16px rgba(0,0,0,.55);white-space:normal;overflow-wrap:break-word}
 .head .l1{color:#fff}
 .head .l2{color:${MOMO_YELLOW}}
-.legal{position:absolute;left:0;right:0;bottom:2.6%;text-align:center;padding:0 9%;
-  font-family:'MTNBrighterSans',sans-serif;font-weight:500;line-height:1.25;color:rgba(255,255,255,.82);
-  font-size:${Math.round(H * 0.0165)}px}
+.legal{position:absolute;left:0;right:0;bottom:${(footH / 2)}%;transform:translateY(50%);text-align:center;padding:0 7%;
+  font-family:'MTNBrighterSans',sans-serif;font-weight:500;line-height:1.3;color:rgba(255,255,255,.9);
+  font-size:${Math.round(H * 0.0155)}px}
 </style></head><body>
-<div class="scrim"></div>
+<div class="grad"></div>
+${legalLine ? `<div class="foot"></div>` : ""}
 <div class="head"><div class="l1">${esc(line1)}</div><div class="l2">${esc(line2)}</div></div>
 ${legalLine ? `<div class="legal">${esc(legalLine)}</div>` : ""}
 </body></html>`;
@@ -64,29 +94,71 @@ ${legalLine ? `<div class="legal">${esc(legalLine)}</div>` : ""}
 export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xPct: number; yPct: number; wPct: number }): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
-  const b = box || { xPct: 3.5, yPct: 3, wPct: 22 };
+  const b = box || { xPct: 4, yPct: 4, wPct: 28 };
   // Normalise: the detector returns 0-100; a fallback may pass fractions of 100 already.
   const wFrac = (b.wPct > 1 ? b.wPct / 100 : b.wPct);
   const xFrac = (b.xPct > 1 ? b.xPct / 100 : b.xPct);
   const yFrac = (b.yPct > 1 ? b.yPct / 100 : b.yPct);
 
-  const clampedW = Math.min(0.30, Math.max(0.20, wFrac)); // sensible logo size; generous to fully cover the garble
+  // FORENSIC placement: honour the reference's own logo box (position + size), only clamped to sane bounds. The
+  // gold-standard slider logo is large (~28-32% wide), so allow up to 38%. Trim the logo's transparent padding
+  // first so it fills the box instead of floating small inside it (Gary: "logo too small").
+  const trimmed = await sharp(logoBuf).trim().png().toBuffer().catch(() => logoBuf);
+  const clampedW = Math.min(0.38, Math.max(0.18, wFrac));
   const targetW = Math.round(W * clampedW);
-  const logo = await sharp(logoBuf).resize({ width: targetW }).png().toBuffer();
-  const left = Math.max(0, Math.round(W * Math.min(xFrac, 0.03)));  // cover from the top-left corner, never inset
-  const top = Math.max(0, Math.round(H * Math.min(yFrac, 0.03)));
+  const logo = await sharp(trimmed).resize({ width: targetW }).png().toBuffer();
+  const lm = await sharp(logo).metadata();
+  const left = Math.max(0, Math.min(Math.round(W * xFrac), W - (lm.width || targetW)));
+  const top = Math.max(0, Math.min(Math.round(H * yFrac), H - (lm.height || 0)));
   return sharp(baseBuf).composite([{ input: logo, left, top }]).png().toBuffer();
+}
+
+// Average luminance (0-255) of a region of the image, so we can pick the logo colour that will READ there.
+async function regionLuminance(buf: Buffer, box: { xPct: number; yPct: number; wPct: number }): Promise<number> {
+  try {
+    const meta = await sharp(buf).metadata();
+    const W = meta.width || 1080, H = meta.height || 1080;
+    const xF = box.xPct > 1 ? box.xPct / 100 : box.xPct;
+    const yF = box.yPct > 1 ? box.yPct / 100 : box.yPct;
+    const wF = box.wPct > 1 ? box.wPct / 100 : box.wPct;
+    const left = Math.max(0, Math.round(W * xF));
+    const top = Math.max(0, Math.round(H * yF));
+    const width = Math.max(8, Math.min(Math.round(W * Math.max(wF, 0.1)), W - left));
+    const height = Math.max(8, Math.min(Math.round(H * 0.12), H - top));
+    const { channels } = await sharp(buf).extract({ left, top, width, height }).stats();
+    const [r, g, b] = channels.map((c) => c.mean);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  } catch { return 128; }
 }
 
 // FINISH A SLIDER: typeset the campaign headline over the baked one, and stamp the REAL logo over whatever the
 // model drew. One place, used by the wizard and the full-set flow, so both get the same brand-safe finish.
 import { typesetSliderHeadline as _typeset } from "./studio-slider";
 import { getBrandKit } from "./studio";
+import { detectLayout } from "./studio-layout";
 import { putBytes } from "./blob";
 
-function pickLogo(logos: { name: string | null; url: string }[]): { url: string } | null {
+// Pick the logo lockup that will READ on this background. Gary: "you use blue and yellow logos - choose the
+// best for visibility." A DARK background wants the light-reading variant (yellow/white lockup); a LIGHT
+// background wants the navy/colour variant. Falls back to the strongest horizontal/colour lockup by name.
+function pickLogoForBg(logos: { name: string | null; url: string }[], bgLum: number): { url: string } | null {
   if (!logos?.length) return null;
-  const score = (n: string) => { const s = n.toLowerCase(); let v = 0; if (/mono|black|white|grey|gray/.test(s)) v -= 5; if (/stack|vert/.test(s)) v -= 3; if (/horiz|primary|full|colou?r/.test(s)) v += 3; if (/momo/.test(s)) v += 2; return v; };
+  const dark = bgLum < 130; // background luminance 0-255
+  const score = (n: string) => {
+    const s = (n || "").toLowerCase();
+    let v = 0;
+    if (/momo/.test(s)) v += 1;
+    if (/horiz|primary|full/.test(s)) v += 2;
+    if (/stack|vert|icon|mark/.test(s)) v -= 2;
+    if (dark) { // want a light-reading logo
+      if (/white|reverse|reversed|yellow|light|on.?dark|dark.?bg/.test(s)) v += 5;
+      if (/navy|blue|black|on.?light|light.?bg/.test(s)) v -= 4;
+    } else { // want a dark/colour logo
+      if (/navy|blue|colou?r|dark|primary|on.?light/.test(s)) v += 5;
+      if (/white|reverse|reversed|mono.?white|on.?dark/.test(s)) v -= 4;
+    }
+    return v;
+  };
   return [...logos].sort((a, b) => score(b.name || "") - score(a.name || ""))[0];
 }
 
@@ -164,37 +236,41 @@ export async function overlayPill(
   return sharp(baseBuf).composite([{ input: pill, left, top }]).png().toBuffer();
 }
 
-export async function finishSlider(clientId: string, _referenceUrl: string, swapUrl: string, callout: string, deal?: Deal | null): Promise<string> {
+export async function finishSlider(clientId: string, referenceUrl: string, swapUrl: string, callout: string, deal?: Deal | null): Promise<string> {
   const kit = await getBrandKit(clientId).catch(() => null);
   const fonts = (kit?.fonts || []) as { family: string; url: string }[];
   let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(swapUrl)).arrayBuffer()));
-  // The swap now returns a CLEAN photograph with NO baked furniture, so we no longer need to detect and cover
-  // the reference's logo/deal - we place OURS at fixed, reliable slider positions and they are the only ones
-  // in the frame. Nothing can garble because the AI never drew any of it.
 
-  // Headline + legal: split "line 1 / line 2" (the Producer's campaign headline) and typeset it over the dark
-  // foot scrim, with the brand kit's bank-free creative legal line beneath it (the plate is clean, so the
-  // reference's baked legal strip is gone - we composite the compliant one back).
+  // FORENSIC placement (Gary): "change only the people and the callouts, keep everything else as the reference."
+  // The swap returns a clean photograph, so we lay OUR real logo, deal and legal at the REFERENCE'S own
+  // positions (no doubling risk, because the plate is clean). One layout read gives us those boxes.
+  const layout = await detectLayout(referenceUrl).catch(() => null);
+
+  // Headline + legal: the Producer's campaign headline over a soft gradient, and the exact reference disclaimer
+  // in the thin navy footer.
   const legal = (kit?.creative_legal_text || "").trim() || null;
   if (callout.trim() || legal) {
-    const [l1, l2] = callout.split("/").map((x) => x.trim());
+    const [l1, l2] = balanceHeadline(callout);
     try {
       out = (await _typeset(out, l1 || callout, l2 || "", fonts, legal)) as Buffer;
     } catch (e) {
       console.error("[finishSlider] headline typeset FAILED:", e);
     }
   }
-  // Deal: stamp OUR real deal card (the campaign's chosen deal) top-right. Fixed position - clean plate.
+  // Deal: stamp the campaign's chosen deal card at the reference's own deal-card box (top-right).
   if (deal && deal.label && deal.price) {
-    try { out = (await overlayDeal(out, deal, fonts, null)) as Buffer; }
+    try { out = (await overlayDeal(out, deal, fonts, layout?.callout)) as Buffer; }
     catch (e) { console.error("[finishSlider] deal overlay failed:", e); }
   }
-  // Logo: stamp the real brand lockup top-left. Fixed position - this is the ONLY logo in the frame now.
-  const logo = pickLogo((kit?.logos || []) as { name: string | null; url: string }[]);
+  // Logo: place the real lockup at the reference's own logo box, and choose the colour variant that reads on the
+  // background there (yellow/white on a dark photo, navy/colour on a light one).
+  const logoBox = layout?.logo || { xPct: 4, yPct: 4, wPct: 28 };
+  const bgLum = await regionLuminance(out, logoBox);
+  const logo = pickLogoForBg((kit?.logos || []) as { name: string | null; url: string }[], bgLum);
   if (logo) {
     try {
       const logoBuf = Buffer.from(await (await fetch(logo.url)).arrayBuffer());
-      out = (await compositeLogo(out, logoBuf, { xPct: 3, yPct: 3, wPct: 24 })) as Buffer;
+      out = (await compositeLogo(out, logoBuf, logoBox)) as Buffer;
     } catch (e) { console.error("[finishSlider] logo composite failed:", e); }
   }
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");
