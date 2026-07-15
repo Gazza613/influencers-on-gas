@@ -8,24 +8,34 @@ import { recordUsage } from "./usage";
 
 const bufOf = (u: string) => fetch(u).then((r) => r.arrayBuffer()).then((b) => Buffer.from(b));
 
-// BUILD ONE MASTHEAD / SECTION-1. Gary's simplification: the transparent cut-out was fragile (ragged edges,
-// a failing person-mask that doubled the furniture). So we DROP the strip + forensic-furniture composite.
-// Instead: swap the person, cut the design with the reference's own (eroded) alpha, and flatten it onto the
-// EXACT Webflow section colour - navy gradient for the masthead, white for section-1. The edge halo vanishes
-// into the colour match, and there is no mask to fail.
+// BUILD ONE MASTHEAD / SECTION-1. NO CUT-OUT (Gary: "see a decent image with no cut outs").
+//
+// Every cut approach ragged-edged, because the new person's hair/shoulders never match the original
+// silhouette we were cutting with. So we never cut. Instead:
+//   1. composite the reference (transparent) onto the EXACT funnel colour -> a COMPLETE finished ad on navy
+//      (masthead) or white (section-1);
+//   2. swap ONLY the person on that whole image - the model keeps the background, disc and furniture as one
+//      continuous picture, and returns a complete image with no edge to tear.
+// The output is already on the funnel colour, so it drops straight into the Webflow section.
 export async function buildDiscCreative(clientId: string, kind: string, refUrl: string, person: string, ratio: string): Promise<{ url: string; error: string | null; calls: number }> {
-  const swap = await forensicSwap(refUrl, { person, construction: "disc", ratio, resolution: "4k", humanise: true });
-  const calls = 1 + (swap.humanised ? 1 : 0);
-  if (!swap.url) return { url: "", error: swap.error || "swap failed", calls };
-
+  const bgKind = /section/i.test(kind) ? "section1" : "masthead";
   try {
-    const cut = await applyReferenceAlpha(await bufOf(swap.url), await bufOf(refUrl)); // eroded edge, transparent
-    const bgKind = /section/i.test(kind) ? "section1" : "masthead";
-    const flat = await onFunnelBackground(cut, bgKind);
-    const url = await putBytes(flat, `studio/${clientId}/${kind}`, "png", "image/png");
+    // A complete ad on the funnel colour becomes the base the swap edits.
+    const base = await onFunnelBackground(await bufOf(refUrl), bgKind);
+    const baseUrl = await putBytes(base, `studio/${clientId}/${kind}-base`, "png", "image/png");
+
+    const swap = await forensicSwap(baseUrl, { person, construction: "disc", ratio, resolution: "4k", humanise: true });
+    const calls = 1 + (swap.humanised ? 1 : 0);
+    if (!swap.url) return { url: "", error: swap.error || "swap failed", calls };
+
+    // Already a complete image on the funnel colour - just normalise to the reference's exact pixel size.
+    const meta = await sharp(await bufOf(refUrl)).metadata().catch(() => null);
+    let out = await bufOf(swap.url);
+    if (meta?.width && meta?.height) out = await sharp(out).resize(meta.width, meta.height, { fit: "fill" }).png().toBuffer();
+    const url = await putBytes(out, `studio/${clientId}/${kind}`, "png", "image/png");
     return { url, error: null, calls };
   } catch (e) {
-    return { url: "", error: String((e as Error)?.message || e).slice(0, 160), calls };
+    return { url: "", error: String((e as Error)?.message || e).slice(0, 160), calls: 0 };
   }
 }
 

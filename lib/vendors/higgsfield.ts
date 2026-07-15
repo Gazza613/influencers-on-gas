@@ -461,15 +461,15 @@ export async function forensicSwap(url: string, opts: {
     // DISC construction (masthead + section 1): the background is NOT a scene, it is the brand's yellow disc on
     // a dark field. Keep it. Swap only the person, as a cut-out figure standing in front of the disc.
     const discPrompt =
-      `@image1 is a FINISHED MTN MoMo advert built on the brand's signature construction: a cut-out person ` +
-      `standing IN FRONT OF a big YELLOW DISC on a DARK background, with brand furniture around them (logo/badge, ` +
-      `floating icon bubbles, a callout, a light swish). ` +
-      `\n\nKEEP EXACTLY, unchanged - same shape, size, position, colour and wording: the YELLOW DISC, the DARK ` +
-      `BACKGROUND, the logo/badge, EVERY floating icon bubble, the callout and all its text, and the swish. ` +
-      `\n\nCHANGE ONE THING ONLY: the person becomes ${person(opts.person)}. Keep them as a CUT-OUT figure in ` +
-      `front of the yellow disc, at the same size, position, pose and crop, lit to match. Do NOT put them in a ` +
-      `room, a street, a market or any scene - the background stays the dark brand field with the yellow disc, ` +
-      `exactly as in @image1. ${skin}`;
+      `@image1 is a FINISHED, COMPLETE MTN MoMo advert: a person in front of a big YELLOW DISC on a SOLID ` +
+      `background colour, with brand furniture around them (logo/badge, floating icon bubbles, a callout, a ` +
+      `light swish). It is already a finished picture - treat it as one. ` +
+      `\n\nKEEP EXACTLY, unchanged - same shape, size, position, colour and wording: the SOLID BACKGROUND COLOUR ` +
+      `(do not change its colour, do not add a room, street, market or any scene), the YELLOW DISC, the ` +
+      `logo/badge, EVERY floating icon bubble, the callout and all its text, and the swish. ` +
+      `\n\nCHANGE ONE THING ONLY: the person becomes ${person(opts.person)}, at the same size, position, pose ` +
+      `and crop, lit to match, blended naturally into the SAME solid background - NOT cut out, no hard outline, ` +
+      `no torn or ragged edge around them. Output a complete, finished, seamless picture. ${skin}`;
 
     // SCENE construction (slider): a full-bleed photograph. Change person + scene, keep the furniture on top.
     const scene = opts.scene?.trim() ? `a real setting: ${opts.scene.trim()}` : `a real, natural setting that suits the brand and the person`;
