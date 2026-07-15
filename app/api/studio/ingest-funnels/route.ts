@@ -55,17 +55,20 @@ export async function GET() {
   if (!client) return NextResponse.json({ error: "no client" }, { status: 400 });
 
   await db().query("delete from knowledge_chunks where client_id=$1 and metadata->>'kind'='funnel'", [client.id]);
-  const out: Record<string, unknown>[] = [];
-  let total = 0;
-  for (const [name, url] of FUNNELS) {
+
+  // Fetch all 20 IN PARALLEL (10s each), not one-after-another - the sequential version took minutes and just
+  // spun the browser. Then chunk everything and embed in one pass.
+  const fetched = await Promise.all(FUNNELS.map(async ([name, url]) => {
     try {
-      const html = await (await fetch(url, { signal: AbortSignal.timeout(25000) })).text();
+      const html = await (await fetch(url, { signal: AbortSignal.timeout(10000) })).text();
       const text = toText(html);
-      if (text.length < 200) { out.push({ name, chunks: 0, note: "thin" }); continue; }
-      const chunks = chunk(text).map((c) => ({ content: c, metadata: { kind: "funnel", campaign: name, url } }));
-      const n = await ingestChunks(client.id, null, chunks);
-      total += n; out.push({ name, chunks: n });
-    } catch (e) { out.push({ name, error: String((e as Error)?.message || e).slice(0, 100) }); }
-  }
+      if (text.length < 200) return { name, url, chunks: [] as string[], note: "thin" };
+      return { name, url, chunks: chunk(text).slice(0, 14) }; // cap per funnel so embedding stays quick
+    } catch (e) { return { name, url, chunks: [] as string[], note: String((e as Error)?.message || e).slice(0, 80) }; }
+  }));
+
+  const items = fetched.flatMap((f) => f.chunks.map((c) => ({ content: c, metadata: { kind: "funnel", campaign: f.name, url: f.url } })));
+  const total = await ingestChunks(client.id, null, items);
+  const out = fetched.map((f) => ({ name: f.name, chunks: f.chunks.length, ...(f.note ? { note: f.note } : {}) }));
   return NextResponse.json({ ok: true, brain: client.name, totalChunks: total, funnels: out });
 }
