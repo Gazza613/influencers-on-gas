@@ -63,11 +63,11 @@ export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xP
   const xFrac = (b.xPct > 1 ? b.xPct / 100 : b.xPct);
   const yFrac = (b.yPct > 1 ? b.yPct / 100 : b.yPct);
 
-  const clampedW = Math.min(0.26, Math.max(0.16, wFrac)); // keep the logo a sensible size; detector over/under-estimates
-  const targetW = Math.round(W * clampedW * 1.04); // small margin to guarantee full cover of the garbled logo
+  const clampedW = Math.min(0.30, Math.max(0.20, wFrac)); // sensible logo size; generous to fully cover the garble
+  const targetW = Math.round(W * clampedW);
   const logo = await sharp(logoBuf).resize({ width: targetW }).png().toBuffer();
-  const left = Math.max(0, Math.round(W * xFrac - W * wFrac * 0.02));
-  const top = Math.max(0, Math.round(H * yFrac - H * 0.01));
+  const left = Math.max(0, Math.round(W * Math.min(xFrac, 0.03)));  // cover from the top-left corner, never inset
+  const top = Math.max(0, Math.round(H * Math.min(yFrac, 0.03)));
   return sharp(baseBuf).composite([{ input: logo, left, top }]).png().toBuffer();
 }
 
@@ -75,7 +75,6 @@ export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xP
 // model drew. One place, used by the wizard and the full-set flow, so both get the same brand-safe finish.
 import { typesetSliderHeadline as _typeset } from "./studio-slider";
 import { getBrandKit } from "./studio";
-import { detectLayout } from "./studio-layout";
 import { putBytes } from "./blob";
 
 function pickLogo(logos: { name: string | null; url: string }[]): { url: string } | null {
@@ -89,21 +88,24 @@ export async function finishSlider(clientId: string, referenceUrl: string, swapU
   const fonts = (kit?.fonts || []) as { family: string; url: string }[];
   let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(swapUrl)).arrayBuffer()));
 
-  // Headline: split "line 1 / line 2" (the Producer's campaign headline), typeset it.
+  // Headline: split "line 1 / line 2" (the Producer's campaign headline), typeset it. Do NOT swallow a failure
+  // silently - that is exactly how the reference's baked headline was slipping through un-themed.
   if (callout.trim()) {
     const [l1, l2] = callout.split("/").map((x) => x.trim());
-    out = (await _typeset(out, l1 || callout, l2 || "", fonts).catch(() => out)) as Buffer;
+    try {
+      out = (await _typeset(out, l1 || callout, l2 || "", fonts)) as Buffer;
+    } catch (e) {
+      console.error("[finishSlider] headline typeset FAILED (headline will be the reference's):", e);
+    }
   }
-  // Logo: cover the (possibly garbled) logo with the real brand lockup, positioned from the detected box.
+  // Logo: cover the (garbled) logo with the real brand lockup, from the top-left corner (fixed, reliable -
+  // detection was landing off and doubling the logo).
   const logo = pickLogo((kit?.logos || []) as { name: string | null; url: string }[]);
   if (logo) {
     try {
-      const [logoBuf, layout] = await Promise.all([
-        fetch(logo.url).then((r) => r.arrayBuffer()).then((b) => Buffer.from(b)),
-        detectLayout(referenceUrl).catch(() => null),
-      ]);
-      out = (await compositeLogo(out, logoBuf, layout?.logo || undefined)) as Buffer;
-    } catch { /* keep the un-logo'd version rather than fail the whole creative */ }
+      const logoBuf = Buffer.from(await (await fetch(logo.url)).arrayBuffer());
+      out = (await compositeLogo(out, logoBuf, { xPct: 3, yPct: 3, wPct: 26 })) as Buffer;
+    } catch (e) { console.error("[finishSlider] logo composite failed:", e); }
   }
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");
 }

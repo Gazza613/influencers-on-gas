@@ -17,10 +17,13 @@ const nextConfig: NextConfig = {
     //     "Cannot find module /var/task/node_modules/playwright-core/browsers.json", a blank HTML 500.
     //     (We are on puppeteer-core now - see lib/studio-render.ts for why - but the same trap applies.)
     // Scoped to the produce function only - 80MB has no business riding along in every other route.
-    "/api/studio/campaign/produce": [
-      "./node_modules/@sparticuz/chromium/bin/**",
-      "./node_modules/puppeteer-core/**",
-    ],
+    // Every route that TYPESETS (headline overlay, etc.) via Chromium needs the browser traced in, or the
+    // render silently fails and the reference's baked copy shows through - which is exactly why the builder's
+    // sliders were coming back un-themed ("Deals Made for Your FYP" instead of the campaign headline).
+    "/api/studio/campaign/produce": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
+    "/api/studio/build": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
+    "/api/studio/build-all": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
+    "/api/studio/momo-set": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
   },
   images: {
     // Let the image optimiser fetch + downsize hero images from our two known hosts so the
