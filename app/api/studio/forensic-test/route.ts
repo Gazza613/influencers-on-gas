@@ -51,6 +51,8 @@ export async function GET(req: Request) {
   const refIdx = u.searchParams.get("ref");
   const person = (u.searchParams.get("person") || "").trim();
   const scene = (u.searchParams.get("scene") || "").trim();
+  // "disc" keeps the yellow disc + dark background (masthead / section 1); "scene" changes the setting (slider).
+  const construction = u.searchParams.get("disc") === "1" ? "disc" : "scene";
 
   // No reference chosen: show the gallery. CLICK a reference to run the swap - Gary should never have to hand-
   // edit a URL. The person box carries whatever he types straight into the click.
@@ -69,10 +71,13 @@ export async function GET(req: Request) {
       `<label style="display:block;margin:12px 0 6px;font-size:13px;color:#9aa4b2">Where are they? (scenery - leave blank to keep it natural)</label>` +
       `<input id="scene" placeholder="e.g. a warm township kitchen on a winter morning" ` +
       `style="width:100%;max-width:640px;padding:11px 13px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:15px">` +
+      `<label style="display:flex;gap:8px;align-items:center;margin:12px 0 2px;font-size:14px;color:#e5e7eb;cursor:pointer">` +
+      `<input type="checkbox" id="disc" style="width:17px;height:17px"> This is a Masthead / Section 1 - keep the yellow disc and dark background, do not change the scene</label>` +
       `<div class="grid">${cards}</div>` +
       `<script>function run(i){var p=encodeURIComponent(document.getElementById('person').value||'a smiling person');` +
       `var s=encodeURIComponent(document.getElementById('scene').value||'');` +
-      `document.body.style.opacity=.5;location.href='?ref='+i+'&person='+p+'&scene='+s;}</script>` +
+      `var d=document.getElementById('disc').checked?'1':'0';` +
+      `document.body.style.opacity=.5;location.href='?ref='+i+'&person='+p+'&scene='+s+'&disc='+d;}</script>` +
       `<style>.card{all:unset;cursor:pointer;display:block}.card img{width:100%;border-radius:8px;border:1px solid #1f2937;transition:border-color .12s}` +
       `.card:hover img{border-color:#8ab4ff}.card span{display:block;font-size:11px;color:#9aa4b2;margin-top:4px}</style>`,
     );
@@ -86,7 +91,7 @@ export async function GET(req: Request) {
   const t0 = Date.now();
   // 4K + humaniser pass, per Gary: clarity must match the reference and the skin must read real. The humanise
   // pass is a second image, so this run meters 2.
-  const { url, rawUrl, error, humanised } = await forensicSwap(ref.url, { person, scene, ratio: "1:1", resolution: "4k", humanise: true });
+  const { url, rawUrl, error, humanised } = await forensicSwap(ref.url, { person, scene, construction, ratio: "1:1", resolution: "4k", humanise: true });
   await recordUsage({ clientId: client.id, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "forensic-swap-test", count: humanised ? 2 : 1 }).catch(() => {});
   const secs = ((Date.now() - t0) / 1000).toFixed(0);
 
@@ -95,7 +100,7 @@ export async function GET(req: Request) {
       `<p><a href="?">Back to the gallery</a></p>`);
   }
 
-  const sceneLine = scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural";
+  const sceneLine = construction === "disc" ? " · disc kept (masthead/section 1)" : (scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural");
   return page(
     `<h1>Forensic swap - reference #${idx} - ${secs}s${humanised ? " · humanised" : ""}</h1>` +
     `<p style="color:#9aa4b2">Lifestyle: "${person.replace(/</g, "&lt;")}"${sceneLine}. ` +
@@ -113,6 +118,6 @@ export async function GET(req: Request) {
     `<a href="?" style="padding:10px 4px">Back to the gallery</a></div></div>` +
     `<script>function go(){var p=encodeURIComponent(document.getElementById('person').value||'a person');` +
     `var s=encodeURIComponent(document.getElementById('scene').value||'');` +
-    `document.body.style.opacity=.5;location.href='?ref=${idx}&person='+p+'&scene='+s;}</script>`,
+    `document.body.style.opacity=.5;location.href='?ref=${idx}&person='+p+'&scene='+s+'&disc=${construction === 'disc' ? '1' : '0'}';}</script>`,
   );
 }

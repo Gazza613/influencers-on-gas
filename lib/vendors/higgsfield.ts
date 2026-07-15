@@ -434,34 +434,52 @@ export async function forensicSwap(url: string, opts: {
   ratio?: string;
   resolution?: "2k" | "4k";
   humanise?: boolean;
+  /** "scene" = full-bleed slider, change person + scene. "disc" = masthead/section-1, keep the yellow disc
+   *  and dark background, swap ONLY the person. The two constructions are fundamentally different: a slider is
+   *  a photograph, a masthead is a cut-out figure on a disc, and putting a masthead subject in a scene destroys
+   *  the disc, which is the whole signature. */
+  construction?: "scene" | "disc";
 }): Promise<{ url: string | null; rawUrl: string | null; error: string | null; humanised: boolean }> {
   if (!isSafePublicUrl(url)) return { url: null, rawUrl: null, error: "reference url is not a safe public url", humanised: false };
   const resolution = opts.resolution || "4k"; // clarity: the reference is high-res; match it, do not soften it
+  const construction = opts.construction || "scene";
+  const skin = `The person must be a REAL South African person photographed on a real camera: authentic skin with ` +
+    `visible pores and natural texture and true, even skin tone - never plastic, never waxy, never airbrushed, ` +
+    `never an over-smoothed 3D render. Sharp, clean, high-resolution, editorial quality.`;
   try {
     const imageId = await importMediaUrl(url);
     if (!imageId) return { url: null, rawUrl: null, error: "could not import the reference into Higgsfield", humanised: false };
     const { call } = await openSession();
     const ar = opts.ratio || "1:1";
-    const scene = opts.scene?.trim()
-      ? `a real setting: ${opts.scene.trim()}`
-      : `a real, natural setting that suits the brand and the person`;
+
+    // DISC construction (masthead + section 1): the background is NOT a scene, it is the brand's yellow disc on
+    // a dark field. Keep it. Swap only the person, as a cut-out figure standing in front of the disc.
+    const discPrompt =
+      `@image1 is a FINISHED MTN MoMo advert built on the brand's signature construction: a cut-out person ` +
+      `standing IN FRONT OF a big YELLOW DISC on a DARK background, with brand furniture around them (logo/badge, ` +
+      `floating icon bubbles, a callout, a light swish). ` +
+      `\n\nKEEP EXACTLY, unchanged - same shape, size, position, colour and wording: the YELLOW DISC, the DARK ` +
+      `BACKGROUND, the logo/badge, EVERY floating icon bubble, the callout and all its text, and the swish. ` +
+      `\n\nCHANGE ONE THING ONLY: the person becomes ${person(opts.person)}. Keep them as a CUT-OUT figure in ` +
+      `front of the yellow disc, at the same size, position, pose and crop, lit to match. Do NOT put them in a ` +
+      `room, a street, a market or any scene - the background stays the dark brand field with the yellow disc, ` +
+      `exactly as in @image1. ${skin}`;
+
+    // SCENE construction (slider): a full-bleed photograph. Change person + scene, keep the furniture on top.
+    const scene = opts.scene?.trim() ? `a real setting: ${opts.scene.trim()}` : `a real, natural setting that suits the brand and the person`;
+    const scenePrompt =
+      `@image1 is a FINISHED MTN MoMo advertisement. ` +
+      `KEEP THESE THREE THINGS EXACTLY as they are in @image1 - same shape, size, position, colour and wording, ` +
+      `do NOT move, resize, restyle, re-typeset or regenerate them: ` +
+      `(1) the curved light SWISH / ring graphic, (2) the MoMo LOGO, (3) the CALLOUTS - the deal cards and every ` +
+      `word of text on them. ` +
+      `\n\nCHANGE the photographic content beneath and around that furniture: the PERSON becomes ${person(opts.person)}, ` +
+      `and the SCENE becomes ${scene}. Compose it naturally - the person believably placed in the scene, well lit, ` +
+      `the brand furniture sitting cleanly on top exactly as before. ${skin}`;
 
     const params: AnyObj = {
       ...baseParams("nano_banana_pro", ar),
-      prompt:
-        `@image1 is a FINISHED MTN MoMo advertisement. ` +
-        `KEEP THESE THREE THINGS EXACTLY as they are in @image1 - same shape, size, position, colour and wording, ` +
-        `do NOT move, resize, restyle, re-typeset or regenerate them: ` +
-        `(1) the curved light SWISH / ring graphic, ` +
-        `(2) the MoMo LOGO, ` +
-        `(3) the CALLOUTS - the deal cards and every word of text on them. ` +
-        `\n\nCHANGE the photographic content beneath and around that furniture: ` +
-        `the PERSON becomes ${person(opts.person)}, and the SCENE becomes ${scene}. ` +
-        `Compose it naturally - the person believably placed in the scene, well lit, the brand furniture sitting ` +
-        `cleanly on top exactly as before. ` +
-        `\n\nThe person must be a REAL South African person photographed on a real camera: authentic skin with ` +
-        `visible pores and natural texture and true, even skin tone - never plastic, never waxy, never airbrushed, ` +
-        `never an over-smoothed 3D render. Sharp, clean, high-resolution, editorial quality.`,
+      prompt: construction === "disc" ? discPrompt : scenePrompt,
       medias: [{ value: imageId, role: "image" }],
       resolution,
     };
