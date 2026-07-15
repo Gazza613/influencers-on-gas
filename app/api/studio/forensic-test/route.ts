@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { listStudioClients, listAssets } from "@/lib/studio";
 import { forensicSwap, stripPerson } from "@/lib/vendors/higgsfield";
+import { applyReferenceAlpha, onBackground } from "@/lib/studio-cutout";
+import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 
 // STEP 1 OF THE REFERENCE-MATCH STUDIO: a viewable fidelity gate, before any UI is built on top.
@@ -123,7 +125,23 @@ export async function GET(req: Request) {
       `<p><a href="?">Back to the gallery</a></p>`);
   }
 
-  const sceneLine = construction === "disc" ? " · disc kept (masthead/section 1)" : (scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural");
+  // MASTHEAD/SECTION-1 must be TRANSPARENT. The swap comes back opaque (with an invented surround); stamp the
+  // reference's own alpha onto it so the surround becomes transparent again, then preview on the funnel navy.
+  let shown = url;
+  let transparentUrl: string | null = null;
+  if (construction === "disc") {
+    try {
+      const [resBuf, refBuf] = await Promise.all([
+        fetch(url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b)),
+        fetch(ref.url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b)),
+      ]);
+      const transparent = await applyReferenceAlpha(resBuf, refBuf);
+      transparentUrl = await putBytes(transparent, `studio/${client.id}/masthead`, "png", "image/png");
+      const navy = await onBackground(transparent, "#0a3a52");
+      shown = await putBytes(navy, `studio/${client.id}/masthead-preview`, "png", "image/png");
+    } catch { /* fall back to the opaque result if the alpha stamp fails */ }
+  }
+  const sceneLine = construction === "disc" ? " · masthead, transparent PNG on funnel navy" : (scene ? ` · scene: "${scene.replace(/</g, "&lt;")}"` : " · scene kept natural");
   return page(
     `<h1>Forensic swap - reference #${idx} - ${secs}s${humanised ? " · humanised" : ""}</h1>` +
     `<p style="color:#9aa4b2">Lifestyle: "${person.replace(/</g, "&lt;")}"${sceneLine}. ` +
@@ -131,9 +149,10 @@ export async function GET(req: Request) {
     `Judge the skin, the clarity, and whether the brand furniture held.</p>` +
     `<div class="cmp">` +
     `<figure style="margin:0"><h2>REFERENCE (your design)</h2><img src="${ref.url}"></figure>` +
-    `<figure style="margin:0"><h2>RESULT (4K${humanised ? " + humaniser" : ""})</h2><img src="${url}"></figure>` +
+    `<figure style="margin:0"><h2>RESULT (4K${humanised ? " + humaniser" : ""})</h2><img src="${shown}"></figure>` +
     `</div>` +
-    (rawUrl && rawUrl !== url ? `<p style="margin-top:8px;font-size:12px"><a href="${rawUrl}" target="_blank">view the pre-humaniser version</a> (so you can tell me if the humaniser pass helped or hurt)</p>` : "") +
+    (transparentUrl ? `<p style="margin-top:8px;font-size:12px"><a href="${transparentUrl}" target="_blank">download the transparent PNG</a> (this is what embeds into the funnel column)</p>` : "") +
+    (rawUrl && rawUrl !== url ? `<p style="margin-top:6px;font-size:12px"><a href="${rawUrl}" target="_blank">view the pre-humaniser version</a></p>` : "") +
     `<div style="margin-top:16px;display:grid;gap:8px;max-width:680px">` +
     `<input id="person" value="${person.replace(/"/g, "&quot;")}" placeholder="lifestyle" style="padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
     `<input id="scene" value="${scene.replace(/"/g, "&quot;")}" placeholder="scenery (blank = natural)" style="padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
