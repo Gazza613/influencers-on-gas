@@ -19,30 +19,34 @@ export async function typesetSliderHeadline(
   line1: string,
   line2: string,
   fonts: { family: string; url: string }[],
+  legal?: string | null,
 ): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
   const size = Math.round(H * 0.082); // ~88px on a 1080 canvas
 
   const esc = (t: string) => String(t).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const legalLine = (legal || "").trim();
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${fontFaceCss(fonts)}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
-/* Cover the OLD headline: a dark scrim rising from ~12% up to ~52% of the height, matching the slider's own
-   navy foot. Leaves the legal strip (bottom ~12%) and the deal card (top-right) untouched. */
-/* Solid navy across the whole old-headline band (fully hides the baked headline), then a soft fade at the top
-   so the scrim reads as the slider's own dark foot, not a pasted bar. */
-.scrim{position:absolute;left:0;right:0;bottom:10%;height:46%;
-  background:linear-gradient(to top, ${MOMO_BLUE} 0%, ${MOMO_BLUE} 52%, ${MOMO_BLUE}CC 68%, ${MOMO_BLUE}66 84%, transparent 100%)}
-.head{position:absolute;left:0;right:0;bottom:14%;text-align:center;padding:0 7%;
+/* The dark foot of the slider. It carries the headline and the legal line. Anchored to the very bottom so both
+   have a solid navy backing, but kept short (top ~36%) so it does not creep up the photo (Gary: "too high"). */
+.scrim{position:absolute;left:0;right:0;bottom:0;height:36%;
+  background:linear-gradient(to top, ${MOMO_BLUE} 0%, ${MOMO_BLUE} 42%, ${MOMO_BLUE}AA 70%, transparent 100%)}
+.head{position:absolute;left:0;right:0;bottom:${legalLine ? "12%" : "9%"};text-align:center;padding:0 7%;
   font-family:'MTNBrighterSans',sans-serif;font-weight:800;line-height:1.04;-webkit-font-smoothing:antialiased}
 .head .l1,.head .l2{font-size:${size}px;letter-spacing:-1px;text-shadow:0 3px 16px rgba(0,0,0,.55);white-space:nowrap}
 .head .l1{color:#fff}
 .head .l2{color:${MOMO_YELLOW}}
+.legal{position:absolute;left:0;right:0;bottom:2.6%;text-align:center;padding:0 9%;
+  font-family:'MTNBrighterSans',sans-serif;font-weight:500;line-height:1.25;color:rgba(255,255,255,.82);
+  font-size:${Math.round(H * 0.0165)}px}
 </style></head><body>
 <div class="scrim"></div>
 <div class="head"><div class="l1">${esc(line1)}</div><div class="l2">${esc(line2)}</div></div>
+${legalLine ? `<div class="legal">${esc(legalLine)}</div>` : ""}
 </body></html>`;
 
   const { png } = await renderPng({ html, width: W, height: H, scale: 1, transparent: true });
@@ -77,7 +81,6 @@ export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xP
 // model drew. One place, used by the wizard and the full-set flow, so both get the same brand-safe finish.
 import { typesetSliderHeadline as _typeset } from "./studio-slider";
 import { getBrandKit } from "./studio";
-import { detectLayout } from "./studio-layout";
 import { putBytes } from "./blob";
 
 function pickLogo(logos: { name: string | null; url: string }[]): { url: string } | null {
@@ -107,36 +110,37 @@ async function overlayDeal(baseBuf: Buffer, deal: Deal, fonts: { family: string;
   return sharp(baseBuf).composite([{ input: card, left: Math.max(0, Math.min(left, W - (cm.width || cardW))), top: Math.max(0, top) }]).png().toBuffer();
 }
 
-export async function finishSlider(clientId: string, referenceUrl: string, swapUrl: string, callout: string, deal?: Deal | null): Promise<string> {
+export async function finishSlider(clientId: string, _referenceUrl: string, swapUrl: string, callout: string, deal?: Deal | null): Promise<string> {
   const kit = await getBrandKit(clientId).catch(() => null);
   const fonts = (kit?.fonts || []) as { family: string; url: string }[];
   let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(swapUrl)).arrayBuffer()));
-  // One layout read of the reference gives the deal-card and logo positions, so our overlays COVER the baked
-  // ones precisely instead of leaving the reference's version peeking out.
-  const layout = await detectLayout(referenceUrl).catch(() => null);
+  // The swap now returns a CLEAN photograph with NO baked furniture, so we no longer need to detect and cover
+  // the reference's logo/deal - we place OURS at fixed, reliable slider positions and they are the only ones
+  // in the frame. Nothing can garble because the AI never drew any of it.
 
-  // Headline: split "line 1 / line 2" (the Producer's campaign headline), typeset it. Do NOT swallow a failure
-  // silently - that is exactly how the reference's baked headline was slipping through un-themed.
-  if (callout.trim()) {
+  // Headline + legal: split "line 1 / line 2" (the Producer's campaign headline) and typeset it over the dark
+  // foot scrim, with the brand kit's bank-free creative legal line beneath it (the plate is clean, so the
+  // reference's baked legal strip is gone - we composite the compliant one back).
+  const legal = (kit?.creative_legal_text || "").trim() || null;
+  if (callout.trim() || legal) {
     const [l1, l2] = callout.split("/").map((x) => x.trim());
     try {
-      out = (await _typeset(out, l1 || callout, l2 || "", fonts)) as Buffer;
+      out = (await _typeset(out, l1 || callout, l2 || "", fonts, legal)) as Buffer;
     } catch (e) {
-      console.error("[finishSlider] headline typeset FAILED (headline will be the reference's):", e);
+      console.error("[finishSlider] headline typeset FAILED:", e);
     }
   }
-  // Deal: stamp OUR real deal card (the campaign's chosen deal) over the reference's baked one, top-right.
+  // Deal: stamp OUR real deal card (the campaign's chosen deal) top-right. Fixed position - clean plate.
   if (deal && deal.label && deal.price) {
-    try { out = (await overlayDeal(out, deal, fonts, layout?.callout)) as Buffer; }
+    try { out = (await overlayDeal(out, deal, fonts, null)) as Buffer; }
     catch (e) { console.error("[finishSlider] deal overlay failed:", e); }
   }
-  // Logo: cover the (garbled) logo with the real brand lockup, from the top-left corner (fixed, reliable -
-  // detection was landing off and doubling the logo).
+  // Logo: stamp the real brand lockup top-left. Fixed position - this is the ONLY logo in the frame now.
   const logo = pickLogo((kit?.logos || []) as { name: string | null; url: string }[]);
   if (logo) {
     try {
       const logoBuf = Buffer.from(await (await fetch(logo.url)).arrayBuffer());
-      out = (await compositeLogo(out, logoBuf, layout?.logo || { xPct: 3, yPct: 3, wPct: 26 })) as Buffer;
+      out = (await compositeLogo(out, logoBuf, { xPct: 3, yPct: 3, wPct: 24 })) as Buffer;
     } catch (e) { console.error("[finishSlider] logo composite failed:", e); }
   }
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");

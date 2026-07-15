@@ -477,17 +477,23 @@ export async function forensicSwap(url: string, opts: {
       `The people do NOT hold a second, additional phone. There must be NO extra, disembodied or floating hand ` +
       `or fingers anywhere near the phone or its screen. Count the hands: each person has exactly two, attached. ${skin}`;
 
-    // SCENE construction (slider): a full-bleed photograph. Change person + scene, keep the furniture on top.
+    // SCENE construction (slider): produce a CLEAN PHOTOGRAPH ONLY. We used to ask the model to KEEP the logo,
+    // swish and deal cards - but it REDRAWS them, which is exactly how the logo garbled to "from HTN" and the
+    // deal card drifted. Instead we ask for the bare photograph with NO graphics at all, then composite every
+    // brand element ourselves from the real assets (finishSlider). The AI never touches a letter or a lockup,
+    // so nothing can garble. The reference is used only for its COMPOSITION (where the person sits, the crop),
+    // and we keep the lower third + top corners clear for the headline, logo and deal card we add.
     const scene = opts.scene?.trim() ? `a real setting: ${opts.scene.trim()}` : `a real, natural setting that suits the brand and the person`;
     const scenePrompt =
-      `@image1 is a FINISHED MTN MoMo advertisement. ` +
-      `KEEP THESE THREE THINGS EXACTLY as they are in @image1 - same shape, size, position, colour and wording, ` +
-      `do NOT move, resize, restyle, re-typeset or regenerate them: ` +
-      `(1) the curved light SWISH / ring graphic, (2) the MoMo LOGO, (3) the CALLOUTS - the deal cards and every ` +
-      `word of text on them. ` +
-      `\n\nCHANGE the photographic content beneath and around that furniture: the PERSON becomes ${person(opts.person)}, ` +
-      `and the SCENE becomes ${scene}. Compose it naturally - the person believably placed in the scene, well lit, ` +
-      `the brand furniture sitting cleanly on top exactly as before. ${skin}`;
+      `@image1 is a reference advert - use it ONLY for its photographic composition: the camera framing, the crop, ` +
+      `and roughly where the person sits in the frame. ` +
+      `\n\nOUTPUT A CLEAN, FULL-BLEED PHOTOGRAPH WITH NO GRAPHICS OF ANY KIND. This is critical: there must be ` +
+      `NO logo, NO badge, NO deal card, NO price bubble, NO callout, NO headline, NO caption, NO watermark, NO ` +
+      `swish/ring/light-streak graphic and NO text or lettering ANYWHERE in the image. Just a real photograph. ` +
+      `Any branding will be added afterwards - your job is only the photograph. ` +
+      `\n\nThe PERSON is ${person(opts.person)}. The SCENE is ${scene}. Compose it naturally and cinematically - ` +
+      `the person believably placed and well lit. Keep the LOWER THIRD and the TOP-LEFT and TOP-RIGHT corners ` +
+      `relatively clean and uncluttered (plain background there), so a headline, logo and offer can sit over them. ${skin}`;
 
     const params: AnyObj = {
       ...baseParams("nano_banana_pro", ar),
