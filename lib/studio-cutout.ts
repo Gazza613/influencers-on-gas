@@ -91,12 +91,35 @@ export async function compositeForensicFurniture(swapBuf: Buffer, referenceBuf: 
   return applyReferenceAlpha(composited, referenceBuf); // empty surround -> transparent
 }
 
-// A quick preview: drop the transparent PNG onto the funnel navy so it is seen the way it will actually be
-// embedded, plus a checkerboard so the transparency itself is unambiguous.
+// A quick preview: drop the transparent PNG onto a flat colour.
 export async function onBackground(pngBuf: Buffer, hex: string): Promise<Buffer> {
   const meta = await sharp(pngBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 811;
   const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
   const bg = sharp({ create: { width: W, height: H, channels: 3, background: { r, g, b } } });
   return bg.composite([{ input: pngBuf }]).png().toBuffer();
+}
+
+// THE FUNNEL-MATCHED BACKGROUND. Gary's fix for the fragile transparent cut-out: instead of shipping a
+// transparent PNG whose ragged edge fights us, we flatten the design onto the EXACT colour of the Webflow
+// section it embeds into, so it reads as seamlessly placed and the edge halo simply disappears into the match.
+//
+// Colours read straight from the live funnel CSS (mtn-momo.webflow.shared.css):
+//   masthead -> the hero section .section-1---hero: linear-gradient(167deg, #0b425d, #02293d)
+//   section1 -> the white sections: #ffffff
+export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "section1"): Promise<Buffer> {
+  const meta = await sharp(pngBuf).metadata();
+  const W = meta.width || 1080, H = meta.height || 811;
+
+  if (kind === "section1") {
+    return sharp({ create: { width: W, height: H, channels: 3, background: "#ffffff" } })
+      .composite([{ input: pngBuf }]).png().toBuffer();
+  }
+  // Masthead: the hero navy gradient, top #0b425d to bottom #02293d (167deg ~ near-vertical, slight left).
+  const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">` +
+    `<defs><linearGradient id="g" x1="0.1" y1="0" x2="-0.1" y2="1">` +
+    `<stop offset="0" stop-color="#0b425d"/><stop offset="1" stop-color="#02293d"/></linearGradient></defs>` +
+    `<rect width="100%" height="100%" fill="url(#g)"/></svg>`;
+  const bg = await sharp(Buffer.from(svg)).png().toBuffer();
+  return sharp(bg).composite([{ input: pngBuf }]).png().toBuffer();
 }

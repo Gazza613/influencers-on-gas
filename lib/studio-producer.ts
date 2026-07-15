@@ -24,7 +24,7 @@ export type CampaignPlan = {
   rationale: string;
   masthead: { subjectPrompt: string; phoneScreen: string };
   section1: { subjectPrompt: string; deals: Deal[] };
-  sliders: { headline1: string; headline2: string; scenePrompt: string; deal: Deal }[];
+  sliders: { subject: string; headline1: string; headline2: string; scenePrompt: string; deal: Deal }[];
   webflow: { heroHeadline: string; heroSubheads: string[]; section1Headline: string; section1Body: string; sliderSubhead: string };
   sms: { copy: string; slug: string; assembled: string; chars: number; gsm7: boolean };
   complianceCheck: string[];
@@ -78,6 +78,7 @@ A funnel campaign order:
 - SMS COPY.
 
 === HOW TO WRITE THE IMAGE PROMPTS (these are generated, so the prompt IS the art direction) ===
+- THE CAMPAIGN THEME MUST BE EMBODIED BY THE PEOPLE, in EVERY creative. This is the most important rule. If the campaign is about a relationship, SHOW that relationship with the right people, together: Mother's Day is a MOTHER AND HER CHILD (a mum and her adult daughter or son), Grandparents Day is a grandparent and grandchild, "send money home" is the sender and the loved one who receives. A single generic person does NOT carry the theme - the viewer must see the campaign in the human being(s) at a glance, before reading a word. Name exactly who is in shot and their relationship.
 - Real South Africans. Ordinary, believable contexts. GSMA's own recommendation is literally "feature real people in different situations showing how they safely and securely use mobile money". This is the category's proven visual language, not a style choice.
 - Warm, positive, dignified. NEVER a jackpot-winner, never a person waving cash, never staged jubilation. The customer is a competent adult making a careful purchase from a real bank - not a lucky winner.
 - CUT-OUT prompts (masthead, section 1): a single subject, chest-up or waist-up, clean isolated subject on a PLAIN NEUTRAL BACKGROUND so it can be cut out cleanly. Bright, even, slightly warm light so it sits against the yellow field. They hold or look at a phone.
@@ -172,6 +173,7 @@ const SCHEMA = {
       items: {
         type: "object", additionalProperties: false,
         properties: {
+          subject: { type: "string", description: "WHO is in this slider, embodying the campaign theme and their relationship (e.g. 'a mother and her adult daughter laughing together'). The theme must be visible in the people." },
           headline1: { type: "string", description: "Line 1, white. Max ~22 characters." },
           headline2: { type: "string", description: "Line 2, MoMo yellow. Max ~22 characters." },
           scenePrompt: { type: "string", description: "Image prompt for the photographic scene. Keep the lower third calm and the top-right clear." },
@@ -189,7 +191,7 @@ const SCHEMA = {
               required: ["label", "amount", "price", "validity"],
             },
         },
-        required: ["headline1", "headline2", "scenePrompt", "deal"],
+        required: ["subject", "headline1", "headline2", "scenePrompt", "deal"],
       },
     },
     webflow: {
@@ -347,6 +349,7 @@ function coercePlan(raw: unknown): CampaignPlan {
     masthead: { subjectPrompt: str(o.masthead?.subjectPrompt), phoneScreen: str(o.masthead?.phoneScreen) || "none" },
     section1: { subjectPrompt: str(o.section1?.subjectPrompt), deals: list<any>(o.section1?.deals).map(deal) },
     sliders: list<any>(o.sliders).map((s) => ({
+      subject: str(s?.subject),
       headline1: str(s?.headline1),
       headline2: str(s?.headline2),
       scenePrompt: str(s?.scenePrompt),

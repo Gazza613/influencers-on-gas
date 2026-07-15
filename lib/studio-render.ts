@@ -64,6 +64,8 @@ export type RenderOpts = {
   scale?: number;
   /** Hard budget. A 5MB page costs a prepaid customer ~R0.40 of their OWN airtime to load (ICASA: R0.08/MB). */
   maxBytes?: number;
+  /** Transparent background - for overlays (a typeset headline) composited onto a photo. */
+  transparent?: boolean;
 };
 
 export async function renderPng(o: RenderOpts): Promise<{ png: Buffer; bytes: number; overBudget: boolean }> {

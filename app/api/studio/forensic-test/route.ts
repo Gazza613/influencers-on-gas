@@ -155,13 +155,15 @@ export async function GET(req: Request) {
   if (refTransparent) {
     // MASTHEAD/SECTION-1: the full forensic path - swap the person, strip the person, then stamp the
     // reference's REAL furniture back (fixes the warped icons) with a tight eroded edge, transparent surround.
-    const r = await buildDiscCreative(client.id, "masthead", ref.url, person, ratio);
+    // The reference name tells us masthead (Hero) vs section-1 (Supporting), which sets the funnel bg colour.
+    const kind = /supporting/i.test(ref.name || "") ? "section1" : "masthead";
+    const r = await buildDiscCreative(client.id, kind, ref.url, person, ratio);
     if (!r.url) {
       return page(`<h1>Failed (${((Date.now() - t0) / 1000).toFixed(0)}s)</h1><div class="err">${(r.error || "no image").replace(/</g, "&lt;")}</div><p><a href="?">Back</a></p>`);
     }
     transparentUrl = r.url;
-    shown = await putBytes(await onBackground(await fetch(r.url).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b)), "#000000"), `studio/${client.id}/masthead-preview`, "png", "image/png");
-    maskNote = r.error ? `note: ${r.error}` : "forensic: real furniture composited, person swapped, edge eroded, transparent surround - shown on black";
+    shown = r.url; // already flattened onto the exact funnel section colour (navy masthead / white section-1)
+    maskNote = r.error ? `note: ${r.error}` : `flattened onto the exact Webflow ${kind} background - no transparent cut-out, no edge halo`;
   } else {
     // SLIDER: full-bleed swap.
     const sw = await forensicSwap(ref.url, { person, scene, construction: effective, ratio, resolution: "4k", humanise: true });
@@ -181,7 +183,7 @@ export async function GET(req: Request) {
     `<figure style="margin:0"><h2>REFERENCE (your design)</h2><img src="${ref.url}"></figure>` +
     `<figure style="margin:0"><h2>RESULT (4K${humanised ? " + humaniser" : ""})</h2><img src="${shown}"></figure>` +
     `</div>` +
-    (transparentUrl ? `<p style="margin-top:8px;font-size:12px"><a href="${transparentUrl}" target="_blank">download the transparent PNG</a> (this is what embeds into the funnel column)</p>` : "") +
+    (transparentUrl ? `<p style="margin-top:8px;font-size:12px"><a href="${transparentUrl}" target="_blank">download the PNG</a> (flattened on the funnel section colour)</p>` : "") +
     (rawUrl && rawUrl !== shown ? `<p style="margin-top:6px;font-size:12px"><a href="${rawUrl}" target="_blank">view the pre-humaniser version</a></p>` : "") +
     `<div style="margin-top:16px;display:grid;gap:8px;max-width:680px">` +
     `<input id="person" value="${person.replace(/"/g, "&quot;")}" placeholder="lifestyle" style="padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
