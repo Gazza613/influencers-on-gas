@@ -217,7 +217,7 @@ export default function BuilderPage() {
                       {options.map((r) => (
                         <button key={r.id} onClick={() => setPicked((p) => ({ ...p, [slotKey]: r.url }))}
                           className={`shrink-0 overflow-hidden rounded-lg border-2 transition ${chosen === r.url ? "border-accent" : "border-line hover:border-ink-dim"}`}>
-                          <img src={r.url} alt={r.name || ""} className="h-28 w-auto bg-surface-2 object-contain" />
+                          <img src={r.url} alt={r.name || ""} className="h-44 w-auto bg-surface-2 object-contain" />
                         </button>
                       ))}
                     </div>
