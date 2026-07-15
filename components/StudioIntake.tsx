@@ -369,6 +369,93 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
         )}
       </div>
 
+      {/* PHONE SCREENSHOTS. When a creative shows a person holding up a phone, its screen must be a REAL app
+          or offer screenshot - never AI-invented UI. These are the approved screens to pick from. */}
+      <div className="rounded-xl border border-line bg-surface-1 p-5">
+        <div className="flex items-center justify-between">
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">MoMo phone screenshots</div>
+          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "phone_screen").length} uploaded</span>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+          Approved MoMo app and offer screenshots. When a creative shows someone holding up a phone, the screen
+          must be one of these real screenshots - the system never invents app UI. Upload the ones your team
+          approves and we reference them at build time.
+        </p>
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+          {busy === "phone_screen" ? "Uploading…" : "＋ Add phone screenshots"}
+          <input type="file" multiple accept="image/png,image/jpeg" className="hidden"
+            onChange={(e) => send(e.target.files, "phone_screen")} />
+        </label>
+        {assets.filter((a) => a.kind === "phone_screen").length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            {assets.filter((a) => a.kind === "phone_screen").map((a) => (
+              <div key={a.id} className="w-[110px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.url} alt={a.name ?? "phone screen"} className="w-full rounded-md border border-line bg-surface-2 object-contain p-1" />
+                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* BRAND ICONS. The client's icon library - the floating icon bubbles and any other brand icons - so
+          creatives reuse the real icons, never invented ones. */}
+      <div className="rounded-xl border border-line bg-surface-1 p-5">
+        <div className="flex items-center justify-between">
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Brand icons</div>
+          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "brand_icon").length} uploaded</span>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+          The brand&apos;s icon library - the floating icon bubbles (dice, call, bag, tap-to-pay, wifi) and any
+          other approved icons. Upload them so creatives reuse the real icons rather than inventing them. PNG
+          with transparency is ideal.
+        </p>
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+          {busy === "brand_icon" ? "Uploading…" : "＋ Add brand icons"}
+          <input type="file" multiple accept="image/png,image/svg+xml,image/jpeg" className="hidden"
+            onChange={(e) => send(e.target.files, "brand_icon")} />
+        </label>
+        {assets.filter((a) => a.kind === "brand_icon").length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            {assets.filter((a) => a.kind === "brand_icon").map((a) => (
+              <div key={a.id} className="w-[92px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.url} alt={a.name ?? "brand icon"} className="w-full rounded-md border border-line bg-surface-2 object-contain p-2" />
+                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* TRAIN THE BRAIN ON LIVE FUNNELS. Keep the brain current as new campaigns ship - ingest the live
+          funnels so the Producer, brief coach, Strategist and Journalist all learn from the newest work. */}
+      <div className="rounded-xl border border-line bg-surface-1 p-5">
+        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Train the brain on live funnels</div>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+          Ingest the live MTN MoMo funnels into the brain so every output learns from the real, current work.
+          Run this whenever new campaigns ship - it refreshes what the Producer, brief coach, Strategist and
+          Journalist draw on.
+        </p>
+        <button
+          onClick={async () => {
+            setBusy("ingest"); setProgress("Ingesting funnels into the brain…");
+            try {
+              const d = await fetch("/api/studio/ingest-funnels").then((r) => r.json());
+              setProgress(d.ok ? `Trained the brain: ${d.totalChunks} chunks from ${(d.funnels || []).filter((f: { chunks: number }) => f.chunks > 0).length} funnels.` : `Failed: ${d.error || "unknown"}`);
+            } catch (e) { setProgress(`Failed: ${String((e as Error)?.message || e).slice(0, 100)}`); }
+            finally { setBusy(""); }
+          }}
+          disabled={!!busy}
+          className="mt-3 rounded-lg border border-[#818cf8]/50 bg-[#818cf8]/10 px-4 py-2 text-xs font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
+          {busy === "ingest" ? "Training…" : "Train the brain on the funnels"}
+        </button>
+        <p className="mt-1 text-[11px] text-ink-faint">Takes about a minute. Safe to re-run - it refreshes the funnel knowledge.</p>
+      </div>
+
       {/* CI DOCUMENT */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">CI document</div>

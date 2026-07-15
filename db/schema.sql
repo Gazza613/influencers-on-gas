@@ -555,3 +555,15 @@ create table if not exists studio_campaigns (
   created_at timestamptz not null default now()
 );
 create index if not exists studio_campaigns_client on studio_campaigns (client_id, created_at desc);
+
+-- Phone screenshots (MoMo app / offer screens): the approved screen to show when a creative holds up a phone.
+-- Never AI-invented UI - the team uploads real screenshots and we reference one at build time.
+alter table studio_assets drop constraint if exists studio_assets_kind_check;
+alter table studio_assets add constraint studio_assets_kind_check
+  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen'));
+
+-- Brand icons: the client's icon library (the floating icon bubbles - dice, call, bag, tap-to-pay, wifi - and
+-- any other brand icons), so creatives reuse the real icons rather than inventing them.
+alter table studio_assets drop constraint if exists studio_assets_kind_check;
+alter table studio_assets add constraint studio_assets_kind_check
+  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon'));
