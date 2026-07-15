@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { renderPng, fontFaceCss } from "./studio-render";
 import { dealCardCss, dealCardHtml } from "./templates/momo-deal-card";
+import { momoPillCss, momoPillHtml } from "./templates/momo-pill";
 import type { Deal } from "./studio-producer";
 
 // TYPESET THE SLIDER HEADLINE. The slider comes back carrying the reference's OWN baked headline. To make it
@@ -108,6 +109,27 @@ async function overlayDeal(baseBuf: Buffer, deal: Deal, fonts: { family: string;
   const left = box ? Math.round(W * (box.xPct > 1 ? box.xPct / 100 : box.xPct) - cardW * 0.04) : W - (cm.width || cardW) - Math.round(W * 0.035);
   const top = box ? Math.round(H * (box.yPct > 1 ? box.yPct / 100 : box.yPct) - H * 0.01) : Math.round(H * 0.035);
   return sharp(baseBuf).composite([{ input: card, left: Math.max(0, Math.min(left, W - (cm.width || cardW))), top: Math.max(0, top) }]).png().toBuffer();
+}
+
+// COMPOSITE THE THEMED 3D PILL over a disc creative (masthead / section 1). The swap now leaves the callout
+// area CLEAN, so this pill is the only one in the frame - the campaign's words in MoMo's own lozenge, never the
+// reference's copy and never AI-drawn. `callout` is "line 1 / line 2" from the Producer. Placed bottom-centre,
+// matching where the reference pill sits, sized to a share of the width.
+export async function overlayPill(baseBuf: Buffer, callout: string, fonts: { family: string; url: string }[], widthFrac = 0.66): Promise<Buffer> {
+  const meta = await sharp(baseBuf).metadata();
+  const W = meta.width || 1080, H = meta.height || 1080;
+  const [l1, l2] = callout.split("/").map((x) => x.trim());
+  if (!l1) return baseBuf;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss(fonts)}
+    *{margin:0;box-sizing:border-box}body{background:transparent;padding:60px}${momoPillCss(0.5)}</style></head>
+    <body>${momoPillHtml(l1, l2)}</body></html>`;
+  const { png } = await renderPng({ html, width: 2400, height: 900, scale: 1, transparent: true });
+  const pillW = Math.round(W * widthFrac);
+  const pill = await sharp(png).trim({ threshold: 8 }).resize({ width: pillW }).png().toBuffer();
+  const pm = await sharp(pill).metadata();
+  const left = Math.round((W - (pm.width || pillW)) / 2);
+  const top = Math.round(H - (pm.height || 0) - H * 0.045); // sit near the bottom, a small margin up
+  return sharp(baseBuf).composite([{ input: pill, left: Math.max(0, left), top: Math.max(0, top) }]).png().toBuffer();
 }
 
 export async function finishSlider(clientId: string, _referenceUrl: string, swapUrl: string, callout: string, deal?: Deal | null): Promise<string> {

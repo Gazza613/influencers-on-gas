@@ -47,7 +47,8 @@ export async function POST(req: Request) {
     const ratio = meta ? nearestRatio(meta.width || 1080, meta.height || 1080) : "1:1";
 
     if (kind === "masthead" || kind === "section1") {
-      const r = await buildDiscCreative(clientId, kind, referenceUrl, subject, ratio);
+      // The callout the user typed (or the Producer pre-filled) becomes the themed pill copy.
+      const r = await buildDiscCreative(clientId, kind, referenceUrl, subject, ratio, callout);
       if (!r.url) return NextResponse.json({ error: r.error || "generation failed" }, { status: 500 });
       return NextResponse.json({ ok: true, url: r.url });
     }

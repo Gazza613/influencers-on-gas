@@ -464,18 +464,22 @@ export async function forensicSwap(url: string, opts: {
     // DISC construction (masthead + section 1): the background is NOT a scene, it is the brand's yellow disc on
     // a dark field. Keep it. Swap only the person, as a cut-out figure standing in front of the disc.
     const discPrompt =
-      `@image1 is a FINISHED, COMPLETE MTN MoMo advert: a person in front of a big YELLOW DISC on a SOLID ` +
-      `background colour, with brand furniture around them (logo/badge, floating icon bubbles, a callout, a ` +
-      `light swish). It is already a finished picture - treat it as one. ` +
-      `\n\nKEEP EXACTLY, unchanged - same shape, size, position, colour and wording: the SOLID BACKGROUND COLOUR ` +
-      `(do not change its colour, do not add a room, street, market or any scene), the YELLOW DISC, the ` +
-      `logo/badge, EVERY floating icon bubble, the callout and all its text, and the swish. ` +
-      `\n\nCHANGE ONE THING ONLY: the person becomes ${person(opts.person)}, at the same size, position, pose ` +
-      `and crop, lit to match, blended naturally into the SAME solid background - NOT cut out, no hard outline, ` +
-      `no torn or ragged edge around them. Output a complete, finished, seamless picture. ` +
-      `\n\nTHE PHONE: this design already has ONE phone/app element. Keep exactly ONE phone in the whole image. ` +
-      `The people do NOT hold a second, additional phone. There must be NO extra, disembodied or floating hand ` +
-      `or fingers anywhere near the phone or its screen. Count the hands: each person has exactly two, attached. ${skin}`;
+      `@image1 is a FINISHED MTN MoMo advert: a person in front of a big YELLOW DISC on a SOLID background ` +
+      `colour, with floating 3D icon bubbles and a light swish around them. ` +
+      `\n\nKEEP EXACTLY, unchanged - same shape, size, position and colour: the SOLID BACKGROUND COLOUR (do not ` +
+      `change its colour, do not add a room, street, market or any scene), the YELLOW DISC, EVERY floating 3D ` +
+      `icon bubble, and the swish. ` +
+      `\n\nREMOVE these two things and leave those areas CLEAN (we add real ones afterwards): (a) the LOGO / ` +
+      `badge in the top-left corner - leave the top-left corner as plain background, NO logo, NO text there; ` +
+      `(b) the CALLOUT PILL / lozenge near the bottom with its words - leave the lower-centre clear of any pill, ` +
+      `badge, banner or lettering. Do NOT draw ANY text, logo or callout anywhere - the picture must contain NO ` +
+      `words at all. ` +
+      `\n\nCHANGE the person to ${person(opts.person)}, at a similar size, position, pose and crop, lit to match, ` +
+      `blended naturally into the SAME solid background - NOT cut out, no hard outline, no torn or ragged edge. ` +
+      `Output a complete, seamless picture with the disc and bubbles intact but NO logo, NO pill and NO text. ` +
+      `\n\nTHE PHONE: if the design has a phone, keep exactly ONE. The people do NOT hold a second phone. There ` +
+      `must be NO extra, disembodied or floating hand or fingers anywhere. Each person has exactly two hands, ` +
+      `attached. ${skin}`;
 
     // SCENE construction (slider): produce a CLEAN PHOTOGRAPH ONLY. We used to ask the model to KEEP the logo,
     // swish and deal cards - but it REDRAWS them, which is exactly how the logo garbled to "from HTN" and the

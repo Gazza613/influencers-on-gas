@@ -3,20 +3,10 @@ import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
 import { forensicSwap } from "./vendors/higgsfield";
 import { onFunnelBackground, applyReferenceAlpha } from "./studio-cutout";
-import { finishSlider, compositeLogo } from "./studio-slider";
+import { finishSlider, overlayPill } from "./studio-slider";
 import { getBrandKit } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
-
-// The real MoMo logo lockup for the disc creatives - never let AI draw it.
-async function realLogo(clientId: string): Promise<Buffer | null> {
-  const kit = await getBrandKit(clientId).catch(() => null);
-  const logos = (kit?.logos || []) as { name: string | null; url: string }[];
-  if (!logos.length) return null;
-  const score = (n: string) => { const s = n.toLowerCase(); let v = 0; if (/mono|black|white|grey|gray/.test(s)) v -= 5; if (/stack|vert/.test(s)) v -= 3; if (/horiz|primary|full|colou?r/.test(s)) v += 3; if (/momo/.test(s)) v += 2; return v; };
-  const best = [...logos].sort((a, b) => score(b.name || "") - score(a.name || ""))[0];
-  return best ? Buffer.from(await (await fetch(best.url)).arrayBuffer()) : null;
-}
 
 const bufOf = (u: string) => fetch(u).then((r) => r.arrayBuffer()).then((b) => Buffer.from(b));
 
@@ -29,13 +19,15 @@ const bufOf = (u: string) => fetch(u).then((r) => r.arrayBuffer()).then((b) => B
 //   2. swap ONLY the person on that whole image - the model keeps the background, disc and furniture as one
 //      continuous picture, and returns a complete image with no edge to tear.
 // The output is already on the funnel colour, so it drops straight into the Webflow section.
-export async function buildDiscCreative(clientId: string, kind: string, refUrl: string, person: string, ratio: string): Promise<{ url: string; error: string | null; calls: number }> {
+export async function buildDiscCreative(clientId: string, kind: string, refUrl: string, person: string, ratio: string, callout?: string): Promise<{ url: string; error: string | null; calls: number }> {
   const bgKind = /section/i.test(kind) ? "section1" : "masthead";
   try {
     // A complete ad on the funnel colour becomes the base the swap edits.
     const base = await onFunnelBackground(await bufOf(refUrl), bgKind);
     const baseUrl = await putBytes(base, `studio/${clientId}/${kind}-base`, "png", "image/png");
 
+    // The swap now KEEPS the disc/bubbles/swish but leaves the logo + pill areas CLEAN (no words at all), so we
+    // composite the real, campaign-themed pill ourselves and nothing garbles.
     const swap = await forensicSwap(baseUrl, { person, construction: "disc", ratio, resolution: "4k", humanise: true });
     const calls = 1 + (swap.humanised ? 1 : 0);
     if (!swap.url) return { url: "", error: swap.error || "swap failed", calls };
@@ -54,9 +46,16 @@ export async function buildDiscCreative(clientId: string, kind: string, refUrl: 
     if (bgKind === "section1") {
       out = (await onFunnelBackground(await applyReferenceAlpha(out, refBuf), "section1")) as Buffer;
     }
-    // Real MoMo logo over the (possibly garbled) one, top-left - same brand-safe rule as the sliders.
-    const logo = await realLogo(clientId).catch(() => null);
-    if (logo) { try { out = (await compositeLogo(out, logo, { xPct: 3.5, yPct: 3.5, wPct: 24 })) as Buffer; } catch { /* keep going */ } }
+    // THE CAMPAIGN PILL: the Producer's on-theme callout, typeset into MoMo's own 3D lozenge and composited
+    // bottom-centre. This is the ONLY pill in the frame (the swap left the area clean), so it can never carry
+    // the reference's copy through onto the campaign (Gary: "the callouts have nothing to do with Mother's Day").
+    // NO top-left logo on the disc creatives (Gary) - the branding is the disc + the pill.
+    if (callout && callout.trim()) {
+      const kit = await getBrandKit(clientId).catch(() => null);
+      const fonts = (kit?.fonts || []) as { family: string; url: string }[];
+      try { out = (await overlayPill(out, callout, fonts, bgKind === "section1" ? 0.6 : 0.66)) as Buffer; }
+      catch (e) { console.error(`[buildDiscCreative] pill overlay failed (${kind}):`, e); }
+    }
 
     const url = await putBytes(out, `studio/${clientId}/${kind}`, "png", "image/png");
     return { url, error: null, calls };
@@ -105,10 +104,10 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
 
 
   type Ref = { name: string; url: string };
-  type Job = { kind: RefCreative["kind"]; index: number; ref?: Ref; person: string; scene?: string; construction: "disc" | "scene"; headline?: string; deal?: import("./studio-producer").Deal };
+  type Job = { kind: RefCreative["kind"]; index: number; ref?: Ref; person: string; scene?: string; construction: "disc" | "scene"; headline?: string; callout?: string; deal?: import("./studio-producer").Deal };
   const jobs: Job[] = [
-    { kind: "masthead", index: 0, ref: pick(mastheads), person: plan.masthead.subjectPrompt, construction: "disc" },
-    { kind: "section1", index: 0, ref: pick(section1s), person: plan.section1.subjectPrompt, construction: "disc" },
+    { kind: "masthead", index: 0, ref: pick(mastheads), person: plan.masthead.subjectPrompt, construction: "disc", callout: plan.masthead.callout },
+    { kind: "section1", index: 0, ref: pick(section1s), person: plan.section1.subjectPrompt, construction: "disc", callout: plan.section1.callout },
     ...plan.sliders.slice(0, 3).map((s, i): Job => ({
       // The slider person now EMBODIES the theme (mom + daughter for Mother's Day) - the Producer writes it.
       kind: "slider", index: i, ref: pick(sliders, i), person: s.subject || `people that suit "${plan.theme}"`,
@@ -125,7 +124,7 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     // DISC (masthead + section-1): the forensic path - swap the person, then stamp the reference's real
     // furniture back, so the bubbles and pill are pixel-perfect instead of the img2img warp Gary flagged.
     if (j.construction === "disc") {
-      const r = await buildDiscCreative(clientId, j.kind, j.ref.url, j.person, ratio);
+      const r = await buildDiscCreative(clientId, j.kind, j.ref.url, j.person, ratio, j.callout);
       totalCalls += r.calls;
       if (r.error) warnings.push(`${j.kind}: ${r.error}`);
       if (!r.url) return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: r.error || "failed" };
