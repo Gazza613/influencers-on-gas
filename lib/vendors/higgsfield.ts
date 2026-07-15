@@ -472,7 +472,10 @@ export async function forensicSwap(url: string, opts: {
       `logo/badge, EVERY floating icon bubble, the callout and all its text, and the swish. ` +
       `\n\nCHANGE ONE THING ONLY: the person becomes ${person(opts.person)}, at the same size, position, pose ` +
       `and crop, lit to match, blended naturally into the SAME solid background - NOT cut out, no hard outline, ` +
-      `no torn or ragged edge around them. Output a complete, finished, seamless picture. ${skin}`;
+      `no torn or ragged edge around them. Output a complete, finished, seamless picture. ` +
+      `\n\nTHE PHONE: this design already has ONE phone/app element. Keep exactly ONE phone in the whole image. ` +
+      `The people do NOT hold a second, additional phone. There must be NO extra, disembodied or floating hand ` +
+      `or fingers anywhere near the phone or its screen. Count the hands: each person has exactly two, attached. ${skin}`;
 
     // SCENE construction (slider): a full-bleed photograph. Change person + scene, keep the furniture on top.
     const scene = opts.scene?.trim() ? `a real setting: ${opts.scene.trim()}` : `a real, natural setting that suits the brand and the person`;

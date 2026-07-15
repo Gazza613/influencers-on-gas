@@ -3,9 +3,20 @@ import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
 import { forensicSwap } from "./vendors/higgsfield";
 import { onFunnelBackground, applyReferenceAlpha } from "./studio-cutout";
-import { finishSlider } from "./studio-slider";
+import { finishSlider, compositeLogo } from "./studio-slider";
+import { getBrandKit } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
+
+// The real MoMo logo lockup for the disc creatives - never let AI draw it.
+async function realLogo(clientId: string): Promise<Buffer | null> {
+  const kit = await getBrandKit(clientId).catch(() => null);
+  const logos = (kit?.logos || []) as { name: string | null; url: string }[];
+  if (!logos.length) return null;
+  const score = (n: string) => { const s = n.toLowerCase(); let v = 0; if (/mono|black|white|grey|gray/.test(s)) v -= 5; if (/stack|vert/.test(s)) v -= 3; if (/horiz|primary|full|colou?r/.test(s)) v += 3; if (/momo/.test(s)) v += 2; return v; };
+  const best = [...logos].sort((a, b) => score(b.name || "") - score(a.name || ""))[0];
+  return best ? Buffer.from(await (await fetch(best.url)).arrayBuffer()) : null;
+}
 
 const bufOf = (u: string) => fetch(u).then((r) => r.arrayBuffer()).then((b) => Buffer.from(b));
 
@@ -43,6 +54,10 @@ export async function buildDiscCreative(clientId: string, kind: string, refUrl: 
     if (bgKind === "section1") {
       out = (await onFunnelBackground(await applyReferenceAlpha(out, refBuf), "section1")) as Buffer;
     }
+    // Real MoMo logo over the (possibly garbled) one, top-left - same brand-safe rule as the sliders.
+    const logo = await realLogo(clientId).catch(() => null);
+    if (logo) { try { out = (await compositeLogo(out, logo, { xPct: 3.5, yPct: 3.5, wPct: 24 })) as Buffer; } catch { /* keep going */ } }
+
     const url = await putBytes(out, `studio/${clientId}/${kind}`, "png", "image/png");
     return { url, error: null, calls };
   } catch (e) {
