@@ -54,15 +54,22 @@ export default function GasStudioPage() {
         </Link>
 
         <Link
-          href="/studio/campaign"
+          href="/studio/build"
           className="group mt-4 block rounded-xl border border-[#818cf8]/40 bg-gradient-to-br from-[#818cf8]/[0.12] to-[#f472b6]/[0.05] px-5 py-4 transition hover:border-[#818cf8]/75"
         >
-          <p className="text-[15px] font-bold text-ink">Funnel campaign →</p>
+          <p className="text-[15px] font-bold text-ink">Funnel builder →</p>
           <p className="mt-1 text-[14px] leading-relaxed text-ink-dim">
-            Describe the campaign in a sentence. The Producer designs the whole funnel - 1 masthead,
-            1 section 1, 3 sliders, the page copy and the SMS - and shows you the plan before anything
-            is generated.
+            Build the funnel section by section. Pick one of your own proven designs per section, say who
+            should be in it, generate, and accept or rerun - 1 masthead, 1 section 1, 3 sliders. Every
+            creative is your design with a new person, nothing invented.
           </p>
+        </Link>
+
+        <Link
+          href="/studio/campaign"
+          className="group mt-3 block rounded-xl border border-line px-5 py-3 transition hover:border-ink-dim"
+        >
+          <p className="text-[14px] font-bold text-ink-dim">Producer (brief → full set in one go) →</p>
         </Link>
 
         <p className="mt-6 text-[15px] leading-relaxed text-ink-dim">
