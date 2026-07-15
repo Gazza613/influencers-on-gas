@@ -155,6 +155,27 @@ export default function BuilderPage() {
   const accepted = Object.values(shot).filter((s) => s.status === "accepted").length;
   const totalSlots = SECTIONS.reduce((n, s) => n + s.count, 0);
 
+  // The download filename for a slot, labelled the way Gary wants: masthead / section-1 / section-2-slider-N.
+  const fileLabel = (k: string) =>
+    k === "masthead" ? "masthead" : k === "section1" ? "section-1" : `section-2-slider-${Number(k.split("-")[1] || 0) + 1}`;
+
+  // DOWNLOAD ALL accepted creatives, each with its labelled filename. Straight to the browser's downloads for
+  // now (desktop); a named Drive folder is a later integration once the client gives us the folder.
+  async function downloadAll() {
+    for (const [k, s] of Object.entries(shot)) {
+      if (s.status !== "accepted") continue;
+      try {
+        const blob = await fetch(s.url).then((r) => r.blob());
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${fileLabel(k)}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(a.href);
+        await new Promise((r) => setTimeout(r, 400)); // let the browser queue each one
+      } catch { /* skip a failed file, keep going */ }
+    }
+  }
+
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
@@ -314,6 +335,11 @@ export default function BuilderPage() {
             <b className="text-ink tabular">{accepted}/{totalSlots}</b> creatives accepted.
             {accepted === totalSlots ? " All five approved - the funnel set is ready." : " Accept each creative when you are happy with it."}
           </p>
+          {accepted === totalSlots && (
+            <button onClick={downloadAll} className="mt-3 rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-black">
+              ⤓ Download all (masthead · section 1 · section 2)
+            </button>
+          )}
           {deals.length > 0 && (
             <p className="mt-2 text-xs text-ink-faint">Deal library available for the offer step: {deals.slice(0, 4).map(dealText).join("  ·  ")}{deals.length > 4 ? " …" : ""}</p>
           )}
