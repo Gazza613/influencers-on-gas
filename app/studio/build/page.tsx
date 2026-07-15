@@ -54,6 +54,8 @@ export default function BuilderPage() {
     fetch(`/api/studio/deals?clientId=${clientId}`).then((r) => r.json()).then((d) => setDeals(d.deals || [])).catch(() => {});
   }, [clientId]);
 
+  const [theme, setTheme] = useState("");
+
   async function sharpen() {
     setErr(""); setBusy((b) => ({ ...b, brief: true }));
     try {
@@ -65,6 +67,32 @@ export default function BuilderPage() {
       else if (d.error) setErr(d.error);
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, brief: false })); }
+  }
+
+  // THE PRODUCER PLANS IT. Gary: "the producer should add this in and then we can edit - the producer must be
+  // the expert." So one click has the Producer read the brief (and the reference set) and write who should be
+  // in every section - theme-embodying - which pre-fills the subject boxes for the user to tweak, not type raw.
+  async function plan() {
+    if (brief.trim().length < 6) { setErr("Write the brief first."); return; }
+    setErr(""); setBusy((b) => ({ ...b, plan: true }));
+    try {
+      const d = await fetch("/api/studio/campaign", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "plan", clientId, brief }),
+      }).then((r) => r.json());
+      const p = d.plan;
+      if (!p) { setErr(d.error || "The Producer could not plan this."); return; }
+      setTheme(p.theme || "");
+      setSubject((x) => ({
+        ...x,
+        masthead: p.masthead?.subjectPrompt || x.masthead || "",
+        section1: p.section1?.subjectPrompt || x.section1 || "",
+        "slider-0": p.sliders?.[0]?.subject || x["slider-0"] || "",
+        "slider-1": p.sliders?.[1]?.subject || x["slider-1"] || "",
+        "slider-2": p.sliders?.[2]?.subject || x["slider-2"] || "",
+      }));
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setBusy((b) => ({ ...b, plan: false })); }
   }
 
   async function generate(slotKey: string, kind: string) {
@@ -110,10 +138,22 @@ export default function BuilderPage() {
           <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
             placeholder="What is the campaign? e.g. Mother's Day - celebrate mums, send money and airtime to your mother through MoMo, zero fees."
             className="mt-3 w-full rounded-xl border border-line bg-surface-2 p-4 text-base leading-relaxed outline-none focus:border-accent" />
-          <button onClick={sharpen} disabled={!!busy.brief || brief.trim().length < 6}
-            className="mt-3 rounded-lg border border-[#818cf8]/60 bg-[#818cf8]/10 px-4 py-2 text-sm font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
-            {busy.brief ? "The Producer is reading…" : "Sharpen the brief"}
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={plan} disabled={!!busy.plan || brief.trim().length < 6}
+              className="rounded-lg bg-accent px-5 py-2 text-sm font-bold text-black disabled:opacity-40">
+              {busy.plan ? "The Producer is planning… (about a minute)" : "Let the Producer plan it"}
+            </button>
+            <button onClick={sharpen} disabled={!!busy.brief || brief.trim().length < 6}
+              className="rounded-lg border border-[#818cf8]/60 bg-[#818cf8]/10 px-4 py-2 text-sm font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
+              {busy.brief ? "Reading…" : "Sharpen the brief first"}
+            </button>
+          </div>
+          {theme && (
+            <p className="mt-3 text-sm text-ink-dim">
+              <span className="font-bold text-ink">{theme}</span> — the Producer has filled in who should be in
+              each section below. Edit any of them, then pick a design and generate.
+            </p>
+          )}
         </section>
 
         {err && <p className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm font-semibold text-red-300">{err}</p>}
