@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
 import { forensicSwap } from "./vendors/higgsfield";
-import { onFunnelBackground } from "./studio-cutout";
+import { onFunnelBackground, applyReferenceAlpha } from "./studio-cutout";
 import { finishSlider } from "./studio-slider";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
@@ -29,12 +29,20 @@ export async function buildDiscCreative(clientId: string, kind: string, refUrl: 
     const calls = 1 + (swap.humanised ? 1 : 0);
     if (!swap.url) return { url: "", error: swap.error || "swap failed", calls };
 
-    // Already a complete image on the funnel colour - just normalise to the reference's exact pixel size.
-    const meta = await sharp(await bufOf(refUrl)).metadata().catch(() => null);
+    // Normalise to the reference's exact pixel size.
+    const refBuf = await bufOf(refUrl);
+    const meta = await sharp(refBuf).metadata().catch(() => null);
     const swapBuf = await bufOf(swap.url);
-    const out: Buffer = (meta?.width && meta?.height)
+    let out: Buffer = (meta?.width && meta?.height)
       ? await sharp(swapBuf).resize(meta.width, meta.height, { fit: "fill" }).png().toBuffer()
       : swapBuf;
+
+    // SECTION-1 must sit on CLEAN WHITE (Gary). The swap re-renders the surround off-white; so for section-1
+    // we cut the design with the reference's tight (eroded) edge and re-place it on pure white. The masthead
+    // stays on its navy, where a re-rendered dark surround is invisible and cutting would ragged the edge.
+    if (bgKind === "section1") {
+      out = (await onFunnelBackground(await applyReferenceAlpha(out, refBuf), "section1")) as Buffer;
+    }
     const url = await putBytes(out, `studio/${clientId}/${kind}`, "png", "image/png");
     return { url, error: null, calls };
   } catch (e) {
@@ -82,14 +90,14 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
 
 
   type Ref = { name: string; url: string };
-  type Job = { kind: RefCreative["kind"]; index: number; ref?: Ref; person: string; scene?: string; construction: "disc" | "scene"; headline?: string };
+  type Job = { kind: RefCreative["kind"]; index: number; ref?: Ref; person: string; scene?: string; construction: "disc" | "scene"; headline?: string; deal?: import("./studio-producer").Deal };
   const jobs: Job[] = [
     { kind: "masthead", index: 0, ref: pick(mastheads), person: plan.masthead.subjectPrompt, construction: "disc" },
     { kind: "section1", index: 0, ref: pick(section1s), person: plan.section1.subjectPrompt, construction: "disc" },
     ...plan.sliders.slice(0, 3).map((s, i): Job => ({
       // The slider person now EMBODIES the theme (mom + daughter for Mother's Day) - the Producer writes it.
       kind: "slider", index: i, ref: pick(sliders, i), person: s.subject || `people that suit "${plan.theme}"`,
-      scene: s.scenePrompt, construction: "scene", headline: `${s.headline1} / ${s.headline2}`,
+      scene: s.scenePrompt, construction: "scene", headline: `${s.headline1} / ${s.headline2}`, deal: s.deal,
     })),
   ];
 
@@ -116,7 +124,7 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     });
     totalCalls += 1 + (humanised ? 1 : 0);
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "swap failed" }; }
-    const finished = await finishSlider(clientId, j.ref.url, url, j.headline || "").catch(() => url);
+    const finished = await finishSlider(clientId, j.ref.url, url, j.headline || "", j.deal || null).catch(() => url);
     return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: finished, headline: j.headline };
   }));
 

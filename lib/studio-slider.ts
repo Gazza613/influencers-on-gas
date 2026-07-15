@@ -1,5 +1,7 @@
 import sharp from "sharp";
 import { renderPng, fontFaceCss } from "./studio-render";
+import { dealCardCss, dealCardHtml } from "./templates/momo-deal-card";
+import type { Deal } from "./studio-producer";
 
 // TYPESET THE SLIDER HEADLINE. The slider comes back carrying the reference's OWN baked headline. To make it
 // the campaign's - and to tell a story across the three sliders with three DIFFERENT hooks (Gary) - we cover
@@ -75,6 +77,7 @@ export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xP
 // model drew. One place, used by the wizard and the full-set flow, so both get the same brand-safe finish.
 import { typesetSliderHeadline as _typeset } from "./studio-slider";
 import { getBrandKit } from "./studio";
+import { detectLayout } from "./studio-layout";
 import { putBytes } from "./blob";
 
 function pickLogo(logos: { name: string | null; url: string }[]): { url: string } | null {
@@ -83,10 +86,34 @@ function pickLogo(logos: { name: string | null; url: string }[]): { url: string 
   return [...logos].sort((a, b) => score(b.name || "") - score(a.name || ""))[0];
 }
 
-export async function finishSlider(clientId: string, referenceUrl: string, swapUrl: string, callout: string): Promise<string> {
+// Render OUR real deal card (vertical) as a transparent PNG, then composite it TOP-RIGHT over the slider's
+// deal-card position - so the deal is the campaign's chosen one, pixel-clean, never the reference's baked card.
+async function overlayDeal(baseBuf: Buffer, deal: Deal, fonts: { family: string; url: string }[], box?: { xPct: number; yPct: number; wPct: number } | null): Promise<Buffer> {
+  const meta = await sharp(baseBuf).metadata();
+  const W = meta.width || 1080, H = meta.height || 1080;
+  // Render the vertical card big, trim to it, then resize to an exact width - guarantees the whole card (down
+  // to the validity line) is present and correctly sized.
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss(fonts)}
+    *{margin:0;box-sizing:border-box}body{background:transparent;padding:20px}${dealCardCss(0.5)}</style></head>
+    <body>${dealCardHtml(deal, "vertical")}</body></html>`;
+  const { png } = await renderPng({ html, width: 1400, height: 1800, scale: 1, transparent: true });
+  // Size to the reference deal-card box (a touch bigger, to fully COVER the baked one), else default top-right.
+  const wFrac = box ? Math.min(0.32, Math.max(0.18, (box.wPct > 1 ? box.wPct / 100 : box.wPct) * 1.08)) : 0.24;
+  const cardW = Math.round(W * wFrac);
+  const card = await sharp(png).trim({ threshold: 10 }).resize({ width: cardW }).png().toBuffer();
+  const cm = await sharp(card).metadata();
+  const left = box ? Math.round(W * (box.xPct > 1 ? box.xPct / 100 : box.xPct) - cardW * 0.04) : W - (cm.width || cardW) - Math.round(W * 0.035);
+  const top = box ? Math.round(H * (box.yPct > 1 ? box.yPct / 100 : box.yPct) - H * 0.01) : Math.round(H * 0.035);
+  return sharp(baseBuf).composite([{ input: card, left: Math.max(0, Math.min(left, W - (cm.width || cardW))), top: Math.max(0, top) }]).png().toBuffer();
+}
+
+export async function finishSlider(clientId: string, referenceUrl: string, swapUrl: string, callout: string, deal?: Deal | null): Promise<string> {
   const kit = await getBrandKit(clientId).catch(() => null);
   const fonts = (kit?.fonts || []) as { family: string; url: string }[];
   let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(swapUrl)).arrayBuffer()));
+  // One layout read of the reference gives the deal-card and logo positions, so our overlays COVER the baked
+  // ones precisely instead of leaving the reference's version peeking out.
+  const layout = await detectLayout(referenceUrl).catch(() => null);
 
   // Headline: split "line 1 / line 2" (the Producer's campaign headline), typeset it. Do NOT swallow a failure
   // silently - that is exactly how the reference's baked headline was slipping through un-themed.
@@ -98,13 +125,18 @@ export async function finishSlider(clientId: string, referenceUrl: string, swapU
       console.error("[finishSlider] headline typeset FAILED (headline will be the reference's):", e);
     }
   }
+  // Deal: stamp OUR real deal card (the campaign's chosen deal) over the reference's baked one, top-right.
+  if (deal && deal.label && deal.price) {
+    try { out = (await overlayDeal(out, deal, fonts, layout?.callout)) as Buffer; }
+    catch (e) { console.error("[finishSlider] deal overlay failed:", e); }
+  }
   // Logo: cover the (garbled) logo with the real brand lockup, from the top-left corner (fixed, reliable -
   // detection was landing off and doubling the logo).
   const logo = pickLogo((kit?.logos || []) as { name: string | null; url: string }[]);
   if (logo) {
     try {
       const logoBuf = Buffer.from(await (await fetch(logo.url)).arrayBuffer());
-      out = (await compositeLogo(out, logoBuf, { xPct: 3, yPct: 3, wPct: 26 })) as Buffer;
+      out = (await compositeLogo(out, logoBuf, layout?.logo || { xPct: 3, yPct: 3, wPct: 26 })) as Buffer;
     } catch (e) { console.error("[finishSlider] logo composite failed:", e); }
   }
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");

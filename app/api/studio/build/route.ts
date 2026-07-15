@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; deal?: import("@/lib/studio-producer").Deal | null };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
   let referenceUrl = String(b.referenceUrl || "");
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     const sw = await forensicSwap(referenceUrl, { person: subject, scene: String(b.scene || ""), construction: "scene", ratio, resolution: "4k", humanise: true });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "wizard-build", count: sw.humanised ? 2 : 1 }).catch(() => {});
     if (!sw.url) return NextResponse.json({ error: sw.error || "generation failed" }, { status: 500 });
-    const finished = await finishSlider(clientId, referenceUrl, sw.url, callout);
+    const finished = await finishSlider(clientId, referenceUrl, sw.url, callout, b.deal || null);
     return NextResponse.json({ ok: true, url: finished });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
