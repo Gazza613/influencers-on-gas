@@ -448,10 +448,13 @@ export async function forensicSwap(url: string, opts: {
     `never an over-smoothed 3D render. Sharp, clean, high-resolution, editorial quality. ` +
     // Anatomy + phone guardrails - from Gary's live notes: a detached arm on one slider, and a phone screen
     // showing a video call of another face.
-    `ANATOMY MUST BE CORRECT: every arm, hand and finger natural, in proportion and properly ATTACHED to the ` +
-    `body - no detached, floating, extra, missing or malformed limbs, correct number of fingers. If a person ` +
-    `holds up a phone, its bright SCREEN faces the viewer showing the MoMo app interface - NEVER the back of ` +
-    `the phone, never the camera side, never a blank or dark screen, never a video call of another face.`;
+    `ANATOMY MUST BE PERFECT AND THIS IS NON-NEGOTIABLE: exactly one head, two arms and two hands per person, ` +
+    `every hand and finger natural, in proportion and properly ATTACHED to the body, correct number of fingers. ` +
+    `There must be NO stray, extra, floating, disembodied or duplicated hand, arm or phone ANYWHERE in the frame. ` +
+    `If the design already contains a phone element, KEEP ONLY THAT ONE - do not add a second phone or a second ` +
+    `hand holding one. Count the hands: a person holding a phone has two hands total, no more. ` +
+    `If a phone is held up, its bright SCREEN faces the viewer showing the MoMo app interface - NEVER the back ` +
+    `of the phone, never the camera side, never a blank or dark screen, never a video call of another face.`;
   try {
     const imageId = await importMediaUrl(url);
     if (!imageId) return { url: null, rawUrl: null, error: "could not import the reference into Higgsfield", humanised: false };
