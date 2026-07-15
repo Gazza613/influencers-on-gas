@@ -477,9 +477,12 @@ export async function forensicSwap(url: string, opts: {
       `\n\nCHANGE the person to ${person(opts.person)}, at a similar size, position, pose and crop, lit to match, ` +
       `blended naturally into the SAME solid background - NOT cut out, no hard outline, no torn or ragged edge. ` +
       `Output a complete, seamless picture with the disc and bubbles intact but NO logo, NO pill and NO text. ` +
-      `\n\nTHE PHONE: if the design has a phone, keep exactly ONE. The people do NOT hold a second phone. There ` +
-      `must be NO extra, disembodied or floating hand or fingers anywhere. Each person has exactly two hands, ` +
-      `attached. ${skin}`;
+      `\n\nHANDS AND PHONES - READ CAREFULLY, this keeps going wrong: count every hand in the frame and make ` +
+      `each one belong to a person and be properly ATTACHED to that person's arm. There must be ZERO extra, ` +
+      `floating, disembodied or duplicated hands or fingers ANYWHERE - not near the held phone, not near any ` +
+      `floating app-phone, not in the background. If the design has a floating phone showing the app, it floats ` +
+      `on its OWN with NO hand holding it. A person holding a phone uses their own two hands and no more. Do a ` +
+      `final check and remove any hand that is not clearly attached to a visible arm of a person in the scene. ${skin}`;
 
     // SCENE construction (slider): produce a CLEAN PHOTOGRAPH ONLY. We used to ask the model to KEEP the logo,
     // swish and deal cards - but it REDRAWS them, which is exactly how the logo garbled to "from HTN" and the

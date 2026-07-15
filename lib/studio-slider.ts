@@ -111,11 +111,19 @@ async function overlayDeal(baseBuf: Buffer, deal: Deal, fonts: { family: string;
   return sharp(baseBuf).composite([{ input: card, left: Math.max(0, Math.min(left, W - (cm.width || cardW))), top: Math.max(0, top) }]).png().toBuffer();
 }
 
-// COMPOSITE THE THEMED 3D PILL over a disc creative (masthead / section 1). The swap now leaves the callout
-// area CLEAN, so this pill is the only one in the frame - the campaign's words in MoMo's own lozenge, never the
-// reference's copy and never AI-drawn. `callout` is "line 1 / line 2" from the Producer. Placed bottom-centre,
-// matching where the reference pill sits, sized to a share of the width.
-export async function overlayPill(baseBuf: Buffer, callout: string, fonts: { family: string; url: string }[], widthFrac = 0.66): Promise<Buffer> {
+// COMPOSITE THE THEMED 3D PILL over a disc creative (masthead / section 1) - the campaign's words in MoMo's own
+// lozenge, never AI-drawn. `callout` is "line 1 / line 2" from the Producer.
+//
+// The swap does NOT reliably remove the reference's baked pill (Gary saw the old pill sitting behind the new
+// one), so we do not depend on it. Instead, when we know where the reference's pill sits (the detected callout
+// box), we size OUR pill to fully COVER it - a touch wider than the box and centred on it - so the old copy is
+// hidden regardless. With no box we fall back to a sensible bottom-centre placement.
+export async function overlayPill(
+  baseBuf: Buffer,
+  callout: string,
+  fonts: { family: string; url: string }[],
+  opts: { box?: { xPct: number; yPct: number; wPct: number } | null; widthFrac?: number } = {},
+): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
   const [l1, l2] = callout.split("/").map((x) => x.trim());
@@ -123,13 +131,37 @@ export async function overlayPill(baseBuf: Buffer, callout: string, fonts: { fam
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss(fonts)}
     *{margin:0;box-sizing:border-box}body{background:transparent;padding:60px}${momoPillCss(0.5)}</style></head>
     <body>${momoPillHtml(l1, l2)}</body></html>`;
-  const { png } = await renderPng({ html, width: 2400, height: 900, scale: 1, transparent: true });
+  const { png } = await renderPng({ html, width: 2600, height: 900, scale: 1, transparent: true });
+  const trimmed = await sharp(png).trim({ threshold: 8 }).png().toBuffer();
+
+  const box = opts.box || null;
+  const boxWFrac = box ? (box.wPct > 1 ? box.wPct / 100 : box.wPct) : 0;
+  // Cover the reference pill: at least 12% wider than its box, clamped sane. Else the caller's default width.
+  const widthFrac = box
+    ? Math.min(0.92, Math.max(0.5, boxWFrac * 1.12))
+    : (opts.widthFrac || 0.66);
   const pillW = Math.round(W * widthFrac);
-  const pill = await sharp(png).trim({ threshold: 8 }).resize({ width: pillW }).png().toBuffer();
+  const pill = await sharp(trimmed).resize({ width: pillW }).png().toBuffer();
   const pm = await sharp(pill).metadata();
-  const left = Math.round((W - (pm.width || pillW)) / 2);
-  const top = Math.round(H - (pm.height || 0) - H * 0.045); // sit near the bottom, a small margin up
-  return sharp(baseBuf).composite([{ input: pill, left: Math.max(0, left), top: Math.max(0, top) }]).png().toBuffer();
+  const pw = pm.width || pillW, ph = pm.height || 0;
+
+  let left: number, top: number;
+  if (box) {
+    // Centre our pill on the reference pill's box centre, so it blankets the old one.
+    const boxXFrac = box.xPct > 1 ? box.xPct / 100 : box.xPct;
+    const boxYFrac = box.yPct > 1 ? box.yPct / 100 : box.yPct;
+    const cx = (boxXFrac + boxWFrac / 2) * W;
+    // The detector gives the box TOP; the reference pills are short, so centre a little below the top edge.
+    const cy = boxYFrac * H + ph * 0.5;
+    left = Math.round(cx - pw / 2);
+    top = Math.round(cy - ph / 2);
+  } else {
+    left = Math.round((W - pw) / 2);
+    top = Math.round(H - ph - H * 0.045);
+  }
+  left = Math.max(0, Math.min(left, W - pw));
+  top = Math.max(0, Math.min(top, H - ph));
+  return sharp(baseBuf).composite([{ input: pill, left, top }]).png().toBuffer();
 }
 
 export async function finishSlider(clientId: string, _referenceUrl: string, swapUrl: string, callout: string, deal?: Deal | null): Promise<string> {

@@ -4,6 +4,7 @@ import { listAssets } from "./studio";
 import { forensicSwap } from "./vendors/higgsfield";
 import { onFunnelBackground, applyReferenceAlpha } from "./studio-cutout";
 import { finishSlider, overlayPill } from "./studio-slider";
+import { detectLayout } from "./studio-layout";
 import { getBrandKit } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
@@ -53,7 +54,10 @@ export async function buildDiscCreative(clientId: string, kind: string, refUrl: 
     if (callout && callout.trim()) {
       const kit = await getBrandKit(clientId).catch(() => null);
       const fonts = (kit?.fonts || []) as { family: string; url: string }[];
-      try { out = (await overlayPill(out, callout, fonts, bgKind === "section1" ? 0.6 : 0.66)) as Buffer; }
+      // Detect where the reference's pill sits so OUR pill fully covers it (the swap does not reliably remove
+      // the old pill - Gary saw it sitting behind the new one).
+      const layout = await detectLayout(refUrl).catch(() => null);
+      try { out = (await overlayPill(out, callout, fonts, { box: layout?.callout || null, widthFrac: bgKind === "section1" ? 0.6 : 0.66 })) as Buffer; }
       catch (e) { console.error(`[buildDiscCreative] pill overlay failed (${kind}):`, e); }
     }
 
