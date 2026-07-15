@@ -51,17 +51,25 @@ export async function GET(req: Request) {
   const refIdx = u.searchParams.get("ref");
   const person = (u.searchParams.get("person") || "").trim();
 
-  // No reference chosen: show the gallery so Gary can pick an index and see what he is working with.
+  // No reference chosen: show the gallery. CLICK a reference to run the swap - Gary should never have to hand-
+  // edit a URL. The person box carries whatever he types straight into the click.
   if (refIdx === null) {
     const cards = refs.map((r, i) =>
-      `<figure><img src="${r.url}" loading="lazy"><figcaption>#${i} ${(r.name || "").slice(0, 40)}</figcaption></figure>`,
+      `<button class="card" onclick="run(${i})">` +
+      `<img src="${r.url}" loading="lazy"><span>#${i} ${(r.name || "").slice(0, 40)}</span></button>`,
     ).join("");
     return page(
       `<h1>Forensic swap test - ${client.name}</h1>` +
-      `<p>Pick a reference below, then load: <code>?ref=NUMBER&person=WHAT YOU WANT</code><br>` +
-      `e.g. <a href="?ref=0&person=a smiling middle-aged South African woman in a mustard jumper">?ref=0&person=a smiling middle-aged South African woman in a mustard jumper</a></p>` +
-      `<p style="color:#9aa4b2">Each run spends one image. It changes only the person and should leave every other pixel of the design where it is.</p>` +
-      `<div class="grid">${cards}</div>`,
+      `<p style="color:#9aa4b2">Type who you want in the picture, then CLICK a design to swap the person into it. ` +
+      `Each click spends one image. Everything except the person should stay exactly where it is.</p>` +
+      `<label style="display:block;margin:14px 0 6px;font-size:13px;color:#9aa4b2">Who should be in the picture?</label>` +
+      `<input id="person" value="a smiling middle-aged South African woman in a mustard jumper" ` +
+      `style="width:100%;max-width:640px;padding:11px 13px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:15px">` +
+      `<div class="grid">${cards}</div>` +
+      `<script>function run(i){var p=encodeURIComponent(document.getElementById('person').value||'a smiling person');` +
+      `document.body.style.opacity=.5;location.href='?ref='+i+'&person='+p;}</script>` +
+      `<style>.card{all:unset;cursor:pointer;display:block}.card img{width:100%;border-radius:8px;border:1px solid #1f2937;transition:border-color .12s}` +
+      `.card:hover img{border-color:#8ab4ff}.card span{display:block;font-size:11px;color:#9aa4b2;margin-top:4px}</style>`,
     );
   }
 
@@ -88,6 +96,10 @@ export async function GET(req: Request) {
     `<figure style="margin:0"><h2>REFERENCE (your design)</h2><img src="${ref.url}"></figure>` +
     `<figure style="margin:0"><h2>RESULT (person swapped)</h2><img src="${url}"></figure>` +
     `</div>` +
-    `<p style="margin-top:16px"><a href="?ref=${idx}&person=${encodeURIComponent(person)}">Rerun</a> &nbsp;·&nbsp; <a href="?">Back to the gallery</a></p>`,
+    `<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">` +
+    `<input id="person" value="${person.replace(/"/g, "&quot;")}" style="flex:1;min-width:280px;padding:10px 12px;border-radius:9px;border:1px solid #2b3646;background:#111827;color:#e5e7eb;font-size:14px">` +
+    `<button onclick="go()" style="padding:10px 18px;border-radius:9px;border:0;background:#8ab4ff;color:#0b0f14;font-weight:700;cursor:pointer">Run again</button>` +
+    `<a href="?" style="padding:10px 4px">Back to the gallery</a></div>` +
+    `<script>function go(){var p=encodeURIComponent(document.getElementById('person').value||'a person');document.body.style.opacity=.5;location.href='?ref=${idx}&person='+p;}</script>`,
   );
 }

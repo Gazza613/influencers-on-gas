@@ -42,26 +42,37 @@ IN SCOPE: mobile money, payments, wallets, financial inclusion, fintech regulati
 OUT OF SCOPE: MTN network/telco strategy, spectrum, coverage, MTN corporate brand campaigns, MTN Group subscriber numbers, telco competitor sets. MTN Group appears ONLY as the endorsement brand behind "MoMo from MTN".
 CRITICAL: MoMo's fintech offers are OFTEN DIFFERENT from MTN's own offers. NEVER infer a MoMo price, bundle or product from an MTN source. If you cannot source it to MoMo directly, do not assert it.`;
 
-const HONESTY = () => `HONESTY RULES:
+const HONESTY = (windowDays: number) => `HONESTY RULES:
 - Every finding must carry a REAL source URL you actually read. If you cannot source it, do not report it.
 - Grade confidence honestly: high (primary source - regulator, company results, statute), medium (credible secondary - law firm, trade press, fact-checker), low (single source, thin, or inferred).
 - Mark material=true ONLY if this would actually change what we say or do. Most news is not material. A quiet day with nothing material is a CORRECT result - say so rather than padding.
 - There is NO published creative-performance data for MoMo South Africa. Anyone quoting SA fintech creative benchmarks is inventing them. Never repeat one.
-- RECENCY IS A HARD GATE. This is a DAILY intelligence run: you report WHAT CHANGED. Only report things published or announced in the LAST ${WINDOW_DAYS} DAYS. Older material - however good - is BACKGROUND, not news, and it already lives in our doctrine. Do not report it. A stale finding presented as current is worse than no finding.
+- RECENCY IS A HARD GATE. This is a DAILY intelligence run: you report WHAT CHANGED. Only report things published or announced in the LAST ${windowDays} DAYS. Older material - however good - is BACKGROUND, not news, and it already lives in our doctrine. Do not report it. A stale finding presented as current is worse than no finding.
 - DATE EVERY FINDING. Give published_at as the date the SOURCE was published or the event happened - NOT today. If you cannot establish the date, leave it empty rather than guessing - but know that an undated finding will be REJECTED, because we cannot claim it is current.
-- Also give 'period' when the data covers a span that differs from the publication date (e.g. a report published this month describing FY2025). Recency of PUBLICATION is not recency of DATA.
-- If something contradicts what we already believe, say so loudly. That is the most valuable thing you can find.`;
+- Also give 'period' when the data covers a span that differs from the publication date (e.g. a report published this month describing FY2025). Recency of PUBLICATION is not recency of DATA.`;
 
 const ROLE_BRIEF: Record<string, string> = {
-  journalist: `You are researching for THE JOURNALIST: material the MTN MoMo CEO could build a DEFENSIBLE PUBLIC ARGUMENT on, for LinkedIn thought leadership.
-The brief is INDUSTRY COMMENTARY ONLY - never product promotion. The moment a post promotes MoMo's services it becomes an FSP advertisement under FAIS and the whole s14 regime applies. So look for: category shifts, regulatory change, financial-inclusion data, fraud and trust research, the informal economy, data affordability, what other markets are learning.
-He is a regulated financial-services executive at a JSE-listed group. So flag anything that is market-sensitive, forward-looking, or that only works as an argument if he discloses something non-public - those are things we must NOT write about.
-The best find is a REAL NUMBER from a PRIMARY SOURCE that contradicts a comfortable industry assumption.`,
+  // THE JOURNALIST speaks as the CEO, in public. Gary: "journalistic best practices, the absolute expert -
+  // truthful, factual, NOT controversial, do NOT compare to competitors, focus on the OPPORTUNITIES for MoMo
+  // the broader LinkedIn market should be aware of. Strategic, professional, compliant, impactful."
+  journalist: `You are THE JOURNALIST, preparing LinkedIn thought-leadership material in the VOICE OF THE MTN MoMo CEO. GAS is the agency drafting on his behalf, so the bar is a respected financial-services executive writing in public: truthful, factual, carefully sourced and PROFESSIONAL.
+Adopt journalistic best practice: verify before you assert, attribute every claim, prefer primary sources, separate fact from opinion. If it is not solid, it does not go in.
+WHAT TO LOOK FOR: opportunities and shifts in the CATEGORY that the broader LinkedIn market - business leaders, policymakers, the financial-inclusion community - should be aware of. Financial inclusion, the informal economy, digital-payment adoption, data affordability, fraud awareness and consumer trust, what other markets are teaching. Frame them as OPPORTUNITIES the industry can rally around, and where MoMo is credibly placed to lead the conversation.
+HARD LINES - these define the job:
+- NEVER compare to, name, or take a swing at a competitor. This is category leadership, not combat.
+- NEVER controversial, political, speculative or market-sensitive. He is a JSE-listed-group executive: nothing forward-looking, nothing that reads as a share-moving statement, nothing that needs non-public information to stand up.
+- INDUSTRY COMMENTARY ONLY, never product promotion. The moment a post sells MoMo's services it becomes an FSP advertisement under FAIS and the whole s14 regime applies. Stay at the level of the category and the customer, never the product.
+The best find is a real, verifiable, current development the CEO can build a generous, forward-looking, non-controversial point of view on - one that makes MoMo look like the adult in the room and the industry better for the conversation.`,
 
-  strategist: `You are researching for THE STRATEGIST: what should change what GAS ADVISES MTN MoMo to do.
-Look for: competitor moves (product launches, pricing, partnerships, distribution), regulatory change that opens or closes a door, market data that shifts the picture, fraud/trust developments, and anything that makes our current creative or channel strategy wrong.
-Be specific about the SO WHAT. "Capitec launched X" is not intelligence. "Capitec launched X, which attacks MoMo's cash-out proximity advantage, so our creative should stop leaning on Y" is intelligence.
-The best find is something that makes a current assumption WRONG.`,
+  // THE STRATEGIST is internal and blunt. Gary: "a ground truth so it can report back on competitors, assess
+  // risks and identify opportunities. Raw truth for our internal strategy team, so no holding back."
+  strategist: `You are THE STRATEGIST: raw ground-truth intelligence for GAS's OWN internal strategy team. This is an internal briefing, not a client-facing document - do not soften, hedge or flatter. Tell us what is actually happening, including what is uncomfortable to hear.
+Three jobs, every run:
+- COMPETITORS: what the fintech set actually did (Capitec Pay, TymeBank, VodaPay, Shoprite Money Market, Standard Bank Instant Money, Mukuru, Discovery Bank) - a launch, a price, a partnership, a distribution move, a numbers release.
+- RISKS: what threatens MoMo's position - a regulatory shift, a competitor encroaching on a MoMo advantage, a fraud or trust development, a channel or pricing pressure.
+- OPPORTUNITIES: an opening MoMo could take - an underserved segment, a competitor weakness, a regulatory door opening, a partner in play.
+Be specific about the SO WHAT and the SO WHAT NOW. "Capitec launched X" is not intelligence. "Capitec launched X, which attacks MoMo's cash-out proximity advantage, so we should stop leaning on Y and test Z" is intelligence.
+If something makes a current MoMo assumption WRONG, LEAD with it and say so plainly - that is the most valuable thing you can put in front of an internal team.`,
 };
 
 const SCHEMA = {
@@ -99,14 +110,23 @@ const SCHEMA = {
   required: ["findings", "quiet_day"],
 } as unknown as Anthropic.Tool["input_schema"];
 
-// HARD RECENCY WINDOW. Gary: "I cannot have stale research or articles, makes no sense." He is right, and
-// flagging staleness was not enough - a daily intelligence run exists to report WHAT CHANGED, so anything
-// outside the window is not news, it is background. Foundational work (the Competition Commission's data, the
-// GSMA trust study) is still authoritative and already lives in the doctrine on the brand kit; it does not
-// belong in a daily queue pretending to be new.
-// So: findings outside the window, or that cannot be dated at all, are REJECTED before they are stored - and
-// the count of what was dropped is reported, never silently swallowed.
-const WINDOW_DAYS = Number(process.env.INTEL_WINDOW_DAYS) || 90;
+// HARD RECENCY WINDOW, PER ROLE. Gary: "I cannot have stale research or articles, makes no sense." He is
+// right, and flagging staleness was not enough - a daily intelligence run exists to report WHAT CHANGED, so
+// anything outside the window is not news, it is background. Foundational work (the Competition Commission's
+// data, the GSMA trust study) is still authoritative and already lives in the doctrine on the brand kit; it
+// does not belong in a daily queue pretending to be new.
+//
+// The Strategist window is 60 days, a hard maximum Gary set - internal intelligence must be genuinely current
+// competitor/risk movement. The Journalist runs a touch wider, because a CEO thought-leadership piece can
+// legitimately reference a recent report or study that broke a couple of months ago - but it is still gated,
+// never open-ended.
+// Findings outside the window, or that cannot be dated at all, are REJECTED before storage, and the count of
+// what was dropped is reported, never silently swallowed.
+const WINDOW_DAYS: Record<string, number> = {
+  strategist: Number(process.env.INTEL_WINDOW_STRATEGIST) || 60,
+  journalist: Number(process.env.INTEL_WINDOW_JOURNALIST) || 90,
+};
+const windowFor = (role: string): number => WINDOW_DAYS[role] ?? 60;
 
 // Run one role's daily research. Returns the findings it PROPOSES (already stored, status 'new').
 export async function runIntel(clientId: string, role: "journalist" | "strategist", today: string): Promise<Intel[]> {
@@ -114,6 +134,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   if (!key) throw new Error("Claude isn't connected");
   const client = new Anthropic({ apiKey: key });
   const kit = await getBrandKit(clientId).catch(() => null);
+  const windowDays = windowFor(role);
 
   // TWO STEPS, deliberately.
   //
@@ -130,7 +151,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
-    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${HONESTY()}\n\nUK spelling. No em dashes.`,
+    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${HONESTY(windowDays)}\n\nUK spelling. No em dashes.`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -140,7 +161,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 4000,
-    system: `${RINGFENCE}\n\n${HONESTY()}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${RINGFENCE}\n\n${HONESTY(windowDays)}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
@@ -153,14 +174,14 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   if (!findings.length) return [];
 
   // THE GATE. Reject anything we cannot prove is current, before it is ever stored.
-  const cutoff = Date.now() - WINDOW_DAYS * 86_400_000;
+  const cutoff = Date.now() - windowDays * 86_400_000;
   const dropped: string[] = [];
   const fresh = findings.filter((f) => {
     const d = String(f.published_at || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { dropped.push(`${String(f.headline || "?").slice(0, 60)} — undated`); return false; }
     const t = new Date(d).getTime();
     if (!Number.isFinite(t) || t < cutoff) {
-      dropped.push(`${String(f.headline || "?").slice(0, 60)} — ${d}, older than ${WINDOW_DAYS} days`);
+      dropped.push(`${String(f.headline || "?").slice(0, 60)} — ${d}, older than ${windowDays} days`);
       return false;
     }
     return true;
