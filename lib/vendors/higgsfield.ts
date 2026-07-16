@@ -418,6 +418,55 @@ export async function editImageUrl(url: string, opts: { instruction: string; rat
   return out;
 }
 
+// 3D-IFY A DEAL CARD (Gary's prompt, tightened). Turns a FLAT intake deal card into the premium 3D extruded
+// badge the reference designs use, so a composited card sits as richly on the creative as MoMo's own devices.
+//
+// THIS IS AN ASSET-PREP STEP, NEVER A PER-RENDER ONE. The entire reason compositing real deal cards works is
+// that no AI touches the price. Running this during a build would hand the price back to the model on every
+// generate - exactly the garble ("Unlimited R20") we removed. So: convert ONCE, a human approves the text, the
+// approved artwork is saved, and from then on we composite that fixed asset forever.
+//
+// Text fidelity is the only real failure mode, so it is called out hard.
+export async function make3dDealCard(url: string, opts: { yaw?: number } = {}): Promise<{ url: string | null; error: string | null }> {
+  if (!isSafePublicUrl(url)) return { url: null, error: "deal card url is not a safe public url" };
+  try {
+    const imageId = await importMediaUrl(url);
+    if (!imageId) return { url: null, error: "could not import the deal card into Higgsfield" };
+    const { call } = await openSession();
+    const yaw = typeof opts.yaw === "number" ? opts.yaw : -10;
+    const params: AnyObj = {
+      ...baseParams("nano_banana_pro", "1:1"),
+      prompt:
+        `Use @image1 as the EXACT source artwork. Convert it into a premium 3D extruded badge while preserving ` +
+        `the original design, colours, typography, layout, proportions, logos and all readable text exactly as ` +
+        `supplied. Do not redesign the artwork. ` +
+        `\n\nApply a 3D transform with X-axis rotation 0 degrees, Y-axis rotation ${yaw} degrees, Z-axis rotation ` +
+        `0 degrees - a slight perspective angle, the badge still upright, front-facing enough and fully readable. ` +
+        `Add realistic extrusion thickness, bevelled edges, subtle 3D depth, soft glossy highlights, a premium ` +
+        `acrylic/plastic material finish, clean studio lighting and a soft realistic shadow. ` +
+        `\n\nTEXT FIDELITY IS CRITICAL: reproduce EVERY character of the price, the data amount and the validity ` +
+        `line EXACTLY as supplied - do not re-typeset, re-letter, re-space, re-word or alter any number, letter ` +
+        `or symbol. If a character is unclear, keep it as it is. Keep the yellow bold. ` +
+        `\n\nKeep the original colour palette accurate. Transparent or plain neutral background. Preserve ` +
+        `spacing, corner radius and overall proportions. Do NOT change the text, add new text, remove elements, ` +
+        `crop the card, warp typography, distort logos, add extra icons, add a scene background, or rotate on ` +
+        `the Z axis.`,
+      medias: [{ value: imageId, role: "image" }],
+      resolution: "4k",
+    };
+    const r = await call("generate_image", { params });
+    let out: string | null = extractImageUrls(r)[0] ?? null;
+    const jobId = extractJobIds(r)[0] ?? null;
+    if (!out && jobId) out = await pollJob(call, jobId, 100);
+    if (out) return { url: out, error: null };
+    if (jobId) return { url: null, error: "the 3D render started but did not finish in time - try again" };
+    const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
+    return { url: null, error: `no image back: ${raw}`.slice(0, 240) };
+  } catch (e) {
+    return { url: null, error: String((e as Error)?.message || e).slice(0, 200) };
+  }
+}
+
 // FORENSIC RETHEME (Gary's exact ask): "select this image, change ONLY the bottom copy and the promo pill copy
 // to the campaign theme, everything else forensically remains - including that yellow line under the callout."
 //
