@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
-import { balanceHeadline } from "@/lib/studio-slider";
+import { balanceHeadline, stampRealLogo } from "@/lib/studio-slider";
 import { listAssets } from "@/lib/studio";
 import { recordUsage } from "@/lib/usage";
 
@@ -67,7 +67,10 @@ export async function POST(req: Request) {
     const ed = await forensicRetheme(referenceUrl, { changes, ratio, resolution: "4k" });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `retheme-${kind}`, count: 1 }).catch(() => {});
     if (!ed.url) return NextResponse.json({ error: ed.error || "generation failed" }, { status: 500 });
-    return NextResponse.json({ ok: true, url: ed.url });
+    // HARD LOCK the MoMo logo: stamp the real lockup over whatever the model drew, so it can never say
+    // "from HTN" again. Never blocks the creative - falls back to the un-stamped image.
+    const locked = await stampRealLogo(clientId, referenceUrl, ed.url);
+    return NextResponse.json({ ok: true, url: locked });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
   }

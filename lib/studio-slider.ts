@@ -275,3 +275,35 @@ export async function finishSlider(clientId: string, referenceUrl: string, swapU
   }
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");
 }
+
+// THE LOGO HARD LOCK (Gary). The retheme keeps the design beautifully, but nano_banana re-draws the MoMo
+// lockup and garbles the wordmark - "MoMo from HTN" instead of "from MTN". That is unshippable brand damage,
+// and no prompt wording fixes it reliably, so we stop asking: after every retheme we stamp the REAL lockup from
+// the brand kit over the logo's own position, at the reference's own size, in the colour variant that reads on
+// the background there. The AI's version is covered. The logo can NEVER be wrong again.
+//
+// Returns the original url unchanged if the client has no logo on file or anything fails - a hard lock must
+// never be the reason a creative fails to come back.
+export async function stampRealLogo(clientId: string, referenceUrl: string, imageUrl: string): Promise<string> {
+  try {
+    const kit = await getBrandKit(clientId).catch(() => null);
+    const logos = (kit?.logos || []) as { name: string | null; url: string }[];
+    if (!logos.length) return imageUrl;
+
+    let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(imageUrl)).arrayBuffer()));
+    // The reference tells us where ITS logo sits; the retheme keeps the logo in that same spot, so stamping at
+    // the same box lands right on top of the garbled one.
+    const layout = await detectLayout(referenceUrl).catch(() => null);
+    const logoBox = layout?.logo || { xPct: 4, yPct: 4, wPct: 28 };
+    const bgLum = await regionLuminance(out, logoBox);
+    const logo = pickLogoForBg(logos, bgLum);
+    if (!logo) return imageUrl;
+
+    const logoBuf = Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer()));
+    out = (await compositeLogo(out, logoBuf, logoBox)) as Buffer;
+    return await putBytes(out, `studio/${clientId}/logo-locked`, "png", "image/png");
+  } catch (e) {
+    console.error("[stampRealLogo] logo hard lock failed, returning un-stamped image:", e);
+    return imageUrl;
+  }
+}
