@@ -151,8 +151,9 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     const { url, error } = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k", solidBackground: j.construction === "disc" });
     totalCalls += 1;
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "retheme failed" }; }
-    // HARD LOCK the logo on every creative - it can never say "from HTN".
-    const locked = await stampRealLogo(clientId, j.ref.url, url);
+    // Sliders get the REAL stamped lockup (the retheme draws none, so it is the only logo and can never say
+    // "from HTN"). Masthead/section-1 get NO logo (Gary) - the Webflow funnel page already carries it.
+    const locked = j.construction === "disc" ? url : await stampRealLogo(clientId, j.ref.url, url);
     return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: locked, headline: j.headline };
   }));
 

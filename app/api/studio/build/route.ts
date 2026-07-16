@@ -80,9 +80,11 @@ export async function POST(req: Request) {
     const ed = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k", solidBackground: isDisc });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `retheme-${kind}`, count: 1 }).catch(() => {});
     if (!ed.url) return NextResponse.json({ error: ed.error || "generation failed" }, { status: 500 });
-    // HARD LOCK the MoMo logo: stamp the real lockup over whatever the model drew, so it can never say
-    // "from HTN" again. Never blocks the creative - falls back to the un-stamped image.
-    const locked = await stampRealLogo(clientId, referenceUrl, ed.url);
+    // THE LOGO. The retheme never draws one (any logo it draws is a defect), so:
+    //   sliders           -> stamp the REAL lockup, the only logo in the frame. Can never say "from HTN".
+    //   masthead/section1 -> NO logo at all (Gary). The Webflow funnel page already carries the MoMo logo, so
+    //                        repeating it on the creative just duplicates it.
+    const locked = isDisc ? ed.url : await stampRealLogo(clientId, referenceUrl, ed.url);
     return NextResponse.json({ ok: true, url: locked });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
