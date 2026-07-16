@@ -24,12 +24,13 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; deal?: import("@/lib/studio-producer").Deal | null };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; theme?: string; deal?: import("@/lib/studio-producer").Deal | null };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
   let referenceUrl = String(b.referenceUrl || "");
   const subject = String(b.subject || "").trim();
   const callout = String(b.callout || "").trim();
+  const theme = String(b.theme || "").trim();
   if (!clientId || !subject) return NextResponse.json({ error: "Describe who should be in it." }, { status: 400 });
 
   try {
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     if (kind === "slider") {
       if (callout) {
         const [hl1, hl2] = balanceHeadline(callout);
-        changes.push(`Change the main bottom HEADLINE to read "${hl1}"${hl2 ? ` then "${hl2}"` : ""} - a white line then a yellow line - keeping any yellow underline beneath it exactly where it is.`);
+        changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in white${hl2 ? ` then "${hl2}" in yellow` : ""}. It is exactly TWO lines and NOTHING else - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Keep any yellow underline beneath it exactly where it is.`);
       }
     } else {
       // masthead / section 1: the callout is the copy on the design's CALLOUT PILL.
@@ -63,8 +64,14 @@ export async function POST(req: Request) {
     }
     // The "who should be in it" field: a people change (or a verbatim instruction if it reads like one).
     if (subject) changes.push(/^\s*(change|keep|replace|make|remove|add|use)\b/i.test(subject) ? subject : `Change the people in the advert to: ${subject}.`);
-    // A selected deal updates the deal-card numbers in place (kept forensic to the design).
-    if (b.deal && b.deal.label) changes.push(`Change the deal/offer text to "${[b.deal.label, b.deal.amount, b.deal.price].filter(Boolean).join(" ")}", in the same deal-card style.`);
+    // THE OFFER MUST FIT THE CAMPAIGN (Gary). The reference designs are DATA-campaign ads, so a faithful
+    // retheme happily keeps their "+1GB" graphics and "All-Net Calls R10" cards on a money-transfer campaign.
+    // A selected deal wins; otherwise the theme governs every offer element in the design.
+    if (b.deal && b.deal.label) {
+      changes.push(`Change the deal/offer card to read "${[b.deal.label, b.deal.amount, b.deal.price].filter(Boolean).join(" ")}", in the same card style and position. Any OTHER offer element in the design must also match this offer - no other, different bundle anywhere.`);
+    } else if (theme) {
+      changes.push(`The campaign is about: ${theme}. EVERY offer element in the design must fit THIS campaign - the deal/offer badge, any floating graphic like "+1GB", any icon popping out of the phone, and any price. If the design carries a data bundle, an airtime or calls offer, or any deal that does not fit this campaign, replace its wording and its icon so it reflects this campaign's offer instead (for a money-transfer campaign use money/transfer imagery, never data). Do NOT leave any off-theme data, airtime or calls offer anywhere in the image.`);
+    }
 
     // MASTHEAD / SECTION 1: flatten the reference onto the EXACT funnel background FIRST, then retheme that.
     // The reference designs are supplied on black (or transparent), so without this the creative comes back on

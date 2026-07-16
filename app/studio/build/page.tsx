@@ -226,7 +226,7 @@ export default function BuilderPage() {
     try {
       const d = await fetch("/api/studio/build", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "" }),
+        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "", theme }),
       }).then(readJson) as any;
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, status: "new" } }));
       else setErr(d.error || "generation failed");

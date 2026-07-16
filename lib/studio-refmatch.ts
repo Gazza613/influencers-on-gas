@@ -133,10 +133,16 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
       if (j.callout) changes.push(`Change the CALLOUT PILL / lozenge copy to "${j.callout}", keeping the pill's exact shape, colour, 3D style and any yellow banner or underline, matched to the design's own font.`);
     } else if (j.headline) {
       const [hl1, hl2] = balanceHeadline(j.headline);
-      changes.push(`Change the main bottom HEADLINE to read "${hl1}"${hl2 ? ` then "${hl2}"` : ""} - a white line then a yellow line - keeping any yellow underline beneath it exactly where it is.`);
+      changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in white${hl2 ? ` then "${hl2}" in yellow` : ""}. It is exactly TWO lines and NOTHING else - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Keep any yellow underline beneath it exactly where it is.`);
     }
     if (j.person) changes.push(`Change the people in the advert to: ${j.person}.`);
-    if (j.deal?.label) changes.push(`Change the deal/offer text to "${[j.deal.label, j.deal.amount, j.deal.price].filter(Boolean).join(" ")}", in the same deal-card style.`);
+    // The offer must fit the campaign - the reference designs are data-campaign ads, so a faithful retheme
+    // otherwise keeps their "+1GB" graphics and calls deals on an off-theme campaign (Gary).
+    if (j.deal?.label) {
+      changes.push(`Change the deal/offer card to read "${[j.deal.label, j.deal.amount, j.deal.price].filter(Boolean).join(" ")}", in the same card style and position. Any OTHER offer element in the design must also match this offer - no other, different bundle anywhere.`);
+    } else if (plan.theme) {
+      changes.push(`The campaign is about: ${plan.theme}. EVERY offer element in the design must fit THIS campaign - the deal/offer badge, any floating graphic like "+1GB", any icon popping out of the phone, and any price. If the design carries a data bundle, an airtime or calls offer, or any deal that does not fit this campaign, replace its wording and its icon so it reflects this campaign's offer instead (for a money-transfer campaign use money/transfer imagery, never data). Do NOT leave any off-theme data, airtime or calls offer anywhere in the image.`);
+    }
 
     // MASTHEAD / SECTION 1: flatten onto the EXACT funnel background before rethemeing, or a reference supplied
     // on black comes back on black instead of the Webflow navy (the step the forensic-test route always did).

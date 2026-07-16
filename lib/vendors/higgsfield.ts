@@ -457,7 +457,15 @@ export async function forensicRetheme(url: string, opts: { changes: string[]; ra
         `colour so the new words look native to the design (MoMo headlines are usually a white line then a ` +
         `yellow line; keep any yellow underline beneath the headline exactly where it is). Do NOT move, restyle, ` +
         `relight, recolour, regenerate, add or remove anything the changes did not explicitly ask for. Keep it a ` +
-        `real, natural photograph, never plastic or over-rendered, sharp and high-resolution.`,
+        `real, natural photograph, never plastic or over-rendered, sharp and high-resolution. ` +
+        // Anatomy + phone guardrail. Changing the people re-renders hands, and this model reliably grows a
+        // second phone or a floating hand if it is not told not to (Gary: "double hands").
+        `\n\nANATOMY - NON-NEGOTIABLE: every person has exactly one head, two arms and two hands, each hand ` +
+        `properly ATTACHED to a visible arm, with natural fingers in correct proportion. There must be ZERO ` +
+        `extra, floating, disembodied or duplicated hands, arms or fingers anywhere in the frame. THE PHONE: ` +
+        `keep exactly ONE phone in the whole image - the same one @image1 has. A person does NOT hold a second ` +
+        `phone, and does not hold one to their ear while holding another. Count the hands and the phones before ` +
+        `you finish, and remove anything that does not belong to a real person in the scene.`,
       medias: [{ value: imageId, role: "image" }],
       resolution: opts.resolution || "4k",
     };
