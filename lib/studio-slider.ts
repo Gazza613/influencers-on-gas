@@ -276,6 +276,57 @@ export async function finishSlider(clientId: string, referenceUrl: string, swapU
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");
 }
 
+// STAMP A REAL DEAL CARD / PILL from the intake library (Gary's team). Asking the model to draw a deal is what
+// produced the garbled "Unlimited R20" and off-theme data cards. The client has 68 real deal-card assets, so
+// when one is chosen we composite THAT image - pixel-perfect, correct price, on brand - and the retheme is told
+// to leave the area clean so ours is the only card in the frame.
+//
+// Placed TOP-RIGHT by default (the position Gary's team asked for), or on the reference's own deal-card box
+// when we can read it, so it lands where that design normally carries its offer.
+export async function stampDealCard(
+  clientId: string,
+  imageUrl: string,
+  dealCardUrl: string,
+  referenceUrl?: string,
+): Promise<string> {
+  try {
+    let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(imageUrl)).arrayBuffer()));
+    const meta = await sharp(out).metadata();
+    const W = meta.width || 1080, H = meta.height || 1080;
+
+    // Prefer the reference's own deal box; else a sensible top-right placement.
+    const layout = referenceUrl ? await detectLayout(referenceUrl).catch(() => null) : null;
+    const box = layout?.callout || null;
+    const wFrac = box
+      ? Math.min(0.34, Math.max(0.16, (box.wPct > 1 ? box.wPct / 100 : box.wPct)))
+      : 0.24;
+
+    const card = await sharp(Buffer.from(new Uint8Array(await (await fetch(dealCardUrl)).arrayBuffer())))
+      .trim()
+      .resize({ width: Math.round(W * wFrac) })
+      .png()
+      .toBuffer();
+    const cm = await sharp(card).metadata();
+    const cw = cm.width || Math.round(W * wFrac), ch = cm.height || 0;
+
+    const left = box
+      ? Math.round(W * (box.xPct > 1 ? box.xPct / 100 : box.xPct))
+      : W - cw - Math.round(W * 0.035);
+    const top = box
+      ? Math.round(H * (box.yPct > 1 ? box.yPct / 100 : box.yPct))
+      : Math.round(H * 0.035);
+
+    out = await sharp(out)
+      .composite([{ input: card, left: Math.max(0, Math.min(left, W - cw)), top: Math.max(0, Math.min(top, H - ch)) }])
+      .png()
+      .toBuffer();
+    return await putBytes(out, `studio/${clientId}/deal-stamped`, "png", "image/png");
+  } catch (e) {
+    console.error("[stampDealCard] failed, returning image without the deal card:", e);
+    return imageUrl;
+  }
+}
+
 // THE LOGO HARD LOCK (Gary). The retheme keeps the design beautifully, but nano_banana re-draws the MoMo
 // lockup and garbles the wordmark - "MoMo from HTN" instead of "from MTN". That is unshippable brand damage,
 // and no prompt wording fixes it reliably, so we stop asking: after every retheme we stamp the REAL lockup from

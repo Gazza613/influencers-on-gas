@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
-import { balanceHeadline, stampRealLogo } from "@/lib/studio-slider";
+import { balanceHeadline, stampRealLogo, stampDealCard } from "@/lib/studio-slider";
 import { onFunnelBackground } from "@/lib/studio-cutout";
 import { putBytes } from "@/lib/blob";
 import { listAssets } from "@/lib/studio";
@@ -24,13 +24,14 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; theme?: string; deal?: import("@/lib/studio-producer").Deal | null };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; theme?: string; dealCardUrl?: string; deal?: import("@/lib/studio-producer").Deal | null };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
   let referenceUrl = String(b.referenceUrl || "");
   const subject = String(b.subject || "").trim();
   const callout = String(b.callout || "").trim();
   const theme = String(b.theme || "").trim();
+  const dealCardUrl = String(b.dealCardUrl || "").trim();
   if (!clientId || !subject) return NextResponse.json({ error: "Describe who should be in it." }, { status: 400 });
 
   try {
@@ -67,7 +68,11 @@ export async function POST(req: Request) {
     // THE OFFER MUST FIT THE CAMPAIGN (Gary). The reference designs are DATA-campaign ads, so a faithful
     // retheme happily keeps their "+1GB" graphics and "All-Net Calls R10" cards on a money-transfer campaign.
     // A selected deal wins; otherwise the theme governs every offer element in the design.
-    if (b.deal && b.deal.label) {
+    // A REAL deal card from the intake library wins over everything: the model must draw NO deal at all, and we
+    // composite the client's own artwork afterwards. Pixel-perfect price, on brand, never garbled.
+    if (dealCardUrl) {
+      changes.push(`Do NOT draw any deal card, offer badge, price bubble, pill or promotional lozenge ANYWHERE in the image, and no prices or offer wording of any kind. Leave the top-right area as clean background/photograph. The real deal card is composited on afterwards, so any offer you draw is a defect.`);
+    } else if (b.deal && b.deal.label) {
       changes.push(`Change the deal/offer card to read "${[b.deal.label, b.deal.amount, b.deal.price].filter(Boolean).join(" ")}", in the same card style and position. Any OTHER offer element in the design must also match this offer - no other, different bundle anywhere.`);
     } else if (theme) {
       changes.push(`The campaign is about: ${theme}. EVERY offer element in the design must fit THIS campaign - the deal/offer badge, any floating graphic like "+1GB", any icon popping out of the phone, and any price. If the design carries a data bundle, an airtime or calls offer, or any deal that does not fit this campaign, replace its wording and its icon so it reflects this campaign's offer instead (for a money-transfer campaign use money/transfer imagery, never data). Do NOT leave any off-theme data, airtime or calls offer anywhere in the image.`);
@@ -91,7 +96,9 @@ export async function POST(req: Request) {
     //   sliders           -> stamp the REAL lockup, the only logo in the frame. Can never say "from HTN".
     //   masthead/section1 -> NO logo at all (Gary). The Webflow funnel page already carries the MoMo logo, so
     //                        repeating it on the creative just duplicates it.
-    const locked = isDisc ? ed.url : await stampRealLogo(clientId, referenceUrl, ed.url);
+    let locked = isDisc ? ed.url : await stampRealLogo(clientId, referenceUrl, ed.url);
+    // The chosen intake deal card / pill, composited top-right from the real artwork.
+    if (dealCardUrl) locked = await stampDealCard(clientId, locked, dealCardUrl, referenceUrl);
     return NextResponse.json({ ok: true, url: locked });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

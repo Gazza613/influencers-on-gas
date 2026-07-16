@@ -96,6 +96,8 @@ export default function BuilderPage() {
   const [flags, setFlags] = useState<string[]>([]);                    // Producer's soft compliance flags
   const [phone, setPhone] = useState<Record<string, string>>({});      // slotKey -> phone treatment
   const [dealSel, setDealSel] = useState<Record<string, string>>({});  // slotKey -> deal id ("" = none)
+  const [cards, setCards] = useState<{ id: string; name: string; url: string }[]>([]); // intake deal-card artwork
+  const [cardSel, setCardSel] = useState<Record<string, string>>({});  // slotKey -> deal_card asset url ("" = none)
   const [callout, setCallout] = useState<Record<string, string>>({});  // slotKey -> callout text to feature
   const [lightbox, setLightbox] = useState("");                        // url of the creative opened full-screen
   const [err, setErr] = useState("");
@@ -103,7 +105,7 @@ export default function BuilderPage() {
   // Start a clean campaign - clear everything from the previous one.
   function startNext() {
     setBrief(""); setTheme(""); setPicked({}); setSubject({}); setShot({}); setConcept({});
-    setFlags([]); setPhone({}); setDealSel({}); setCallout({}); setErr("");
+    setFlags([]); setPhone({}); setDealSel({}); setCardSel({}); setCallout({}); setErr("");
   }
 
   // Phone treatment -> a line appended to the person direction. Gary: if they hold a phone to the screen, or
@@ -129,6 +131,8 @@ export default function BuilderPage() {
       setRefs((d.assets || []).filter((a: Ref) => a.kind === "reference"));
     }).catch(() => {});
     fetch(`/api/studio/deals?clientId=${clientId}`).then((r) => r.json()).then((d) => setDeals(d.deals || [])).catch(() => {});
+    // The client's own deal-card / pill artwork from intake - we composite the chosen one, never draw it.
+    fetch(`/api/studio/deal-cards?clientId=${clientId}`).then((r) => r.json()).then((d) => setCards(d.cards || [])).catch(() => {});
   }, [clientId]);
 
   const [theme, setTheme] = useState("");
@@ -226,7 +230,7 @@ export default function BuilderPage() {
     try {
       const d = await fetch("/api/studio/build", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "", theme }),
+        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "", theme, dealCardUrl: cardSel[slotKey] || "" }),
       }).then(readJson) as any;
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, status: "new" } }));
       else setErr(d.error || "generation failed");
@@ -370,12 +374,27 @@ export default function BuilderPage() {
                       placeholder="e.g. a mother and her adult daughter smiling together"
                       className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[15px] outline-none focus:border-accent" />
 
-                    {/* per-creative controls: deal, callout, phone */}
-                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    {/* per-creative controls: deal card, deal text, phone, callout */}
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      {/* THE REAL DEAL CARD / PILL (Gary's team): pick one of the client's own intake artworks
+                          and we composite it TOP-RIGHT. Pixel-perfect price, never AI-drawn. Beats the text-only
+                          "deal to feature" below, which asks the model to draw the offer. */}
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Deal to feature</label>
-                        <select value={dealSel[slotKey] || ""} onChange={(e) => setDealSel((x) => ({ ...x, [slotKey]: e.target.value }))}
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Deal card / pill (top right)</label>
+                        <select value={cardSel[slotKey] || ""} onChange={(e) => setCardSel((x) => ({ ...x, [slotKey]: e.target.value }))}
                           className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent">
+                          <option value="">None</option>
+                          {cards.map((c) => <option key={c.id} value={c.url}>{c.name.replace(/\.(png|jpe?g)$/i, "")}</option>)}
+                        </select>
+                        {cardSel[slotKey] && (
+                          <img src={cardSel[slotKey]} alt="" className="mt-1.5 h-12 rounded border border-line bg-surface-2 object-contain p-1" />
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Deal to feature (typed)</label>
+                        <select value={dealSel[slotKey] || ""} onChange={(e) => setDealSel((x) => ({ ...x, [slotKey]: e.target.value }))}
+                          disabled={!!cardSel[slotKey]}
+                          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent disabled:opacity-40">
                           <option value="">No deal</option>
                           {deals.map((d) => <option key={d.id} value={d.id}>{d.label} · {d.amount}{d.amountSuffix || ""} · {d.price}</option>)}
                         </select>
