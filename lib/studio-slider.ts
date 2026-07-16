@@ -276,6 +276,44 @@ export async function finishSlider(clientId: string, referenceUrl: string, swapU
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");
 }
 
+// TYPESET A CUSTOM DEAL onto a creative. Gary: "deals are dynamic from the client - if it says 1GB for R2 and I
+// want 5GB for R49, can I change it?"
+//
+// The answer is yes, and WITHOUT handing the price to an AI: the client's deal card is already rebuilt as code
+// (templates/momo-deal-card.ts, measured off their real artwork), so any deal the team types is RENDERED in that
+// design - every character exact, because we set the type ourselves. Dynamic deals, zero garble risk.
+export async function stampTypesetDeal(
+  clientId: string,
+  imageUrl: string,
+  deal: Deal,
+  referenceUrl?: string,
+): Promise<string> {
+  try {
+    const kit = await getBrandKit(clientId).catch(() => null);
+    const fonts = (kit?.fonts || []) as { family: string; url: string }[];
+    const buf: Buffer = Buffer.from(new Uint8Array(await (await fetch(imageUrl)).arrayBuffer()));
+    const layout = referenceUrl ? await detectLayout(referenceUrl).catch(() => null) : null;
+    const out = await overlayDeal(buf, deal, fonts, layout?.callout);
+    return await putBytes(out, `studio/${clientId}/deal-typeset`, "png", "image/png");
+  } catch (e) {
+    console.error("[stampTypesetDeal] failed, returning image without the deal:", e);
+    return imageUrl;
+  }
+}
+
+// Render JUST the deal card as a standalone transparent PNG - so the builder can PREVIEW exactly what will land
+// on the creative before spending a generate (Gary: "I need a preview image on the deal selector").
+export async function renderDealCardPreview(clientId: string, deal: Deal, orientation: "vertical" | "horizontal" = "vertical"): Promise<string> {
+  const kit = await getBrandKit(clientId).catch(() => null);
+  const fonts = (kit?.fonts || []) as { family: string; url: string }[];
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss(fonts)}
+    *{margin:0;box-sizing:border-box}body{background:transparent;padding:24px}${dealCardCss(0.5)}</style></head>
+    <body>${dealCardHtml(deal, orientation)}</body></html>`;
+  const { png } = await renderPng({ html, width: 1600, height: 2000, scale: 1, transparent: true });
+  const trimmed = await sharp(png).trim({ threshold: 10 }).png().toBuffer();
+  return putBytes(trimmed, `studio/${clientId}/deal-preview`, "png", "image/png");
+}
+
 // STAMP A REAL DEAL CARD / PILL from the intake library (Gary's team). Asking the model to draw a deal is what
 // produced the garbled "Unlimited R20" and off-theme data cards. The client has 68 real deal-card assets, so
 // when one is chosen we composite THAT image - pixel-perfect, correct price, on brand - and the retheme is told

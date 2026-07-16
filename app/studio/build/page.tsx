@@ -103,12 +103,17 @@ export default function BuilderPage() {
   const [lightbox, setLightbox] = useState("");                        // url of the creative opened full-screen
   const [edit, setEdit] = useState<Record<string, string>>({});        // slotKey -> edit instruction for the landed render
   const [scene, setScene] = useState<Record<string, string>>({});      // slotKey -> setting/background (SLIDERS ONLY)
+  // A DYNAMIC deal the team types. We typeset it in the client's own card design, so every character is exact -
+  // the price is never handed to the model (Gary: "deals are dynamic from the client").
+  const [custom, setCustom] = useState<Record<string, Deal>>({});      // slotKey -> typed deal
+  const [dealPrev, setDealPrev] = useState<Record<string, string>>({}); // slotKey -> rendered card preview url
   const [err, setErr] = useState("");
 
   // Start a clean campaign - clear everything from the previous one.
   function startNext() {
     setBrief(""); setTheme(""); setPicked({}); setSubject({}); setShot({}); setConcept({});
-    setFlags([]); setPhone({}); setDealSel({}); setCardSel({}); setCallout({}); setScene({}); setEdit({}); setErr("");
+    setFlags([]); setPhone({}); setDealSel({}); setCardSel({}); setCallout({}); setScene({}); setEdit({});
+    setCustom({}); setDealPrev({}); setErr("");
   }
 
   // Phone treatment -> a line appended to the person direction. Gary: if they hold a phone to the screen, or
@@ -228,7 +233,9 @@ export default function BuilderPage() {
     let subj = (subject[slotKey] || "").trim();
     if (!subj) { setErr("Say who should be in it (or let the Producer plan it)."); return; }
     subj += PHONE_MAP[phone[slotKey]] || ""; // fold the phone treatment into the direction
-    const deal = deals.find((d) => d.id === dealSel[slotKey]) || null;
+    // A typed (dynamic) deal wins over a library pick - it is what the team actually edited.
+    const typed = custom[slotKey];
+    const deal = (typed?.label && typed?.price) ? typed : (deals.find((d) => d.id === dealSel[slotKey]) || null);
     setErr(""); setBusy((b) => ({ ...b, [slotKey]: true }));
     try {
       const d = await fetch("/api/studio/build", {
@@ -239,6 +246,28 @@ export default function BuilderPage() {
       else setErr(d.error || "generation failed");
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, [slotKey]: false })); }
+  }
+
+  function setCustomField(slotKey: string, field: keyof Deal, value: string) {
+    setCustom((x) => ({ ...x, [slotKey]: { ...(x[slotKey] || { id: "", label: "", amount: "", price: "", validity: "" }), [field]: value } as Deal }));
+    setDealPrev((p) => ({ ...p, [slotKey]: "" })); // the preview is stale the moment the numbers change
+  }
+
+  // Render the typed deal as the ACTUAL card that will land, so the team can check it before spending a
+  // generate. Free - our own renderer, no vendor call.
+  async function previewDeal(slotKey: string) {
+    const deal = custom[slotKey];
+    if (!deal?.label || !deal?.price) { setErr("A deal needs at least a label and a price."); return; }
+    setErr(""); setBusy((b) => ({ ...b, [`dp-${slotKey}`]: true }));
+    try {
+      const d = await fetch("/api/studio/deal-preview", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, deal }),
+      }).then(readJson) as any;
+      if (d.url) setDealPrev((p) => ({ ...p, [slotKey]: d.url }));
+      else setErr(d.error || "could not render the card");
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setBusy((b) => ({ ...b, [`dp-${slotKey}`]: false })); }
   }
 
   // ITERATE ON THE LANDED RENDER (Gary): edit the creative in front of you, rather than re-rolling from the
@@ -396,28 +425,61 @@ export default function BuilderPage() {
 
                     {/* per-creative controls: deal card, deal text, phone, callout */}
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      {/* THE REAL DEAL CARD / PILL (Gary's team): pick one of the client's own intake artworks
-                          and we composite it TOP-RIGHT. Pixel-perfect price, never AI-drawn. Beats the text-only
-                          "deal to feature" below, which asks the model to draw the offer. */}
-                      <div>
+                      {/* THE OFFER. Two brand-safe routes, never AI-drawn:
+                          1. pick one of the client's own intake artworks (visual picker, so the team SEES it), or
+                          2. type a dynamic deal, which we TYPESET in the client's own card design - every
+                             character exact, because we set the type (Gary: "deals are dynamic from the client"). */}
+                      <div className="sm:col-span-2">
                         <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Deal card / pill (top right)</label>
-                        <select value={cardSel[slotKey] || ""} onChange={(e) => setCardSel((x) => ({ ...x, [slotKey]: e.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent">
-                          <option value="">None</option>
-                          {cards.map((c) => <option key={c.id} value={c.url}>{c.name.replace(/\.(png|jpe?g)$/i, "")}</option>)}
-                        </select>
-                        {cardSel[slotKey] && (
-                          <img src={cardSel[slotKey]} alt="" className="mt-1.5 h-12 rounded border border-line bg-surface-2 object-contain p-1" />
-                        )}
+                        <div className="mt-1 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface-2 p-1.5">
+                          <button onClick={() => setCardSel((x) => ({ ...x, [slotKey]: "" }))}
+                            className={`rounded border px-2 py-1 text-[11px] font-bold ${!cardSel[slotKey] ? "border-accent text-accent" : "border-line text-ink-dim"}`}>
+                            None
+                          </button>
+                          {cards.map((c) => (
+                            <button key={c.id} onClick={() => setCardSel((x) => ({ ...x, [slotKey]: c.url }))}
+                              title={c.name.replace(/\.(png|jpe?g)$/i, "")}
+                              className={`rounded border p-0.5 ${cardSel[slotKey] === c.url ? "border-accent ring-1 ring-accent" : "border-line"}`}>
+                              <img src={c.url} alt={c.name} className="h-11 w-auto rounded-sm bg-white/5 object-contain" />
+                            </button>
+                          ))}
+                        </div>
+                        {cardSel[slotKey] && <p className="mt-1 text-[11px] text-[#86efac]">✓ Real artwork - composited exactly, never redrawn.</p>}
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Deal to feature (typed)</label>
-                        <select value={dealSel[slotKey] || ""} onChange={(e) => setDealSel((x) => ({ ...x, [slotKey]: e.target.value }))}
-                          disabled={!!cardSel[slotKey]}
-                          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent disabled:opacity-40">
-                          <option value="">No deal</option>
-                          {deals.map((d) => <option key={d.id} value={d.id}>{d.label} · {d.amount}{d.amountSuffix || ""} · {d.price}</option>)}
-                        </select>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">…or type a deal (we typeset it)</label>
+                        <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                          <input value={custom[slotKey]?.label || ""} onChange={(e) => setCustomField(slotKey, "label", e.target.value)}
+                            disabled={!!cardSel[slotKey]} placeholder="Social Pass"
+                            className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[12px] outline-none focus:border-accent disabled:opacity-40" />
+                          <input value={custom[slotKey]?.amount || ""} onChange={(e) => setCustomField(slotKey, "amount", e.target.value)}
+                            disabled={!!cardSel[slotKey]} placeholder="5GB"
+                            className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[12px] outline-none focus:border-accent disabled:opacity-40" />
+                          <input value={custom[slotKey]?.price || ""} onChange={(e) => setCustomField(slotKey, "price", e.target.value)}
+                            disabled={!!cardSel[slotKey]} placeholder="R49"
+                            className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[12px] outline-none focus:border-accent disabled:opacity-40" />
+                          <input value={custom[slotKey]?.validity || ""} onChange={(e) => setCustomField(slotKey, "validity", e.target.value)}
+                            disabled={!!cardSel[slotKey]} placeholder="*Valid for 7 Days"
+                            className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[12px] outline-none focus:border-accent disabled:opacity-40" />
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <button onClick={() => previewDeal(slotKey)}
+                            disabled={!!cardSel[slotKey] || !(custom[slotKey]?.label && custom[slotKey]?.price) || !!busy[`dp-${slotKey}`]}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-[11px] font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+                            {busy[`dp-${slotKey}`] && <Spinner className="h-3 w-3" />} Preview card
+                          </button>
+                          <select value={dealSel[slotKey] || ""} onChange={(e) => { const d = deals.find((x) => x.id === e.target.value); setDealSel((x) => ({ ...x, [slotKey]: e.target.value })); if (d) setCustom((x) => ({ ...x, [slotKey]: { id: d.id, label: d.label, amount: d.amount, amountSuffix: d.amountSuffix || "", price: d.price, validity: d.validity } })); setDealPrev((p) => ({ ...p, [slotKey]: "" })); }}
+                            disabled={!!cardSel[slotKey]}
+                            className="flex-1 rounded-lg border border-line bg-surface-2 px-2 py-1 text-[11px] outline-none focus:border-accent disabled:opacity-40">
+                            <option value="">…or start from the deal library</option>
+                            {deals.map((d) => <option key={d.id} value={d.id}>{d.label} · {d.amount}{d.amountSuffix || ""} · {d.price}</option>)}
+                          </select>
+                        </div>
+                        {dealPrev[slotKey] && (
+                          <img src={dealPrev[slotKey]} alt="" onClick={() => setLightbox(dealPrev[slotKey])}
+                            className="mt-1.5 h-20 cursor-zoom-in rounded border border-line bg-surface-2 object-contain p-1" />
+                        )}
                       </div>
                       {/* SETTING - sliders only. Masthead/section 1 must keep the flat funnel colour or they
                           stop matching the Webflow section they drop into. */}

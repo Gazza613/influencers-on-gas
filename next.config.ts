@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
     "/api/studio/build": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
     "/api/studio/build-all": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
     "/api/studio/momo-set": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
+    // Renders the client's deal card as code so a typed (dynamic) deal can be previewed and composited with
+    // exact type. Without the browser traced in, the render throws and the deal silently never lands.
+    "/api/studio/deal-preview": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
   },
   images: {
     // Let the image optimiser fetch + downsize hero images from our two known hosts so the
