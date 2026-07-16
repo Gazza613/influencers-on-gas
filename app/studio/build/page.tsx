@@ -101,12 +101,14 @@ export default function BuilderPage() {
   const [cardSel, setCardSel] = useState<Record<string, string>>({});  // slotKey -> deal_card asset url ("" = none)
   const [callout, setCallout] = useState<Record<string, string>>({});  // slotKey -> callout text to feature
   const [lightbox, setLightbox] = useState("");                        // url of the creative opened full-screen
+  const [edit, setEdit] = useState<Record<string, string>>({});        // slotKey -> edit instruction for the landed render
+  const [scene, setScene] = useState<Record<string, string>>({});      // slotKey -> setting/background (SLIDERS ONLY)
   const [err, setErr] = useState("");
 
   // Start a clean campaign - clear everything from the previous one.
   function startNext() {
     setBrief(""); setTheme(""); setPicked({}); setSubject({}); setShot({}); setConcept({});
-    setFlags([]); setPhone({}); setDealSel({}); setCardSel({}); setCallout({}); setErr("");
+    setFlags([]); setPhone({}); setDealSel({}); setCardSel({}); setCallout({}); setScene({}); setEdit({}); setErr("");
   }
 
   // Phone treatment -> a line appended to the person direction. Gary: if they hold a phone to the screen, or
@@ -231,10 +233,31 @@ export default function BuilderPage() {
     try {
       const d = await fetch("/api/studio/build", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "", theme, dealCardUrl: cardSel[slotKey] || "" }),
+        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "", theme, dealCardUrl: cardSel[slotKey] || "", scene: scene[slotKey] || "" }),
       }).then(readJson) as any;
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, status: "new" } }));
       else setErr(d.error || "generation failed");
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setBusy((b) => ({ ...b, [slotKey]: false })); }
+  }
+
+  // ITERATE ON THE LANDED RENDER (Gary): edit the creative in front of you, rather than re-rolling from the
+  // reference. The brand locks (logo, chosen deal card) are re-applied server side, so iterating is safe.
+  async function applyEdit(slotKey: string, kind: string) {
+    const s = shot[slotKey];
+    const instruction = (edit[slotKey] || "").trim();
+    if (!s || instruction.length < 3) { setErr("Say what you want changed on this creative."); return; }
+    setErr(""); setBusy((b) => ({ ...b, [slotKey]: true }));
+    try {
+      const d = await fetch("/api/studio/edit", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId, kind, imageUrl: s.url, instruction,
+          referenceUrl: picked[slotKey] || "", dealCardUrl: cardSel[slotKey] || "",
+        }),
+      }).then(readJson) as any;
+      if (d.url) { setShot((x) => ({ ...x, [slotKey]: { url: d.url, status: "new" } })); setEdit((x) => ({ ...x, [slotKey]: "" })); }
+      else setErr(d.error || "the edit failed");
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, [slotKey]: false })); }
   }
@@ -396,6 +419,23 @@ export default function BuilderPage() {
                           {deals.map((d) => <option key={d.id} value={d.id}>{d.label} · {d.amount}{d.amountSuffix || ""} · {d.price}</option>)}
                         </select>
                       </div>
+                      {/* SETTING - sliders only. Masthead/section 1 must keep the flat funnel colour or they
+                          stop matching the Webflow section they drop into. */}
+                      {sec.key === "slider" ? (
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Setting / background</label>
+                          <input value={scene[slotKey] || ""} onChange={(e) => setScene((x) => ({ ...x, [slotKey]: e.target.value }))}
+                            placeholder="Keep the design's"
+                            className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent" />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Background</label>
+                          <p className="mt-1 rounded-lg border border-dashed border-line px-2.5 py-2 text-[12px] text-ink-dim/80">
+                            Locked to the funnel {sec.key === "section1" ? "white" : "navy"} so it drops into Webflow seamlessly.
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Phone in shot</label>
                         <select value={phone[slotKey] || ""} onChange={(e) => setPhone((x) => ({ ...x, [slotKey]: e.target.value }))}
@@ -444,6 +484,27 @@ export default function BuilderPage() {
                           <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">⤢ Open</span>
                         </button>
                         {s.status === "accepted" && <p className="mt-1 text-xs font-bold text-[#86efac]">✓ Accepted</p>}
+
+                        {/* EDIT WHAT LANDED (Gary) - tweak this exact creative instead of re-rolling it.
+                            The logo and the chosen deal card are re-stamped after the edit, so iterating
+                            can never garble them. */}
+                        <div className="mt-2 w-full max-w-md">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Change something on this image</label>
+                          <div className="mt-1 flex gap-2">
+                            <input
+                              value={edit[slotKey] || ""}
+                              onChange={(e) => setEdit((x) => ({ ...x, [slotKey]: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === "Enter") applyEdit(slotKey, sec.key); }}
+                              placeholder="e.g. lose the second phone · make her cardigan navy · warmer light"
+                              className="flex-1 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                            />
+                            <button onClick={() => applyEdit(slotKey, sec.key)} disabled={!!busy[slotKey] || (edit[slotKey] || "").trim().length < 3}
+                              className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+                              Apply
+                            </button>
+                          </div>
+                          <p className="mt-1 text-[11px] text-ink-dim/70">Edits this render, keeping everything else. The logo and deal card stay locked.</p>
+                        </div>
                       </div>
                     )}
                   </div>

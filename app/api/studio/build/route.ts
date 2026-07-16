@@ -65,6 +65,11 @@ export async function POST(req: Request) {
     }
     // The "who should be in it" field: a people change (or a verbatim instruction if it reads like one).
     if (subject) changes.push(/^\s*(change|keep|replace|make|remove|add|use)\b/i.test(subject) ? subject : `Change the people in the advert to: ${subject}.`);
+    // SETTING / BACKGROUND - sliders only. A slider is a photograph, so re-setting it is safe. A masthead or
+    // section 1 must keep the flat funnel colour or it stops matching the Webflow section it drops into, so the
+    // control is never offered there and we ignore it if it somehow arrives.
+    const scene = String(b.scene || "").trim();
+    if (scene && kind === "slider") changes.push(`Change the SETTING / background to: ${scene}. Keep the same framing, composition and the signature swish, and keep the people believably lit for that setting.`);
     // THE OFFER MUST FIT THE CAMPAIGN (Gary). The reference designs are DATA-campaign ads, so a faithful
     // retheme happily keeps their "+1GB" graphics and "All-Net Calls R10" cards on a money-transfer campaign.
     // A selected deal wins; otherwise the theme governs every offer element in the design.
