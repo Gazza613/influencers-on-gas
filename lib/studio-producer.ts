@@ -181,8 +181,8 @@ const SCHEMA = {
         properties: {
           concept: { type: "string", description: "The creative director's note for this slider: a sentence on the scene + idea, for the team to read/edit/run." },
           subject: { type: "string", description: "WHO is in this slider, embodying the campaign theme and their relationship (e.g. 'a mother and her adult daughter laughing together'). The theme must be visible in the people." },
-          headline1: { type: "string", description: "Line 1, white. Max ~22 characters." },
-          headline2: { type: "string", description: "Line 2, MoMo yellow. Max ~22 characters." },
+          headline1: { type: "string", description: "Line 1, WHITE. Max ~22 characters. A slider headline is NEVER more than these two lines. PUNCTUATION: commas are preferred over full stops - if you do use a full stop, finish the sentence with one on line 2 as well; be consistent across both lines and across all three sliders." },
+          headline2: { type: "string", description: "Line 2, MoMo YELLOW. Max ~22 characters. Never add a third line, a price line or a deal line - the offer is a separate composited card." },
           scenePrompt: { type: "string", description: "Image prompt for the photographic scene. Keep the lower third calm and the top-right clear." },
           deal: {
               type: "object", additionalProperties: false,

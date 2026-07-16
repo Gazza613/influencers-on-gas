@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
-import { balanceHeadline, stampRealLogo, stampDealCard, stampTypesetDeal } from "@/lib/studio-slider";
-import { onFunnelBackground } from "@/lib/studio-cutout";
+import { balanceHeadline, tidyCallout, stampRealLogo, stampDealCard, stampTypesetDeal } from "@/lib/studio-slider";
+import { onFunnelBackground, flattenSection1ToWhite } from "@/lib/studio-cutout";
+import { SLIDER_GRADE } from "@/lib/studio-refmatch";
 import { putBytes } from "@/lib/blob";
 import { listAssets } from "@/lib/studio";
 import { recordUsage } from "@/lib/usage";
@@ -56,9 +57,11 @@ export async function POST(req: Request) {
     const changes: string[] = [];
     if (kind === "slider") {
       if (callout) {
-        const [hl1, hl2] = balanceHeadline(callout);
-        changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in white${hl2 ? ` then "${hl2}" in yellow` : ""}. It is exactly TWO lines and NOTHING else - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Keep any yellow underline beneath it exactly where it is.`);
+        const [hl1, hl2] = balanceHeadline(tidyCallout(callout));
+        changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in WHITE${hl2 ? ` then "${hl2}" in YELLOW` : ""}. NEVER more than two lines - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Set the punctuation exactly as written, character for character - do not add or remove a full stop or a comma. Keep any yellow underline beneath it exactly where it is.`);
       }
+      // One grade across all three sliders, whatever the setting, so the set hangs together in the funnel.
+      changes.push(SLIDER_GRADE);
     } else {
       // masthead / section 1: the callout is the copy on the design's CALLOUT PILL.
       if (callout) changes.push(`Change the CALLOUT PILL / lozenge copy to "${callout}", keeping the pill's exact shape, colour, 3D style and any yellow banner or underline, matched to the design's own font.`);
@@ -101,7 +104,18 @@ export async function POST(req: Request) {
     //   sliders           -> stamp the REAL lockup, the only logo in the frame. Can never say "from HTN".
     //   masthead/section1 -> NO logo at all (Gary). The Webflow funnel page already carries the MoMo logo, so
     //                        repeating it on the creative just duplicates it.
-    let locked = isDisc ? ed.url : await stampRealLogo(clientId, referenceUrl, ed.url);
+    // SECTION 1 MUST BE PURE WHITE for the Webflow white section. The model keeps painting faint smudges there
+    // and no prompt has held, so this is deterministic: flood-fill the background to #ffffff from the edges,
+    // protecting a halo around the design so the bubbles keep their shadows.
+    let finalUrl = ed.url;
+    if (kind === "section1") {
+      try {
+        const cleaned = await flattenSection1ToWhite(Buffer.from(new Uint8Array(await (await fetch(ed.url)).arrayBuffer())));
+        finalUrl = await putBytes(cleaned, `studio/${clientId}/section1-white`, "png", "image/png");
+      } catch (e) { console.error("[build] section-1 white flatten failed, keeping the render:", e); }
+    }
+
+    let locked = isDisc ? finalUrl : await stampRealLogo(clientId, referenceUrl, finalUrl);
     // THE OFFER, composited - never AI-drawn. Chosen artwork wins; otherwise a typed deal is typeset in the
     // client's own card design (dynamic deals, every character exact).
     if (dealCardUrl) locked = await stampDealCard(clientId, locked, dealCardUrl, referenceUrl);

@@ -107,6 +107,80 @@ export async function onBackground(pngBuf: Buffer, hex: string): Promise<Buffer>
 // Colours read straight from the live funnel CSS (mtn-momo.webflow.shared.css):
 //   masthead -> the hero section .section-1---hero: linear-gradient(167deg, #0b425d, #02293d)
 //   section1 -> the white sections: #ffffff
+// FORCE THE SECTION-1 BACKGROUND TO PURE WHITE (Gary: "smudges top right and top left... it happens with almost
+// all outputs for section 1 - fix it and lock it in").
+//
+// The model keeps painting a faint room/vignette onto what must be #ffffff, and no prompt wording has held. So
+// we stop asking: this is deterministic. We flood-fill INWARD FROM THE EDGES, whitening any pixel that is
+// "background-like" (light and near-neutral) and connected to the border.
+//
+// Why the flood fill rather than a global threshold: a global rule would also blow out light areas INSIDE the
+// design - a white shirt, a highlight on the disc. Only edge-connected pixels are background, so the fill stops
+// dead at the yellow disc, the blue bubbles and the person (all saturated or dark), and can never reach an
+// interior highlight.
+//
+// The thresholds are deliberately conservative: LIGHT smudges go, but the soft drop shadows under the bubbles
+// (darker than the cutoff) survive, so the design keeps its depth.
+// A soft drop shadow and a painted-on smudge are the SAME brightness - luminance alone cannot separate them,
+// and a naive fill flattens the bubbles' shadows (verified: it lifted a 226-grey shadow straight to white).
+// What DOES separate them is distance: shadows hug the design, smudges sit out in the open. So we protect a
+// halo around the design and only clean beyond it.
+const BG_MIN_LUM = 185;    // lighter than this to count as background
+const BG_MAX_SAT = 40;     // and near-neutral (max-min channel spread)
+// Tuned on a test rig, not guessed: at 0.035 the fill breached a drop shadow at an unprotected point and then
+// ate the whole thing (shadow pixels are background-like, so once inside it spreads through). 0.06 keeps the
+// shadow (226 stays 226) while still cleaning corner smudges to pure white. 0.09 gains nothing.
+const HALO_FRAC = 0.06;    // protected shadow zone around the design, as a fraction of the width
+
+export async function flattenSection1ToWhite(buf: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, C = info.channels;
+
+  const isBgPixel = (i: number): boolean => {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if (lum < BG_MIN_LUM) return false;
+    return Math.max(r, g, b) - Math.min(r, g, b) <= BG_MAX_SAT;
+  };
+
+  // 1. The DESIGN mask: everything that is not background-like (the disc, the bubbles, the person, the pill).
+  const design = Buffer.alloc(W * H);
+  for (let p = 0; p < W * H; p++) design[p] = isBgPixel(p * C) ? 0 : 255;
+
+  // 2. Dilate it into a halo, so the design's own soft shadows sit INSIDE the protected zone and survive.
+  const radius = Math.max(4, Math.round(W * HALO_FRAC));
+  const halo = await sharp(design, { raw: { width: W, height: H, channels: 1 } })
+    .blur(radius)          // spreads the mask outward
+    .threshold(8)          // anything the blur touched at all becomes protected
+    .raw()
+    .toBuffer();
+
+  // 3. Flood-fill background-like pixels inward from the edges, never entering the halo.
+  const seen = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  let sp = 0;
+  const push = (x: number, y: number) => {
+    const p = y * W + x;
+    if (!seen[p]) { seen[p] = 1; stack[sp++] = p; }
+  };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+  for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+
+  while (sp > 0) {
+    const p = stack[--sp];
+    if (halo[p]) continue;             // protected: the design or its shadow - leave it alone
+    const i = p * C;
+    if (!isBgPixel(i)) continue;       // a non-background pixel is a wall: do not spread through it
+    data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
+    const x = p % W, y = (p / W) | 0;
+    if (x > 0) push(x - 1, y);
+    if (x < W - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < H - 1) push(x, y + 1);
+  }
+  return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
+}
+
 export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "section1"): Promise<Buffer> {
   const meta = await sharp(pngBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 811;

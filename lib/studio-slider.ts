@@ -15,6 +15,33 @@ import type { Deal } from "./studio-producer";
 const MOMO_YELLOW = "#F9CB0F";
 const MOMO_BLUE = "#004F71";
 
+// SLIDER CALLOUT PUNCTUATION - Gary's lock-in rule: "if we have full stops we need to end the sentence with a
+// full stop. if not, commas - which is preferred - then no full stop."
+//
+// The rule is CONSISTENCY, and we never invent punctuation:
+//   - if the copy uses a full stop anywhere, the sentence is finished with one;
+//   - if it doesn't, no line ends in a full stop.
+// We do NOT add commas. "Commas preferred" is a writing style for the Producer (it is in the Producer's brief),
+// not a transform - a first pass that force-added them produced "Miss your mom?," and broke "Everyday Value /
+// for Every Woman", which is one continuous phrase, not two clauses. A ? or ! is left alone.
+export function tidyCallout(callout: string): string {
+  const raw = String(callout || "").trim();
+  if (!raw) return raw;
+  const parts = raw.includes("/") ? raw.split("/").map((s) => s.trim()) : [raw];
+  const usesFullStops = parts.some((p) => /\.\s*$/.test(p));
+  const fixed = parts.map((p, i) => {
+    let s = p.trim();
+    const isLast = i === parts.length - 1;
+    if (usesFullStops) {
+      if (isLast && !/[.?!]\s*$/.test(s)) s += ".";        // finish the sentence
+    } else {
+      s = s.replace(/\s*\.+\s*$/, "");                     // no full stops in this set: drop any stray one
+    }
+    return s;
+  });
+  return fixed.join(" / ");
+}
+
 // Split a headline into two BALANCED lines. If the copy already carries a "/", honour it. Otherwise break it
 // at the word boundary nearest the middle, so a long single phrase ("Share in the joy this mothers day") becomes
 // two lines instead of one that runs off the edge (Gary: "cut off").

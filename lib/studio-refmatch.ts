@@ -2,14 +2,23 @@ import sharp from "sharp";
 import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
 import { forensicSwap, forensicRetheme } from "./vendors/higgsfield";
-import { onFunnelBackground, applyReferenceAlpha } from "./studio-cutout";
-import { overlayPill, balanceHeadline, stampRealLogo } from "./studio-slider";
+import { onFunnelBackground, applyReferenceAlpha, flattenSection1ToWhite } from "./studio-cutout";
+import { overlayPill, balanceHeadline, tidyCallout, stampRealLogo } from "./studio-slider";
 import { detectLayout } from "./studio-layout";
 import { getBrandKit } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
 
 const bufOf = (u: string) => fetch(u).then((r) => r.arrayBuffer()).then((b) => Buffer.from(b));
+
+// THE SLIDER GRADE - one look across all three (Gary). The sliders sit side by side in the funnel, so if one is
+// bright outdoor daylight and the next is warm indoor lamplight, the set reads as mismatched. Every slider gets
+// this same colour direction, whatever its setting, so the three hang together as one campaign.
+export const SLIDER_GRADE =
+  "COLOUR GRADE - keep this IDENTICAL across the campaign's sliders so they sit together as a set: a warm, " +
+  "golden, softly-lit tone with gentle contrast and rich but natural skin; the MoMo blue and yellow light " +
+  "accents in the same strength and hue as @image1. Do not shift the grade cooler, flatter or more neutral " +
+  "because of the setting - an outdoor scene must still carry the same warm accent and tone as an indoor one.";
 
 // BUILD ONE MASTHEAD / SECTION-1. NO CUT-OUT (Gary: "see a decent image with no cut outs").
 //
@@ -132,10 +141,13 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     if (j.construction === "disc") {
       if (j.callout) changes.push(`Change the CALLOUT PILL / lozenge copy to "${j.callout}", keeping the pill's exact shape, colour, 3D style and any yellow banner or underline, matched to the design's own font.`);
     } else if (j.headline) {
-      const [hl1, hl2] = balanceHeadline(j.headline);
-      changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in white${hl2 ? ` then "${hl2}" in yellow` : ""}. It is exactly TWO lines and NOTHING else - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Keep any yellow underline beneath it exactly where it is.`);
+      const [hl1, hl2] = balanceHeadline(tidyCallout(j.headline));
+      changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in WHITE${hl2 ? ` then "${hl2}" in YELLOW` : ""}. NEVER more than two lines - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Set the punctuation exactly as written, character for character - do not add or remove a full stop or a comma. Keep any yellow underline beneath it exactly where it is.`);
     }
     if (j.person) changes.push(`Change the people in the advert to: ${j.person}.`);
+    // ONE GRADE ACROSS ALL THREE SLIDERS (Gary): they sit next to each other in the funnel, so an outdoor
+    // daylight slider beside a warm indoor one reads as a mismatched set. Same accent and tone, always.
+    if (j.construction === "scene") changes.push(SLIDER_GRADE);
     // The offer must fit the campaign - the reference designs are data-campaign ads, so a faithful retheme
     // otherwise keeps their "+1GB" graphics and calls deals on an off-theme campaign (Gary).
     if (j.deal?.label) {
@@ -157,9 +169,18 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     const { url, error } = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k", solidBackground: j.construction === "disc" });
     totalCalls += 1;
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "retheme failed" }; }
+
+    // SECTION 1 MUST BE PURE WHITE for its Webflow section - deterministic, because no prompt has held.
+    let cleanUrl = url;
+    if (j.kind === "section1") {
+      try {
+        const cleaned = await flattenSection1ToWhite(await bufOf(url));
+        cleanUrl = await putBytes(cleaned, `studio/${clientId}/section1-white`, "png", "image/png");
+      } catch (e) { console.error("[produceRefMatch] section-1 white flatten failed:", e); }
+    }
     // Sliders get the REAL stamped lockup (the retheme draws none, so it is the only logo and can never say
     // "from HTN"). Masthead/section-1 get NO logo (Gary) - the Webflow funnel page already carries it.
-    const locked = j.construction === "disc" ? url : await stampRealLogo(clientId, j.ref.url, url);
+    const locked = j.construction === "disc" ? cleanUrl : await stampRealLogo(clientId, j.ref.url, cleanUrl);
     return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: locked, headline: j.headline };
   }));
 
