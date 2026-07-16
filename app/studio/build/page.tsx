@@ -49,20 +49,21 @@ const WORKING_LINES = [
   "Almost there - good creative takes a minute…",
 ];
 
-function WorkingOverlay({ label }: { label: string }) {
+// INLINE working state - NOT a blocking overlay (Gary: "the spinner can happen in the screen so my team can
+// continue on the next scenes in parallel"). Each section renders its own, so the team can fire several
+// creatives at once and keep working while they cook.
+function WorkingInline({ label }: { label: string }) {
   const [i, setI] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setI((n) => (n + 1) % WORKING_LINES.length), 2600);
     return () => clearInterval(t);
   }, []);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-6" role="status" aria-live="polite">
-      <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-line bg-surface-1 px-8 py-7 text-center">
-        <Spinner className="h-8 w-8 text-accent" />
-        <p className="text-sm font-bold text-ink">{label}</p>
-        <p className="text-xs text-ink-dim">{WORKING_LINES[i]}</p>
-        <p className="text-[11px] text-ink-dim/70">This runs on the live vendors and can take a few minutes. Keep this tab open.</p>
-      </div>
+    <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-xl border border-dashed border-line bg-surface-2/60 px-6 py-8 text-center" role="status" aria-live="polite">
+      <Spinner className="h-6 w-6 text-accent" />
+      <p className="text-sm font-bold text-ink">{label}</p>
+      <p className="text-xs text-ink-dim">{WORKING_LINES[i]}</p>
+      <p className="text-[11px] text-ink-dim/70">Carry on with the other sections - this keeps running.</p>
     </div>
   );
 }
@@ -242,13 +243,9 @@ export default function BuilderPage() {
   const accepted = Object.values(shot).filter((s) => s.status === "accepted").length;
   const totalSlots = SECTIONS.reduce((n, s) => n + s.count, 0);
 
-  // Which long-running job (if any) should block the screen with the working overlay. Plan/sharpen are quick,
-  // so their button spinner is enough; anything that generates an image gets the overlay.
-  const busySlot = Object.keys(busy).find((k) => busy[k] && k !== "plan" && k !== "brief" && k !== "all");
+  // Nothing blocks the screen: each creative shows its own inline working state, so the team can fire several
+  // sections at once and keep editing the rest (Gary).
   const slotTitle = (k: string) => (k.startsWith("slider-") ? `slider ${Number(k.split("-")[1]) + 1}` : k === "section1" ? "section 1" : k);
-  const overlayLabel = busy.all
-    ? "The experts are building the whole funnel"
-    : busySlot ? `Generating your ${slotTitle(busySlot)}` : "";
 
   // The download filename for a slot, labelled the way Gary wants: masthead / section-1 / section-2-slider-N.
   const fileLabel = (k: string) =>
@@ -432,7 +429,14 @@ export default function BuilderPage() {
                         className="text-sm font-semibold text-ink-dim underline hover:text-ink">Reject</button>}
                     </div>
 
-                    {s && (
+                    {/* This creative's own working state - inline, so other sections stay fully usable. */}
+                    {busy[slotKey] && (
+                      <div className="mt-3">
+                        <WorkingInline label={`Generating your ${slotTitle(slotKey)}`} />
+                      </div>
+                    )}
+
+                    {s && !busy[slotKey] && (
                       <div className="mt-3">
                         <button onClick={() => setLightbox(s.url)} className="group relative block w-full max-w-md" title="Open full screen">
                           <img src={s.url} alt="" className={`w-full rounded-lg border-2 ${s.status === "accepted" ? "border-[#4ade80]" : "border-line"}`}
@@ -464,10 +468,6 @@ export default function BuilderPage() {
           )}
         </div>
       </main>
-
-      {/* WORKING OVERLAY - anything that generates an image blocks with a spinner + quirky copy, so the team can
-          see the platform is genuinely running (Gary). Quick actions (plan/sharpen) just spin their button. */}
-      {overlayLabel && <WorkingOverlay label={overlayLabel} />}
 
       {/* PREVIEW / OPEN IN SCREEN - click any rendered creative to see it full size. */}
       {lightbox && (
