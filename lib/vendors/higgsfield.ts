@@ -487,7 +487,14 @@ export async function forensicRetheme(url: string, opts: { changes: string[]; ra
     const params: AnyObj = {
       ...baseParams("nano_banana_pro", ar),
       prompt:
-        `@image1 is a FINISHED MTN MoMo advert. Reproduce it EXACTLY and identically, pixel-for-pixel: the SAME ` +
+        // HARD RULE, STATED FIRST. Gary: "the subject only ever has 1 handset if a handset is used." Buried at
+        // the end of a long prompt this kept losing - the model gave her a phone to look at AND one to hold up.
+        `HARD RULE - ONE HANDSET ONLY: the ENTIRE image contains AT MOST ONE phone. If a person holds a phone, ` +
+        `that is the ONLY phone in the whole frame - they do NOT also look at a second phone, hold one to their ` +
+        `ear, rest one nearby, or have one floating. If @image1 already contains a phone, keep that ONE and never ` +
+        `add another. Before you finish, count the phones: the answer must be one, or none. Two phones is a ` +
+        `defect and the image is wrong. ` +
+        `\n\n@image1 is a FINISHED MTN MoMo advert. Reproduce it EXACTLY and identically, pixel-for-pixel: the SAME ` +
         `people and faces, the SAME poses and framing, the SAME background and scene, the SAME signature curved ` +
         `light SWISH / glowing ribbons, the SAME layout and spacing, the SAME fonts, sizes, ` +
         `weights, colours and EVERY graphic detail - including any yellow underline, rule or banner. ` +

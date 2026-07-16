@@ -118,11 +118,14 @@ export default function BuilderPage() {
 
   // Phone treatment -> a line appended to the person direction. Gary: if they hold a phone to the screen, or
   // point at it, showing the MoMo app on that screen (added or invented) is fine.
+  // ONE HANDSET, ALWAYS (Gary's hard rule). These read as "the single phone", never "a phone" - the old wording
+  // ("they hold up a phone") ADDED a handset to a design that already had one, so the subject ended up looking
+  // at one phone while holding up another.
   const PHONE_MAP: Record<string, string> = {
-    app: " They hold up a phone with its screen facing the viewer, showing the MoMo app interface.",
-    looking: " They look at the phone in their hand; its screen shows the MoMo app.",
-    pointing: " They point at the phone screen, which shows the MoMo app.",
-    none: " No phone in shot.",
+    app: " There is exactly ONE phone in the whole image and they hold up that single phone, screen facing the viewer, showing the MoMo app. They are not looking at or holding any other phone.",
+    looking: " There is exactly ONE phone in the whole image and they look at that single phone in their hand; its screen shows the MoMo app. There is no second phone anywhere.",
+    pointing: " There is exactly ONE phone in the whole image and they point at that single phone's screen, which shows the MoMo app. There is no second phone anywhere.",
+    none: " There is NO phone anywhere in the image - nobody holds, looks at or points at a phone.",
   };
 
   useEffect(() => {

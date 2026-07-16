@@ -71,7 +71,7 @@ ${doctrine.slice(0, 8000)}
 
 === WHAT YOU ARE PLANNING ===
 A funnel campaign order:
-- 1 MASTHEAD (1080x811). A cut-out subject composited on the yellow disc. NO headline is baked in - Webflow supplies the words beside it. The subject usually holds a phone; the phone screen shows either the deals or the MoMo app.
+- 1 MASTHEAD (1080x811). A cut-out subject composited on the yellow disc. NO headline is baked in - Webflow supplies the words beside it. The subject usually holds ONE phone (never two); its screen shows either the deals or the MoMo app.
 - 1 SECTION 1 (1239x1080). A cut-out subject, with deal cards floating around them. NO baked headline.
 - 3 SLIDERS (1080x1080). A photographic SCENE (not a cut-out). The headline IS baked in, two lines: line 1 white, line 2 MoMo yellow. One deal card each.
 - WEBFLOW COPY: the hero headline + subheads, the section-1 headline + body paragraph, the slider subhead. These are HTML text on the page, beside the images.
@@ -81,7 +81,7 @@ A funnel campaign order:
 - THE CAMPAIGN THEME MUST BE EMBODIED BY THE PEOPLE, in EVERY creative. This is the most important rule. If the campaign is about a relationship, SHOW that relationship with the right people, together: Mother's Day is a MOTHER AND HER CHILD (a mum and her adult daughter or son), Grandparents Day is a grandparent and grandchild, "send money home" is the sender and the loved one who receives. A single generic person does NOT carry the theme - the viewer must see the campaign in the human being(s) at a glance, before reading a word. Name exactly who is in shot and their relationship.
 - Real South Africans. Ordinary, believable contexts. GSMA's own recommendation is literally "feature real people in different situations showing how they safely and securely use mobile money". This is the category's proven visual language, not a style choice.
 - Warm, positive, dignified. NEVER a jackpot-winner, never a person waving cash, never staged jubilation. The customer is a competent adult making a careful purchase from a real bank - not a lucky winner.
-- CUT-OUT prompts (masthead, section 1): a single subject, chest-up or waist-up, clean isolated subject on a PLAIN NEUTRAL BACKGROUND so it can be cut out cleanly. Bright, even, slightly warm light so it sits against the yellow field. They hold or look at a phone.
+- CUT-OUT prompts (masthead, section 1): a single subject, chest-up or waist-up, clean isolated subject on a PLAIN NEUTRAL BACKGROUND so it can be cut out cleanly. Bright, even, slightly warm light so it sits against the yellow field. ONE HANDSET ONLY: if a phone is in shot there is exactly ONE, and the subject either holds it up OR looks at it - never both, and never a second phone anywhere in frame.
 - SCENE prompts (sliders): a real photographic moment. Lit for the theme. Leave the LOWER THIRD relatively calm and uncluttered, because the headline and the legal strip go there, and the TOP-RIGHT clear, because the deal card goes there.
 - Never describe text, logos, prices or UI in an image prompt. Those are rendered by the template, not generated.
 
