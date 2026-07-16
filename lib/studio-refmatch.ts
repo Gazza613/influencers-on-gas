@@ -148,7 +148,7 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
       } catch (e) { console.error(`[produceRefMatch] funnel background failed (${j.kind}):`, e); }
     }
 
-    const { url, error } = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k" });
+    const { url, error } = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k", solidBackground: j.construction === "disc" });
     totalCalls += 1;
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "retheme failed" }; }
     // HARD LOCK the logo on every creative - it can never say "from HTN".

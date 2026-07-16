@@ -76,7 +76,8 @@ export async function POST(req: Request) {
       editUrl = await putBytes(base, `studio/${clientId}/${kind}-base`, "png", "image/png");
     }
 
-    const ed = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k" });
+    const isDisc = kind === "masthead" || kind === "section1";
+    const ed = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k", solidBackground: isDisc });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `retheme-${kind}`, count: 1 }).catch(() => {});
     if (!ed.url) return NextResponse.json({ error: ed.error || "generation failed" }, { status: 500 });
     // HARD LOCK the MoMo logo: stamp the real lockup over whatever the model drew, so it can never say

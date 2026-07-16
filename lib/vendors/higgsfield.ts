@@ -421,7 +421,7 @@ export async function editImageUrl(url: string, opts: { instruction: string; rat
 // change asks otherwise, background, the signature swish, the logo, the layout, the fonts, colours and every
 // graphic detail like the yellow underline) and apply only the listed changes, matched to the design's own
 // style so the new words look native. This is the "any image platform" behaviour Gary wants.
-export async function forensicRetheme(url: string, opts: { changes: string[]; ratio?: string; resolution?: "2k" | "4k" }): Promise<{ url: string | null; error: string | null }> {
+export async function forensicRetheme(url: string, opts: { changes: string[]; ratio?: string; resolution?: "2k" | "4k"; solidBackground?: boolean }): Promise<{ url: string | null; error: string | null }> {
   if (!isSafePublicUrl(url)) return { url: null, error: "reference url is not a safe public url" };
   const changeList = opts.changes.map((c) => c.trim()).filter(Boolean);
   if (!changeList.length) return { url: null, error: "no changes given" };
@@ -436,8 +436,22 @@ export async function forensicRetheme(url: string, opts: { changes: string[]; ra
       prompt:
         `@image1 is a FINISHED MTN MoMo advert. Reproduce it EXACTLY and identically, pixel-for-pixel: the SAME ` +
         `people and faces, the SAME poses and framing, the SAME background and scene, the SAME signature curved ` +
-        `light SWISH / glowing ribbons, the SAME MoMo logo, the SAME layout and spacing, the SAME fonts, sizes, ` +
+        `light SWISH / glowing ribbons, the SAME layout and spacing, the SAME fonts, sizes, ` +
         `weights, colours and EVERY graphic detail - including any yellow underline, rule or banner. ` +
+        // THE LOGO IS THE ONE EXCEPTION. We stamp the real lockup on afterwards (stampRealLogo). If the model
+        // also draws one it lands at a slightly different size/position and we get TWO overlapping logos - the
+        // garbled "MoMo/MoMo from MTN/from HTN" mess. So the model must leave that corner empty.
+        `\n\nCRITICAL EXCEPTION - THE LOGO: do NOT draw, reproduce, redraw or include the MoMo logo or wordmark ` +
+        `ANYWHERE in the image. Leave the area where the logo sits as clean, plain background or photograph with ` +
+        `NO logo, NO badge, NO icon and NO lettering of any kind there. The real logo is composited on top ` +
+        `afterwards, so any logo you draw is a defect. ` +
+        // Disc creatives (masthead / section 1) sit on a SOLID funnel colour. "Change the people" otherwise
+        // invites the model to invent a room behind them, which breaks the Webflow background match.
+        (opts.solidBackground
+          ? `\n\nTHE BACKGROUND IS A SOLID FLAT COLOUR: keep it EXACTLY that same solid colour, edge to edge, ` +
+            `behind everything. Do NOT add a room, home, street, window, furniture, scenery or ANY environment ` +
+            `behind the people - they stand against the flat colour with the yellow disc, exactly as in @image1.`
+          : "") +
         `\n\nChange ONLY the following, and change NOTHING else at all: ${changes} ` +
         `\n\nFor any text you change, match the ORIGINAL's exact font, weight, size, position, alignment and ` +
         `colour so the new words look native to the design (MoMo headlines are usually a white line then a ` +
