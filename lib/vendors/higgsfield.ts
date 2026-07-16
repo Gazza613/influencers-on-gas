@@ -101,11 +101,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 // Poll one generation job until it yields an image URL (or terminal/no-url).
+//
+// sync:true is REQUIRED for us. Higgsfield's own response says so: "In text-only clients, use job_status with
+// sync:true to poll for completion" - without it the status call returns immediately as still-running and we
+// fall through to a bogus "no image back" even though the job succeeds. This bit the 4K masthead retheme.
 async function pollJob(call: Caller, jobId: string, rounds = 60): Promise<string | null> {
   for (let round = 0; round < rounds; round++) {
     if (round) await sleep(3000);
     try {
-      const data = unwrapMCP(await call("job_status", { jobId })) as AnyObj;
+      const data = unwrapMCP(await call("job_status", { jobId, sync: true })) as AnyObj;
       const item = (Array.isArray(data?.results) ? (data.results as AnyObj[])[0] : data) as AnyObj;
       const ro = (item?.results as AnyObj) || {};
       const url = (ro.rawUrl || ro.minUrl || item?.result_url || item?.url || extractImageUrls(data)[0]) as string | undefined;
@@ -472,8 +476,12 @@ export async function forensicRetheme(url: string, opts: { changes: string[]; ra
     const r = await call("generate_image", { params });
     let out: string | null = extractImageUrls(r)[0] ?? null;
     const jobId = extractJobIds(r)[0] ?? null;
-    if (!out && jobId) out = await pollJob(call, jobId, 60);
+    // A 4K retheme of a dense masthead is slow - poll for up to ~7.5 min (the route allows 800s).
+    if (!out && jobId) out = await pollJob(call, jobId, 150);
     if (out) return { url: out, error: null };
+    // Distinguish "the job ran but did not finish in time" from "the vendor rejected it". Conflating them is
+    // what sent Gary a wall of raw MCP text instead of something he could act on.
+    if (jobId) return { url: null, error: `The render started but did not finish in time (job ${jobId.slice(0, 8)}). Hit Rerun - it usually lands on a second pass.` };
     const raw = typeof r === "string" ? r : JSON.stringify(unwrapMCP(r) ?? r);
     return { url: null, error: `no image back: ${raw}`.slice(0, 280) };
   } catch (e) {
