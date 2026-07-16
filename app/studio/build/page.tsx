@@ -24,6 +24,62 @@ const SECTIONS = [
 
 const dealText = (d: Deal) => `${d.label} · ${d.amount}${d.amountSuffix || ""} · ${d.price} · ${d.validity}`;
 
+// A spinner on EVERY button that does work (Gary: "any button clicked must have a visual spinner so the user
+// knows the platform is processing").
+function Spinner({ className = "" }: { className?: string }) {
+  return (
+    <svg className={`h-4 w-4 shrink-0 animate-spin ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+      <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Quirky working copy, so the team can see it is genuinely running and not frozen. Cycles while we wait.
+const WORKING_LINES = [
+  "Briefing the creative expert…",
+  "Studying your reference design…",
+  "Keeping the swish exactly where it is…",
+  "Casting the right faces…",
+  "Rewriting the callout for the campaign…",
+  "Matching the MTN type…",
+  "Stamping the real MoMo logo (never AI-drawn)…",
+  "Checking nobody grew a third hand…",
+  "Polishing the pixels…",
+  "Almost there - good creative takes a minute…",
+];
+
+function WorkingOverlay({ label }: { label: string }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((n) => (n + 1) % WORKING_LINES.length), 2600);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-6" role="status" aria-live="polite">
+      <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-line bg-surface-1 px-8 py-7 text-center">
+        <Spinner className="h-8 w-8 text-accent" />
+        <p className="text-sm font-bold text-ink">{label}</p>
+        <p className="text-xs text-ink-dim">{WORKING_LINES[i]}</p>
+        <p className="text-[11px] text-ink-dim/70">This runs on the live vendors and can take a few minutes. Keep this tab open.</p>
+      </div>
+    </div>
+  );
+}
+
+// Read a response SAFELY. A long build that exceeds the gateway limit comes back as a 504 HTML page, and
+// r.json() then throws an opaque parse error - which is exactly why "build the whole funnel" looked like it
+// just hung. Surface something the team can act on instead.
+async function readJson(r: Response): Promise<Record<string, unknown>> {
+  const text = await r.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    if (r.status === 504 || r.status === 502) throw new Error("The build took longer than the server allows and timed out. Try 'Just plan it', then generate each creative one at a time.");
+    throw new Error(`The server returned ${r.status}. ${text.slice(0, 120)}`);
+  }
+}
+
 export default function BuilderPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState("");
@@ -100,7 +156,7 @@ export default function BuilderPage() {
       const d = await fetch("/api/studio/campaign", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "plan", clientId, brief }),
-      }).then((r) => r.json());
+      }).then(readJson) as any;
       const p = d.plan;
       if (!p) { setErr(d.error || "The Producer could not plan this."); return; }
       setTheme(p.theme || "");
@@ -141,7 +197,7 @@ export default function BuilderPage() {
       const d = await fetch("/api/studio/build-all", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, brief }),
-      }).then((r) => r.json());
+      }).then(readJson) as any;
       const p = d.plan;
       if (p) {
         setTheme(p.theme || "");
@@ -171,7 +227,7 @@ export default function BuilderPage() {
       const d = await fetch("/api/studio/build", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "" }),
-      }).then((r) => r.json());
+      }).then(readJson) as any;
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, status: "new" } }));
       else setErr(d.error || "generation failed");
     } catch (e) { setErr(String((e as Error)?.message || e)); }
@@ -181,6 +237,14 @@ export default function BuilderPage() {
   const refsFor = (m: RegExp) => refs.filter((r) => m.test(r.name || ""));
   const accepted = Object.values(shot).filter((s) => s.status === "accepted").length;
   const totalSlots = SECTIONS.reduce((n, s) => n + s.count, 0);
+
+  // Which long-running job (if any) should block the screen with the working overlay. Plan/sharpen are quick,
+  // so their button spinner is enough; anything that generates an image gets the overlay.
+  const busySlot = Object.keys(busy).find((k) => busy[k] && k !== "plan" && k !== "brief" && k !== "all");
+  const slotTitle = (k: string) => (k.startsWith("slider-") ? `slider ${Number(k.split("-")[1]) + 1}` : k === "section1" ? "section 1" : k);
+  const overlayLabel = busy.all
+    ? "The experts are building the whole funnel"
+    : busySlot ? `Generating your ${slotTitle(busySlot)}` : "";
 
   // The download filename for a slot, labelled the way Gary wants: masthead / section-1 / section-2-slider-N.
   const fileLabel = (k: string) =>
@@ -230,15 +294,18 @@ export default function BuilderPage() {
             className="mt-3 w-full rounded-xl border border-line bg-surface-2 p-4 text-base leading-relaxed outline-none focus:border-accent" />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={buildAll} disabled={!!busy.all || brief.trim().length < 6}
-              className="rounded-lg bg-gradient-to-r from-[#818cf8] to-[#f472b6] px-5 py-2.5 text-sm font-bold text-black disabled:opacity-40">
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#818cf8] to-[#f472b6] px-5 py-2.5 text-sm font-bold text-black disabled:opacity-40">
+              {busy.all && <Spinner />}
               {busy.all ? "The experts are building the full funnel… (a few minutes)" : "✦ Let the experts build the whole funnel"}
             </button>
             <button onClick={plan} disabled={!!busy.plan || !!busy.all || brief.trim().length < 6}
-              className="rounded-lg border border-line px-4 py-2 text-sm font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+              className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+              {busy.plan && <Spinner />}
               {busy.plan ? "Planning…" : "Just plan it (I'll pick + generate)"}
             </button>
             <button onClick={sharpen} disabled={!!busy.brief || !!busy.all || brief.trim().length < 6}
-              className="rounded-lg border border-line px-4 py-2 text-sm font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+              className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+              {busy.brief && <Spinner />}
               {busy.brief ? "Reading…" : "Sharpen the brief"}
             </button>
           </div>
@@ -334,7 +401,8 @@ export default function BuilderPage() {
 
                     <div className="mt-3 flex items-center gap-2">
                       <button onClick={() => generate(slotKey, sec.key)} disabled={!!busy[slotKey]}
-                        className="rounded-lg bg-accent px-5 py-2 text-sm font-bold text-black disabled:opacity-40">
+                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2 text-sm font-bold text-black disabled:opacity-40">
+                        {busy[slotKey] && <Spinner />}
                         {busy[slotKey] ? "Generating… (a few min)" : s ? "Rerun" : chosen ? "Generate" : "Generate (expert picks a design)"}
                       </button>
                       {s && s.status !== "accepted" && (
@@ -378,9 +446,13 @@ export default function BuilderPage() {
         </div>
       </main>
 
+      {/* WORKING OVERLAY - anything that generates an image blocks with a spinner + quirky copy, so the team can
+          see the platform is genuinely running (Gary). Quick actions (plan/sharpen) just spin their button. */}
+      {overlayLabel && <WorkingOverlay label={overlayLabel} />}
+
       {/* PREVIEW / OPEN IN SCREEN - click any rendered creative to see it full size. */}
       {lightbox && (
-        <div onClick={() => setLightbox("")} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6" role="dialog">
+        <div onClick={() => setLightbox("")} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-6" role="dialog">
           <img src={lightbox} alt="" className="max-h-[92vh] max-w-[95vw] rounded-lg" style={{ background: "#0b0f14" }} />
           <button onClick={() => setLightbox("")} className="absolute right-5 top-5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-bold text-white hover:bg-white/20">Close ✕</button>
           <a href={lightbox} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="absolute bottom-5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-bold text-white hover:bg-white/20">Open in new tab ↗</a>

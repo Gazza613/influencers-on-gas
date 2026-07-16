@@ -1,9 +1,9 @@
 import sharp from "sharp";
 import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
-import { forensicSwap } from "./vendors/higgsfield";
+import { forensicSwap, forensicRetheme } from "./vendors/higgsfield";
 import { onFunnelBackground, applyReferenceAlpha } from "./studio-cutout";
-import { finishSlider, overlayPill } from "./studio-slider";
+import { overlayPill, balanceHeadline, stampRealLogo } from "./studio-slider";
 import { detectLayout } from "./studio-layout";
 import { getBrandKit } from "./studio";
 import { putBytes } from "./blob";
@@ -125,25 +125,25 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     const meta = await sharp(await bufOf(j.ref.url)).metadata().catch(() => null);
     const ratio = meta ? nearestRatio(meta.width || 1080, meta.height || 1080) : "1:1";
 
-    // DISC (masthead + section-1): the forensic path - swap the person, then stamp the reference's real
-    // furniture back, so the bubbles and pill are pixel-perfect instead of the img2img warp Gary flagged.
+    // FORENSIC RETHEME - the same locked strategy the wizard uses (keep the reference, change only the copy and
+    // the people). One Higgsfield call per creative instead of swap + humaniser + Chromium composites, which is
+    // also why the full set now finishes inside the function's time budget instead of hanging.
+    const changes: string[] = [];
     if (j.construction === "disc") {
-      const r = await buildDiscCreative(clientId, j.kind, j.ref.url, j.person, ratio, j.callout);
-      totalCalls += r.calls;
-      if (r.error) warnings.push(`${j.kind}: ${r.error}`);
-      if (!r.url) return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: r.error || "failed" };
-      return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: r.url, headline: j.headline };
+      if (j.callout) changes.push(`Change the CALLOUT PILL / lozenge copy to "${j.callout}", keeping the pill's exact shape, colour, 3D style and any yellow banner or underline, matched to the design's own font.`);
+    } else if (j.headline) {
+      const [hl1, hl2] = balanceHeadline(j.headline);
+      changes.push(`Change the main bottom HEADLINE to read "${hl1}"${hl2 ? ` then "${hl2}"` : ""} - a white line then a yellow line - keeping any yellow underline beneath it exactly where it is.`);
     }
+    if (j.person) changes.push(`Change the people in the advert to: ${j.person}.`);
+    if (j.deal?.label) changes.push(`Change the deal/offer text to "${[j.deal.label, j.deal.amount, j.deal.price].filter(Boolean).join(" ")}", in the same deal-card style.`);
 
-    // SCENE (slider): swap, then FINISH - typeset the campaign headline over the baked one and stamp the real
-    // logo (never AI-drawn). The three sliders then read as the campaign's story, not the reference's copy.
-    const { url, error, humanised } = await forensicSwap(j.ref.url, {
-      person: j.person, scene: j.scene, construction: j.construction, ratio, resolution: "4k", humanise: true,
-    });
-    totalCalls += 1 + (humanised ? 1 : 0);
-    if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "swap failed" }; }
-    const finished = await finishSlider(clientId, j.ref.url, url, j.headline || "", j.deal || null).catch(() => url);
-    return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: finished, headline: j.headline };
+    const { url, error } = await forensicRetheme(j.ref.url, { changes, ratio, resolution: "4k" });
+    totalCalls += 1;
+    if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "retheme failed" }; }
+    // HARD LOCK the logo on every creative - it can never say "from HTN".
+    const locked = await stampRealLogo(clientId, j.ref.url, url);
+    return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: locked, headline: j.headline };
   }));
 
   await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "refmatch-campaign", count: totalCalls }).catch(() => {});
