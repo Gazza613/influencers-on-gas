@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
 import { balanceHeadline, stampRealLogo } from "@/lib/studio-slider";
+import { onFunnelBackground } from "@/lib/studio-cutout";
+import { putBytes } from "@/lib/blob";
 import { listAssets } from "@/lib/studio";
 import { recordUsage } from "@/lib/usage";
 
@@ -64,7 +66,17 @@ export async function POST(req: Request) {
     // A selected deal updates the deal-card numbers in place (kept forensic to the design).
     if (b.deal && b.deal.label) changes.push(`Change the deal/offer text to "${[b.deal.label, b.deal.amount, b.deal.price].filter(Boolean).join(" ")}", in the same deal-card style.`);
 
-    const ed = await forensicRetheme(referenceUrl, { changes, ratio, resolution: "4k" });
+    // MASTHEAD / SECTION 1: flatten the reference onto the EXACT funnel background FIRST, then retheme that.
+    // The reference designs are supplied on black (or transparent), so without this the creative comes back on
+    // black instead of the Webflow navy. This is the step the /api/studio/forensic-test route always did - and
+    // why that test produced a perfect Webflow-blue masthead while the live builder did not.
+    let editUrl = referenceUrl;
+    if (kind === "masthead" || kind === "section1") {
+      const base = await onFunnelBackground(refBuf, kind === "section1" ? "section1" : "masthead");
+      editUrl = await putBytes(base, `studio/${clientId}/${kind}-base`, "png", "image/png");
+    }
+
+    const ed = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k" });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `retheme-${kind}`, count: 1 }).catch(() => {});
     if (!ed.url) return NextResponse.json({ error: ed.error || "generation failed" }, { status: 500 });
     // HARD LOCK the MoMo logo: stamp the real lockup over whatever the model drew, so it can never say

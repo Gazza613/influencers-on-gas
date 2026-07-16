@@ -138,7 +138,17 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     if (j.person) changes.push(`Change the people in the advert to: ${j.person}.`);
     if (j.deal?.label) changes.push(`Change the deal/offer text to "${[j.deal.label, j.deal.amount, j.deal.price].filter(Boolean).join(" ")}", in the same deal-card style.`);
 
-    const { url, error } = await forensicRetheme(j.ref.url, { changes, ratio, resolution: "4k" });
+    // MASTHEAD / SECTION 1: flatten onto the EXACT funnel background before rethemeing, or a reference supplied
+    // on black comes back on black instead of the Webflow navy (the step the forensic-test route always did).
+    let editUrl = j.ref.url;
+    if (j.construction === "disc") {
+      try {
+        const base = await onFunnelBackground(await bufOf(j.ref.url), j.kind === "section1" ? "section1" : "masthead");
+        editUrl = await putBytes(base, `studio/${clientId}/${j.kind}-base`, "png", "image/png");
+      } catch (e) { console.error(`[produceRefMatch] funnel background failed (${j.kind}):`, e); }
+    }
+
+    const { url, error } = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k" });
     totalCalls += 1;
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "retheme failed" }; }
     // HARD LOCK the logo on every creative - it can never say "from HTN".
