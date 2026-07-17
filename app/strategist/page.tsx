@@ -20,7 +20,7 @@ export default async function StrategistPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <Link href="/home" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Strategist</h1>
-        <p className="mt-2 max-w-3xl text-[16px] leading-relaxed text-ink-dim">
+        <p className="mt-2 max-w-3xl text-[18px] leading-relaxed text-ink-dim">
           Daily market and competitor intelligence for the client. It looks for what makes a current assumption
           <b className="text-ink"> wrong</b> - a competitor move, a regulatory door opening, data that shifts the
           picture. Every finding carries its source and an honest confidence grade. It proposes; you decide.

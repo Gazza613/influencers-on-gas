@@ -120,7 +120,7 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
         </button>
       </div>
 
-      {note && <p className="rounded-lg border border-[#fbbf24]/35 bg-[#fbbf24]/[0.07] px-3 py-2 text-[15px] text-[#fcd34d]">{note}</p>}
+      {note && <p className="rounded-lg border border-[#fbbf24]/35 bg-[#fbbf24]/[0.07] px-3 py-2 text-[17px] text-[#fcd34d]">{note}</p>}
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface-1 p-6 text-center">
@@ -150,8 +150,8 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
   return (
     <div className={`rounded-xl border p-4 ${i.material ? "border-[#4ade80]/30 bg-[#4ade80]/[0.04]" : "border-line bg-surface-1"}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="text-[18px] font-bold leading-snug text-ink">{i.headline}</p>
-        <span className={`tabular shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold ${CONF[i.confidence] || CONF.medium}`}>{i.confidence}</span>
+        <p className="text-[20px] font-bold leading-snug text-ink">{i.headline}</p>
+        <span className={`tabular shrink-0 rounded-full border px-2 py-0.5 text-[13px] font-bold ${CONF[i.confidence] || CONF.medium}`}>{i.confidence}</span>
       </div>
 
       {/* DATE TAGS. When the source was published, and when we found it. They are not the same thing, and
@@ -163,19 +163,19 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
           // found it. "found" as loose grey text read like a footnote and got missed.
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {d.published ? (
-              <span className={`tabular rounded border px-1.5 py-0.5 text-[12px] font-semibold ${d.stale ? "border-[#fbbf24]/45 bg-[#fbbf24]/10 text-[#fcd34d]" : "border-line text-ink-dim"}`}>
+              <span className={`tabular rounded border px-1.5 py-0.5 text-[13px] font-semibold ${d.stale ? "border-[#fbbf24]/45 bg-[#fbbf24]/10 text-[#fcd34d]" : "border-line text-ink-dim"}`}>
                 Published {d.published}{d.stale && d.ageDays !== null ? ` · ${d.ageDays} days old` : ""}
               </span>
             ) : (
-              <span className="tabular rounded border border-[#f87171]/45 bg-[#f87171]/10 px-1.5 py-0.5 text-[12px] font-semibold text-[#fca5a5]">
+              <span className="tabular rounded border border-[#f87171]/45 bg-[#f87171]/10 px-1.5 py-0.5 text-[13px] font-semibold text-[#fca5a5]">
                 Published date not established
               </span>
             )}
-            <span className="tabular rounded border border-line px-1.5 py-0.5 text-[12px] font-semibold text-ink-faint">
+            <span className="tabular rounded border border-line px-1.5 py-0.5 text-[13px] font-semibold text-ink-faint">
               Found {d.found}
             </span>
             {i.period && (
-              <span className="tabular rounded border border-line px-1.5 py-0.5 text-[12px] font-semibold text-ink-faint">
+              <span className="tabular rounded border border-line px-1.5 py-0.5 text-[13px] font-semibold text-ink-faint">
                 Data covers {i.period}
               </span>
             )}
@@ -183,8 +183,8 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
         );
       })()}
 
-      <p className="mt-2 text-[16px] leading-relaxed text-ink-dim"><b className="text-ink">Why it matters:</b> {i.why_it_matters}</p>
-      {i.detail && <p className="mt-2 text-[15px] leading-relaxed text-ink-faint">{i.detail}</p>}
+      <p className="mt-2 text-[18px] leading-relaxed text-ink-dim"><b className="text-ink">Why it matters:</b> {i.why_it_matters}</p>
+      {i.detail && <p className="mt-2 text-[17px] leading-relaxed text-ink-faint">{i.detail}</p>}
 
       {/* THE INTERNAL ASSESSMENT - what this could actually do to MoMo SA, and the campaign move it argues for.
           Set apart on purpose: it is GAS's own commercial thinking, NOT part of the sourced reporting above and
@@ -198,16 +198,16 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
         const isStrat = i.role === "strategist";
         return (
           <div className="mt-3 rounded-r-lg border-l-2 border-[#818cf8] bg-surface-2/60 px-3 py-2.5">
-            <p className="tabular text-[12px] uppercase tracking-[0.16em] text-[#a5b4fc]">
+            <p className="tabular text-[13px] uppercase tracking-[0.16em] text-[#a5b4fc]">
               Our read{tag ? ` · ${tag}` : ""}
             </p>
             {i.impact_risk && (
-              <p className="mt-1.5 text-[15px] leading-relaxed text-ink-dim">
+              <p className="mt-1.5 text-[17px] leading-relaxed text-ink-dim">
                 <b className="text-ink">What it could do to MoMo:</b> {i.impact_risk}
               </p>
             )}
             {i.campaign_response && (
-              <p className="mt-1.5 text-[15px] leading-relaxed text-ink-dim">
+              <p className="mt-1.5 text-[17px] leading-relaxed text-ink-dim">
                 <b className="text-ink">{isStrat ? "What we should do" : "What the CEO could say"}:</b> {i.campaign_response}
               </p>
             )}
@@ -219,13 +219,13 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
           becomes a fact nobody can trace, and every future article and strategy inherits it. If a finding has
           no source, say so plainly rather than letting it pass as verified. */}
       <div className="mt-3 border-t border-line pt-2.5">
-        <p className="tabular text-[12px] uppercase tracking-[0.16em] text-ink-faint">Sources</p>
+        <p className="tabular text-[13px] uppercase tracking-[0.16em] text-ink-faint">Sources</p>
         {sourcesOf(i).length === 0 ? (
-          <p className="mt-1 text-[13px] font-bold text-[#fca5a5]">⚠ No source. Do not treat this as verified.</p>
+          <p className="mt-1 text-[14px] font-bold text-[#fca5a5]">⚠ No source. Do not treat this as verified.</p>
         ) : (
           <ol className="mt-1 space-y-0.5">
             {sourcesOf(i).map((s, n) => (
-              <li key={s.url + n} className="text-[13px] leading-relaxed">
+              <li key={s.url + n} className="text-[14px] leading-relaxed">
                 <span className="tabular text-ink-faint">{n + 1}.</span>{" "}
                 <a href={s.url} target="_blank" rel="noreferrer" className="text-[#93c5fd] underline decoration-[#93c5fd]/40 hover:decoration-[#93c5fd]">
                   {s.name || s.url}
@@ -244,11 +244,11 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
 
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
         <button onClick={() => decide(i.id, "accepted")} disabled={busy}
-          className="rounded-lg border border-[#4ade80]/40 px-3 py-1 text-[13px] font-bold text-[#86efac] hover:bg-[#4ade80]/10 disabled:opacity-40">
+          className="rounded-lg border border-[#4ade80]/40 px-3 py-1 text-[14px] font-bold text-[#86efac] hover:bg-[#4ade80]/10 disabled:opacity-40">
           ✓ Accept into the brain
         </button>
         <button onClick={() => decide(i.id, "binned")} disabled={busy}
-          className="rounded-lg border border-line px-3 py-1 text-[13px] font-bold text-ink-faint hover:text-ink disabled:opacity-40">
+          className="rounded-lg border border-line px-3 py-1 text-[14px] font-bold text-ink-faint hover:text-ink disabled:opacity-40">
           Bin
         </button>
       </div>
