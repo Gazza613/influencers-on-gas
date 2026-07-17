@@ -105,7 +105,7 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
       ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #1f2630;">
            <div style="font-size:12px;letter-spacing:2px;color:#98a0ad;">SOURCES</div>
            <ol style="margin:6px 0 0;padding-left:18px;color:#8a8f98;">${srcs.map((s) =>
-             `<li style="font-size:14px;line-height:1.8;"><a href="${esc(s.url)}" style="color:#7dd3fc;text-decoration:underline;">${esc(s.name || s.url)}</a> <span style="color:#98a0ad;">· posted ${esc(posted)}</span></li>`).join("")}</ol>
+             `<li class="small" style="font-size:14px;line-height:1.8;"><a href="${esc(s.url)}" style="color:#7dd3fc;text-decoration:underline;">${esc(s.name || s.url)}</a> <span style="color:#98a0ad;">· posted ${esc(posted)}</span></li>`).join("")}</ol>
          </div>`
       : `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #1f2630;font-size:12px;font-weight:700;color:#f87171;">No source. Do not treat this as verified.</div>`;
 
@@ -114,7 +114,7 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
     const age = i.published_at ? Math.floor((Date.now() - new Date(i.published_at).getTime()) / 86_400_000) : null;
     const stale = age !== null && age > 30;
     const tag = (text: string, colour: string, border: string) =>
-      `<span style="display:inline-block;border:1px solid ${border};color:${colour};border-radius:5px;padding:3px 9px;font-size:13px;font-weight:600;margin-right:6px;">${text}</span>`;
+      `<span class="tag" style="display:inline-block;border:1px solid ${border};color:${colour};border-radius:5px;padding:3px 9px;font-size:13px;font-weight:600;margin-right:6px;margin-bottom:4px;">${text}</span>`;
     const publishedTag = i.published_at
       ? tag(`Published ${esc(ukDate(i.published_at))}${stale ? ` · ${age} days old` : ""}`, stale ? "#fbbf24" : "#c9ced6", stale ? "rgba(251,191,36,0.4)" : "#2b3440")
       : tag("Published date not established", "#f87171", "rgba(248,113,113,0.4)");
@@ -126,30 +126,30 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
     const def = /\bdefensive\b/i.test(move), pro = /\bproactive\b/i.test(move);
     const stance = def && pro ? "DEFENSIVE + PROACTIVE" : def ? "DEFENSIVE" : pro ? "PROACTIVE" : "";
     const assessment = (risk || move)
-      ? `<div style="margin-top:12px;padding:12px 14px;background:rgba(249,98,3,0.06);border-left:2px solid #f96203;border-radius:0 8px 8px 0;">
+      ? `<div class="card" style="margin-top:12px;padding:12px 14px;background:rgba(249,98,3,0.06);border-left:2px solid #f96203;border-radius:0 8px 8px 0;">
            <div style="font-size:10px;letter-spacing:2px;font-weight:800;color:#f96203;">OUR READ${stance ? ` · ${stance}` : ""}</div>
-           ${risk ? `<p style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What it could do to MoMo:</b> ${esc(risk)}</p>` : ""}
-           ${move ? `<p style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What we should do:</b> ${esc(move)}</p>` : ""}
+           ${risk ? `<p class="p" style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What it could do to MoMo:</b> ${esc(risk)}</p>` : ""}
+           ${move ? `<p class="p" style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What we should do:</b> ${esc(move)}</p>` : ""}
          </div>`
       : "";
 
     return `
-    <div style="border:1px solid #1f2630;border-radius:12px;padding:16px 18px;margin-bottom:12px;background:#0d1117;">
-      <div style="font-size:20px;font-weight:800;color:#ffffff;line-height:1.45;letter-spacing:0.3px;">${esc(i.headline)} ${badge(i.confidence)}</div>
+    <div class="card" style="border:1px solid #1f2630;border-radius:12px;padding:16px 18px;margin-bottom:12px;background:#0d1117;">
+      <div class="h2" style="font-size:18px;font-weight:800;color:#ffffff;line-height:1.45;letter-spacing:0.2px;">${esc(i.headline)} ${badge(i.confidence)}</div>
       <div style="margin-top:8px;">${publishedTag}${foundTag}${periodTag}</div>
-      <p style="margin:14px 0 0;font-size:16px;line-height:1.7;color:#e6e9ee;"><b style="color:#fff;">Why it matters:</b> ${esc(i.why_it_matters)}</p>
-      ${i.detail ? `<p style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#c9ced6;">${esc(String(i.detail).slice(0, 900))}</p>` : ""}
+      <p class="p" style="margin:14px 0 0;font-size:15px;line-height:1.7;color:#e6e9ee;"><b style="color:#fff;">Why it matters:</b> ${esc(i.why_it_matters)}</p>
+      ${i.detail ? `<p class="p" style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#c9ced6;">${esc(String(i.detail).slice(0, 900))}</p>` : ""}
       ${assessment}
       ${sourceHtml}
     </div>`;
   }).join("");
 
   const body = `
-    <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:.3px;">${esc(client)} · Daily Intelligence</div>
+    <div class="h1" style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:.2px;line-height:1.25;">${esc(client)} · Daily Intelligence</div>
     <div style="margin-top:4px;font-size:14px;color:#8a8f98;">${esc(ukDate(today))}</div>
 
-    <div style="margin-top:16px;padding:14px 16px;background:#0d1117;border:1px solid #1f2630;border-radius:12px;">
-      <p style="margin:0;font-size:15px;line-height:1.7;color:#e6e9ee;">${esc(intro)}</p>
+    <div class="card" style="margin-top:16px;padding:14px 16px;background:#0d1117;border:1px solid #1f2630;border-radius:12px;">
+      <p class="p" style="margin:0;font-size:15px;line-height:1.7;color:#e6e9ee;">${esc(intro)}</p>
     </div>
 
     <div style="margin-top:24px;font-size:13px;letter-spacing:2px;color:#98a0ad;">MATERIAL FINDINGS</div>
