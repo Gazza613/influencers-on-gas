@@ -152,16 +152,33 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
   const [letter, setLetter] = useState<string>("");
   const [writing, setWriting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [art, setArt] = useState<string>("");      // the LinkedIn creative that runs with the piece
+  const [drawing, setDrawing] = useState(false);
 
+  // ONE CLICK, BOTH THINGS (Gary). The piece lands FIRST and fast, then its creative follows in its own short
+  // request - so you are reading the article while the image renders, instead of staring at a spinner for both.
+  // The same call that writes the piece art-directs it, so the image cannot end up illustrating a different
+  // article to the one beside it.
   async function writeNewsletter() {
-    setWriting(true);
+    setWriting(true); setArt("");
     const d = await fetch("/api/studio/intel/newsletter", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, id: i.id }),
     }).then((r) => r.json()).catch(() => null);
     setWriting(false);
-    if (d?.newsletter) setLetter(d.newsletter);
-    else flex(d?.error || "Could not write the newsletter.");
+    if (!d?.newsletter) { flex(d?.error || "Could not write the newsletter."); return; }
+    setLetter(d.newsletter);
+
+    const subject = d?.art?.subject || "";
+    if (!subject) return;
+    setDrawing(true);
+    const c = await fetch("/api/studio/intel/newsletter-creative", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, subject, callout: d?.art?.callout || "" }),
+    }).then((r) => r.json()).catch(() => null);
+    setDrawing(false);
+    if (c?.url) setArt(c.url);
+    else if (c?.error) flex(`The article is ready. The creative did not render: ${c.error}`);
   }
   return (
     <div className={`rounded-xl border p-4 ${i.material ? "border-[#4ade80]/30 bg-[#4ade80]/[0.04]" : "border-line bg-surface-1"}`}>
@@ -273,6 +290,24 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
             </div>
           </div>
           <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink-dim">{letter}</p>
+
+          {/* THE CREATIVE that runs with it: MoMo's own design, real logo stamped, no offer anywhere. */}
+          {drawing && (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-4 text-[13px] text-ink-dim">
+              <svg className="h-4 w-4 animate-spin text-accent" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              Rendering the creative for this piece…
+            </div>
+          )}
+          {art && (
+            <div className="mt-3">
+              <img src={art} alt="" className="w-full max-w-sm rounded-lg border border-line" />
+              <a href={art} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[13px] font-semibold text-[#93c5fd] underline">Open full size ↗</a>
+            </div>
+          )}
+
           <p className="mt-2 text-[12px] text-ink-faint">A draft, not a post. Read every line before it goes out under his name.</p>
         </div>
       )}

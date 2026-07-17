@@ -8,6 +8,21 @@ import { loadIntelBrief } from "@/lib/intel";
 import { PREMIUM } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
 
+// The writer also art-directs. A creative chosen by a separate step would illustrate a different article than
+// the one it sits next to - so the same call that writes the piece decides the image, and is bound by the same
+// rules (no competitor, no product pitch, no price).
+const PIECE = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    title: { type: "string", description: "The newsletter title. Short, plain, no colon-subtitle cliche." },
+    body: { type: "string", description: "The piece itself, 200-320 words. Plain paragraphs separated by blank lines. No markdown, no headings." },
+    image_subject: { type: "string", description: "ART DIRECTION for the LinkedIn image: WHO is in it and what is happening. A real, specific, EMOTIVE South African human moment that carries the piece - a person, their situation, their expression. No products, no phones held up like an advert, no logos, no text described. Just the human moment." },
+    image_callout: { type: "string", description: "The line that sits on the image, as 'line one / line two'. Max ~22 characters a line. It is the emotional line of the piece, NOT an offer and NOT a price. No competitor, no product pitch." },
+  },
+  required: ["title", "body", "image_subject", "image_callout"],
+} as unknown as Anthropic.Tool["input_schema"];
+
 // TURN A JOURNALIST FINDING INTO THE CEO'S NEWSLETTER (Gary).
 //
 // The Journalist finds the material; this writes the piece. It is the CEO of MTN MoMo speaking to his own
@@ -91,20 +106,33 @@ export async function POST(req: Request) {
     const client = new Anthropic({ apiKey: key });
     const res = await client.messages.create({
       model: PREMIUM,
-      max_tokens: 1600,
+      max_tokens: 2000,
       system: `${cfg.scope}\n\n${RULES}`,
+      tools: [{ name: "piece", description: "The CEO's newsletter piece and the art direction for its image.", input_schema: PIECE }],
+      tool_choice: { type: "tool", name: "piece" }, // FORCED - a piece always comes back
       messages: [{
         role: "user",
-        content: `Turn the material below into the CEO's newsletter piece. Return ONLY the piece: a short title on the first line, a blank line, then the body. No preamble, no notes, no markdown headings.\n\n${material}`,
+        content: `Write the CEO's newsletter piece from the material below, and art-direct the LinkedIn image that runs with it.\n\n${material}`,
       }],
     });
     await recordUsage({ clientId, provider: "anthropic", model: PREMIUM, unit: "request", action: "ceo-newsletter", count: 1 }).catch(() => {});
 
-    const text = res.content.filter((x) => x.type === "text").map((x) => (x as { text: string }).text).join("\n").trim();
-    if (!text) return NextResponse.json({ error: "Nothing came back. Try again." }, { status: 500 });
+    const block = res.content.find((x) => x.type === "tool_use");
+    if (!block || block.type !== "tool_use") return NextResponse.json({ error: "Nothing came back. Try again." }, { status: 500 });
+    const out = block.input as { title?: string; body?: string; image_subject?: string; image_callout?: string };
+
     // The house rule is enforced, not requested: no em dashes, ever.
-    const clean = text.replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ");
-    return NextResponse.json({ ok: true, newsletter: clean });
+    const noDash = (t: unknown) => String(t ?? "").replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ").trim();
+    const title = noDash(out.title);
+    const body = noDash(out.body);
+    if (!body) return NextResponse.json({ error: "Nothing came back. Try again." }, { status: 500 });
+
+    return NextResponse.json({
+      ok: true,
+      newsletter: title ? `${title}\n\n${body}` : body,
+      // Handed back so the creative can be generated as a second, short request - keeping this one fast.
+      art: { subject: noDash(out.image_subject), callout: noDash(out.image_callout) },
+    });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
   }
