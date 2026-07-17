@@ -80,6 +80,39 @@ function StrategistMark() {
   );
 }
 
+// A live screen with a pulse running through it - campaign performance, as it happens.
+function MediaMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+      <defs>
+        <linearGradient id="md-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#60A5FA" /><stop offset="0.55" stopColor="#22D3EE" /><stop offset="1" stopColor="#818CF8" />
+        </linearGradient>
+      </defs>
+      <rect x="5" y="9" width="38" height="27" rx="3.5" stroke="url(#md-g)" strokeWidth="2.6" />
+      <path d="M11 26l6-7 5 6 4-9 5 10h6" stroke="url(#md-g)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18 42h12" stroke="url(#md-g)" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M24 36v6" stroke="url(#md-g)" strokeWidth="2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A funnel narrowing to a single qualified spark - many prospects in, high intent out.
+function PsiMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+      <defs>
+        <linearGradient id="psi-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#EC4899" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#818CF8" />
+        </linearGradient>
+      </defs>
+      <path d="M6 8h36L28 25v13l-8 5V25L6 8Z" stroke="url(#psi-g)" strokeWidth="2.6" strokeLinejoin="round" />
+      <circle cx="38" cy="34" r="6.5" stroke="url(#psi-g)" strokeWidth="2.4" />
+      <path d="M35.4 34l1.9 1.9 3.4-3.6" stroke="url(#psi-g)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function HomePage() {
   return (
     <div className="flex min-h-dvh flex-col">
@@ -87,14 +120,15 @@ export default function HomePage() {
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-6 py-12">
         <div className="mb-10 text-center">
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Studio <span className="brand-grad">on</span> GAS
+            The Agency of <span className="brand-grad">NOW</span>
           </h1>
           <p className="mt-3 text-base text-ink-dim sm:text-lg">
             Human-led strategy, AI execution. Pick where you&apos;re working today.
           </p>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2">
+        {/* Six doors now, so three across on a wide screen rather than a long two-column scroll. */}
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {/* DOOR 1 - the existing, shipped product. */}
           <Link
             href="/influencers"
@@ -162,6 +196,47 @@ export default function HomePage() {
               Open the desk →
             </span>
           </Link>
+
+          {/* DOOR 5 + 6 - live products that run on their OWN domains, not inside this app. They are plain
+              anchors, not next/link, and they open in a new tab: this is a jump to another system, and a router
+              push would try to route it here and 404. The arrow says "leaving", so nobody is surprised. */}
+          <a
+            href="https://media.gasmarketing.co.za/"
+            target="_blank"
+            rel="noreferrer"
+            className="group relative overflow-hidden rounded-2xl border border-[#60a5fa]/35 bg-gradient-to-br from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.05] p-7 transition hover:border-[#60a5fa]/70 hover:from-[#60a5fa]/[0.16]"
+          >
+            <MediaMark />
+            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">
+              Media <span className="brand-grad">on</span> GAS
+            </h2>
+            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
+              Live, real-time campaign insight. What the media is doing right now, for the client and for us, in
+              one place instead of five dashboards.
+            </p>
+            <span className="mt-5 inline-block text-sm font-bold text-[#93c5fd] transition group-hover:translate-x-0.5">
+              Open Media ↗
+            </span>
+          </a>
+
+          <a
+            href="https://psi.gasmarketing.co.za/"
+            target="_blank"
+            rel="noreferrer"
+            className="group relative overflow-hidden rounded-2xl border border-[#ec4899]/35 bg-gradient-to-br from-[#ec4899]/[0.10] to-[#a855f7]/[0.05] p-7 transition hover:border-[#ec4899]/70 hover:from-[#ec4899]/[0.16]"
+          >
+            <PsiMark />
+            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">
+              PSI <span className="brand-grad">on</span> GAS
+            </h2>
+            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
+              Pre-Sales Intelligence. Qualifies and nurtures a prospect until they are a high-intent lead worth
+              handing to the client, not just a name on a list.
+            </p>
+            <span className="mt-5 inline-block text-sm font-bold text-[#f9a8d4] transition group-hover:translate-x-0.5">
+              Open PSI ↗
+            </span>
+          </a>
         </div>
       </main>
     </div>
