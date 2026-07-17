@@ -58,11 +58,17 @@ export async function POST(req: Request) {
       `\n\nCRITICAL - THE IMAGE CONTAINS NO GRAPHICS OF ANY KIND: no logo, no badge, no deal card, no price, no ` +
       `offer, no percentage, no pill, no callout, no headline, no caption, no watermark, no lettering and no ` +
       `numbers ANYWHERE. It is a photograph only. Any graphic or text you draw is a defect. ` +
+      // The white-band bug: told to "leave the top calm for a logo", the model drew a white header banner. Kill
+      // it - the photograph fills the whole frame, and the logo sits ON the picture, not on a strip.
+      `\n\nIT IS A FULL-BLEED PHOTOGRAPH THAT FILLS THE ENTIRE FRAME, EDGE TO EDGE. There is NO white or grey ` +
+      `header band, NO banner, NO border, NO frame, NO margin and NO solid colour strip along any edge. The ` +
+      `photograph reaches every edge of the image. ` +
       `\n\nNobody presents a phone to the camera like an advert. If a phone appears at all there is exactly ONE, ` +
       `held naturally. Anatomy must be perfect: two hands per person, each attached to a visible arm, correct ` +
       `fingers, no floating or duplicated hands. ` +
-      `\n\nLeave the LOWER THIRD and the TOP-LEFT corner relatively calm and uncluttered, so a line of type and a ` +
-      `logo can sit over them.`;
+      `\n\nCompose it so the person sits a little lower or to one side, keeping the TOP-LEFT area and the LOWER ` +
+      `THIRD calmer within the photograph (softer background, not a blank band), so a logo and a line of type ` +
+      `read cleanly once placed over the picture.`;
 
     const [shot] = await generateBatchDetailed([prompt], "nano_banana_pro", "1:1", { resolution: "2k" }, null);
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-linkedin-creative", count: 1 }).catch(() => {});
