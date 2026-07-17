@@ -22,11 +22,18 @@ type Intel = {
 // TWO dates, and conflating them is how stale information becomes "current":
 //   found_at     - when WE researched it
 //   published_at - when the SOURCE was published / the thing actually happened
-// A 2019 article discovered today is not news. Anything older than ~90 days is flagged, so it can never sit in
-// the queue looking as fresh as something published this morning.
-const STALE_DAYS = 90;
+// A 2019 article discovered today is not news. The research window is now 30 days (Gary), so anything past that
+// is flagged and can never sit in the queue looking as fresh as something published this morning.
+const STALE_DAYS = 30;
 function dateBits(i: Intel): { published: string; found: string; ageDays: number | null; stale: boolean } {
-  const fmt = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  // UK long form, the way we write dates: "17th July 2026".
+  const fmt = (d: string) => {
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return "";
+    const day = dt.getUTCDate();
+    const th = day % 10 === 1 && day !== 11 ? "st" : day % 10 === 2 && day !== 12 ? "nd" : day % 10 === 3 && day !== 13 ? "rd" : "th";
+    return `${day}${th} ${dt.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" })} ${dt.getUTCFullYear()}`;
+  };
   const found = i.found_at ? fmt(i.found_at) : "";
   if (!i.published_at) return { published: "", found, ageDays: null, stale: false };
   const ageDays = Math.floor((Date.now() - new Date(i.published_at).getTime()) / 86_400_000);
@@ -87,8 +94,15 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
     await refresh(clientId);
   }
 
-  const material = items.filter((i) => i.material);
-  const rest = items.filter((i) => !i.material);
+  // LEAD WITH THE MOST RECENT (Gary). Newest publication first; anything we could not date sinks to the bottom,
+  // because we cannot claim it is current.
+  const byRecency = (a: Intel, b: Intel) => {
+    const av = a.published_at ? new Date(a.published_at).getTime() : -Infinity;
+    const bv = b.published_at ? new Date(b.published_at).getTime() : -Infinity;
+    return bv - av;
+  };
+  const material = items.filter((i) => i.material).sort(byRecency);
+  const rest = items.filter((i) => !i.material).sort(byRecency);
 
   return (
     <div className="mt-6 space-y-5">
@@ -145,22 +159,26 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
       {(() => {
         const d = dateBits(i);
         return (
+          // BOTH DATES AS LABELLED TAGS, under the headline (Gary): when the source was published, and when we
+          // found it. "found" as loose grey text read like a footnote and got missed.
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {d.published ? (
               <span className={`tabular rounded border px-1.5 py-0.5 text-[10px] font-semibold ${d.stale ? "border-[#fbbf24]/45 bg-[#fbbf24]/10 text-[#fcd34d]" : "border-line text-ink-dim"}`}>
-                📅 {d.published}{d.stale && d.ageDays !== null ? ` · ${d.ageDays} days old` : ""}
+                Published {d.published}{d.stale && d.ageDays !== null ? ` · ${d.ageDays} days old` : ""}
               </span>
             ) : (
               <span className="tabular rounded border border-[#f87171]/45 bg-[#f87171]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#fca5a5]">
-                📅 undated
+                Published date not established
               </span>
             )}
+            <span className="tabular rounded border border-line px-1.5 py-0.5 text-[10px] font-semibold text-ink-faint">
+              Found {d.found}
+            </span>
             {i.period && (
               <span className="tabular rounded border border-line px-1.5 py-0.5 text-[10px] font-semibold text-ink-faint">
-                data: {i.period}
+                Data covers {i.period}
               </span>
             )}
-            <span className="tabular text-[10px] text-ink-faint">found {d.found}</span>
           </div>
         );
       })()}
@@ -181,16 +199,16 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
         return (
           <div className="mt-3 rounded-r-lg border-l-2 border-[#818cf8] bg-surface-2/60 px-3 py-2.5">
             <p className="tabular text-[10px] uppercase tracking-[0.16em] text-[#a5b4fc]">
-              Internal{tag ? ` · ${tag}` : ""}
+              Our read{tag ? ` · ${tag}` : ""}
             </p>
             {i.impact_risk && (
               <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
-                <b className="text-ink">{isStrat ? "Commercial impact / risk to MoMo SA" : "Narrative impact / risk for MoMo SA"}:</b> {i.impact_risk}
+                <b className="text-ink">What it could do to MoMo:</b> {i.impact_risk}
               </p>
             )}
             {i.campaign_response && (
               <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
-                <b className="text-ink">{isStrat ? "Activation + positioning call" : "Narrative move"}:</b> {i.campaign_response}
+                <b className="text-ink">{isStrat ? "What we should do" : "What the CEO could say"}:</b> {i.campaign_response}
               </p>
             )}
           </div>
@@ -213,6 +231,11 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
                   {s.name || s.url}
                 </a>
                 <span className="ml-1.5 text-ink-faint">{host(s.url)}</span>
+                {/* The date the content was POSTED, right next to the link (Gary) - so you can see how current
+                    a source is without opening it. */}
+                <span className="ml-1.5 text-ink-faint">
+                  · posted {dateBits(i).published || "date not established"}
+                </span>
               </li>
             ))}
           </ol>

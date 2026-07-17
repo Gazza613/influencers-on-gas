@@ -6,6 +6,7 @@ import { runIntel, type Intel } from "@/lib/intel";
 import { listBrains } from "@/lib/brains";
 import { recordUsage } from "@/lib/usage";
 import { PREMIUM } from "@/lib/vendors/anthropic";
+import { emailShell } from "@/lib/email-shell";
 
 // THE DAILY INTELLIGENCE RUN. The Journalist and The Strategist each go and find what changed, decide whether
 // it is MATERIAL, and file it into the "Worth reviewing" queue. Only the material findings are emailed.
@@ -58,96 +59,122 @@ function assessmentHtml(i: Intel): string {
 
 const APP_URL = process.env.APP_URL || "https://influencers.gasmarketing.co.za";
 
-// THE STRATEGIST BRIEFING. Gary: "we will just get the daily strategist email - no need for the Journalist to
-// send a daily email. Make it clear what this email is all about for Sam and Gary."
-//
-// The Journalist still RUNS and still files to the review queue - it is the tool for drafting the CEO's LinkedIn
-// material, pulled on when someone sits down to write. It is not a daily bulletin, so it no longer pushes an
-// inbox. This email is the Strategist only: the tool GAS uses as MoMo's performance marketing agency to guide
-// campaign activations and the positioning we take to MoMo's internal teams.
-function buildEmail(client: string, strategist: Intel[], today: string): string {
-  const badge = (c: string) =>
-    c === "high" ? `<span style="background:#dcfce7;color:#166534;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">high</span>`
-      : c === "low" ? `<span style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">low</span>`
-        : `<span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">medium</span>`;
+// UK date, the way we write it: "17th July 2026". Not the US default, and not an ISO string in a briefing that
+// goes to EXCO.
+function ukDate(d: Date | string): string {
+  const dt = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(dt.getTime())) return "";
+  const day = dt.getUTCDate();
+  const th = day % 10 === 1 && day !== 11 ? "st" : day % 10 === 2 && day !== 12 ? "nd" : day % 10 === 3 && day !== 13 ? "rd" : "th";
+  const month = dt.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+  return `${day}${th} ${month} ${dt.getUTCFullYear()}`;
+}
 
-  const block = (title: string, items: Intel[]) => {
-    if (!items.length) {
-      return `<h3 style="margin:26px 0 6px;font-size:15px;color:#0f172a">${title}</h3>
-        <p style="margin:0;color:#64748b;font-size:14px">Nothing material today. That is a real answer, not a gap.</p>`;
-    }
-    return `<h3 style="margin:26px 0 10px;font-size:15px;color:#0f172a">${title}</h3>` + items.map((i) => {
-      // Every finding carries its sources into the inbox, so you can check it without opening the platform.
-      // An unsourced claim is flagged, never quietly passed off as verified.
-      const srcs = (Array.isArray(i.sources) && i.sources.length)
-        ? i.sources
-        : i.source_url ? [{ name: i.source_name || i.source_url, url: i.source_url }] : [];
-      const sourceHtml = srcs.length
-        ? `<p style="margin:10px 0 0;padding-top:8px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8">SOURCES</p>
-           <ol style="margin:4px 0 0;padding-left:18px">${srcs.map((s) =>
-             `<li style="font-size:12px;line-height:1.6"><a href="${esc(s.url)}" style="color:#2563eb">${esc(s.name || s.url)}</a></li>`).join("")}</ol>`
-        : `<p style="margin:10px 0 0;font-size:12px;font-weight:700;color:#b91c1c">⚠ No source. Do not treat this as verified.</p>`;
-      // DATE TAGS. When the source was published vs when we found it - a 2019 article discovered today is not
-      // news, and anything over 90 days old is flagged so it can never read as this morning's intelligence.
-      const fmt = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-      const age = i.published_at ? Math.floor((Date.now() - new Date(i.published_at).getTime()) / 86_400_000) : null;
-      const stale = age !== null && age > 90;
-      const dateHtml = i.published_at
-        ? `<span style="display:inline-block;border:1px solid ${stale ? "#fcd34d" : "#e2e8f0"};background:${stale ? "#fffbeb" : "#fff"};color:${stale ? "#92400e" : "#64748b"};border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600">📅 ${esc(fmt(i.published_at))}${stale ? ` · ${age} days old` : ""}</span>`
-        : `<span style="display:inline-block;border:1px solid #fca5a5;background:#fef2f2;color:#b91c1c;border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600">📅 undated</span>`;
-      const periodHtml = i.period
-        ? ` <span style="display:inline-block;border:1px solid #e2e8f0;color:#64748b;border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600">data: ${esc(i.period)}</span>`
-        : "";
-      return `
-      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px">
-        <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a">${esc(i.headline)} ${badge(i.confidence)}</p>
-        <p style="margin:0 0 8px">${dateHtml}${periodHtml}</p>
-        <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#334155"><b>Why it matters:</b> ${esc(i.why_it_matters)}</p>
-        <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:#475569">${esc(String(i.detail || "").slice(0, 700))}</p>
-        ${assessmentHtml(i)}
-        ${sourceHtml}
-      </div>`;
-    }).join("");
+// THE STRATEGIST BRIEFING. Gary: "we will just get the daily strategist email - no need for the Journalist to
+// send a daily email. Make it clear what this email is all about for Sam and Gary... make the look and feel more
+// professional with a GAS look and feel as this is going to the EXCO and MTN MoMo internal team."
+//
+// So it now uses the shared GAS shell (dark, orb, Sami's signature) like our other emails, instead of the
+// off-brand light layout it had. The Journalist still runs and still files to the review queue - it is the tool
+// for drafting the CEO's LinkedIn voice, not a daily bulletin, so it no longer pushes an inbox.
+function buildEmail(client: string, strategist: Intel[], today: string): string {
+  // GREEN / AMBER / RED, the way we always grade (Gary). Tuned for the dark shell.
+  const badge = (c: string) => {
+    const [bg, fg, label] =
+      c === "high" ? ["rgba(74,222,128,0.14)", "#4ade80", "HIGH"]
+        : c === "low" ? ["rgba(248,113,113,0.14)", "#f87171", "LOW"]
+          : ["rgba(251,191,36,0.14)", "#fbbf24", "MED"];
+    return `<span style="background:${bg};color:${fg};border-radius:10px;padding:2px 8px;font-size:10px;font-weight:800;letter-spacing:1px;">${label}</span>`;
   };
 
-  return `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#0f172a">
-    <p style="margin:0;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#94a3b8">Studio on GAS · The Strategist</p>
-    <h2 style="margin:6px 0 2px;font-size:22px">${esc(client)} · daily intelligence</h2>
-    <p style="margin:0 0 14px;color:#64748b;font-size:13px">${esc(today)}</p>
+  // LEAD WITH THE MOST RECENT (Gary). Newest publication first; anything undated sinks to the bottom, because
+  // we cannot claim it is current.
+  const items = [...strategist].sort((a, b) => {
+    const av = a.published_at ? new Date(a.published_at).getTime() : -Infinity;
+    const bv = b.published_at ? new Date(b.published_at).getTime() : -Infinity;
+    return bv - av;
+  });
 
-    <!-- WHAT THIS IS. Gary asked for this to be explicit: a briefing nobody can place is a briefing nobody acts
-         on, and Sam is new to it. Say what it is for, what it is not, and what is expected of the reader. -->
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 8px">
-      <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#334155">
-        <b>What this is.</b> GAS is MTN MoMo's performance marketing agency. Every morning The Strategist goes and
-        finds what actually changed in the SA fintech market - competitor moves, risks to MoMo's position, and
-        openings worth taking - and only what is <b>material</b> reaches this email. A quiet day means nothing
-        material was found, which is a real answer, not a gap.
-      </p>
-      <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#334155">
-        <b>What to do with it.</b> Each finding carries an internal read of the <b>commercial impact or risk to
-        MoMo SA</b> and the <b>activation and positioning call</b> it argues for - defensive or proactive. It is
-        written to guide our campaign activations and the positioning we take to MoMo's internal teams. Every
-        claim is sourced: check the links before you repeat anything.
-      </p>
-      <p style="margin:0;font-size:13px;line-height:1.6;color:#334155">
-        <b>These are proposals.</b> Nothing is written into the client brain automatically - a human accepts or
-        bins each one on the platform. That gate is deliberate: without it a bad source quietly becomes "fact"
-        and every future strategy inherits it.
+  const cards = items.map((i) => {
+    const srcs = (Array.isArray(i.sources) && i.sources.length)
+      ? i.sources
+      : i.source_url ? [{ name: i.source_name || i.source_url, url: i.source_url }] : [];
+    // Every source carries the date the content was posted, right next to the link (Gary), so nobody has to open
+    // it to know how current it is.
+    const posted = i.published_at ? ukDate(i.published_at) : "date not established";
+    const sourceHtml = srcs.length
+      ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #1f2630;">
+           <div style="font-size:10px;letter-spacing:2px;color:#5f6672;">SOURCES</div>
+           <ol style="margin:6px 0 0;padding-left:18px;color:#8a8f98;">${srcs.map((s) =>
+             `<li style="font-size:12px;line-height:1.7;"><a href="${esc(s.url)}" style="color:#7dd3fc;text-decoration:none;">${esc(s.name || s.url)}</a> <span style="color:#5f6672;">· posted ${esc(posted)}</span></li>`).join("")}</ol>
+         </div>`
+      : `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #1f2630;font-size:12px;font-weight:700;color:#f87171;">No source. Do not treat this as verified.</div>`;
+
+    // BOTH DATES, under the headline (Gary): when it was published, and when we found it. Conflating them is how
+    // old news reads as this morning's intelligence.
+    const age = i.published_at ? Math.floor((Date.now() - new Date(i.published_at).getTime()) / 86_400_000) : null;
+    const stale = age !== null && age > 30;
+    const tag = (text: string, colour: string, border: string) =>
+      `<span style="display:inline-block;border:1px solid ${border};color:${colour};border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;margin-right:6px;">${text}</span>`;
+    const publishedTag = i.published_at
+      ? tag(`Published ${esc(ukDate(i.published_at))}${stale ? ` · ${age} days old` : ""}`, stale ? "#fbbf24" : "#8a8f98", stale ? "rgba(251,191,36,0.4)" : "#1f2630")
+      : tag("Published date not established", "#f87171", "rgba(248,113,113,0.4)");
+    const foundTag = tag(`Found ${esc(ukDate(i.found_at || today))}`, "#5f6672", "#1f2630");
+    const periodTag = i.period ? tag(`Data covers ${esc(i.period)}`, "#8a8f98", "#1f2630") : "";
+
+    const risk = String(i.impact_risk || "").trim();
+    const move = String(i.campaign_response || "").trim();
+    const def = /\bdefensive\b/i.test(move), pro = /\bproactive\b/i.test(move);
+    const stance = def && pro ? "DEFENSIVE + PROACTIVE" : def ? "DEFENSIVE" : pro ? "PROACTIVE" : "";
+    const assessment = (risk || move)
+      ? `<div style="margin-top:12px;padding:12px 14px;background:rgba(249,98,3,0.06);border-left:2px solid #f96203;border-radius:0 8px 8px 0;">
+           <div style="font-size:10px;letter-spacing:2px;font-weight:800;color:#f96203;">OUR READ${stance ? ` · ${stance}` : ""}</div>
+           ${risk ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.65;color:#c9ced6;"><b style="color:#fff;">What it could do to MoMo:</b> ${esc(risk)}</p>` : ""}
+           ${move ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.65;color:#c9ced6;"><b style="color:#fff;">What we should do:</b> ${esc(move)}</p>` : ""}
+         </div>`
+      : "";
+
+    return `
+    <div style="border:1px solid #1f2630;border-radius:12px;padding:16px 18px;margin-bottom:12px;background:#0d1117;">
+      <div style="font-size:16px;font-weight:800;color:#ffffff;line-height:1.4;">${esc(i.headline)} ${badge(i.confidence)}</div>
+      <div style="margin-top:8px;">${publishedTag}${foundTag}${periodTag}</div>
+      <p style="margin:12px 0 0;font-size:14px;line-height:1.65;color:#c9ced6;"><b style="color:#fff;">Why it matters:</b> ${esc(i.why_it_matters)}</p>
+      ${i.detail ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.65;color:#8a8f98;">${esc(String(i.detail).slice(0, 900))}</p>` : ""}
+      ${assessment}
+      ${sourceHtml}
+    </div>`;
+  }).join("");
+
+  const body = `
+    <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:.3px;">${esc(client)} · Daily Intelligence</div>
+    <div style="margin-top:4px;font-size:14px;color:#8a8f98;">${esc(ukDate(today))}</div>
+
+    <div style="margin-top:16px;padding:14px 16px;background:#0d1117;border:1px solid #1f2630;border-radius:12px;">
+      <p style="margin:0;font-size:13px;line-height:1.7;color:#c9ced6;">
+        GAS is MTN MoMo's performance marketing agency. Each morning I look for what actually changed in the
+        South African fintech market: what rivals did, what threatens MoMo's position, and where there is an
+        opening. Only findings that should change something reach this email, and each one says what it could do
+        to MoMo and what I think we should do about it. Every claim is sourced, so please check the links before
+        repeating anything.
       </p>
     </div>
 
-    ${block("Material findings", strategist)}
+    <div style="margin-top:22px;font-size:11px;letter-spacing:2px;color:#5f6672;">MATERIAL FINDINGS</div>
+    <div style="margin-top:10px;">${cards}</div>
 
-    <p style="margin:22px 0 0">
-      <a href="${APP_URL}/strategist" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700">Review and accept on the platform →</a>
-    </p>
-    <p style="margin:14px 0 0;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#94a3b8">
-      The Journalist (material for the CEO's LinkedIn voice) runs daily too, but does not email - its findings
-      wait in the queue at <a href="${APP_URL}/journalist" style="color:#64748b">/journalist</a> for when you sit
-      down to write.
-    </p>
-  </div>`;
+    <div style="margin-top:20px;">
+      <a href="${APP_URL}/strategist" style="display:inline-block;background:#f96203;color:#07090d;text-decoration:none;border-radius:9px;padding:11px 18px;font-size:13px;font-weight:800;">Review and accept on the platform</a>
+    </div>`;
+
+  return emailShell({
+    strapline: "DAILY INTELLIGENCE",
+    dateLabel: `${client} · ${ukDate(today)}`,
+    body,
+    cadence: "DAILY INTELLIGENCE, 08:30 SAST",
+    wordmark: "STRATEGIST",
+    role: "AI Research Strategist",
+    department: "GAS Marketing Automation",
+  });
 }
 
 export async function GET(req: Request) {
@@ -190,6 +217,7 @@ export async function GET(req: Request) {
           to: intelRecipients(),
           subject: `The Strategist · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
           html: buildEmail(c.name, sm, today),
+          fromName: "Strategist on GAS", // it lands with EXCO and MoMo's team: say what it is (Gary)
         }).catch(() => {});
         emailed = true;
       }

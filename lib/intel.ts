@@ -45,12 +45,30 @@ IN SCOPE: mobile money, payments, wallets, financial inclusion, fintech regulati
 OUT OF SCOPE: MTN network/telco strategy, spectrum, coverage, MTN corporate brand campaigns, MTN Group subscriber numbers, telco competitor sets. MTN Group appears ONLY as the endorsement brand behind "MoMo from MTN".
 CRITICAL: MoMo's fintech offers are OFTEN DIFFERENT from MTN's own offers. NEVER infer a MoMo price, bundle or product from an MTN source. If you cannot source it to MoMo directly, do not assert it.`;
 
+// HOW IT READS DECIDES WHETHER IT GETS USED. Gary: "I find the language very complicated for our team - make it
+// simpler and more understandable, but do not steer away from the actual real content, do not dilute the message
+// by making it more understandable."
+//
+// That is the whole tension, and the rule below states it explicitly: simplify the LANGUAGE, never the SUBSTANCE.
+// The failing examples were consultant-speak ("Two-sided and genuinely material to our doctrine"), not detail -
+// so we ban the register, not the content. Every number, name, date and caveat stays.
+const STYLE = `HOW TO WRITE THIS (it is read by busy marketers and by MoMo's own team, not by analysts):
+- Plain, direct English. Short sentences. Everyday words. Say the thing itself, not the jargon for it.
+- SIMPLER LANGUAGE, SAME SUBSTANCE. Do NOT dilute or generalise to sound readable: keep every number, name,
+  date, caveat and honest uncertainty exactly as it is. If a term of art is unavoidable (FAIS, FSP, e-money),
+  use it and explain it in a few words the first time.
+- No consultant register: avoid "two-sided", "doctrine", "materially", "leverage", "signals", "posture",
+  "vectors". Write as if telling a colleague what happened and what we should do about it.
+- Lead with the point. The first sentence says what happened or what to do, not the build-up.
+- UK British spelling, ALWAYS. NEVER use an em dash or an en dash: use a comma, a full stop, or a plain hyphen.`;
+
 const HONESTY = (windowDays: number) => `HONESTY RULES:
 - Every finding must carry a REAL source URL you actually read. If you cannot source it, do not report it.
 - Grade confidence honestly: high (primary source - regulator, company results, statute), medium (credible secondary - law firm, trade press, fact-checker), low (single source, thin, or inferred).
 - Mark material=true ONLY if this would actually change what we say or do. Most news is not material. A quiet day with nothing material is a CORRECT result - say so rather than padding.
 - There is NO published creative-performance data for MoMo South Africa. Anyone quoting SA fintech creative benchmarks is inventing them. Never repeat one.
 - RECENCY IS A HARD GATE. This is a DAILY intelligence run: you report WHAT CHANGED. Only report things published or announced in the LAST ${windowDays} DAYS. Older material - however good - is BACKGROUND, not news, and it already lives in our doctrine. Do not report it. A stale finding presented as current is worse than no finding.
+- HYPER-FOCUS ON THE NEWEST. Inside the window, newer beats older every time: something from the last few days is worth far more to us than something from three weeks ago, even if the older item is more interesting. Search for the most recent developments FIRST and report the freshest material you can stand up. Order your findings newest first.
 - DATE EVERY FINDING. Give published_at as the date the SOURCE was published or the event happened - NOT today. If you cannot establish the date, leave it empty rather than guessing - but know that an undated finding will be REJECTED, because we cannot claim it is current.
 - Also give 'period' when the data covers a span that differs from the publication date (e.g. a report published this month describing FY2025). Recency of PUBLICATION is not recency of DATA.`;
 
@@ -188,9 +206,13 @@ const SCHEMA = {
 // never open-ended.
 // Findings outside the window, or that cannot be dated at all, are REJECTED before storage, and the count of
 // what was dropped is reported, never silently swallowed.
+// 30 DAYS MAXIMUM (Gary: "no research presented to be older than 30 days maximum - the agent must hyper focus on
+// the newer research"). Both roles are gated to the same month now: a briefing that guides this week's
+// activations cannot lean on last quarter's news, and the CEO cannot post about something the market has moved
+// on from. Recency of PUBLICATION, not of discovery.
 const WINDOW_DAYS: Record<string, number> = {
-  strategist: Number(process.env.INTEL_WINDOW_STRATEGIST) || 60,
-  journalist: Number(process.env.INTEL_WINDOW_JOURNALIST) || 90,
+  strategist: Number(process.env.INTEL_WINDOW_STRATEGIST) || 30,
+  journalist: Number(process.env.INTEL_WINDOW_JOURNALIST) || 30,
 };
 const windowFor = (role: string): number => WINDOW_DAYS[role] ?? 60;
 
@@ -217,7 +239,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
-    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${ASSESSMENT[role]}\n\n${HONESTY(windowDays)}\n\nUK spelling. No em dashes.`,
+    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${ASSESSMENT[role]}\n\n${HONESTY(windowDays)}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -228,7 +250,9 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     model: PREMIUM,
     // The assessment adds two reasoned fields per finding, so the filing step needs the room to think.
     max_tokens: 6000,
-    system: `${RINGFENCE}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT[role]}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
+    // never carried the UK-spelling / no-em-dash rule at all, which is how em dashes kept reaching the inbox.
+    system: `${RINGFENCE}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT[role]}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
@@ -255,6 +279,16 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   });
   if (dropped.length) console.warn(`[intel:${role}] dropped ${dropped.length} stale/undated finding(s): ${dropped.join(" | ")}`);
 
+  // NO EM DASHES, EVER (Gary). The prompt asks, but a prompt is not a guarantee and this is a house rule, so we
+  // enforce it on the way into the database: every em dash and en dash becomes a plain hyphen. Once stored clean,
+  // the email, the platform queue and anything downstream inherit it - there is no second place to remember.
+  // A numeric range is handled FIRST and tightly ("12-18 months"), because the generic prose rule would turn it
+  // into "12 - 18 months", which is not how anyone writes a range.
+  const noDash = (s: unknown) => String(s ?? "")
+    .replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2")
+    .replace(/\s*[—–]\s*/g, " - ")
+    .trim();
+
   const saved: Intel[] = [];
   for (const f of fresh) {
     const srcs = (Array.isArray(f.sources) ? f.sources : [])
@@ -264,14 +298,14 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
       `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at`,
-      [clientId, role, String(f.headline || "").slice(0, 300), String(f.why_it_matters || "").slice(0, 1200),
-       String(f.detail || "").slice(0, 4000), JSON.stringify(srcs),
+      [clientId, role, noDash(f.headline).slice(0, 300), noDash(f.why_it_matters).slice(0, 1200),
+       noDash(f.detail).slice(0, 4000), JSON.stringify(srcs),
        srcs[0]?.url ?? null, srcs.map((s) => s.name).join(" · ").slice(0, 200) || null,
        /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? f.published_at : null,
        String(f.period || "").slice(0, 60) || null,
        ["high", "medium", "low"].includes(String(f.confidence)) ? f.confidence : "medium", f.material === true,
-       String(f.impact_risk || "").slice(0, 3000) || null,
-       String(f.campaign_response || "").slice(0, 3000) || null],
+       noDash(f.impact_risk).slice(0, 3000) || null,
+       noDash(f.campaign_response).slice(0, 3000) || null],
     )) as Intel[];
     saved.push(rows[0]);
   }
