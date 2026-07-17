@@ -44,10 +44,15 @@ function assessmentHtml(i: Intel): string {
   const defensive = /\bdefensive\b/i.test(move);
   const proactive = /\bproactive\b/i.test(move);
   const tag = defensive && proactive ? "defensive + proactive" : defensive ? "defensive" : proactive ? "proactive" : "";
+  // The two roles assess different things, so label them honestly. The Strategist guides our activations and the
+  // positioning we take to MoMo's teams; the Journalist is about the CEO's public narrative.
+  const isStrat = i.role === "strategist";
+  const riskLabel = isStrat ? "Commercial impact / risk to MoMo SA" : "Narrative impact / risk for MoMo SA";
+  const moveLabel = isStrat ? "Activation + positioning call" : "Narrative move";
   return `<div style="margin:0 0 8px;padding:10px 12px;background:#f8fafc;border-left:3px solid #6366f1;border-radius:0 6px 6px 0">
-    <p style="margin:0 0 4px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6366f1">Internal assessment${tag ? ` · ${tag}` : ""}</p>
-    ${risk ? `<p style="margin:0 0 6px;font-size:13px;line-height:1.55;color:#334155"><b>Impact / risk to MoMo SA:</b> ${esc(risk.slice(0, 900))}</p>` : ""}
-    ${move ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#334155"><b>Campaign response:</b> ${esc(move.slice(0, 900))}</p>` : ""}
+    <p style="margin:0 0 4px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6366f1">Internal${tag ? ` · ${tag}` : ""}</p>
+    ${risk ? `<p style="margin:0 0 6px;font-size:13px;line-height:1.55;color:#334155"><b>${riskLabel}:</b> ${esc(risk.slice(0, 900))}</p>` : ""}
+    ${move ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#334155"><b>${moveLabel}:</b> ${esc(move.slice(0, 900))}</p>` : ""}
   </div>`;
 }
 

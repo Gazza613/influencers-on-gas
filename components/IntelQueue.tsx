@@ -175,16 +175,23 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
         const move = i.campaign_response || "";
         const def = /\bdefensive\b/i.test(move), pro = /\bproactive\b/i.test(move);
         const tag = def && pro ? "defensive + proactive" : def ? "defensive" : pro ? "proactive" : "";
+        // Label by role: the Strategist guides our activations and the positioning we take to MoMo's internal
+        // teams; the Journalist is about the CEO's public narrative. Same fields, different jobs.
+        const isStrat = i.role === "strategist";
         return (
           <div className="mt-3 rounded-r-lg border-l-2 border-[#818cf8] bg-surface-2/60 px-3 py-2.5">
             <p className="tabular text-[10px] uppercase tracking-[0.16em] text-[#a5b4fc]">
-              Internal assessment{tag ? ` · ${tag}` : ""}
+              Internal{tag ? ` · ${tag}` : ""}
             </p>
             {i.impact_risk && (
-              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim"><b className="text-ink">Impact / risk to MoMo SA:</b> {i.impact_risk}</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
+                <b className="text-ink">{isStrat ? "Commercial impact / risk to MoMo SA" : "Narrative impact / risk for MoMo SA"}:</b> {i.impact_risk}
+              </p>
             )}
             {i.campaign_response && (
-              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim"><b className="text-ink">Campaign response:</b> {i.campaign_response}</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
+                <b className="text-ink">{isStrat ? "Activation + positioning call" : "Narrative move"}:</b> {i.campaign_response}
+              </p>
             )}
           </div>
         );

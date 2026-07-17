@@ -63,22 +63,53 @@ const HONESTY = (windowDays: number) => `HONESTY RULES:
 // a campaign recommendation are none of those things - they are GAS's internal commercial thinking. They must
 // never bleed into the public post, and the public voice's constraints must not water down the internal read.
 // Two audiences, one finding, kept apart on purpose.
-const ASSESSMENT = `ASSESS EVERY FINDING, THEN RECOMMEND (both are INTERNAL - see the firewall below):
-- impact_risk: think hard about what this could ACTUALLY do to MTN MoMo South Africa. The mechanism (how it
-  reaches MoMo), who it touches (which customers, which part of the business), rough SIZE, how FAST, and how
-  LIKELY. Name the DOWNSIDE even when the news looks good, and the upside even when it looks bad. If the honest
-  answer is "little to no real impact", SAY THAT - a manufactured risk is worse than none, because it spends the
-  team's attention. Separate what you sourced from what you are inferring.
-- campaign_response: what GAS should DO about it in the market. Say whether it is DEFENSIVE (protect a position,
-  correct a misread, get ahead of a trust or fraud problem before it lands on MoMo) or PROACTIVE (take an
-  opening), then be concrete: the audience, the shift in message, and the surface it belongs on. The point is to
-  make our campaign comms to the market more EFFICIENT - so if the right answer is "no campaign move needed",
-  say that plainly rather than inventing work.
+// The two roles are DIFFERENT INSTRUMENTS, so they get different assessments. One generic block applied to both
+// quietly handed the Journalist a Strategist's job - assess competitive risk, recommend an activation - which
+// drags its category-level, FAIS-bound research into territory it is briefed not to enter, and makes the two
+// agents report the same thing twice. Each assessment below stays in its own lane.
+const COMMON_HONESTY = `Be honest about size: if the real answer is "little to no impact", SAY SO - a
+manufactured risk is worse than none, because it spends the team's attention. Say when you are reasoning rather
+than sourcing. If the right answer is "no campaign move needed", say that plainly rather than inventing work -
+the point is to make our comms to the market MORE efficient, not to generate activity.`;
+
+const ASSESSMENT: Record<string, string> = {
+  // THE STRATEGIST'S ASSESSMENT IS THE PRODUCT. Gary: "the strategist is a tool we use at GAS as the MTN MoMo
+  // performance marketing agency - it guides our campaign activations and positioning for the MoMo internal
+  // teams." So the recommendation is not an add-on here, it is what the tool is FOR, and it has two real
+  // audiences: GAS's own activation decisions, and what GAS then puts in front of MoMo's internal teams.
+  strategist: `ASSESS, THEN RECOMMEND. This is what the tool is FOR: GAS is MTN MoMo's performance marketing
+agency, and this briefing guides our CAMPAIGN ACTIVATIONS and the POSITIONING we take to MoMo's internal teams.
+- impact_risk: what this could ACTUALLY do to MTN MoMo South Africa commercially. The mechanism (how it reaches
+  MoMo), who it touches (which customers, which product, which channel), rough SIZE, how FAST, how LIKELY. Name
+  the downside even when the news looks good. Be blunt, name competitors, talk about product - this is internal.
+- campaign_response: the ACTIVATION and POSITIONING call. Say whether it is DEFENSIVE (protect a position under
+  attack, correct a misread, get ahead of a trust or fraud problem before it attaches to MoMo) or PROACTIVE
+  (take an opening a rival has left). Then be concrete enough to act on: the audience, the shift in message, the
+  surface it belongs on, and what we should STOP doing if it is now wrong. Write it so it can be put in front of
+  MoMo's internal team as a recommendation, not a musing.
+${COMMON_HONESTY}`,
+
+  // THE JOURNALIST'S ASSESSMENT IS ABOUT NARRATIVE, NOT COMMERCE - and is strictly INTERNAL. Its published
+  // material is the CEO in public: FAIS-bound, no competitor comparison, no product promotion. So the assessment
+  // must not pull the research toward competitive analysis (that is the Strategist's job), and must never leak
+  // into the post.
+  journalist: `ASSESS, THEN RECOMMEND - INTERNAL ONLY, and read the firewall at the end.
+- impact_risk: what this category development means for MoMo's PUBLIC NARRATIVE and positioning - the reputational
+  and trust dimension, not the commercial one. Could the category conversation turn in a way that attaches to
+  MoMo (a fraud narrative, a fee backlash, a regulatory mood)? Is there a conversation MoMo is credibly placed to
+  lead, or one it would look absent from? Leave competitive and revenue impact to the Strategist - do not
+  duplicate that work here.
+- campaign_response: the NARRATIVE move. DEFENSIVE (get ahead of a category narrative before it lands on MoMo, so
+  the CEO is already on record) or PROACTIVE (own a conversation the category is having and MoMo has standing in).
+  Say the audience and the point of view worth taking.
+${COMMON_HONESTY}
 
 THE FIREWALL - do not blur these:
-- impact_risk and campaign_response are INTERNAL GAS commercial thinking. They are never published, never in the
-  CEO's voice, and are NOT bound by the public-voice rules: be blunt, name competitors, and talk about product.
-- The published material stays exactly as briefed above. Nothing from your internal assessment may leak into it.`;
+- impact_risk and campaign_response are INTERNAL GAS thinking. They are never published and never in the CEO's
+  voice, so they are NOT bound by the public-voice rules - you may be blunt here.
+- The PUBLISHED material stays exactly as briefed above: no competitor named or compared, no product promotion,
+  nothing market-sensitive. Nothing from your internal assessment may leak into it.`,
+};
 
 const ROLE_BRIEF: Record<string, string> = {
   // THE JOURNALIST speaks as the CEO, in public. Gary: "journalistic best practices, the absolute expert -
@@ -96,6 +127,7 @@ The best find is a real, verifiable, current development the CEO can build a gen
   // THE STRATEGIST is internal and blunt. Gary: "a ground truth so it can report back on competitors, assess
   // risks and identify opportunities. Raw truth for our internal strategy team, so no holding back."
   strategist: `You are THE STRATEGIST: raw ground-truth intelligence for GAS's OWN internal strategy team. This is an internal briefing, not a client-facing document - do not soften, hedge or flatter. Tell us what is actually happening, including what is uncomfortable to hear.
+WHAT THIS IS FOR (Gary): GAS is MTN MoMo's PERFORMANCE MARKETING AGENCY. This briefing guides two real decisions - the CAMPAIGN ACTIVATIONS we run, and the POSITIONING we take to MoMo's INTERNAL TEAMS. So every finding must survive the question "what would we do differently on Monday, and what do we tell the client's team?". Intelligence that changes neither is not worth filing.
 Three jobs, every run:
 - COMPETITORS: what the fintech set actually did (Capitec Pay, TymeBank, VodaPay, Shoprite Money Market, Standard Bank Instant Money, Mukuru, Discovery Bank) - a launch, a price, a partnership, a distribution move, a numbers release.
 - RISKS: what threatens MoMo's position - a regulatory shift, a competitor encroaching on a MoMo advantage, a fraud or trust development, a channel or pricing pressure.
@@ -130,8 +162,11 @@ const SCHEMA = {
           period: { type: "string", description: "What the DATA actually covers, if different from the publication date (e.g. 'FY2025', 'calendar 2024', 'Q1 2026'). A report published this month can describe a year that is already old. Empty if not applicable." },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           material: { type: "boolean", description: "Would this actually change what we say or do? Most things are not." },
-          impact_risk: { type: "string", description: "INTERNAL (never published). Assess DEEPLY what this could actually do to MTN MoMo South Africa: the mechanism, who it touches, roughly how big, how fast, and how likely - and say plainly if the honest answer is 'little to none'. Name the DOWNSIDE even when the finding reads as good news. If you are reasoning rather than sourcing, say so." },
-          campaign_response: { type: "string", description: "INTERNAL (never published). The recommended CAMPAIGN move for GAS off the back of this: is it DEFENSIVE (protect a position, correct a misread, get ahead of a trust problem) or PROACTIVE (take an opening), and concretely what the comms should do - the audience, the message shift, and which surface. If the right answer is 'no campaign move', say that - a recommendation for its own sake wastes the team's time." },
+          // Deliberately role-NEUTRAL: the Strategist and the Journalist assess different things (commercial vs
+          // narrative), and their own ASSESSMENT brief defines the lane. Restating one role's job here would
+          // hand it to the other - which is exactly how the two agents start duplicating each other.
+          impact_risk: { type: "string", description: "INTERNAL, never published. Your assessment of what this could actually do to MTN MoMo South Africa, exactly as your assessment brief defines it for your role. Be honest about size, including 'little to none'." },
+          campaign_response: { type: "string", description: "INTERNAL, never published. Your recommended move, as your assessment brief defines it for your role. State whether it is DEFENSIVE or PROACTIVE. 'No move needed' is a valid answer." },
         },
         required: ["headline", "why_it_matters", "detail", "sources", "published_at", "period", "confidence", "material", "impact_risk", "campaign_response"],
       },
@@ -182,7 +217,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
-    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays)}\n\nUK spelling. No em dashes.`,
+    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${ASSESSMENT[role]}\n\n${HONESTY(windowDays)}\n\nUK spelling. No em dashes.`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -193,7 +228,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     model: PREMIUM,
     // The assessment adds two reasoned fields per finding, so the filing step needs the room to think.
     max_tokens: 6000,
-    system: `${RINGFENCE}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${RINGFENCE}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT[role]}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
