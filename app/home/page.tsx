@@ -1,57 +1,54 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 
-// THE TWO DOORS. Studio on GAS is the platform; it has two products behind one login:
-//   • Influencers on GAS - the AI-influencer video studio (cast, script, voice, shoot, cut).
-//   • GAS Studio        - the template creative factory (batch statics, motion, funnel, SMS).
-// This is the first screen after sign-in. It deliberately does nothing else: pick a door.
+// THE AGENCY OF NOW - the first screen after sign-in. It does one job: get the team to the right desk.
 //
-// Palette note: both doors stay in the pink/purple/blue accent family (orange is reserved for the GAS
-// mark alone - never a background wash). The two are separated by hue within that family, not by
-// introducing a new colour: Influencers leans pink/violet, GAS Studio leans blue/cyan.
+// It is grouped, not gridded, and that is the point. Six tiles laid out flat say "here are six things". Six
+// tiles in three named pairs say what this agency actually IS: we MAKE the work, we KNOW the market, and we RUN
+// it live. The team reads the shape of the business before they read a single tile.
+//
+// Palette: everything stays in the pink/purple/blue accent family, separated by hue within it rather than by
+// introducing new colours. Orange is the GAS mark alone and never a background wash.
+//
+// A server component on purpose: no client JS for a page whose job is to be instant. The life on it (the drifting
+// glows, the hover lifts) is CSS.
 export const dynamic = "force-dynamic";
 
-// Custom marks, not emoji. Influencers = a face framed in a viewfinder (someone on camera).
-// GAS Studio = stacked frames in different ratios (one order, every size).
+// Custom marks, not emoji. Each says what its desk does in one glance.
 function InfluencerMark() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
       <defs>
         <linearGradient id="inf-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#EC4899" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#60A5FA" />
         </linearGradient>
       </defs>
-      {/* viewfinder corners */}
       <path d="M4 15V8a4 4 0 0 1 4-4h7M44 15V8a4 4 0 0 0-4-4h-7M4 33v7a4 4 0 0 0 4 4h7M44 33v7a4 4 0 0 1-4 4h-7"
         stroke="url(#inf-g)" strokeWidth="2.6" strokeLinecap="round" />
-      {/* head + shoulders */}
       <circle cx="24" cy="20.5" r="6.2" stroke="url(#inf-g)" strokeWidth="2.6" />
-      <path d="M13.5 38c1.6-5.7 5.6-8.6 10.5-8.6S32.9 32.3 34.5 38"
-        stroke="url(#inf-g)" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M13.5 38c1.6-5.7 5.6-8.6 10.5-8.6S32.9 32.3 34.5 38" stroke="url(#inf-g)" strokeWidth="2.6" strokeLinecap="round" />
     </svg>
   );
 }
 
 function StudioMark() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
       <defs>
         <linearGradient id="std-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#60A5FA" /><stop offset="0.5" stopColor="#818CF8" /><stop offset="1" stopColor="#22D3EE" />
+          <stop stopColor="#60A5FA" /><stop offset="0.55" stopColor="#22D3EE" /><stop offset="1" stopColor="#818CF8" />
         </linearGradient>
       </defs>
-      {/* three frames, three ratios - the same design rendered at every size */}
-      <rect x="4" y="10" width="16" height="22" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
-      <rect x="24" y="6" width="20" height="20" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
-      <rect x="16" y="30" width="28" height="13" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
+      <rect x="4" y="10" width="22" height="28" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
+      <rect x="30" y="10" width="14" height="14" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
+      <rect x="30" y="28" width="14" height="10" rx="3" stroke="url(#std-g)" strokeWidth="2.6" />
     </svg>
   );
 }
 
-// A nib — writing, with authority.
 function JournalistMark() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
       <defs>
         <linearGradient id="jr-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#22D3EE" /><stop offset="0.55" stopColor="#60A5FA" /><stop offset="1" stopColor="#818CF8" />
@@ -63,10 +60,9 @@ function JournalistMark() {
   );
 }
 
-// A rising line with a plotted turn — reading the market.
 function StrategistMark() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
       <defs>
         <linearGradient id="st-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#818CF8" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#EC4899" />
@@ -80,10 +76,9 @@ function StrategistMark() {
   );
 }
 
-// A live screen with a pulse running through it - campaign performance, as it happens.
 function MediaMark() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
       <defs>
         <linearGradient id="md-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#60A5FA" /><stop offset="0.55" stopColor="#22D3EE" /><stop offset="1" stopColor="#818CF8" />
@@ -91,16 +86,14 @@ function MediaMark() {
       </defs>
       <rect x="5" y="9" width="38" height="27" rx="3.5" stroke="url(#md-g)" strokeWidth="2.6" />
       <path d="M11 26l6-7 5 6 4-9 5 10h6" stroke="url(#md-g)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M18 42h12" stroke="url(#md-g)" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M24 36v6" stroke="url(#md-g)" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M18 42h12M24 36v6" stroke="url(#md-g)" strokeWidth="2.6" strokeLinecap="round" />
     </svg>
   );
 }
 
-// A funnel narrowing to a single qualified spark - many prospects in, high intent out.
 function PsiMark() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-10 w-10" aria-hidden>
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
       <defs>
         <linearGradient id="psi-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#EC4899" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#818CF8" />
@@ -113,130 +106,163 @@ function PsiMark() {
   );
 }
 
+type Door = {
+  name: React.ReactNode;
+  href: string;
+  external?: boolean;
+  mark: React.ReactNode;
+  blurb: string;
+  action: string;
+  ring: string;      // border + hover glow
+  wash: string;      // the faint gradient inside the card
+  accent: string;    // the action text
+};
+
+const GROUPS: { label: string; note: string; doors: Door[] }[] = [
+  {
+    label: "Make",
+    note: "The work itself",
+    doors: [
+      {
+        name: <>Influencers <span className="brand-grad">on</span> GAS</>,
+        href: "/influencers",
+        mark: <InfluencerMark />,
+        blurb: "The AI-influencer video studio. Cast a face, give it a voice, shoot and cut the film.",
+        action: "Open the studio",
+        ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
+        wash: "from-[#a855f7]/[0.10] to-[#ec4899]/[0.04]",
+        accent: "text-[#d8b4fe]",
+      },
+      {
+        name: <>GAS Studio</>,
+        href: "/studio",
+        mark: <StudioMark />,
+        blurb: "The creative factory. A brief in, a publish-ready funnel set out, on the client's own designs.",
+        action: "Open the factory",
+        ring: "border-[#60a5fa]/30 hover:border-[#60a5fa]/70 hover:shadow-[0_0_50px_-12px_rgba(96,165,250,0.45)]",
+        wash: "from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.04]",
+        accent: "text-[#93c5fd]",
+      },
+    ],
+  },
+  {
+    label: "Know",
+    note: "Researched daily, sourced, never assumed",
+    doors: [
+      {
+        name: <>The Journalist</>,
+        href: "/journalist",
+        mark: <JournalistMark />,
+        blurb: "Thought leadership a client CEO can put his name to, built from primary sources, never opinion.",
+        action: "Open the desk",
+        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
+        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
+        accent: "text-[#67e8f9]",
+      },
+      {
+        name: <>The Strategist</>,
+        href: "/strategist",
+        mark: <StrategistMark />,
+        blurb: "Daily market and competitor intelligence. It hunts for what makes a current assumption wrong.",
+        action: "Open the desk",
+        ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
+        wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
+        accent: "text-[#a5b4fc]",
+      },
+    ],
+  },
+  {
+    label: "Run",
+    note: "Live, in market, right now",
+    doors: [
+      {
+        name: <>Media <span className="brand-grad">on</span> GAS</>,
+        href: "https://media.gasmarketing.co.za/",
+        external: true,
+        mark: <MediaMark />,
+        blurb: "Live, real-time campaign insight. What the media is doing now, in one place instead of five dashboards.",
+        action: "Open Media",
+        ring: "border-[#38bdf8]/30 hover:border-[#38bdf8]/70 hover:shadow-[0_0_50px_-12px_rgba(56,189,248,0.45)]",
+        wash: "from-[#38bdf8]/[0.10] to-[#60a5fa]/[0.04]",
+        accent: "text-[#7dd3fc]",
+      },
+      {
+        name: <>PSI <span className="brand-grad">on</span> GAS</>,
+        href: "https://psi.gasmarketing.co.za/",
+        external: true,
+        mark: <PsiMark />,
+        blurb: "Pre-Sales Intelligence. Qualifies and nurtures a prospect until they are a high-intent lead worth handing over.",
+        action: "Open PSI",
+        ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
+        wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
+        accent: "text-[#f9a8d4]",
+      },
+    ],
+  },
+];
+
+function Tile({ d }: { d: Door }) {
+  const inner = (
+    <>
+      {/* A soft light that only wakes on hover - the card feels lit rather than decorated. */}
+      <span aria-hidden className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${d.wash} opacity-0 blur-2xl transition duration-500 group-hover:opacity-100`} />
+      <span className="relative block transition duration-300 group-hover:-translate-y-0.5">{d.mark}</span>
+      <h2 className="relative mt-4 text-[22px] font-extrabold tracking-tight text-ink">{d.name}</h2>
+      <p className="relative mt-2 text-[14px] leading-relaxed text-ink-dim">{d.blurb}</p>
+      <span className={`relative mt-5 inline-flex items-center gap-1.5 text-[13px] font-bold ${d.accent}`}>
+        {d.action}
+        <span className="transition-transform duration-300 group-hover:translate-x-1">{d.external ? "↗" : "→"}</span>
+      </span>
+    </>
+  );
+  const cls = `group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 transition duration-300 hover:-translate-y-1`;
+
+  // The live products sit on their OWN domains: a plain anchor in a new tab, never a router push (which would
+  // try to route them inside this app and 404).
+  return d.external ? (
+    <a href={d.href} target="_blank" rel="noreferrer" className={cls}>{inner}</a>
+  ) : (
+    <Link href={d.href} className={cls}>{inner}</Link>
+  );
+}
+
 export default function HomePage() {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="relative flex min-h-dvh flex-col overflow-hidden">
+      {/* Ambient depth. Two slow, far-off glows in the accent family - enough to stop the page reading as a flat
+          grid, never enough to compete with the tiles. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-[#a855f7]/[0.07] blur-[120px]" />
+        <div className="absolute -bottom-52 -right-40 h-[36rem] w-[36rem] rounded-full bg-[#60a5fa]/[0.07] blur-[120px]" />
+      </div>
+
       <AppHeader />
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-6 py-12">
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
+        <div className="max-w-2xl">
+          <p className="tabular text-[11px] uppercase tracking-[0.3em] text-ink-faint">GAS Marketing</p>
+          <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">
             The Agency of <span className="brand-grad">NOW</span>
           </h1>
-          <p className="mt-3 text-base text-ink-dim sm:text-lg">
-            Human-led strategy, AI execution. Pick where you&apos;re working today.
+          <p className="mt-4 text-lg leading-relaxed text-ink-dim">
+            Human command. AI execution. One platform.
           </p>
         </div>
 
-        {/* Six doors now, so three across on a wide screen rather than a long two-column scroll. */}
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {/* DOOR 1 - the existing, shipped product. */}
-          <Link
-            href="/influencers"
-            className="group relative overflow-hidden rounded-2xl border border-[#a855f7]/35 bg-gradient-to-br from-[#a855f7]/[0.10] to-[#ec4899]/[0.05] p-7 transition hover:border-[#a855f7]/70 hover:from-[#a855f7]/[0.16]"
-          >
-            <InfluencerMark />
-            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">
-              Influencers <span className="brand-grad">on</span> GAS
-            </h2>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
-              Build an AI influencer and take them from a brief to a publish-ready video. Cast and
-              lock the identity, write the script, design the voice, shoot the scenes, then cut.
-            </p>
-            <span className="mt-5 inline-block text-sm font-bold text-[#c79bff] transition group-hover:translate-x-0.5">
-              Open the video studio →
-            </span>
-          </Link>
-
-          {/* DOOR 2 - the template creative factory. Being built in phases; the shell behind this door
-              is honest about what is and isn't live yet rather than pretending to be finished. */}
-          <Link
-            href="/studio"
-            className="group relative overflow-hidden rounded-2xl border border-[#60a5fa]/35 bg-gradient-to-br from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.05] p-7 transition hover:border-[#60a5fa]/70 hover:from-[#60a5fa]/[0.16]"
-          >
-            <StudioMark />
-            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">GAS Studio</h2>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
-              The template creative factory. One campaign order renders every static, motion cut,
-              funnel and SMS a client needs, off locked designs that can never drift.
-            </p>
-            <span className="mt-5 inline-block text-sm font-bold text-[#93c5fd] transition group-hover:translate-x-0.5">
-              Open the factory →
-            </span>
-          </Link>
-
-          {/* DOOR 3 - thought leadership. Industry commentary only: a post that promotes the client's financial
-              services becomes a regulated advertisement, so this stays deliberately on the category. */}
-          <Link
-            href="/journalist"
-            className="group relative overflow-hidden rounded-2xl border border-[#22d3ee]/35 bg-gradient-to-br from-[#22d3ee]/[0.09] to-[#818cf8]/[0.05] p-7 transition hover:border-[#22d3ee]/70 hover:from-[#22d3ee]/[0.15]"
-          >
-            <JournalistMark />
-            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">The Journalist</h2>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
-              Thought leadership a client CEO can put his name to. It researches the category daily and builds
-              a defensible argument from primary sources, never from opinion.
-            </p>
-            <span className="mt-5 inline-block text-sm font-bold text-[#67e8f9] transition group-hover:translate-x-0.5">
-              Open the desk →
-            </span>
-          </Link>
-
-          {/* DOOR 4 - market intelligence. Proposes, never asserts; a human accepts each finding into the brain. */}
-          <Link
-            href="/strategist"
-            className="group relative overflow-hidden rounded-2xl border border-[#818cf8]/35 bg-gradient-to-br from-[#818cf8]/[0.10] to-[#a855f7]/[0.05] p-7 transition hover:border-[#818cf8]/70 hover:from-[#818cf8]/[0.16]"
-          >
-            <StrategistMark />
-            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">The Strategist</h2>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
-              Daily market and competitor intelligence. It hunts for what makes a current assumption wrong, and
-              files it with a source and an honest confidence grade.
-            </p>
-            <span className="mt-5 inline-block text-sm font-bold text-[#a5b4fc] transition group-hover:translate-x-0.5">
-              Open the desk →
-            </span>
-          </Link>
-
-          {/* DOOR 5 + 6 - live products that run on their OWN domains, not inside this app. They are plain
-              anchors, not next/link, and they open in a new tab: this is a jump to another system, and a router
-              push would try to route it here and 404. The arrow says "leaving", so nobody is surprised. */}
-          <a
-            href="https://media.gasmarketing.co.za/"
-            target="_blank"
-            rel="noreferrer"
-            className="group relative overflow-hidden rounded-2xl border border-[#60a5fa]/35 bg-gradient-to-br from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.05] p-7 transition hover:border-[#60a5fa]/70 hover:from-[#60a5fa]/[0.16]"
-          >
-            <MediaMark />
-            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">
-              Media <span className="brand-grad">on</span> GAS
-            </h2>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
-              Live, real-time campaign insight. What the media is doing right now, for the client and for us, in
-              one place instead of five dashboards.
-            </p>
-            <span className="mt-5 inline-block text-sm font-bold text-[#93c5fd] transition group-hover:translate-x-0.5">
-              Open Media ↗
-            </span>
-          </a>
-
-          <a
-            href="https://psi.gasmarketing.co.za/"
-            target="_blank"
-            rel="noreferrer"
-            className="group relative overflow-hidden rounded-2xl border border-[#ec4899]/35 bg-gradient-to-br from-[#ec4899]/[0.10] to-[#a855f7]/[0.05] p-7 transition hover:border-[#ec4899]/70 hover:from-[#ec4899]/[0.16]"
-          >
-            <PsiMark />
-            <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink">
-              PSI <span className="brand-grad">on</span> GAS
-            </h2>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink-dim">
-              Pre-Sales Intelligence. Qualifies and nurtures a prospect until they are a high-intent lead worth
-              handing to the client, not just a name on a list.
-            </p>
-            <span className="mt-5 inline-block text-sm font-bold text-[#f9a8d4] transition group-hover:translate-x-0.5">
-              Open PSI ↗
-            </span>
-          </a>
+        <div className="mt-12 space-y-10">
+          {GROUPS.map((g) => (
+            <section key={g.label}>
+              {/* The group label carries a hairline out to the edge: it reads as a chapter, not a heading. */}
+              <div className="flex items-center gap-4">
+                <h2 className="tabular text-[11px] uppercase tracking-[0.3em] text-ink-dim">{g.label}</h2>
+                <span className="text-[13px] text-ink-faint">{g.note}</span>
+                <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-line to-transparent" />
+              </div>
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                {g.doors.map((d) => <Tile key={d.href} d={d} />)}
+              </div>
+            </section>
+          ))}
         </div>
       </main>
     </div>
