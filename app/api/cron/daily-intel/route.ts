@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { cronAuthed } from "@/lib/cron";
 import { sendEmail, emailConfigured } from "@/lib/email";
-import { runIntel, type Intel } from "@/lib/intel";
-import { listBrains } from "@/lib/brains";
+import { runIntel, loadIntelBrief, brainsWithIntel, type Intel } from "@/lib/intel";
 import { recordUsage } from "@/lib/usage";
 import { PREMIUM } from "@/lib/vendors/anthropic";
 import { emailShell } from "@/lib/email-shell";
@@ -77,7 +76,7 @@ function ukDate(d: Date | string): string {
 // So it now uses the shared GAS shell (dark, orb, Sami's signature) like our other emails, instead of the
 // off-brand light layout it had. The Journalist still runs and still files to the review queue - it is the tool
 // for drafting the CEO's LinkedIn voice, not a daily bulletin, so it no longer pushes an inbox.
-function buildEmail(client: string, strategist: Intel[], today: string): string {
+function buildEmail(client: string, strategist: Intel[], today: string, intro: string): string {
   // GREEN / AMBER / RED, the way we always grade (Gary). Tuned for the dark shell.
   const badge = (c: string) => {
     const [bg, fg, label] =
@@ -150,13 +149,7 @@ function buildEmail(client: string, strategist: Intel[], today: string): string 
     <div style="margin-top:4px;font-size:14px;color:#8a8f98;">${esc(ukDate(today))}</div>
 
     <div style="margin-top:16px;padding:14px 16px;background:#0d1117;border:1px solid #1f2630;border-radius:12px;">
-      <p style="margin:0;font-size:13px;line-height:1.7;color:#c9ced6;">
-        GAS is MTN MoMo's performance marketing agency. Each morning I look for what actually changed in the
-        South African fintech market: what rivals did, what threatens MoMo's position, and where there is an
-        opening. Only findings that should change something reach this email, and each one says what it could do
-        to MoMo and what I think we should do about it. Every claim is sourced, so please check the links before
-        repeating anything.
-      </p>
+      <p style="margin:0;font-size:14px;line-height:1.7;color:#c9ced6;">${esc(intro)}</p>
     </div>
 
     <div style="margin-top:22px;font-size:11px;letter-spacing:2px;color:#5f6672;">MATERIAL FINDINGS</div>
@@ -187,9 +180,12 @@ export async function GET(req: Request) {
   const only = url.searchParams.get("clientId") || "";
   const today = new Date().toISOString().slice(0, 10);
 
-  // For v1 the intelligence roles run for the clients that have a brand kit doctrine to reason against.
-  const clients = (await listBrains().catch(() => [])).filter((c) => (only ? c.id === only : /momo/i.test(c.name)));
-  if (!clients.length) return NextResponse.json({ ok: true, skipped: "no client in scope" });
+  // WHICH BRAINS RUN. Any brain with an intel brief - adding the brief is what switches a brain's research on,
+  // so there is no hardcoded client list here to fall out of step (it used to match /momo/i, which would have
+  // silently skipped GAS's own brain).
+  const configured = await brainsWithIntel().catch(() => []);
+  const clients = configured.filter((c) => (only ? c.clientId === only : true)).map((c) => ({ id: c.clientId, name: c.clientName }));
+  if (!clients.length) return NextResponse.json({ ok: true, skipped: "no brain has an intel brief" });
 
   const out: Record<string, unknown>[] = [];
   for (const c of clients) {
@@ -211,12 +207,18 @@ export async function GET(req: Request) {
       // THE EMAIL IS THE STRATEGIST ONLY (Gary). The Journalist still runs and still files to the queue - it is
       // the tool for drafting the CEO's LinkedIn voice, picked up when someone sits down to write, not a daily
       // bulletin. So a Journalist-only day sends nothing rather than mailing the team something to ignore.
+      // The intro belongs to the brain: MoMo's briefing is about the SA fintech market, GAS's is about our own
+      // agency growth, and one description cannot honestly cover both.
+      const cfg = await loadIntelBrief(c.id).catch(() => null);
+      const intro = cfg?.emailIntro
+        || `Daily intelligence for ${c.name}. Only findings that should change something reach this email, and each one carries what it could do and what I think we should do about it. Every claim is sourced, so please check the links before repeating anything.`;
+
       let emailed = false;
       if (sm.length && emailConfigured()) {
         await sendEmail({
           to: intelRecipients(),
           subject: `The Strategist · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
-          html: buildEmail(c.name, sm, today),
+          html: buildEmail(c.name, sm, today, intro),
           fromName: "Strategist on GAS", // it lands with EXCO and MoMo's team: say what it is (Gary)
         }).catch(() => {});
         emailed = true;

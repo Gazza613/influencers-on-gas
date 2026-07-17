@@ -503,6 +503,34 @@ alter table studio_intel add column if not exists period text;
 alter table studio_intel add column if not exists impact_risk text;
 alter table studio_intel add column if not exists campaign_response text;
 
+-- ── PER-CLIENT INTEL BRIEFS ─────────────────────────────────────────────────
+-- WHAT EACH CLIENT'S RESEARCHERS ARE ALLOWED TO RESEARCH. This table exists to stop CROSS-CLIENT CONTAMINATION
+-- (Gary, on adding GAS Marketing's own research alongside MTN MoMo's: "I do not want to contaminate MoMo - how
+-- do we prevent this").
+--
+-- The scope lock and the role briefs used to be hardcoded constants pointing at MTN MoMo, so a second client
+-- would have been researched under MoMo's scope lock. Now every client carries its OWN:
+--   scope       - the absolute in/out-of-scope lock for THIS client (the ringfence)
+--   journalist  - the public-voice brief. NULL means this client has no Journalist: the role does not run.
+--   strategist  - the internal-intelligence brief. NULL means it does not run.
+--   window_days - recency gate for this client (30 by default, Gary's maximum)
+--
+-- THE SAFETY PROPERTY: no row here means the research REFUSES to run for that client. There is deliberately no
+-- default and no fallback, because a fallback would silently hand one client another client's scope - which is
+-- exactly the contamination we are preventing. Findings are already stored and retrieved by client_id, so the
+-- brains stay separate; this closes the last door, which was the prompt itself.
+create table if not exists intel_briefs (
+  client_id   uuid primary key references clients(id) on delete cascade,
+  scope       text not null,
+  journalist  text,
+  strategist  text,
+  window_days int not null default 30,
+  updated_at  timestamptz not null default now()
+);
+-- The "what this is" paragraph at the top of that brain's daily email. It was hardcoded to MoMo ("GAS is MTN
+-- MoMo's performance marketing agency..."), which would have been simply untrue on GAS's own briefing.
+alter table intel_briefs add column if not exists email_intro text;
+
 -- ── GAS Studio: final production ────────────────────────────────────────────
 -- Background removal for the masthead / section-1 cut-outs. fal bills per COMPUTE SECOND, not per image,
 -- and will not quote the GPU rate without a logged-in dashboard - so this row is seeded UNPRICED on purpose
