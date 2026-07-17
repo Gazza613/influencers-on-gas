@@ -229,11 +229,28 @@ function Tile({ d }: { d: Door }) {
 export default function HomePage() {
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
-      {/* Ambient depth. Two slow, far-off glows in the accent family - enough to stop the page reading as a flat
-          grid, never enough to compete with the tiles. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-[#a855f7]/[0.07] blur-[120px]" />
-        <div className="absolute -bottom-52 -right-40 h-[36rem] w-[36rem] rounded-full bg-[#60a5fa]/[0.07] blur-[120px]" />
+      {/* AMBIENT DEPTH. The page was reading flat (Gary), so it now breathes: soft flares that slowly pulse and
+          drift, an orange one leading because this is GAS's OWN front door and orange is the GAS energy (the
+          "orange is the mark alone" rule guards CLIENT creatives, not our own brand page). Kept low-opacity and
+          slow so it feels premium and alive, never a wash or a distraction. Plus a fine grain for texture.
+          Pure CSS - the page stays a server component, instant to load, no JS. */}
+      <style>{`
+        @keyframes gasFlareA { 0%,100%{opacity:.55;transform:translate3d(0,0,0) scale(1)} 50%{opacity:.9;transform:translate3d(2%,-2%,0) scale(1.08)} }
+        @keyframes gasFlareB { 0%,100%{opacity:.5;transform:translate3d(0,0,0) scale(1.05)} 50%{opacity:.85;transform:translate3d(-2%,2%,0) scale(1)} }
+        @keyframes gasFlareC { 0%,100%{opacity:.4} 50%{opacity:.7} }
+        @media (prefers-reduced-motion: reduce){ .gas-flare{animation:none !important} }
+      `}</style>
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        {/* The GAS orange, top-right, leading. */}
+        <div className="gas-flare absolute -right-32 -top-40 h-[40rem] w-[40rem] rounded-full bg-[#f96203]/[0.10] blur-[130px]" style={{ animation: "gasFlareA 11s ease-in-out infinite" }} />
+        {/* A smaller, warmer orange ember low-left, so the warmth is not only in one corner. */}
+        <div className="gas-flare absolute -bottom-24 left-1/4 h-[26rem] w-[26rem] rounded-full bg-[#fb923c]/[0.07] blur-[120px]" style={{ animation: "gasFlareC 9s ease-in-out infinite 1.5s" }} />
+        {/* The accent family holds the balance - violet left, blue right. */}
+        <div className="gas-flare absolute -left-40 top-16 h-[34rem] w-[34rem] rounded-full bg-[#a855f7]/[0.08] blur-[120px]" style={{ animation: "gasFlareB 13s ease-in-out infinite" }} />
+        <div className="gas-flare absolute -bottom-52 -right-40 h-[36rem] w-[36rem] rounded-full bg-[#60a5fa]/[0.07] blur-[130px]" style={{ animation: "gasFlareA 15s ease-in-out infinite 2s" }} />
+        {/* Fine grain for a premium, non-flat surface. A tiny SVG noise tile, very low opacity. */}
+        <div className="absolute inset-0 opacity-[0.035] mix-blend-soft-light"
+          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
       </div>
 
       <AppHeader />

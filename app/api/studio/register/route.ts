@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const KINDS = new Set(["reference", "logo", "font", "ci_doc", "image", "deal_card", "phone_screen", "brand_icon"]);
+const KINDS = new Set(["reference", "logo", "font", "ci_doc", "image", "deal_card", "phone_screen", "brand_icon", "ceo_photo"]);
 
 export async function POST(req: Request) {
   const session = await auth();
