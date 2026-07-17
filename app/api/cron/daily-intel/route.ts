@@ -18,6 +18,18 @@ import { PREMIUM } from "@/lib/vendors/anthropic";
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
+// WHO GETS THE DIGEST. The intel digest has its own recipient list, separate from the cost email - the people
+// who need to read the Strategist every morning are not the same people who watch spend.
+//   INTEL_EMAIL_TO  - comma-separated, overrides everything (set it in Vercel to change the list, no deploy).
+//   otherwise       - the cost recipient (or Gary) PLUS sam@ (Gary asked for Sam on the strategist findings).
+// Deduped and trimmed, because nodemailer will happily mail the same person twice.
+function intelRecipients(): string {
+  if (process.env.INTEL_EMAIL_TO?.trim()) return process.env.INTEL_EMAIL_TO.trim();
+  const base = (process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za").split(",");
+  const list = [...base, "sam@gasmarketing.co.za"].map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return [...new Set(list)].join(",");
+}
+
 function esc(s: string): string {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -112,7 +124,7 @@ export async function GET(req: Request) {
       let emailed = false;
       if ((jm.length || sm.length) && emailConfigured()) {
         await sendEmail({
-          to: process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za",
+          to: intelRecipients(),
           subject: `${c.name} · ${jm.length + sm.length} material finding${jm.length + sm.length === 1 ? "" : "s"} · ${today}`,
           html: buildEmail(c.name, jm, sm, today),
         }).catch(() => {});
