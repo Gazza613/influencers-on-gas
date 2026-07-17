@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template. CLAUDE.md lists .env.example as a key file, but `.env*` was quietly ignoring it, so it
+# was never actually in the repo. It holds variable NAMES and placeholders only - no secrets - and the repo is
+# public, so keep it that way.
+!.env.example
 
 # vercel
 .vercel
