@@ -56,7 +56,16 @@ function assessmentHtml(i: Intel): string {
   </div>`;
 }
 
-function buildEmail(client: string, journalist: Intel[], strategist: Intel[], today: string): string {
+const APP_URL = process.env.APP_URL || "https://influencers.gasmarketing.co.za";
+
+// THE STRATEGIST BRIEFING. Gary: "we will just get the daily strategist email - no need for the Journalist to
+// send a daily email. Make it clear what this email is all about for Sam and Gary."
+//
+// The Journalist still RUNS and still files to the review queue - it is the tool for drafting the CEO's LinkedIn
+// material, pulled on when someone sits down to write. It is not a daily bulletin, so it no longer pushes an
+// inbox. This email is the Strategist only: the tool GAS uses as MoMo's performance marketing agency to guide
+// campaign activations and the positioning we take to MoMo's internal teams.
+function buildEmail(client: string, strategist: Intel[], today: string): string {
   const badge = (c: string) =>
     c === "high" ? `<span style="background:#dcfce7;color:#166534;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">high</span>`
       : c === "low" ? `<span style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">low</span>`
@@ -102,13 +111,41 @@ function buildEmail(client: string, journalist: Intel[], strategist: Intel[], to
   };
 
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#0f172a">
-    <p style="margin:0;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#94a3b8">Studio on GAS · daily intelligence</p>
-    <h2 style="margin:6px 0 2px;font-size:22px">${esc(client)}</h2>
-    <p style="margin:0;color:#64748b;font-size:13px">${esc(today)} · only material findings are shown. Everything else is in the review queue.</p>
-    ${block("The Journalist — material for a defensible public argument", journalist)}
-    ${block("The Strategist — what should change what we advise", strategist)}
-    <p style="margin:28px 0 0;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8">
-      These are PROPOSALS. Nothing has been written into the client brain. Accept or bin each one on the platform.
+    <p style="margin:0;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#94a3b8">Studio on GAS · The Strategist</p>
+    <h2 style="margin:6px 0 2px;font-size:22px">${esc(client)} · daily intelligence</h2>
+    <p style="margin:0 0 14px;color:#64748b;font-size:13px">${esc(today)}</p>
+
+    <!-- WHAT THIS IS. Gary asked for this to be explicit: a briefing nobody can place is a briefing nobody acts
+         on, and Sam is new to it. Say what it is for, what it is not, and what is expected of the reader. -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin:0 0 8px">
+      <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#334155">
+        <b>What this is.</b> GAS is MTN MoMo's performance marketing agency. Every morning The Strategist goes and
+        finds what actually changed in the SA fintech market - competitor moves, risks to MoMo's position, and
+        openings worth taking - and only what is <b>material</b> reaches this email. A quiet day means nothing
+        material was found, which is a real answer, not a gap.
+      </p>
+      <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#334155">
+        <b>What to do with it.</b> Each finding carries an internal read of the <b>commercial impact or risk to
+        MoMo SA</b> and the <b>activation and positioning call</b> it argues for - defensive or proactive. It is
+        written to guide our campaign activations and the positioning we take to MoMo's internal teams. Every
+        claim is sourced: check the links before you repeat anything.
+      </p>
+      <p style="margin:0;font-size:13px;line-height:1.6;color:#334155">
+        <b>These are proposals.</b> Nothing is written into the client brain automatically - a human accepts or
+        bins each one on the platform. That gate is deliberate: without it a bad source quietly becomes "fact"
+        and every future strategy inherits it.
+      </p>
+    </div>
+
+    ${block("Material findings", strategist)}
+
+    <p style="margin:22px 0 0">
+      <a href="${APP_URL}/strategist" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700">Review and accept on the platform →</a>
+    </p>
+    <p style="margin:14px 0 0;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#94a3b8">
+      The Journalist (material for the CEO's LinkedIn voice) runs daily too, but does not email - its findings
+      wait in the queue at <a href="${APP_URL}/journalist" style="color:#64748b">/journalist</a> for when you sit
+      down to write.
     </p>
   </div>`;
 }
@@ -144,12 +181,15 @@ export async function GET(req: Request) {
       const jm = journalist.filter((i) => i.material);
       const sm = strategist.filter((i) => i.material);
 
+      // THE EMAIL IS THE STRATEGIST ONLY (Gary). The Journalist still runs and still files to the queue - it is
+      // the tool for drafting the CEO's LinkedIn voice, picked up when someone sits down to write, not a daily
+      // bulletin. So a Journalist-only day sends nothing rather than mailing the team something to ignore.
       let emailed = false;
-      if ((jm.length || sm.length) && emailConfigured()) {
+      if (sm.length && emailConfigured()) {
         await sendEmail({
           to: intelRecipients(),
-          subject: `${c.name} · ${jm.length + sm.length} material finding${jm.length + sm.length === 1 ? "" : "s"} · ${today}`,
-          html: buildEmail(c.name, jm, sm, today),
+          subject: `The Strategist · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
+          html: buildEmail(c.name, sm, today),
         }).catch(() => {});
         emailed = true;
       }
