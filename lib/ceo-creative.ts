@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { generateBatchDetailed } from "./vendors/higgsfield";
+import { removeBackground } from "./vendors/fal";
 import { cutoutToTransparent } from "./studio-cutout";
 import { compositeLogo, tidyCallout } from "./studio-slider";
 import { renderPng, fontFaceCss } from "./studio-render";
@@ -46,16 +47,31 @@ export async function buildCeoCreatives(
   const message = tidyCallout(opts.message).split("/")[0].replace(/[,;]\s*$/, "").trim();
   const W = 1200, H = 1200;
 
-  // 2. Cut him out ONCE - the same forensic asset lands on all three backdrops.
-  const raw = Buffer.from(new Uint8Array(await (await fetch(photo.url)).arrayBuffer()));
-  const cut = await cutoutToTransparent(raw).catch(() => null);
-  if (!cut) return { creatives: [], error: "Could not cut the CEO photo out. A clean, plain background works best." };
-  // Size him to sit on the right, from the bottom, about 82% of the height.
+  // 2. Cut him out ONCE with a PROPER matting model - fal BiRefNet - not luminance keying. A CEO cut-out has to
+  //    be flawless (Gary: "not good, CEO will not approve"), and flood-fill left a ragged, haloed edge on his
+  //    suit because his studio background is a grey gradient, not pure white. BiRefNet cuts hair and soft edges
+  //    cleanly. Falls back to the flood-fill only if fal is unreachable, so a creative still comes back.
+  let cut: Buffer;
+  const matted = await removeBackground(photo.url).catch(() => ({ url: null as string | null, error: "matting failed" }));
+  if (matted.url) {
+    cut = Buffer.from(new Uint8Array(await (await fetch(matted.url)).arrayBuffer()));
+  } else {
+    const raw = Buffer.from(new Uint8Array(await (await fetch(photo.url)).arrayBuffer()));
+    const fb = await cutoutToTransparent(raw).catch(() => null);
+    if (!fb) return { creatives: [], error: `Could not cut the CEO photo out (${matted.error || "no matting"}).` };
+    cut = fb;
+  }
+  cut = await sharp(cut).trim().png().toBuffer(); // tighten to the subject
+
+  // Size him to sit on the RIGHT, bottom-anchored. Right-aligned with a small right bleed so his left edge lands
+  // clear of the message column, whatever his shoulder width.
   const cm = await sharp(cut).metadata();
-  const figH = Math.round(H * 0.82);
+  const figH = Math.round(H * 0.86);
   const figW = Math.round((cm.width || 800) * (figH / (cm.height || 1000)));
   const figure = await sharp(cut).resize({ height: figH }).png().toBuffer();
-  const figLeft = W - figW + Math.round(figW * 0.06); // let him run slightly off the right edge
+  // His leftmost point is forced to at least 50% of the width, so the headline never reaches him (Gary: "must
+  // never go over the subject's face"). If he is wide, he bleeds further off the right edge instead.
+  const figLeft = Math.max(Math.round(W * 0.50), W - figW);
   const figTop = H - figH;
 
   // 3. The foreground overlay - message (left), name plate (bottom-left), compliance (footer) - one render.
@@ -69,8 +85,18 @@ export async function buildCeoCreatives(
   const shots = await generateBatchDetailed(prompts, "nano_banana_pro", "1:1", { resolution: "2k" }, null);
   await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
 
+  // THE YELLOW LOGO for a dark field (Gary). The CEO backdrop is always deep navy, so pick the light-reading
+  // lockup - yellow / white / reversed - not the navy-on-navy one that vanishes.
   const logos = (kit?.logos || []) as { name: string | null; url: string }[];
-  const logo = logos.find((l) => /horiz|primary|full/i.test(l.name || "")) || logos[0];
+  const logoScore = (n: string) => {
+    const s = (n || "").toLowerCase(); let v = 0;
+    if (/yellow|white|reverse|reversed|light|mono.?white|on.?dark/.test(s)) v += 6;
+    if (/navy|blue|black|dark|on.?light/.test(s)) v -= 5;
+    if (/horiz|primary|full/.test(s)) v += 2;
+    if (/stack|vert|icon|mark/.test(s)) v -= 2;
+    return v;
+  };
+  const logo = [...logos].sort((a, b) => logoScore(b.name || "") - logoScore(a.name || ""))[0];
   const logoBuf = logo ? Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer())) : null;
 
   const creatives: CeoCreative[] = [];
@@ -104,17 +130,22 @@ export async function buildCeoCreatives(
 // so the words live in the calm negative space on the left.
 async function renderCeoOverlay(W: number, H: number, message: string, name: string, title: string, legal: string, fonts: { family: string; url: string }[]): Promise<Buffer> {
   const esc = (t: string) => String(t || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const msgSize = Math.round(H * 0.072);
+  // THE MESSAGE LIVES IN A LEFT COLUMN THAT NEVER REACHES HIM. His figure's leftmost is forced to >= 50% of the
+  // width, so the column is capped at 42% and auto-sized so even the LONGEST WORD fits inside it - a long word
+  // cannot break, so the type must shrink to the column rather than run under his shoulder (Gary).
+  const colW = W * 0.42;
+  const longestWord = Math.max(...message.split(/\s+/).map((w) => w.length), 1);
+  const msgSize = Math.max(Math.round(H * 0.042), Math.min(Math.round(H * 0.076), Math.floor(colW / (longestWord * 0.60))));
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${fontFaceCss(fonts)}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
-/* A soft dark wash on the left so white type reads whatever the backdrop does. */
-.wash{position:absolute;inset:0;background:linear-gradient(105deg, rgba(4,25,40,.82) 0%, rgba(4,25,40,.5) 34%, transparent 60%)}
+/* A soft dark wash on the left so white type reads whatever the backdrop does behind it. */
+.wash{position:absolute;inset:0;background:linear-gradient(102deg, rgba(4,25,40,.85) 0%, rgba(4,25,40,.5) 30%, transparent 52%)}
 .foot{position:absolute;left:0;right:0;bottom:0;height:8%;background:${"#004F71"}}
-.msg{position:absolute;left:7%;top:20%;width:52%;color:#fff;font-family:'MTNBrighterSans',sans-serif;
-  font-weight:800;font-size:${msgSize}px;line-height:1.08;letter-spacing:-1px;text-shadow:0 3px 18px rgba(0,0,0,.5)}
-.plate{position:absolute;left:7%;bottom:12%}
+.msg{position:absolute;left:6.5%;top:17%;width:42%;color:#fff;font-family:'MTNBrighterSans',sans-serif;
+  font-weight:800;font-size:${msgSize}px;line-height:1.06;letter-spacing:-1px;text-shadow:0 3px 18px rgba(0,0,0,.55)}
+.plate{position:absolute;left:6.5%;bottom:12%}
 ${nameplateCss(0.42)}
 .legal{position:absolute;left:0;right:0;bottom:2.6%;text-align:center;padding:0 7%;
   font-family:'MTNBrighterSans',sans-serif;font-weight:500;line-height:1.3;color:rgba(255,255,255,.9);font-size:${Math.round(H * 0.0145)}px}

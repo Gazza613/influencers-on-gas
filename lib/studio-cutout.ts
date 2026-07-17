@@ -172,8 +172,22 @@ export async function cutoutToTransparent(buf: Buffer): Promise<Buffer> {
   }
 
   const cut = await sharp(data, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
-  // Trim the now-transparent margins so the subject fills the asset, and feather the alpha a touch.
-  return sharp(cut).trim().png().toBuffer();
+
+  // FEATHER THE MATTE. A raw flood-fill leaves a hard, slightly ragged edge with a 1-2px pale halo of leftover
+  // background (Gary: "feathering"). Fix the alpha channel on its own: blur then threshold high to ERODE the
+  // edge inward (killing the halo), then a soft blur so it reads as a real photographed edge, not scissors.
+  const alpha = await sharp(cut)
+    .extractChannel(3)
+    .blur(2)                 // spread the edge
+    .threshold(205)          // keep only the solid interior -> pulls the edge in ~1-2px, removes the halo
+    .blur(0.8)               // soft anti-aliased feather
+    .toColourspace("b-w")
+    .toBuffer();
+  const rgb = await sharp(cut).removeAlpha().toBuffer();
+  const feathered = await sharp(rgb).joinChannel(alpha).png().toBuffer();
+
+  // Trim the now-transparent margins so the subject fills the asset.
+  return sharp(feathered).trim().png().toBuffer();
 }
 
 export async function flattenSection1ToWhite(buf: Buffer): Promise<Buffer> {

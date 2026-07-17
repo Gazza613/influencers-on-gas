@@ -105,7 +105,7 @@ const REMBG_MODEL = process.env.FAL_REMBG_MODEL || "fal-ai/birefnet/v2";
 
 export async function removeBackground(imageUrl: string): Promise<{ url: string | null; error: string | null }> {
   const k = await key();
-  if (!key) return { url: null, error: "fal is not connected" };
+  if (!k) return { url: null, error: "fal is not connected" };
   try {
     const res = await fetch(`https://fal.run/${REMBG_MODEL}`, {
       method: "POST",
