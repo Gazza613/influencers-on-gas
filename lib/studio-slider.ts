@@ -69,6 +69,10 @@ export async function typesetSliderHeadline(
   line2: string,
   fonts: { family: string; url: string }[],
   legal?: string | null,
+  // LIFT THE WHOLE FOOT off the bottom edge, as a % of height. Zero for a funnel slider, which is shown whole.
+  // A LinkedIn 4:5 post is CROPPED towards square on desktop, so anything hard against the bottom edge is the
+  // first thing to be cut - and the headline is the one element that must survive (Gary).
+  liftPct = 0,
 ): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
@@ -83,21 +87,22 @@ export async function typesetSliderHeadline(
   // Match the gold-standard slider: NOT a heavy blue bar. A SOFT gradient for headline legibility over the
   // photo, plus a THIN solid navy footer at the very bottom that carries the two-line legal disclaimer.
   const footH = legalLine ? 9 : 0;            // % height of the navy legal footer
+  const lift = Math.max(0, Math.min(30, liftPct));
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${fontFaceCss(fonts)}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
 /* Soft gradient for the headline - the photo shows through, no hard bar (Gary: "blue shading too high"). */
-.grad{position:absolute;left:0;right:0;bottom:${footH}%;height:26%;
+.grad{position:absolute;left:0;right:0;bottom:${footH + lift}%;height:26%;
   background:linear-gradient(to top, ${MOMO_BLUE}D9 0%, ${MOMO_BLUE}7A 44%, transparent 100%)}
 /* The thin solid navy footer, only as tall as the legal needs. */
-.foot{position:absolute;left:0;right:0;bottom:0;height:${footH}%;background:${MOMO_BLUE}}
-.head{position:absolute;left:0;right:0;bottom:${footH + 3}%;text-align:center;padding:0 7%;
+.foot{position:absolute;left:0;right:0;bottom:${lift}%;height:${footH}%;background:${MOMO_BLUE}}
+.head{position:absolute;left:0;right:0;bottom:${footH + lift + 3}%;text-align:center;padding:0 7%;
   font-family:'MTNBrighterSans',sans-serif;font-weight:800;line-height:1.04;-webkit-font-smoothing:antialiased}
 .head .l1,.head .l2{font-size:${size}px;letter-spacing:-1px;text-shadow:0 3px 16px rgba(0,0,0,.55);white-space:normal;overflow-wrap:break-word}
 .head .l1{color:#fff}
 .head .l2{color:${MOMO_YELLOW}}
-.legal{position:absolute;left:0;right:0;bottom:${(footH / 2)}%;transform:translateY(50%);text-align:center;padding:0 7%;
+.legal{position:absolute;left:0;right:0;bottom:${lift + footH / 2}%;transform:translateY(50%);text-align:center;padding:0 7%;
   font-family:'MTNBrighterSans',sans-serif;font-weight:500;line-height:1.3;color:rgba(255,255,255,.9);
   font-size:${Math.round(H * 0.0155)}px}
 </style></head><body>
