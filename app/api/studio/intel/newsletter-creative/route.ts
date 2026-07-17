@@ -39,17 +39,22 @@ export async function POST(req: Request) {
   if (!clientId || !subject) return NextResponse.json({ error: "Nothing to art-direct yet." }, { status: 400 });
 
   try {
-    // 1. A CLEAN PHOTOGRAPH, generated 3:4 and cropped to 4:5.
-    //    4:5 (1080x1350) takes the most room in the LinkedIn MOBILE feed and earns the most engagement, which is
-    //    where this is actually read (Gary's call). The trade is that LinkedIn crops it towards square on
-    //    DESKTOP, so anything against the bottom edge is the first thing cut - handled by the safe area below.
-    //    The model has no 4:5, so we take its 3:4 (which is TALLER than 4:5) and crop the height. Cropping a
-    //    taller frame is lossless in the sense that matters: nothing is stretched.
+    // 1. A CLEAN PHOTOGRAPH, 1:1 (1200x1200).
+    //    4:5 was tried and reverted (Gary). It was not the aspect that failed, it was what the aspect forced: to
+    //    survive LinkedIn's desktop crop the foot had to be LIFTED off the bottom edge, which left a navy bar
+    //    floating with photograph still running underneath it. That reads as a mistake, and on a CEO's post a
+    //    mistake is the whole story. 1:1 renders identically everywhere, needs no crop, so the foot sits on the
+    //    bottom edge exactly as it does on a slider - the layout we already know works.
     const prompt =
-      `A real, warm, emotive documentary photograph of ${subject}. ` +
+      `A premium, credible editorial photograph of ${subject}. ` +
+      // It sits under a CEO's name, so the register is dignity and competence, not hardship. A worried face
+      // beside an executive's market note reads as pity, not value (Gary: "very poor especially for a CEO post").
+      `The person is DIGNIFIED, capable and composed - never anxious, worried, struggling or pitiable. ` +
       `Authentic South African, shot on a real camera: natural light, true even skin tone with visible texture, ` +
       `never plastic, never an over-smoothed 3D render. Editorial quality, sharp, high resolution, shallow depth ` +
-      `of field, a genuine unposed human moment. Warm golden grade with gentle contrast. ` +
+      `of field, a clean and uncluttered composition with a clear single subject - not a busy crowded scene. ` +
+      `Warm, restrained grade with gentle contrast. Corporate-grade photography, the standard of a bank's annual ` +
+      `report, not a stock photo. ` +
       `\n\nCRITICAL - THE IMAGE CONTAINS NO GRAPHICS OF ANY KIND: no logo, no badge, no deal card, no price, no ` +
       `offer, no percentage, no pill, no callout, no headline, no caption, no watermark, no lettering and no ` +
       `numbers ANYWHERE. It is a photograph only. Any graphic or text you draw is a defect. ` +
@@ -59,7 +64,7 @@ export async function POST(req: Request) {
       `\n\nLeave the LOWER THIRD and the TOP-LEFT corner relatively calm and uncluttered, so a line of type and a ` +
       `logo can sit over them.`;
 
-    const [shot] = await generateBatchDetailed([prompt], "nano_banana_pro", "3:4", { resolution: "2k" }, null);
+    const [shot] = await generateBatchDetailed([prompt], "nano_banana_pro", "1:1", { resolution: "2k" }, null);
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-linkedin-creative", count: 1 }).catch(() => {});
     if (!shot?.url) return NextResponse.json({ error: shot?.error || "the creative did not come back" }, { status: 500 });
 
@@ -67,22 +72,20 @@ export async function POST(req: Request) {
     const fonts = (kit?.fonts || []) as { family: string; url: string }[];
     const raw: Buffer = Buffer.from(new Uint8Array(await (await fetch(shot.url)).arrayBuffer()));
 
-    // Crop 3:4 -> 4:5 on the height, centred, then land on LinkedIn's 1080x1350. Never stretch: a distorted
-    // face is worse than a slightly tighter crop.
-    let out: Buffer = await sharp(raw)
-      .resize(1080, 1350, { fit: "cover", position: "attention" })
-      .png()
-      .toBuffer();
+    // LinkedIn renders feed images up to 1200px wide, so 1200x1200 is the sharp, safe square. No crop, so
+    // nothing can be clipped and nothing needs lifting off an edge.
+    let out: Buffer = await sharp(raw).resize(1200, 1200, { fit: "cover", position: "attention" }).png().toBuffer();
 
-    // 2. THE CALLOUT, typeset by us. One line, white. Plus the AI disclosure (Gary: "always add AI Creative to
-    //    the disclaimer copy"). This is NOT an advertisement, so it carries no FSP compliance strip - that
-    //    belongs on a creative that makes an offer, and this one deliberately does not.
-    // THE SAFE AREA is the point of the whole exercise. LinkedIn crops 4:5 towards square on desktop, taking
-    // roughly the top and bottom tenth, so the callout is lifted clear of the bottom edge and the logo dropped
-    // clear of the top. Both then survive the crop AND read on mobile, which is the only way 4:5 is worth it.
-    const SAFE_PCT = 11;
-    if (callout) {
-      try { out = (await typesetSliderHeadline(out, callout, "", fonts, "AI Creative", SAFE_PCT)) as Buffer; }
+    // 2. THE CALLOUT, typeset by us: one line, white, over the soft gradient, with the compliance line in the
+    //    footer beneath it - the same proven foot a slider carries.
+    //    THE COMPLIANCE LINE IS BACK (Gary: "compliance line is missing on the creatives for this too"). I had
+    //    dropped it and kept only the AI disclosure, reasoning that a point of view is not an advertisement so
+    //    the FSP strip is not required. Gary's call overrides: this is a MoMo-branded asset going out in public,
+    //    so it carries MoMo's line. It already ends with "AI Creative", so the disclosure comes with it.
+    //    No lift: 1:1 is never cropped, so the foot belongs on the bottom edge.
+    const legal = (kit?.creative_legal_text || "").trim() || "AI Creative";
+    if (callout || legal) {
+      try { out = (await typesetSliderHeadline(out, callout, "", fonts, legal, 0)) as Buffer; }
       catch (e) { console.error("[ceo-creative] typeset failed:", e); }
     }
 
@@ -93,7 +96,7 @@ export async function POST(req: Request) {
     if (logo) {
       try {
         const logoBuf = Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer()));
-        out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 12, wPct: 26 })) as Buffer;
+        out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: 26 })) as Buffer;
       } catch (e) { console.error("[ceo-creative] logo composite failed:", e); }
     }
 

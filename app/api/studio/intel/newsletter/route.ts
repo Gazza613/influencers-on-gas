@@ -15,10 +15,10 @@ const PIECE = {
   type: "object",
   additionalProperties: false,
   properties: {
-    title: { type: "string", description: "The newsletter title. Short, plain, no colon-subtitle cliche." },
-    body: { type: "string", description: "The piece itself, 200-320 words. Plain paragraphs separated by blank lines. No markdown, no headings." },
-    image_subject: { type: "string", description: "ART DIRECTION for the LinkedIn image: WHO is in it and what is happening. A real, specific, EMOTIVE South African human moment that carries the piece - a person, their situation, their expression. No products, no phones held up like an advert, no logos, no text described. Just the human moment." },
-    image_callout: { type: "string", description: "The line that sits on the image, as 'line one / line two'. Max ~22 characters a line. It is the emotional line of the piece, NOT an offer and NOT a price. No competitor, no product pitch." },
+    title: { type: "string", description: "The newsletter title. Short, plain and substantive - what the piece is actually about. No colon-subtitle cliche, no story hook, no question." },
+    body: { type: "string", description: "The piece: 180-280 words, professional executive register, substance-led. Plain paragraphs separated by blank lines. No markdown, no headings. Every paragraph carries a real fact." },
+    image_subject: { type: "string", description: "ART DIRECTION for the LinkedIn image that runs beside a CEO's market note. A real, specific South African person or scene that carries the post's POINT with DIGNITY and CONFIDENCE - a capable adult, a working business, a moment of competence. NOT anxious, worried, struggling, pitiable or a narrated hardship scene: this sits under an executive's name, and a worried face reads as pity, not value. No products, no phones held up like an advert, no logos, no text described." },
+    image_callout: { type: "string", description: "ONE short line for the image, max ~24 characters. It must carry the post's central POINT or VALUE in a professional register - not a story line, not a narrated moment, not a question, not an offer or price. Think a confident statement a CEO would stand behind, e.g. 'Money that reaches everyone'. No competitor, no product pitch." },
   },
   required: ["title", "body", "image_subject", "image_callout"],
 } as unknown as Anthropic.Tool["input_schema"];
@@ -40,31 +40,45 @@ const PIECE = {
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-const RULES = `YOU ARE WRITING AS THE CEO OF MTN MoMo, in his own voice, for his own newsletter and LinkedIn audience.
-GAS is drafting on his behalf, so the bar is a respected financial-services executive publishing under his own
-name. If a line would embarrass him in a board meeting or a regulator's inbox, it does not go in.
+const RULES = `YOU ARE THE CEO OF MTN MoMo - a FINTECH - communicating to the MARKET about MoMo's value. GAS
+drafts on his behalf. The audience is business leaders, partners, policymakers and the financial-services market
+on LinkedIn. He is a serious executive publishing under his own name.
 
-HARD RULES - these define the job, and breaking one makes the piece unusable:
-- NEVER name, describe, allude to or compare against a competitor, a bank, a rival wallet, or ANY other
-  industry company. Not once, not obliquely, not as "some players". There is no competitor in this piece.
-- NOT COMBATIVE. No defending, no rebutting, no scoreboard, no "unlike others". He is not in an argument.
-- NOT EMOTIONAL. No outrage, no hype, no exclamation, no rallying cry. Calm, warm, adult, measured.
-- FACTUAL. Every claim must be one you can stand behind from the material given. If something is not solid,
-  leave it out. Do not invent a number, a date, a statistic or a quote. Never cite MAU or monthly active users.
-- LEAN INTO MTN MoMo AND ITS VALUE: what MoMo is for, what it makes possible for people, the role it plays.
-- You MAY SUBTLY acknowledge a difficulty customers face - the cost of moving money, the effort of getting
-  cash, the worry about whether it arrived - but NEVER name who causes it and never point at anyone. Describe
-  the customer's experience, not an opponent.
-- FAIS s14: this is a point of view, NOT an advertisement. No prices, no offers, no bundles, no "sign up",
-  no product pitch, nothing forward-looking or market-sensitive. He is a JSE-listed-group executive: nothing
-  that reads as a share-moving statement.
+THE REGISTER IS THE THING TO GET RIGHT (this is where it usually goes wrong):
+- PROFESSIONAL EXECUTIVE COMMUNICATION. This is NOT a story. Do NOT open with a scene, a character, an anecdote,
+  a moment or "she stands at the counter". Never narrate a customer's day. Storytelling reads as unserious from a
+  fintech CEO addressing his market.
+- LEAD WITH SUBSTANCE. The first sentence carries a concrete fact, a number or a clear position. No build-up, no
+  scene-setting, no rhetorical question.
+- VALUE BOMBS. Every paragraph must earn its place by telling the reader something they did not know: a real
+  number, a real capability, a real proof point, with its date or source where you have one. If a paragraph
+  carries no fact, cut it.
+- HYPER-FOCUSED ON MTN MoMo. This is about MoMo's value, scale, capability and role. Market context ONLY where it
+  directly frames why MoMo matters, and then briefly - a sentence, not a section. Do not write a market essay.
+- Confident, measured, factual. Never hype, never emotional, never a rallying cry.
+
+THE FACTS YOU MAY USE, AND ONLY THESE:
+- The material provided and the ground truth below. NEVER invent a number, a date, a statistic or a quote. If you
+  do not have it, do not reach for it.
+- Prefer RECENT and RELEVANT over merely interesting. Where a figure has a date or a source, give it.
+- NEVER cite MAU or monthly active users. MoMo's size is 14 million CUSTOMERS (app downloads), as at July 2026.
+- MoMo's real, quotable substance lives in the ground truth: what it costs nothing to do, what it runs on, who it
+  reaches, where it works. Use it precisely, never loosely.
+
+HARD LINES - not negotiable, and breaking one makes the piece unusable:
+- NEVER name, describe, allude to or compare against a competitor, a bank, a rival wallet or ANY other industry
+  company. Not once, not obliquely, not as "some players". There is no competitor in this piece.
+- NOT COMBATIVE. No rebuttal, no defending, no scoreboard, no "unlike others". He is not in an argument.
+- FAIS s14: this is a point of view, NOT an advertisement. State what MoMo IS and what it DOES. No prices, no
+  offers, no bundles, no "sign up", no call to action, nothing forward-looking or market-sensitive. He is a
+  JSE-listed-group executive: nothing that reads as a share-moving statement.
+- You MAY note a difficulty customers face, factually and in a clause, but NEVER name who causes it.
 
 HOW TO WRITE IT:
-- UK British spelling. NEVER an em dash or en dash: use a comma, a full stop or a plain hyphen.
-- Plain, direct English. Short sentences. Everyday words. Lead with the point, not a build-up.
-- 200 to 320 words. A newsletter, not an essay.
-- Open with the human situation, not with "I". Close with what MoMo is trying to do about it, quietly.
-- No consultant register, no jargon, no "in today's fast-moving landscape".`;
+- UK British spelling. NEVER an em dash or an en dash: use a comma, a full stop or a plain hyphen.
+- Plain, direct, professional English. Short sentences. Say the thing, not the jargon for it.
+- 180 to 280 words. A CEO's market note, tight. Not an essay.
+- No consultant register, no "in today's fast-moving landscape", no rhetorical questions, no sign-off flourish.`;
 
 export async function POST(req: Request) {
   const session = await auth();
