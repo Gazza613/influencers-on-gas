@@ -103,9 +103,9 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
     const posted = i.published_at ? ukDate(i.published_at) : "date not established";
     const sourceHtml = srcs.length
       ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #1f2630;">
-           <div style="font-size:10px;letter-spacing:2px;color:#5f6672;">SOURCES</div>
+           <div style="font-size:12px;letter-spacing:2px;color:#98a0ad;">SOURCES</div>
            <ol style="margin:6px 0 0;padding-left:18px;color:#8a8f98;">${srcs.map((s) =>
-             `<li style="font-size:12px;line-height:1.7;"><a href="${esc(s.url)}" style="color:#7dd3fc;text-decoration:none;">${esc(s.name || s.url)}</a> <span style="color:#5f6672;">· posted ${esc(posted)}</span></li>`).join("")}</ol>
+             `<li style="font-size:14px;line-height:1.8;"><a href="${esc(s.url)}" style="color:#7dd3fc;text-decoration:underline;">${esc(s.name || s.url)}</a> <span style="color:#98a0ad;">· posted ${esc(posted)}</span></li>`).join("")}</ol>
          </div>`
       : `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #1f2630;font-size:12px;font-weight:700;color:#f87171;">No source. Do not treat this as verified.</div>`;
 
@@ -114,12 +114,12 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
     const age = i.published_at ? Math.floor((Date.now() - new Date(i.published_at).getTime()) / 86_400_000) : null;
     const stale = age !== null && age > 30;
     const tag = (text: string, colour: string, border: string) =>
-      `<span style="display:inline-block;border:1px solid ${border};color:${colour};border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;margin-right:6px;">${text}</span>`;
+      `<span style="display:inline-block;border:1px solid ${border};color:${colour};border-radius:5px;padding:3px 9px;font-size:13px;font-weight:600;margin-right:6px;">${text}</span>`;
     const publishedTag = i.published_at
-      ? tag(`Published ${esc(ukDate(i.published_at))}${stale ? ` · ${age} days old` : ""}`, stale ? "#fbbf24" : "#8a8f98", stale ? "rgba(251,191,36,0.4)" : "#1f2630")
+      ? tag(`Published ${esc(ukDate(i.published_at))}${stale ? ` · ${age} days old` : ""}`, stale ? "#fbbf24" : "#c9ced6", stale ? "rgba(251,191,36,0.4)" : "#2b3440")
       : tag("Published date not established", "#f87171", "rgba(248,113,113,0.4)");
-    const foundTag = tag(`Found ${esc(ukDate(i.found_at || today))}`, "#5f6672", "#1f2630");
-    const periodTag = i.period ? tag(`Data covers ${esc(i.period)}`, "#8a8f98", "#1f2630") : "";
+    const foundTag = tag(`Found ${esc(ukDate(i.found_at || today))}`, "#98a0ad", "#2b3440");
+    const periodTag = i.period ? tag(`Data covers ${esc(i.period)}`, "#c9ced6", "#2b3440") : "";
 
     const risk = String(i.impact_risk || "").trim();
     const move = String(i.campaign_response || "").trim();
@@ -128,17 +128,17 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
     const assessment = (risk || move)
       ? `<div style="margin-top:12px;padding:12px 14px;background:rgba(249,98,3,0.06);border-left:2px solid #f96203;border-radius:0 8px 8px 0;">
            <div style="font-size:10px;letter-spacing:2px;font-weight:800;color:#f96203;">OUR READ${stance ? ` · ${stance}` : ""}</div>
-           ${risk ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.65;color:#c9ced6;"><b style="color:#fff;">What it could do to MoMo:</b> ${esc(risk)}</p>` : ""}
-           ${move ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.65;color:#c9ced6;"><b style="color:#fff;">What we should do:</b> ${esc(move)}</p>` : ""}
+           ${risk ? `<p style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What it could do to MoMo:</b> ${esc(risk)}</p>` : ""}
+           ${move ? `<p style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What we should do:</b> ${esc(move)}</p>` : ""}
          </div>`
       : "";
 
     return `
     <div style="border:1px solid #1f2630;border-radius:12px;padding:16px 18px;margin-bottom:12px;background:#0d1117;">
-      <div style="font-size:16px;font-weight:800;color:#ffffff;line-height:1.4;">${esc(i.headline)} ${badge(i.confidence)}</div>
+      <div style="font-size:20px;font-weight:800;color:#ffffff;line-height:1.45;letter-spacing:0.3px;">${esc(i.headline)} ${badge(i.confidence)}</div>
       <div style="margin-top:8px;">${publishedTag}${foundTag}${periodTag}</div>
-      <p style="margin:12px 0 0;font-size:14px;line-height:1.65;color:#c9ced6;"><b style="color:#fff;">Why it matters:</b> ${esc(i.why_it_matters)}</p>
-      ${i.detail ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.65;color:#8a8f98;">${esc(String(i.detail).slice(0, 900))}</p>` : ""}
+      <p style="margin:14px 0 0;font-size:16px;line-height:1.7;color:#e6e9ee;"><b style="color:#fff;">Why it matters:</b> ${esc(i.why_it_matters)}</p>
+      ${i.detail ? `<p style="margin:10px 0 0;font-size:15px;line-height:1.75;color:#c9ced6;">${esc(String(i.detail).slice(0, 900))}</p>` : ""}
       ${assessment}
       ${sourceHtml}
     </div>`;
@@ -149,10 +149,10 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
     <div style="margin-top:4px;font-size:14px;color:#8a8f98;">${esc(ukDate(today))}</div>
 
     <div style="margin-top:16px;padding:14px 16px;background:#0d1117;border:1px solid #1f2630;border-radius:12px;">
-      <p style="margin:0;font-size:14px;line-height:1.7;color:#c9ced6;">${esc(intro)}</p>
+      <p style="margin:0;font-size:15px;line-height:1.7;color:#e6e9ee;">${esc(intro)}</p>
     </div>
 
-    <div style="margin-top:22px;font-size:11px;letter-spacing:2px;color:#5f6672;">MATERIAL FINDINGS</div>
+    <div style="margin-top:24px;font-size:13px;letter-spacing:2px;color:#98a0ad;">MATERIAL FINDINGS</div>
     <div style="margin-top:10px;">${cards}</div>
 
     <div style="margin-top:20px;">
