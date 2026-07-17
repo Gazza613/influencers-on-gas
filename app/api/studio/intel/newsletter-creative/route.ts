@@ -1,34 +1,29 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import sharp from "sharp";
-import { forensicRetheme } from "@/lib/vendors/higgsfield";
-import { balanceHeadline, tidyCallout, stampRealLogo } from "@/lib/studio-slider";
-import { listAssets } from "@/lib/studio";
+import { generateBatchDetailed } from "@/lib/vendors/higgsfield";
+import { typesetSliderHeadline, compositeLogo, tidyCallout } from "@/lib/studio-slider";
+import { getBrandKit } from "@/lib/studio";
+import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 
-// THE CEO'S LINKEDIN CREATIVE, to run with his newsletter (Gary: "a MoMo aligned to CI creative added so we can
-// have both the creative and the article... MTN logo top left, callout below, no deals, just relevant creative
-// for the article push to LinkedIn, emotive creative").
+// THE CEO'S LINKEDIN CREATIVE, to run with his newsletter.
 //
-// It reuses the funnel builder's module, and its locked strategy: take one of the client's own proven designs,
-// change only the people and the copy, keep the design's own look, and stamp the REAL logo on top so it can
-// never garble. Same engine, different job.
+// BUILT CLEAN-PLATE, and that is the whole lesson from the first attempt. I first rethemed one of MoMo's funnel
+// sliders and told the model to "draw no deal card" - it kept the reference's deal card anyway, and garbled the
+// logo on the way. Asking this model to REMOVE design furniture does not work; it reliably keeps it. That is the
+// same lesson as the old callout pill sitting behind the new one.
 //
-// THREE DIFFERENCES from a funnel slider, and they are the whole brief:
-//   NO DEAL. Not a card, not a badge, not a price. This is the CEO's point of view, and the moment it carries
-//   an offer it becomes an FSP advertisement under FAIS s14 - the same line the newsletter itself must not
-//   cross. So the model is told to draw no offer, and we composite none.
-//   EMOTIVE, not promotional: a human moment, not a product shot.
-//   THE CALLOUT is the piece's emotional line, written by the same call that wrote the piece, so the image and
-//   the article are about the same thing.
+// So we inherit nothing. There is no reference to forensically match here - this is a NEW asset, not a copy of a
+// funnel design - so:
+//   1. generate a CLEAN emotive photograph with no graphics, no text and no logo in it at all;
+//   2. typeset the callout ourselves (never garbles, because the model never draws a letter);
+//   3. stamp the REAL logo top-left from the brand asset.
+// Nothing to inherit means no deal card can appear, and no logo can double up.
+//
+// NO OFFER, EVER: the moment the CEO's post carries a price or a deal it becomes an FSP advertisement under
+// FAIS s14 - the same line the newsletter itself must not cross.
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
-
-function nearestRatio(w: number, h: number): string {
-  const t = w / h;
-  const opts: [string, number][] = [["1:1", 1], ["4:3", 4 / 3], ["3:4", 3 / 4], ["3:2", 3 / 2], ["16:9", 16 / 9], ["9:16", 9 / 16]];
-  return opts.reduce((b, o) => (Math.abs(o[1] - t) < Math.abs(b[1] - t) ? o : b))[0];
-}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -37,36 +32,56 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => ({}))) as { clientId?: string; subject?: string; callout?: string };
   const clientId = String(b.clientId || "");
   const subject = String(b.subject || "").trim();
-  const callout = String(b.callout || "").trim();
+  // ONE LINE for a newsletter post (Gary: "keep the callout to 1 line for a more corporate appeal"). If the
+  // writer hands back a two-part line, we take the first half rather than stack it.
+  const callout = tidyCallout(String(b.callout || "")).split("/")[0].replace(/[,;]\s*$/, "").trim();
   if (!clientId || !subject) return NextResponse.json({ error: "Nothing to art-direct yet." }, { status: 400 });
 
   try {
-    // A slider design: a full-bleed photograph, which is the right shape for LinkedIn and for a human moment.
-    // The disc constructions are funnel furniture and would look like an advert here.
-    const pool = (await listAssets(clientId, "reference"))
-      .filter((a) => /slider|slide/i.test(a.name || "") && !/supporting/i.test(a.name || ""));
-    if (!pool.length) return NextResponse.json({ error: "No slider designs on file to work from." }, { status: 400 });
-    const referenceUrl = pool[Math.floor(Date.now() / 1000) % pool.length].url;
+    // 1. A CLEAN PHOTOGRAPH. Square, because it is a LinkedIn post. MoMo's CI shows up as light and grade -
+    //    warm, real South African people - never as furniture, which is what we are deliberately not inheriting.
+    const prompt =
+      `A real, warm, emotive documentary photograph of ${subject}. ` +
+      `Authentic South African, shot on a real camera: natural light, true even skin tone with visible texture, ` +
+      `never plastic, never an over-smoothed 3D render. Editorial quality, sharp, high resolution, shallow depth ` +
+      `of field, a genuine unposed human moment. Warm golden grade with gentle contrast. ` +
+      `\n\nCRITICAL - THE IMAGE CONTAINS NO GRAPHICS OF ANY KIND: no logo, no badge, no deal card, no price, no ` +
+      `offer, no percentage, no pill, no callout, no headline, no caption, no watermark, no lettering and no ` +
+      `numbers ANYWHERE. It is a photograph only. Any graphic or text you draw is a defect. ` +
+      `\n\nNobody presents a phone to the camera like an advert. If a phone appears at all there is exactly ONE, ` +
+      `held naturally. Anatomy must be perfect: two hands per person, each attached to a visible arm, correct ` +
+      `fingers, no floating or duplicated hands. ` +
+      `\n\nLeave the LOWER THIRD and the TOP-LEFT corner relatively calm and uncluttered, so a line of type and a ` +
+      `logo can sit over them.`;
 
-    const refBuf: Buffer = Buffer.from(new Uint8Array(await (await fetch(referenceUrl)).arrayBuffer()));
-    const meta = await sharp(refBuf).metadata().catch(() => null);
-    const ratio = meta ? nearestRatio(meta.width || 1080, meta.height || 1080) : "1:1";
-
-    const changes: string[] = [];
-    if (callout) {
-      const [hl1, hl2] = balanceHeadline(tidyCallout(callout));
-      changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in WHITE${hl2 ? ` then "${hl2}" in YELLOW` : ""}. NEVER more than two lines - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Set the punctuation exactly as written. Keep any yellow underline beneath it exactly where it is.`);
-    }
-    changes.push(`Change the people in the advert to: ${subject}. Make it a real, warm, EMOTIVE human moment, photographed naturally - not a product shot, nobody presenting a phone to camera like an advert.`);
-    // NO OFFER, ANYWHERE. This is the CEO speaking, not an advertisement (FAIS s14).
-    changes.push(`Do NOT draw any deal card, offer badge, price bubble, pill, promotional lozenge, price, percentage or offer wording ANYWHERE in the image. There is no offer in this picture at all. Leave the top-right area as clean photograph.`);
-
-    const ed = await forensicRetheme(referenceUrl, { changes, ratio, resolution: "2k" });
+    const [shot] = await generateBatchDetailed([prompt], "nano_banana_pro", "1:1", { resolution: "2k" }, null);
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-linkedin-creative", count: 1 }).catch(() => {});
-    if (!ed.url) return NextResponse.json({ error: ed.error || "the creative did not come back" }, { status: 500 });
+    if (!shot?.url) return NextResponse.json({ error: shot?.error || "the creative did not come back" }, { status: 500 });
 
-    // The logo is the one thing never left to the model - top-left, from the real brand asset.
-    const url = await stampRealLogo(clientId, referenceUrl, ed.url);
+    const kit = await getBrandKit(clientId).catch(() => null);
+    const fonts = (kit?.fonts || []) as { family: string; url: string }[];
+    let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(shot.url)).arrayBuffer()));
+
+    // 2. THE CALLOUT, typeset by us. One line, white. Plus the AI disclosure (Gary: "always add AI Creative to
+    //    the disclaimer copy"). This is NOT an advertisement, so it carries no FSP compliance strip - that
+    //    belongs on a creative that makes an offer, and this one deliberately does not.
+    if (callout) {
+      try { out = (await typesetSliderHeadline(out, callout, "", fonts, "AI Creative")) as Buffer; }
+      catch (e) { console.error("[ceo-creative] typeset failed:", e); }
+    }
+
+    // 3. THE REAL LOGO, top-left. The photograph has none, so this is the only logo in the frame and can never
+    //    double up or read "from HTN".
+    const logos = (kit?.logos || []) as { name: string | null; url: string }[];
+    const logo = logos.find((l) => /horiz|primary|full/i.test(l.name || "")) || logos[0];
+    if (logo) {
+      try {
+        const logoBuf = Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer()));
+        out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: 26 })) as Buffer;
+      } catch (e) { console.error("[ceo-creative] logo composite failed:", e); }
+    }
+
+    const url = await putBytes(out, `studio/${clientId}/ceo-linkedin`, "png", "image/png");
     return NextResponse.json({ ok: true, url });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

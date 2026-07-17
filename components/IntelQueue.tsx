@@ -154,6 +154,9 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
   const [copied, setCopied] = useState(false);
   const [art, setArt] = useState<string>("");      // the LinkedIn creative that runs with the piece
   const [drawing, setDrawing] = useState(false);
+  // Kept so the image can be RERUN without rewriting the article (Gary) - the piece is fine, it is the render
+  // you did not like.
+  const [artBrief, setArtBrief] = useState<{ subject: string; callout: string } | null>(null);
 
   // ONE CLICK, BOTH THINGS (Gary). The piece lands FIRST and fast, then its creative follows in its own short
   // request - so you are reading the article while the image renders, instead of staring at a spinner for both.
@@ -169,16 +172,22 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
     if (!d?.newsletter) { flex(d?.error || "Could not write the newsletter."); return; }
     setLetter(d.newsletter);
 
-    const subject = d?.art?.subject || "";
-    if (!subject) return;
+    const brief = { subject: d?.art?.subject || "", callout: d?.art?.callout || "" };
+    if (!brief.subject) return;
+    setArtBrief(brief);
+    await drawCreative(brief);
+  }
+
+  // The image on its own. Every run is a fresh generation, so this is a genuine second take.
+  async function drawCreative(brief: { subject: string; callout: string }) {
     setDrawing(true);
     const c = await fetch("/api/studio/intel/newsletter-creative", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, subject, callout: d?.art?.callout || "" }),
+      body: JSON.stringify({ clientId, subject: brief.subject, callout: brief.callout }),
     }).then((r) => r.json()).catch(() => null);
     setDrawing(false);
     if (c?.url) setArt(c.url);
-    else if (c?.error) flex(`The article is ready. The creative did not render: ${c.error}`);
+    else flex(`The article is ready. The creative did not render: ${c?.error || "unknown error"}`);
   }
   return (
     <div className={`rounded-xl border p-4 ${i.material ? "border-[#4ade80]/30 bg-[#4ade80]/[0.04]" : "border-line bg-surface-1"}`}>
@@ -301,10 +310,19 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
               Rendering the creative for this piece…
             </div>
           )}
-          {art && (
+          {art && !drawing && (
             <div className="mt-3">
               <img src={art} alt="" className="w-full max-w-sm rounded-lg border border-line" />
-              <a href={art} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[13px] font-semibold text-[#93c5fd] underline">Open full size ↗</a>
+              <div className="mt-1.5 flex items-center gap-3">
+                <a href={art} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-[#93c5fd] underline">Open full size ↗</a>
+                {/* Rerun the IMAGE only - the article stays exactly as written (Gary). */}
+                {artBrief && (
+                  <button onClick={() => drawCreative(artBrief)} disabled={drawing}
+                    className="rounded-md border border-line px-2.5 py-1 text-[13px] font-bold text-ink-dim hover:text-ink disabled:opacity-40">
+                    ↻ Rerun image
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
