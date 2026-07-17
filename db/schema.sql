@@ -493,6 +493,16 @@ alter table studio_intel add column if not exists sources jsonb not null default
 alter table studio_intel add column if not exists published_at date;
 alter table studio_intel add column if not exists period text;
 
+-- A finding that stops at "this happened" makes the reader do the work. Two INTERNAL columns carry it through
+-- to a decision (Gary: "assess deeply the possible impact/risk for MoMo SA, then make a campaign recommendation
+-- as a defensive and pro-active move"):
+--   impact_risk       - what this could actually do TO MoMo SA, sized and reasoned, including the downside
+--   campaign_response - the recommended campaign move for GAS: defensive, proactive, or both
+-- INTERNAL ONLY. These never go near the CEO's public LinkedIn voice - the Journalist's public material is
+-- FAIS-bound (no competitor comparison, no product promotion), and a campaign recommendation is neither.
+alter table studio_intel add column if not exists impact_risk text;
+alter table studio_intel add column if not exists campaign_response text;
+
 -- ── GAS Studio: final production ────────────────────────────────────────────
 -- Background removal for the masthead / section-1 cut-outs. fal bills per COMPUTE SECOND, not per image,
 -- and will not quote the GPU rate without a logged-in dashboard - so this row is seeded UNPRICED on purpose

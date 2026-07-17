@@ -33,6 +33,9 @@ export type Intel = {
   period: string | null;
   confidence: string;
   material: boolean;
+  // INTERNAL assessment - never part of the CEO's public voice. See the brief in ASSESSMENT below.
+  impact_risk: string | null;
+  campaign_response: string | null;
   status: string;
   found_at: string;
 };
@@ -50,6 +53,32 @@ const HONESTY = (windowDays: number) => `HONESTY RULES:
 - RECENCY IS A HARD GATE. This is a DAILY intelligence run: you report WHAT CHANGED. Only report things published or announced in the LAST ${windowDays} DAYS. Older material - however good - is BACKGROUND, not news, and it already lives in our doctrine. Do not report it. A stale finding presented as current is worse than no finding.
 - DATE EVERY FINDING. Give published_at as the date the SOURCE was published or the event happened - NOT today. If you cannot establish the date, leave it empty rather than guessing - but know that an undated finding will be REJECTED, because we cannot claim it is current.
 - Also give 'period' when the data covers a span that differs from the publication date (e.g. a report published this month describing FY2025). Recency of PUBLICATION is not recency of DATA.`;
+
+// EVERY FINDING CARRIES A DECISION (Gary). Research that stops at "this happened" makes the reader do the work
+// twice. So each finding is assessed for what it could actually do to MoMo SA, and carries a recommended
+// campaign response - defensive, proactive, or explicitly neither.
+//
+// THE FIREWALL MATTERS MORE THAN THE FEATURE. The Journalist's PUBLISHED material is the CEO speaking in public:
+// FAIS-bound, no competitor comparison, no product promotion, nothing market-sensitive. An impact assessment and
+// a campaign recommendation are none of those things - they are GAS's internal commercial thinking. They must
+// never bleed into the public post, and the public voice's constraints must not water down the internal read.
+// Two audiences, one finding, kept apart on purpose.
+const ASSESSMENT = `ASSESS EVERY FINDING, THEN RECOMMEND (both are INTERNAL - see the firewall below):
+- impact_risk: think hard about what this could ACTUALLY do to MTN MoMo South Africa. The mechanism (how it
+  reaches MoMo), who it touches (which customers, which part of the business), rough SIZE, how FAST, and how
+  LIKELY. Name the DOWNSIDE even when the news looks good, and the upside even when it looks bad. If the honest
+  answer is "little to no real impact", SAY THAT - a manufactured risk is worse than none, because it spends the
+  team's attention. Separate what you sourced from what you are inferring.
+- campaign_response: what GAS should DO about it in the market. Say whether it is DEFENSIVE (protect a position,
+  correct a misread, get ahead of a trust or fraud problem before it lands on MoMo) or PROACTIVE (take an
+  opening), then be concrete: the audience, the shift in message, and the surface it belongs on. The point is to
+  make our campaign comms to the market more EFFICIENT - so if the right answer is "no campaign move needed",
+  say that plainly rather than inventing work.
+
+THE FIREWALL - do not blur these:
+- impact_risk and campaign_response are INTERNAL GAS commercial thinking. They are never published, never in the
+  CEO's voice, and are NOT bound by the public-voice rules: be blunt, name competitors, and talk about product.
+- The published material stays exactly as briefed above. Nothing from your internal assessment may leak into it.`;
 
 const ROLE_BRIEF: Record<string, string> = {
   // THE JOURNALIST speaks as the CEO, in public. Gary: "journalistic best practices, the absolute expert -
@@ -101,8 +130,10 @@ const SCHEMA = {
           period: { type: "string", description: "What the DATA actually covers, if different from the publication date (e.g. 'FY2025', 'calendar 2024', 'Q1 2026'). A report published this month can describe a year that is already old. Empty if not applicable." },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           material: { type: "boolean", description: "Would this actually change what we say or do? Most things are not." },
+          impact_risk: { type: "string", description: "INTERNAL (never published). Assess DEEPLY what this could actually do to MTN MoMo South Africa: the mechanism, who it touches, roughly how big, how fast, and how likely - and say plainly if the honest answer is 'little to none'. Name the DOWNSIDE even when the finding reads as good news. If you are reasoning rather than sourcing, say so." },
+          campaign_response: { type: "string", description: "INTERNAL (never published). The recommended CAMPAIGN move for GAS off the back of this: is it DEFENSIVE (protect a position, correct a misread, get ahead of a trust problem) or PROACTIVE (take an opening), and concretely what the comms should do - the audience, the message shift, and which surface. If the right answer is 'no campaign move', say that - a recommendation for its own sake wastes the team's time." },
         },
-        required: ["headline", "why_it_matters", "detail", "sources", "published_at", "period", "confidence", "material"],
+        required: ["headline", "why_it_matters", "detail", "sources", "published_at", "period", "confidence", "material", "impact_risk", "campaign_response"],
       },
     },
     quiet_day: { type: "boolean", description: "True if nothing material was found. That is a correct result, not a failure." },
@@ -151,7 +182,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
-    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${HONESTY(windowDays)}\n\nUK spelling. No em dashes.`,
+    system: `${RINGFENCE}\n\n${ROLE_BRIEF[role]}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays)}\n\nUK spelling. No em dashes.`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -160,8 +191,9 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
   const res = await client.messages.create({
     model: PREMIUM,
-    max_tokens: 4000,
-    system: `${RINGFENCE}\n\n${HONESTY(windowDays)}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    // The assessment adds two reasoned fields per finding, so the filing step needs the room to think.
+    max_tokens: 6000,
+    system: `${RINGFENCE}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
@@ -194,15 +226,17 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
       .filter((s): s is { name: string; url: string } => !!s && typeof (s as { url?: string }).url === "string" && /^https?:\/\//i.test((s as { url: string }).url))
       .slice(0, 8);
     const rows = (await db().query(
-      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-       returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, status, found_at`,
+      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at`,
       [clientId, role, String(f.headline || "").slice(0, 300), String(f.why_it_matters || "").slice(0, 1200),
        String(f.detail || "").slice(0, 4000), JSON.stringify(srcs),
        srcs[0]?.url ?? null, srcs.map((s) => s.name).join(" · ").slice(0, 200) || null,
        /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? f.published_at : null,
        String(f.period || "").slice(0, 60) || null,
-       ["high", "medium", "low"].includes(String(f.confidence)) ? f.confidence : "medium", f.material === true],
+       ["high", "medium", "low"].includes(String(f.confidence)) ? f.confidence : "medium", f.material === true,
+       String(f.impact_risk || "").slice(0, 3000) || null,
+       String(f.campaign_response || "").slice(0, 3000) || null],
     )) as Intel[];
     saved.push(rows[0]);
   }
@@ -211,7 +245,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
 export async function listIntel(clientId: string, status = "new"): Promise<Intel[]> {
   return (await db().query(
-    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, status, found_at
+    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at
      from studio_intel where client_id = $1 and status = $2 order by material desc, found_at desc limit 80`,
     [clientId, status],
   )) as Intel[];

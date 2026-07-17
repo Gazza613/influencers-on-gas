@@ -34,6 +34,23 @@ function esc(s: string): string {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// THE DECISION, not just the news (Gary). Every finding carries an INTERNAL read of what it could do to MoMo SA
+// and the campaign move it argues for. Set apart visually so nobody mistakes it for the sourced reporting above
+// it - and, for the Journalist, so nobody mistakes GAS's commercial thinking for the CEO's public voice.
+function assessmentHtml(i: Intel): string {
+  const risk = String(i.impact_risk || "").trim();
+  const move = String(i.campaign_response || "").trim();
+  if (!risk && !move) return "";
+  const defensive = /\bdefensive\b/i.test(move);
+  const proactive = /\bproactive\b/i.test(move);
+  const tag = defensive && proactive ? "defensive + proactive" : defensive ? "defensive" : proactive ? "proactive" : "";
+  return `<div style="margin:0 0 8px;padding:10px 12px;background:#f8fafc;border-left:3px solid #6366f1;border-radius:0 6px 6px 0">
+    <p style="margin:0 0 4px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6366f1">Internal assessment${tag ? ` · ${tag}` : ""}</p>
+    ${risk ? `<p style="margin:0 0 6px;font-size:13px;line-height:1.55;color:#334155"><b>Impact / risk to MoMo SA:</b> ${esc(risk.slice(0, 900))}</p>` : ""}
+    ${move ? `<p style="margin:0;font-size:13px;line-height:1.55;color:#334155"><b>Campaign response:</b> ${esc(move.slice(0, 900))}</p>` : ""}
+  </div>`;
+}
+
 function buildEmail(client: string, journalist: Intel[], strategist: Intel[], today: string): string {
   const badge = (c: string) =>
     c === "high" ? `<span style="background:#dcfce7;color:#166534;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">high</span>`
@@ -72,7 +89,8 @@ function buildEmail(client: string, journalist: Intel[], strategist: Intel[], to
         <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a">${esc(i.headline)} ${badge(i.confidence)}</p>
         <p style="margin:0 0 8px">${dateHtml}${periodHtml}</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#334155"><b>Why it matters:</b> ${esc(i.why_it_matters)}</p>
-        <p style="margin:0;font-size:13px;line-height:1.55;color:#475569">${esc(String(i.detail || "").slice(0, 700))}</p>
+        <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:#475569">${esc(String(i.detail || "").slice(0, 700))}</p>
+        ${assessmentHtml(i)}
         ${sourceHtml}
       </div>`;
     }).join("");

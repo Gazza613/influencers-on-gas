@@ -15,6 +15,8 @@ type Intel = {
   sources: { name: string; url: string }[];
   published_at: string | null; period: string | null;
   confidence: string; material: boolean; status: string; found_at: string;
+  // INTERNAL: what this could do to MoMo SA, and the campaign move it argues for. Never the CEO's public voice.
+  impact_risk: string | null; campaign_response: string | null;
 };
 
 // TWO dates, and conflating them is how stale information becomes "current":
@@ -165,6 +167,28 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
 
       <p className="mt-2 text-[14px] leading-relaxed text-ink-dim"><b className="text-ink">Why it matters:</b> {i.why_it_matters}</p>
       {i.detail && <p className="mt-2 text-[13px] leading-relaxed text-ink-faint">{i.detail}</p>}
+
+      {/* THE INTERNAL ASSESSMENT - what this could actually do to MoMo SA, and the campaign move it argues for.
+          Set apart on purpose: it is GAS's own commercial thinking, NOT part of the sourced reporting above and
+          - on a Journalist finding - never the CEO's public voice, which is FAIS-bound. */}
+      {(i.impact_risk || i.campaign_response) && (() => {
+        const move = i.campaign_response || "";
+        const def = /\bdefensive\b/i.test(move), pro = /\bproactive\b/i.test(move);
+        const tag = def && pro ? "defensive + proactive" : def ? "defensive" : pro ? "proactive" : "";
+        return (
+          <div className="mt-3 rounded-r-lg border-l-2 border-[#818cf8] bg-surface-2/60 px-3 py-2.5">
+            <p className="tabular text-[10px] uppercase tracking-[0.16em] text-[#a5b4fc]">
+              Internal assessment{tag ? ` · ${tag}` : ""}
+            </p>
+            {i.impact_risk && (
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim"><b className="text-ink">Impact / risk to MoMo SA:</b> {i.impact_risk}</p>
+            )}
+            {i.campaign_response && (
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim"><b className="text-ink">Campaign response:</b> {i.campaign_response}</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* SOURCES. Every finding shows where it came from. An unsourced "insight" is worse than no insight - it
           becomes a fact nobody can trace, and every future article and strategy inherits it. If a finding has
