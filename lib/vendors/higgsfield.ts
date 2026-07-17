@@ -525,15 +525,22 @@ export async function forensicRetheme(url: string, opts: { changes: string[]; ra
         `extra, floating, disembodied or duplicated hands, arms or fingers anywhere in the frame. THE PHONE: ` +
         `keep exactly ONE phone in the whole image - the same one @image1 has. A person does NOT hold a second ` +
         `phone, and does not hold one to their ear while holding another. Count the hands and the phones before ` +
-        `you finish, and remove anything that does not belong to a real person in the scene.`,
+        `you finish, and remove anything that does not belong to a real person in the scene. ` +
+        // Gary: "phones when added are not realistic - they are too long in shape."
+        `\n\nPHONE SHAPE: any phone must be a REAL, current smartphone with true proportions - roughly 2:1 tall ` +
+        `(about twice as tall as it is wide), never elongated, stretched or taller than a real handset. It must ` +
+        `sit in the hand at a believable size for that person's grip, with correct thickness and rounded corners.`,
       medias: [{ value: imageId, role: "image" }],
-      resolution: opts.resolution || "4k",
+      resolution: opts.resolution || "2k",
     };
     const r = await call("generate_image", { params });
     let out: string | null = extractImageUrls(r)[0] ?? null;
     const jobId = extractJobIds(r)[0] ?? null;
-    // A 4K retheme of a dense masthead is slow - poll for up to ~7.5 min (the route allows 800s).
-    if (!out && jobId) out = await pollJob(call, jobId, 150);
+    // Poll for ~4.5 min max. This is deliberately SHORTER than the platform will let the request live: if we
+    // poll longer than the gateway allows, it cuts the connection and the browser gets a bare "Failed to fetch"
+    // with no error to read (Gary saw exactly that). Better to return a real "hit Rerun" message ourselves.
+    // At 2k a retheme lands well inside this.
+    if (!out && jobId) out = await pollJob(call, jobId, 90);
     if (out) return { url: out, error: null };
     // Distinguish "the job ran but did not finish in time" from "the vendor rejected it". Conflating them is
     // what sent Gary a wall of raw MCP text instead of something he could act on.

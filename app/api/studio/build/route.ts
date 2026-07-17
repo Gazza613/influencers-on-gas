@@ -97,7 +97,7 @@ export async function POST(req: Request) {
     }
 
     const isDisc = kind === "masthead" || kind === "section1";
-    const ed = await forensicRetheme(editUrl, { changes, ratio, resolution: "4k", solidBackground: isDisc });
+    const ed = await forensicRetheme(editUrl, { changes, ratio, resolution: "2k", solidBackground: isDisc });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `retheme-${kind}`, count: 1 }).catch(() => {});
     if (!ed.url) return NextResponse.json({ error: ed.error || "generation failed" }, { status: 500 });
     // THE LOGO. The retheme never draws one (any logo it draws is a defect), so:

@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     // A stamped deal card must not be redrawn either - we re-composite the real one below.
     if (dealCardUrl) changes.push(`Do NOT draw any deal card, offer badge, price bubble or pill anywhere, and no prices. Leave the top-right area as clean background - the real deal card is composited on afterwards.`);
 
-    const ed = await forensicRetheme(imageUrl, { changes, ratio, resolution: "4k", solidBackground: isDisc });
+    const ed = await forensicRetheme(imageUrl, { changes, ratio, resolution: "2k", solidBackground: isDisc });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `edit-${kind || "creative"}`, count: 1 }).catch(() => {});
     if (!ed.url) return NextResponse.json({ error: ed.error || "the edit did not come back" }, { status: 500 });
 
