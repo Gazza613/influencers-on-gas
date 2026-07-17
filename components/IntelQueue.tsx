@@ -131,13 +131,13 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
           {material.length > 0 && (
             <div>
               <p className="tabular mb-2 text-sm uppercase tracking-[0.2em] text-[#86efac]">Material — {material.length}</p>
-              <div className="space-y-3">{material.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} />)}</div>
+              <div className="space-y-3">{material.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} />)}</div>
             </div>
           )}
           {rest.length > 0 && (
             <div>
               <p className="tabular mb-2 mt-6 text-sm uppercase tracking-[0.2em] text-ink-faint">Noted, not material — {rest.length}</p>
-              <div className="space-y-3">{rest.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} />)}</div>
+              <div className="space-y-3">{rest.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} />)}</div>
             </div>
           )}
         </>
@@ -146,7 +146,23 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
   );
 }
 
-function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void }) {
+function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string }) {
+  // THE CEO'S NEWSLETTER (Gary). Only on Journalist findings - a Strategist finding is internal, blunt and names
+  // competitors, so it is exactly what must never reach the CEO's public voice.
+  const [letter, setLetter] = useState<string>("");
+  const [writing, setWriting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function writeNewsletter() {
+    setWriting(true);
+    const d = await fetch("/api/studio/intel/newsletter", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, id: i.id }),
+    }).then((r) => r.json()).catch(() => null);
+    setWriting(false);
+    if (d?.newsletter) setLetter(d.newsletter);
+    else flex(d?.error || "Could not write the newsletter.");
+  }
   return (
     <div className={`rounded-xl border p-4 ${i.material ? "border-[#4ade80]/30 bg-[#4ade80]/[0.04]" : "border-line bg-surface-1"}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -242,7 +258,38 @@ function Card({ i, busy, decide }: { i: Intel; busy: boolean; decide: (id: strin
         )}
       </div>
 
+      {/* THE CEO'S NEWSLETTER (Gary). Journalist findings only - a Strategist finding is internal and names
+          competitors, which is precisely what must never reach the CEO's public voice. */}
+      {letter && (
+        <div className="mt-3 rounded-lg border border-[#818cf8]/40 bg-surface-2/60 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="tabular text-[12px] uppercase tracking-[0.16em] text-[#a5b4fc]">Draft newsletter · the CEO&apos;s voice</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => { navigator.clipboard?.writeText(letter); setCopied(true); setTimeout(() => setCopied(false), 1800); }}
+                className="rounded-md border border-line px-2.5 py-1 text-[13px] font-bold text-ink-dim hover:text-ink">
+                {copied ? "Copied" : "Copy"}
+              </button>
+              <button onClick={() => setLetter("")} className="text-[13px] font-semibold text-ink-faint underline hover:text-ink">Close</button>
+            </div>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink-dim">{letter}</p>
+          <p className="mt-2 text-[12px] text-ink-faint">A draft, not a post. Read every line before it goes out under his name.</p>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+        {i.role === "journalist" && (
+          <button onClick={writeNewsletter} disabled={writing}
+            className="mr-auto inline-flex items-center gap-2 rounded-lg border border-[#818cf8]/40 px-3 py-1 text-[14px] font-bold text-[#a5b4fc] hover:bg-[#818cf8]/10 disabled:opacity-40">
+            {writing && (
+              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            )}
+            {writing ? "Writing…" : letter ? "Rewrite newsletter" : "✎ Make this a CEO newsletter"}
+          </button>
+        )}
         <button onClick={() => decide(i.id, "accepted")} disabled={busy}
           className="rounded-lg border border-[#4ade80]/40 px-3 py-1 text-[14px] font-bold text-[#86efac] hover:bg-[#4ade80]/10 disabled:opacity-40">
           ✓ Accept into the brain
