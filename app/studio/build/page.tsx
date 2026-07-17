@@ -164,8 +164,8 @@ export default function BuilderPage() {
   // THE PRODUCER PLANS IT. Gary: "the producer should add this in and then we can edit - the producer must be
   // the expert." So one click has the Producer read the brief (and the reference set) and write who should be
   // in every section - theme-embodying - which pre-fills the subject boxes for the user to tweak, not type raw.
-  async function plan() {
-    if (brief.trim().length < 6) { setErr("Write the brief first."); return; }
+  async function plan(): Promise<any | null> {
+    if (brief.trim().length < 6) { setErr("Write the brief first."); return null; }
     setErr(""); setBusy((b) => ({ ...b, plan: true }));
     try {
       const d = await fetch("/api/studio/campaign", {
@@ -173,7 +173,7 @@ export default function BuilderPage() {
         body: JSON.stringify({ action: "plan", clientId, brief }),
       }).then(readJson) as any;
       const p = d.plan;
-      if (!p) { setErr(d.error || "The Producer could not plan this."); return; }
+      if (!p) { setErr(d.error || "The Producer could not plan this."); return null; }
       setTheme(p.theme || "");
       setSubject((x) => ({
         ...x,
@@ -199,56 +199,80 @@ export default function BuilderPage() {
         "slider-2": p.sliders?.[2] ? `${p.sliders[2].headline1} / ${p.sliders[2].headline2}` : x["slider-2"] || "",
       }));
       setFlags(Array.isArray(p.complianceCheck) ? p.complianceCheck : []);
-    } catch (e) { setErr(String((e as Error)?.message || e)); }
+      return p;
+    } catch (e) { setErr(String((e as Error)?.message || e)); return null; }
     finally { setBusy((b) => ({ ...b, plan: false })); }
   }
 
-  // LET THE EXPERTS BUILD THE WHOLE STACK. One click: the Producer plans, the creative expert picks references
-  // and generates all five, finished. The team then co-pilots (rerun / edit / accept). Gary's core philosophy.
+  // LET THE EXPERTS BUILD THE WHOLE STACK. The Producer plans, then all five creatives generate.
+  //
+  // The five requests are fired FROM HERE, in parallel - they are NOT one server call any more. The old
+  // /api/studio/build-all did five 4K rethemes plus polling inside a single request that had to survive to the
+  // end, so one slow render killed all five and the browser reported "Failed to fetch" (the connection cut, so
+  // there was not even a response to read an error from). Now each creative is its own short request, isolated:
+  // one can fail or be slow without touching the other four, each lands in its slot as it finishes, and it all
+  // runs through the SAME per-creative endpoint the wizard uses - so the two can never drift apart again, which
+  // is what made an earlier expert run so much worse than building by hand.
   async function buildAll() {
     if (brief.trim().length < 6) { setErr("Give the experts a brief."); return; }
     setErr(""); setBusy((b) => ({ ...b, all: true }));
     try {
-      const d = await fetch("/api/studio/build-all", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, brief }),
-      }).then(readJson) as any;
-      const p = d.plan;
-      if (p) {
-        setTheme(p.theme || "");
-        setSubject({ masthead: p.masthead?.subjectPrompt || "", section1: p.section1?.subjectPrompt || "", "slider-0": p.sliders?.[0]?.subject || "", "slider-1": p.sliders?.[1]?.subject || "", "slider-2": p.sliders?.[2]?.subject || "" });
-        setConcept({ masthead: p.masthead?.concept || "", section1: p.section1?.concept || "", "slider-0": p.sliders?.[0]?.concept || "", "slider-1": p.sliders?.[1]?.concept || "", "slider-2": p.sliders?.[2]?.concept || "" });
-        setCallout({ masthead: p.masthead?.callout || "", section1: p.section1?.callout || "", "slider-0": p.sliders?.[0] ? `${p.sliders[0].headline1} / ${p.sliders[0].headline2}` : "", "slider-1": p.sliders?.[1] ? `${p.sliders[1].headline1} / ${p.sliders[1].headline2}` : "", "slider-2": p.sliders?.[2] ? `${p.sliders[2].headline1} / ${p.sliders[2].headline2}` : "" });
-        setFlags(Array.isArray(p.complianceCheck) ? p.complianceCheck : []);
-      }
-      for (const c of (d.creatives || []) as { kind: string; index: number; url: string; refUrl: string }[]) {
-        const slotKey = c.kind === "slider" ? `slider-${c.index}` : c.kind;
-        if (c.url) setShot((s) => ({ ...s, [slotKey]: { url: c.url, status: "new" } }));
-        if (c.refUrl) setPicked((x) => ({ ...x, [slotKey]: c.refUrl }));
-      }
-      if (d.error && !p) setErr(d.error);
+      const p = await plan();
+      if (!p) return;
+      // Read the direction straight off the plan - React state is batched, so it is not readable yet.
+      const jobs: { slotKey: string; kind: string; subject: string; callout: string }[] = [
+        { slotKey: "masthead", kind: "masthead", subject: p.masthead?.subjectPrompt || "", callout: p.masthead?.callout || "" },
+        { slotKey: "section1", kind: "section1", subject: p.section1?.subjectPrompt || "", callout: p.section1?.callout || "" },
+        ...(p.sliders || []).slice(0, 3).map((s: any, i: number) => ({
+          slotKey: `slider-${i}`, kind: "slider",
+          subject: s.subject || `people that suit "${p.theme}"`,
+          callout: `${s.headline1} / ${s.headline2}`,
+        })),
+      ];
+      await Promise.all(jobs.map((j) =>
+        generateWith(j.slotKey, j.kind, { subject: j.subject, callout: j.callout, theme: p.theme || "" })
+      ));
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, all: false })); }
   }
 
-  async function generate(slotKey: string, kind: string) {
-    const referenceUrl = picked[slotKey] || ""; // optional - the expert picks one if none chosen
-    let subj = (subject[slotKey] || "").trim();
+  // ONE creative. Everything - the wizard button and the experts fan-out - goes through here, so there is a
+  // single path to keep correct.
+  async function generateWith(
+    slotKey: string,
+    kind: string,
+    o: { subject: string; callout: string; theme: string },
+  ) {
+    const subj = o.subject.trim();
     if (!subj) { setErr("Say who should be in it (or let the Producer plan it)."); return; }
-    subj += PHONE_MAP[phone[slotKey]] || ""; // fold the phone treatment into the direction
-    // A typed (dynamic) deal wins over a library pick - it is what the team actually edited.
     const typed = custom[slotKey];
     const deal = (typed?.label && typed?.price) ? typed : (deals.find((d) => d.id === dealSel[slotKey]) || null);
-    setErr(""); setBusy((b) => ({ ...b, [slotKey]: true }));
+    setBusy((b) => ({ ...b, [slotKey]: true }));
     try {
       const d = await fetch("/api/studio/build", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, kind, referenceUrl, subject: subj, deal, callout: callout[slotKey] || "", theme, dealCardUrl: cardSel[slotKey] || "", scene: scene[slotKey] || "" }),
+        body: JSON.stringify({
+          clientId, kind,
+          referenceUrl: picked[slotKey] || "",              // optional - the expert picks one if none chosen
+          subject: subj + (PHONE_MAP[phone[slotKey]] || ""), // fold the phone treatment into the direction
+          deal, callout: o.callout, theme: o.theme,
+          dealCardUrl: cardSel[slotKey] || "", scene: scene[slotKey] || "",
+        }),
       }).then(readJson) as any;
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, status: "new" } }));
-      else setErr(d.error || "generation failed");
-    } catch (e) { setErr(String((e as Error)?.message || e)); }
-    finally { setBusy((b) => ({ ...b, [slotKey]: false })); }
+      else setErr(`${slotTitle(slotKey)}: ${d.error || "generation failed"}`);
+    } catch (e) {
+      setErr(`${slotTitle(slotKey)}: ${String((e as Error)?.message || e)}`);
+    } finally { setBusy((b) => ({ ...b, [slotKey]: false })); }
+  }
+
+  async function generate(slotKey: string, kind: string) {
+    setErr("");
+    await generateWith(slotKey, kind, {
+      subject: subject[slotKey] || "",
+      callout: callout[slotKey] || "",
+      theme,
+    });
   }
 
   function setCustomField(slotKey: string, field: keyof Deal, value: string) {
