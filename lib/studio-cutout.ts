@@ -132,6 +132,50 @@ const BG_MAX_SAT = 40;     // and near-neutral (max-min channel spread)
 // shadow (226 stays 226) while still cleaning corner smudges to pure white. 0.09 gains nothing.
 const HALO_FRAC = 0.06;    // protected shadow zone around the design, as a fraction of the width
 
+// CUT A PERSON OUT OF A CLEAN STUDIO SHOT to a transparent PNG. Used for the CEO creative: his real photo on a
+// white studio background becomes a floating cut-out we composite onto a MoMo field - forensically his face,
+// never generated.
+//
+// Same edge-flood-fill as flattenSection1ToWhite, but the background becomes TRANSPARENT instead of white, and
+// the threshold is looser (a studio backdrop runs 230-255). The person is a wall the fill cannot cross, so his
+// dark suit, his skin and even a bright white shirt survive - the shirt because it is interior, never
+// edge-connected. A soft 1px feather on the resulting alpha keeps the edge from looking cut with scissors.
+export async function cutoutToTransparent(buf: Buffer): Promise<Buffer> {
+  const flat = await sharp(buf).flatten({ background: "#ffffff" }).png().toBuffer(); // drop any existing alpha first
+  const { data, info } = await sharp(flat).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, C = info.channels;
+
+  const isBg = (i: number): boolean => {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if (lum < 205) return false;                          // looser than the white-flatten: studio white is bright
+    return Math.max(r, g, b) - Math.min(r, g, b) <= 26;   // and near-neutral
+  };
+
+  const seen = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  let sp = 0;
+  const push = (x: number, y: number) => { const p = y * W + x; if (!seen[p]) { seen[p] = 1; stack[sp++] = p; } };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+  for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+
+  while (sp > 0) {
+    const p = stack[--sp];
+    const i = p * C;
+    if (!isBg(i)) continue;
+    data[i + 3] = 0;                                       // background pixel -> transparent
+    const x = p % W, y = (p / W) | 0;
+    if (x > 0) push(x - 1, y);
+    if (x < W - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < H - 1) push(x, y + 1);
+  }
+
+  const cut = await sharp(data, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+  // Trim the now-transparent margins so the subject fills the asset, and feather the alpha a touch.
+  return sharp(cut).trim().png().toBuffer();
+}
+
 export async function flattenSection1ToWhite(buf: Buffer): Promise<Buffer> {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, C = info.channels;

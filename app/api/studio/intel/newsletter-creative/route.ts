@@ -3,7 +3,8 @@ import { auth } from "@/auth";
 import sharp from "sharp";
 import { generateBatchDetailed } from "@/lib/vendors/higgsfield";
 import { typesetSliderHeadline, compositeLogo, tidyCallout } from "@/lib/studio-slider";
-import { getBrandKit } from "@/lib/studio";
+import { getBrandKit, listAssets } from "@/lib/studio";
+import { buildCeoCreatives } from "@/lib/ceo-creative";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 
@@ -39,6 +40,17 @@ export async function POST(req: Request) {
   if (!clientId || !subject) return NextResponse.json({ error: "Nothing to art-direct yet." }, { status: 400 });
 
   try {
+    // IF THE CLIENT HAS A CEO PHOTO ON FILE, the creative is HIM - forensically, his real cut-out face on a MoMo
+    // field, with his name plate (Gary). Returns THREE for the team to pick from. Otherwise we fall back to the
+    // generic emotive photograph below.
+    const ceoPhotos = await listAssets(clientId, "ceo_photo").catch(() => []);
+    if (ceoPhotos.length) {
+      const r = await buildCeoCreatives(clientId, { message: callout || subject });
+      const urls = r.creatives.filter((c) => c.url).map((c) => c.url);
+      if (urls.length) return NextResponse.json({ ok: true, url: urls[0], urls });
+      return NextResponse.json({ error: r.error || "the CEO creative did not come back" }, { status: 500 });
+    }
+
     // 1. A CLEAN PHOTOGRAPH, 1:1 (1200x1200).
     //    4:5 was tried and reverted (Gary). It was not the aspect that failed, it was what the aspect forced: to
     //    survive LinkedIn's desktop crop the foot had to be LIFTED off the bottom edge, which left a navy bar

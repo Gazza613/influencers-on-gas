@@ -400,6 +400,39 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
         )}
       </div>
 
+      {/* CEO PHOTOS. The executive's own photographs, so the CEO newsletter creative composites his REAL face -
+          forensic, not a generated likeness (Gary). Clean white-background studio shots cut out best. Consent to
+          use his image in AI-composited creative must be on file before these are used. */}
+      <div className="rounded-xl border border-line bg-surface-1 p-5">
+        <div className="flex items-center justify-between">
+          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">CEO photos</div>
+          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "ceo_photo").length} uploaded</span>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+          The executive&apos;s own photographs, for the CEO newsletter creative. His REAL face is cut out and
+          composited in, so it is forensically him, never a generated lookalike. <b className="text-ink-dim">Clean
+          white-background studio shots work best</b> (crisp edges, even light). Consent to use his image must be
+          on file.
+        </p>
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-bold text-[#c79bff] hover:bg-[#a855f7]/10">
+          {busy === "ceo_photo" ? "Uploading…" : "＋ Add CEO photos"}
+          <input type="file" multiple accept="image/png,image/jpeg,image/webp" className="hidden"
+            onChange={(e) => send(e.target.files, "ceo_photo")} />
+        </label>
+        {assets.filter((a) => a.kind === "ceo_photo").length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            {assets.filter((a) => a.kind === "ceo_photo").map((a) => (
+              <div key={a.id} className="w-[92px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.url} alt={a.name ?? "CEO photo"} className="w-full rounded-md border border-line bg-surface-2 object-cover" style={{ aspectRatio: "3/4" }} />
+                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* BRAND ICONS. The client's icon library - the floating icon bubbles and any other brand icons - so
           creatives reuse the real icons, never invented ones. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">

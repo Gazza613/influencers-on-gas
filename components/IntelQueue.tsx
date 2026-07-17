@@ -152,7 +152,8 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
   const [letter, setLetter] = useState<string>("");
   const [writing, setWriting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [art, setArt] = useState<string>("");      // the LinkedIn creative that runs with the piece
+  const [art, setArt] = useState<string>("");      // the SELECTED LinkedIn creative that runs with the piece
+  const [options, setOptions] = useState<string[]>([]); // the CEO build returns three; pick the best
   const [drawing, setDrawing] = useState(false);
   // Kept so the image can be RERUN without rewriting the article (Gary) - the piece is fine, it is the render
   // you did not like.
@@ -163,7 +164,7 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
   // The same call that writes the piece art-directs it, so the image cannot end up illustrating a different
   // article to the one beside it.
   async function writeNewsletter() {
-    setWriting(true); setArt("");
+    setWriting(true); setArt(""); setOptions([]);
     const d = await fetch("/api/studio/intel/newsletter", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, id: i.id }),
@@ -180,13 +181,15 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
 
   // The image on its own. Every run is a fresh generation, so this is a genuine second take.
   async function drawCreative(brief: { subject: string; callout: string }) {
-    setDrawing(true);
+    setDrawing(true); setOptions([]);
     const c = await fetch("/api/studio/intel/newsletter-creative", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, subject: brief.subject, callout: brief.callout }),
     }).then((r) => r.json()).catch(() => null);
     setDrawing(false);
-    if (c?.url) setArt(c.url);
+    // The CEO build returns THREE options to choose from; the generic path returns one.
+    const urls: string[] = Array.isArray(c?.urls) && c.urls.length ? c.urls : c?.url ? [c.url] : [];
+    if (urls.length) { setArt(urls[0]); setOptions(urls.length > 1 ? urls : []); }
     else flex(`The article is ready. The creative did not render: ${c?.error || "unknown error"}`);
   }
   return (
@@ -313,6 +316,20 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
           {art && !drawing && (
             <div className="mt-3">
               <img src={art} alt="" className="w-full max-w-sm rounded-lg border border-line" />
+              {/* THREE OPTIONS (CEO build): pick the best. The selected one is highlighted. */}
+              {options.length > 1 && (
+                <div className="mt-2">
+                  <p className="text-[12px] text-ink-faint">Pick the best of {options.length}:</p>
+                  <div className="mt-1 flex gap-2">
+                    {options.map((u, n) => (
+                      <button key={u} onClick={() => setArt(u)}
+                        className={`overflow-hidden rounded-md border-2 ${art === u ? "border-[#818cf8]" : "border-line"}`}>
+                        <img src={u} alt={`Option ${n + 1}`} className="h-16 w-16 object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="mt-1.5 flex items-center gap-3">
                 <a href={art} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-[#93c5fd] underline">Open full size ↗</a>
                 {/* Rerun the IMAGE only - the article stays exactly as written (Gary). */}
