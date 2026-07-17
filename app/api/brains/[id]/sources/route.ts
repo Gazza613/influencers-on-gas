@@ -12,12 +12,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const type = body.type === "website" ? "website" : "text";
+  const type = body.type === "website" ? "website" : body.type === "file" ? "file" : "text";
   const text = typeof body.text === "string" ? body.text.trim() : "";
   let uri = typeof body.uri === "string" ? body.uri.trim() : "";
 
   if (type === "website") {
     if (!/^https?:\/\//i.test(uri)) return NextResponse.json({ error: "Enter a valid website URL (https://…)." }, { status: 400 });
+  } else if (type === "file") {
+    // The browser uploaded straight to Blob and hands us the URL back. It must be OUR blob store: a brain will
+    // fetch this URL server-side, so accepting an arbitrary URL here would turn "add a document" into a way to
+    // make the server fetch anything. A client's brain is their proprietary information (Gary) - the ingest
+    // door is exactly where that has to be enforced, not just the read path.
+    if (!/^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\//i.test(uri)) {
+      return NextResponse.json({ error: "Upload the document through this page rather than pasting a link to it." }, { status: 400 });
+    }
+    if (!text) return NextResponse.json({ error: "The file needs a name." }, { status: 400 });
   } else {
     if (text.length < 20) return NextResponse.json({ error: "Paste a bit more text to learn from." }, { status: 400 });
     if (!uri) uri = "Pasted note";

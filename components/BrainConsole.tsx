@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
 
@@ -9,7 +10,8 @@ type Hit = { content: string; metadata: Record<string, unknown>; score: number }
 
 export default function BrainConsole({ brainId, initialSources }: { brainId: string; initialSources: Source[] }) {
   const [sources, setSources] = useState<Source[]>(initialSources);
-  const [mode, setMode] = useState<"website" | "text">("website");
+  const [mode, setMode] = useState<"website" | "text" | "file">("website");
+  const [progress, setProgress] = useState("");
   const [uri, setUri] = useState("");
   const [text, setText] = useState("");
   const [adding, setAdding] = useState(false);
@@ -43,6 +45,40 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setAddErr(d?.error || "Could not add source"); setAdding(false); return; }
     setUri(""); setText("");
+    await refresh();
+    setAdding(false);
+  }
+
+  // DOCUMENTS (articles, PDFs, decks, notes). Each file goes STRAIGHT to Blob from the browser - a serverless
+  // request body caps around 4.5MB and a research PDF sails past it - then we register it, and it ingests as it
+  // lands. Files are handled one at a time with the failures NAMED: dropping ten PDFs in and being told only
+  // that "something went wrong" would be useless.
+  async function addFiles(list: FileList | null) {
+    if (!list?.length || adding) return;
+    setAdding(true); setAddErr(""); setProgress("");
+    const failed: string[] = [];
+    let done = 0;
+    for (const f of Array.from(list)) {
+      setProgress(`${f.name} (${done + 1}/${list.length})`);
+      try {
+        const blob = await upload(`brains/${brainId}/${f.name}`, f, {
+          access: "public",
+          handleUploadUrl: "/api/brains/blob-upload",
+        });
+        const r = await fetch(`/api/brains/${brainId}/sources`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "file", uri: blob.url, text: f.name }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) failed.push(`${f.name}: ${d?.error || "could not add"}`);
+      } catch (e) {
+        failed.push(`${f.name}: ${String((e as Error)?.message || e).slice(0, 90)}`);
+      }
+      done++;
+    }
+    setProgress("");
+    if (failed.length) setAddErr(failed.join(" · "));
+    else flex(`${done} document${done === 1 ? "" : "s"} added. The brain is reading ${done === 1 ? "it" : "them"} now.`);
     await refresh();
     setAdding(false);
   }
@@ -100,22 +136,50 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
       {/* Add knowledge */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Feed the brain</div>
-        <div className="mt-3 flex gap-2">
-          <button onClick={() => setMode("website")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "website" ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim"}`}>Website</button>
-          <button onClick={() => setMode("text")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${mode === "text" ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim"}`}>Paste text</button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {([["file", "Documents"], ["website", "Website or link"], ["text", "Paste text"]] as const).map(([m, label]) => (
+            <button key={m} onClick={() => setMode(m)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim hover:text-ink"}`}>
+              {label}
+            </button>
+          ))}
         </div>
-        {mode === "website" ? (
-          <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://client-website.com/about"
-            className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
+
+        {mode === "file" ? (
+          <>
+            {/* Articles, PDFs, decks, notes. Uploads straight to Blob and ingests as each one lands. */}
+            <label className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface-2/50 px-4 py-7 text-center hover:border-[#a855f7]/50">
+              <input type="file" multiple accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown,text/csv"
+                onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} disabled={adding} className="hidden" />
+              <span className="text-sm font-bold text-ink">Choose documents, or drop them here</span>
+              <span className="text-[13px] text-ink-dim">Articles, PDFs, research, notes. Each one ingests as it lands.</span>
+              <span className="mt-1 text-[12px] text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
+            </label>
+            {progress && <p className="mt-2 text-[13px] text-ink-dim">Uploading {progress}…</p>}
+          </>
+        ) : mode === "website" ? (
+          <>
+            <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://an-article.com/the-piece"
+              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
+            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+              {adding ? "Adding to brain…" : "Add to brain"}
+            </button>
+          </>
         ) : (
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Paste brand notes, positioning, proof points…"
-            className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
+          <>
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Paste brand notes, positioning, proof points, a transcript…"
+              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
+            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+              {adding ? "Adding to brain…" : "Add to brain"}
+            </button>
+          </>
         )}
-        <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
-          {adding ? "Adding to brain…" : "Add to brain"}
-        </button>
-        {addErr && <p className="mt-2 text-xs text-alert">{addErr}</p>}
-        <p className="mt-2 text-[11px] text-ink-faint">Sources are scraped, chunked and embedded into this brain only.</p>
+
+        {addErr && <p className="mt-2 text-[13px] text-alert">{addErr}</p>}
+        {/* The isolation guarantee, said out loud where someone is about to hand us a client's private material. */}
+        <p className="mt-3 text-[13px] text-ink-faint">
+          Everything added here is chunked and embedded into <b className="text-ink-dim">this brain only</b>. No other brain can read it.
+        </p>
       </div>
 
       {/* Sources */}

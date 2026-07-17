@@ -385,6 +385,26 @@ export const ingestSource = inngest.createFunction(
         await step.run("usage-scrape", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: 1 }));
         if (!page.content) throw new Error("page had no readable content");
         items = chunkText(page.content).map((c) => ({ content: c, metadata: { url: page.url, title: page.title } }));
+      } else if (type === "file") {
+        // AN UPLOADED DOCUMENT (article, PDF, deck, notes). The browser put it straight into Blob, so `uri` is
+        // a public blob URL and `text` carries the original filename.
+        //
+        // PDFs go through Firecrawl, which already parses them - rather than adding a PDF library to a bundle
+        // that is already fighting Vercel's 250MB function limit. Plain text is just read.
+        const name = text || uri;
+        const isPdf = /\.pdf(\?|$)/i.test(uri);
+        const doc = await step.run("read-file", async () => {
+          if (isPdf) {
+            const page = await scrape(uri);
+            return { content: page.content, title: name };
+          }
+          const r = await fetch(uri);
+          if (!r.ok) throw new Error(`could not read the uploaded file (${r.status})`);
+          return { content: (await r.text()).trim(), title: name };
+        });
+        if (isPdf) await step.run("usage-parse", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest-pdf", count: 1 }));
+        if (!doc.content) throw new Error("that file had no readable text in it (a scanned image PDF has no text layer)");
+        items = chunkText(doc.content).map((c) => ({ content: c, metadata: { url: uri, title: doc.title } }));
       } else {
         items = chunkText(text).map((c) => ({ content: c, metadata: { title: uri || "Pasted note" } }));
       }
