@@ -250,10 +250,12 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
 
       {/* THE SHOWCASE EYE, bottom-right and ABOVE the card link so it wins the click. */}
       {d.peek && (
-        <Link href={d.peek.href} title={d.peek.label} aria-label={d.peek.label}
+        // A NEW TAB (Gary): the showcase is something you look at while your work stays open behind you, so it
+        // must not navigate the dashboard away. A plain anchor, not a router push, for the same reason.
+        <a href={d.peek.href} target="_blank" rel="noreferrer" title={d.peek.label} aria-label={`${d.peek.label} (opens in a new tab)`}
           className={`absolute bottom-5 right-5 z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line/80 bg-surface-1/70 backdrop-blur-sm transition ${d.accent} hover:scale-110 hover:border-current`}>
           <EyeMark />
-        </Link>
+        </a>
       )}
     </div>
   );
