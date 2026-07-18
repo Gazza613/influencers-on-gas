@@ -23,7 +23,7 @@ export default function GasStudioPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-        <Link href="/dashboard" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
+        <Link href="/dashboard" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
 
         <div className="mt-4 flex items-center gap-3">
           <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>

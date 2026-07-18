@@ -45,10 +45,16 @@ export async function buildCeoCreatives(
   clientId: string,
   opts: { message: string; name?: string; title?: string },
 ): Promise<{ creatives: CeoCreative[]; error: string | null }> {
-  // 1. His real photo - THE LARGEST ONE ON FILE, not the most recent.
-  //    listAssets returns newest-first, so taking photos[0] grabbed whichever was uploaded last. That picked a
-  //    500x534 shot over a 1022x1533 one and scaled it ~1.9x to fill the frame, which is exactly why he came
-  //    back pixelated (Gary). Resolution is the whole game for a CEO's face, so we choose on pixels.
+  // 1. His real photo. VARIED, not always the same one (Gary: "does Kagiso always have to be wearing the same
+  //    clothes - this will make the post very stale").
+  //
+  //    The wardrobe can only vary as far as the PHOTOS vary: we composite his real cut-out, so changing his
+  //    jacket or shirt would mean an AI altering a real executive's appearance, which forfeits the whole
+  //    forensic guarantee. So variety comes from real photographs - upload him in a few outfits and the system
+  //    rotates through them.
+  //
+  //    Resolution still gates the choice, because a soft face is worse than a repeated jacket: only photos
+  //    within reach of the largest are eligible, then we rotate among those so successive posts differ.
   const photos = await listAssets(clientId, "ceo_photo");
   if (!photos.length) return { creatives: [], error: "No CEO photo on file. Upload one on the intake page first." };
   const sized = await Promise.all(photos.map(async (p) => {
@@ -57,7 +63,12 @@ export async function buildCeoCreatives(
       return { p, h: m.height || 0, area: (m.width || 0) * (m.height || 0) };
     } catch { return { p, h: 0, area: 0 }; }
   }));
-  const photo = sized.sort((a, b) => b.area - a.area)[0].p;
+  const ranked = sized.sort((a, b) => b.area - a.area);
+  const best = ranked[0];
+  // Anything at least 70% of the best photo's area is good enough to use, so a decent second outfit is not
+  // discarded just for being slightly smaller.
+  const eligible = ranked.filter((r) => r.area >= best.area * 0.7);
+  const photo = eligible[Math.floor(Date.now() / 60000) % eligible.length].p;
 
   const kit = await getBrandKit(clientId).catch(() => null);
   const fonts = (kit?.fonts || []) as { family: string; url: string }[];
@@ -204,16 +215,27 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
   font-weight:800;font-size:${msgSize}px;line-height:1.06;letter-spacing:-1px;text-shadow:0 3px 18px rgba(0,0,0,.55)}
 .plate{position:absolute;left:6.5%;bottom:12%}
 ${nameplateCss(0.42)}
-/* One short line, small but readable, aligned under the name plate. */
-.ai{position:absolute;left:6%;bottom:4.5%;font-family:'MTNBrighterSans',sans-serif;font-weight:600;
-  letter-spacing:.4px;color:rgba(255,255,255,.78);font-size:${Math.round(H * 0.0155)}px;
-  text-shadow:0 2px 8px rgba(0,0,0,.7)}
+/* THE AI MARK - bottom RIGHT, clear of the name plate, small but legible (Gary). An icon plus the words reads
+   as a credential rather than a caption, which is the point: it should look deliberate and disclosed, not
+   apologetic. */
+.ai{position:absolute;right:5%;bottom:4.5%;display:inline-flex;align-items:center;gap:${Math.round(H * 0.006)}px;
+  padding:${Math.round(H * 0.006)}px ${Math.round(H * 0.011)}px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.22);background:rgba(8,26,42,.42);
+  font-family:'MTNBrighterSans',sans-serif;font-weight:600;letter-spacing:.3px;
+  color:rgba(255,255,255,.82);font-size:${Math.round(H * 0.0125)}px}
+.ai svg{width:${Math.round(H * 0.016)}px;height:${Math.round(H * 0.016)}px;flex:none}
 </style></head><body>
 <div class="wash"></div>
 <div class="btm"></div>
 <div class="msg">${esc(message)}</div>
 <div class="plate">${nameplateHtml(name, title)}</div>
-<div class="ai">${esc(legal)}</div>
+<div class="ai">
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 2.6l1.9 5.6 5.6 1.9-5.6 1.9L12 17.6l-1.9-5.6-5.6-1.9 5.6-1.9L12 2.6Z" fill="#F9CB0F"/>
+    <path d="M18.6 15.2l.8 2.3 2.3.8-2.3.8-.8 2.3-.8-2.3-2.3-.8 2.3-.8.8-2.3Z" fill="#F9CB0F" opacity=".75"/>
+  </svg>
+  <span>${esc(legal)}</span>
+</div>
 </body></html>`;
   const { png } = await renderPng({ html, width: W, height: H, scale: 1, transparent: true });
   return png;
