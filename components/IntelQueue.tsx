@@ -103,6 +103,7 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
     const bv = b.published_at ? new Date(b.published_at).getTime() : -Infinity;
     return bv - av;
   };
+  const clientName = clients.find((c) => c.id === clientId)?.name || "us";
   const material = items.filter((i) => i.material).sort(byRecency);
   const rest = items.filter((i) => !i.material).sort(byRecency);
 
@@ -133,13 +134,13 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
           {material.length > 0 && (
             <div>
               <p className="tabular mb-2 text-base uppercase tracking-[0.2em] text-[#86efac]">Material — {material.length}</p>
-              <div className="space-y-3">{material.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} />)}</div>
+              <div className="space-y-3">{material.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} clientName={clientName} />)}</div>
             </div>
           )}
           {rest.length > 0 && (
             <div>
               <p className="tabular mb-2 mt-6 text-base uppercase tracking-[0.2em] text-ink-faint">Noted, not material — {rest.length}</p>
-              <div className="space-y-3">{rest.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} />)}</div>
+              <div className="space-y-3">{rest.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} clientName={clientName} />)}</div>
             </div>
           )}
         </>
@@ -148,7 +149,7 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
   );
 }
 
-function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string }) {
+function Card({ i, busy, decide, clientId, clientName }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string; clientName: string }) {
   // THE CEO'S NEWSLETTER (Gary). Only on Journalist findings - a Strategist finding is internal, blunt and names
   // competitors, so it is exactly what must never reach the CEO's public voice.
   // Seeded from the SAVED draft (Gary): the piece and its creative used to live only in React state, so logging
@@ -278,7 +279,7 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
             </p>
             {i.impact_risk && (
               <p className="mt-1.5 text-[18px] leading-relaxed text-ink-dim">
-                <b className="text-ink">What it could do to MoMo:</b> {i.impact_risk}
+                <b className="text-ink">What it could do to {clientName}:</b> {i.impact_risk}
               </p>
             )}
             {i.campaign_response && (

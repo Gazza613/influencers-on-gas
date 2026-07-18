@@ -37,7 +37,7 @@ function esc(s: string): string {
 // THE DECISION, not just the news (Gary). Every finding carries an INTERNAL read of what it could do to MoMo SA
 // and the campaign move it argues for. Set apart visually so nobody mistakes it for the sourced reporting above
 // it - and, for the Journalist, so nobody mistakes GAS's commercial thinking for the CEO's public voice.
-function assessmentHtml(i: Intel): string {
+function assessmentHtml(i: Intel, client: string): string {
   const risk = String(i.impact_risk || "").trim();
   const move = String(i.campaign_response || "").trim();
   if (!risk && !move) return "";
@@ -47,7 +47,7 @@ function assessmentHtml(i: Intel): string {
   // The two roles assess different things, so label them honestly. The Strategist guides our activations and the
   // positioning we take to MoMo's teams; the Journalist is about the CEO's public narrative.
   const isStrat = i.role === "strategist";
-  const riskLabel = isStrat ? "Commercial impact / risk to MoMo SA" : "Narrative impact / risk for MoMo SA";
+  const riskLabel = isStrat ? `Commercial impact / risk to ${client}` : `Narrative impact / risk for ${client}`;
   const moveLabel = isStrat ? "Activation + positioning call" : "Narrative move";
   return `<div style="margin:0 0 8px;padding:10px 12px;background:#f8fafc;border-left:3px solid #6366f1;border-radius:0 6px 6px 0">
     <p style="margin:0 0 4px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6366f1">Internal${tag ? ` · ${tag}` : ""}</p>
@@ -128,7 +128,7 @@ function buildEmail(client: string, strategist: Intel[], today: string, intro: s
     const assessment = (risk || move)
       ? `<div class="card" style="margin-top:12px;padding:11px 12px;background:rgba(249,98,3,0.06);border-left:2px solid #f96203;border-radius:0 8px 8px 0;">
            <div style="font-size:10px;letter-spacing:2px;font-weight:800;color:#f96203;">OUR READ${stance ? ` · ${stance}` : ""}</div>
-           ${risk ? `<p class="p" style="margin:9px 0 0;font-size:14px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What it could do to MoMo:</b> ${esc(risk)}</p>` : ""}
+           ${risk ? `<p class="p" style="margin:9px 0 0;font-size:14px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What it could do to ${esc(client)}:</b> ${esc(risk)}</p>` : ""}
            ${move ? `<p class="p" style="margin:9px 0 0;font-size:14px;line-height:1.75;color:#e6e9ee;"><b style="color:#fff;">What we should do:</b> ${esc(move)}</p>` : ""}
          </div>`
       : "";
