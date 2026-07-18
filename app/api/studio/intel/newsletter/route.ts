@@ -80,6 +80,12 @@ HARD LINES - not negotiable, and breaking one makes the piece unusable:
   offers, no bundles, no "sign up", no call to action, nothing forward-looking or market-sensitive. He is a
   JSE-listed-group executive: nothing that reads as a share-moving statement.
 - You MAY note a difficulty customers face, factually and in a clause, but NEVER name who causes it.
+- NEVER NAME THE UNDERWRITING BANK (Gary). Do not mention African Bank, do not say "juristic representative",
+  do not cite an FSP number, and do not explain who is regulated or who provides the banking behind MoMo. It is
+  irrelevant to this audience and it drags the focus off MTN MoMo. The doctrine below carries that detail for
+  COMPLIANCE COPY on advertisements; this is a point of view, not an advertisement, so it does not belong here.
+  Equally, never imply MoMo itself is a bank - simply talk about what MoMo DOES and what it makes possible,
+  and leave the corporate structure out of it entirely.
 
 HOW TO WRITE IT:
 - UK British spelling. NEVER an em dash or an en dash: use a comma, a full stop or a plain hyphen.
