@@ -8,7 +8,9 @@ import { getSetting, setSetting, LANDING_LAYOUT } from "@/lib/settings";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const layout = await getSetting(LANDING_LAYOUT, "systems");
+  // Default is "cards", the original floating photos: Gary reviewed the systems layout and rejected it,
+  // so the fallback must be the layout he wants, not the one he turned down.
+  const layout = await getSetting(LANDING_LAYOUT, "cards");
   return NextResponse.json({ layout });
 }
 

@@ -74,11 +74,14 @@ export default function Landing() {
   // the app, not see the logged-out "Get Started" marketing view - which read as a surprise logout. Hold the
   // render until we know, so the CTA never flashes for a signed-in user.
   const [authChecked, setAuthChecked] = useState(false);
-  // WHICH LAYOUT: the six systems, or the original floating influencer photos. Stored in the database so Gary
-  // can switch back without a deploy ("i may go back to how it is now"). ?layout=cards / ?layout=systems
-  // previews the other one without changing what the public sees - so the two can be compared side by side
-  // before committing to either.
-  const [layout, setLayout] = useState<"systems" | "cards">("systems");
+  // WHICH LAYOUT: the original floating influencer photos, or the six systems. Stored in the database so it
+  // switches without a deploy. ?layout=cards / ?layout=systems previews the other one without changing what
+  // the public sees.
+  //
+  // DEFAULTS TO "cards". Gary previewed the systems layout and did not like it, so the photos are the live
+  // page again. The systems code stays because switching is now a click, but the fallback must never be the
+  // layout that was turned down - a failed settings lookup should look like the page he approved.
+  const [layout, setLayout] = useState<"systems" | "cards">("cards");
   useEffect(() => {
     let cancelled = false;
     // Layout FIRST, before the signed-out early return below - otherwise landing here after sign-out would
