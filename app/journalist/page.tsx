@@ -21,9 +21,9 @@ export default async function JournalistPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
-        <Link href="/home" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
+        <Link href="/home" className="text-base font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Journalist</h1>
-        <p className="mt-2 max-w-3xl text-[18px] leading-relaxed text-ink-dim">
+        <p className="mt-2 max-w-3xl text-[20px] leading-relaxed text-ink-dim">
           Thought leadership the CEO can put his name to. It researches the category daily and files what it
           finds here. <b className="text-ink">Industry commentary only</b> - never product promotion, because a
           post that promotes MoMo&apos;s services becomes a regulated financial advertisement. GAS drafts; the
