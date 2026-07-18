@@ -21,6 +21,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
 
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
+  const [answer, setAnswer] = useState("");
   const [querying, setQuerying] = useState(false);
   const [qErr, setQErr] = useState("");
   const [reindexing, setReindexing] = useState(false);
@@ -120,13 +121,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
 
   async function runQuery() {
     if (!query.trim() || querying) return;
-    setQuerying(true); setQErr(""); setHits(null);
+    setQuerying(true); setQErr(""); setHits(null); setAnswer("");
     const r = await fetch(`/api/brains/${brainId}/query`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setQErr(d?.error || "Query failed"); setQuerying(false); return; }
     setHits(d.hits || []);
+    setAnswer(d.answer || "");
     setQuerying(false);
   }
 
@@ -224,14 +226,23 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
         <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Test the brain</div>
         <div className="mt-3 flex gap-2">
           <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runQuery()}
-            placeholder="Ask what the brain knows (e.g. what's the brand's positioning?)"
+            placeholder="Ask the brain anything, e.g. who is the CEO? what is our positioning?"
             className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
           <button onClick={runQuery} disabled={querying || !query.trim()} className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink hover:border-line-strong disabled:opacity-50">
-            {querying ? "Searching…" : "Search"}
+            {querying ? "Thinking…" : "Ask"}
           </button>
         </div>
         {qErr && <p className="mt-2 text-sm text-alert">{qErr}</p>}
-        {hits && hits.length === 0 && <p className="mt-3 text-base text-ink-dim">No matches. Feed the brain some knowledge first.</p>}
+        {/* THE ANSWER, not a pile of search results. The passages stay below it so any answer can be checked
+            against the material it was written from - that is what makes it trustworthy rather than just fluent. */}
+        {answer && (
+          <div className="mt-4 rounded-lg border border-[#a855f7]/35 bg-[#a855f7]/[0.07] p-4">
+            <div className="tabular mb-2 text-[13px] uppercase tracking-[0.18em] text-[#c79bff]">The brain says</div>
+            <p className="whitespace-pre-wrap text-[17px] leading-relaxed text-ink">{answer}</p>
+          </div>
+        )}
+        {hits && hits.length === 0 && !answer && <p className="mt-3 text-base text-ink-dim">No matches. Feed the brain some knowledge first.</p>}
+        {hits && hits.length > 0 && <p className="mt-4 text-[14px] uppercase tracking-wider text-ink-faint">What it read to answer that</p>}
         {hits && hits.length > 0 && (
           <ul className="mt-3 space-y-2">
             {hits.map((h, i) => (

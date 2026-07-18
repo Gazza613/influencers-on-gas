@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { getBrain } from "@/lib/brains";
 import { getBrandKit } from "@/lib/studio";
-import { chunkText, ingestChunks } from "@/lib/rag";
+import { chunkStructured, ingestChunks } from "@/lib/rag";
 import { metered } from "@/lib/usage";
 
 // MAKE THE DOCTRINE RETRIEVABLE.
@@ -47,7 +47,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     [id, DOCTRINE_KIND],
   )) as { id: string }[];
 
-  const pieces = chunkText(doctrine);
+  // Structured, not character-sliced: the doctrine is written in paragraphs and each one is a unit of meaning.
+  // Slicing it at a character count split the CEO's name away from his title and made retrieval look broken.
+  const pieces = chunkStructured(doctrine);
   const stored = await metered(
     { clientId: id, provider: "voyage", model: "voyage-4-lite", unit: "embedding", action: "ingest", count: pieces.length },
     () => ingestChunks(id, null, pieces.map((content, i) => ({
