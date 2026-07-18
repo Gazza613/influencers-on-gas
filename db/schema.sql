@@ -604,4 +604,4 @@ alter table studio_assets add constraint studio_assets_kind_check
 -- any other brand icons), so creatives reuse the real icons rather than inventing them.
 alter table studio_assets drop constraint if exists studio_assets_kind_check;
 alter table studio_assets add constraint studio_assets_kind_check
-  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon','ceo_photo'));
+  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon','ceo_photo','ceo_cutout'));

@@ -182,10 +182,18 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
   // The image on its own. Every run is a fresh generation, so this is a genuine second take.
   async function drawCreative(brief: { subject: string; callout: string }) {
     setDrawing(true); setOptions([]);
+    // A HARD CEILING so the spinner can never hang (Gary watched one for ten minutes). If the render outlives
+    // this, the connection is almost certainly already dead at the gateway, and a spinner that never resolves
+    // tells you nothing. Give up cleanly and say so.
     const c = await fetch("/api/studio/intel/newsletter-creative", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, subject: brief.subject, callout: brief.callout }),
-    }).then((r) => r.json()).catch(() => null);
+      signal: AbortSignal.timeout(5 * 60 * 1000),
+    }).then((r) => r.json()).catch((e) => ({
+      error: (e as Error)?.name === "TimeoutError"
+        ? "The creative took too long and was cut off. The article is safe - hit Rerun image."
+        : "The creative request failed. The article is safe - hit Rerun image.",
+    }));
     setDrawing(false);
     // The CEO build returns THREE options to choose from; the generic path returns one.
     const urls: string[] = Array.isArray(c?.urls) && c.urls.length ? c.urls : c?.url ? [c.url] : [];

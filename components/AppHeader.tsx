@@ -18,10 +18,10 @@ export default function AppHeader() {
   return (
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-y-2 border-b border-line bg-surface-1 px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/home" className="flex items-center gap-2 font-extrabold tracking-tight" title="Switch between Influencers on GAS and GAS Studio">
+        <Link href="/home" className="flex items-center gap-2 font-extrabold tracking-tight" title="The Agency of NOW - all six desks">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/gas-logo.png" alt="GAS" className="h-6 w-6 rounded-full" />
-          <span className="hidden sm:inline">Studio <span className="brand-grad">on</span> GAS</span>
+          <span className="hidden sm:inline">The Agency of <span className="brand-grad">NOW</span></span>
         </Link>
         <span className="hidden text-ink-faint sm:inline">/</span>
         <SetupNav isSuperAdmin={me?.role === "super_admin"} />

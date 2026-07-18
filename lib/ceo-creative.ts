@@ -5,7 +5,7 @@ import { cutoutToTransparent } from "./studio-cutout";
 import { compositeLogo, tidyCallout } from "./studio-slider";
 import { renderPng, fontFaceCss } from "./studio-render";
 import { nameplateCss, nameplateHtml } from "./templates/momo-nameplate";
-import { getBrandKit, listAssets } from "./studio";
+import { getBrandKit, listAssets, addAsset } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
 
@@ -71,17 +71,31 @@ export async function buildCeoCreatives(
   //    be flawless (Gary: "not good, CEO will not approve"), and flood-fill left a ragged, haloed edge on his
   //    suit because his studio background is a grey gradient, not pure white. BiRefNet cuts hair and soft edges
   //    cleanly. Falls back to the flood-fill only if fal is unreachable, so a creative still comes back.
+  //    CACHED. The matte is identical every time for a given photo, but re-running it cost up to 120s on EVERY
+  //    render - a big part of why Gary watched a spinner for ten minutes. Cut once, store it, reuse forever.
+  const cacheName = `cutout:${photo.id}`;
+  const cached = (await listAssets(clientId, "ceo_cutout").catch(() => [])).find((a) => a.name === cacheName);
   let cut: Buffer;
-  const matted = await removeBackground(photo.url).catch(() => ({ url: null as string | null, error: "matting failed" }));
-  if (matted.url) {
-    cut = Buffer.from(new Uint8Array(await (await fetch(matted.url)).arrayBuffer()));
+  if (cached) {
+    cut = Buffer.from(new Uint8Array(await (await fetch(cached.url)).arrayBuffer()));
   } else {
-    const raw = Buffer.from(new Uint8Array(await (await fetch(photo.url)).arrayBuffer()));
-    const fb = await cutoutToTransparent(raw).catch(() => null);
-    if (!fb) return { creatives: [], error: `Could not cut the CEO photo out (${matted.error || "no matting"}).` };
-    cut = fb;
+    const matted = await removeBackground(photo.url).catch(() => ({ url: null as string | null, error: "matting failed" }));
+    if (matted.url) {
+      cut = Buffer.from(new Uint8Array(await (await fetch(matted.url)).arrayBuffer()));
+    } else {
+      const raw = Buffer.from(new Uint8Array(await (await fetch(photo.url)).arrayBuffer()));
+      const fb = await cutoutToTransparent(raw).catch(() => null);
+      if (!fb) return { creatives: [], error: `Could not cut the CEO photo out (${matted.error || "no matting"}).` };
+      cut = fb;
+    }
+    cut = await sharp(cut).trim().png().toBuffer(); // tighten to the subject before caching
+    // Store it so every future render skips the matting entirely. Best effort: a failed cache write must never
+    // fail the creative.
+    try {
+      const cutUrl = await putBytes(cut, `studio/${clientId}/ceo-cutout`, "png", "image/png");
+      await addAsset(clientId, "ceo_cutout", cutUrl, cacheName, { source_photo: photo.id });
+    } catch (e) { console.error("[ceo-creative] could not cache the cut-out:", e); }
   }
-  cut = await sharp(cut).trim().png().toBuffer(); // tighten to the subject
 
   // Size him to sit on the RIGHT, bottom-anchored. Right-aligned with a small right bleed so his left edge lands
   // clear of the message column, whatever his shoulder width.
