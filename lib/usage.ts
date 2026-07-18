@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { getZarPerUsd } from "./fx";
+import { rollUpByDesk, type DeskSpend } from "./desks";
 
 // Higgsfield Ultra: $375 / 9,000 credits per month ⇒ ≈ $0.0417 per credit (USD_PER_CREDIT).
 // The Rand value of a credit is now WIRED TO THE LIVE USD/ZAR RATE (lib/fx.ts) via
@@ -88,7 +89,8 @@ export type CostReport = {
   byUser: { user_email: string; credits: number; cents: number; events: number }[];
   byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
-  byAction: { action: string; credits: number; cents: number }[];
+  byAction: { action: string; credits: number; cents: number; events: number }[];
+  byDesk: DeskSpend[];
   byDay: { day: string; credits: number; cents: number }[];
   influencers: { id: string; name: string }[];
   providers: string[];
@@ -144,14 +146,17 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
     group by i.id, i.name order by max(u.created_at) desc limit 200`)) as CostReport["byInfluencer"];
 
   const byProvider = (await q(`select u.provider, sum(u.credits)::float as credits, sum(u.cents)::int as cents from usage_events u ${where} group by u.provider order by cents desc`)) as CostReport["byProvider"];
-  const byAction = (await q(`select coalesce(u.action,'(other)') as action, sum(u.credits)::float as credits, sum(u.cents)::int as cents from usage_events u ${where} group by u.action order by cents desc`)) as CostReport["byAction"];
+  const byAction = (await q(`select coalesce(u.action,'(other)') as action, sum(u.credits)::float as credits, sum(u.cents)::int as cents, count(*)::int as events from usage_events u ${where} group by u.action order by cents desc`)) as CostReport["byAction"];
+  // Which DESK spent it. Rolled up from the action rows in TypeScript (see lib/desks.ts) rather than a SQL
+  // CASE, so the mapping sits next to the call sites that set the action and cannot drift out of step.
+  const byDesk = rollUpByDesk(byAction);
   const byDay = (await q(`select to_char(date_trunc('day', u.created_at),'YYYY-MM-DD') as day, sum(u.credits)::float as credits, sum(u.cents)::int as cents from usage_events u ${where} group by date_trunc('day', u.created_at) order by date_trunc('day', u.created_at) asc limit 120`)) as CostReport["byDay"];
 
   // Picker option lists (unfiltered).
   const influencers = (await db().query(`select id, name from influencers order by created_at desc limit 500`)) as { id: string; name: string }[];
   const providers = (await db().query(`select distinct provider from usage_events order by provider`) as { provider: string }[]).map((r) => r.provider);
 
-  return { total, split, byUser, byInfluencer, byProvider, byAction, byDay, influencers, providers };
+  return { total, split, byUser, byInfluencer, byProvider, byAction, byDesk, byDay, influencers, providers };
 }
 
 // Total ledger credits/cents recorded since a date (for cycle reconciliation).

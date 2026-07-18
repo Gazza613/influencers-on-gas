@@ -94,6 +94,10 @@ export async function buildCeoCreatives(
     cut = Buffer.from(new Uint8Array(await (await fetch(cached.url)).arrayBuffer()));
   } else {
     const matted = await removeBackground(photo.url).catch(() => ({ url: null as string | null, error: "matting failed" }));
+    // METER IT. This is a paid fal call and it was going unrecorded, so the Journalist's desk under-reported
+    // every CEO creative it produced. Recorded INSIDE the cache miss, never on a cache hit, because a hit
+    // spends nothing. Best effort - a cost write must not fail the creative.
+    await recordUsage({ clientId, provider: "fal", model: "fal-ai/birefnet/v2", unit: "image", action: "ceo-cutout", count: 1 }).catch(() => {});
     if (matted.url) {
       cut = Buffer.from(new Uint8Array(await (await fetch(matted.url)).arrayBuffer()));
     } else {

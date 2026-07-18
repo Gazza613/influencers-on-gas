@@ -169,9 +169,11 @@ export default function Landing() {
       <div style={{ maxWidth: 680, position: "relative", zIndex: 2 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 40 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gas-logo.png" alt="GAS" style={{ width: 110, height: 110, marginBottom: 22, borderRadius: "50%", filter: "drop-shadow(0 10px 32px rgba(255,90,30,0.55))" }} />
-          <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.32em", fontSize: "clamp(22px, 3.2vw, 30px)", fontWeight: 800, letterSpacing: "-0.6px" }}>
-            <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Studio on</span>
+          <img src="/gas-logo.png" alt="GAS" style={{ width: 132, height: 132, marginBottom: 22, borderRadius: "50%", filter: "drop-shadow(0 10px 32px rgba(255,90,30,0.55))" }} />
+          {/* SET IN CAPS (Gary) - the platform name should make a statement. Caps need POSITIVE tracking:
+              the -0.6px that suited mixed case jams uppercase letterforms together and reads as a smudge. */}
+          <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.32em", fontSize: "clamp(22px, 3.2vw, 30px)", fontWeight: 800, letterSpacing: "2.4px" }}>
+            <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>STUDIO ON</span>
             <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
           </div>
         </div>

@@ -9,7 +9,8 @@ type Report = {
   byUser: { user_email: string; credits: number; cents: number; events: number }[];
   byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
-  byAction: { action: string; credits: number; cents: number }[];
+  byAction: { action: string; credits: number; cents: number; events: number }[];
+  byDesk: { desk: string; credits: number; cents: number; events: number; tint: string }[];
   byDay: { day: string; credits: number; cents: number }[];
   influencers: { id: string; name: string }[];
   providers: string[];
@@ -309,6 +310,11 @@ export default function CostControlPage() {
           </div>
         </div>
 
+        {/* WHICH DESK SPENT IT (Gary). The question Cost Control could not answer until now: the ledger knew
+            what was bought but not which of the six desks bought it. Sits above the older tables because it is
+            the first thing anyone actually wants to know. */}
+        {report && report.byDesk.length > 0 && <DeskSplit desks={report.byDesk} />}
+
         {/* Tables */}
         <Section title="By team member">{report && <Table rows={report.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, credits: u.credits, cents: u.cents, sub: `${u.events} jobs` }))} />}</Section>
         <Section title="By influencer (latest builds first)">
@@ -376,6 +382,58 @@ export default function CostControlPage() {
         })()}
       </main>
     </div>
+  );
+}
+
+// SPEND BY DESK. A stacked share bar (where the money went, at a glance) over a per-desk breakdown.
+//
+// Shares are computed from cents, but a desk with real spend that rounds to under 1% still gets a visible
+// sliver - a zero-width segment reads as "this desk is free", which is exactly the wrong conclusion when the
+// Journalist costs R65 against the studio's R1,400. "Unattributed" is shown, never hidden: it is the signal
+// that a new action needs mapping in lib/desks.ts.
+function DeskSplit({ desks }: { desks: { desk: string; credits: number; cents: number; events: number; tint: string }[] }) {
+  const total = desks.reduce((s, d) => s + d.cents, 0);
+  const pct = (c: number) => (total > 0 ? (c / total) * 100 : 0);
+
+  return (
+    <section className="mt-6">
+      <h2 className="tabular mb-2 text-xs uppercase tracking-[0.2em] text-ink-faint">By desk</h2>
+      <div className="rounded-xl border border-line bg-surface-1 p-5">
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-2">
+          {desks.map((d) => (
+            <div key={d.desk} title={`${d.desk} · ${rand(d.cents)}`} style={{ width: `${Math.max(pct(d.cents), d.cents > 0 ? 0.8 : 0)}%`, background: d.tint }} />
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          {desks.map((d) => (
+            <div key={d.desk} className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-2.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.tint }} />
+                <span className="truncate text-sm font-semibold text-ink">{d.desk}</span>
+                <span className="tabular shrink-0 text-[11px] text-ink-faint">{d.events.toLocaleString()} jobs</span>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="tabular text-sm font-bold text-ink">{rand(d.cents)}</div>
+                {/* A desk that ran real jobs for R0 is NOT a metering gap, and must not read as one. The
+                    creative factory runs on nano_banana_pro / gpt_image_2, which the Higgsfield Ultra plan
+                    bills at zero, so its marginal cost genuinely is nil. Say so, rather than showing a bare
+                    R0.00 that looks like something failed to record. */}
+                {d.cents === 0 && d.events > 0
+                  ? <div className="text-[11px] font-medium text-ready">included in the plan</div>
+                  : <div className="tabular text-[11px] text-ink-faint">{pct(d.cents).toFixed(1)}%{d.credits >= 1 && ` · ${Math.round(d.credits).toLocaleString()} cr`}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {desks.some((d) => d.desk === "Unattributed") && (
+          <p className="mt-3 text-[11px] text-ink-faint">
+            <strong className="text-ink-dim">Unattributed</strong> means a new job type has shipped that no desk claims yet. Map its action in <code>lib/desks.ts</code> and it moves to the right desk, including its history.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 

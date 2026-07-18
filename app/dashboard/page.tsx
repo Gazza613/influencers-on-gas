@@ -151,8 +151,10 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#d8b4fe]",
       },
       {
-        // Renamed from "GAS Studio" (Gary) so it joins the "... on GAS" family.
-        name: <>Studio <span className="brand-grad">on</span> GAS</>,
+        // "Creatives on GAS", not "Studio on GAS" (Gary). STUDIO ON GAS is now the PLATFORM - the whole thing,
+        // all six desks. This tile is one desk inside it: the creative factory. Sharing the name made the part
+        // look like the whole, so the desk is named for what it actually produces.
+        name: <>Creatives <span className="brand-grad">on</span> GAS</>,
         href: "/studio",
         mark: <StudioMark />,
         blurb: "A brief in, a publish-ready funnel out. Every creative built on the client's own proven designs, never invented from scratch.",

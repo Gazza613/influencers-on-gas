@@ -17,6 +17,12 @@ const ROWS: [string, string, string, number, number][] = [
   ["heygen", "talking_photo", "video", 0, 0], // legacy build/twin presenter - same HeyGen plan
   ["heygen", "talking_photo", "avatar", 0, 0], // legacy build/twin presenter - same HeyGen plan
   ["fal", "omnihuman_1_5", "second", 0, 296], // OmniHuman 1.5 a-roll - fal PAYG $0.16/s ≈ R2.96/s (metered per second)
+  // BiRefNet v2 matting (the CEO cut-out and the funnel subject cuts). DERIVED, NOT PUBLISHED: fal quotes no
+  // per-image price for BiRefNet - the model page says "billed per compute second" - so this is built from
+  // fal's own published H100 list rate of $3.99/h (= $0.001108/s) over a ~2.3s matte, giving ~$0.0025/image
+  // ≈ 5 ZAR cents at R18.5/$. Rounded UP so the desk over-reports rather than under-reports. Re-price the
+  // moment fal publishes a per-image figure, or from a real invoice line.
+  ["fal", "fal-ai/birefnet/v2", "image", 0, 5],
   ["elevenlabs", "eleven_multilingual_v2", "tts", 0, 0], // within the ElevenLabs subscription quota
   ["elevenlabs", "clone", "voice", 0, 0], // voice clone - within subscription quota
   ["elevenlabs", "scribe_v1", "stt", 0, 0], // Scribe STT - within subscription quota
