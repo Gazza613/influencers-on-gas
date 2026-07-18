@@ -44,6 +44,7 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [duplicates, setDuplicates] = useState(0);
   const [cleaning, setCleaning] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async (nextOffset: number, search: string) => {
     setLoading(true);
@@ -97,6 +98,19 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
     } else flex("Could not clean up the duplicates. Please try again.");
   }
 
+  // Replaces any previously synced doctrine, so pressing this twice is the same as pressing it once.
+  async function syncDoctrine() {
+    if (syncing) return;
+    setSyncing(true);
+    const r = await fetch(`/api/brains/${brainId}/sync-doctrine`, { method: "POST" }).catch(() => null);
+    const d = await r?.json().catch(() => ({}));
+    setSyncing(false);
+    if (r?.ok) {
+      setChunks([]); await load(0, term);
+      flex(`Doctrine synced: ${d.stored} passage${d.stored === 1 ? "" : "s"} the brain can now retrieve.`);
+    } else flex(d?.error || "Could not sync the doctrine.");
+  }
+
   function search(e?: React.FormEvent) {
     e?.preventDefault();
     setChunks([]);
@@ -116,6 +130,20 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
           {open ? "Hide" : `Inspect ${total} passage${total === 1 ? "" : "s"}`}
         </span>
       </button>
+
+      {/* SYNC THE DOCTRINE. The brand doctrine is written on the brand kit, and a handful of routes read it
+          there directly - but the brain searches chunks, so until it is synced none of it is retrievable and
+          the brain answers from scraped pages alone. Safe to press repeatedly: it replaces, never appends. */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface-2 px-4 py-3">
+        <p className="text-[15px] text-ink-dim">
+          <b className="text-ink">Brand doctrine.</b> The positioning, rules and proof points written on this
+          client&apos;s brand kit. Sync it so the brain can actually retrieve it, and re-sync whenever you change it.
+        </p>
+        <button onClick={syncDoctrine} disabled={syncing}
+          className="shrink-0 rounded-lg border border-[#a855f7]/40 px-3.5 py-2 text-[15px] font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+          {syncing ? "Syncing…" : "↻ Sync the doctrine"}
+        </button>
+      </div>
 
       {open && (
         <div className="mt-5">
