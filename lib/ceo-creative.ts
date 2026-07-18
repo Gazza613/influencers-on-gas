@@ -22,10 +22,21 @@ import { recordUsage } from "./usage";
 // Three backdrop directions. Abstract and branded, never a busy human scene - a clean studio cut-out sits
 // naturally on a simple MoMo field and looks pasted on a crowded street. This is also how his real exec cards
 // are built.
+// THREE GENUINELY DIFFERENT PLACES (Gary: the first set were all much the same). One studio, one corporate
+// interior, one with a view - so the choice is a real choice.
+//
+// NOTE ON BRANDING: we describe a modern corporate headquarters, never "the MTN building" with signage. An AI
+// drawing MTN branding would be inventing a brand asset, which is the one thing we never do - the real logo is
+// composited on afterwards.
 const BACKDROPS = [
-  "a premium deep navy studio background with a soft top-lit gradient, subtle and clean, corporate",
-  "a deep navy background with one soft curved MoMo light-swish/glow arcing behind, gentle and premium",
-  "a deep navy background with a faint, heavily blurred out-of-focus modern office suggested in the darkness",
+  // 1. Corporate studio - the clean, formal option that already works.
+  "a premium deep navy studio backdrop with a soft top-lit gradient, clean, formal, corporate portrait lighting",
+  // 2. Inside a modern corporate HQ.
+  "the interior of a modern corporate headquarters office in Johannesburg: glass partitions, warm downlighting, " +
+  "dark tones, softly out of focus at a shallow depth of field so it reads as a real place behind the subject",
+  // 3. A skyline view, evening.
+  "a modern executive office at dusk with floor-to-ceiling windows and a softly blurred Johannesburg city " +
+  "skyline glowing beyond the glass, deep blue evening tones, shallow depth of field",
 ];
 
 export type CeoCreative = { url: string; error?: string };
@@ -34,10 +45,19 @@ export async function buildCeoCreatives(
   clientId: string,
   opts: { message: string; name?: string; title?: string },
 ): Promise<{ creatives: CeoCreative[]; error: string | null }> {
-  // 1. His real photo. Prefer a portrait-ish one; the team uploads clean studio shots.
+  // 1. His real photo - THE LARGEST ONE ON FILE, not the most recent.
+  //    listAssets returns newest-first, so taking photos[0] grabbed whichever was uploaded last. That picked a
+  //    500x534 shot over a 1022x1533 one and scaled it ~1.9x to fill the frame, which is exactly why he came
+  //    back pixelated (Gary). Resolution is the whole game for a CEO's face, so we choose on pixels.
   const photos = await listAssets(clientId, "ceo_photo");
   if (!photos.length) return { creatives: [], error: "No CEO photo on file. Upload one on the intake page first." };
-  const photo = photos[0];
+  const sized = await Promise.all(photos.map(async (p) => {
+    try {
+      const m = await sharp(Buffer.from(new Uint8Array(await (await fetch(p.url)).arrayBuffer()))).metadata();
+      return { p, h: m.height || 0, area: (m.width || 0) * (m.height || 0) };
+    } catch { return { p, h: 0, area: 0 }; }
+  }));
+  const photo = sized.sort((a, b) => b.area - a.area)[0].p;
 
   const kit = await getBrandKit(clientId).catch(() => null);
   const fonts = (kit?.fonts || []) as { family: string; url: string }[];
@@ -66,12 +86,16 @@ export async function buildCeoCreatives(
   // Size him to sit on the RIGHT, bottom-anchored. Right-aligned with a small right bleed so his left edge lands
   // clear of the message column, whatever his shoulder width.
   const cm = await sharp(cut).metadata();
-  const figH = Math.round(H * 0.86);
-  const figW = Math.round((cm.width || 800) * (figH / (cm.height || 1000)));
-  const figure = await sharp(cut).resize({ height: figH }).png().toBuffer();
-  // His leftmost point is forced to at least 50% of the width, so the headline never reaches him (Gary: "must
-  // never go over the subject's face"). If he is wide, he bleeds further off the right edge instead.
-  const figLeft = Math.max(Math.round(W * 0.50), W - figW);
+  // NEVER UPSCALE HARD. Enlarging a small cut-out cannot add detail, it only softens his face - the pixelation
+  // Gary saw. Allow a mild 1.15x at most, otherwise render him at his native size and let him sit slightly
+  // smaller in frame. Crisp and smaller beats big and mushy on a CEO.
+  const nativeH = cm.height || 0;
+  const figH = Math.min(Math.round(H * 0.86), Math.round((nativeH || H) * 1.15));
+  const figW = Math.round((cm.width || 800) * (figH / (nativeH || 1000)));
+  const figure = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
+  // He sits a little further LEFT now (Gary), while his leftmost point still clears the message column so the
+  // headline can never reach him. If he is wide, he bleeds further off the right edge instead.
+  const figLeft = Math.max(Math.round(W * 0.45), W - figW);
   const figTop = H - figH;
 
   // 3. The foreground overlay - message (left), name plate (bottom-left), compliance (footer) - one render.
@@ -133,9 +157,9 @@ async function renderCeoOverlay(W: number, H: number, message: string, name: str
   // THE MESSAGE LIVES IN A LEFT COLUMN THAT NEVER REACHES HIM. His figure's leftmost is forced to >= 50% of the
   // width, so the column is capped at 42% and auto-sized so even the LONGEST WORD fits inside it - a long word
   // cannot break, so the type must shrink to the column rather than run under his shoulder (Gary).
-  const colW = W * 0.42;
+  const colW = W * 0.37;
   const longestWord = Math.max(...message.split(/\s+/).map((w) => w.length), 1);
-  const msgSize = Math.max(Math.round(H * 0.042), Math.min(Math.round(H * 0.076), Math.floor(colW / (longestWord * 0.60))));
+  const msgSize = Math.max(Math.round(H * 0.040), Math.min(Math.round(H * 0.072), Math.floor(colW / (longestWord * 0.60))));
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${fontFaceCss(fonts)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -143,7 +167,7 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
 /* A soft dark wash on the left so white type reads whatever the backdrop does behind it. */
 .wash{position:absolute;inset:0;background:linear-gradient(102deg, rgba(4,25,40,.85) 0%, rgba(4,25,40,.5) 30%, transparent 52%)}
 .foot{position:absolute;left:0;right:0;bottom:0;height:8%;background:${"#004F71"}}
-.msg{position:absolute;left:6.5%;top:17%;width:42%;color:#fff;font-family:'MTNBrighterSans',sans-serif;
+.msg{position:absolute;left:6%;top:17%;width:37%;color:#fff;font-family:'MTNBrighterSans',sans-serif;
   font-weight:800;font-size:${msgSize}px;line-height:1.06;letter-spacing:-1px;text-shadow:0 3px 18px rgba(0,0,0,.55)}
 .plate{position:absolute;left:6.5%;bottom:12%}
 ${nameplateCss(0.42)}
