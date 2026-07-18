@@ -1,7 +1,5 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
-import { getTileArt } from "@/lib/tile-art";
-import TileArtControls from "@/components/TileArtControls";
 
 // THE AGENCY OF NOW - the first screen after sign-in. It does one job: get the team to the right desk.
 //
@@ -109,9 +107,6 @@ function PsiMark() {
 }
 
 type Door = {
-  // Stable identifier, used to hang artwork on this tile. Never the display name: the copy gets reworded
-  // (Studio on GAS -> Creatives on GAS already happened once) and artwork must survive that.
-  key: string;
   name: React.ReactNode;
   href: string;
   external?: boolean;
@@ -145,7 +140,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
     note: "The work itself",
     doors: [
       {
-        key: "influencers",
         name: <>Influencers <span className="brand-grad">on</span> GAS</>,
         href: "/influencers",
         mark: <InfluencerMark />,
@@ -160,7 +154,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         // "Creatives on GAS", not "Studio on GAS" (Gary). STUDIO ON GAS is now the PLATFORM - the whole thing,
         // all six desks. This tile is one desk inside it: the creative factory. Sharing the name made the part
         // look like the whole, so the desk is named for what it actually produces.
-        key: "creatives",
         name: <>Creatives <span className="brand-grad">on</span> GAS</>,
         href: "/studio",
         mark: <StudioMark />,
@@ -177,7 +170,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
     note: "Live, in market, right now",
     doors: [
       {
-        key: "media",
         name: <>Media <span className="brand-grad">on</span> GAS</>,
         href: "https://media.gasmarketing.co.za/",
         external: true,
@@ -189,7 +181,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#7dd3fc]",
       },
       {
-        key: "psi",
         name: <>PSI <span className="brand-grad">on</span> GAS</>,
         href: "https://psi.gasmarketing.co.za/",
         external: true,
@@ -207,7 +198,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
     note: "Researched daily, sourced, never assumed",
     doors: [
       {
-        key: "strategist",
         name: <>The Strategist</>,
         href: "/strategist",
         mark: <StrategistMark />,
@@ -218,7 +208,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#a5b4fc]",
       },
       {
-        key: "journalist",
         name: <>The Journalist</>,
         href: "/journalist",
         mark: <JournalistMark />,
@@ -232,7 +221,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   },
 ];
 
-function Tile({ d, index = 0, art }: { d: Door; index?: number; art?: { url: string; source: string } }) {
+function Tile({ d, index = 0 }: { d: Door; index?: number }) {
   // The card is a CONTAINER, not itself a link, so a second destination (the showcase eye) can live inside it.
   // Nesting an anchor inside an anchor is invalid HTML and breaks the inner click, so the main destination is a
   // stretched overlay link and the eye sits above it on a higher layer.
@@ -243,18 +232,6 @@ function Tile({ d, index = 0, art }: { d: Door; index?: number; art?: { url: str
 
   return (
     <div className={`${cls} gas-rise`} style={{ animationDelay: `${80 + index * 90}ms` }}>
-      {/* THE WORK ITSELF, sitting UNDER everything else. Low opacity and a heavy gradient scrim so the mark
-          and the copy keep their contrast: this is atmosphere, not a hero image. It lifts a touch on hover,
-          which makes the card feel like it is holding something real rather than wearing a texture. */}
-      {art && (
-        <span aria-hidden className="pointer-events-none absolute inset-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={art.url} alt="" loading="lazy" decoding="async"
-            className="h-full w-full scale-105 object-cover opacity-[0.18] transition duration-700 group-hover:scale-110 group-hover:opacity-[0.28]" />
-          <span className="absolute inset-0 bg-gradient-to-t from-[#07070E] via-[#07070E]/85 to-[#07070E]/55" />
-        </span>
-      )}
-
       {/* A soft light that only wakes on hover - the card feels lit rather than decorated. */}
       <span aria-hidden className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${d.wash} opacity-0 blur-2xl transition duration-500 group-hover:opacity-100`} />
 
@@ -286,11 +263,7 @@ function Tile({ d, index = 0, art }: { d: Door; index?: number; art?: { url: str
   );
 }
 
-export default async function HomePage() {
-  // Artwork is pulled from the work the platform has actually produced. Never allowed to break the front
-  // door: if the lookup fails the tiles simply render as they always did, marks and colour only.
-  const art = await getTileArt().catch(() => ({} as Record<string, { url: string; source: string }>));
-
+export default function HomePage() {
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* AMBIENT DEPTH. The page was reading flat (Gary), so it now breathes: soft flares that slowly pulse and
@@ -348,15 +321,12 @@ export default async function HomePage() {
                 <span aria-hidden className="gas-draw h-px flex-1 bg-gradient-to-r from-line to-transparent" />
               </div>
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
-                {g.doors.map((d, n) => <Tile key={d.href} d={d} index={gi * 2 + n} art={art[d.key]} />)}
+                {g.doors.map((d, n) => <Tile key={d.href} d={d} index={gi * 2 + n} />)}
               </div>
             </section>
           ))}
         </div>
       </main>
-
-      {/* The way back, super-admin only and deliberately quiet at the foot of the page. */}
-      <TileArtControls />
     </div>
   );
 }
