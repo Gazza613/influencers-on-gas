@@ -23,7 +23,7 @@ export default function GasStudioPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-        <Link href="/home" className="text-xs font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
+        <Link href="/home" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
 
         <div className="mt-4 flex items-center gap-3">
           <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
@@ -38,7 +38,7 @@ export default function GasStudioPage() {
           </svg>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight">GAS Studio</h1>
-            <p className="text-sm text-ink-dim">The template creative factory</p>
+            <p className="text-base text-ink-dim">The template creative factory</p>
           </div>
         </div>
 
@@ -46,8 +46,8 @@ export default function GasStudioPage() {
           href="/studio/intake"
           className="group mt-6 block rounded-xl border border-[#60a5fa]/40 bg-gradient-to-br from-[#60a5fa]/[0.12] to-[#22d3ee]/[0.05] px-5 py-4 transition hover:border-[#60a5fa]/75"
         >
-          <p className="text-[15px] font-bold text-ink">Template intake →</p>
-          <p className="mt-1 text-[14px] leading-relaxed text-ink-dim">
+          <p className="text-[17px] font-bold text-ink">Template intake →</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">
             Start here. Upload the reference set your team designed by hand, plus the licensed fonts and
             approved logos. Every template is recreated from your reference and locked against it.
           </p>
@@ -57,8 +57,8 @@ export default function GasStudioPage() {
           href="/studio/build"
           className="group mt-4 block rounded-xl border border-[#818cf8]/40 bg-gradient-to-br from-[#818cf8]/[0.12] to-[#f472b6]/[0.05] px-5 py-4 transition hover:border-[#818cf8]/75"
         >
-          <p className="text-[15px] font-bold text-ink">Funnel builder →</p>
-          <p className="mt-1 text-[14px] leading-relaxed text-ink-dim">
+          <p className="text-[17px] font-bold text-ink">Funnel builder →</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">
             Build the funnel section by section. Pick one of your own proven designs per section, say who
             should be in it, generate, and accept or rerun - 1 masthead, 1 section 1, 3 sliders. Every
             creative is your design with a new person, nothing invented.
@@ -69,24 +69,24 @@ export default function GasStudioPage() {
           href="/studio/campaign"
           className="group mt-3 block rounded-xl border border-line px-5 py-3 transition hover:border-ink-dim"
         >
-          <p className="text-[14px] font-bold text-ink-dim">Producer (brief → full set in one go) →</p>
+          <p className="text-[15px] font-bold text-ink-dim">Producer (brief → full set in one go) →</p>
         </Link>
 
-        <p className="mt-6 text-[15px] leading-relaxed text-ink-dim">
+        <p className="mt-6 text-[17px] leading-relaxed text-ink-dim">
           One campaign order renders every static, motion cut, funnel and SMS a client needs - off designs
           locked as code, so the layout can never drift between campaigns. You supply the brief. The system
           designs the creatives, writes the copy and generates the imagery, and a human approves before
           anything ships.
         </p>
 
-        <h2 className="mt-8 text-xs font-bold uppercase tracking-[0.2em] text-ink-faint">What&apos;s coming, in order</h2>
+        <h2 className="mt-8 text-sm font-bold uppercase tracking-[0.2em] text-ink-faint">What&apos;s coming, in order</h2>
         <ol className="mt-3 space-y-2">
           {PHASES.map((p) => (
             <li key={p.n} className="flex gap-3 rounded-xl border border-line bg-surface-1 px-4 py-3">
-              <span className="tabular mt-0.5 h-6 w-6 shrink-0 rounded-full border border-line text-center text-xs font-bold leading-6 text-ink-faint">{p.n}</span>
+              <span className="tabular mt-0.5 h-6 w-6 shrink-0 rounded-full border border-line text-center text-sm font-bold leading-6 text-ink-faint">{p.n}</span>
               <div>
-                <p className="text-[15px] font-bold text-ink">{p.title}</p>
-                <p className="mt-0.5 text-[14px] leading-relaxed text-ink-dim">{p.detail}</p>
+                <p className="text-[17px] font-bold text-ink">{p.title}</p>
+                <p className="mt-0.5 text-[15px] leading-relaxed text-ink-dim">{p.detail}</p>
               </div>
             </li>
           ))}

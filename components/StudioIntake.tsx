@@ -145,15 +145,15 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
     <div className="mt-6 space-y-6">
       {/* CLIENT */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Client</div>
-        {progress && <p className="mt-2 text-[12px] text-[#93c5fd]">Uploading {progress}…</p>}
+        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Client</div>
+        {progress && <p className="mt-2 text-[14px] text-[#93c5fd]">Uploading {progress}…</p>}
         {clients.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-dim">
+          <p className="mt-3 text-base text-ink-dim">
             No clients yet. A client is created in <a href="/setup/brains" className="text-[#93c5fd] underline">Brains</a> - one client record carries the brand, the brain and the Studio templates.
           </p>
         ) : (
           <select value={clientId} onChange={(e) => setClientId(e.target.value)}
-            className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#60a5fa]">
+            className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base text-ink outline-none focus:border-[#60a5fa]">
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
@@ -162,19 +162,19 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
       {/* BRAND KIT - fonts first: without the licensed files, server-rendered text can never match the design. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Brand kit</div>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Brand kit</div>
           {/* A standing receipt of what we hold, so you never have to wonder whether an upload landed. */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${fonts.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]"}`}>
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[14px] font-bold ${fonts.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]"}`}>
               {fonts.length} font{fonts.length === 1 ? "" : "s"}
             </span>
-            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${logos.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[14px] font-bold ${logos.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
               {logos.length} logo{logos.length === 1 ? "" : "s"}
             </span>
-            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${assets.filter((a) => a.kind === "deal_card").length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[14px] font-bold ${assets.filter((a) => a.kind === "deal_card").length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
               {assets.filter((a) => a.kind === "deal_card").length} deal card{assets.filter((a) => a.kind === "deal_card").length === 1 ? "" : "s"}
             </span>
-            <span className={`tabular rounded-full border px-2.5 py-1 text-[11px] font-bold ${templates.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
+            <span className={`tabular rounded-full border px-2.5 py-1 text-[14px] font-bold ${templates.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-line text-ink-faint"}`}>
               {templates.length} reference{templates.length === 1 ? "" : "s"}
             </span>
           </div>
@@ -182,12 +182,12 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-sm font-bold text-ink">Licensed fonts <span className="text-[#f87171]">*</span></p>
-            <p className="mt-1 text-[13px] leading-relaxed text-ink-dim">
+            <p className="text-base font-bold text-ink">Licensed fonts <span className="text-[#f87171]">*</span></p>
+            <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">
               The real font files we render with (.woff2 / .otf / .ttf). Without these the rendered text
               cannot match the design, and no CSS fixes it. Upload every weight you use.
             </p>
-            <label className="mt-2 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+            <label className="mt-2 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
               {busy === "font" ? "Uploading…" : "＋ Add font files"}
               <input type="file" multiple accept=".woff2,.woff,.otf,.ttf" className="hidden"
                 onChange={(e) => send(e.target.files, "font")} />
@@ -195,7 +195,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
             {fontFamilies.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {fontFamilies.map(([family, count]) => (
-                  <li key={family} className="tabular text-[11px] text-[#86efac]">
+                  <li key={family} className="tabular text-[14px] text-[#86efac]">
                     ✓ {family} <span className="text-ink-faint">· {count} weight{count === 1 ? "" : "s"}</span>
                   </li>
                 ))}
@@ -204,12 +204,12 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           </div>
 
           <div>
-            <p className="text-sm font-bold text-ink">Approved logos</p>
-            <p className="mt-1 text-[13px] leading-relaxed text-ink-dim">
+            <p className="text-base font-bold text-ink">Approved logos</p>
+            <p className="mt-1 text-[15px] leading-relaxed text-ink-dim">
               The client&apos;s approved marks (transparent PNG, or SVG). Used by both the funnel and the
               social sets, so they live here once.
             </p>
-            <label className="mt-2 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+            <label className="mt-2 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
               {busy === "logo" ? "Uploading…" : "＋ Add logos"}
               <input type="file" multiple accept="image/png,image/svg+xml,image/jpeg" className="hidden"
                 onChange={(e) => send(e.target.files, "logo")} />
@@ -229,10 +229,10 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
       {/* THE FUNNEL REFERENCE SET */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex items-center justify-between">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Funnel creatives — the reference set</div>
-          <span className="tabular text-[11px] text-ink-faint">{templates.length} ingested</span>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Funnel creatives — the reference set</div>
+          <span className="tabular text-[14px] text-ink-faint">{templates.length} ingested</span>
         </div>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
           Many versions of a layout pile up over time. Mark the ONE that is current and approved with ★ - that
           file becomes the design contract, the thing the coded template must match pixel for pixel at lock
           time. Recreating a stale version would bake a dead design into the contract, so it&apos;s your call,
@@ -247,12 +247,12 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
               <div key={p.key} className="rounded-lg border border-line bg-surface-2 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-bold text-ink">
+                    <p className="text-base font-bold text-ink">
                       {p.label}
-                      <span className="tabular ml-2 text-[11px] font-normal text-[#93c5fd]">{p.w}×{p.h} locked</span>
-                      {approved > 0 && <span className="ml-2 text-[11px] font-bold text-[#86efac]">★ approved</span>}
+                      <span className="tabular ml-2 text-[14px] font-normal text-[#93c5fd]">{p.w}×{p.h} locked</span>
+                      {approved > 0 && <span className="ml-2 text-[14px] font-bold text-[#86efac]">★ approved</span>}
                     </p>
-                    <p className="text-[12px] text-ink-faint">{p.hint} · {got.length} uploaded</p>
+                    <p className="text-[14px] text-ink-faint">{p.hint} · {got.length} uploaded</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {got.length > 1 && (
@@ -260,10 +260,10 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
                         onClick={() => analyse(p.key)}
                         disabled={!!busy}
                         title="Read every creative in this set and work out the locked design vs the editable slots"
-                        className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40"
+                        className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-sm font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40"
                       >{busy === `analyse-${p.key}` ? "✨ Reading the set…" : "✨ Read the set"}</button>
                     )}
-                  <label className="cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+                  <label className="cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
                     {busy === "reference" ? "Uploading…" : got.length ? "＋ Add more" : "＋ Upload"}
                     <input type="file" multiple accept="image/png,image/jpeg" className="hidden"
                       onChange={(e) => send(e.target.files, "reference", p.key)} />
@@ -281,9 +281,9 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={t.reference_url} alt={t.name} className="w-full rounded-md border border-line bg-surface-1 object-contain" style={{ aspectRatio: `${p.w}/${p.h}` }} />
                           )}
-                          <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={t.name}>{t.name}</p>
+                          <p className="tabular mt-1 truncate text-[13px] text-ink-dim" title={t.name}>{t.name}</p>
                           {/* A file that isn't on the locked canvas can't be the contract - say so plainly. */}
-                          <p className={`tabular text-[10px] ${wrongSize ? "font-bold text-[#fca5a5]" : "text-ink-faint"}`}>
+                          <p className={`tabular text-[13px] ${wrongSize ? "font-bold text-[#fca5a5]" : "text-ink-faint"}`}>
                             {t.width}×{t.height}{wrongSize ? " ⚠ off-canvas" : ""}
                           </p>
                           <div className="mt-0.5 flex items-center gap-2">
@@ -291,9 +291,9 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
                               onClick={() => approveRef(t.id, !isApproved)}
                               disabled={wrongSize && !isApproved}
                               title={wrongSize ? `This isn't ${p.w}×${p.h}, so it can't be the design contract.` : isApproved ? "Approved - this is the design contract" : "Make this the approved design"}
-                              className={`text-[10px] font-bold disabled:opacity-30 ${isApproved ? "text-[#86efac]" : "text-[#93c5fd] hover:underline"}`}
+                              className={`text-[13px] font-bold disabled:opacity-30 ${isApproved ? "text-[#86efac]" : "text-[#93c5fd] hover:underline"}`}
                             >{isApproved ? "★ approved" : "☆ approve"}</button>
-                            <button onClick={() => remove("template", t.id)} className="text-[10px] text-alert hover:underline">remove</button>
+                            <button onClick={() => remove("template", t.id)} className="text-[13px] text-alert hover:underline">remove</button>
                           </div>
                         </div>
                       );
@@ -311,10 +311,10 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           disclosure that gets paraphrased is a compliance breach, so this text is a fixed block. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex items-center justify-between">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Compliance line</div>
-          {savedCompliance && <span className="tabular text-[11px] text-[#86efac]">saved ✓</span>}
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Compliance line</div>
+          {savedCompliance && <span className="tabular text-[14px] text-[#86efac]">saved ✓</span>}
         </div>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
           Paste the client&apos;s compliance sentence here (for example: <span className="text-ink-faint">Ts&amp;Cs Apply · Queries? 083135 · MTN JR AUTH FSP 46094</span>).
           It gets reproduced word for word on any creative that needs it. The copy engine can never rewrite
           or shorten it, so the disclosure stays intact on every asset.
@@ -324,12 +324,12 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           onChange={(e) => { setCompliance(e.target.value); setSavedCompliance(false); }}
           rows={3}
           placeholder="Copy the compliance sentence here…"
-          className="mt-3 w-full resize-none rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[14px] leading-relaxed text-ink outline-none focus:border-[#60a5fa]"
+          className="mt-3 w-full resize-none rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[15px] leading-relaxed text-ink outline-none focus:border-[#60a5fa]"
         />
         <button
           onClick={saveCompliance}
           disabled={busy === "compliance" || !clientId}
-          className="mt-2 rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
+          className="mt-2 rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
         >{busy === "compliance" ? "Saving…" : "Save compliance line"}</button>
       </div>
 
@@ -340,16 +340,16 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           reference. Deal cards serve the funnel AND the social sets. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex items-center justify-between">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Deal cards</div>
-          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "deal_card").length} uploaded</span>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Deal cards</div>
+          <span className="tabular text-[14px] text-ink-faint">{assets.filter((a) => a.kind === "deal_card").length} uploaded</span>
         </div>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
           Your deal card designs. Upload each one and I recreate it as a pixel-matched component with the
           offer text as an editable slot, so the team can change &quot;R50 cashback&quot; to anything without a
           designer touching it, and the card still looks exactly like this reference. They&apos;re shared across
           the funnel and the social sets.
         </p>
-        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
           {busy === "deal_card" ? "Uploading…" : "＋ Add deal cards"}
           <input type="file" multiple accept="image/png,image/jpeg,image/svg+xml" className="hidden"
             onChange={(e) => send(e.target.files, "deal_card")} />
@@ -360,9 +360,9 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
               <div key={a.id} className="w-[150px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={a.url} alt={a.name ?? "deal card"} className="w-full rounded-md border border-line bg-surface-2 object-contain p-2" />
-                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
-                <p className="tabular text-[10px] text-ink-faint">{a.meta?.width}×{a.meta?.height}</p>
-                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+                <p className="tabular mt-1 truncate text-[13px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <p className="tabular text-[13px] text-ink-faint">{a.meta?.width}×{a.meta?.height}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[13px] text-alert hover:underline">Remove</button>
               </div>
             ))}
           </div>
@@ -373,15 +373,15 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           or offer screenshot - never AI-invented UI. These are the approved screens to pick from. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex items-center justify-between">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">MoMo phone screenshots</div>
-          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "phone_screen").length} uploaded</span>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">MoMo phone screenshots</div>
+          <span className="tabular text-[14px] text-ink-faint">{assets.filter((a) => a.kind === "phone_screen").length} uploaded</span>
         </div>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
           Approved MoMo app and offer screenshots. When a creative shows someone holding up a phone, the screen
           must be one of these real screenshots - the system never invents app UI. Upload the ones your team
           approves and we reference them at build time.
         </p>
-        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
           {busy === "phone_screen" ? "Uploading…" : "＋ Add phone screenshots"}
           <input type="file" multiple accept="image/png,image/jpeg" className="hidden"
             onChange={(e) => send(e.target.files, "phone_screen")} />
@@ -392,8 +392,8 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
               <div key={a.id} className="w-[110px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={a.url} alt={a.name ?? "phone screen"} className="w-full rounded-md border border-line bg-surface-2 object-contain p-1" />
-                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
-                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+                <p className="tabular mt-1 truncate text-[13px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[13px] text-alert hover:underline">Remove</button>
               </div>
             ))}
           </div>
@@ -405,16 +405,16 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           use his image in AI-composited creative must be on file before these are used. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex items-center justify-between">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">CEO photos</div>
-          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "ceo_photo").length} uploaded</span>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">CEO photos</div>
+          <span className="tabular text-[14px] text-ink-faint">{assets.filter((a) => a.kind === "ceo_photo").length} uploaded</span>
         </div>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
           The executive&apos;s own photographs, for the CEO newsletter creative. His REAL face is cut out and
           composited in, so it is forensically him, never a generated lookalike. <b className="text-ink-dim">Clean
           white-background studio shots work best</b> (crisp edges, even light). Consent to use his image must be
           on file.
         </p>
-        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-bold text-[#c79bff] hover:bg-[#a855f7]/10">
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-sm font-bold text-[#c79bff] hover:bg-[#a855f7]/10">
           {busy === "ceo_photo" ? "Uploading…" : "＋ Add CEO photos"}
           <input type="file" multiple accept="image/png,image/jpeg,image/webp" className="hidden"
             onChange={(e) => send(e.target.files, "ceo_photo")} />
@@ -425,8 +425,8 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
               <div key={a.id} className="w-[92px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={a.url} alt={a.name ?? "CEO photo"} className="w-full rounded-md border border-line bg-surface-2 object-cover" style={{ aspectRatio: "3/4" }} />
-                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
-                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+                <p className="tabular mt-1 truncate text-[13px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[13px] text-alert hover:underline">Remove</button>
               </div>
             ))}
           </div>
@@ -437,15 +437,15 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           creatives reuse the real icons, never invented ones. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex items-center justify-between">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Brand icons</div>
-          <span className="tabular text-[11px] text-ink-faint">{assets.filter((a) => a.kind === "brand_icon").length} uploaded</span>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Brand icons</div>
+          <span className="tabular text-[14px] text-ink-faint">{assets.filter((a) => a.kind === "brand_icon").length} uploaded</span>
         </div>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
           The brand&apos;s icon library - the floating icon bubbles (dice, call, bag, tap-to-pay, wifi) and any
           other approved icons. Upload them so creatives reuse the real icons rather than inventing them. PNG
           with transparency is ideal.
         </p>
-        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-xs font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
           {busy === "brand_icon" ? "Uploading…" : "＋ Add brand icons"}
           <input type="file" multiple accept="image/png,image/svg+xml,image/jpeg" className="hidden"
             onChange={(e) => send(e.target.files, "brand_icon")} />
@@ -456,8 +456,8 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
               <div key={a.id} className="w-[92px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={a.url} alt={a.name ?? "brand icon"} className="w-full rounded-md border border-line bg-surface-2 object-contain p-2" />
-                <p className="tabular mt-1 truncate text-[10px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
-                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[10px] text-alert hover:underline">Remove</button>
+                <p className="tabular mt-1 truncate text-[13px] text-ink-dim" title={a.name ?? ""}>{a.name}</p>
+                <button onClick={() => remove("asset", a.id)} className="mt-0.5 text-[13px] text-alert hover:underline">Remove</button>
               </div>
             ))}
           </div>
@@ -467,8 +467,8 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
       {/* TRAIN THE BRAIN ON LIVE FUNNELS. Keep the brain current as new campaigns ship - ingest the live
           funnels so the Producer, brief coach, Strategist and Journalist all learn from the newest work. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Train the brain on live funnels</div>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-dim">
+        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Train the brain on live funnels</div>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
           Ingest the live MTN MoMo funnels into the brain so every output learns from the real, current work.
           Run this whenever new campaigns ship - it refreshes what the Producer, brief coach, Strategist and
           Journalist draw on.
@@ -483,24 +483,24 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
             finally { setBusy(""); }
           }}
           disabled={!!busy}
-          className="mt-3 rounded-lg border border-[#818cf8]/50 bg-[#818cf8]/10 px-4 py-2 text-xs font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
+          className="mt-3 rounded-lg border border-[#818cf8]/50 bg-[#818cf8]/10 px-4 py-2 text-sm font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
           {busy === "ingest" ? "Training…" : "Train the brain on the funnels"}
         </button>
-        <p className="mt-1 text-[11px] text-ink-faint">Takes about a minute. Safe to re-run - it refreshes the funnel knowledge.</p>
+        <p className="mt-1 text-[14px] text-ink-faint">Takes about a minute. Safe to re-run - it refreshes the funnel knowledge.</p>
       </div>
 
       {/* CI DOCUMENT */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">CI document</div>
-        <p className="mt-2 text-[13px] text-ink-dim">The client&apos;s corporate identity guide. Kept attached to the templates as part of the design contract.</p>
-        <label className="mt-2 inline-block cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-ink-dim hover:text-ink">
+        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">CI document</div>
+        <p className="mt-2 text-[15px] text-ink-dim">The client&apos;s corporate identity guide. Kept attached to the templates as part of the design contract.</p>
+        <label className="mt-2 inline-block cursor-pointer rounded-lg border border-line px-3 py-1.5 text-sm font-bold text-ink-dim hover:text-ink">
           {busy === "ci_doc" ? "Uploading…" : "＋ Add CI document"}
           <input type="file" multiple accept=".pdf,image/png,image/jpeg" className="hidden"
             onChange={(e) => send(e.target.files, "ci_doc")} />
         </label>
         <ul className="mt-2 space-y-1">
           {assets.filter((a) => a.kind === "ci_doc").map((a) => (
-            <li key={a.id} className="flex items-center gap-2 text-[11px] text-ink-dim">
+            <li key={a.id} className="flex items-center gap-2 text-[14px] text-ink-dim">
               <a href={a.url} target="_blank" rel="noreferrer" className="underline">{a.name}</a>
               <button onClick={() => remove("asset", a.id)} className="text-alert hover:underline">remove</button>
             </li>

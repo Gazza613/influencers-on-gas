@@ -93,33 +93,33 @@ export default function DealCards3DPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-ink">3D deal cards</h1>
-            <p className="mt-1 text-sm text-ink-dim">
+            <p className="mt-1 text-base text-ink-dim">
               Turn the flat intake cards into premium 3D badges. <strong className="text-ink">Check every digit before you approve</strong> - this is the one
               place an AI touches a price. Approved cards join the deal-card picker in the builder.
             </p>
           </div>
-          <Link href="/studio/build" className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-ink-dim hover:text-ink">← Back to the builder</Link>
+          <Link href="/studio/build" className="rounded-lg border border-line px-3 py-1.5 text-sm font-bold text-ink-dim hover:text-ink">← Back to the builder</Link>
         </div>
 
         <div className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface-1 p-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Client</label>
+            <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Client</label>
             <select value={clientId} onChange={(e) => setClientId(e.target.value)}
-              className="mt-1 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent">
+              className="mt-1 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent">
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint">Angle (Y rotation)</label>
+            <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Angle (Y rotation)</label>
             <input type="number" value={yaw} onChange={(e) => setYaw(Number(e.target.value))} min={-30} max={30}
-              className="mt-1 w-28 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] outline-none focus:border-accent" />
+              className="mt-1 w-28 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent" />
           </div>
-          <p className="text-xs text-ink-dim">
+          <p className="text-sm text-ink-dim">
             {cards.length} flat cards · {working} rendering · <span className="font-bold text-[#86efac]">{approved} approved</span>
           </p>
         </div>
 
-        {err && <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-sm text-[#fca5a5]">{err}</p>}
+        {err && <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-base text-[#fca5a5]">{err}</p>}
 
         <div className="mt-5 space-y-4">
           {cards.map((c) => {
@@ -127,11 +127,11 @@ export default function DealCards3DPage() {
             return (
               <div key={c.id} className="rounded-xl border border-line bg-surface-1 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-bold text-ink">{c.name.replace(/\.(png|jpe?g)$/i, "")}</p>
+                  <p className="text-base font-bold text-ink">{c.name.replace(/\.(png|jpe?g)$/i, "")}</p>
                   <div className="flex items-center gap-2">
-                    {saved[c.id] && <span className="text-xs font-bold text-[#86efac]">✓ Saved as 3D</span>}
+                    {saved[c.id] && <span className="text-sm font-bold text-[#86efac]">✓ Saved as 3D</span>}
                     <button onClick={() => make(c)} disabled={job?.status === "working"}
-                      className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-bold text-black disabled:opacity-40">
+                      className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-1.5 text-sm font-bold text-black disabled:opacity-40">
                       {job?.status === "working" && <Spinner />}
                       {job?.status === "working" ? "Rendering…" : job?.url ? "Re-render" : "Make 3D"}
                     </button>
@@ -140,44 +140,44 @@ export default function DealCards3DPage() {
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Flat original</p>
+                    <p className="mb-1 text-[14px] font-semibold uppercase tracking-wider text-ink-faint">Flat original</p>
                     <img src={c.url} alt="" onClick={() => setZoom(c.url)} className="w-full cursor-zoom-in rounded-lg border border-line bg-white/5 object-contain p-2" />
                   </div>
                   <div>
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">3D version</p>
+                    <p className="mb-1 text-[14px] font-semibold uppercase tracking-wider text-ink-faint">3D version</p>
                     {job?.status === "working" && (
-                      <div className="flex h-full min-h-[120px] items-center justify-center rounded-lg border border-dashed border-line text-xs text-ink-dim">
+                      <div className="flex h-full min-h-[120px] items-center justify-center rounded-lg border border-dashed border-line text-sm text-ink-dim">
                         <Spinner className="mr-2 text-accent" /> Extruding…
                       </div>
                     )}
-                    {job?.status === "error" && <p className="rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 p-2 text-xs text-[#fca5a5]">{job.error}</p>}
+                    {job?.status === "error" && <p className="rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 p-2 text-sm text-[#fca5a5]">{job.error}</p>}
                     {job?.url && (
                       <>
                         <img src={job.url} alt="" onClick={() => setZoom(job.url!)} className="w-full cursor-zoom-in rounded-lg border border-line bg-white/5 object-contain p-2" />
                         <div className="mt-2 flex items-center gap-2">
                           <button onClick={() => approve(c)}
-                            className="rounded-lg border border-[#4ade80]/50 bg-[#4ade80]/10 px-3 py-1.5 text-xs font-bold text-[#86efac]">
+                            className="rounded-lg border border-[#4ade80]/50 bg-[#4ade80]/10 px-3 py-1.5 text-sm font-bold text-[#86efac]">
                             ✓ Text is correct - approve
                           </button>
                           <button onClick={() => setJobs((j) => { const x = { ...j }; delete x[c.id]; return x; })}
-                            className="text-xs font-semibold text-ink-dim underline hover:text-ink">Reject</button>
+                            className="text-sm font-semibold text-ink-dim underline hover:text-ink">Reject</button>
                         </div>
                       </>
                     )}
-                    {!job && <p className="rounded-lg border border-dashed border-line p-4 text-xs text-ink-dim">Not rendered yet.</p>}
+                    {!job && <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-dim">Not rendered yet.</p>}
                   </div>
                 </div>
               </div>
             );
           })}
-          {!cards.length && <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-ink-dim">No flat deal cards on file for this client.</p>}
+          {!cards.length && <p className="rounded-xl border border-dashed border-line p-6 text-center text-base text-ink-dim">No flat deal cards on file for this client.</p>}
         </div>
       </main>
 
       {zoom && (
         <div onClick={() => setZoom("")} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6" role="dialog">
           <img src={zoom} alt="" className="max-h-[92vh] max-w-[95vw] rounded-lg bg-white/5" />
-          <button onClick={() => setZoom("")} className="absolute right-5 top-5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-bold text-white hover:bg-white/20">Close ✕</button>
+          <button onClick={() => setZoom("")} className="absolute right-5 top-5 rounded-lg bg-white/10 px-3 py-1.5 text-base font-bold text-white hover:bg-white/20">Close ✕</button>
         </div>
       )}
     </div>

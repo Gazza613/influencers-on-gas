@@ -17,6 +17,8 @@ type Intel = {
   confidence: string; material: boolean; status: string; found_at: string;
   // INTERNAL: what this could do to MoMo SA, and the campaign move it argues for. Never the CEO's public voice.
   impact_risk: string | null; campaign_response: string | null;
+  // The kept CEO draft, so it survives a logout.
+  newsletter: string | null; newsletter_art: string | null; newsletter_options: string[] | null;
 };
 
 // TWO dates, and conflating them is how stale information becomes "current":
@@ -149,11 +151,13 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
 function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string }) {
   // THE CEO'S NEWSLETTER (Gary). Only on Journalist findings - a Strategist finding is internal, blunt and names
   // competitors, so it is exactly what must never reach the CEO's public voice.
-  const [letter, setLetter] = useState<string>("");
+  // Seeded from the SAVED draft (Gary): the piece and its creative used to live only in React state, so logging
+  // out threw them away and there was nothing to take to the CEO.
+  const [letter, setLetter] = useState<string>(i.newsletter || "");
   const [writing, setWriting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [art, setArt] = useState<string>("");      // the SELECTED LinkedIn creative that runs with the piece
-  const [options, setOptions] = useState<string[]>([]); // the CEO build returns three; pick the best
+  const [art, setArt] = useState<string>(i.newsletter_art || "");   // the SELECTED creative
+  const [options, setOptions] = useState<string[]>(i.newsletter_options || []); // the CEO build returns three
   const [drawing, setDrawing] = useState(false);
   // Kept so the image can be RERUN without rewriting the article (Gary) - the piece is fine, it is the render
   // you did not like.
@@ -163,6 +167,20 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
   // request - so you are reading the article while the image renders, instead of staring at a spinner for both.
   // The same call that writes the piece art-directs it, so the image cannot end up illustrating a different
   // article to the one beside it.
+  // Keep whatever changed, so it is still here after a logout. Best effort: a failed save must never lose the
+  // draft that is already on screen.
+  async function keepDraft(patch: { newsletter?: string; art?: string; options?: string[] }) {
+    await fetch("/api/studio/intel/draft", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, id: i.id, ...patch }),
+    }).catch(() => {});
+  }
+
+  async function removeDraft() {
+    setLetter(""); setArt(""); setOptions([]); setArtBrief(null);
+    await fetch(`/api/studio/intel/draft?clientId=${clientId}&id=${i.id}`, { method: "DELETE" }).catch(() => {});
+  }
+
   async function writeNewsletter() {
     setWriting(true); setArt(""); setOptions([]);
     const d = await fetch("/api/studio/intel/newsletter", {
@@ -172,6 +190,7 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
     setWriting(false);
     if (!d?.newsletter) { flex(d?.error || "Could not write the newsletter."); return; }
     setLetter(d.newsletter);
+    await keepDraft({ newsletter: d.newsletter });
 
     const brief = { subject: d?.art?.subject || "", callout: d?.art?.callout || "" };
     if (!brief.subject) return;
@@ -197,7 +216,10 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
     setDrawing(false);
     // The CEO build returns THREE options to choose from; the generic path returns one.
     const urls: string[] = Array.isArray(c?.urls) && c.urls.length ? c.urls : c?.url ? [c.url] : [];
-    if (urls.length) { setArt(urls[0]); setOptions(urls.length > 1 ? urls : []); }
+    if (urls.length) {
+      setArt(urls[0]); setOptions(urls.length > 1 ? urls : []);
+      await keepDraft({ art: urls[0], options: urls.length > 1 ? urls : [] });
+    }
     else flex(`The article is ready. The creative did not render: ${c?.error || "unknown error"}`);
   }
   return (
@@ -307,6 +329,8 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
                 {copied ? "Copied" : "Copy"}
               </button>
               <button onClick={() => setLetter("")} className="text-[15px] font-semibold text-ink-faint underline hover:text-ink">Close</button>
+              {/* CLOSE hides it for now; REMOVE discards the kept draft for good (Gary: keep or remove). */}
+              <button onClick={removeDraft} className="text-[15px] font-semibold text-[#fca5a5] underline hover:text-[#f87171]">Remove</button>
             </div>
           </div>
           <p className="mt-2 whitespace-pre-wrap text-[17px] leading-relaxed text-ink-dim">{letter}</p>
@@ -330,7 +354,7 @@ function Card({ i, busy, decide, clientId }: { i: Intel; busy: boolean; decide: 
                   <p className="text-[14px] text-ink-faint">Pick the best of {options.length}:</p>
                   <div className="mt-1 flex gap-2">
                     {options.map((u, n) => (
-                      <button key={u} onClick={() => setArt(u)}
+                      <button key={u} onClick={() => { setArt(u); keepDraft({ art: u }); }}
                         className={`overflow-hidden rounded-md border-2 ${art === u ? "border-[#818cf8]" : "border-line"}`}>
                         <img src={u} alt={`Option ${n + 1}`} className="h-16 w-16 object-cover" />
                       </button>

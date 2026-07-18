@@ -20,22 +20,27 @@ const MOMO_BLUE = "#004F71";
 //
 // The rule is CONSISTENCY, and we never invent punctuation:
 //   - if the copy uses a full stop anywhere, the sentence is finished with one;
-//   - if it doesn't, no line ends in a full stop.
-// We do NOT add commas. "Commas preferred" is a writing style for the Producer (it is in the Producer's brief),
-// not a transform - a first pass that force-added them produced "Miss your mom?," and broke "Everyday Value /
-// for Every Woman", which is one continuous phrase, not two clauses. A ? or ! is left alone.
+//   - IF IT USES A COMMA, it is a sentence, so it is finished with a full stop (Gary, locked in: "if we use
+//     commas make sure we add a full stop at the end of that sentence"). "Verify the channel, not just the
+//     number" becomes "...the number.";
+//   - otherwise it is a bare phrase and carries no full stop at all.
+// We never ADD a comma - that is a writing choice for the Producer, not a transform. A first pass that
+// force-added them produced "Miss your mom?," and broke "Everyday Value / for Every Woman", which is one
+// continuous phrase, not two clauses. A ? or ! already ends the sentence, so it is left alone.
 export function tidyCallout(callout: string): string {
   const raw = String(callout || "").trim();
   if (!raw) return raw;
   const parts = raw.includes("/") ? raw.split("/").map((s) => s.trim()) : [raw];
   const usesFullStops = parts.some((p) => /\.\s*$/.test(p));
+  const usesCommas = parts.some((p) => p.includes(","));
+  const needsFullStop = usesFullStops || usesCommas;
   const fixed = parts.map((p, i) => {
     let s = p.trim();
     const isLast = i === parts.length - 1;
-    if (usesFullStops) {
+    if (needsFullStop) {
       if (isLast && !/[.?!]\s*$/.test(s)) s += ".";        // finish the sentence
     } else {
-      s = s.replace(/\s*\.+\s*$/, "");                     // no full stops in this set: drop any stray one
+      s = s.replace(/\s*\.+\s*$/, "");                     // a bare phrase: drop any stray full stop
     }
     return s;
   });

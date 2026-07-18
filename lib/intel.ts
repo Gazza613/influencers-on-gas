@@ -37,6 +37,10 @@ export type Intel = {
   // INTERNAL assessment - never part of the CEO's public voice. See the brief in ASSESSMENT below.
   impact_risk: string | null;
   campaign_response: string | null;
+  // The CEO newsletter drafted off this finding, kept so it survives a logout.
+  newsletter: string | null;
+  newsletter_art: string | null;
+  newsletter_options: string[];
   status: string;
   found_at: string;
 };
@@ -281,7 +285,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
 export async function listIntel(clientId: string, status = "new"): Promise<Intel[]> {
   return (await db().query(
-    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at
+    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, newsletter, newsletter_art, newsletter_options, status, found_at
      from studio_intel where client_id = $1 and status = $2 order by material desc, found_at desc limit 80`,
     [clientId, status],
   )) as Intel[];

@@ -61,7 +61,10 @@ export async function buildCeoCreatives(
 
   const kit = await getBrandKit(clientId).catch(() => null);
   const fonts = (kit?.fonts || []) as { family: string; url: string }[];
-  const legal = (kit?.creative_legal_text || "").trim() || "AI Creative";
+  // THE CEO POST CARRIES ONLY A SHORT AI DISCLOSURE, not the FSP compliance strip (Gary). This is a point of
+  // view, not an advertisement, so FAIS s14 does not require the strip here - and a three-line legal band was
+  // dominating a portrait. One short honest line, on the photograph, no bar.
+  const legal = "AI-generated image";
   const name = (opts.name || "Kagiso Mothibi").trim();
   const title = (opts.title || "CEO, Fintech, MTN SA").trim();
   const message = tidyCallout(opts.message).split("/")[0].replace(/[,;]\s*$/, "").trim();
@@ -194,19 +197,23 @@ ${fontFaceCss(fonts)}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
 /* A soft dark wash on the left so white type reads whatever the backdrop does behind it. */
 .wash{position:absolute;inset:0;background:linear-gradient(102deg, rgba(4,25,40,.85) 0%, rgba(4,25,40,.5) 30%, transparent 52%)}
-.foot{position:absolute;left:0;right:0;bottom:0;height:8%;background:${"#004F71"}}
+/* No footer bar (Gary): the disclosure sits on the photograph itself. A soft bottom gradient keeps it
+   readable over whatever the backdrop does, without becoming a band. */
+.btm{position:absolute;left:0;right:0;bottom:0;height:16%;background:linear-gradient(to top, rgba(4,20,32,.72) 0%, transparent 100%)}
 .msg{position:absolute;left:6%;top:17%;width:37%;color:#fff;font-family:'MTNBrighterSans',sans-serif;
   font-weight:800;font-size:${msgSize}px;line-height:1.06;letter-spacing:-1px;text-shadow:0 3px 18px rgba(0,0,0,.55)}
 .plate{position:absolute;left:6.5%;bottom:12%}
 ${nameplateCss(0.42)}
-.legal{position:absolute;left:0;right:0;bottom:2.6%;text-align:center;padding:0 7%;
-  font-family:'MTNBrighterSans',sans-serif;font-weight:500;line-height:1.3;color:rgba(255,255,255,.9);font-size:${Math.round(H * 0.0145)}px}
+/* One short line, small but readable, aligned under the name plate. */
+.ai{position:absolute;left:6%;bottom:4.5%;font-family:'MTNBrighterSans',sans-serif;font-weight:600;
+  letter-spacing:.4px;color:rgba(255,255,255,.78);font-size:${Math.round(H * 0.0155)}px;
+  text-shadow:0 2px 8px rgba(0,0,0,.7)}
 </style></head><body>
 <div class="wash"></div>
-<div class="foot"></div>
+<div class="btm"></div>
 <div class="msg">${esc(message)}</div>
 <div class="plate">${nameplateHtml(name, title)}</div>
-<div class="legal">${esc(legal)}</div>
+<div class="ai">${esc(legal)}</div>
 </body></html>`;
   const { png } = await renderPng({ html, width: W, height: H, scale: 1, transparent: true });
   return png;

@@ -500,6 +500,15 @@ alter table studio_intel add column if not exists period text;
 --   campaign_response - the recommended campaign move for GAS: defensive, proactive, or both
 -- INTERNAL ONLY. These never go near the CEO's public LinkedIn voice - the Journalist's public material is
 -- FAIS-bound (no competitor comparison, no product promotion), and a campaign recommendation is neither.
+-- The CEO newsletter drafted off a finding, kept so it SURVIVES a logout (Gary: the article and photos
+-- disappear when I log back in). A draft that vanishes cannot be taken to the CEO for approval.
+--   newsletter          - the drafted piece
+--   newsletter_art      - the chosen creative
+--   newsletter_options  - the other renders, so the choice can be revisited
+alter table studio_intel add column if not exists newsletter text;
+alter table studio_intel add column if not exists newsletter_art text;
+alter table studio_intel add column if not exists newsletter_options jsonb not null default '[]'::jsonb;
+
 alter table studio_intel add column if not exists impact_risk text;
 alter table studio_intel add column if not exists campaign_response text;
 
