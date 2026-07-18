@@ -12,14 +12,14 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
   const sources = await listSources(id);
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <Link href="/setup/brains" className="text-xs text-ink-dim hover:text-ink">← Brains</Link>
+    <div className="mx-auto max-w-5xl">
+      <Link href="/setup/brains" className="text-base text-ink-dim hover:text-ink">← Brains</Link>
       <div className="mt-2 flex items-center gap-3">
-        <h1 className="text-xl font-bold">{brain.name}</h1>
-        <span className="tabular rounded bg-surface-2 px-2 py-0.5 text-[10px] uppercase tracking-wide text-ink-faint">brain</span>
-        <span className="tabular text-xs text-ink-faint">{brain.chunk_count ?? 0} chunks</span>
+        <h1 className="text-3xl font-bold">{brain.name}</h1>
+        <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[12px] uppercase tracking-wide text-ink-faint">brain</span>
+        <span className="tabular text-base text-ink-faint">{brain.chunk_count ?? 0} passages</span>
       </div>
-      <BrainConsole brainId={brain.id} initialSources={sources} />
+      <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} />
     </div>
   );
 }

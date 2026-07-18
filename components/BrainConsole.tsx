@@ -4,11 +4,13 @@ import { useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
+import BrainKnowledge from "@/components/BrainKnowledge";
+import BrainLibrary from "@/components/BrainLibrary";
 
 type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number };
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
-export default function BrainConsole({ brainId, initialSources }: { brainId: string; initialSources: Source[] }) {
+export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }: { brainId: string; initialSources: Source[]; chunkCount?: number }) {
   const [sources, setSources] = useState<Source[]>(initialSources);
   const [mode, setMode] = useState<"website" | "text" | "file">("website");
   const [progress, setProgress] = useState("");
@@ -134,12 +136,12 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
   return (
     <div className="mt-6 space-y-6">
       {/* Add knowledge */}
-      <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Feed the brain</div>
+      <div className="rounded-xl border border-line bg-surface-1 p-6">
+        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Feed the brain</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {([["file", "Documents"], ["website", "Website or link"], ["text", "Paste text"]] as const).map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim hover:text-ink"}`}>
+              className={`rounded-lg px-3 py-1.5 text-base font-semibold ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim hover:text-ink"}`}>
               {label}
             </button>
           ))}
@@ -151,56 +153,56 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
             <label className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface-2/50 px-4 py-7 text-center hover:border-[#a855f7]/50">
               <input type="file" multiple accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown,text/csv"
                 onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} disabled={adding} className="hidden" />
-              <span className="text-sm font-bold text-ink">Choose documents, or drop them here</span>
-              <span className="text-[13px] text-ink-dim">Articles, PDFs, research, notes. Each one ingests as it lands.</span>
-              <span className="mt-1 text-[12px] text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
+              <span className="text-base font-bold text-ink">Choose documents, or drop them here</span>
+              <span className="text-[15px] text-ink-dim">Articles, PDFs, research, notes. Each one ingests as it lands.</span>
+              <span className="mt-1 text-[14px] text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
             </label>
-            {progress && <p className="mt-2 text-[13px] text-ink-dim">Uploading {progress}…</p>}
+            {progress && <p className="mt-2 text-[15px] text-ink-dim">Uploading {progress}…</p>}
           </>
         ) : mode === "website" ? (
           <>
             <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://an-article.com/the-piece"
-              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
-            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
+            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-base font-bold disabled:opacity-50">
               {adding ? "Adding to brain…" : "Add to brain"}
             </button>
           </>
         ) : (
           <>
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Paste brand notes, positioning, proof points, a transcript…"
-              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
-            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
+            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-base font-bold disabled:opacity-50">
               {adding ? "Adding to brain…" : "Add to brain"}
             </button>
           </>
         )}
 
-        {addErr && <p className="mt-2 text-[13px] text-alert">{addErr}</p>}
+        {addErr && <p className="mt-2 text-[15px] text-alert">{addErr}</p>}
         {/* The isolation guarantee, said out loud where someone is about to hand us a client's private material. */}
-        <p className="mt-3 text-[13px] text-ink-faint">
+        <p className="mt-3 text-[15px] text-ink-faint">
           Everything added here is chunked and embedded into <b className="text-ink-dim">this brain only</b>. No other brain can read it.
         </p>
       </div>
 
       {/* Sources */}
-      <div className="rounded-xl border border-line bg-surface-1 p-5">
+      <div className="rounded-xl border border-line bg-surface-1 p-6">
         <div className="flex items-center justify-between gap-2">
-          <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Knowledge sources</div>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Knowledge sources</div>
           {sources.length > 0 && (
             <div className="flex items-center gap-2">
-              <button onClick={reindex} disabled={reindexing} title="Rebuild every chunk's embedding with the current model. Needed once after an embedding-model change, otherwise retrieval returns noise. Your text is not touched." className="rounded-md border border-[#a855f7]/40 px-2.5 py-1 text-[11px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reindexing ? "Re-indexing…" : "↻ Re-index"}</button>
-              <button onClick={nukeAll} className="rounded-md border border-alert/40 px-2.5 py-1 text-[11px] font-semibold text-alert hover:bg-alert/10">Nuke all data</button>
+              <button onClick={reindex} disabled={reindexing} title="Rebuild every chunk's embedding with the current model. Needed once after an embedding-model change, otherwise retrieval returns noise. Your text is not touched." className="rounded-md border border-[#a855f7]/40 px-2.5 py-1 text-[13px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reindexing ? "Re-indexing…" : "↻ Re-index"}</button>
+              <button onClick={nukeAll} className="rounded-md border border-alert/40 px-2.5 py-1 text-[13px] font-semibold text-alert hover:bg-alert/10">Nuke all data</button>
             </div>
           )}
         </div>
         {sources.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-dim">No sources yet.</p>
+          <p className="mt-3 text-base text-ink-dim">No sources yet.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {sources.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 border-b border-line/60 py-2 text-sm">
+              <li key={s.id} className="flex items-center justify-between gap-3 border-b border-line/60 py-2.5 text-base">
                 <span className="min-w-0 truncate text-ink">{s.type === "website" ? s.uri : s.uri || "Pasted note"}</span>
-                <span className="flex shrink-0 items-center gap-3 text-[11px]">
+                <span className="flex shrink-0 items-center gap-3 text-[13px]">
                   <span className="text-ink-faint">{s.chunk_count ?? 0} chunks</span>
                   <span className={badge(s.status)}>{s.status === "pending" ? "indexing…" : s.status}</span>
                   <button onClick={() => removeSource(s)} title="Delete this source" aria-label="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
@@ -211,25 +213,31 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
         )}
       </div>
 
+      {/* WHAT IT KNOWS + WHAT IT BUILDS FROM. Both sit above "Test the brain" deliberately: when an answer
+          comes back wrong the first question is "what is actually in there?", and that has to be one scroll
+          away, not buried under the tools that add more. */}
+      <BrainKnowledge brainId={brainId} total={chunkCount} />
+      <BrainLibrary brainId={brainId} />
+
       {/* Test the brain */}
-      <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-ink-faint">Test the brain</div>
+      <div className="rounded-xl border border-line bg-surface-1 p-6">
+        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Test the brain</div>
         <div className="mt-3 flex gap-2">
           <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runQuery()}
             placeholder="Ask what the brain knows (e.g. what's the brand's positioning?)"
-            className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm outline-none focus:border-line-strong" />
-          <button onClick={runQuery} disabled={querying || !query.trim()} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink hover:border-line-strong disabled:opacity-50">
+            className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
+          <button onClick={runQuery} disabled={querying || !query.trim()} className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink hover:border-line-strong disabled:opacity-50">
             {querying ? "Searching…" : "Search"}
           </button>
         </div>
-        {qErr && <p className="mt-2 text-xs text-alert">{qErr}</p>}
-        {hits && hits.length === 0 && <p className="mt-3 text-sm text-ink-dim">No matches. Feed the brain some knowledge first.</p>}
+        {qErr && <p className="mt-2 text-sm text-alert">{qErr}</p>}
+        {hits && hits.length === 0 && <p className="mt-3 text-base text-ink-dim">No matches. Feed the brain some knowledge first.</p>}
         {hits && hits.length > 0 && (
           <ul className="mt-3 space-y-2">
             {hits.map((h, i) => (
               <li key={i} className="rounded-lg border border-line bg-surface-2 p-3">
-                <div className="tabular mb-1 text-[10px] text-ink-faint">match {Math.round(h.score * 100)}%{(h.metadata?.title as string) ? ` · ${h.metadata.title}` : ""}</div>
-                <div className="text-[13px] leading-relaxed text-ink-dim">{h.content.slice(0, 280)}{h.content.length > 280 ? "…" : ""}</div>
+                <div className="tabular mb-1 text-[12px] text-ink-faint">match {Math.round(h.score * 100)}%{(h.metadata?.title as string) ? ` · ${h.metadata.title}` : ""}</div>
+                <div className="text-[15px] leading-relaxed text-ink-dim">{h.content.slice(0, 280)}{h.content.length > 280 ? "…" : ""}</div>
               </li>
             ))}
           </ul>
@@ -237,10 +245,10 @@ export default function BrainConsole({ brainId, initialSources }: { brainId: str
       </div>
 
       {/* Danger zone */}
-      <div className="rounded-xl border border-alert/30 bg-alert/5 p-5">
-        <div className="tabular text-xs uppercase tracking-[0.2em] text-alert">Danger zone</div>
-        <p className="mt-2 text-[13px] text-ink-dim">Delete this entire brain and everything in it. This cannot be undone.</p>
-        <button onClick={deleteBrainNow} className="mt-3 rounded-lg border border-alert/50 px-4 py-2 text-sm font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
+      <div className="rounded-xl border border-alert/30 bg-alert/5 p-6">
+        <div className="tabular text-sm uppercase tracking-[0.2em] text-alert">Danger zone</div>
+        <p className="mt-2 text-[15px] text-ink-dim">Delete this entire brain and everything in it. This cannot be undone.</p>
+        <button onClick={deleteBrainNow} className="mt-3 rounded-lg border border-alert/50 px-4 py-2 text-base font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
       </div>
     </div>
   );
