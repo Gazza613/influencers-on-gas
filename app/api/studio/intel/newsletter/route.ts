@@ -16,7 +16,7 @@ const PIECE = {
   additionalProperties: false,
   properties: {
     title: { type: "string", description: "The newsletter title. Short, plain and substantive - what the piece is actually about. No colon-subtitle cliche, no story hook, no question." },
-    body: { type: "string", description: "The piece: 180-280 words, professional executive register, substance-led. Plain paragraphs separated by blank lines. No markdown, no headings. Every paragraph carries a real fact." },
+    body: { type: "string", description: "The piece: 180-280 words, professional executive register, substance-led. Plain paragraphs separated by blank lines. No markdown, no headings. Every paragraph says something the reader did not know - but do NOT force a statistic into every piece; most need none, and any figure used must be highly credible and attributable." },
     image_subject: { type: "string", description: "ART DIRECTION for the LinkedIn image that runs beside a CEO's market note. A real, specific South African person or scene that carries the post's POINT with DIGNITY and CONFIDENCE - a capable adult, a working business, a moment of competence. NOT anxious, worried, struggling, pitiable or a narrated hardship scene: this sits under an executive's name, and a worried face reads as pity, not value. No products, no phones held up like an advert, no logos, no text described." },
     image_callout: { type: "string", description: "ONE short line for the image, max ~24 characters. It must carry the post's central POINT or VALUE in a professional register - not a story line, not a narrated moment, not a question, not an offer or price. Think a confident statement a CEO would stand behind, e.g. 'Money that reaches everyone'. No competitor, no product pitch." },
   },
@@ -50,9 +50,16 @@ THE REGISTER IS THE THING TO GET RIGHT (this is where it usually goes wrong):
   fintech CEO addressing his market.
 - LEAD WITH SUBSTANCE. The first sentence carries a concrete fact, a number or a clear position. No build-up, no
   scene-setting, no rhetorical question.
-- VALUE BOMBS. Every paragraph must earn its place by telling the reader something they did not know: a real
-  number, a real capability, a real proof point, with its date or source where you have one. If a paragraph
-  carries no fact, cut it.
+- EVERY PARAGRAPH EARNS ITS PLACE by telling the reader something they did not already know: a real capability,
+  a real proof point, a clear position, or a number. If a paragraph says nothing new, cut it.
+- STATISTICS ARE A SEASONING, NOT THE MEAL. Do NOT force a number into every piece or every paragraph - a
+  newsletter that always opens with a statistic becomes stale and obvious, and the reader stops seeing them.
+  Use a figure when it genuinely carries the point, and let other pieces stand on capability, position or plain
+  clear thinking instead. Roughly: most pieces need no statistic at all.
+- WHEN YOU DO USE A FIGURE it must be HIGHLY CREDIBLE and attributable - a regulator, an official release, a
+  company's own published result, a recognised industry body - and you say where it came from and when. If the
+  source is thin, second-hand or you cannot name it, leave the number out entirely. A weak statistic under a
+  CEO's name is worse than no statistic.
 - HYPER-FOCUSED ON MTN MoMo. This is about MoMo's value, scale, capability and role. Market context ONLY where it
   directly frames why MoMo matters, and then briefly - a sentence, not a section. Do not write a market essay.
 - Confident, measured, factual. Never hype, never emotional, never a rallying cry.

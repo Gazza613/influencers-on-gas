@@ -90,9 +90,20 @@ export async function buildCeoCreatives(
   // Gary saw. Allow a mild 1.15x at most, otherwise render him at his native size and let him sit slightly
   // smaller in frame. Crisp and smaller beats big and mushy on a CEO.
   const nativeH = cm.height || 0;
-  const figH = Math.min(Math.round(H * 0.86), Math.round((nativeH || H) * 1.15));
+  const figH = Math.min(Math.round(H * 0.96), Math.round((nativeH || H) * 1.15)); // bigger presence (Gary)
   const figW = Math.round((cm.width || 800) * (figH / (nativeH || 1000)));
-  const figure = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
+  const figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
+
+  // BLEND HIM INTO THE SCENE. A hard cut-out on a generated backdrop reads as two separate pictures (Gary:
+  // "looks detached"). Two cheap, physical fixes do most of the work:
+  //   1. a CONTACT SHADOW - his own silhouette, blurred and dimmed, sitting behind and just off him. Without a
+  //      shadow the eye reads a sticker; with one it reads a person standing in a room.
+  //   2. a TONE MATCH - pull his saturation and brightness down a touch so he shares the backdrop's cooler,
+  //      dimmer grade instead of popping like a brighter layer pasted on top.
+  const figure = await sharp(figureRaw).modulate({ brightness: 0.94, saturation: 0.88 }).png().toBuffer();
+  const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(30).linear(0.5, 0).toColourspace("b-w").toBuffer();
+  const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
+  const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
   // He sits a little further LEFT now (Gary), while his leftmost point still clears the message column so the
   // headline can never reach him. If he is wide, he bleeds further off the right edge instead.
   const figLeft = Math.max(Math.round(W * 0.45), W - figW);
@@ -132,9 +143,12 @@ export async function buildCeoCreatives(
         ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
         : await navyField(W, H);
 
+      const x = Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
       let out = await sharp(bg)
         .composite([
-          { input: figure, left: Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5))), top: figTop },
+          // The contact shadow goes down FIRST, offset slightly left and down, so he sits IN the scene.
+          { input: shadow, left: Math.max(0, x - Math.round(figW * 0.03)), top: Math.max(0, figTop + Math.round(figH * 0.012)) },
+          { input: figure, left: x, top: figTop },
           { input: overlay, left: 0, top: 0 },
         ])
         .png().toBuffer();
