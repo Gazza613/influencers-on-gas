@@ -116,7 +116,20 @@ type Door = {
   ring: string;      // border + hover glow
   wash: string;      // the faint gradient inside the card
   accent: string;    // the action text
+  // An optional SECOND destination in the corner (the showcase eye). A card can have two jobs: go to work, or
+  // go and look at the work.
+  peek?: { href: string; label: string };
 };
+
+// The showcase eye. An eye, not a link icon, because the job is "go and SEE the work".
+function EyeMark() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]" aria-hidden>
+      <path d="M1.8 12S5.4 5.4 12 5.4 22.2 12 22.2 12 18.6 18.6 12 18.6 1.8 12 1.8 12Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3.1" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
 
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
@@ -129,6 +142,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <InfluencerMark />,
         blurb: "The AI-influencer video studio. Cast a face, give it a voice, shoot and cut the film.",
         action: "Open the studio",
+        peek: { href: "/s/showcase", label: "See the showcase" },
         ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
         wash: "from-[#a855f7]/[0.10] to-[#ec4899]/[0.04]",
         accent: "text-[#d8b4fe]",
@@ -202,10 +216,26 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
 ];
 
 function Tile({ d }: { d: Door }) {
-  const inner = (
-    <>
+  // The card is a CONTAINER, not itself a link, so a second destination (the showcase eye) can live inside it.
+  // Nesting an anchor inside an anchor is invalid HTML and breaks the inner click, so the main destination is a
+  // stretched overlay link and the eye sits above it on a higher layer.
+  const cls = `group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 transition duration-300 hover:-translate-y-1`;
+  // The live products sit on their OWN domains: a plain anchor in a new tab, never a router push (which would
+  // try to route them inside this app and 404).
+  const label = typeof d.action === "string" ? d.action : "Open";
+
+  return (
+    <div className={cls}>
       {/* A soft light that only wakes on hover - the card feels lit rather than decorated. */}
       <span aria-hidden className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${d.wash} opacity-0 blur-2xl transition duration-500 group-hover:opacity-100`} />
+
+      {/* The main destination, covering the whole card. */}
+      {d.external ? (
+        <a href={d.href} target="_blank" rel="noreferrer" aria-label={label} className="absolute inset-0 z-10" />
+      ) : (
+        <Link href={d.href} aria-label={label} className="absolute inset-0 z-10" />
+      )}
+
       <span className="relative block transition duration-300 group-hover:-translate-y-0.5">{d.mark}</span>
       <h2 className="relative mt-4 text-[22px] font-extrabold tracking-tight text-ink">{d.name}</h2>
       <p className="relative mt-2 text-[14px] leading-relaxed text-ink-dim">{d.blurb}</p>
@@ -213,16 +243,15 @@ function Tile({ d }: { d: Door }) {
         {d.action}
         <span className="transition-transform duration-300 group-hover:translate-x-1">{d.external ? "↗" : "→"}</span>
       </span>
-    </>
-  );
-  const cls = `group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 transition duration-300 hover:-translate-y-1`;
 
-  // The live products sit on their OWN domains: a plain anchor in a new tab, never a router push (which would
-  // try to route them inside this app and 404).
-  return d.external ? (
-    <a href={d.href} target="_blank" rel="noreferrer" className={cls}>{inner}</a>
-  ) : (
-    <Link href={d.href} className={cls}>{inner}</Link>
+      {/* THE SHOWCASE EYE, bottom-right and ABOVE the card link so it wins the click. */}
+      {d.peek && (
+        <Link href={d.peek.href} title={d.peek.label} aria-label={d.peek.label}
+          className={`absolute bottom-5 right-5 z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line/80 bg-surface-1/70 backdrop-blur-sm transition ${d.accent} hover:scale-110 hover:border-current`}>
+          <EyeMark />
+        </Link>
+      )}
+    </div>
   );
 }
 
