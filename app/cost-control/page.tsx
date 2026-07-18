@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
+import FixedCosts from "@/components/FixedCosts";
 
 type Report = {
   total: { credits: number; cents: number; events: number };
@@ -69,6 +70,9 @@ export default function CostControlPage() {
   const [userEmail, setUserEmail] = useState("");
 
   const [report, setReport] = useState<Report | null>(null);
+  // Fixed-cost allocation per desk, loaded by the FixedCosts panel and shared with the desk split so both
+  // views agree on what a desk actually costs.
+  const [fixedByDesk, setFixedByDesk] = useState<Record<string, number>>({});
   const [audit, setAudit] = useState<Audit>([]);
   const [prev, setPrev] = useState<{ cents: number; credits: number } | null>(null);
   const [cycle, setCycle] = useState<{ start: string; trackedCredits: number; trackedCents: number } | null>(null);
@@ -313,7 +317,12 @@ export default function CostControlPage() {
         {/* WHICH DESK SPENT IT (Gary). The question Cost Control could not answer until now: the ledger knew
             what was bought but not which of the six desks bought it. Sits above the older tables because it is
             the first thing anyone actually wants to know. */}
-        {report && report.byDesk.length > 0 && <DeskSplit desks={report.byDesk} />}
+        {report && report.byDesk.length > 0 && <DeskSplit desks={report.byDesk} fixedByDesk={fixedByDesk} />}
+
+        {/* The standing cost of the stack, and where it lands. Below the desk split because the desks are the
+            answer and this is the working. */}
+        <FixedCosts isSuperAdmin={isSuper}
+          onLoaded={(a) => setFixedByDesk(Object.fromEntries(a.byDesk.map((d) => [d.desk, d.cents])))} />
 
         {/* Tables */}
         <Section title="By team member">{report && <Table rows={report.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, credits: u.credits, cents: u.cents, sub: `${u.events} jobs` }))} />}</Section>
@@ -385,46 +394,60 @@ export default function CostControlPage() {
   );
 }
 
-// SPEND BY DESK. A stacked share bar (where the money went, at a glance) over a per-desk breakdown.
+// SPEND BY DESK - TRUE COST, not marginal cost.
 //
-// Shares are computed from cents, but a desk with real spend that rounds to under 1% still gets a visible
-// sliver - a zero-width segment reads as "this desk is free", which is exactly the wrong conclusion when the
-// Journalist costs R65 against the studio's R1,400. "Unattributed" is shown, never hidden: it is the signal
-// that a new action needs mapping in lib/desks.ts.
-function DeskSplit({ desks }: { desks: { desk: string; credits: number; cents: number; events: number; tint: string }[] }) {
-  const total = desks.reduce((s, d) => s + d.cents, 0);
+// This panel first shipped showing metered spend only, which reported the creative factory at R0 across 204
+// real jobs. True at the margin and wrong about the business (Gary): the Higgsfield Ultra plan is $375 a
+// month whether it renders one image or a thousand, so "free" images are free only after the subscription is
+// already paid. A cost centre that hides a $375 standing commitment is not a cost centre.
+//
+// So each desk now carries two numbers: what its jobs cost at the margin, and its share of the subscriptions
+// its work runs on, allocated by job count. The desk total is the sum - what the agency actually spends to
+// run that desk.
+//
+// Shares are computed from the true total, but a desk with real cost that rounds under 1% still gets a
+// visible sliver: a zero-width segment reads as "this desk is free", the exact misreading this fixes.
+type DeskRow = { desk: string; credits: number; cents: number; events: number; tint: string };
+function DeskSplit({ desks, fixedByDesk }: { desks: DeskRow[]; fixedByDesk: Record<string, number> }) {
+  const trueOf = (d: DeskRow) => d.cents + (fixedByDesk[d.desk] ?? 0);
+  const total = desks.reduce((s, d) => s + trueOf(d), 0);
   const pct = (c: number) => (total > 0 ? (c / total) * 100 : 0);
+  const anyFixed = Object.values(fixedByDesk).some((v) => v > 0);
 
   return (
     <section className="mt-6">
-      <h2 className="tabular mb-2 text-xs uppercase tracking-[0.2em] text-ink-faint">By desk</h2>
+      <h2 className="tabular mb-2 text-xs uppercase tracking-[0.2em] text-ink-faint">
+        By desk {anyFixed && <span className="normal-case tracking-normal text-ink-dim">· pay-per-job plus its share of the subscriptions</span>}
+      </h2>
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-2">
           {desks.map((d) => (
-            <div key={d.desk} title={`${d.desk} · ${rand(d.cents)}`} style={{ width: `${Math.max(pct(d.cents), d.cents > 0 ? 0.8 : 0)}%`, background: d.tint }} />
+            <div key={d.desk} title={`${d.desk} · ${rand(trueOf(d))}`} style={{ width: `${Math.max(pct(trueOf(d)), trueOf(d) > 0 ? 0.8 : 0)}%`, background: d.tint }} />
           ))}
         </div>
 
         <div className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-          {desks.map((d) => (
-            <div key={d.desk} className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.tint }} />
-                <span className="truncate text-sm font-semibold text-ink">{d.desk}</span>
-                <span className="tabular shrink-0 text-[11px] text-ink-faint">{d.events.toLocaleString()} jobs</span>
+          {desks.map((d) => {
+            const fixed = fixedByDesk[d.desk] ?? 0;
+            return (
+              <div key={d.desk} className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.tint }} />
+                  <span className="truncate text-sm font-semibold text-ink">{d.desk}</span>
+                  <span className="tabular shrink-0 text-[11px] text-ink-faint">{d.events.toLocaleString()} jobs</span>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="tabular text-sm font-bold text-ink">{rand(trueOf(d))}</div>
+                  {/* Show the split whenever a subscription lands here, so nobody has to guess whether a big
+                      number is jobs or standing cost. This is also what stops a zero-marginal desk reading as
+                      broken: it is not "free", it is carrying its slice of the plans it runs on. */}
+                  {fixed > 0
+                    ? <div className="tabular text-[11px] text-ink-faint">{rand(d.cents)} jobs + {rand(fixed)} plans · {pct(trueOf(d)).toFixed(1)}%</div>
+                    : <div className="tabular text-[11px] text-ink-faint">{pct(trueOf(d)).toFixed(1)}%{d.credits >= 1 && ` · ${Math.round(d.credits).toLocaleString()} cr`}</div>}
+                </div>
               </div>
-              <div className="shrink-0 text-right">
-                <div className="tabular text-sm font-bold text-ink">{rand(d.cents)}</div>
-                {/* A desk that ran real jobs for R0 is NOT a metering gap, and must not read as one. The
-                    creative factory runs on nano_banana_pro / gpt_image_2, which the Higgsfield Ultra plan
-                    bills at zero, so its marginal cost genuinely is nil. Say so, rather than showing a bare
-                    R0.00 that looks like something failed to record. */}
-                {d.cents === 0 && d.events > 0
-                  ? <div className="text-[11px] font-medium text-ready">included in the plan</div>
-                  : <div className="tabular text-[11px] text-ink-faint">{pct(d.cents).toFixed(1)}%{d.credits >= 1 && ` · ${Math.round(d.credits).toLocaleString()} cr`}</div>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {desks.some((d) => d.desk === "Unattributed") && (

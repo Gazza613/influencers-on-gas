@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getReport, getAuditTrail, getCreditsSince, type CostFilters } from "@/lib/usage";
 import { getZarPerUsd } from "@/lib/fx";
 import { cycleStartIso } from "@/lib/cron";
+import { allocateFixedCosts } from "@/lib/subscriptions";
 
 // Filtered Cost Control report (DB only - fast). Live balance comes from /api/balance.
 export async function GET(req: Request) {
@@ -22,16 +23,20 @@ export async function GET(req: Request) {
   const cmpTo = u.searchParams.get("cmpTo");
 
   const cycleStart = cycleStartIso(10);
-  const [report, audit, zarPerUsd, prev, cycle] = await Promise.all([
+  const [report, audit, zarPerUsd, prev, cycle, fixed] = await Promise.all([
     getReport(filters),
     getAuditTrail(30),
     getZarPerUsd(),
     cmpFrom && cmpTo ? getReport({ ...filters, from: cmpFrom, to: cmpTo }) : Promise.resolve(null),
     getCreditsSince(cycleStart),
+    // The standing subscription cost, allocated onto the desks by their share of each provider's jobs. Never
+    // allowed to break the page: a missing table on a not-yet-migrated deploy must not take Cost Control down.
+    allocateFixedCosts(filters.from, filters.to).catch(() => null),
   ]);
   return NextResponse.json({
     report, audit, zarPerUsd,
     previous: prev ? { cents: prev.total.cents, credits: prev.total.credits } : null,
     cycle: { start: cycleStart, trackedCredits: Math.round(cycle.credits), trackedCents: cycle.cents },
+    fixed,
   });
 }

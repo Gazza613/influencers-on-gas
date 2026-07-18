@@ -614,3 +614,24 @@ alter table studio_assets add constraint studio_assets_kind_check
 alter table studio_assets drop constraint if exists studio_assets_kind_check;
 alter table studio_assets add constraint studio_assets_kind_check
   check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon','ceo_photo','ceo_cutout'));
+
+-- ── Subscriptions: the FIXED monthly exposure ────────────────────────────────
+-- Metered usage only ever answered "what did this job cost us at the margin?". For a platform built on
+-- subscriptions that badly understates the business (Gary): the Higgsfield Ultra plan is $375 whether we
+-- render one image or a thousand, so a desk running 204 jobs on unlimited models was reporting R0 - true at
+-- the margin, and wrong about what the company actually spends.
+--
+-- These rows are the standing cost of the tech stack. They are ALLOCATED across the desks by each desk's
+-- share of that provider's jobs, so fixed cost lands where the work happened instead of sitting in a
+-- footnote. Amounts live here, never in code, exactly like rate_card.
+create table if not exists subscriptions (
+  id          uuid primary key default gen_random_uuid(),
+  provider    text not null,                         -- matches usage_events.provider where one exists
+  name        text not null,                         -- 'Higgsfield Ultra', 'Claude Max', ...
+  monthly_usd numeric not null default 0,            -- list price per month, USD
+  active      boolean not null default true,
+  note        text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create unique index if not exists idx_subscriptions_provider_name on subscriptions(provider, name);
