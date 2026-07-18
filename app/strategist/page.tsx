@@ -18,7 +18,7 @@ export default async function StrategistPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
-        <Link href="/home" className="text-base font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
+        <Link href="/dashboard" className="text-base font-semibold text-ink-dim transition hover:text-ink">← Studio on GAS</Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Strategist</h1>
         <p className="mt-2 max-w-3xl text-[20px] leading-relaxed text-ink-dim">
           Daily market and competitor intelligence for the client. It looks for what makes a current assumption

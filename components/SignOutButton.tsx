@@ -20,7 +20,9 @@ export default function SignOutButton() {
     } catch {
       /* leave anyway - see above */
     }
-    window.location.href = "/";
+    // The PUBLIC landing page, and the flag makes it STAY there: without it the landing page's own session
+    // check can still see a not-yet-cleared session and redirect straight back to the dashboard (Gary).
+    window.location.href = "/?signedout=1";
   }
 
   return (

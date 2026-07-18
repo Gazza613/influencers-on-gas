@@ -75,9 +75,16 @@ export default function Landing() {
   const [authChecked, setAuthChecked] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    // JUST SIGNED OUT? Stay here. Signing out sends you to "/?signedout=1", and without this check the session
+    // lookup below could still see a not-yet-propagated session and bounce you straight back to the dashboard -
+    // which is exactly what Gary saw ("they land on /home again").
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("signedout")) {
+      setAuthChecked(true);
+      return;
+    }
     fetch("/api/auth/session", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => { if (cancelled) return; if (s?.user) router.replace("/home"); else setAuthChecked(true); })
+      .then((s) => { if (cancelled) return; if (s?.user) router.replace("/dashboard"); else setAuthChecked(true); })
       .catch(() => { if (!cancelled) setAuthChecked(true); });
     return () => { cancelled = true; };
   }, [router]);
