@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { listConnections } from "@/lib/connections";
 import ConnectTools from "@/components/ConnectTools";
+import LandingLayoutSwitch from "@/components/LandingLayoutSwitch";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,10 @@ export default async function ConnectPage() {
         the required tools are connected.
       </p>
       <ConnectTools initial={connections} canEdit={session?.user?.role === "super_admin"} />
+
+      {/* Settings, not a connection - but this is where platform-wide switches live, and the dashboard's job
+          is to be six tiles and nothing else. Super admin only. */}
+      {session?.user?.role === "super_admin" && <LandingLayoutSwitch />}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SYSTEMS } from "@/components/SystemMarks";
 
 // The landing headline cycles "Create Your ___". It covers everything behind the login: the AI-influencer video
 // studio (Influencers / Avatars), the creative factory (Designs / Social Ads / Campaigns), and the intelligence
@@ -73,8 +74,19 @@ export default function Landing() {
   // the app, not see the logged-out "Get Started" marketing view - which read as a surprise logout. Hold the
   // render until we know, so the CTA never flashes for a signed-in user.
   const [authChecked, setAuthChecked] = useState(false);
+  // WHICH LAYOUT: the six systems, or the original floating influencer photos. Stored in the database so Gary
+  // can switch back without a deploy ("i may go back to how it is now"). ?layout=cards / ?layout=systems
+  // previews the other one without changing what the public sees - so the two can be compared side by side
+  // before committing to either.
+  const [layout, setLayout] = useState<"systems" | "cards">("systems");
   useEffect(() => {
     let cancelled = false;
+    // Layout FIRST, before the signed-out early return below - otherwise landing here after sign-out would
+    // skip the lookup and always show the default, ignoring whichever layout is actually live.
+    const forced = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("layout") : null;
+    if (forced === "cards" || forced === "systems") setLayout(forced);
+    else fetch("/api/landing-layout", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.layout) setLayout(d.layout); }).catch(() => {});
+
     // JUST SIGNED OUT? Stay here. Signing out sends you to "/?signedout=1", and without this check the session
     // lookup below could still see a not-yet-propagated session and bounce you straight back to the dashboard -
     // which is exactly what Gary saw ("they land on /home again").
@@ -130,10 +142,17 @@ export default function Landing() {
       {/* Dot grid */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
 
-      {/* Floating influencer cards (real heroes) */}
+      {/* THE SIX SYSTEMS (or the original influencer photos), in the same six floating slots.
+          The mapping is exact and that is the whole idea: there were already three cards down each side and
+          there are exactly six systems, so the page's existing character - the drift, the sway, the staggered
+          entrance - carries over untouched while the content becomes what the platform actually IS.
+          Display only, like the photo cards they replace: a logged-out visitor clicking one would just bounce
+          off the login gate, and the page already has one clear action in Get Started. */}
       {CARDS.map((card, i) => {
+        const sys = SYSTEMS[i];
         const pick = cardSrcs[i];
-        if (!pick) return null;
+        if (layout === "cards" && !pick) return null;
+        if (layout === "systems" && !sys) return null;
         const opt = (u: string) => `/_next/image?url=${encodeURIComponent(u)}&w=640&q=75`;
         const pos: Record<string, string> = {};
         if ("left" in card) pos.left = card.left as string;
@@ -146,16 +165,31 @@ export default function Landing() {
                 cards drift AND sway - on different periods, so the motion stays organic rather than in lockstep. */}
             <div style={{ animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite` }}>
               <div style={{ position: "relative", animation: `cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`, borderRadius: 18, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={opt(pick.url)} alt="" loading="lazy" decoding="async"
-                onError={(e) => {
-                  // Self-heal a broken/expired frame: optimised hero, then raw hero, then stop.
-                  const t = e.currentTarget; const step = t.dataset.step || "0";
-                  if (step === "0") { t.dataset.step = "1"; t.src = opt(pick.hero); }
-                  else if (step === "1") { t.dataset.step = "2"; t.src = pick.hero; }
-                }}
-                style={{ width: "100%", aspectRatio: "2/3", objectFit: "cover", display: "block" }} />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,14,0.16) 0%, transparent 42%)" }} />
+              {layout === "systems" ? (
+                // A SYSTEM CARD. Same 2:3 slot as the photo it replaces, so the composition does not shift.
+                // The mark is given room and the name is set large: at this size on a moving card, one strong
+                // name beats a paragraph nobody can read while it drifts.
+                <div style={{ width: "100%", aspectRatio: "2/3", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "16% 13%", background: `linear-gradient(160deg, ${sys.tint}1F 0%, rgba(7,7,14,0.92) 55%)`, textAlign: "left" }}>
+                  <div style={{ width: "34%", maxWidth: 54 }}>{sys.mark(`sys-${sys.key}`)}</div>
+                  <div>
+                    <div style={{ fontSize: "clamp(13px, 1.25vw, 18px)", fontWeight: 800, lineHeight: 1.18, letterSpacing: "-0.3px", color: "#fff" }}>{sys.name}</div>
+                    <div style={{ marginTop: "0.45em", fontSize: "clamp(10px, 0.85vw, 12.5px)", lineHeight: 1.35, color: "rgba(255,255,255,0.5)" }}>{sys.line}</div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={opt(pick!.url)} alt="" loading="lazy" decoding="async"
+                    onError={(e) => {
+                      // Self-heal a broken/expired frame: optimised hero, then raw hero, then stop.
+                      const t = e.currentTarget; const step = t.dataset.step || "0";
+                      if (step === "0") { t.dataset.step = "1"; t.src = opt(pick!.hero); }
+                      else if (step === "1") { t.dataset.step = "2"; t.src = pick!.hero; }
+                    }}
+                    style={{ width: "100%", aspectRatio: "2/3", objectFit: "cover", display: "block" }} />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(7,7,14,0.16) 0%, transparent 42%)" }} />
+                </>
+              )}
               </div>
             </div>
           </div>
@@ -189,6 +223,20 @@ export default function Landing() {
           Human command. AI execution. One platform.
         </p>
 
+        {/* MOBILE. The floating cards are hidden below 860px, so on a phone the six systems would simply not
+            exist - the whole point of the layout, invisible to half the visitors. A compact two-column strip
+            carries them instead, below the CTA where it does not fight the headline. */}
+        {layout === "systems" && (
+          <div className="landing-systems-mobile" style={{ display: "none", gap: 8, marginBottom: 40, textAlign: "left" }}>
+            {SYSTEMS.map((sysm) => (
+              <div key={sysm.key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", borderRadius: 12, background: `linear-gradient(140deg, ${sysm.tint}1A 0%, rgba(255,255,255,0.03) 70%)`, border: "1px solid rgba(255,255,255,0.07)" }}>
+                <span style={{ width: 22, flexShrink: 0 }}>{sysm.mark(`m-${sysm.key}`)}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.25, color: "rgba(255,255,255,0.92)" }}>{sysm.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <button
           onClick={() => router.push("/login")}
           style={{ padding: "17px 60px", borderRadius: 980, background: "linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)", color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.2px", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)", transition: "transform 0.18s, box-shadow 0.18s", border: "none", cursor: "pointer" }}
@@ -208,7 +256,11 @@ export default function Landing() {
         @keyframes cardSway { 0%,100%{transform:translateX(0px)} 25%{transform:translateX(8px)} 75%{transform:translateX(-7px)} }
         @keyframes cardAppear { from{opacity:0} to{opacity:var(--target-opacity,0.44)} }
         .landing-card { display:block }
-        @media (max-width: 860px) { .landing-card { display:none } }
+        @media (max-width: 860px) {
+          .landing-card { display:none }
+          /* The systems strip only exists where the floating cards do not. */
+          .landing-systems-mobile { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) }
+        }
       `}</style>
     </div>
   );
