@@ -143,7 +143,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>Influencers <span className="brand-grad">on</span> GAS</>,
         href: "/influencers",
         mark: <InfluencerMark />,
-        blurb: "The AI-influencer video studio. Cast a face, give it a voice, shoot and cut the film.",
+        blurb: "Cast a face, give it a voice, then shoot and cut the film. A complete AI-influencer studio, brief to broadcast-ready.",
         action: "Open the studio",
         peek: { href: "/s/showcase", label: "See the showcase" },
         ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
@@ -155,7 +155,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>Studio <span className="brand-grad">on</span> GAS</>,
         href: "/studio",
         mark: <StudioMark />,
-        blurb: "The creative factory. A brief in, a publish-ready funnel set out, on the client's own designs.",
+        blurb: "A brief in, a publish-ready funnel out. Every creative built on the client's own proven designs, never invented from scratch.",
         action: "Open the factory",
         ring: "border-[#60a5fa]/30 hover:border-[#60a5fa]/70 hover:shadow-[0_0_50px_-12px_rgba(96,165,250,0.45)]",
         wash: "from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.04]",
@@ -172,7 +172,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         href: "https://media.gasmarketing.co.za/",
         external: true,
         mark: <MediaMark />,
-        blurb: "Live, real-time campaign insights. What the media is doing now, all in real-time and on one dashboard.",
+        blurb: "Live campaign insight, as it happens. What the media is doing right now, every channel on a single dashboard.",
         action: "Open Media",
         ring: "border-[#38bdf8]/30 hover:border-[#38bdf8]/70 hover:shadow-[0_0_50px_-12px_rgba(56,189,248,0.45)]",
         wash: "from-[#38bdf8]/[0.10] to-[#60a5fa]/[0.04]",
@@ -183,7 +183,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         href: "https://psi.gasmarketing.co.za/",
         external: true,
         mark: <PsiMark />,
-        blurb: "Pre-Sales Intelligence. Qualifies and nurtures a prospect until they are a high-intent lead worth handing over.",
+        blurb: "Pre-Sales Intelligence. Qualifies and nurtures every prospect until they are a high-intent lead worth handing over.",
         action: "Open PSI",
         ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
@@ -199,7 +199,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The Strategist</>,
         href: "/strategist",
         mark: <StrategistMark />,
-        blurb: "Daily market and competitor intelligence. It hunts for what makes a current assumption wrong.",
+        blurb: "Daily market and competitor intelligence. It hunts for what makes a current assumption wrong, then says what to do about it.",
         action: "Open the desk",
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
         wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
@@ -209,7 +209,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The Journalist</>,
         href: "/journalist",
         mark: <JournalistMark />,
-        blurb: "Thought leadership a client CEO can put his name to, built from primary sources, never opinion.",
+        blurb: "Thought leadership a client CEO can put his name to. Built from primary sources, sourced and dated, never opinion.",
         action: "Open the desk",
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
@@ -219,7 +219,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   },
 ];
 
-function Tile({ d }: { d: Door }) {
+function Tile({ d, index = 0 }: { d: Door; index?: number }) {
   // The card is a CONTAINER, not itself a link, so a second destination (the showcase eye) can live inside it.
   // Nesting an anchor inside an anchor is invalid HTML and breaks the inner click, so the main destination is a
   // stretched overlay link and the eye sits above it on a higher layer.
@@ -229,7 +229,7 @@ function Tile({ d }: { d: Door }) {
   const label = typeof d.action === "string" ? d.action : "Open";
 
   return (
-    <div className={cls}>
+    <div className={`${cls} gas-rise`} style={{ animationDelay: `${80 + index * 90}ms` }}>
       {/* A soft light that only wakes on hover - the card feels lit rather than decorated. */}
       <span aria-hidden className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${d.wash} opacity-0 blur-2xl transition duration-500 group-hover:opacity-100`} />
 
@@ -241,9 +241,9 @@ function Tile({ d }: { d: Door }) {
       )}
 
       <span className="relative block transition duration-300 group-hover:-translate-y-0.5">{d.mark}</span>
-      <h2 className="relative mt-4 text-[22px] font-extrabold tracking-tight text-ink">{d.name}</h2>
-      <p className="relative mt-2 text-[14px] leading-relaxed text-ink-dim">{d.blurb}</p>
-      <span className={`relative mt-5 inline-flex items-center gap-1.5 text-[13px] font-bold ${d.accent}`}>
+      <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink">{d.name}</h2>
+      <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-dim">{d.blurb}</p>
+      <span className={`relative mt-5 inline-flex items-center gap-1.5 text-[15px] font-bold ${d.accent}`}>
         {d.action}
         <span className="transition-transform duration-300 group-hover:translate-x-1">{d.external ? "↗" : "→"}</span>
       </span>
@@ -271,7 +271,24 @@ export default function HomePage() {
         @keyframes gasFlareA { 0%,100%{opacity:.55;transform:translate3d(0,0,0) scale(1)} 50%{opacity:.9;transform:translate3d(2%,-2%,0) scale(1.08)} }
         @keyframes gasFlareB { 0%,100%{opacity:.5;transform:translate3d(0,0,0) scale(1.05)} 50%{opacity:.85;transform:translate3d(-2%,2%,0) scale(1)} }
         @keyframes gasFlareC { 0%,100%{opacity:.4} 50%{opacity:.7} }
-        @media (prefers-reduced-motion: reduce){ .gas-flare{animation:none !important} }
+        /* Tiles arrive in sequence rather than all at once - it reads as composed, not as a page load. */
+        @keyframes gasRise { from{opacity:0;transform:translate3d(0,14px,0)} to{opacity:1;transform:none} }
+        /* A slow sheen travelling through NOW, so the one word that carries the idea has life in it. */
+        @keyframes gasShine { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+        .gas-rise{opacity:0;animation:gasRise .7s cubic-bezier(.22,.8,.28,1) both}
+        .gas-now{
+          background:linear-gradient(90deg,#f96203,#f472b6,#818cf8,#22d3ee,#f96203);
+          background-size:200% 100%;
+          -webkit-background-clip:text;background-clip:text;color:transparent;
+          animation:gasShine 9s linear infinite;
+        }
+        /* The hairline under each group label draws itself in. */
+        @keyframes gasDraw { from{transform:scaleX(0)} to{transform:scaleX(1)} }
+        .gas-draw{transform-origin:left;animation:gasDraw .9s cubic-bezier(.22,.8,.28,1) both}
+        @media (prefers-reduced-motion: reduce){
+          .gas-flare,.gas-rise,.gas-now,.gas-draw{animation:none !important}
+          .gas-rise{opacity:1 !important}
+        }
       `}</style>
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         {/* The GAS orange, top-right, leading. */}
@@ -290,26 +307,26 @@ export default function HomePage() {
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
         <div className="max-w-2xl">
-          <p className="tabular text-[11px] uppercase tracking-[0.3em] text-ink-faint">GAS Marketing</p>
+          <p className="tabular text-[13px] font-semibold uppercase tracking-[0.34em] text-[#f96203]/85">GAS Marketing</p>
           <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">
-            The Agency of <span className="brand-grad">NOW</span>
+            The Agency of <span className="gas-now">NOW</span>
           </h1>
-          <p className="mt-4 text-lg leading-relaxed text-ink-dim">
+          <p className="mt-4 text-[19px] leading-relaxed text-ink-dim">
             Human command. AI execution. One platform.
           </p>
         </div>
 
         <div className="mt-12 space-y-10">
-          {GROUPS.map((g) => (
+          {GROUPS.map((g, gi) => (
             <section key={g.label}>
               {/* The group label carries a hairline out to the edge: it reads as a chapter, not a heading. */}
               <div className="flex items-center gap-4">
-                <h2 className="tabular text-[11px] uppercase tracking-[0.3em] text-ink-dim">{g.label}</h2>
-                <span className="text-[13px] text-ink-faint">{g.note}</span>
-                <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-line to-transparent" />
+                <h2 className="tabular text-[13px] font-semibold uppercase tracking-[0.3em] text-ink-dim">{g.label}</h2>
+                <span className="text-[15px] text-ink-faint">{g.note}</span>
+                <span aria-hidden className="gas-draw h-px flex-1 bg-gradient-to-r from-line to-transparent" />
               </div>
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
-                {g.doors.map((d) => <Tile key={d.href} d={d} />)}
+                {g.doors.map((d, n) => <Tile key={d.href} d={d} index={gi * 2 + n} />)}
               </div>
             </section>
           ))}
