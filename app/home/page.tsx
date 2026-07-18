@@ -131,6 +131,9 @@ function EyeMark() {
   );
 }
 
+// GARY'S ORDER: Influencers, Studio, Media, PSI, Strategist, Journalist. It maps cleanly onto the three pairs,
+// so the grouping survives - Run simply moves ahead of Know, and the Strategist leads its pair (it is the daily
+// working tool; the Journalist is picked up when someone sits down to write).
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
     label: "Make",
@@ -148,7 +151,8 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#d8b4fe]",
       },
       {
-        name: <>GAS Studio</>,
+        // Renamed from "GAS Studio" (Gary) so it joins the "... on GAS" family.
+        name: <>Studio <span className="brand-grad">on</span> GAS</>,
         href: "/studio",
         mark: <StudioMark />,
         blurb: "The creative factory. A brief in, a publish-ready funnel set out, on the client's own designs.",
@@ -156,32 +160,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         ring: "border-[#60a5fa]/30 hover:border-[#60a5fa]/70 hover:shadow-[0_0_50px_-12px_rgba(96,165,250,0.45)]",
         wash: "from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.04]",
         accent: "text-[#93c5fd]",
-      },
-    ],
-  },
-  {
-    label: "Know",
-    note: "Researched daily, sourced, never assumed",
-    doors: [
-      {
-        name: <>The Journalist</>,
-        href: "/journalist",
-        mark: <JournalistMark />,
-        blurb: "Thought leadership a client CEO can put his name to, built from primary sources, never opinion.",
-        action: "Open the desk",
-        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
-        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
-        accent: "text-[#67e8f9]",
-      },
-      {
-        name: <>The Strategist</>,
-        href: "/strategist",
-        mark: <StrategistMark />,
-        blurb: "Daily market and competitor intelligence. It hunts for what makes a current assumption wrong.",
-        action: "Open the desk",
-        ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
-        wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
-        accent: "text-[#a5b4fc]",
       },
     ],
   },
@@ -194,7 +172,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         href: "https://media.gasmarketing.co.za/",
         external: true,
         mark: <MediaMark />,
-        blurb: "Live, real-time campaign insight. What the media is doing now, in one place instead of five dashboards.",
+        blurb: "Live, real-time campaign insights. What the media is doing now, all in real-time and on one dashboard.",
         action: "Open Media",
         ring: "border-[#38bdf8]/30 hover:border-[#38bdf8]/70 hover:shadow-[0_0_50px_-12px_rgba(56,189,248,0.45)]",
         wash: "from-[#38bdf8]/[0.10] to-[#60a5fa]/[0.04]",
@@ -210,6 +188,32 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#f9a8d4]",
+      },
+    ],
+  },
+  {
+    label: "Know",
+    note: "Researched daily, sourced, never assumed",
+    doors: [
+      {
+        name: <>The Strategist</>,
+        href: "/strategist",
+        mark: <StrategistMark />,
+        blurb: "Daily market and competitor intelligence. It hunts for what makes a current assumption wrong.",
+        action: "Open the desk",
+        ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
+        wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
+        accent: "text-[#a5b4fc]",
+      },
+      {
+        name: <>The Journalist</>,
+        href: "/journalist",
+        mark: <JournalistMark />,
+        blurb: "Thought leadership a client CEO can put his name to, built from primary sources, never opinion.",
+        action: "Open the desk",
+        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
+        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
+        accent: "text-[#67e8f9]",
       },
     ],
   },
