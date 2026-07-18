@@ -273,20 +273,11 @@ export default function HomePage() {
         @keyframes gasFlareC { 0%,100%{opacity:.4} 50%{opacity:.7} }
         /* Tiles arrive in sequence rather than all at once - it reads as composed, not as a page load. */
         @keyframes gasRise { from{opacity:0;transform:translate3d(0,14px,0)} to{opacity:1;transform:none} }
-        /* A slow sheen travelling through NOW, so the one word that carries the idea has life in it. */
-        @keyframes gasShine { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
-        .gas-rise{opacity:0;animation:gasRise .7s cubic-bezier(.22,.8,.28,1) both}
-        .gas-now{
-          background:linear-gradient(90deg,#f96203,#f472b6,#818cf8,#22d3ee,#f96203);
-          background-size:200% 100%;
-          -webkit-background-clip:text;background-clip:text;color:transparent;
-          animation:gasShine 9s linear infinite;
-        }
         /* The hairline under each group label draws itself in. */
         @keyframes gasDraw { from{transform:scaleX(0)} to{transform:scaleX(1)} }
         .gas-draw{transform-origin:left;animation:gasDraw .9s cubic-bezier(.22,.8,.28,1) both}
         @media (prefers-reduced-motion: reduce){
-          .gas-flare,.gas-rise,.gas-now,.gas-draw{animation:none !important}
+          .gas-flare,.gas-rise,.gas-draw{animation:none !important}
           .gas-rise{opacity:1 !important}
         }
       `}</style>
@@ -307,9 +298,9 @@ export default function HomePage() {
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
         <div className="max-w-2xl">
-          <p className="tabular text-[13px] font-semibold uppercase tracking-[0.34em] text-[#f96203]/85">GAS Marketing</p>
+          <p className="tabular text-[15px] font-semibold uppercase tracking-[0.34em] text-white">GAS Marketing</p>
           <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">
-            The Agency of <span className="gas-now">NOW</span>
+            The Agency of <span className="brand-grad-anim">NOW</span>
           </h1>
           <p className="mt-4 text-[19px] leading-relaxed text-ink-dim">
             Human command. AI execution. One platform.

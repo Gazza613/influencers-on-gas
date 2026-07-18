@@ -84,6 +84,23 @@ body {
 
 /* ── Brand accent (pink → purple → blue) — shared across login, landing, build.
    Orange stays the GAS mark only. */
+/* THE ANIMATED GRADIENT - LOCKED (Gary). Whenever copy is "brought to life" with a moving gradient, anywhere on
+   the platform, it uses THESE colours: the brand pink/purple/blue, the same family as the showcase page. NEVER
+   orange - orange is the GAS mark alone and must not be used to animate copy.
+   The stops are a palindrome (pink -> purple -> blue -> purple -> pink) so a 200% shift loops seamlessly with no
+   jump at the wrap. Define it here, once, so it can never drift between pages. */
+.brand-grad-anim {
+  background: linear-gradient(90deg, #ec4899, #a855f7, #60a5fa, #a855f7, #ec4899);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: brandGradShift 9s linear infinite;
+}
+@keyframes brandGradShift { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
+@media (prefers-reduced-motion: reduce) { .brand-grad-anim { animation: none; } }
+
 .brand-grad {
   background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #60a5fa 100%);
   -webkit-background-clip: text;
