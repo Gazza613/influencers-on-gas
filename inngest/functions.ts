@@ -434,7 +434,9 @@ export const ingestSource = inngest.createFunction(
       await step.run("mark-indexed", () => setSourceStatus(sourceId, "indexed"));
       return { ok: true, chunks: stored };
     } catch (e) {
-      await step.run("mark-failed", () => setSourceStatus(sourceId, "failed"));
+      // Record WHY. "failed" on its own is not a diagnosis, and the person looking at it cannot read our logs.
+      const why = String((e as Error)?.message || e).slice(0, 400);
+      await step.run("mark-failed", () => setSourceStatus(sourceId, "failed", why));
       throw e;
     }
   },

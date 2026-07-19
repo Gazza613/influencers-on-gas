@@ -132,16 +132,19 @@ export default function Landing() {
       {/* Orbs */}
       <div style={{ position: "absolute", width: 760, height: 760, top: "-22%", left: "-18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.28) 0%, transparent 65%)", animation: "orb1 14s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", width: 620, height: 620, top: "-14%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.22) 0%, transparent 65%)", animation: "orb2 19s ease-in-out infinite", pointerEvents: "none" }} />
-      {/* MORE DEPTH IN THE DEAD SPACE (Gary: "a little flat"). Removing the star field left the middle and
-          lower thirds genuinely empty, and two glows at the top could not carry a full page on their own.
-          Three more, all in the blue-purple family and all FAINTER than the two originals (0.10-0.14 against
-          0.22-0.28), placed where there was nothing: mid-left, lower-centre and mid-right. Each on its own
-          slow, mismatched period so the page breathes rather than pulses.
-          Kept in the accent family on purpose - orange belongs to the horizon and the mark, and a warm glow
-          up here would fight the sunset rather than support it. */}
-      <div style={{ position: "absolute", width: 640, height: 640, top: "34%", left: "-14%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 68%)", animation: "orb3 26s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: 720, height: 720, top: "52%", left: "24%", borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.11) 0%, transparent 70%)", animation: "orb4 31s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: 560, height: 560, top: "40%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.10) 0%, transparent 68%)", animation: "orb5 23s ease-in-out infinite", pointerEvents: "none" }} />
+      {/* DEPTH WHERE THE EYE ACTUALLY LOOKS (Gary, with arrows on a screenshot).
+          The first attempt put these at the page EDGES and low-centre, which failed twice over: the edge ones
+          sat BEHIND the floating cards so nothing showed, and the low-centre one bled into the sunset and
+          muddied the orange. Both are now in the two genuinely empty pockets either side of the logo - the
+          black space between the cards and the centre column, high on the page and clear of the horizon.
+          Positioned by their CENTRE via a wrapper, because the glow itself animates `transform` and a
+          centring translate on the same element would be overwritten by the keyframe. */}
+      <div aria-hidden style={{ position: "absolute", left: "25%", top: "22%", pointerEvents: "none" }}>
+        <div style={{ width: 520, height: 520, marginLeft: -260, marginTop: -260, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.20) 0%, rgba(99,102,241,0.08) 45%, transparent 70%)", animation: "orb3 24s ease-in-out infinite" }} />
+      </div>
+      <div aria-hidden style={{ position: "absolute", left: "71%", top: "24%", pointerEvents: "none" }}>
+        <div style={{ width: 500, height: 500, marginLeft: -250, marginTop: -250, borderRadius: "50%", background: "radial-gradient(circle, rgba(96,165,250,0.18) 0%, rgba(168,85,247,0.08) 46%, transparent 70%)", animation: "orb4 29s ease-in-out infinite" }} />
+      </div>
       {/* ── SUNSET HORIZON (Gary, experimental - "i may reverse this move but lets try") ──────────────────
           Committed on its own so reverting it touches nothing else on the page.
 
@@ -249,7 +252,6 @@ export default function Landing() {
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
         @keyframes orb3 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(38px,-46px) scale(0.92)} 70%{transform:translate(-44px,20px) scale(1.07)} }
         @keyframes orb4 { 0%,100%{transform:translate(0,0) scale(1)} 45%{transform:translate(-36px,34px) scale(1.08)} }
-        @keyframes orb5 { 0%,100%{transform:translate(0,0) scale(1)} 55%{transform:translate(30px,-40px) scale(0.94)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
         @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-26px)} }

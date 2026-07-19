@@ -63,11 +63,12 @@ export type KnowledgeSource = {
   status: string;
   last_synced_at: string | null;
   chunk_count?: number;
+  error?: string | null;
 };
 
 export async function listSources(clientId: string): Promise<KnowledgeSource[]> {
   return (await db().query(
-    `select s.id, s.client_id, s.type, s.uri, s.status, s.last_synced_at,
+    `select s.id, s.client_id, s.type, s.uri, s.status, s.error, s.last_synced_at,
             (select count(*) from knowledge_chunks k where k.source_id = s.id) as chunk_count
      from knowledge_sources s where s.client_id = $1 order by s.id desc`,
     [clientId],
@@ -82,8 +83,14 @@ export async function createSource(clientId: string, type: string, uri: string):
   return rows[0].id;
 }
 
-export async function setSourceStatus(id: string, status: string): Promise<void> {
-  await db().query("update knowledge_sources set status = $2, last_synced_at = now() where id = $1", [id, status]);
+// A FAILURE HAS TO EXPLAIN ITSELF. This used to record only the word "failed", so a source that broke gave
+// nobody anything to act on - the first site crawl could only be diagnosed by guessing at it. The reason is
+// now stored with the status and shown on the brain page.
+export async function setSourceStatus(id: string, status: string, error?: string | null): Promise<void> {
+  await db().query(
+    "update knowledge_sources set status = $2, error = $3, last_synced_at = now() where id = $1",
+    [id, status, status === "failed" ? (error ?? null) : null],
+  );
 }
 
 // Delete one source (its chunks + embeddings cascade). Scoped to the brain for safety.

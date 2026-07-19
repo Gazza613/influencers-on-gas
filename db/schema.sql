@@ -667,3 +667,7 @@ create index if not exists idx_users_reset_token on users(reset_token);
 alter table intel_briefs add column if not exists ceo_rules text;
 alter table intel_briefs add column if not exists ceo_name  text;
 alter table intel_briefs add column if not exists ceo_title text;
+
+-- Why an ingest failed. Status alone said "failed" and nothing else, so a broken source could only be
+-- diagnosed by guessing - which is exactly what happened to the first site crawl.
+alter table knowledge_sources add column if not exists error text;

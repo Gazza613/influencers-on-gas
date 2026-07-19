@@ -7,7 +7,7 @@ import { flex } from "@/lib/flex";
 import BrainKnowledge from "@/components/BrainKnowledge";
 import BrainLibrary from "@/components/BrainLibrary";
 
-type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number };
+type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null };
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
 export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }: { brainId: string; initialSources: Source[]; chunkCount?: number }) {
@@ -217,13 +217,19 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
         ) : (
           <ul className="mt-3 space-y-2">
             {sources.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 border-b border-line/60 py-2.5 text-base">
+              <li key={s.id} className="border-b border-line/60 py-2.5 text-base">
+                <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate text-ink">{s.type === "website" ? s.uri : s.uri || "Pasted note"}</span>
                 <span className="flex shrink-0 items-center gap-3 text-[13px]">
                   <span className="text-ink-faint">{s.chunk_count ?? 0} chunks</span>
                   <span className={badge(s.status)}>{s.status === "pending" ? "indexing…" : s.status}</span>
                   <button onClick={() => removeSource(s)} title="Delete this source" aria-label="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
                 </span>
+                </div>
+                {/* The reason, in plain sight. A source that says only "failed" gives nobody anything to act on. */}
+                {s.status === "failed" && s.error && (
+                  <p className="mt-1.5 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-[15px] leading-relaxed text-alert">{s.error}</p>
+                )}
               </li>
             ))}
           </ul>
