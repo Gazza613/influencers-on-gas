@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { askConfirm } from "@/lib/confirm";
 
-type User = { id: string; email: string; name: string | null; role: string; status: string; created_at: string };
+type User = { id: string; email: string; name: string | null; role: string; status: string; created_at: string; suspended_at?: string | null };
 
 const ROLE_LABEL: Record<string, string> = { super_admin: "Super admin", admin: "Admin", producer: "Member" };
 
@@ -36,16 +36,38 @@ export default function TeamManager() {
     setEmail(""); setName(""); load();
   }
 
-  async function remove(u: User) {
-    if (!(await askConfirm({ title: `Remove ${u.name || u.email}?`, body: "They will lose access immediately.", tone: "danger", confirmLabel: "Remove" }))) return;
-    const r = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+  // SUSPEND is the everyday action; REMOVE is permanent. Both now bite on the person's next request, because
+  // the auth gate re-checks account status rather than trusting a token that can be up to 8 hours old.
+  async function setStatus(u: User, action: "suspend" | "reactivate") {
+    if (action === "suspend" && !(await askConfirm({
+      title: `Suspend ${u.name || u.email}?`,
+      body: "They are signed out on their next click and cannot sign back in. Their account and history are kept, and you can reactivate them at any time.",
+      tone: "danger", confirmLabel: "Suspend",
+    }))) return;
+    const r = await fetch(`/api/users/${u.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }),
+    });
+    const d = await r.json().catch(() => ({}));
     if (r.ok) load();
+    else setMsg({ kind: "err", text: d?.error || "Could not change that account" });
+  }
+
+  async function remove(u: User) {
+    if (!(await askConfirm({
+      title: `Permanently remove ${u.name || u.email}?`,
+      body: "Their account is deleted and cannot be restored - you would have to invite them again from scratch. To take access away temporarily, use Suspend instead.",
+      tone: "danger", confirmLabel: "Remove permanently",
+    }))) return;
+    const r = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) load();
+    else setMsg({ kind: "err", text: d?.error || "Could not remove that account" });
   }
 
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-xl font-bold">Team</h1>
-      <p className="mt-1 text-sm text-ink-dim">Invite teammates and manage access. Gated to <span className="text-ink-dim">@gasmarketing.co.za</span> emails for now. Everyone can see Cost Control; only a super admin can invite or remove members.</p>
+      <p className="mt-1 text-sm text-ink-dim">Invite teammates and manage access. Gated to <span className="text-ink-dim">@gasmarketing.co.za</span> emails for now. Everyone can see Cost Control; only a super admin can invite, suspend or remove members. Suspending or removing takes effect on their very next click, not when their session expires.</p>
 
       {/* Invite */}
       <div className="glow-accent mt-5 rounded-xl bg-surface-1 p-4">
@@ -83,12 +105,20 @@ export default function TeamManager() {
                   </td>
                   <td className="px-4 py-3 text-xs text-ink-dim">{ROLE_LABEL[u.role] ?? u.role}</td>
                   <td className="px-4 py-3">
-                    <span className={`tabular rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${u.status === "active" ? "bg-ready/15 text-ready" : "bg-active/15 text-active"}`}>
-                      {u.status === "active" ? "active" : "invited"}
+                    <span className={`tabular rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                      u.status === "active" ? "bg-ready/15 text-ready"
+                      : u.status === "suspended" ? "bg-alert/15 text-alert"
+                      : "bg-active/15 text-active"}`}>
+                      {u.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => remove(u)} className="rounded-md px-2 py-1 text-xs text-ink-faint hover:bg-alert/15 hover:text-alert">Remove</button>
+                    {u.status === "suspended" ? (
+                      <button onClick={() => setStatus(u, "reactivate")} className="rounded-md px-2 py-1 text-xs font-semibold text-ready hover:bg-ready/15">Reactivate</button>
+                    ) : (
+                      <button onClick={() => setStatus(u, "suspend")} className="rounded-md px-2 py-1 text-xs text-ink-faint hover:bg-alert/15 hover:text-alert">Suspend</button>
+                    )}
+                    <button onClick={() => remove(u)} className="ml-1 rounded-md px-2 py-1 text-xs text-ink-faint hover:bg-alert/15 hover:text-alert">Remove</button>
                   </td>
                 </tr>
               ))}

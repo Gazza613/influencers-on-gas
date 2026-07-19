@@ -24,8 +24,9 @@ export type AppUser = {
   email: string;
   name: string | null;
   role: string;          // 'super_admin' | 'admin' | 'producer'
-  status: string;        // 'invited' | 'active'
+  status: string;        // 'invited' | 'active' | 'suspended'
   created_at: string;
+  suspended_at?: string | null;
 };
 
 export async function listUsers(): Promise<AppUser[]> {
@@ -91,4 +92,24 @@ export async function verifyUser(email: string, password: string): Promise<AppUs
 
 export async function deleteUser(id: string): Promise<void> {
   await db().query(`delete from users where id=$1`, [id]);
+}
+
+// SUSPEND rather than delete. Removal used to be the only option, which meant losing the person's record and
+// any way to let them back in. Suspension is reversible and keeps the history; both are instant now, because
+// the auth gate re-checks status on every request (lib/access-check).
+//
+// The password is deliberately left in place: a suspension is "not right now", not "start again". Reactivating
+// lets them sign straight back in with what they already had.
+export async function suspendUser(id: string): Promise<void> {
+  await db().query(`update users set status='suspended', suspended_at=now() where id=$1`, [id]);
+}
+
+// Back to active. An invite that was never accepted returns to 'invited', not 'active' - it still has no
+// password, and marking it active would leave an account nobody can sign in to.
+export async function reactivateUser(id: string): Promise<void> {
+  await db().query(
+    `update users set status = case when password_hash is null then 'invited' else 'active' end,
+                      suspended_at = null
+     where id=$1`, [id],
+  );
 }

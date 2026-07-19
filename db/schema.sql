@@ -635,3 +635,23 @@ create table if not exists subscriptions (
   updated_at  timestamptz not null default now()
 );
 create unique index if not exists idx_subscriptions_provider_name on subscriptions(provider, name);
+
+-- ── Team access: suspension + login throttling ───────────────────────────────
+-- SUSPEND, don't only delete. Removing a teammate used to be a hard delete: the row went, so there was no way
+-- to re-enable them and no record they had ever been there. Suspension keeps the person and their history and
+-- is reversible; delete stays for genuine removals.
+alter table users add column if not exists suspended_at timestamptz;
+-- status: 'invited' | 'active' | 'suspended'
+
+-- LOGIN THROTTLING. /login was unthrottled, so it was open to brute force - a real exposure on a public
+-- endpoint, independent of any team-management work. Attempts are recorded here and counted over a rolling
+-- window, per EMAIL (someone hammering one account) and per IP (someone spraying many accounts).
+create table if not exists login_attempts (
+  id     bigserial primary key,
+  email  text,
+  ip     text,
+  ok     boolean not null default false,
+  at     timestamptz not null default now()
+);
+create index if not exists idx_login_attempts_email on login_attempts(lower(email), at desc);
+create index if not exists idx_login_attempts_ip on login_attempts(ip, at desc);
