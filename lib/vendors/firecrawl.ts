@@ -80,8 +80,9 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
         title: p.metadata?.title || p.metadata?.sourceURL || "",
         content: (p.markdown || "").trim(),
       }))
-      // A crawl always picks up some navigation and tag pages. Anything under ~400 characters is not an
-      // article, and letting those in would fill the brain with menus.
-      .filter((p) => p.content.length > 400),
+      // A crawl always picks up navigation and tag pages; anything under ~400 characters is not an article and
+      // would fill the brain with menus. A sitemap is a list of links rather than content, so it goes too - it
+      // arrived in the first real crawl as 24 chunks of bare URLs.
+      .filter((p) => p.content.length > 400 && !/\.(xml|json|txt)(\?|$)/i.test(p.url)),
   };
 }

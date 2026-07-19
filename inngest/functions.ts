@@ -17,7 +17,7 @@ import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/he
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape, startCrawl, crawlStatus } from "@/lib/vendors/firecrawl";
-import { chunkText, ingestChunks } from "@/lib/rag";
+import { chunkText, ingestChunks, clearSourceChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
 import { recordUsage } from "@/lib/usage";
 
@@ -388,7 +388,7 @@ export const ingestSource = inngest.createFunction(
         let pages: { url: string; title: string; content: string }[] = [];
         let seen = 0;
         // Up to ~10 minutes. Each wait is its own step, so the function sleeps rather than holding a request.
-        for (let i = 0; i < 40; i++) {
+        for (let i = 0; i < 80; i++) {
           await step.sleep(`crawl-wait-${i}`, "15s");
           const st = await step.run(`crawl-poll-${i}`, () => crawlStatus(started.id));
           pages = st.pages; seen = st.seen;
@@ -437,8 +437,20 @@ export const ingestSource = inngest.createFunction(
       }
       if (!items.length) throw new Error("nothing to ingest");
 
-      // ingestChunks embeds in batches; can take a while on the free tier (429 retries).
-      const stored = await step.run("embed-store", () => ingestChunks(clientId, sourceId, items));
+      // IDEMPOTENT BY DESIGN. Inserting everything in one step meant that if that step timed out - and on a
+      // multi-page crawl it did - Inngest retried it and inserted the whole set a SECOND time. Chunk counts
+      // doubled silently, which is the worst way for this to fail: the brain looks fuller and is just repeating
+      // itself, and duplicates crowd real facts out of the top few retrieval slots.
+      //
+      // Clearing this source's chunks first makes a retry replace rather than duplicate, and splitting the
+      // work into batched steps keeps any single step short enough not to time out in the first place.
+      await step.run("clear-existing", () => clearSourceChunks(sourceId));
+      let stored = 0;
+      const BATCH = 40;
+      for (let i = 0; i < items.length; i += BATCH) {
+        const slice = items.slice(i, i + BATCH);
+        stored += await step.run(`embed-store-${i / BATCH}`, () => ingestChunks(clientId, sourceId, slice));
+      }
       await step.run("usage-embed", () => recordUsage({ clientId, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "ingest", count: stored }));
       await step.run("mark-indexed", () => setSourceStatus(sourceId, "indexed"));
       return { ok: true, chunks: stored };

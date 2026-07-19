@@ -72,6 +72,13 @@ export function chunkText(text: string, size = 900, overlap = 120): string[] {
   return chunks;
 }
 
+
+// Drop everything a source previously taught the brain. Called before a re-ingest so the operation is
+// idempotent: a retried or re-run source REPLACES its chunks instead of adding a second copy of them.
+export async function clearSourceChunks(sourceId: string): Promise<void> {
+  await db().query(`delete from knowledge_chunks where source_id = $1`, [sourceId]);
+}
+
 // Embed + store chunks for a brain. ALWAYS scoped to clientId. Embeds in batches.
 export async function ingestChunks(
   clientId: string,
