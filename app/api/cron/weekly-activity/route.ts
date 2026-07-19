@@ -110,7 +110,7 @@ export async function GET(req: Request) {
       department: "GAS Marketing",
     });
 
-    await sendEmail({ to: TO.join(","), subject: `Studio on GAS - team activity, ${a.from} to ${a.to}`, html });
+    await sendEmail({ fromName: "Studio on GAS", to: TO.join(","), subject: `Studio on GAS - team activity, ${a.from} to ${a.to}`, html });
     return NextResponse.json({ ok: true, sent: TO, members: a.members.length, ...t });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 500 });

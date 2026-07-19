@@ -13,7 +13,14 @@ const BASE = APP_URL;
 export function emailHeader(strapline: string, dateLabel: string, wordmark = "STUDIO"): string {
   return `
   <div style="text-align:center;padding:10px 0 22px;">
-    <img src="${BASE}/gas-logo.png" width="62" height="62" class="orb" style="border-radius:50%;box-shadow:0 0 28px rgba(249,98,3,0.55);" alt="GAS" />
+    <!-- NO RING. The logo is a transparent PNG with padding around the orb, so a box-shadow drew its glow at
+         the IMAGE BOX edge rather than around the visible orb - leaving a band of near-black background
+         between the two that read as a hard black border (Gary). The flare is now a soft radial gradient on
+         the cell BEHIND the image, which hugs the orb and has no edge to see. A client that ignores the
+         gradient simply shows a clean logo, which is the right way for this to degrade. -->
+    <div class="orbwrap" style="width:96px;height:96px;margin:0 auto;background:radial-gradient(circle at 50% 50%, rgba(249,98,3,0.42) 0%, rgba(249,98,3,0.16) 42%, rgba(249,98,3,0) 68%);">
+      <img src="${BASE}/gas-logo.png" width="62" height="62" class="orb" style="display:block;margin:0 auto;padding-top:17px;border:0;outline:none;" alt="GAS" />
+    </div>
     <div class="strap" style="margin-top:12px;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:#f96203;font-weight:700;">${strapline}</div>
     <div class="wordmark" style="margin-top:6px;font-size:22px;font-weight:800;letter-spacing:0;color:#ffffff;white-space:nowrap;">${wordmark} <span style="color:#f96203;">ON GAS</span></div>
     <div class="datelabel" style="margin-top:8px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#8a8f98;">${dateLabel}</div>
@@ -33,7 +40,9 @@ export function emailSignature(cadence: string, role = "AI Influencer Expert", d
     <div style="height:1px;background:linear-gradient(90deg,rgba(168,85,247,0.5),transparent);margin:14px 0;"></div>
     <table role="presentation" cellpadding="0" cellspacing="0"><tr>
       <td style="vertical-align:middle;padding-right:12px;">
-        <img src="${BASE}/gas-logo.png" width="44" height="44" style="border-radius:50%;box-shadow:0 0 16px rgba(249,98,3,0.4);" alt="GAS" />
+        <div style="width:62px;height:62px;background:radial-gradient(circle at 50% 50%, rgba(249,98,3,0.34) 0%, rgba(249,98,3,0.12) 44%, rgba(249,98,3,0) 70%);">
+          <img src="${BASE}/gas-logo.png" width="44" height="44" style="display:block;margin:0 auto;padding-top:9px;border:0;outline:none;" alt="GAS" />
+        </div>
       </td>
       <td style="vertical-align:middle;">
         <div class="foot-mark" style="font-size:12px;font-weight:800;letter-spacing:1px;color:#ffffff;white-space:nowrap;">${wordmark} <span style="color:#f96203;">ON</span> GAS</div>
@@ -60,7 +69,8 @@ export function emailShell(opts: {
   <style>
     /* Desktop is the ENHANCEMENT. Anything that strips this still gets a clean mobile email. */
     @media only screen and (min-width:601px) {
-      .orb { width:84px !important; height:84px !important; }
+      .orb { width:84px !important; height:84px !important; padding-top:22px !important; }
+      .orbwrap { width:128px !important; height:128px !important; }
       .wordmark { font-size:30px !important; letter-spacing:1px !important; }
       .strap { font-size:12px !important; letter-spacing:5px !important; }
       .datelabel { font-size:12px !important; letter-spacing:3px !important; }

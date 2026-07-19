@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
     const link = `${APP_URL}/reset/${started.token}`;
     const { subject, html } = resetEmail({ name: started.name, link });
-    await sendEmail({ to: email, subject, html });
+    await sendEmail({ to: email, subject, html, fromName: "Studio on GAS" });
   } catch {
     /* never leak an internal failure through a different-looking response */
   }
