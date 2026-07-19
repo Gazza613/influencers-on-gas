@@ -377,6 +377,7 @@ export const ingestSource = inngest.createFunction(
     const type = String(event.data.type || "text");
     const uri = String(event.data.uri || "");
     const text = String(event.data.text || "");
+    const includePath = event.data.includePath ? String(event.data.includePath) : null;
 
     try {
       let items: { content: string; metadata?: Record<string, unknown> }[];
@@ -384,7 +385,7 @@ export const ingestSource = inngest.createFunction(
         // A WHOLE SECTION. Firecrawl's crawl is asynchronous, so this starts the job and then polls across
         // durable steps - a serverless request would time out long before a fifty-page site finished, which
         // is exactly why this belongs in Inngest rather than in the route.
-        const started = await step.run("crawl-start", () => startCrawl(uri, 80));
+        const started = await step.run("crawl-start", () => startCrawl(uri, 80, includePath));
         let pages: { url: string; title: string; content: string }[] = [];
         let seen = 0;
         // Up to ~10 minutes. Each wait is its own step, so the function sleeps rather than holding a request.

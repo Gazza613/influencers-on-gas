@@ -75,10 +75,10 @@ export async function listSources(clientId: string): Promise<KnowledgeSource[]> 
   )) as KnowledgeSource[];
 }
 
-export async function createSource(clientId: string, type: string, uri: string): Promise<string> {
+export async function createSource(clientId: string, type: string, uri: string, includePath?: string | null): Promise<string> {
   const rows = (await db().query(
-    "insert into knowledge_sources (client_id, type, uri, status) values ($1, $2, $3, 'pending') returning id",
-    [clientId, type, uri],
+    "insert into knowledge_sources (client_id, type, uri, status, include_path) values ($1, $2, $3, 'pending', $4) returning id",
+    [clientId, type, uri, includePath ?? null],
   )) as { id: string }[];
   return rows[0].id;
 }

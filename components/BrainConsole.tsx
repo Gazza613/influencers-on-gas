@@ -15,6 +15,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
   const [mode, setMode] = useState<"website" | "crawl" | "text" | "file">("website");
   const [progress, setProgress] = useState("");
   const [uri, setUri] = useState("");
+  const [includePath, setIncludePath] = useState("");
   const [text, setText] = useState("");
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState("");
@@ -43,11 +44,11 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
     setAdding(true); setAddErr("");
     const r = await fetch(`/api/brains/${brainId}/sources`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mode === "website" || mode === "crawl" ? { type: mode, uri } : { type: "text", text }),
+      body: JSON.stringify(mode === "crawl" ? { type: "crawl", uri, includePath } : mode === "website" ? { type: "website", uri } : { type: "text", text }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setAddErr(d?.error || "Could not add source"); setAdding(false); return; }
-    setUri(""); setText("");
+    setUri(""); setText(""); setIncludePath("");
     await refresh();
     setAdding(false);
   }
@@ -168,12 +169,20 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
                 always be traced back to what it came from. */}
             <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://a-site.com/articles"
               className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong" />
+            {/* SCOPE. Without it a crawl wanders the whole site - the first real one returned a case study, a
+                solutions page and the sitemap alongside the articles. It also excludes the index page itself,
+                whose summaries are abbreviated restatements of the very articles we want and would compete
+                with them in retrieval. */}
+            <input value={includePath} onChange={(e) => setIncludePath(e.target.value)} placeholder="Only pages under this path, e.g. /blog"
+              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong" />
             <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">
               {adding ? "Starting the crawl…" : "Crawl and add everything"}
             </button>
             <p className="mt-2.5 text-[15px] text-ink-dim">
-              Follows the links under that address and reads every article it finds, up to 80 pages. Takes a few
-              minutes and keeps running if you close the tab.
+              Reads every article it finds, up to 80 pages. Takes a few minutes and keeps running if you close
+              the tab. <b className="text-ink-dim">Set the path</b> when the articles live somewhere other than
+              the address you started from, which is the usual shape of a blog - an index at one path, the
+              articles at another.
             </p>
           </>
         ) : mode === "website" ? (

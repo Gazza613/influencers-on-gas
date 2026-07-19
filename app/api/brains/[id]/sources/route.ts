@@ -32,9 +32,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!uri) uri = "Pasted note";
   }
 
-  const sourceId = await createSource(id, type, uri);
+  const includePath = typeof body.includePath === "string" ? body.includePath.trim() : "";
+  const sourceId = await createSource(id, type, uri, includePath || null);
   try {
-    await inngest.send({ name: "brain/ingest.source", data: { sourceId, clientId: id, type, uri, text } });
+    await inngest.send({ name: "brain/ingest.source", data: { sourceId, clientId: id, type, uri, text, includePath: includePath || null } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }

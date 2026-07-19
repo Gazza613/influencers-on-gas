@@ -671,3 +671,7 @@ alter table intel_briefs add column if not exists ceo_title text;
 -- Why an ingest failed. Status alone said "failed" and nothing else, so a broken source could only be
 -- diagnosed by guessing - which is exactly what happened to the first site crawl.
 alter table knowledge_sources add column if not exists error text;
+
+-- Restrict a crawl to one section of a site. Without it a crawl wanders: the first real one pulled a case
+-- study, a solutions page and the sitemap alongside the articles it was asked for.
+alter table knowledge_sources add column if not exists include_path text;

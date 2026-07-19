@@ -37,7 +37,7 @@ export async function scrape(url: string): Promise<ScrapedPage> {
 // a durable Inngest step - a serverless request would time out long before a fifty-page site finished.
 export type CrawlStarted = { id: string };
 
-export async function startCrawl(url: string, limit = 60): Promise<CrawlStarted> {
+export async function startCrawl(url: string, limit = 60, includePath?: string | null): Promise<CrawlStarted> {
   const res = await fetch(`${BASE}/crawl`, {
     method: "POST",
     headers: { Authorization: `Bearer ${await key()}`, "Content-Type": "application/json" },
@@ -49,6 +49,11 @@ export async function startCrawl(url: string, limit = 60): Promise<CrawlStarted>
       // every article lives at /blog/..., so nothing was under /articles and the crawler followed nothing.
       // Index-at-one-path, articles-at-another is the normal shape of a blog, not an edge case.
       allowBackwardLinks: true,
+      // SCOPE IT TO ONE SECTION. Without this a crawl wanders the whole site: the first real one returned a
+      // case study, a solutions page and the sitemap alongside the articles it was asked for, and the INDEX
+      // page itself dominated the brain with 220 chunks of summaries - abbreviated restatements of the very
+      // articles we wanted, which is the worst thing to have competing with them in retrieval.
+      ...(includePath ? { includePaths: [`^${includePath.replace(/^\/?/, "/").replace(/\/$/, "")}/.*`] } : {}),
       scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
     }),
   });
