@@ -1,6 +1,7 @@
 import { emailShell } from "./email-shell";
+import { APP_URL } from "./app-url";
 
-const BASE = "https://influencers.gasmarketing.co.za";
+const BASE = APP_URL;
 
 // The ideas HTML is produced by a model from LIVE web-search content, so treat it as
 // untrusted. Allow only safe formatting tags (keeping their inline style), and strip

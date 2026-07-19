@@ -1,4 +1,5 @@
-const BASE = "https://influencers.gasmarketing.co.za";
+import { APP_URL } from "./app-url";
+const BASE = APP_URL;
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
 export function inviteEmail(opts: { inviterName: string; inviteeName?: string; link: string }): { subject: string; html: string } {

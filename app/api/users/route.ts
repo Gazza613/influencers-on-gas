@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { listUsers, inviteUser, isGasEmail } from "@/lib/users";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { inviteEmail } from "@/lib/invite-email";
+import { APP_URL } from "@/lib/app-url";
 
 export const maxDuration = 30;
 
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   if (!isGasEmail(email)) return NextResponse.json({ error: "Access is for @gasmarketing.co.za only. For external access, email grow@gasmarketing.co.za." }, { status: 400 });
 
   const token = await inviteUser({ email, name, role });
-  const link = `https://influencers.gasmarketing.co.za/invite/${token}`;
+  const link = `${APP_URL}/invite/${token}`;
   const { subject, html } = inviteEmail({ inviterName: a.session.user.name ?? "GAS", inviteeName: name, link });
   const result = await sendEmail({ to: email, subject, html });
 

@@ -1,6 +1,7 @@
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { db } from "@/lib/db";
 import { getInfluencer, updateProductionFields } from "@/lib/influencers";
+import { APP_URL } from "./app-url";
 
 // Ops alerting: when the platform hits a real problem (a vendor out of credits, a rejected/expired API
 // key, a vendor down/timing out, or a build step that failed outright), email the admin a branded,
@@ -65,7 +66,7 @@ function brandedHtml(title: string, detail: string, c: { tag: string; cause: str
           <pre style="margin:0;padding:12px 14px;background:#0f0f18;border:1px solid #262636;border-radius:10px;color:#9aa0b4;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(detail).slice(0, 1200)}</pre>
         </td></tr>
         <tr><td style="padding:18px 28px 26px">
-          <a href="https://influencers.gasmarketing.co.za/cost-control" style="display:inline-block;padding:10px 18px;border-radius:10px;background:linear-gradient(90deg,#a855f7,#60a5fa);color:#fff;font-size:13px;font-weight:700;text-decoration:none">Open Cost Control →</a>
+          <a href="${APP_URL}/cost-control" style="display:inline-block;padding:10px 18px;border-radius:10px;background:linear-gradient(90deg,#a855f7,#60a5fa);color:#fff;font-size:13px;font-weight:700;text-decoration:none">Open Cost Control →</a>
           <p style="margin:16px 0 0;color:#5b5b6e;font-size:11px;line-height:1.5">You're getting this because you're the platform admin. Alerts are grouped so a single outage won't flood your inbox.</p>
         </td></tr>
       </table>

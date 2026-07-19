@@ -6,6 +6,7 @@ import { runIntel, loadIntelBrief, brainsWithIntel, type Intel } from "@/lib/int
 import { recordUsage } from "@/lib/usage";
 import { PREMIUM } from "@/lib/vendors/anthropic";
 import { emailShell } from "@/lib/email-shell";
+import { APP_URL } from "@/lib/app-url";
 
 // THE DAILY INTELLIGENCE RUN. The Journalist and The Strategist each go and find what changed, decide whether
 // it is MATERIAL, and file it into the "Worth reviewing" queue. Only the material findings are emailed.
@@ -56,7 +57,7 @@ function assessmentHtml(i: Intel, client: string): string {
   </div>`;
 }
 
-const APP_URL = process.env.APP_URL || "https://influencers.gasmarketing.co.za";
+
 
 // UK date, the way we write it: "17th July 2026". Not the US default, and not an ISO string in a briefing that
 // goes to EXCO.

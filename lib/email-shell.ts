@@ -1,7 +1,8 @@
+import { APP_URL } from "./app-url";
 // Shared branded shell for ALL Influencers on GAS emails (research, cost, future).
 // Centred GAS orb with an orange glow, an orange strapline, the white "INFLUENCERS ON GAS"
 // wordmark (ON GAS in orange), a date line, then the Sami signature + footer.
-const BASE = "https://influencers.gasmarketing.co.za";
+const BASE = APP_URL;
 
 // `wordmark` lets a specific email carry its own name (e.g. STRATEGIST ON GAS) instead of the platform default.
 // The Strategist briefing goes to EXCO and MoMo's internal team, so it should say what it is.

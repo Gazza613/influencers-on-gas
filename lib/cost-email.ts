@@ -1,5 +1,6 @@
 import type { CostReport } from "@/lib/usage";
 import { emailShell } from "./email-shell";
+import { APP_URL } from "./app-url";
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PROVIDER_LABEL: Record<string, string> = {
@@ -12,7 +13,7 @@ const ACTION_LABEL: Record<string, string> = {
   qa: "AI Vision QA", compose: "Scene writing", research: "Daily research", tagline: "Tagline",
 };
 
-const BASE = "https://influencers.gasmarketing.co.za";
+const BASE = APP_URL;
 
 // Escape user-controlled values (influencer names, emails) before HTML interpolation.
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));

@@ -4,7 +4,7 @@ import { sendEmail, emailConfigured } from "@/lib/email";
 // servers, so the producer shouldn't have to sit and watch. When a long job finishes we email them a link so
 // they can walk away and get pulled back only when there's something to do. Fully guarded: a no-op unless email
 // is configured, and every send is wrapped so a mail hiccup can NEVER fail the render job.
-const APP_URL = process.env.APP_URL || "https://influencers.gasmarketing.co.za";
+import { APP_URL } from "./app-url";
 // Gary is always BCC'd on every render notification (team oversight), whoever built it.
 const gary = () => process.env.SUPER_ADMIN_EMAIL || process.env.ALERT_EMAIL_TO || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
 const recipient = () => process.env.ALERT_EMAIL_TO || process.env.SUPER_ADMIN_EMAIL || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";

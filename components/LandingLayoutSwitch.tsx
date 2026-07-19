@@ -54,7 +54,7 @@ export default function LandingLayoutSwitch() {
     <section className="mt-8">
       <h2 className="text-xl font-bold text-ink">Public landing page</h2>
       <p className="mt-1.5 text-base text-ink-dim">
-        What a visitor sees at influencers.gasmarketing.co.za before they sign in. Switch back at any time.
+        What a visitor sees on the public site before they sign in. Switch back at any time.
       </p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row">
         <Option id="systems" title="The six systems" note="The six systems float down both sides. Says what the platform is made of." />
