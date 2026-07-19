@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: "Studio on GAS",
-  description: "GAS Marketing's creative platform: Influencers on GAS (AI influencer video) and GAS Studio (template creative factory).",
+  description: "Studio on GAS - GAS Marketing's platform for campaigns, creative and market intelligence.",
 };
 
 export default function RootLayout({

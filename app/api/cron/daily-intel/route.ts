@@ -77,7 +77,7 @@ function ukDate(d: Date | string): string {
 // So it now uses the shared GAS shell (dark, orb, Sami's signature) like our other emails, instead of the
 // off-brand light layout it had. The Journalist still runs and still files to the review queue - it is the tool
 // for drafting the CEO's LinkedIn voice, not a daily bulletin, so it no longer pushes an inbox.
-function buildEmail(client: string, strategist: Intel[], today: string, intro: string): string {
+export function buildEmail(client: string, strategist: Intel[], today: string, intro: string): string {
   // GREEN / AMBER / RED, the way we always grade (Gary). Tuned for the dark shell.
   const badge = (c: string) => {
     const [bg, fg, label] =

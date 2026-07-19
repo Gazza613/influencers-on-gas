@@ -79,59 +79,59 @@ export default function TeamManager() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <h1 className="text-xl font-bold">Team</h1>
-      <p className="mt-1 text-sm text-ink-dim">Invite teammates and manage access. Gated to <span className="text-ink-dim">@gasmarketing.co.za</span> emails for now. Everyone can see Cost Control; only a super admin can invite, suspend or remove members. Suspending or removing takes effect on their very next click, not when their session expires.</p>
+    <div className="mx-auto max-w-5xl">
+      <h1 className="text-3xl font-bold">Team</h1>
+      <p className="mt-3 max-w-3xl text-lg leading-relaxed text-ink-dim">Invite teammates and manage access. Gated to <span className="text-ink-dim">@gasmarketing.co.za</span> emails for now. Everyone can see Cost Control; only a super admin can invite, suspend or remove members. Suspending or removing takes effect on their very next click, not when their session expires.</p>
 
       {/* Invite */}
       <div className="glow-accent mt-5 rounded-xl bg-surface-1 p-4">
-        <div className="tabular text-xs uppercase tracking-[0.2em] brand-grad font-semibold">Invite a teammate</div>
+        <div className="tabular text-sm uppercase tracking-[0.2em] brand-grad font-semibold">Invite a teammate</div>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email"
-            className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#a855f7]" />
+            className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none focus:border-[#a855f7]" />
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)"
-            className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-[#a855f7]" />
-          <select value={role} onChange={(e) => setRole(e.target.value)} className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none">
+            className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none focus:border-[#a855f7]" />
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none">
             <option value="producer">Member</option>
           </select>
-          <button onClick={invite} disabled={busy || !email.trim()} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">
+          <button onClick={invite} disabled={busy || !email.trim()} className="btn-brand rounded-lg px-5 py-2.5 text-lg font-bold disabled:opacity-50">
             {busy ? "Sending…" : "Send invite →"}
           </button>
         </div>
-        {msg && <p className={`mt-2 break-all text-xs ${msg.kind === "ok" ? "text-ready" : "text-alert"}`}>{msg.text}</p>}
+        {msg && <p className={`mt-3 break-all text-base ${msg.kind === "ok" ? "text-ready" : "text-alert"}`}>{msg.text}</p>}
       </div>
 
       {/* List */}
       <div className="mt-6 overflow-hidden rounded-xl border border-line bg-surface-1">
         {users === null ? (
-          <div className="px-4 py-6 text-center text-xs text-ink-faint">Loading team…</div>
+          <div className="px-4 py-7 text-center text-base text-ink-faint">Loading team…</div>
         ) : users.length === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-ink-faint">No teammates yet. Invite your first above.</div>
+          <div className="px-4 py-7 text-center text-base text-ink-faint">No teammates yet. Invite your first above.</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-base">
             <tbody>
               {users.map((u) => (
                 <tr key={u.id} className="border-b border-line last:border-0">
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-ink">{u.name || u.email}</div>
-                    {u.name && <div className="text-[11px] text-ink-faint">{u.email}</div>}
+                  <td className="px-4 py-3.5">
+                    <div className="text-lg font-semibold text-ink">{u.name || u.email}</div>
+                    {u.name && <div className="text-[14px] text-ink-faint">{u.email}</div>}
                   </td>
-                  <td className="px-4 py-3 text-xs text-ink-dim">{ROLE_LABEL[u.role] ?? u.role}</td>
-                  <td className="px-4 py-3">
-                    <span className={`tabular rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                  <td className="px-4 py-3.5 text-base text-ink-dim">{ROLE_LABEL[u.role] ?? u.role}</td>
+                  <td className="px-4 py-3.5">
+                    <span className={`tabular rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase ${
                       u.status === "active" ? "bg-ready/15 text-ready"
                       : u.status === "suspended" ? "bg-alert/15 text-alert"
                       : "bg-active/15 text-active"}`}>
                       {u.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3.5 text-right">
                     {u.status === "suspended" ? (
-                      <button onClick={() => setStatus(u, "reactivate")} className="rounded-md px-2 py-1 text-xs font-semibold text-ready hover:bg-ready/15">Reactivate</button>
+                      <button onClick={() => setStatus(u, "reactivate")} className="rounded-md px-2.5 py-1.5 text-[15px] font-semibold text-ready hover:bg-ready/15">Reactivate</button>
                     ) : (
-                      <button onClick={() => setStatus(u, "suspend")} className="rounded-md px-2 py-1 text-xs text-ink-faint hover:bg-alert/15 hover:text-alert">Suspend</button>
+                      <button onClick={() => setStatus(u, "suspend")} className="rounded-md px-2.5 py-1.5 text-[15px] text-ink-faint hover:bg-alert/15 hover:text-alert">Suspend</button>
                     )}
-                    <button onClick={() => remove(u)} className="ml-1 rounded-md px-2 py-1 text-xs text-ink-faint hover:bg-alert/15 hover:text-alert">Remove</button>
+                    <button onClick={() => remove(u)} className="ml-1 rounded-md px-2.5 py-1.5 text-[15px] text-ink-faint hover:bg-alert/15 hover:text-alert">Remove</button>
                   </td>
                 </tr>
               ))}
@@ -147,40 +147,40 @@ export default function TeamManager() {
       {act && (
         <section className="mt-8">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="text-lg font-bold text-ink">Team activity</h2>
+            <h2 className="text-2xl font-bold text-ink">Team activity</h2>
             <div className="flex items-center gap-1">
               {[7, 30, 90].map((d) => (
                 <button key={d} onClick={() => loadActivity(d)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${days === d ? "bg-surface-2 text-ink" : "text-ink-faint hover:text-ink"}`}>
+                  className={`rounded-md px-3 py-1.5 text-[15px] font-semibold transition ${days === d ? "bg-surface-2 text-ink" : "text-ink-faint hover:text-ink"}`}>
                   {d}d
                 </button>
               ))}
             </div>
           </div>
-          <p className="mt-1 text-sm text-ink-dim">
+          <p className="mt-2 text-lg text-ink-dim">
             {act.from} to {act.to} · <b className="text-ink">{act.totals.activeMembers} of {act.totals.teamSize}</b> signed in ·
             {" "}{act.totals.logins} sign-ins · {act.totals.jobs} jobs · {rand(act.totals.cents)}
           </p>
 
           <div className="mt-3 overflow-hidden rounded-xl border border-line bg-surface-1">
-            <table className="w-full text-sm">
+            <table className="w-full text-base">
               <tbody>
                 {act.members.map((m) => (
                   <tr key={m.email} className="border-b border-line last:border-0">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-ink">{m.name || m.email}</div>
-                      <div className="text-[11px] text-ink-faint">
+                    <td className="px-4 py-3.5">
+                      <div className="text-lg font-semibold text-ink">{m.name || m.email}</div>
+                      <div className="text-[14px] text-ink-faint">
                         {m.neverSignedIn
                           ? <span className="text-active">no sign-in in this window</span>
                           : <>last in {m.lastLogin} · {m.logins} sign-in{m.logins === 1 ? "" : "s"}</>}
                         {m.failed > 0 && <span className="text-alert"> · {m.failed} failed</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="tabular text-sm font-bold text-ink">{m.jobs} job{m.jobs === 1 ? "" : "s"}</div>
-                      <div className="tabular text-[11px] text-ink-faint">{rand(m.cents)}</div>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="tabular text-lg font-bold text-ink">{m.jobs} job{m.jobs === 1 ? "" : "s"}</div>
+                      <div className="tabular text-[14px] text-ink-faint">{rand(m.cents)}</div>
                     </td>
-                    <td className="hidden px-4 py-3 text-right text-[11px] text-ink-dim sm:table-cell">
+                    <td className="hidden px-4 py-3.5 text-right text-[14px] text-ink-dim sm:table-cell">
                       {m.desks.length ? m.desks.slice(0, 2).map((d) => `${d.desk.replace(" on GAS", "")} ${d.jobs}`).join(" · ") : "—"}
                     </td>
                   </tr>
@@ -188,7 +188,7 @@ export default function TeamManager() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[12px] text-ink-faint">
+          <p className="mt-3 text-[15px] text-ink-faint">
             Studio on GAS only. Media on GAS is a separate product with its own team controls and reporting, so its
             activity cannot appear here.
           </p>

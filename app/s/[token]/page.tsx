@@ -37,7 +37,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
               <img src="/gas-logo.png" alt="GAS" className="h-full w-full scale-110 object-cover" />
             </span>
           </div>
-          <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Influencers on GAS</span>
+          <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Studio on GAS</span>
           <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
             AI influencers,<br />
             <span className="brand-flow">brought to life.</span>
@@ -99,7 +99,7 @@ export default async function PublicShowcase({ params }: { params: Promise<{ tok
             </div>
           </div>
           <p className="mt-7 border-t border-white/5 pt-5 text-center text-xs text-white/35">
-            Response marketing, powered by AI · Produced with Influencers on GAS · © GAS Marketing
+            Response marketing, powered by AI · Produced with Studio on GAS · © GAS Marketing
           </p>
         </div>
       </footer>

@@ -373,10 +373,10 @@ export async function generateBibleSection(
 
 // Daily "Higgsfield expert" research. Uses Claude with live web search to pull the
 // latest Higgsfield features, Soul training and prompt best practices, and AI-influencer
-// trends, then turns them into concrete ideas to implement in Influencers on GAS.
+// trends, then turns them into concrete ideas to implement in Studio on GAS.
 // Returns a clean HTML fragment (list of ideas) for the daily email.
 function tipsSystem(today: string): string {
-  return `You are the in-house Higgsfield and AI-influencer expert for "Influencers on GAS", an agency platform that builds consistent AI influencers and their social creatives. Today is ${today}.
+  return `You are the in-house Higgsfield and AI-influencer expert for "Studio on GAS", an agency platform that builds consistent AI influencers and their social creatives. Today is ${today}.
 
 ${PLATFORM_STATE}
 
@@ -406,7 +406,7 @@ export async function researchHiggsfieldTips(today: string): Promise<string> {
     max_tokens: 2800,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 6 } as unknown as Anthropic.Tool],
     system: tipsSystem(today),
-    messages: [{ role: "user", content: "Research today's best Higgsfield and AI-influencer practices and give me concrete, build-aware, dated and sourced ideas to implement in Influencers on GAS. Skip anything we already do or rejected." }],
+    messages: [{ role: "user", content: "Research today's best Higgsfield and AI-influencer practices and give me concrete, build-aware, dated and sourced ideas to implement in Studio on GAS. Skip anything we already do or rejected." }],
   });
   const html = res.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   return html || "NO_SIGNIFICANT_FINDINGS";

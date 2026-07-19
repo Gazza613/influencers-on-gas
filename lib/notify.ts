@@ -12,7 +12,7 @@ const esc = (s: string) => String(s).replace(/[<>&]/g, (c) => (({ "<": "&lt;", "
 
 function shell(heading: string, body: string, ctaHref: string, ctaLabel: string): string {
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0a0b0f;padding:28px;border-radius:16px;color:#eef1f6;max-width:520px">
-    <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#c07cff;font-weight:700">Influencers on GAS · Producer</div>
+    <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#c07cff;font-weight:700">Studio on GAS · Producer</div>
     <div style="font-size:22px;font-weight:800;margin:8px 0 10px">${heading}</div>
     <p style="color:#aab2c2;font-size:14px;line-height:1.6;margin:0 0 18px">${body}</p>
     <a href="${ctaHref}" style="display:inline-block;padding:11px 20px;border-radius:10px;background:linear-gradient(90deg,#ec4899,#a855f7,#60a5fa);color:#fff;font-size:13px;font-weight:700;text-decoration:none">${ctaLabel}</a>
