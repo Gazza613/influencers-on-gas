@@ -90,13 +90,16 @@ const DOTS = (() => {
   // the centre column and the space under the CTA looked empty while the edges looked busy. Dividing the page
   // into a grid and placing one star per cell, jittered inside it, guarantees even coverage everywhere while
   // still looking scattered. This is the standard fix for exactly this artefact.
-  const COLS = 16, ROWS = 15;                      // 240 cells, one star each
+  //
+  // The grid is also the density dial. Thinning the field is a matter of fewer, larger cells - which keeps
+  // the coverage even as it gets sparser, instead of reopening the holes that random scatter left.
+  const COLS = 12, ROWS = 11;                      // 132 cells, one star each
   const out = [];
   for (let cy = 0; cy < ROWS; cy++) {
     for (let cx = 0; cx < COLS; cx++) {
       // BRIGHTNESS ON A POWER LAW: mostly faint, a rare few brilliant. An even spread is the single thing
       // that makes a star field look generated.
-      const mag = Math.pow(r(), 2.4);
+      const mag = Math.pow(r(), 1.9);
       const min = 0.13 + mag * 0.34;
       // SIZE FOLLOWS BRIGHTNESS - a star looks bigger only because it blooms.
       const size = mag > 0.86 ? 4 : mag > 0.62 ? 3 : mag > 0.3 ? 2 : 1.5;
