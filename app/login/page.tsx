@@ -49,34 +49,34 @@ export default function LoginPage() {
       <div style={{ position: "absolute", width: 820, height: 820, bottom: "-32%", left: "18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 65%)", animation: "orb3 23s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
 
-      <div className="relative z-10 flex w-full max-w-[420px] flex-col items-center">
+      <div className="relative z-10 flex w-full max-w-[480px] flex-col items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/gas-logo.png" alt="GAS" width={104} height={104} className="login-logo rounded-full" style={{ filter: "drop-shadow(0 12px 40px rgba(255,90,30,0.55))" }} />
-        <h1 className="mt-7 inline-flex items-baseline gap-[0.32em] font-extrabold" style={{ fontSize: "clamp(22px, 3.2vw, 30px)", letterSpacing: "-0.6px" }}>
-          <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Studio on</span>
+        <img src="/gas-logo.png" alt="GAS" className="login-logo rounded-full" style={{ width: "clamp(104px, 26vw, 158px)", height: "clamp(104px, 26vw, 158px)", filter: "drop-shadow(0 12px 40px rgba(255,90,30,0.55))" }} />
+        <h1 className="mt-7 inline-flex items-baseline gap-[0.32em] font-extrabold" style={{ fontSize: "clamp(19px, 4.6vw, 30px)", letterSpacing: "0.08em" }}>
+          <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>STUDIO ON</span>
           <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
         </h1>
-        <p className="tabular mt-2 text-[11px] uppercase tracking-[0.42em]" style={{ color: "rgba(255,255,255,0.42)" }}>Human led · AI powered</p>
+        <p className="tabular mt-3 text-[14px] uppercase tracking-[0.38em]" style={{ color: "rgba(255,255,255,0.42)" }}>Human led · AI powered</p>
 
-        <form onSubmit={submit} className="login-card relative mt-9 w-full rounded-2xl p-8">
-          <div className="tabular mb-6 text-center text-[11px] font-semibold uppercase tracking-[0.36em]" style={{ color: "rgba(168,85,247,0.85)" }}>Studio Access</div>
+        <form onSubmit={submit} className="login-card relative mt-9 w-full rounded-2xl p-9">
+          <div className="tabular mb-6 text-center text-[14px] font-semibold uppercase tracking-[0.34em]" style={{ color: "rgba(168,85,247,0.85)" }}>Studio Access</div>
           <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your work email" autoComplete="username"
-            className="login-input w-full rounded-lg px-4 py-3 text-sm text-ink outline-none" />
+            className="login-input w-full rounded-lg px-4 py-3.5 text-[17px] text-ink outline-none" />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" autoComplete="current-password"
-            className="login-input mt-3 w-full rounded-lg px-4 py-3 text-sm text-ink outline-none" />
-          {error && <p className="mt-3 text-xs text-alert">{error}</p>}
+            className="login-input mt-3 w-full rounded-lg px-4 py-3.5 text-[17px] text-ink outline-none" />
+          {error && <p className="mt-3 text-[15px] text-alert">{error}</p>}
           <button type="submit" disabled={busy}
-            className="login-cta mt-5 w-full rounded-full py-3.5 text-sm font-bold uppercase tracking-[0.2em] text-white transition disabled:opacity-70"
+            className="login-cta mt-6 w-full rounded-full py-4 text-[17px] font-bold uppercase tracking-[0.18em] text-white transition disabled:opacity-70"
             style={{ background: "linear-gradient(135deg,#EC4899 0%,#8B5CF6 100%)", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)" }}>
             {busy ? "Checking…" : "Sign in →"}
           </button>
-          <p className="mt-6 text-center text-[11px] leading-relaxed text-ink-faint">
+          <p className="mt-6 text-center text-[14px] leading-relaxed text-ink-faint">
             Access is by invitation only. Contact <a href="mailto:grow@gasmarketing.co.za" className="text-accent">grow@gasmarketing.co.za</a>.
           </p>
         </form>
 
-        <p className="tabular mt-7 flex items-center gap-2 text-[10px] uppercase tracking-[0.32em] text-ink-faint">
-          <span aria-hidden>🔒</span> Secure creative studio
+        <p className="tabular mt-7 flex items-center gap-2 text-[13px] uppercase tracking-[0.3em] text-ink-faint">
+          <span aria-hidden>🔒</span> Secure Studio Platform
         </p>
       </div>
 
