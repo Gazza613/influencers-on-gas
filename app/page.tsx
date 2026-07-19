@@ -137,11 +137,17 @@ export default function Landing() {
   if (!authChecked) return <div style={{ minHeight: "100vh", background: "#07070E" }} />;
 
   return (
-    <div style={{ minHeight: "100vh", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#07070E", overflow: "hidden", padding: "40px 24px 80px", textAlign: "center" }}>
+    <div style={{ minHeight: "100dvh", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#07070E", overflow: "hidden", padding: "clamp(26px, 6vw, 40px) clamp(18px, 5vw, 24px) clamp(46px, 10vw, 80px)", textAlign: "center" }}>
       {/* Orbs */}
       <div style={{ position: "absolute", width: 760, height: 760, top: "-22%", left: "-18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.28) 0%, transparent 65%)", animation: "orb1 14s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", width: 620, height: 620, top: "-14%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.22) 0%, transparent 65%)", animation: "orb2 19s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", width: 820, height: 820, bottom: "-32%", left: "18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 65%)", animation: "orb3 23s ease-in-out infinite", pointerEvents: "none" }} />
+      {/* TWO MORE, DELIBERATELY FAINTER THAN THE FIRST THREE (0.13 and 0.10 against 0.18-0.28). The brief was
+          "add a few more but do not overdo it", and the way that goes wrong is matching the new ones to the
+          existing intensity: five equal glows is a light show, not depth. These fill the two dead zones - mid
+          right, and under the CTA - on their own slow periods so nothing ever pulses in unison. */}
+      <div style={{ position: "absolute", width: 560, height: 560, top: "34%", right: "-16%", borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.13) 0%, transparent 68%)", animation: "orb4 27s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: 680, height: 680, bottom: "-24%", right: "8%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,132,252,0.10) 0%, transparent 70%)", animation: "orb5 31s ease-in-out infinite", pointerEvents: "none" }} />
       {/* Dot grid */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
 
@@ -204,25 +210,25 @@ export default function Landing() {
 
       {/* Center content */}
       <div style={{ maxWidth: 680, position: "relative", zIndex: 2 }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 40 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "clamp(26px, 6vw, 40px)" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gas-logo.png" alt="GAS" style={{ width: 132, height: 132, marginBottom: 22, borderRadius: "50%", filter: "drop-shadow(0 10px 32px rgba(255,90,30,0.55))" }} />
+          <img src="/gas-logo.png" alt="GAS" style={{ width: "clamp(104px, 26vw, 158px)", height: "clamp(104px, 26vw, 158px)", marginBottom: "clamp(16px, 4vw, 22px)", borderRadius: "50%", filter: "drop-shadow(0 10px 32px rgba(255,90,30,0.55))" }} />
           {/* SET IN CAPS (Gary) - the platform name should make a statement. Caps need POSITIVE tracking:
               the -0.6px that suited mixed case jams uppercase letterforms together and reads as a smudge. */}
-          <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.32em", fontSize: "clamp(22px, 3.2vw, 30px)", fontWeight: 800, letterSpacing: "2.4px" }}>
+          <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.32em", fontSize: "clamp(19px, 4.6vw, 30px)", fontWeight: 800, letterSpacing: "0.08em" }}>
             <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>STUDIO ON</span>
             <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
           </div>
         </div>
 
-        <h1 style={{ fontSize: "clamp(62px,10vw,104px)", fontWeight: 800, letterSpacing: "-3.5px", lineHeight: 1.0, color: "#fff", marginBottom: 2 }}>Create Your</h1>
+        <h1 style={{ fontSize: "clamp(40px, 11vw, 104px)", fontWeight: 800, letterSpacing: "-0.034em", lineHeight: 1.02, color: "#fff", marginBottom: 2 }}>Create Your</h1>
 
-        <div style={{ fontSize: "clamp(62px,10vw,104px)", fontWeight: 800, letterSpacing: "-3.5px", lineHeight: 1.1, minHeight: "1.15em", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 36 }}>
+        <div style={{ fontSize: "clamp(40px, 11vw, 104px)", fontWeight: 800, letterSpacing: "-0.034em", lineHeight: 1.1, minHeight: "1.15em", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "clamp(22px, 5vw, 36px)" }}>
           <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{animatedWord}</span>
-          <span style={{ display: "inline-block", width: 5, height: "0.72em", background: "linear-gradient(to bottom, #EC4899, #A855F7)", marginLeft: 6, borderRadius: 3, animation: "blink 1s step-end infinite", verticalAlign: "middle", flexShrink: 0 }} />
+          <span style={{ display: "inline-block", width: "clamp(3px, 0.05em, 5px)", height: "0.72em", background: "linear-gradient(to bottom, #EC4899, #A855F7)", marginLeft: 6, borderRadius: 3, animation: "blink 1s step-end infinite", verticalAlign: "middle", flexShrink: 0 }} />
         </div>
 
-        <p style={{ fontSize: 20, color: "rgba(255,255,255,0.38)", lineHeight: 1.65, margin: "0 auto 52px", maxWidth: 440, fontWeight: 400, letterSpacing: "-0.1px" }}>
+        <p style={{ fontSize: "clamp(17px, 4.6vw, 22px)", color: "rgba(255,255,255,0.44)", lineHeight: 1.6, margin: "0 auto clamp(32px, 7vw, 52px)", maxWidth: 460, fontWeight: 400, letterSpacing: "-0.1px" }}>
           Human command. AI execution. One platform.
         </p>
 
@@ -242,7 +248,7 @@ export default function Landing() {
 
         <button
           onClick={() => router.push("/login")}
-          style={{ padding: "17px 60px", borderRadius: 980, background: "linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)", color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.2px", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)", transition: "transform 0.18s, box-shadow 0.18s", border: "none", cursor: "pointer" }}
+          style={{ padding: "clamp(15px, 3.6vw, 17px) clamp(36px, 11vw, 60px)", borderRadius: 980, maxWidth: "100%", background: "linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)", color: "#fff", fontSize: "clamp(15.5px, 4vw, 17px)", fontWeight: 700, letterSpacing: "-0.2px", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)", transition: "transform 0.18s, box-shadow 0.18s", border: "none", cursor: "pointer" }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.04) translateY(-2px)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(168,85,247,0.65), 0 8px 32px rgba(0,0,0,0.5)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1) translateY(0)"; e.currentTarget.style.boxShadow = "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)"; }}
         >
@@ -255,6 +261,8 @@ export default function Landing() {
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         @keyframes orb3 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(35px,-55px) scale(0.90)} 70%{transform:translate(-55px,22px) scale(1.08)} }
+        @keyframes orb4 { 0%,100%{transform:translate(0,0) scale(1)} 45%{transform:translate(-40px,30px) scale(1.09)} }
+        @keyframes orb5 { 0%,100%{transform:translate(0,0) scale(1)} 55%{transform:translate(30px,-38px) scale(0.92)} }
         @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-26px)} }
         @keyframes cardSway { 0%,100%{transform:translateX(0px)} 25%{transform:translateX(8px)} 75%{transform:translateX(-7px)} }
         @keyframes cardAppear { from{opacity:0} to{opacity:var(--target-opacity,0.44)} }
