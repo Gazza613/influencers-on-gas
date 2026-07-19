@@ -67,8 +67,10 @@ const CARDS = [
 //   1. TUNED IN THREE PASSES, and the history is the lesson. First attempt: 1-2px at 0.05-0.12 resting.
 //      Verified in the live DOM - all of them rendering, none of them visible, because at 1px on a near-black
 //      field the eye cannot resolve a dot at 5%. Second: 2-3px at 0.10-0.18. Visible, still too quiet.
-//      Now 2-4px at 0.16-0.26 resting and 0.44-0.68 peak, with a bloom on every dot. SIZE and GLOW were the
-//      levers all along, not opacity: a 4px dot with a halo reads as a star, a 1px dot reads as dust.
+//      Now 70 stars at 2-5px, resting 0.24-0.38 and peaking 0.58-0.88, moving in 3.5-8s. SIZE and GLOW were
+//      the levers all along, not opacity: a 4px dot with a halo reads as a star, a 1px dot reads as dust.
+//      They also travel with INTENT - up and slightly right, on a shared heading - because a shared direction
+//      turns seventy independent wobbles into one field of embers rising.
 //   2. ORANGE AND WHITE, not orange alone. Orange every time would tip a dark navy page towards a warm cast;
 //      mixed roughly one in three, the orange reads as occasional embers and the white keeps it cool.
 //      (Orange is fine here: the "orange is the GAS mark alone" rule guards CLIENT creatives, not our own page.)
@@ -82,21 +84,26 @@ function seeded(seed: number) {
 }
 const DOTS = (() => {
   const r = seeded(20260719);
-  return Array.from({ length: 42 }, () => {
+  return Array.from({ length: 70 }, () => {
     const orange = r() < 0.35;                     // roughly one in three
-    const min = 0.16 + r() * 0.10;                 // resting opacity
+    const min = 0.24 + r() * 0.14;                 // resting opacity
     const k = r();
     return {
       left: +(r() * 98).toFixed(2),
       top: +(r() * 96).toFixed(2),
-      // A spread of 2-4px rather than one size: uniform dots read as a pattern, mixed ones read as depth.
-      size: k < 0.45 ? 2 : k < 0.8 ? 3 : 4,
+      // A spread of sizes rather than one: uniform dots read as a pattern, mixed ones read as depth.
+      size: k < 0.4 ? 2 : k < 0.7 ? 3 : k < 0.9 ? 4 : 5,
       colour: orange ? "255,106,0" : "255,255,255",
       min: +min.toFixed(3),
-      max: +(min + 0.28 + r() * 0.14).toFixed(3),
-      dur: +(7 + r() * 8).toFixed(1),
-      delay: +(r() * 7).toFixed(1),
-      drift: +(-9 - r() * 7).toFixed(1),           // upward travel, px
+      max: +(min + 0.34 + r() * 0.16).toFixed(3),
+      // FAST. 3.5-8s against the old 7-15s, so the field reads as moving rather than as slowly breathing.
+      dur: +(3.5 + r() * 4.5).toFixed(1),
+      delay: +(r() * 5).toFixed(1),
+      // INTENTIONAL: every star travels UP and slightly RIGHT, and further than before (22-56px against
+      // 9-16px). A shared direction is what turns thirty independent wobbles into one field of embers
+      // rising - the drift used to be aimless, which is why it read as decoration rather than motion.
+      drift: +(-22 - r() * 34).toFixed(1),
+      xdrift: +(3 + r() * 11).toFixed(1),
     };
   });
 })();
@@ -208,7 +215,7 @@ export default function Landing() {
             width: d.size, height: d.size, borderRadius: "50%",
             background: `rgb(${d.colour})`, opacity: d.min,
             boxShadow: `0 0 ${d.size * 3}px rgba(${d.colour},0.6)`,
-            ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`,
+            ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`, ["--dot-x" as string]: `${d.xdrift}px`,
             animation: `gasDotDrift ${d.dur}s ease-in-out ${d.delay}s infinite`,
           }} />
         ))}
@@ -326,8 +333,8 @@ export default function Landing() {
         @keyframes orb3 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(35px,-55px) scale(0.90)} 70%{transform:translate(-55px,22px) scale(1.08)} }
         /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
         @keyframes gasDotDrift {
-          0%, 100% { transform: translateY(0); opacity: var(--dot-min, 0.08) }
-          50%      { transform: translateY(var(--dot-drift, -12px)); opacity: var(--dot-max, 0.22) }
+          0%, 100% { transform: translate3d(0, 0, 0) scale(0.8); opacity: var(--dot-min, 0.08) }
+          50%      { transform: translate3d(var(--dot-x, 6px), var(--dot-drift, -12px), 0) scale(1.25); opacity: var(--dot-max, 0.22) }
         }
         /* Motion off means motion off. The dots are pure decoration, so they simply do not render. */
         @media (prefers-reduced-motion: reduce) { .gas-dots { display: none } }
