@@ -1,12 +1,16 @@
 import { APP_URL } from "./app-url";
-// Shared branded shell for ALL Influencers on GAS emails (research, cost, future).
-// Centred GAS orb with an orange glow, an orange strapline, the white "INFLUENCERS ON GAS"
-// wordmark (ON GAS in orange), a date line, then the Sami signature + footer.
+// Shared branded shell for ALL Studio on GAS emails - invites, password resets, research, cost.
+// Centred GAS orb with an orange glow, an orange strapline, the white "STUDIO ON GAS" wordmark
+// (ON GAS in orange), a date line, then the Sami signature + footer.
+//
+// The default wordmark was "INFLUENCERS" and every email still went out branded as the old product after the
+// platform became Studio on GAS. An invite is often the first thing a new teammate ever sees from us, so it
+// carrying the wrong product name is not a small thing.
 const BASE = APP_URL;
 
 // `wordmark` lets a specific email carry its own name (e.g. STRATEGIST ON GAS) instead of the platform default.
 // The Strategist briefing goes to EXCO and MoMo's internal team, so it should say what it is.
-export function emailHeader(strapline: string, dateLabel: string, wordmark = "INFLUENCERS"): string {
+export function emailHeader(strapline: string, dateLabel: string, wordmark = "STUDIO"): string {
   return `
   <div style="text-align:center;padding:10px 0 22px;">
     <img src="${BASE}/gas-logo.png" width="62" height="62" class="orb" style="border-radius:50%;box-shadow:0 0 28px rgba(249,98,3,0.55);" alt="GAS" />
@@ -20,7 +24,7 @@ export function emailHeader(strapline: string, dateLabel: string, wordmark = "IN
 // (e.g. "DAILY RESEARCH, 08:15 SAST" or "DAILY COST CONTROL, 07:30 SAST").
 // Sami wears a different hat per email: the AI Influencer Expert on the creative side, the AI Research
 // Strategist on the intelligence briefing (Gary). Same person, honest about which job he is doing.
-export function emailSignature(cadence: string, role = "AI Influencer Expert", department = "Creative Department", wordmark = "INFLUENCERS"): string {
+export function emailSignature(cadence: string, role = "AI Influencer Expert", department = "Creative Department", wordmark = "STUDIO"): string {
   return `
   <div style="margin-top:30px;">
     <div class="sig-name" style="font-size:15px;font-weight:800;color:#ffffff;">Sami</div>

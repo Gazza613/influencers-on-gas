@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { getInvite, isGasEmail } from "@/lib/users";
+import AuthShell from "@/components/AuthShell";
 import SetPassword from "@/components/SetPassword";
+import { getInvite, isGasEmail } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
@@ -10,41 +11,19 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const invite = found && isGasEmail(found.email) ? found : null;
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6" style={{ background: "#07070E" }}>
-      <div style={{ position: "absolute", width: 700, height: 700, top: "-22%", left: "-15%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.22) 0%, transparent 65%)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: 620, height: 620, bottom: "-22%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.18) 0%, transparent 65%)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
-
-      <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/gas-logo.png" alt="GAS" width={96} height={96} className="rounded-full" style={{ filter: "drop-shadow(0 12px 40px rgba(255,90,30,0.55))" }} />
-        <h1 className="mt-6 inline-flex items-baseline gap-[0.32em] text-2xl font-extrabold">
-          <span className="brand-grad">Influencers on</span>
-          <span style={{ fontWeight: 900, background: "linear-gradient(135deg,#FFB020,#FF6A00 45%,#FF2D55)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
-        </h1>
-        <p className="tabular mt-2 text-[11px] uppercase tracking-[0.42em]" style={{ color: "rgba(255,255,255,0.42)" }}>Welcome to the studio</p>
-
-        <div className="login-card mt-8 w-full rounded-2xl p-8">
-          {invite ? (
-            <SetPassword token={token} email={invite.email} />
-          ) : (
-            <div className="text-center">
-              <div className="text-sm font-semibold text-ink">This invite link is invalid or expired</div>
-              <p className="mt-2 text-xs text-ink-dim">Access is for GAS Marketing (@gasmarketing.co.za). For a fresh invite or external access, email <a href="mailto:grow@gasmarketing.co.za" className="text-accent">grow@gasmarketing.co.za</a>.</p>
-              <Link href="/login" className="mt-4 inline-block text-xs text-accent">← Back to sign in</Link>
-            </div>
-          )}
+    <AuthShell eyebrow="Welcome to the studio">
+      {invite ? (
+        <SetPassword token={token} email={invite.email} />
+      ) : (
+        <div className="text-center">
+          <div className="text-[17px] font-bold text-ink">This invite has expired</div>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-dim">
+            Invitations last 7 days and are for GAS Marketing addresses. For a fresh one, email{" "}
+            <a href="mailto:grow@gasmarketing.co.za" className="inline-block px-1 py-2 text-accent underline-offset-2 hover:underline">grow@gasmarketing.co.za</a>.
+          </p>
+          <Link href="/login" className="mt-5 inline-block text-[15px] font-semibold text-accent">← Back to sign in</Link>
         </div>
-      </div>
-
-      <style>{`
-        .login-card {
-          background: linear-gradient(180deg, rgba(18,14,26,0.82) 0%, rgba(10,9,16,0.86) 100%);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(168,85,247,0.34);
-          box-shadow: 0 0 0 1px rgba(168,85,247,0.06), 0 0 38px rgba(168,85,247,0.18), inset 0 1px 0 rgba(255,255,255,0.04);
-        }
-      `}</style>
-    </div>
+      )}
+    </AuthShell>
   );
 }

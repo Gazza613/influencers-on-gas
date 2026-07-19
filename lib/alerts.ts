@@ -52,7 +52,7 @@ function brandedHtml(title: string, detail: string, c: { tag: string; cause: str
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:92%;background:#14141f;border:1px solid #262636;border-radius:16px;overflow:hidden">
         <tr><td style="background:linear-gradient(90deg,#ec4899,#a855f7,#60a5fa);height:5px;line-height:5px;font-size:0">&nbsp;</td></tr>
         <tr><td style="padding:24px 28px 8px">
-          <div style="color:#8b8b9e;font-size:11px;letter-spacing:2px;text-transform:uppercase">Influencers on GAS · Platform alert</div>
+          <div style="color:#8b8b9e;font-size:11px;letter-spacing:2px;text-transform:uppercase">Studio on GAS · Platform alert</div>
           <div style="display:inline-block;margin-top:12px;padding:4px 12px;border-radius:999px;background:rgba(236,72,153,0.15);border:1px solid rgba(236,72,153,0.4);color:#f9a8d4;font-size:12px;font-weight:700;letter-spacing:1px">⚠️ ${esc(c.tag)}</div>
           <h1 style="margin:14px 0 0;color:#ffffff;font-size:19px;line-height:1.35">${esc(title)}</h1>
         </td></tr>
@@ -82,7 +82,7 @@ export async function alertOps(opts: { title: string; detail: string; context?: 
     const tag = `${c.tag}:${opts.title}`.slice(0, 200);
     if (!(await throttleOk(tag, opts.throttleMinutes ?? 15))) return { sent: false };
     const html = brandedHtml(opts.title, opts.detail, c, opts.context || {});
-    await sendEmail({ to: ALERT_TO(), subject: `⚠️ Influencers on GAS - [${c.tag}] ${opts.title}`.slice(0, 150), html });
+    await sendEmail({ to: ALERT_TO(), subject: `⚠️ Studio on GAS - [${c.tag}] ${opts.title}`.slice(0, 150), html });
     return { sent: true };
   } catch {
     return { sent: false };

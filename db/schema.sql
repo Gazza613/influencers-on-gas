@@ -655,3 +655,9 @@ create table if not exists login_attempts (
 );
 create index if not exists idx_login_attempts_email on login_attempts(lower(email), at desc);
 create index if not exists idx_login_attempts_ip on login_attempts(ip, at desc);
+
+-- Password reset: a single-use, 1-hour token. Short-lived on purpose - an invite link can sit in an inbox for
+-- a week because it grants nothing on its own, but a reset link IS the account until it is used.
+alter table users add column if not exists reset_token text;
+alter table users add column if not exists reset_expires timestamptz;
+create index if not exists idx_users_reset_token on users(reset_token);
