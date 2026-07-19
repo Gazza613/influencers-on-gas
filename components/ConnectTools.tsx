@@ -55,18 +55,18 @@ export default function ConnectTools({
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold">{c.label}</span>
+                <span className="text-xl font-semibold">{c.label}</span>
                 {c.required ? (
-                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ink-faint">
+                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[12px] uppercase tracking-wide text-ink-faint">
                     required
                   </span>
                 ) : (
-                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ink-faint">
+                  <span className="tabular rounded bg-surface-2 px-1.5 py-0.5 text-[12px] uppercase tracking-wide text-ink-faint">
                     optional
                   </span>
                 )}
               </div>
-              <div className="mt-0.5 text-xs text-ink-dim">{c.role}</div>
+              <div className="mt-1 text-[15px] text-ink-dim">{c.role}</div>
             </div>
 
             <div className="flex shrink-0 items-center gap-3">
@@ -77,7 +77,7 @@ export default function ConnectTools({
                     setEditing(editing === c.id ? null : c.id);
                     setSecret("");
                   }}
-                  className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-dim hover:border-line-strong hover:text-ink"
+                  className="rounded-md border border-line px-3 py-2 text-[15px] font-semibold text-ink-dim hover:border-line-strong hover:text-ink"
                 >
                   {editing === c.id ? "Cancel" : c.connected ? "Update" : "Connect"}
                 </button>
@@ -85,14 +85,14 @@ export default function ConnectTools({
               {canEdit && c.connected && (
                 <button
                   onClick={() => disconnect(c.id)}
-                  className="rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-alert/80 hover:text-alert"
+                  className="rounded-md border border-line px-3 py-2 text-[15px] font-semibold text-alert/80 hover:text-alert"
                 >
                   Disconnect
                 </button>
               )}
               {/* Members can't edit connections - so a not-connected required tool isn't a dead row: tell them who can. */}
               {!canEdit && !c.connected && c.required && (
-                <span className="text-[11px] font-medium text-[#fbbf24]">⚠ Ask a workspace admin to connect this</span>
+                <span className="text-[14px] font-medium text-[#fbbf24]">⚠ Ask a workspace admin to connect this</span>
               )}
             </div>
           </div>
@@ -105,12 +105,12 @@ export default function ConnectTools({
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
                 placeholder={`Paste ${c.label} API key`}
-                className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                className="flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none focus:border-accent"
               />
               <button
                 onClick={() => save(c.id)}
                 disabled={busy || !secret.trim()}
-                className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-60"
+                className="btn-brand rounded-lg px-5 py-2.5 text-lg font-bold disabled:opacity-60"
               >
                 {busy ? "Saving…" : "Save"}
               </button>
@@ -124,14 +124,14 @@ export default function ConnectTools({
 
 function StatusBadge({ connected, source, verified }: { connected: boolean; source: string | null; verified: boolean | null }) {
   if (!connected) {
-    return <span className="text-xs text-ink-faint">Not connected</span>;
+    return <span className="text-[15px] text-ink-faint">Not connected</span>;
   }
   if (source === "vault" && verified === false) {
-    return <span className="text-xs text-alert">Key error, re-enter</span>;
+    return <span className="text-[15px] text-alert">Key error, re-enter</span>;
   }
   // Uniform look for vault + env: every connected tool reads the same.
   return (
-    <span className="flex items-center gap-1.5 text-xs text-ready">
+    <span className="flex items-center gap-1.5 text-[15px] text-ready">
       <span className="h-1.5 w-1.5 rounded-full bg-ready" />
       {verified ? "Connected · verified" : "Connected"}
     </span>

@@ -30,7 +30,3 @@ export async function setSetting(key: string, value: string): Promise<void> {
     [key, value],
   );
 }
-
-// The public landing page: "systems" shows the six systems, "cards" shows the floating influencer photos.
-export const LANDING_LAYOUT = "landing_layout";
-export type LandingLayout = "systems" | "cards";
