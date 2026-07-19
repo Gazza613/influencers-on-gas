@@ -238,9 +238,9 @@ export default function Landing() {
           reads as a static wash. Orange is fine here: the "orange is the GAS mark alone" rule guards CLIENT
           creatives, not our own brand page. */}
       <div aria-hidden style={{ position: "absolute", left: "-16%", right: "-16%", bottom: "-14%", height: "68%", pointerEvents: "none", zIndex: 0, animation: "gasHorizon 17s ease-in-out infinite" }}>
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 78% 100% at 50% 100%, rgba(255,106,0,0.27) 0%, rgba(255,72,0,0.13) 36%, transparent 74%)" }} />
-        <div style={{ position: "absolute", left: "8%", right: "8%", bottom: 0, height: "54%", background: "radial-gradient(ellipse 62% 100% at 50% 100%, rgba(255,150,30,0.35) 0%, rgba(255,90,0,0.15) 46%, transparent 80%)" }} />
-        <div style={{ position: "absolute", left: "14%", right: "14%", bottom: 0, height: 3, background: "linear-gradient(90deg, transparent 0%, rgba(255,170,60,0.52) 28%, rgba(255,195,100,0.66) 50%, rgba(255,170,60,0.52) 72%, transparent 100%)", filter: "blur(2px)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 78% 100% at 50% 100%, rgba(255,106,0,0.20) 0%, rgba(255,72,0,0.095) 36%, transparent 74%)" }} />
+        <div style={{ position: "absolute", left: "8%", right: "8%", bottom: 0, height: "54%", background: "radial-gradient(ellipse 62% 100% at 50% 100%, rgba(255,150,30,0.26) 0%, rgba(255,90,0,0.11) 46%, transparent 80%)" }} />
+        <div style={{ position: "absolute", left: "14%", right: "14%", bottom: 0, height: 3, background: "linear-gradient(90deg, transparent 0%, rgba(255,170,60,0.40) 28%, rgba(255,195,100,0.50) 50%, rgba(255,170,60,0.40) 72%, transparent 100%)", filter: "blur(2px)" }} />
       </div>
 
       {/* Dot grid */}
