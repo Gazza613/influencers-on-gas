@@ -71,9 +71,11 @@ const CARDS = [
 //      the levers all along, not opacity: a 4px dot with a halo reads as a star, a 1px dot reads as dust.
 //      They also travel with INTENT - up and slightly right, on a shared heading - because a shared direction
 //      turns seventy independent wobbles into one field of embers rising.
-//   2. ORANGE AND WHITE, not orange alone. Orange every time would tip a dark navy page towards a warm cast;
-//      mixed roughly one in three, the orange reads as occasional embers and the white keeps it cool.
-//      (Orange is fine here: the "orange is the GAS mark alone" rule guards CLIENT creatives, not our own page.)
+//   2. ALL WHITE, A REAL SKY (Gary). The orange is gone. Three things do the work of making 120 dots read as
+//      stars rather than as a pattern: brightness on a POWER LAW so faint stars vastly outnumber bright ones,
+//      size TIED to brightness so a bright star is bright because it is near rather than merely bigger, and
+//      a spread of colour TEMPERATURE - pure white mostly, some blue-white, a few warm. Only the brighter
+//      stars carry a halo; haloing all of them flattens the depth the magnitude spread creates.
 //
 // POSITIONS ARE SEEDED, NEVER Math.random(). This component renders on the server and again on the client, and
 // a random layout would differ between the two - React would report a hydration mismatch and throw the markup
@@ -84,24 +86,29 @@ function seeded(seed: number) {
 }
 const DOTS = (() => {
   const r = seeded(20260719);
-  return Array.from({ length: 70 }, () => {
-    const orange = r() < 0.35;                     // roughly one in three
-    const min = 0.24 + r() * 0.14;                 // resting opacity
-    const k = r();
+  return Array.from({ length: 120 }, () => {
+    // BRIGHTNESS FOLLOWS A POWER LAW, not a flat range. A real sky is mostly faint stars with a handful of
+    // bright ones; an even spread of brightness is the single thing that makes a star field look generated.
+    const mag = Math.pow(r(), 2.4);               // 0 = faint and common, 1 = brilliant and rare
+    const min = 0.10 + mag * 0.34;
+    // SIZE FOLLOWS BRIGHTNESS. Stars are points of light - a bright one looks bigger only because it blooms,
+    // so decoupling the two reads as dots of assorted sizes rather than as stars at assorted distances.
+    const size = mag > 0.86 ? 4 : mag > 0.62 ? 3 : mag > 0.3 ? 2 : 1.5;
+    // COLOUR TEMPERATURE. All white, as asked, but not all the SAME white: real stars run blue-white through
+    // to warm, and that faint variation is most of what sells a night sky. Pure white dominates.
+    const t = r();
+    const colour = t < 0.7 ? "255,255,255" : t < 0.88 ? "202,215,255" : "255,241,224";
     return {
-      left: +(r() * 98).toFixed(2),
-      top: +(r() * 96).toFixed(2),
-      // A spread of sizes rather than one: uniform dots read as a pattern, mixed ones read as depth.
-      size: k < 0.4 ? 2 : k < 0.7 ? 3 : k < 0.9 ? 4 : 5,
-      colour: orange ? "255,106,0" : "255,255,255",
+      left: +(r() * 99).toFixed(2),
+      top: +(r() * 97).toFixed(2),
+      size, colour,
       min: +min.toFixed(3),
-      max: +(min + 0.34 + r() * 0.16).toFixed(3),
-      // FAST. 3.5-8s against the old 7-15s, so the field reads as moving rather than as slowly breathing.
-      dur: +(3.5 + r() * 4.5).toFixed(1),
-      delay: +(r() * 5).toFixed(1),
-      // INTENTIONAL, AND STRAIGHT UP (Gary). The sideways component is gone: every star rises on the same
-      // vertical axis, which reads as embers lifting rather than as drift on a breeze.
+      max: +(min + 0.22 + mag * 0.34).toFixed(3),
+      // Bright stars twinkle slower than faint ones, which is the other half of looking real.
+      dur: +(3.5 + r() * 4.5 + mag * 3).toFixed(1),
+      delay: +(r() * 6).toFixed(1),
       drift: +(-22 - r() * 34).toFixed(1),
+      glow: mag > 0.62,                            // only the brighter stars carry a halo
     };
   });
 })();
@@ -220,7 +227,7 @@ export default function Landing() {
             position: "absolute", left: `${d.left}%`, top: `${d.top}%`,
             width: d.size, height: d.size, borderRadius: "50%",
             background: `rgb(${d.colour})`, opacity: d.min,
-            boxShadow: `0 0 ${d.size * 3}px rgba(${d.colour},0.6)`,
+            boxShadow: d.glow ? `0 0 ${d.size * 3}px rgba(${d.colour},0.65)` : undefined,
             ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`,
             animation: `gasDotDrift ${d.dur}s ease-in-out ${d.delay}s infinite`,
           }} />
