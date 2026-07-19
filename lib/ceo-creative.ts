@@ -76,8 +76,15 @@ export async function buildCeoCreatives(
   // view, not an advertisement, so FAIS s14 does not require the strip here - and a three-line legal band was
   // dominating a portrait. One short honest line, on the photograph, no bar.
   const legal = "AI-generated image";
-  const name = (opts.name || "Kagiso Mothibi").trim();
-  const title = (opts.title || "CEO, Fintech, MTN SA").trim();
+  // NO DEFAULT IDENTITY. These used to fall back to "Kagiso Mothibi" and "CEO, Fintech, MTN SA", so any brain
+  // that did not pass a name got MoMo's CEO printed on its nameplate - and the creative route never passed one.
+  // A missing name is now a refusal, because a creative published under the wrong person's name is worse than
+  // no creative at all.
+  const name = (opts.name || "").trim();
+  const title = (opts.title || "").trim();
+  if (!name || !title) {
+    return { creatives: [], error: "This brain has no CEO name and title set, so there is nobody to attribute the creative to." };
+  }
   const message = tidyCallout(opts.message).split("/")[0].replace(/[,;]\s*$/, "").trim();
   const W = 1200, H = 1200;
 

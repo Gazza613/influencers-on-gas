@@ -7,6 +7,7 @@ import { getBrandKit, listAssets } from "@/lib/studio";
 import { buildCeoCreatives } from "@/lib/ceo-creative";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
+import { loadIntelBrief } from "@/lib/intel";
 
 // THE CEO'S LINKEDIN CREATIVE, to run with his newsletter.
 //
@@ -45,7 +46,13 @@ export async function POST(req: Request) {
     // generic emotive photograph below.
     const ceoPhotos = await listAssets(clientId, "ceo_photo").catch(() => []);
     if (ceoPhotos.length) {
-      const r = await buildCeoCreatives(clientId, { message: callout || subject });
+      // Identity comes from THIS brain. Passing nothing used to mean MoMo's CEO by default.
+      const brief = await loadIntelBrief(clientId).catch(() => null);
+      const r = await buildCeoCreatives(clientId, {
+        message: callout || subject,
+        name: brief?.ceoName ?? undefined,
+        title: brief?.ceoTitle ?? undefined,
+      });
       const urls = r.creatives.filter((c) => c.url).map((c) => c.url);
       if (urls.length) return NextResponse.json({ ok: true, url: urls[0], urls });
       return NextResponse.json({ error: r.error || "the CEO creative did not come back" }, { status: 500 });

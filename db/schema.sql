@@ -661,3 +661,9 @@ create index if not exists idx_login_attempts_ip on login_attempts(ip, at desc);
 alter table users add column if not exists reset_token text;
 alter table users add column if not exists reset_expires timestamptz;
 create index if not exists idx_users_reset_token on users(reset_token);
+
+-- The CEO's voice, per brain. These lived in the newsletter route and the creative as MTN MoMo constants, so a
+-- second brain would have inherited a fintech's writing rules and another company's CEO on the nameplate.
+alter table intel_briefs add column if not exists ceo_rules text;
+alter table intel_briefs add column if not exists ceo_name  text;
+alter table intel_briefs add column if not exists ceo_title text;

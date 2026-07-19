@@ -80,6 +80,14 @@ export type IntelBrief = {
   strategist: string | null;
   windowDays: number;
   emailIntro: string | null;
+  // THE CEO'S VOICE, PER BRAIN. These were hardcoded to MTN MoMo in the newsletter route and in the creative:
+  // the writing rules named a fintech and applied FAIS advertising law, and the nameplate defaulted to Kagiso
+  // Mothibi. Pointed at a second brain, that would have published GAS thought leadership under fintech rules
+  // with another company's CEO on it. No MoMo FACT would have leaked - the data was always client_id scoped -
+  // but the VOICE would have, which is its own kind of contamination and just as unpublishable.
+  ceoRules: string | null;
+  ceoName: string | null;
+  ceoTitle: string | null;
 };
 
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
@@ -99,6 +107,9 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
     strategist: (r.strategist as string) || null,
     windowDays: Number(r.window_days) || 30,
     emailIntro: (r.email_intro as string) || null,
+    ceoRules: (r.ceo_rules as string) || null,
+    ceoName: (r.ceo_name as string) || null,
+    ceoTitle: (r.ceo_title as string) || null,
   };
 }
 

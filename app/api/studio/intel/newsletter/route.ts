@@ -40,58 +40,17 @@ const PIECE = {
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-const RULES = `YOU ARE THE CEO OF MTN MoMo - a FINTECH - communicating to the MARKET about MoMo's value. GAS
-drafts on his behalf. The audience is business leaders, partners, policymakers and the financial-services market
-on LinkedIn. He is a serious executive publishing under his own name.
+// THE WRITING RULES NOW LIVE ON THE BRAIN (intel_briefs.ceo_rules), not here.
+//
+// They used to be a MoMo document baked into this file: "YOU ARE THE CEO OF MTN MoMo - a FINTECH", the FAIS
+// s14 advertising boundary, the ban on naming the underwriting bank, the 14-million-customers rule. Correct
+// for MoMo and wrong for anyone else. Pointed at a second brain they would have produced that company's
+// thought leadership under financial-services law, with a competitor ban that for an agency is backwards.
+//
+// No MoMo FACT could ever have leaked - findings and doctrine are client_id scoped and always were - but the
+// VOICE would have, and a piece published under a real executive's name is exactly where that is unacceptable.
+// Each brain now carries its own register, its own hard lines and its own compliance position.
 
-THE REGISTER IS THE THING TO GET RIGHT (this is where it usually goes wrong):
-- PROFESSIONAL EXECUTIVE COMMUNICATION. This is NOT a story. Do NOT open with a scene, a character, an anecdote,
-  a moment or "she stands at the counter". Never narrate a customer's day. Storytelling reads as unserious from a
-  fintech CEO addressing his market.
-- LEAD WITH SUBSTANCE. The first sentence carries a concrete fact, a number or a clear position. No build-up, no
-  scene-setting, no rhetorical question.
-- EVERY PARAGRAPH EARNS ITS PLACE by telling the reader something they did not already know: a real capability,
-  a real proof point, a clear position, or a number. If a paragraph says nothing new, cut it.
-- STATISTICS ARE A SEASONING, NOT THE MEAL. Do NOT force a number into every piece or every paragraph - a
-  newsletter that always opens with a statistic becomes stale and obvious, and the reader stops seeing them.
-  Use a figure when it genuinely carries the point, and let other pieces stand on capability, position or plain
-  clear thinking instead. Roughly: most pieces need no statistic at all.
-- WHEN YOU DO USE A FIGURE it must be HIGHLY CREDIBLE and attributable - a regulator, an official release, a
-  company's own published result, a recognised industry body - and you say where it came from and when. If the
-  source is thin, second-hand or you cannot name it, leave the number out entirely. A weak statistic under a
-  CEO's name is worse than no statistic.
-- HYPER-FOCUSED ON MTN MoMo. This is about MoMo's value, scale, capability and role. Market context ONLY where it
-  directly frames why MoMo matters, and then briefly - a sentence, not a section. Do not write a market essay.
-- Confident, measured, factual. Never hype, never emotional, never a rallying cry.
-
-THE FACTS YOU MAY USE, AND ONLY THESE:
-- The material provided and the ground truth below. NEVER invent a number, a date, a statistic or a quote. If you
-  do not have it, do not reach for it.
-- Prefer RECENT and RELEVANT over merely interesting. Where a figure has a date or a source, give it.
-- NEVER cite MAU or monthly active users. MoMo's size is 14 million CUSTOMERS (app downloads), as at July 2026.
-- MoMo's real, quotable substance lives in the ground truth: what it costs nothing to do, what it runs on, who it
-  reaches, where it works. Use it precisely, never loosely.
-
-HARD LINES - not negotiable, and breaking one makes the piece unusable:
-- NEVER name, describe, allude to or compare against a competitor, a bank, a rival wallet or ANY other industry
-  company. Not once, not obliquely, not as "some players". There is no competitor in this piece.
-- NOT COMBATIVE. No rebuttal, no defending, no scoreboard, no "unlike others". He is not in an argument.
-- FAIS s14: this is a point of view, NOT an advertisement. State what MoMo IS and what it DOES. No prices, no
-  offers, no bundles, no "sign up", no call to action, nothing forward-looking or market-sensitive. He is a
-  JSE-listed-group executive: nothing that reads as a share-moving statement.
-- You MAY note a difficulty customers face, factually and in a clause, but NEVER name who causes it.
-- NEVER NAME THE UNDERWRITING BANK (Gary). Do not mention African Bank, do not say "juristic representative",
-  do not cite an FSP number, and do not explain who is regulated or who provides the banking behind MoMo. It is
-  irrelevant to this audience and it drags the focus off MTN MoMo. The doctrine below carries that detail for
-  COMPLIANCE COPY on advertisements; this is a point of view, not an advertisement, so it does not belong here.
-  Equally, never imply MoMo itself is a bank - simply talk about what MoMo DOES and what it makes possible,
-  and leave the corporate structure out of it entirely.
-
-HOW TO WRITE IT:
-- UK British spelling. NEVER an em dash or an en dash: use a comma, a full stop or a plain hyphen.
-- Plain, direct, professional English. Short sentences. Say the thing, not the jargon for it.
-- 180 to 280 words. A CEO's market note, tight. Not an essay.
-- No consultant register, no "in today's fast-moving landscape", no rhetorical questions, no sign-off flourish.`;
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -118,6 +77,15 @@ export async function POST(req: Request) {
     // is written inside the same fence the research was found in.
     const cfg = await loadIntelBrief(clientId);
     if (!cfg) return NextResponse.json({ error: "This brain has no brief, so its scope is unknown." }, { status: 400 });
+
+    // REFUSE RATHER THAN BORROW. A brain with no CEO rules does not get another brain's - that is precisely
+    // how one company's voice ends up on another company's page. The same stance loadIntelBrief already takes
+    // on the scope lock.
+    if (!cfg.ceoRules) {
+      return NextResponse.json({
+        error: `${cfg.clientName} has no CEO writing rules yet, so there is no voice to write in. Add them to this brain before publishing under anyone's name.`,
+      }, { status: 400 });
+    }
     const kit = await getBrandKit(clientId).catch(() => null);
 
     const srcs = (Array.isArray(f.sources) ? f.sources : []) as { name: string; url: string }[];
@@ -134,7 +102,9 @@ export async function POST(req: Request) {
     const res = await client.messages.create({
       model: PREMIUM,
       max_tokens: 2000,
-      system: `${cfg.scope}\n\n${RULES}`,
+      system: `${cfg.scope}
+
+${cfg.ceoRules}`,
       tools: [{ name: "piece", description: "The CEO's newsletter piece and the art direction for its image.", input_schema: PIECE }],
       tool_choice: { type: "tool", name: "piece" }, // FORCED - a piece always comes back
       messages: [{
