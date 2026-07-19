@@ -222,6 +222,24 @@ export default function Landing() {
       <div style={{ position: "absolute", width: 760, height: 760, top: "-22%", left: "-18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.28) 0%, transparent 65%)", animation: "orb1 14s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", width: 620, height: 620, top: "-14%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.22) 0%, transparent 65%)", animation: "orb2 19s ease-in-out infinite", pointerEvents: "none" }} />
       {/* Three glows. Two more were tried here and removed (Gary) - the star field now carries the depth. */}
+      {/* ── SUNSET HORIZON (Gary, experimental - "i may reverse this move but lets try") ──────────────────
+          Committed on its own so reverting it touches nothing else on the page.
+
+          Three stacked layers, because one flat orange gradient reads as a coloured rectangle rather than as
+          light. A real sunset is a bright, narrow band at the horizon, a broad warm bloom above it, and a
+          cool gap before the night sky takes over:
+            1. BLOOM  - wide and low, the ambient warmth
+            2. CORE   - tighter and hotter, hugging the very bottom
+            3. BAND   - a thin bright line at the base, which is what actually sells it as a horizon
+          All of it sits at zIndex 0, beneath the stars and the content, and breathes slowly so it never
+          reads as a static wash. Orange is fine here: the "orange is the GAS mark alone" rule guards CLIENT
+          creatives, not our own brand page. */}
+      <div aria-hidden style={{ position: "absolute", left: "-12%", right: "-12%", bottom: "-16%", height: "56%", pointerEvents: "none", zIndex: 0, animation: "gasHorizon 17s ease-in-out infinite" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 78% 100% at 50% 100%, rgba(255,106,0,0.20) 0%, rgba(255,72,0,0.09) 34%, transparent 70%)" }} />
+        <div style={{ position: "absolute", left: "12%", right: "12%", bottom: 0, height: "46%", background: "radial-gradient(ellipse 62% 100% at 50% 100%, rgba(255,150,30,0.26) 0%, rgba(255,90,0,0.10) 45%, transparent 78%)" }} />
+        <div style={{ position: "absolute", left: "20%", right: "20%", bottom: 0, height: 2, background: "linear-gradient(90deg, transparent 0%, rgba(255,170,60,0.42) 30%, rgba(255,190,90,0.52) 50%, rgba(255,170,60,0.42) 70%, transparent 100%)", filter: "blur(1.5px)" }} />
+      </div>
+
       {/* Dot grid */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
 
@@ -360,6 +378,8 @@ export default function Landing() {
 
       <style>{`
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        /* The horizon breathes rather than sitting still - a fixed gradient reads as a painted background. */
+        @keyframes gasHorizon { 0%,100%{opacity:0.85;transform:translateY(0)} 50%{opacity:1;transform:translateY(-8px)} }
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
