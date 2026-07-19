@@ -395,9 +395,13 @@ export const ingestSource = inngest.createFunction(
           if (st.done) break;
         }
         if (!pages.length) {
+          // NAME THE LIKELY CAUSE. Fetching nothing at all is almost always robots.txt: many sites allow
+          // Google and Bing and then block everything else with "User-agent: * / Disallow: /", which a
+          // well-behaved crawler obeys. That was exactly what stopped the first real crawl, and it took a
+          // manual look at robots.txt to find - the message should have said so.
           throw new Error(seen
-            ? `the crawl fetched ${seen} page${seen === 1 ? "" : "s"} but none had enough readable text - try the page the articles actually live under`
-            : "the crawl found no pages to read - check the address, and that the articles are linked from it");
+            ? `fetched ${seen} page${seen === 1 ? "" : "s"} but none had enough readable text - point at the section the articles actually live under`
+            : "the crawler was not allowed to read a single page. This is usually robots.txt: sites often allow Google and Bing and block everything else. Add 'User-agent: FirecrawlAgent' with 'Allow: /' to that site's robots.txt, or check the address is right.");
         }
         await step.run("usage-crawl", () => recordUsage({ clientId, provider: "firecrawl", model: "crawl", unit: "page", action: "ingest", count: pages.length }));
         // Each page keeps its OWN url and title in metadata, so a passage can always be traced back to the
