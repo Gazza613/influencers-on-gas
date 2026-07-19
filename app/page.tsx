@@ -132,7 +132,16 @@ export default function Landing() {
       {/* Orbs */}
       <div style={{ position: "absolute", width: 760, height: 760, top: "-22%", left: "-18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.28) 0%, transparent 65%)", animation: "orb1 14s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", width: 620, height: 620, top: "-14%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.22) 0%, transparent 65%)", animation: "orb2 19s ease-in-out infinite", pointerEvents: "none" }} />
-      {/* Three glows. Two more were tried here and removed (Gary) - the star field now carries the depth. */}
+      {/* MORE DEPTH IN THE DEAD SPACE (Gary: "a little flat"). Removing the star field left the middle and
+          lower thirds genuinely empty, and two glows at the top could not carry a full page on their own.
+          Three more, all in the blue-purple family and all FAINTER than the two originals (0.10-0.14 against
+          0.22-0.28), placed where there was nothing: mid-left, lower-centre and mid-right. Each on its own
+          slow, mismatched period so the page breathes rather than pulses.
+          Kept in the accent family on purpose - orange belongs to the horizon and the mark, and a warm glow
+          up here would fight the sunset rather than support it. */}
+      <div style={{ position: "absolute", width: 640, height: 640, top: "34%", left: "-14%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 68%)", animation: "orb3 26s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: 720, height: 720, top: "52%", left: "24%", borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.11) 0%, transparent 70%)", animation: "orb4 31s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: 560, height: 560, top: "40%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.10) 0%, transparent 68%)", animation: "orb5 23s ease-in-out infinite", pointerEvents: "none" }} />
       {/* ── SUNSET HORIZON (Gary, experimental - "i may reverse this move but lets try") ──────────────────
           Committed on its own so reverting it touches nothing else on the page.
 
@@ -150,6 +159,14 @@ export default function Landing() {
         <div style={{ position: "absolute", left: "8%", right: "8%", bottom: 0, height: "54%", background: "radial-gradient(ellipse 62% 100% at 50% 100%, rgba(255,150,30,0.26) 0%, rgba(255,90,0,0.11) 46%, transparent 80%)" }} />
         <div style={{ position: "absolute", left: "14%", right: "14%", bottom: 0, height: 3, background: "linear-gradient(90deg, transparent 0%, rgba(255,170,60,0.40) 28%, rgba(255,195,100,0.50) 50%, rgba(255,170,60,0.40) 72%, transparent 100%)", filter: "blur(2px)" }} />
       </div>
+
+      {/* GRAIN. Large dark gradients band and read as flat colour on a good screen; a fine noise layer is what
+          print has always used to stop that, and it reads as texture rather than as an effect. Inline SVG
+          turbulence, so it costs no network request and no image to maintain. Very low opacity on purpose -
+          if you can see the grain, there is too much of it. */}
+      <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.045, mixBlendMode: "overlay",
+        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        backgroundSize: "160px 160px" }} />
 
       {/* Dot grid */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
@@ -230,6 +247,9 @@ export default function Landing() {
         /* The horizon breathes rather than sitting still - a fixed gradient reads as a painted background. */
         @keyframes gasHorizon { 0%,100%{opacity:0.85;transform:translateY(0)} 50%{opacity:1;transform:translateY(-8px)} }
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
+        @keyframes orb3 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(38px,-46px) scale(0.92)} 70%{transform:translate(-44px,20px) scale(1.07)} }
+        @keyframes orb4 { 0%,100%{transform:translate(0,0) scale(1)} 45%{transform:translate(-36px,34px) scale(1.08)} }
+        @keyframes orb5 { 0%,100%{transform:translate(0,0) scale(1)} 55%{transform:translate(30px,-40px) scale(0.94)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
         @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-26px)} }
