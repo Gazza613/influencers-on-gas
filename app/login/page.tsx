@@ -70,11 +70,16 @@ export default function LoginPage() {
             style={{ background: "linear-gradient(135deg,#EC4899 0%,#8B5CF6 100%)", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)" }}>
             {busy ? "Checking…" : "Sign in →"}
           </button>
+          {/* Same muted colour as the line beneath it (Gary) - it is a quiet secondary action, not a second
+              call to action competing with Sign in. The underline carries the affordance instead of colour. */}
           <p className="mt-[clamp(14px,3.5vw,24px)] text-center text-[14px] leading-relaxed">
-            <a href="/reset" className="font-semibold text-accent hover:underline">Forgotten your password?</a>
+            <a href="/reset" className="text-ink-faint underline-offset-4 hover:text-ink-dim hover:underline">Forgotten your password?</a>
           </p>
+          {/* "Contact" and the address stay together on their own line, so the address never dangles alone at
+              the end of a wrap. */}
           <p className="mt-3 text-center text-[14px] leading-relaxed text-ink-faint">
-            Access is by invitation only. Contact <a href="mailto:grow@gasmarketing.co.za" className="text-accent inline-block px-1 py-2.5 underline-offset-2 hover:underline">grow@gasmarketing.co.za</a>.
+            Access is by invitation only.<br />
+            Contact <a href="mailto:grow@gasmarketing.co.za" className="text-ink-faint underline-offset-2 hover:text-ink-dim hover:underline">grow@gasmarketing.co.za</a>.
           </p>
         </form>
 
