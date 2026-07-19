@@ -99,11 +99,9 @@ const DOTS = (() => {
       // FAST. 3.5-8s against the old 7-15s, so the field reads as moving rather than as slowly breathing.
       dur: +(3.5 + r() * 4.5).toFixed(1),
       delay: +(r() * 5).toFixed(1),
-      // INTENTIONAL: every star travels UP and slightly RIGHT, and further than before (22-56px against
-      // 9-16px). A shared direction is what turns thirty independent wobbles into one field of embers
-      // rising - the drift used to be aimless, which is why it read as decoration rather than motion.
+      // INTENTIONAL, AND STRAIGHT UP (Gary). The sideways component is gone: every star rises on the same
+      // vertical axis, which reads as embers lifting rather than as drift on a breeze.
       drift: +(-22 - r() * 34).toFixed(1),
-      xdrift: +(3 + r() * 11).toFixed(1),
     };
   });
 })();
@@ -121,6 +119,19 @@ function rank(inf: Inf): number {
   if (inf.status === "frames_ready" || inf.status === "cast_ready") return 1;
   return 2;
 }
+
+// SHOOTING STARS. Rare on purpose: each one is idle for the vast majority of its cycle and visible for barely
+// a second, so they register as an event rather than as a loop. Four of them on long, mismatched periods
+// (19-34s) means one crosses every few seconds without any two ever syncing into a pattern.
+//
+// White only (Gary). The orange belongs to the rising embers; a streak reads as a different thing entirely,
+// and colouring it too would blur the two into one effect.
+const SHOOTERS = [
+  { left: 12, top: 14, len: 90, dur: 19, delay: 3.5, dx: 300, dy: -210 },
+  { left: 68, top: 8, len: 120, dur: 26, delay: 11, dx: 380, dy: -260 },
+  { left: 38, top: 30, len: 74, dur: 31, delay: 19, dx: 250, dy: -175 },
+  { left: 82, top: 24, len: 104, dur: 34, delay: 27, dx: 330, dy: -230 },
+];
 
 export default function Landing() {
   const router = useRouter();
@@ -198,12 +209,7 @@ export default function Landing() {
       <div style={{ position: "absolute", width: 760, height: 760, top: "-22%", left: "-18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.28) 0%, transparent 65%)", animation: "orb1 14s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", width: 620, height: 620, top: "-14%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.22) 0%, transparent 65%)", animation: "orb2 19s ease-in-out infinite", pointerEvents: "none" }} />
       <div style={{ position: "absolute", width: 820, height: 820, bottom: "-32%", left: "18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 65%)", animation: "orb3 23s ease-in-out infinite", pointerEvents: "none" }} />
-      {/* TWO MORE, DELIBERATELY FAINTER THAN THE FIRST THREE (0.13 and 0.10 against 0.18-0.28). The brief was
-          "add a few more but do not overdo it", and the way that goes wrong is matching the new ones to the
-          existing intensity: five equal glows is a light show, not depth. These fill the two dead zones - mid
-          right, and under the CTA - on their own slow periods so nothing ever pulses in unison. */}
-      <div style={{ position: "absolute", width: 560, height: 560, top: "34%", right: "-16%", borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.13) 0%, transparent 68%)", animation: "orb4 27s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: 680, height: 680, bottom: "-24%", right: "8%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,132,252,0.10) 0%, transparent 70%)", animation: "orb5 31s ease-in-out infinite", pointerEvents: "none" }} />
+      {/* Three glows. Two more were tried here and removed (Gary) - the star field now carries the depth. */}
       {/* Dot grid */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
 
@@ -215,8 +221,22 @@ export default function Landing() {
             width: d.size, height: d.size, borderRadius: "50%",
             background: `rgb(${d.colour})`, opacity: d.min,
             boxShadow: `0 0 ${d.size * 3}px rgba(${d.colour},0.6)`,
-            ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`, ["--dot-x" as string]: `${d.xdrift}px`,
+            ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`,
             animation: `gasDotDrift ${d.dur}s ease-in-out ${d.delay}s infinite`,
+          }} />
+        ))}
+
+        {/* The streaks themselves. A gradient bar rotated onto its heading, so the tail trails behind the head. */}
+        {SHOOTERS.map((sh, i) => (
+          <span key={`sh-${i}`} style={{
+            position: "absolute", left: `${sh.left}%`, top: `${sh.top}%`,
+            width: sh.len, height: 2, borderRadius: 2, opacity: 0,
+            background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 78%, #fff 100%)",
+            boxShadow: "0 0 8px rgba(255,255,255,0.75)",
+            ["--sh-x" as string]: `${sh.dx}px`, ["--sh-y" as string]: `${sh.dy}px`,
+            // The bar must lie along its own heading, or the tail points somewhere the star is not going.
+            ["--sh-rot" as string]: `${((Math.atan2(sh.dy, sh.dx) * 180) / Math.PI).toFixed(1)}deg`,
+            animation: `gasShoot ${sh.dur}s linear ${sh.delay}s infinite`,
           }} />
         ))}
       </div>
@@ -334,12 +354,19 @@ export default function Landing() {
         /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
         @keyframes gasDotDrift {
           0%, 100% { transform: translate3d(0, 0, 0) scale(0.8); opacity: var(--dot-min, 0.08) }
-          50%      { transform: translate3d(var(--dot-x, 6px), var(--dot-drift, -12px), 0) scale(1.25); opacity: var(--dot-max, 0.22) }
+          50%      { transform: translate3d(0, var(--dot-drift, -12px), 0) scale(1.25); opacity: var(--dot-max, 0.22) }
+        }
+        /* Idle, then a fast streak, then idle again. Keeping the visible window to 6% of the cycle is what
+           makes it feel occasional rather than like something on a loop. */
+        @keyframes gasShoot {
+          0%, 1%   { opacity: 0; transform: translate3d(0,0,0) rotate(var(--sh-rot, -35deg)) scaleX(0.3) }
+          2%       { opacity: 0.9 }
+          6%       { opacity: 0.9 }
+          7%       { opacity: 0; transform: translate3d(var(--sh-x, 300px), var(--sh-y, -210px), 0) rotate(var(--sh-rot, -35deg)) scaleX(1) }
+          100%     { opacity: 0; transform: translate3d(var(--sh-x, 300px), var(--sh-y, -210px), 0) rotate(var(--sh-rot, -35deg)) scaleX(1) }
         }
         /* Motion off means motion off. The dots are pure decoration, so they simply do not render. */
         @media (prefers-reduced-motion: reduce) { .gas-dots { display: none } }
-        @keyframes orb4 { 0%,100%{transform:translate(0,0) scale(1)} 45%{transform:translate(-40px,30px) scale(1.09)} }
-        @keyframes orb5 { 0%,100%{transform:translate(0,0) scale(1)} 55%{transform:translate(30px,-38px) scale(0.92)} }
         @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-26px)} }
         @keyframes cardSway { 0%,100%{transform:translateX(0px)} 25%{transform:translateX(8px)} 75%{transform:translateX(-7px)} }
         @keyframes cardAppear { from{opacity:0} to{opacity:var(--target-opacity,0.44)} }
