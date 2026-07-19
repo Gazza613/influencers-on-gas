@@ -16,7 +16,7 @@ import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotsta
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
-import { scrape, startCrawl, crawlStatus } from "@/lib/vendors/firecrawl";
+import { scrape, startCrawl, crawlStatus, sitemapUrls } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks, clearSourceChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
 import { recordUsage } from "@/lib/usage";
@@ -382,31 +382,49 @@ export const ingestSource = inngest.createFunction(
     try {
       let items: { content: string; metadata?: Record<string, unknown> }[];
       if (type === "crawl") {
-        // A WHOLE SECTION. Firecrawl's crawl is asynchronous, so this starts the job and then polls across
-        // durable steps - a serverless request would time out long before a fifty-page site finished, which
-        // is exactly why this belongs in Inngest rather than in the route.
-        const started = await step.run("crawl-start", () => startCrawl(uri, 80, includePath));
+        // SITEMAP FIRST. Firecrawl's crawler would not follow this site's article links however it was
+        // configured - pointed at the index it returned a case study, a privacy policy and the sitemap, but
+        // never one of the 76 articles, which are plain anchors in the served HTML. So we stop relying on
+        // another crawler's link heuristics and read the site's own sitemap, which lists every page by
+        // definition, then scrape exactly the ones the path filter asks for.
+        const listed = await step.run("sitemap", () => sitemapUrls(uri, includePath));
+
         let pages: { url: string; title: string; content: string }[] = [];
-        let seen = 0;
-        // Up to ~10 minutes. Each wait is its own step, so the function sleeps rather than holding a request.
-        for (let i = 0; i < 80; i++) {
-          await step.sleep(`crawl-wait-${i}`, "15s");
-          const st = await step.run(`crawl-poll-${i}`, () => crawlStatus(started.id));
-          pages = st.pages; seen = st.seen;
-          if (st.done) break;
+        if (listed.length) {
+          // Scrape in small batches, each its own step. A step that tries 76 pages will time out, and a
+          // timed-out step is retried - which is exactly how the previous version doubled a brain's chunks.
+          const targets = listed.slice(0, 90);
+          const B = 6;
+          for (let i = 0; i < targets.length; i += B) {
+            const slice = targets.slice(i, i + B);
+            const got = await step.run(`scrape-${i / B}`, async () =>
+              (await Promise.all(slice.map((u) => scrape(u).catch(() => null))))
+                .filter((p): p is { url: string; title: string; content: string } => !!p && p.content.length > 400));
+            pages = pages.concat(got);
+          }
+          await step.run("usage-crawl", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: pages.length }));
+        } else {
+          // No sitemap: fall back to the crawler.
+          const started = await step.run("crawl-start", () => startCrawl(uri, 80, includePath));
+          let seen = 0;
+          for (let i = 0; i < 80; i++) {
+            await step.sleep(`crawl-wait-${i}`, "15s");
+            const st = await step.run(`crawl-poll-${i}`, () => crawlStatus(started.id));
+            pages = st.pages; seen = st.seen;
+            if (st.done) break;
+          }
+          if (!pages.length) {
+            throw new Error(seen
+              ? `fetched ${seen} page${seen === 1 ? "" : "s"} but none had enough readable text`
+              : "the crawler was not allowed to read a single page. This is usually robots.txt: sites often allow Google and Bing and block everything else. Add 'User-agent: FirecrawlAgent' with 'Allow: /' to that site's robots.txt.");
+          }
         }
+
         if (!pages.length) {
-          // NAME THE LIKELY CAUSE. Fetching nothing at all is almost always robots.txt: many sites allow
-          // Google and Bing and then block everything else with "User-agent: * / Disallow: /", which a
-          // well-behaved crawler obeys. That was exactly what stopped the first real crawl, and it took a
-          // manual look at robots.txt to find - the message should have said so.
-          throw new Error(seen
-            ? `fetched ${seen} page${seen === 1 ? "" : "s"} but none had enough readable text - point at the section the articles actually live under`
-            : "the crawler was not allowed to read a single page. This is usually robots.txt: sites often allow Google and Bing and block everything else. Add 'User-agent: FirecrawlAgent' with 'Allow: /' to that site's robots.txt, or check the address is right.");
+          throw new Error(`the sitemap listed ${listed.length} page${listed.length === 1 ? "" : "s"} under that path but none could be read`);
         }
-        await step.run("usage-crawl", () => recordUsage({ clientId, provider: "firecrawl", model: "crawl", unit: "page", action: "ingest", count: pages.length }));
-        // Each page keeps its OWN url and title in metadata, so a passage can always be traced back to the
-        // article it came from - which is the difference between a citable brain and a pile of text.
+        // Each page keeps its OWN url and title, so a passage can always be traced back to the article it came
+        // from - the difference between a citable brain and a pile of text.
         items = pages.flatMap((pg) => chunkText(pg.content).map((c) => ({ content: c, metadata: { url: pg.url, title: pg.title, kind: "article" } })));
       } else if (type === "website") {
         const page = await step.run("scrape", () => scrape(uri));

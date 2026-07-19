@@ -91,3 +91,28 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
       .filter((p) => p.content.length > 400 && !/\.(xml|json|txt)(\?|$)/i.test(p.url)),
   };
 }
+
+// THE SITEMAP IS THE RELIABLE ROUTE, not link-following.
+//
+// Firecrawl's crawler would not follow this site's article links no matter how it was configured: pointed at
+// the index it fetched a case study, a privacy policy and the sitemap, but never one of the 76 articles, even
+// though they are 76 plain <a href> anchors in the served HTML. Rather than keep guessing at another crawler's
+// heuristics, we read the site's own sitemap and scrape exactly the pages we want.
+//
+// It is deterministic, it honours the path filter precisely, and it uses the single-page scrape that has
+// always worked. A site without a sitemap falls back to the crawler.
+export async function sitemapUrls(siteUrl: string, includePath?: string | null): Promise<string[]> {
+  const origin = new URL(siteUrl).origin;
+  const res = await fetch(`${origin}/sitemap.xml`, { headers: { "User-Agent": "FirecrawlAgent" } });
+  if (!res.ok) return [];
+  const xml = await res.text();
+  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+
+  const want = includePath ? `/${includePath.replace(/^\/+|\/+$/g, "")}/` : null;
+  return [...new Set(urls)]
+    .filter((u) => u.startsWith(origin))
+    // The path filter, applied to the URL itself rather than trusted to a crawler's scoping.
+    .filter((u) => (want ? new URL(u).pathname.startsWith(want) : true))
+    // Never the sitemap or other non-pages.
+    .filter((u) => !/\.(xml|json|txt|pdf|png|jpe?g|svg|webp)(\?|$)/i.test(u));
+}
