@@ -12,7 +12,7 @@ type Hit = { content: string; metadata: Record<string, unknown>; score: number }
 
 export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }: { brainId: string; initialSources: Source[]; chunkCount?: number }) {
   const [sources, setSources] = useState<Source[]>(initialSources);
-  const [mode, setMode] = useState<"website" | "text" | "file">("website");
+  const [mode, setMode] = useState<"website" | "crawl" | "text" | "file">("website");
   const [progress, setProgress] = useState("");
   const [uri, setUri] = useState("");
   const [text, setText] = useState("");
@@ -43,7 +43,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
     setAdding(true); setAddErr("");
     const r = await fetch(`/api/brains/${brainId}/sources`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mode === "website" ? { type: "website", uri } : { type: "text", text }),
+      body: JSON.stringify(mode === "website" || mode === "crawl" ? { type: mode, uri } : { type: "text", text }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setAddErr(d?.error || "Could not add source"); setAdding(false); return; }
@@ -141,7 +141,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
       <div className="rounded-xl border border-line bg-surface-1 p-6">
         <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Feed the brain</div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {([["file", "Documents"], ["website", "Website or link"], ["text", "Paste text"]] as const).map(([m, label]) => (
+          {([["file", "Documents"], ["website", "One page"], ["crawl", "Whole section"], ["text", "Paste text"]] as const).map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)}
               className={`rounded-lg px-3 py-1.5 text-base font-semibold ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim hover:text-ink"}`}>
               {label}
@@ -160,6 +160,21 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
               <span className="mt-1 text-[14px] text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
             </label>
             {progress && <p className="mt-2 text-[15px] text-ink-dim">Uploading {progress}…</p>}
+          </>
+        ) : mode === "crawl" ? (
+          <>
+            {/* A WHOLE SECTION, not one page. Scraping the index of a blog gets fifty headlines and no
+                arguments; this brings every article in, each keeping its own title and URL so a passage can
+                always be traced back to what it came from. */}
+            <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://a-site.com/articles"
+              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong" />
+            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">
+              {adding ? "Starting the crawl…" : "Crawl and add everything"}
+            </button>
+            <p className="mt-2.5 text-[15px] text-ink-dim">
+              Follows the links under that address and reads every article it finds, up to 80 pages. Takes a few
+              minutes and keeps running if you close the tab.
+            </p>
           </>
         ) : mode === "website" ? (
           <>

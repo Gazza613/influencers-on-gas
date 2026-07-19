@@ -10,7 +10,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Studio on GAS",
+  title: "STUDIO ON GAS",
   description: "Studio on GAS - GAS Marketing's platform for campaigns, creative and market intelligence.",
 };
 

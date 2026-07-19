@@ -16,7 +16,7 @@ import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotsta
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
-import { scrape } from "@/lib/vendors/firecrawl";
+import { scrape, startCrawl, crawlStatus } from "@/lib/vendors/firecrawl";
 import { chunkText, ingestChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
 import { recordUsage } from "@/lib/usage";
@@ -380,7 +380,25 @@ export const ingestSource = inngest.createFunction(
 
     try {
       let items: { content: string; metadata?: Record<string, unknown> }[];
-      if (type === "website") {
+      if (type === "crawl") {
+        // A WHOLE SECTION. Firecrawl's crawl is asynchronous, so this starts the job and then polls across
+        // durable steps - a serverless request would time out long before a fifty-page site finished, which
+        // is exactly why this belongs in Inngest rather than in the route.
+        const started = await step.run("crawl-start", () => startCrawl(uri, 80));
+        let pages: { url: string; title: string; content: string }[] = [];
+        // Up to ~10 minutes. Each wait is its own step, so the function sleeps rather than holding a request.
+        for (let i = 0; i < 40; i++) {
+          await step.sleep(`crawl-wait-${i}`, "15s");
+          const st = await step.run(`crawl-poll-${i}`, () => crawlStatus(started.id));
+          pages = st.pages;
+          if (st.done) break;
+        }
+        if (!pages.length) throw new Error("the crawl found no readable pages");
+        await step.run("usage-crawl", () => recordUsage({ clientId, provider: "firecrawl", model: "crawl", unit: "page", action: "ingest", count: pages.length }));
+        // Each page keeps its OWN url and title in metadata, so a passage can always be traced back to the
+        // article it came from - which is the difference between a citable brain and a pile of text.
+        items = pages.flatMap((pg) => chunkText(pg.content).map((c) => ({ content: c, metadata: { url: pg.url, title: pg.title, kind: "article" } })));
+      } else if (type === "website") {
         const page = await step.run("scrape", () => scrape(uri));
         await step.run("usage-scrape", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: 1 }));
         if (!page.content) throw new Error("page had no readable content");

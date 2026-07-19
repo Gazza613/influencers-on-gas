@@ -12,11 +12,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const type = body.type === "website" ? "website" : body.type === "file" ? "file" : "text";
+  const type = body.type === "website" ? "website" : body.type === "crawl" ? "crawl" : body.type === "file" ? "file" : "text";
   const text = typeof body.text === "string" ? body.text.trim() : "";
   let uri = typeof body.uri === "string" ? body.uri.trim() : "";
 
-  if (type === "website") {
+  if (type === "website" || type === "crawl") {
     if (!/^https?:\/\//i.test(uri)) return NextResponse.json({ error: "Enter a valid website URL (https://…)." }, { status: 400 });
   } else if (type === "file") {
     // The browser uploaded straight to Blob and hands us the URL back. It must be OUR blob store: a brain will
