@@ -20,9 +20,10 @@ export default function SignOutButton() {
     } catch {
       /* leave anyway - see above */
     }
-    // The PUBLIC landing page, and the flag makes it STAY there: without it the landing page's own session
-    // check can still see a not-yet-cleared session and redirect straight back to the dashboard (Gary).
-    window.location.href = "/?signedout=1";
+    // The PUBLIC landing page. The old "?signedout=1" flag existed only to stop the landing page bouncing a
+    // just-signed-out user back to the dashboard on a not-yet-cleared session. That page no longer redirects
+    // anyone, so the flag is dead weight and a clean URL is what people should be left on.
+    window.location.href = "/";
   }
 
   return (

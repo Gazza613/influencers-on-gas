@@ -153,10 +153,14 @@ export default function Landing() {
   const router = useRouter();
   const animatedWord = useTypewriter();
   const [cardSrcs, setCardSrcs] = useState<({ url: string; hero: string } | null)[]>(CARDS.map(() => null));
-  // Session-aware: an ALREADY signed-in user who lands here (e.g. tapping "← Home") should go straight into
-  // the app, not see the logged-out "Get Started" marketing view - which read as a surprise logout. Hold the
-  // render until we know, so the CTA never flashes for a signed-in user.
-  const [authChecked, setAuthChecked] = useState(false);
+  // SIGNED-IN USERS MAY LOOK AT THIS PAGE (Gary). It used to redirect them straight to /dashboard, which meant
+  // typing the landing-page URL bounced you back to the app and there was no way to see the front door at all
+  // - not even with a hard refresh. A public homepage you cannot visit is just broken.
+  //
+  // So nothing redirects now. The page renders for everyone, and the only thing the session changes is the
+  // CTA: signed out it says "Get Started" and goes to /login, signed in it says "Enter the Studio" and goes
+  // to the dashboard. Same page, right door.
+  const [signedIn, setSignedIn] = useState(false);
   // WHICH LAYOUT: the original floating influencer photos, or the six systems. Stored in the database so it
   // switches without a deploy. ?layout=cards / ?layout=systems previews the other one without changing what
   // the public sees.
@@ -173,19 +177,15 @@ export default function Landing() {
     if (forced === "cards" || forced === "systems") setLayout(forced);
     else fetch("/api/landing-layout", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.layout) setLayout(d.layout); }).catch(() => {});
 
-    // JUST SIGNED OUT? Stay here. Signing out sends you to "/?signedout=1", and without this check the session
-    // lookup below could still see a not-yet-propagated session and bounce you straight back to the dashboard -
-    // which is exactly what Gary saw ("they land on /home again").
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("signedout")) {
-      setAuthChecked(true);
-      return;
-    }
+    // Read the session only to label the CTA. No redirect, so the "?signedout=1" guard that used to stop a
+    // not-yet-cleared session bouncing you back to the dashboard is no longer needed: there is nothing to
+    // bounce to.
     fetch("/api/auth/session", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => { if (cancelled) return; if (s?.user) router.replace("/dashboard"); else setAuthChecked(true); })
-      .catch(() => { if (!cancelled) setAuthChecked(true); });
+      .then((s) => { if (!cancelled) setSignedIn(!!s?.user); })
+      .catch(() => {});
     return () => { cancelled = true; };
-  }, [router]);
+  }, []);
 
   // Load real influencer hero images: ONE distinct influencer per card (no repeats, no
   // cycling). Cards beyond the number of available influencers stay empty.
@@ -215,9 +215,6 @@ export default function Landing() {
       })
       .catch(() => {});
   }, []);
-
-  // Signed-in users are being redirected to /home (the two doors); don't flash the marketing CTA at them.
-  if (!authChecked) return <div style={{ minHeight: "100vh", background: "#07070E" }} />;
 
   return (
     <div style={{ minHeight: "100dvh", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#07070E", overflow: "hidden", padding: "clamp(26px, 6vw, 40px) clamp(18px, 5vw, 24px) clamp(46px, 10vw, 80px)", textAlign: "center" }}>
@@ -370,12 +367,12 @@ export default function Landing() {
         )}
 
         <button
-          onClick={() => router.push("/login")}
+          onClick={() => router.push(signedIn ? "/dashboard" : "/login")}
           style={{ padding: "clamp(15px, 3.6vw, 17px) clamp(36px, 11vw, 60px)", borderRadius: 980, maxWidth: "100%", background: "linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)", color: "#fff", fontSize: "clamp(15.5px, 4vw, 17px)", fontWeight: 700, letterSpacing: "-0.2px", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)", transition: "transform 0.18s, box-shadow 0.18s", border: "none", cursor: "pointer" }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.04) translateY(-2px)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(168,85,247,0.65), 0 8px 32px rgba(0,0,0,0.5)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1) translateY(0)"; e.currentTarget.style.boxShadow = "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)"; }}
         >
-          Get Started →
+          {signedIn ? "Enter the Studio →" : "Get Started →"}
         </button>
       </div>
 
