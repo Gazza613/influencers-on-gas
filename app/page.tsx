@@ -57,70 +57,7 @@ const CARDS = [
 ] as const;
 
 
-// FLOATING DOTS (Gary, after inngest.com - "but make a little more subtle").
-//
-// Their version is pure CSS, not a canvas: ~30 absolutely-positioned 1-2px spans in one orange, each drifting
-// on its own period with opacity animating between a per-dot min and max. Worth copying the technique exactly,
-// because it costs no JavaScript and no main-thread work - the compositor does all of it.
-//
-// TWO THINGS CHANGED FOR US:
-//   1. TUNED IN THREE PASSES, and the history is the lesson. First attempt: 1-2px at 0.05-0.12 resting.
-//      Verified in the live DOM - all of them rendering, none of them visible, because at 1px on a near-black
-//      field the eye cannot resolve a dot at 5%. Second: 2-3px at 0.10-0.18. Visible, still too quiet.
-//      Now 70 stars at 2-5px, resting 0.24-0.38 and peaking 0.58-0.88, moving in 3.5-8s. SIZE and GLOW were
-//      the levers all along, not opacity: a 4px dot with a halo reads as a star, a 1px dot reads as dust.
-//      They also travel with INTENT - up and slightly right, on a shared heading - because a shared direction
-//      turns seventy independent wobbles into one field of embers rising.
-//   2. ALL WHITE, A REAL SKY (Gary). The orange is gone. Three things do the work of making 120 dots read as
-//      stars rather than as a pattern: brightness on a POWER LAW so faint stars vastly outnumber bright ones,
-//      size TIED to brightness so a bright star is bright because it is near rather than merely bigger, and
-//      a spread of colour TEMPERATURE - pure white mostly, some blue-white, a few warm. Only the brighter
-//      stars carry a halo; haloing all of them flattens the depth the magnitude spread creates.
-//
-// POSITIONS ARE SEEDED, NEVER Math.random(). This component renders on the server and again on the client, and
-// a random layout would differ between the two - React would report a hydration mismatch and throw the markup
-// away. A fixed seed gives scatter that is stable everywhere.
-function seeded(seed: number) {
-  let x = seed;
-  return () => { x = (x * 1664525 + 1013904223) % 4294967296; return x / 4294967296; };
-}
-const DOTS = (() => {
-  const r = seeded(20260719);
-  // STRATIFIED, NOT RANDOM. Pure random scatter always clumps and leaves bare patches - which is exactly why
-  // the centre column and the space under the CTA looked empty while the edges looked busy. Dividing the page
-  // into a grid and placing one star per cell, jittered inside it, guarantees even coverage everywhere while
-  // still looking scattered. This is the standard fix for exactly this artefact.
-  //
-  // The grid is also the density dial. Thinning the field is a matter of fewer, larger cells - which keeps
-  // the coverage even as it gets sparser, instead of reopening the holes that random scatter left.
-  const COLS = 12, ROWS = 11;                      // 132 cells, one star each
-  const out = [];
-  for (let cy = 0; cy < ROWS; cy++) {
-    for (let cx = 0; cx < COLS; cx++) {
-      // BRIGHTNESS ON A POWER LAW: mostly faint, a rare few brilliant. An even spread is the single thing
-      // that makes a star field look generated.
-      const mag = Math.pow(r(), 1.9);
-      const min = 0.13 + mag * 0.34;
-      // SIZE FOLLOWS BRIGHTNESS - a star looks bigger only because it blooms.
-      const size = mag > 0.86 ? 4 : mag > 0.62 ? 3 : mag > 0.3 ? 2 : 1.5;
-      // COLOUR TEMPERATURE: all white, but not the same white. Pure dominates, some blue-white, a few warm.
-      const t = r();
-      const colour = t < 0.7 ? "255,255,255" : t < 0.88 ? "202,215,255" : "255,241,224";
-      out.push({
-        left: +(((cx + 0.12 + r() * 0.76) / COLS) * 100).toFixed(2),
-        top: +(((cy + 0.12 + r() * 0.76) / ROWS) * 100).toFixed(2),
-        size, colour,
-        min: +min.toFixed(3),
-        max: +(min + 0.22 + mag * 0.34).toFixed(3),
-        dur: +(4 + r() * 5 + mag * 3).toFixed(1),
-        delay: +(r() * 9).toFixed(1),              // spread wide so the field never pulses together
-        drift: +(-26 - r() * 38).toFixed(1),
-        glow: mag > 0.62,
-      });
-    }
-  }
-  return out;
-})();
+// The star field that lived here was removed (Gary). The sunset horizon carries the page on its own now.
 
 type Inf = { status?: string; persona?: { hero_url?: string; hero_realism_url?: string; locked?: boolean } | null; look_refs?: { url: string; hero?: boolean }[] | null };
 // All usable photos for an influencer, hero first, then their other frames.
@@ -136,18 +73,6 @@ function rank(inf: Inf): number {
   return 2;
 }
 
-// SHOOTING STARS. Rare on purpose: each one is idle for the vast majority of its cycle and visible for barely
-// a second, so they register as an event rather than as a loop. Four of them on long, mismatched periods
-// (19-34s) means one crosses every few seconds without any two ever syncing into a pattern.
-//
-// White only (Gary). The orange belongs to the rising embers; a streak reads as a different thing entirely,
-// and colouring it too would blur the two into one effect.
-const SHOOTERS = [
-  { left: 12, top: 14, len: 90, dur: 19, delay: 3.5, dx: 300, dy: -210 },
-  { left: 68, top: 8, len: 120, dur: 26, delay: 11, dx: 380, dy: -260 },
-  { left: 38, top: 30, len: 74, dur: 31, delay: 19, dx: 250, dy: -175 },
-  { left: 82, top: 24, len: 104, dur: 34, delay: 27, dx: 330, dy: -230 },
-];
 
 export default function Landing() {
   const router = useRouter();
@@ -243,33 +168,6 @@ export default function Landing() {
       {/* Dot grid */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
 
-      {/* Drifting dots. aria-hidden and pointer-events:none - decoration a screen reader should never announce. */}
-      <div aria-hidden className="gas-dots" style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
-        {DOTS.map((d, i) => (
-          <span key={i} style={{
-            position: "absolute", left: `${d.left}%`, top: `${d.top}%`,
-            width: d.size, height: d.size, borderRadius: "50%",
-            background: `rgb(${d.colour})`, opacity: d.min,
-            boxShadow: d.glow ? `0 0 ${d.size * 3}px rgba(${d.colour},0.65)` : undefined,
-            ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`,
-            animation: `gasDotDrift ${d.dur}s ease-in-out ${d.delay}s infinite`,
-          }} />
-        ))}
-
-        {/* The streaks themselves. A gradient bar rotated onto its heading, so the tail trails behind the head. */}
-        {SHOOTERS.map((sh, i) => (
-          <span key={`sh-${i}`} style={{
-            position: "absolute", left: `${sh.left}%`, top: `${sh.top}%`,
-            width: sh.len, height: 2, borderRadius: 2, opacity: 0,
-            background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 78%, #fff 100%)",
-            boxShadow: "0 0 8px rgba(255,255,255,0.75)",
-            ["--sh-x" as string]: `${sh.dx}px`, ["--sh-y" as string]: `${sh.dy}px`,
-            // The bar must lie along its own heading, or the tail points somewhere the star is not going.
-            ["--sh-rot" as string]: `${((Math.atan2(sh.dy, sh.dx) * 180) / Math.PI).toFixed(1)}deg`,
-            animation: `gasShoot ${sh.dur}s linear ${sh.delay}s infinite`,
-          }} />
-        ))}
-      </div>
 
       {/* THE SIX SYSTEMS (or the original influencer photos), in the same six floating slots.
           The mapping is exact and that is the whole idea: there were already three cards down each side and
@@ -383,27 +281,6 @@ export default function Landing() {
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
-        /* ALWAYS UPWARD (Gary). The previous version peaked at 50% and returned to its origin, which meant
-           the second half of every cycle was a descent. This travels one way for the whole cycle and fades in
-           and out at the ends, so a star is never seen falling and the loop point is invisible. */
-        @keyframes gasDotDrift {
-          0%   { transform: translate3d(0, 0, 0) scale(0.75); opacity: 0 }
-          18%  { opacity: var(--dot-min, 0.1) }
-          52%  { transform: translate3d(0, calc(var(--dot-drift, -30px) * 0.55), 0) scale(1.2); opacity: var(--dot-max, 0.4) }
-          82%  { opacity: var(--dot-min, 0.1) }
-          100% { transform: translate3d(0, var(--dot-drift, -30px), 0) scale(0.75); opacity: 0 }
-        }
-        /* Idle, then a fast streak, then idle again. Keeping the visible window to 6% of the cycle is what
-           makes it feel occasional rather than like something on a loop. */
-        @keyframes gasShoot {
-          0%, 1%   { opacity: 0; transform: translate3d(0,0,0) rotate(var(--sh-rot, -35deg)) scaleX(0.3) }
-          2%       { opacity: 0.9 }
-          6%       { opacity: 0.9 }
-          7%       { opacity: 0; transform: translate3d(var(--sh-x, 300px), var(--sh-y, -210px), 0) rotate(var(--sh-rot, -35deg)) scaleX(1) }
-          100%     { opacity: 0; transform: translate3d(var(--sh-x, 300px), var(--sh-y, -210px), 0) rotate(var(--sh-rot, -35deg)) scaleX(1) }
-        }
-        /* Motion off means motion off. The dots are pure decoration, so they simply do not render. */
-        @media (prefers-reduced-motion: reduce) { .gas-dots { display: none } }
         @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-26px)} }
         @keyframes cardSway { 0%,100%{transform:translateX(0px)} 25%{transform:translateX(8px)} 75%{transform:translateX(-7px)} }
         @keyframes cardAppear { from{opacity:0} to{opacity:var(--target-opacity,0.44)} }
