@@ -92,7 +92,8 @@ export type IntelBrief = {
 
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const rows = (await db().query(
-    `select b.client_id, c.name as client_name, b.scope, b.journalist, b.strategist, b.window_days, b.email_intro
+    `select b.client_id, c.name as client_name, b.scope, b.journalist, b.strategist, b.window_days, b.email_intro,
+            b.ceo_rules, b.ceo_name, b.ceo_title
      from intel_briefs b join clients c on c.id = b.client_id
      where b.client_id = $1`,
     [clientId],
