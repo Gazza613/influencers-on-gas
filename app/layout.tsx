@@ -21,9 +21,11 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <head>
         {/* Re-gate on hard refresh BEFORE paint: a reload of any signed-in page clears the session
-            (via /api/relogin) and sends the user to login, no flash of the current page. We pass the
-            current path as ?to= so login returns them to the SAME page after signing back in (not the
-            homepage). Skips the homepage and login so they don't needlessly bounce. */}
+            (via /api/relogin) and lands the user on the PUBLIC LANDING PAGE, with no flash of the page they
+            were on. The front door, not the login form - being dropped straight onto a password prompt read
+            as "you have been kicked out" (Gary). The current path rides along as ?to= and is handed on to
+            /login when they choose to sign in, so they still return to the SAME page. Skips the homepage,
+            login and public share links so they never needlessly bounce. */}
         <script
           dangerouslySetInnerHTML={{
             __html:

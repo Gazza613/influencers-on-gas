@@ -29,11 +29,15 @@ function safeNext(v: string | null, origin: string): string {
 }
 
 export async function GET(req: Request) {
-  // Re-gate on reload (Gary's security posture) BUT remember where the user was, so after signing back in
-  // they land on the SAME page, not the homepage - the #1 trust fix from the journey audit.
+  // Re-gate on reload (Gary's security posture), but land on the PUBLIC LANDING PAGE rather than the login
+  // form (Gary). Being dropped straight onto a password prompt reads as "you have been kicked out"; the front
+  // door reads as "you are signed out", which is the same fact told properly.
+  //
+  // The ?next= still rides along, handed to the landing page and passed on to /login when the user chooses to
+  // sign in, so the return-to-the-same-page behaviour is not lost on the way.
   const url = new URL(req.url);
   const next = safeNext(url.searchParams.get("to"), url.origin);
-  const res = NextResponse.redirect(new URL(next ? `/login?next=${encodeURIComponent(next)}` : "/login", req.url));
+  const res = NextResponse.redirect(new URL(next ? `/?next=${encodeURIComponent(next)}` : "/", req.url));
   for (const name of COOKIES) res.cookies.set(name, "", { path: "/", expires: new Date(0) });
   // Don't let this hop get cached.
   res.headers.set("Cache-Control", "no-store");
