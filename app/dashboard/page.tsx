@@ -211,7 +211,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The Journalist</>,
         href: "/journalist",
         mark: <JournalistMark />,
-        blurb: "Thought leadership a client CEO can put his name to. Built from primary sources, sourced and dated, never opinion.",
+        blurb: "Thought leadership a named executive can put their name to. Built from primary sources, sourced and dated, never opinion.",
         action: "Open the desk",
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",

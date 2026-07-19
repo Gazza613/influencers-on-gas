@@ -3,17 +3,17 @@ import AppHeader from "@/components/AppHeader";
 import IntelQueue from "@/components/IntelQueue";
 import { listStudioClients } from "@/lib/studio";
 
-// THE JOURNALIST. Thought leadership for the MTN MoMo CEO to post on LinkedIn.
+// THE JOURNALIST. Thought leadership for a named executive to post on LinkedIn, written for whichever brain
+// is selected.
 //
-// SCOPE, decided with Gary and legally load-bearing: INDUSTRY COMMENTARY ONLY. The moment a post promotes
-// MoMo's services it becomes an FSP advertisement under FAIS and the whole s14 regime applies (no urgency,
-// balanced presentation, African Bank identified as product supplier). Staying on category commentary keeps it
-// out of that definition entirely: authority without exposure.
+// It is NOT product promotion, and the reason differs by client rather than being one universal rule. For MTN
+// MoMo the line is legal: a post that promotes their services becomes an FSP advertisement under FAIS s14.
+// For GAS's own brain there is no such regime, and the constraint is editorial instead - a positioning piece
+// that turns into a pitch stops being worth reading.
 //
-// And it goes out under a real person's name. So: GAS drafts, the CEO's office approves and publishes. Never
-// the other way round. No fabricated quotes, no invented anecdotes, every claim traceable to a public source
-// he could defend in a room.
-export const dynamic = "force-dynamic";
+// Which is why the specifics live on the BRAIN (intel_briefs: the scope lock, the journalist brief, the CEO
+// rules, who signs) and never in this page. A shared screen cannot carry one client's compliance position as
+// though it applied to everyone.
 
 export default async function JournalistPage() {
   const clients = await listStudioClients().catch(() => []);
@@ -23,11 +23,17 @@ export default async function JournalistPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <Link href="/dashboard" className="text-lg font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Journalist</h1>
+        {/* BRAIN-NEUTRAL. This described MoMo alone - "the CEO", and product promotion becoming "a regulated
+            financial advertisement", which is a FAIS point true of a fintech and of nothing else. The platform
+            now runs several brains, so a shared page cannot carry one client's compliance position as if it
+            were everyone's. The specifics - who signs, what may not be said - live on each brain and are
+            applied when the piece is written. */}
         <p className="mt-2 max-w-3xl text-[24px] leading-relaxed text-ink-dim">
-          Thought leadership the CEO can put his name to. It researches the category daily and files what it
-          finds here. <b className="text-ink">Industry commentary only</b> - never product promotion, because a
-          post that promotes MoMo&apos;s services becomes a regulated financial advertisement. GAS drafts; the
-          CEO&apos;s office approves and publishes.
+          Thought leadership the named executive can put their name to. It researches the selected brain&apos;s
+          category daily and files what it finds here. <b className="text-ink">Industry commentary only</b> -
+          never product promotion. GAS drafts; the executive&apos;s office approves and publishes. Each brain
+          carries its own voice, its own hard lines and its own compliance position, and a piece is written
+          under those rather than any other client&apos;s.
         </p>
         <IntelQueue clients={clients} role="journalist" />
       </main>
