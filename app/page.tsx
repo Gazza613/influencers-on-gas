@@ -86,10 +86,6 @@ export default function Landing() {
   // CTA: signed out it says "Get Started" and goes to /login, signed in it says "Enter the Studio" and goes
   // to the dashboard. Same page, right door.
   const [signedIn, setSignedIn] = useState(false);
-  // A hard refresh of a signed-in page re-gates and drops the user here with ?next=<where they were>. Holding
-  // it and handing it to /login is what keeps "sign back in and carry on where you left off" working now that
-  // the re-gate lands on the front door instead of the login form.
-  const [next, setNext] = useState("");
   // WHICH LAYOUT: the original floating influencer photos, or the six systems. Stored in the database so it
   // switches without a deploy. ?layout=cards / ?layout=systems previews the other one without changing what
   // the public sees.
@@ -109,12 +105,6 @@ export default function Landing() {
     // Read the session only to label the CTA. No redirect, so the "?signedout=1" guard that used to stop a
     // not-yet-cleared session bouncing you back to the dashboard is no longer needed: there is nothing to
     // bounce to.
-    if (typeof window !== "undefined") {
-      const n = new URLSearchParams(window.location.search).get("next") || "";
-      // Same-origin paths only - this value ends up in a redirect, so it must never become an open redirect.
-      if (n.startsWith("/") && !n.startsWith("//")) setNext(n);
-    }
-
     fetch("/api/auth/session", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => { if (!cancelled) setSignedIn(!!s?.user); })
@@ -275,7 +265,7 @@ export default function Landing() {
         )}
 
         <button
-          onClick={() => router.push(signedIn ? (next || "/dashboard") : `/login${next ? `?next=${encodeURIComponent(next)}` : ""}`)}
+          onClick={() => router.push(signedIn ? "/dashboard" : "/login")}
           style={{ padding: "clamp(15px, 3.6vw, 17px) clamp(36px, 11vw, 60px)", borderRadius: 980, maxWidth: "100%", background: "linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)", color: "#fff", fontSize: "clamp(15.5px, 4vw, 17px)", fontWeight: 700, letterSpacing: "-0.2px", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)", transition: "transform 0.18s, box-shadow 0.18s", border: "none", cursor: "pointer" }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.04) translateY(-2px)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(168,85,247,0.65), 0 8px 32px rgba(0,0,0,0.5)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1) translateY(0)"; e.currentTarget.style.boxShadow = "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)"; }}

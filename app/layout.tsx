@@ -23,13 +23,13 @@ export default function RootLayout({
         {/* Re-gate on hard refresh BEFORE paint: a reload of any signed-in page clears the session
             (via /api/relogin) and lands the user on the PUBLIC LANDING PAGE, with no flash of the page they
             were on. The front door, not the login form - being dropped straight onto a password prompt read
-            as "you have been kicked out" (Gary). The current path rides along as ?to= and is handed on to
-            /login when they choose to sign in, so they still return to the SAME page. Skips the homepage,
-            login and public share links so they never needlessly bounce. */}
+            as "you have been kicked out" (Gary). NOTHING is carried across - no ?next=, no query string on the
+            landing page - so the URL stays clean and the journey simply starts again. Skips the homepage,
+            login, reset and public share links so they never needlessly bounce. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=(performance&&performance.navigation&&performance.navigation.type);var r=(t===1);if(!r&&performance.getEntriesByType){var e=performance.getEntriesByType('navigation')[0];r=!!(e&&e.type==='reload');}var p=location.pathname;if(r&&p!=='/'&&p!=='/login'&&p.lastIndexOf('/api/',0)!==0&&p.lastIndexOf('/s/',0)!==0){location.replace('/api/relogin?to='+encodeURIComponent(location.pathname+location.search));}}catch(_){}})();",
+              "(function(){try{var t=(performance&&performance.navigation&&performance.navigation.type);var r=(t===1);if(!r&&performance.getEntriesByType){var e=performance.getEntriesByType('navigation')[0];r=!!(e&&e.type==='reload');}var p=location.pathname;if(r&&p!=='/'&&p!=='/login'&&p.lastIndexOf('/reset',0)!==0&&p.lastIndexOf('/invite',0)!==0&&p.lastIndexOf('/api/',0)!==0&&p.lastIndexOf('/s/',0)!==0){location.replace('/api/relogin');}}catch(_){}})();",
           }}
         />
       </head>
