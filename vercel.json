@@ -8,9 +8,25 @@
     }
   },
   "crons": [
-    { "path": "/api/cron/cost-audit", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/daily-cost-email", "schedule": "30 5 * * *" },
-    { "path": "/api/cron/higgsfield-tips", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/daily-intel", "schedule": "30 6 * * *" }
+    {
+      "path": "/api/cron/cost-audit",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/daily-cost-email",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron/higgsfield-tips",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/daily-intel",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-activity",
+      "schedule": "0 5 * * 1"
+    }
   ]
 }

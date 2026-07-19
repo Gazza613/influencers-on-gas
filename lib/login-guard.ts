@@ -17,6 +17,9 @@ import { db } from "./db";
 // Recording never throws into the caller: a throttle that takes sign-in down when the database hiccups is a
 // worse outage than the attack it prevents. It fails OPEN deliberately, and that trade is the right way round
 // for a tool used by one small team.
+//
+// The successful attempts recorded here are also the platform's LOGIN HISTORY, read by lib/activity for the
+// team adoption report. That is why the tidy-up below prunes failures and successes on different clocks.
 
 const WINDOW_MIN = 15;
 const MAX_PER_EMAIL = 8;
@@ -68,9 +71,14 @@ export async function recordAttempt(email: string, ip: string, ok: boolean): Pro
       await db().query(`delete from login_attempts where lower(email) = lower($1) and ok = false`, [email]);
     }
     await db().query(`insert into login_attempts (email, ip, ok) values ($1, $2, $3)`, [email, ip, ok]);
-    // Opportunistic tidy-up. The table is only ever read over a 15-minute window, so anything older than a day
-    // is dead weight; doing it here avoids needing a cron for a housekeeping job this small.
-    if (!ok) await db().query(`delete from login_attempts where at < now() - interval '1 day'`);
+    // Opportunistic tidy-up, FAILURES ONLY. The original swept the whole table after a day, which would have
+    // quietly destroyed the login history the team activity report is built on - successful sign-ins are the
+    // record of who is actually using the studio, and they are worth keeping. Failures are only ever read
+    // over a 15-minute window, so a day is already generous for them.
+    if (!ok) await db().query(`delete from login_attempts where ok = false and at < now() - interval '1 day'`);
+    // Successes are history, kept for six months. Long enough for any adoption question, short enough that we
+    // are not sitting on a year of who-signed-in-when for no reason.
+    if (ok) await db().query(`delete from login_attempts where ok = true and at < now() - interval '180 days'`);
   } catch {
     /* never break sign-in over an audit write */
   }

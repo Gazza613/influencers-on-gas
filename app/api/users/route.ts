@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const email = String(body.email ?? "").trim().toLowerCase();
   const name = typeof body.name === "string" ? body.name.trim() : undefined;
-  const role = body.role === "admin" ? "admin" : "producer";
+  const role = "producer"; // one admin only (Gary, from env) - see lib/users.inviteUser
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
   if (!isGasEmail(email)) return NextResponse.json({ error: "Access is for @gasmarketing.co.za only. For external access, email grow@gasmarketing.co.za." }, { status: 400 });
 
