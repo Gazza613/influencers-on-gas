@@ -52,6 +52,47 @@ const CARDS = [
   { right: "-18px", top: "72%", w: "clamp(148px, 14vw, 218px)", rot: "6deg", opacity: 0.86, period: 13, sway: 17, delay: 1.2 },
 ] as const;
 
+
+// FLOATING DOTS (Gary, after inngest.com - "but make a little more subtle").
+//
+// Their version is pure CSS, not a canvas: ~30 absolutely-positioned 1-2px spans in one orange, each drifting
+// on its own period with opacity animating between a per-dot min and max. Worth copying the technique exactly,
+// because it costs no JavaScript and no main-thread work - the compositor does all of it.
+//
+// TWO THINGS CHANGED FOR US:
+//   1. SUBTLER, as asked. Inngest sit at 0.10-0.20 resting and peak 0.35-0.55. Ours rest at 0.05-0.12 and peak
+//      0.16-0.30, roughly half. This page already carries five glows, a dot grid and a vignette, so dots at
+//      their intensity would read as noise on top of texture rather than depth.
+//   2. ORANGE AND WHITE, not orange alone. Orange every time would tip a dark navy page towards a warm cast;
+//      mixed roughly one in three, the orange reads as occasional embers and the white keeps it cool.
+//      (Orange is fine here: the "orange is the GAS mark alone" rule guards CLIENT creatives, not our own page.)
+//
+// POSITIONS ARE SEEDED, NEVER Math.random(). This component renders on the server and again on the client, and
+// a random layout would differ between the two - React would report a hydration mismatch and throw the markup
+// away. A fixed seed gives scatter that is stable everywhere.
+function seeded(seed: number) {
+  let x = seed;
+  return () => { x = (x * 1664525 + 1013904223) % 4294967296; return x / 4294967296; };
+}
+const DOTS = (() => {
+  const r = seeded(20260719);
+  return Array.from({ length: 30 }, () => {
+    const orange = r() < 0.34;                     // roughly one in three
+    const min = 0.05 + r() * 0.07;                 // resting opacity
+    return {
+      left: +(r() * 98).toFixed(2),
+      top: +(r() * 96).toFixed(2),
+      size: r() < 0.45 ? 2 : 1,
+      colour: orange ? "255,106,0" : "255,255,255",
+      min: +min.toFixed(3),
+      max: +(min + 0.11 + r() * 0.07).toFixed(3),
+      dur: +(7 + r() * 8).toFixed(1),
+      delay: +(r() * 7).toFixed(1),
+      drift: +(-9 - r() * 7).toFixed(1),           // upward travel, px
+    };
+  });
+})();
+
 type Inf = { status?: string; persona?: { hero_url?: string; hero_realism_url?: string; locked?: boolean } | null; look_refs?: { url: string; hero?: boolean }[] | null };
 // All usable photos for an influencer, hero first, then their other frames.
 function imagesOf(inf: Inf): string[] {
@@ -150,6 +191,19 @@ export default function Landing() {
       <div style={{ position: "absolute", width: 680, height: 680, bottom: "-24%", right: "8%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,132,252,0.10) 0%, transparent 70%)", animation: "orb5 31s ease-in-out infinite", pointerEvents: "none" }} />
       {/* Dot grid */}
       <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
+
+      {/* Drifting dots. aria-hidden and pointer-events:none - decoration a screen reader should never announce. */}
+      <div aria-hidden className="gas-dots" style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+        {DOTS.map((d, i) => (
+          <span key={i} style={{
+            position: "absolute", left: `${d.left}%`, top: `${d.top}%`,
+            width: d.size, height: d.size, borderRadius: "50%",
+            background: `rgb(${d.colour})`, opacity: d.min,
+            ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`,
+            animation: `gasDotDrift ${d.dur}s ease-in-out ${d.delay}s infinite`,
+          }} />
+        ))}
+      </div>
 
       {/* THE SIX SYSTEMS (or the original influencer photos), in the same six floating slots.
           The mapping is exact and that is the whole idea: there were already three cards down each side and
@@ -261,6 +315,13 @@ export default function Landing() {
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         @keyframes orb3 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(35px,-55px) scale(0.90)} 70%{transform:translate(-55px,22px) scale(1.08)} }
+        /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
+        @keyframes gasDotDrift {
+          0%, 100% { transform: translateY(0); opacity: var(--dot-min, 0.08) }
+          50%      { transform: translateY(var(--dot-drift, -12px)); opacity: var(--dot-max, 0.22) }
+        }
+        /* Motion off means motion off. The dots are pure decoration, so they simply do not render. */
+        @media (prefers-reduced-motion: reduce) { .gas-dots { display: none } }
         @keyframes orb4 { 0%,100%{transform:translate(0,0) scale(1)} 45%{transform:translate(-40px,30px) scale(1.09)} }
         @keyframes orb5 { 0%,100%{transform:translate(0,0) scale(1)} 55%{transform:translate(30px,-38px) scale(0.92)} }
         @keyframes cardFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-26px)} }
