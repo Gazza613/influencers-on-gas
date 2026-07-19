@@ -39,17 +39,21 @@ function useTypewriter() {
 
 // Six floating card slots (position, rotation, size, float timing).
 //
-// SIZES: scaled up ~40% from the originals (158/138/146/160/140/148), which came straight across from the
-// archived Vite build and always read small on a desktop monitor. They are declared in `vw` with a px floor
-// and ceiling, so they now GROW with the viewport instead of staying a fixed 158px on a 27-inch screen -
-// which is what made them feel like they had shrunk.
+// SIZES: a further 15% up (Gary), on top of the ~40% that took them off the archived Vite build's fixed
+// 158/138/146/160/140/148. Floor, growth rate and ceiling all move together, so they read bigger at every
+// viewport rather than only on a wide monitor - raising just the ceiling would have changed nothing on a
+// laptop, which is where they are actually looked at.
+//
+// This is a deliberate departure from the archive floors checked earlier: the archive sized them to sit
+// behind the headline as texture, and Gary wants them present. Their opacity is still the louder difference
+// if they ever start competing with the centre column.
 const CARDS = [
-  { left: "-30px", top: "6%", w: "clamp(158px, 15vw, 232px)", rot: "-9deg", opacity: 0.92, period: 8, sway: 11, delay: 0.0 },
-  { left: "26px", top: "43%", w: "clamp(138px, 13vw, 202px)", rot: "5deg", opacity: 0.78, period: 10, sway: 14, delay: 1.6 },
-  { left: "-16px", top: "74%", w: "clamp(146px, 14vw, 214px)", rot: "-5deg", opacity: 0.84, period: 12, sway: 16, delay: 0.8 },
-  { right: "-30px", top: "4%", w: "clamp(160px, 15vw, 236px)", rot: "10deg", opacity: 0.92, period: 9, sway: 13, delay: 0.4 },
-  { right: "22px", top: "42%", w: "clamp(140px, 13vw, 206px)", rot: "-7deg", opacity: 0.78, period: 11, sway: 15, delay: 2.0 },
-  { right: "-18px", top: "72%", w: "clamp(148px, 14vw, 218px)", rot: "6deg", opacity: 0.86, period: 13, sway: 17, delay: 1.2 },
+  { left: "-30px", top: "6%", w: "clamp(182px, 17vw, 267px)", rot: "-9deg", opacity: 0.92, period: 8, sway: 11, delay: 0.0 },
+  { left: "26px", top: "43%", w: "clamp(159px, 15vw, 232px)", rot: "5deg", opacity: 0.78, period: 10, sway: 14, delay: 1.6 },
+  { left: "-16px", top: "74%", w: "clamp(168px, 16vw, 246px)", rot: "-5deg", opacity: 0.84, period: 12, sway: 16, delay: 0.8 },
+  { right: "-30px", top: "4%", w: "clamp(184px, 17vw, 271px)", rot: "10deg", opacity: 0.92, period: 9, sway: 13, delay: 0.4 },
+  { right: "22px", top: "42%", w: "clamp(161px, 15vw, 237px)", rot: "-7deg", opacity: 0.78, period: 11, sway: 15, delay: 2.0 },
+  { right: "-18px", top: "72%", w: "clamp(170px, 16vw, 251px)", rot: "6deg", opacity: 0.86, period: 13, sway: 17, delay: 1.2 },
 ] as const;
 
 
