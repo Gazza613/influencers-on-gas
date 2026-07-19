@@ -64,9 +64,10 @@ const CARDS = [
 // because it costs no JavaScript and no main-thread work - the compositor does all of it.
 //
 // TWO THINGS CHANGED FOR US:
-//   1. SUBTLER, as asked. Inngest sit at 0.10-0.20 resting and peak 0.35-0.55. Ours rest at 0.05-0.12 and peak
-//      0.16-0.30, roughly half. This page already carries five glows, a dot grid and a vignette, so dots at
-//      their intensity would read as noise on top of texture rather than depth.
+//   1. SUBTLER, as asked - but SEEN. The first pass rested at 0.05-0.12 and peaked at 0.17-0.28, roughly half
+//      of Inngest, at 1-2px. That was not subtle, it was invisible: at 1px on a near-black field the eye
+//      cannot resolve a dot at 5% whatever else is happening. Now 2-3px, resting 0.10-0.18 and peaking
+//      0.28-0.46, so it still sits under Inngest's 0.35-0.55 peak while actually reading as motion.
 //   2. ORANGE AND WHITE, not orange alone. Orange every time would tip a dark navy page towards a warm cast;
 //      mixed roughly one in three, the orange reads as occasional embers and the white keeps it cool.
 //      (Orange is fine here: the "orange is the GAS mark alone" rule guards CLIENT creatives, not our own page.)
@@ -80,16 +81,18 @@ function seeded(seed: number) {
 }
 const DOTS = (() => {
   const r = seeded(20260719);
-  return Array.from({ length: 30 }, () => {
-    const orange = r() < 0.34;                     // roughly one in three
-    const min = 0.05 + r() * 0.07;                 // resting opacity
+  return Array.from({ length: 34 }, () => {
+    const orange = r() < 0.35;                     // roughly one in three
+    const min = 0.10 + r() * 0.08;                 // resting opacity
     return {
       left: +(r() * 98).toFixed(2),
       top: +(r() * 96).toFixed(2),
-      size: r() < 0.45 ? 2 : 1,
+      // NO 1px DOTS. At 1px a dot is sub-perceptual on a near-black page no matter its opacity, and the
+      // static grid behind it is already 1px at 5%. Size does more for visibility here than opacity does.
+      size: r() < 0.6 ? 2 : 3,
       colour: orange ? "255,106,0" : "255,255,255",
       min: +min.toFixed(3),
-      max: +(min + 0.11 + r() * 0.07).toFixed(3),
+      max: +(min + 0.18 + r() * 0.10).toFixed(3),
       dur: +(7 + r() * 8).toFixed(1),
       delay: +(r() * 7).toFixed(1),
       drift: +(-9 - r() * 7).toFixed(1),           // upward travel, px
@@ -203,6 +206,7 @@ export default function Landing() {
             position: "absolute", left: `${d.left}%`, top: `${d.top}%`,
             width: d.size, height: d.size, borderRadius: "50%",
             background: `rgb(${d.colour})`, opacity: d.min,
+            boxShadow: d.colour === "255,106,0" ? `0 0 ${d.size * 3}px rgba(255,106,0,0.55)` : undefined,
             ["--dot-min" as string]: d.min, ["--dot-max" as string]: d.max, ["--dot-drift" as string]: `${d.drift}px`,
             animation: `gasDotDrift ${d.dur}s ease-in-out ${d.delay}s infinite`,
           }} />
