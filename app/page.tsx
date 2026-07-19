@@ -86,31 +86,37 @@ function seeded(seed: number) {
 }
 const DOTS = (() => {
   const r = seeded(20260719);
-  return Array.from({ length: 120 }, () => {
-    // BRIGHTNESS FOLLOWS A POWER LAW, not a flat range. A real sky is mostly faint stars with a handful of
-    // bright ones; an even spread of brightness is the single thing that makes a star field look generated.
-    const mag = Math.pow(r(), 2.4);               // 0 = faint and common, 1 = brilliant and rare
-    const min = 0.10 + mag * 0.34;
-    // SIZE FOLLOWS BRIGHTNESS. Stars are points of light - a bright one looks bigger only because it blooms,
-    // so decoupling the two reads as dots of assorted sizes rather than as stars at assorted distances.
-    const size = mag > 0.86 ? 4 : mag > 0.62 ? 3 : mag > 0.3 ? 2 : 1.5;
-    // COLOUR TEMPERATURE. All white, as asked, but not all the SAME white: real stars run blue-white through
-    // to warm, and that faint variation is most of what sells a night sky. Pure white dominates.
-    const t = r();
-    const colour = t < 0.7 ? "255,255,255" : t < 0.88 ? "202,215,255" : "255,241,224";
-    return {
-      left: +(r() * 99).toFixed(2),
-      top: +(r() * 97).toFixed(2),
-      size, colour,
-      min: +min.toFixed(3),
-      max: +(min + 0.22 + mag * 0.34).toFixed(3),
-      // Bright stars twinkle slower than faint ones, which is the other half of looking real.
-      dur: +(3.5 + r() * 4.5 + mag * 3).toFixed(1),
-      delay: +(r() * 6).toFixed(1),
-      drift: +(-22 - r() * 34).toFixed(1),
-      glow: mag > 0.62,                            // only the brighter stars carry a halo
-    };
-  });
+  // STRATIFIED, NOT RANDOM. Pure random scatter always clumps and leaves bare patches - which is exactly why
+  // the centre column and the space under the CTA looked empty while the edges looked busy. Dividing the page
+  // into a grid and placing one star per cell, jittered inside it, guarantees even coverage everywhere while
+  // still looking scattered. This is the standard fix for exactly this artefact.
+  const COLS = 16, ROWS = 15;                      // 240 cells, one star each
+  const out = [];
+  for (let cy = 0; cy < ROWS; cy++) {
+    for (let cx = 0; cx < COLS; cx++) {
+      // BRIGHTNESS ON A POWER LAW: mostly faint, a rare few brilliant. An even spread is the single thing
+      // that makes a star field look generated.
+      const mag = Math.pow(r(), 2.4);
+      const min = 0.13 + mag * 0.34;
+      // SIZE FOLLOWS BRIGHTNESS - a star looks bigger only because it blooms.
+      const size = mag > 0.86 ? 4 : mag > 0.62 ? 3 : mag > 0.3 ? 2 : 1.5;
+      // COLOUR TEMPERATURE: all white, but not the same white. Pure dominates, some blue-white, a few warm.
+      const t = r();
+      const colour = t < 0.7 ? "255,255,255" : t < 0.88 ? "202,215,255" : "255,241,224";
+      out.push({
+        left: +(((cx + 0.12 + r() * 0.76) / COLS) * 100).toFixed(2),
+        top: +(((cy + 0.12 + r() * 0.76) / ROWS) * 100).toFixed(2),
+        size, colour,
+        min: +min.toFixed(3),
+        max: +(min + 0.22 + mag * 0.34).toFixed(3),
+        dur: +(4 + r() * 5 + mag * 3).toFixed(1),
+        delay: +(r() * 9).toFixed(1),              // spread wide so the field never pulses together
+        drift: +(-26 - r() * 38).toFixed(1),
+        glow: mag > 0.62,
+      });
+    }
+  }
+  return out;
 })();
 
 type Inf = { status?: string; persona?: { hero_url?: string; hero_realism_url?: string; locked?: boolean } | null; look_refs?: { url: string; hero?: boolean }[] | null };
@@ -357,9 +363,15 @@ export default function Landing() {
         @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
         /* Drift up and fade in, then back. Opacity reads the per-dot vars so every dot has its own range. */
+        /* ALWAYS UPWARD (Gary). The previous version peaked at 50% and returned to its origin, which meant
+           the second half of every cycle was a descent. This travels one way for the whole cycle and fades in
+           and out at the ends, so a star is never seen falling and the loop point is invisible. */
         @keyframes gasDotDrift {
-          0%, 100% { transform: translate3d(0, 0, 0) scale(0.8); opacity: var(--dot-min, 0.08) }
-          50%      { transform: translate3d(0, var(--dot-drift, -12px), 0) scale(1.25); opacity: var(--dot-max, 0.22) }
+          0%   { transform: translate3d(0, 0, 0) scale(0.75); opacity: 0 }
+          18%  { opacity: var(--dot-min, 0.1) }
+          52%  { transform: translate3d(0, calc(var(--dot-drift, -30px) * 0.55), 0) scale(1.2); opacity: var(--dot-max, 0.4) }
+          82%  { opacity: var(--dot-min, 0.1) }
+          100% { transform: translate3d(0, var(--dot-drift, -30px), 0) scale(0.75); opacity: 0 }
         }
         /* Idle, then a fast streak, then idle again. Keeping the visible window to 6% of the cycle is what
            makes it feel occasional rather than like something on a loop. */
