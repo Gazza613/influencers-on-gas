@@ -47,10 +47,10 @@ export async function getUserByEmail(email: string): Promise<(AppUser & { passwo
 // Create or refresh an invite. Returns the raw token to embed in the email link.
 export async function inviteUser(o: { email: string; name?: string; role?: string }): Promise<string> {
   const token = randomBytes(24).toString("hex");
-  // EVERY INVITE IS A MEMBER. There is one admin, Gary, and he authenticates from the environment rather than
-  // from this table - so there is no path by which an invite should ever create elevated access, whatever the
-  // caller posts.
-  const role = "producer";
+  // Member by default; admin only when explicitly asked for. Only a super admin can reach this at all, so the
+  // decision is always Gary's. "admin" is a REAL role now - it manages the team - rather than the cosmetic
+  // label it used to be, which was assigned here and never checked anywhere.
+  const role = o.role === "admin" ? "admin" : "producer";
   await db().query(
     `insert into users (email, name, role, status, invite_token, invite_expires)
      values ($1,$2,$3,'invited',$4, now() + interval '7 days')

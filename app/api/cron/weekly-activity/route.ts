@@ -43,9 +43,9 @@ export async function GET(req: Request) {
     // Everyone is listed, busiest first. A quiet week is the finding, so nobody is hidden for having one.
     const rows = a.members.map((m) => {
       const desks = m.desks.slice(0, 2).map((d) => `${esc(d.desk.replace(" on GAS", ""))} ${d.jobs}`).join(" · ") || "—";
-      const when = m.neverSignedIn
-        ? `<span style="color:#fbbf24;">did not sign in</span>`
-        : `last in ${esc(m.lastLogin)} · ${m.logins} sign-in${m.logins === 1 ? "" : "s"}`;
+      const when = m.sessions === 0
+        ? `<span style="color:#fbbf24;">not seen this week</span>`
+        : `${m.daysActive} day${m.daysActive === 1 ? "" : "s"} active · ${m.sessions} session${m.sessions === 1 ? "" : "s"}${m.typicalDay ? ` · typically ${esc(m.typicalDay)}` : ""}`;
       return `
       <tr>
         <td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);">
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
            <b style="color:#fbbf24;">Not seen this week:</b> ${a.quietest.map((m) => esc(m.name || m.email)).join(", ")}.
            Worth a nudge if they were expected to be building.
          </p>`
-      : `<p class="p" style="font-size:13px;line-height:1.7;color:#86efac;margin:16px 0 0;">Everyone on the team signed in this week.</p>`;
+      : `<p class="p" style="font-size:13px;line-height:1.7;color:#86efac;margin:16px 0 0;">Everyone on the team was active this week.</p>`;
 
     const body = `
       <p class="p" style="font-size:14px;line-height:1.7;color:#9aa0a8;margin:0 0 14px;">
@@ -74,8 +74,8 @@ export async function GET(req: Request) {
 
       <table role="presentation" width="100%" cellpadding="0" cellspacing="6" style="margin:0 0 6px;">
         <tr>
-          ${stat("Adoption", `${t.activeMembers}/${t.teamSize}`, "signed in")}
-          ${stat("Sign-ins", String(t.logins))}
+          ${stat("Adoption", `${t.activeMembers}/${t.teamSize}`, "were active")}
+          ${stat("Sessions", String(t.sessions), "visits to the studio")}
         </tr>
         <tr>
           ${stat("Jobs run", String(t.jobs))}
@@ -94,6 +94,9 @@ export async function GET(req: Request) {
       </table>
 
       <p class="small" style="font-size:11px;line-height:1.6;color:#6f757e;margin:18px 0 0;">
+        Sessions are visits to the studio, counted as activity with no gap longer than 30 minutes. We do not
+        track time at a desk, so this reports how often and how regularly people come in, not hours worked.
+        <br /><br />
         Studio on GAS only. Media on GAS is a separate product with its own team controls and its own reporting,
         so its activity is not included here and this is not a view of it.
       </p>`;

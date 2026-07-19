@@ -11,12 +11,20 @@ export const dynamic = "force-dynamic";
 async function gate(id: string) {
   const session = await auth();
   if (!session?.user) return { error: "Unauthorized", status: 401 as const };
-  if (session.user.role !== "super_admin") return { error: "Super admin only", status: 403 as const };
+  if (session.user.role !== "super_admin" && session.user.role !== "admin") {
+    return { error: "Admins only", status: 403 as const };
+  }
+  const target = (await listUsers().catch(() => [])).find((u) => u.id === id);
+
+  // A team admin may not touch a super admin. Otherwise the person you promoted could suspend you, and the
+  // account that authenticates from the environment is the one that can put everything right again.
+  if (session.user.role === "admin" && target?.role === "super_admin") {
+    return { error: "You cannot change a super admin.", status: 403 as const };
+  }
 
   // SELF-PROTECTION. Suspending or deleting your own account would now revoke the session you are holding on
   // the very next click, and there is no second super admin to undo it. The database would be perfectly fine
   // and the studio would be unreachable. This became a real risk the moment revocation started working.
-  const target = (await listUsers().catch(() => [])).find((u) => u.id === id);
   if (target && target.email.toLowerCase() === String(session.user.email ?? "").toLowerCase()) {
     return { error: "You cannot suspend or remove your own account.", status: 400 as const };
   }

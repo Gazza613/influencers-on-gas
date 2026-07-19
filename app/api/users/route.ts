@@ -10,7 +10,11 @@ export const maxDuration = 30;
 async function requireSuperAdmin() {
   const session = await auth();
   if (!session?.user) return { error: "Unauthorized", status: 401 as const };
-  if (session.user.role !== "super_admin") return { error: "Super admin only", status: 403 as const };
+  // Team management is the ONE thing a team admin can do that a member cannot. Platform configuration -
+  // connected tools, brains, the landing layout - stays super-admin only and is unaffected by this.
+  if (session.user.role !== "super_admin" && session.user.role !== "admin") {
+    return { error: "Admins only", status: 403 as const };
+  }
   return { session };
 }
 
@@ -27,7 +31,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const email = String(body.email ?? "").trim().toLowerCase();
   const name = typeof body.name === "string" ? body.name.trim() : undefined;
-  const role = "producer"; // one admin only (Gary, from env) - see lib/users.inviteUser
+  const role = body.role === "admin" ? "admin" : "producer";
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
   if (!isGasEmail(email)) return NextResponse.json({ error: "Access is for @gasmarketing.co.za only. For external access, email grow@gasmarketing.co.za." }, { status: 400 });
 

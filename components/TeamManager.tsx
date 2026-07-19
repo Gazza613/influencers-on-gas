@@ -4,14 +4,18 @@ import { useEffect, useState } from "react";
 import { askConfirm } from "@/lib/confirm";
 
 type User = { id: string; email: string; name: string | null; role: string; status: string; created_at: string; suspended_at?: string | null };
-type Member = { email: string; name: string | null; logins: number; failed: number; lastLogin: string | null; jobs: number; cents: number; desks: { desk: string; jobs: number }[]; neverSignedIn: boolean };
-type Activity = { from: string; to: string; members: Member[]; totals: { logins: number; jobs: number; cents: number; activeMembers: number; teamSize: number } };
+type Member = { email: string; name: string | null; logins: number; failed: number; lastLogin: string | null; jobs: number; cents: number; desks: { desk: string; jobs: number }[]; neverSignedIn: boolean; sessions: number; daysActive: number; typicalDay: string | null };
+type Activity = { from: string; to: string; members: Member[]; totals: { sessions: number; logins: number; jobs: number; cents: number; activeMembers: number; teamSize: number } };
 const rand = (c: number) => "R" + (c / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// There is exactly ONE admin (Gary), and it comes from the environment, not from this table. The old "admin"
-// role was cosmetic - assigned here, never checked anywhere - so it told people they had powers they did not
-// have. Kept in the map only so any existing row still renders honestly.
-const ROLE_LABEL: Record<string, string> = { super_admin: "Admin (you)", admin: "Member", producer: "Member" };
+// THREE LEVELS, and each one now means something:
+//   super_admin - Gary, from the environment. Everything, including platform config and connected tools.
+//   admin       - can manage the team: invite, suspend, remove, and see activity. Nothing else changes.
+//   producer    - a member. Uses the studio, sees Cost Control, cannot manage anyone.
+//
+// "admin" used to be assigned here and checked nowhere, so it promised powers it did not grant. It is a real
+// role now, which is what makes it safe to offer in the invite form again.
+const ROLE_LABEL: Record<string, string> = { super_admin: "Admin (you)", admin: "Team admin", producer: "Member" };
 
 export default function TeamManager() {
   const [users, setUsers] = useState<User[] | null>(null);
@@ -93,6 +97,7 @@ export default function TeamManager() {
             className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none focus:border-[#a855f7]" />
           <select value={role} onChange={(e) => setRole(e.target.value)} className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none">
             <option value="producer">Member</option>
+            <option value="admin">Team admin</option>
           </select>
           <button onClick={invite} disabled={busy || !email.trim()} className="btn-brand rounded-lg px-5 py-2.5 text-lg font-bold disabled:opacity-50">
             {busy ? "Sending…" : "Send invite →"}
@@ -159,7 +164,7 @@ export default function TeamManager() {
           </div>
           <p className="mt-2 text-lg text-ink-dim">
             {act.from} to {act.to} · <b className="text-ink">{act.totals.activeMembers} of {act.totals.teamSize}</b> signed in ·
-            {" "}{act.totals.logins} sign-ins · {act.totals.jobs} jobs · {rand(act.totals.cents)}
+            {" "}{act.totals.sessions} sessions · {act.totals.jobs} jobs · {rand(act.totals.cents)}
           </p>
 
           <div className="mt-3 overflow-hidden rounded-xl border border-line bg-surface-1">
@@ -170,9 +175,9 @@ export default function TeamManager() {
                     <td className="px-4 py-3.5">
                       <div className="text-lg font-semibold text-ink">{m.name || m.email}</div>
                       <div className="text-[14px] text-ink-faint">
-                        {m.neverSignedIn
-                          ? <span className="text-active">no sign-in in this window</span>
-                          : <>last in {m.lastLogin} · {m.logins} sign-in{m.logins === 1 ? "" : "s"}</>}
+                        {m.sessions === 0
+                          ? <span className="text-active">not seen in this window</span>
+                          : <>{m.daysActive} day{m.daysActive === 1 ? "" : "s"} active · {m.sessions} session{m.sessions === 1 ? "" : "s"}{m.typicalDay ? ` · typically ${m.typicalDay}` : ""}</>}
                         {m.failed > 0 && <span className="text-alert"> · {m.failed} failed</span>}
                       </div>
                     </td>
