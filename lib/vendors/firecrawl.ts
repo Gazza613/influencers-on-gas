@@ -103,12 +103,26 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
 // always worked. A site without a sitemap falls back to the crawler.
 export async function sitemapUrls(siteUrl: string, includePath?: string | null): Promise<string[]> {
   const origin = new URL(siteUrl).origin;
+
+  // INFER THE SCOPE FROM THE ADDRESS when none was typed. Giving the crawler ".../blog" plainly means "the
+  // blog", and making someone repeat that in a second field is a trap: leave it blank and the whole site
+  // comes in, which is the opposite of what they asked for. An explicit path still wins.
+  //
+  // The path is taken AS TYPED, deliberately not after following redirects. Following them looked like the
+  // careful choice and is exactly wrong here: /blog 301s to /articles on this site, while the articles
+  // themselves live at /blog/... - so resolving the redirect would scope to /articles and select nothing.
+  // What someone types is what they mean.
+  let scope = includePath;
+  if (!scope) {
+    const trimmed = new URL(siteUrl).pathname.replace(/^\/+|\/+$/g, "");
+    if (trimmed) scope = trimmed;
+  }
   const res = await fetch(`${origin}/sitemap.xml`, { headers: { "User-Agent": "FirecrawlAgent" } });
   if (!res.ok) return [];
   const xml = await res.text();
   const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
 
-  const want = includePath ? `/${includePath.replace(/^\/+|\/+$/g, "")}/` : null;
+  const want = scope ? `/${scope.replace(/^\/+|\/+$/g, "")}/` : null;
   return [...new Set(urls)]
     .filter((u) => u.startsWith(origin))
     // The path filter, applied to the URL itself rather than trusted to a crawler's scoping.
