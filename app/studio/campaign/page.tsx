@@ -136,7 +136,7 @@ export default function CampaignPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-        <Link href="/studio" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
+        <Link href="/studio" className="text-base font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Funnel campaign</h1>
         <p className="mt-1 text-[17px] leading-relaxed text-ink-dim">
           Tell the Producer what the campaign is. It designs the whole funnel: 1 masthead, 1 section 1, 3 sliders,
@@ -256,7 +256,7 @@ export default function CampaignPage() {
               <div key={c.key} className="rounded-2xl border border-line bg-surface-1 p-5">
                 <div className="flex items-baseline justify-between">
                   <p className="text-base font-bold">{c.title}</p>
-                  <span className="text-sm text-ink-dim">no baked headline · Webflow supplies the copy</span>
+                  <span className="text-base text-ink-dim">no baked headline · Webflow supplies the copy</span>
                 </div>
                 <textarea value={txt(c.prompt)} onChange={(e) => c.set(e.target.value)} rows={3}
                   className="mt-2 w-full rounded-lg border border-line bg-surface-2 p-3 text-[17px] leading-relaxed outline-none focus:border-accent" />
@@ -273,7 +273,7 @@ export default function CampaignPage() {
               <div key={i} className="rounded-2xl border border-line bg-surface-1 p-5">
                 <div className="flex items-baseline justify-between">
                   <p className="text-base font-bold">Slider {i + 1} · 1080×1080</p>
-                  <span className="text-sm text-ink-dim tabular">{dealLine(s.deal)}</span>
+                  <span className="text-base text-ink-dim tabular">{dealLine(s.deal)}</span>
                 </div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <input value={txt(s.headline1)} onChange={(e) => edit((p) => { p.sliders[i].headline1 = e.target.value; })}
@@ -296,33 +296,33 @@ export default function CampaignPage() {
                 <p className="text-[15px] font-semibold uppercase tracking-widest text-ink-dim">Page copy (Webflow)</p>
                 <button
                   onClick={() => navigator.clipboard?.writeText(webflowText(plan))}
-                  className="text-sm font-semibold text-ink-dim underline hover:text-ink">Copy all</button>
+                  className="text-base font-semibold text-ink-dim underline hover:text-ink">Copy all</button>
               </div>
 
-              <p className="mt-4 text-sm font-semibold uppercase tracking-wider text-ink-faint">Hero headline · sits beside the masthead</p>
+              <p className="mt-4 text-base font-semibold uppercase tracking-wider text-ink-faint">Hero headline · sits beside the masthead</p>
               <input value={txt(plan.webflow?.heroHeadline)}
                 onChange={(e) => edit((p) => { p.webflow.heroHeadline = e.target.value; })}
                 className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg font-bold outline-none focus:border-accent" />
 
-              <p className="mt-4 text-sm font-semibold uppercase tracking-wider text-ink-faint">Hero subheads</p>
+              <p className="mt-4 text-base font-semibold uppercase tracking-wider text-ink-faint">Hero subheads</p>
               {arr<unknown>(plan.webflow?.heroSubheads).map((h, i) => (
                 <input key={i} value={txt(h)}
                   onChange={(e) => edit((p) => { p.webflow.heroSubheads[i] = e.target.value; })}
                   className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-[17px] leading-relaxed outline-none focus:border-accent" />
               ))}
 
-              <p className="mt-4 text-sm font-semibold uppercase tracking-wider text-ink-faint">Section 1 headline · sits beside the deal cards</p>
+              <p className="mt-4 text-base font-semibold uppercase tracking-wider text-ink-faint">Section 1 headline · sits beside the deal cards</p>
               <input value={txt(plan.webflow?.section1Headline)}
                 onChange={(e) => edit((p) => { p.webflow.section1Headline = e.target.value; })}
                 className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg font-bold outline-none focus:border-accent" />
 
-              <p className="mt-4 text-sm font-semibold uppercase tracking-wider text-ink-faint">Section 1 body</p>
+              <p className="mt-4 text-base font-semibold uppercase tracking-wider text-ink-faint">Section 1 body</p>
               <textarea value={txt(plan.webflow?.section1Body)} rows={4}
                 onChange={(e) => edit((p) => { p.webflow.section1Body = e.target.value; })}
                 className="mt-1 w-full rounded-lg border border-line bg-surface-2 p-3 text-[17px] leading-relaxed outline-none focus:border-accent" />
 
               {/* The Producer has always written this and the page silently threw it away. */}
-              <p className="mt-4 text-sm font-semibold uppercase tracking-wider text-ink-faint">Slider subhead · introduces the three sliders</p>
+              <p className="mt-4 text-base font-semibold uppercase tracking-wider text-ink-faint">Slider subhead · introduces the three sliders</p>
               <input value={txt(plan.webflow?.sliderSubhead)}
                 onChange={(e) => edit((p) => { p.webflow.sliderSubhead = e.target.value; })}
                 className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-[17px] outline-none focus:border-accent" />
@@ -335,12 +335,12 @@ export default function CampaignPage() {
                 {/* Segments matter in rand: one non-GSM-7 character drops the segment from 160 chars to 70. */}
                 {/* The count is of the ASSEMBLED message - link, queries number and FSP tail included -
                     because that is what actually gets billed. 190 is the client's ceiling. */}
-                <span className={`text-sm tabular ${(Number(plan.sms?.chars) || 0) > 190 || !plan.sms?.gsm7 ? "font-bold text-red-400" : "text-ink-dim"}`}>
+                <span className={`text-base tabular ${(Number(plan.sms?.chars) || 0) > 190 || !plan.sms?.gsm7 ? "font-bold text-red-400" : "text-ink-dim"}`}>
                   {Number(plan.sms?.chars) || 0}/190 chars · {(Number(plan.sms?.chars) || 0) <= 160 ? "1 segment" : "2 segments"}{plan.sms?.gsm7 ? "" : " · NOT GSM-7"}
                 </span>
               </div>
               <p className="mt-2 font-mono text-[17px] leading-relaxed">{txt(plan.sms?.assembled)}</p>
-              <p className="mt-2 text-sm text-ink-dim">
+              <p className="mt-2 text-base text-ink-dim">
                 Only the selling line is written by the Producer. The link, the queries number and the
                 FSP tail are fixed furniture and are appended automatically.
               </p>
@@ -383,8 +383,8 @@ export default function CampaignPage() {
                 <div key={i} className="rounded-2xl border border-line bg-surface-1 p-3">
                   {c.url
                     ? <a href={c.url} target="_blank" rel="noreferrer"><img src={c.url} alt="" className="w-full rounded-lg" /></a>
-                    : <p className="p-6 text-center text-sm text-red-400">{txt(c.error) || "did not render"}</p>}
-                  <p className="mt-2 flex items-baseline justify-between text-sm text-ink-dim">
+                    : <p className="p-6 text-center text-base text-red-400">{txt(c.error) || "did not render"}</p>}
+                  <p className="mt-2 flex items-baseline justify-between text-base text-ink-dim">
                     <span className="font-semibold uppercase tracking-wider">{c.kind}{c.kind === "slider" ? ` ${c.index + 1}` : ""}</span>
                     <span className="tabular">{c.width}×{c.height} · {(c.bytes / 1024).toFixed(0)}KB</span>
                   </p>
@@ -392,7 +392,7 @@ export default function CampaignPage() {
               ))}
             </div>
             {warnings.length > 0 && (
-              <ul className="mt-4 space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-300">
+              <ul className="mt-4 space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-base text-amber-300">
                 {warnings.map((w, i) => <li key={i}>• {txt(w)}</li>)}
               </ul>
             )}

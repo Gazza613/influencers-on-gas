@@ -62,7 +62,7 @@ function WorkingInline({ label }: { label: string }) {
     <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-xl border border-dashed border-line bg-surface-2/60 px-6 py-8 text-center" role="status" aria-live="polite">
       <Spinner className="h-6 w-6 text-accent" />
       <p className="text-base font-bold text-ink">{label}</p>
-      <p className="text-sm text-ink-dim">{WORKING_LINES[i]}</p>
+      <p className="text-base text-ink-dim">{WORKING_LINES[i]}</p>
       <p className="text-[14px] text-ink-dim/70">Carry on with the other sections - this keeps running.</p>
     </div>
   );
@@ -352,8 +352,8 @@ export default function BuilderPage() {
       <AppHeader />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         <div className="flex items-center justify-between">
-          <Link href="/studio" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
-          <button onClick={startNext} className="rounded-lg border border-line px-3 py-1.5 text-sm font-bold text-ink-dim hover:border-ink-dim hover:text-ink">↻ Start next campaign</button>
+          <Link href="/studio" className="text-base font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
+          <button onClick={startNext} className="rounded-lg border border-line px-3 py-1.5 text-base font-bold text-ink-dim hover:border-ink-dim hover:text-ink">↻ Start next campaign</button>
         </div>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Funnel builder</h1>
         <p className="mt-1 text-[17px] leading-relaxed text-ink-dim">
@@ -389,7 +389,7 @@ export default function BuilderPage() {
               {busy.brief ? "Reading…" : "Sharpen the brief"}
             </button>
           </div>
-          <p className="mt-2 text-sm text-ink-faint">The experts plan, pick your best designs, generate and finish all five. Your team co-pilots below - rerun, edit or accept any creative.</p>
+          <p className="mt-2 text-base text-ink-faint">The experts plan, pick your best designs, generate and finish all five. Your team co-pilots below - rerun, edit or accept any creative.</p>
           {theme && (
             <p className="mt-3 text-base text-ink-dim">
               <span className="font-bold text-ink">{theme}</span> — the Producer has filled in who should be in
@@ -415,7 +415,7 @@ export default function BuilderPage() {
           const options = refsFor(sec.match);
           return (
             <section key={sec.key} className="mt-8">
-              <h2 className="text-xl font-bold">{sec.title}</h2>
+              <h2 className="text-3xl font-bold">{sec.title}</h2>
               <p className="mt-0.5 text-base text-ink-dim">{sec.hint}</p>
 
               {Array.from({ length: sec.count }).map((_, slot) => {
@@ -445,7 +445,7 @@ export default function BuilderPage() {
                       ))}
                     </div>
 
-                    <label className="mt-3 block text-sm font-semibold uppercase tracking-wider text-ink-faint">Who should be in it? (bring the theme in)</label>
+                    <label className="mt-3 block text-base font-semibold uppercase tracking-wider text-ink-faint">Who should be in it? (bring the theme in)</label>
                     <input value={subject[slotKey] || ""} onChange={(e) => setSubject((x) => ({ ...x, [slotKey]: e.target.value }))}
                       placeholder="e.g. a mother and her adult daughter smiling together"
                       className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] outline-none focus:border-accent" />
@@ -457,7 +457,7 @@ export default function BuilderPage() {
                           2. type a dynamic deal, which we TYPESET in the client's own card design - every
                              character exact, because we set the type (Gary: "deals are dynamic from the client"). */}
                       <div className="sm:col-span-2">
-                        <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Deal card / pill (top right)</label>
+                        <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Deal card / pill (top right)</label>
                         <div className="mt-1 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface-2 p-1.5">
                           <button onClick={() => setCardSel((x) => ({ ...x, [slotKey]: "" }))}
                             className={`rounded border px-2 py-1 text-[14px] font-bold ${!cardSel[slotKey] ? "border-accent text-accent" : "border-line text-ink-dim"}`}>
@@ -475,7 +475,7 @@ export default function BuilderPage() {
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">…or type a deal (we typeset it)</label>
+                        <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">…or type a deal (we typeset it)</label>
                         <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                           <input value={custom[slotKey]?.label || ""} onChange={(e) => setCustomField(slotKey, "label", e.target.value)}
                             disabled={!!cardSel[slotKey]} placeholder="Social Pass"
@@ -512,21 +512,21 @@ export default function BuilderPage() {
                           stop matching the Webflow section they drop into. */}
                       {sec.key === "slider" ? (
                         <div>
-                          <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Setting / background</label>
+                          <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Setting / background</label>
                           <input value={scene[slotKey] || ""} onChange={(e) => setScene((x) => ({ ...x, [slotKey]: e.target.value }))}
                             placeholder="Keep the design's"
                             className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent" />
                         </div>
                       ) : (
                         <div>
-                          <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Background</label>
+                          <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Background</label>
                           <p className="mt-1 rounded-lg border border-dashed border-line px-2.5 py-2 text-[14px] text-ink-dim/80">
                             Locked to the funnel {sec.key === "section1" ? "white" : "navy"} so it drops into Webflow seamlessly.
                           </p>
                         </div>
                       )}
                       <div>
-                        <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Phone in shot</label>
+                        <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Phone in shot</label>
                         <select value={phone[slotKey] || ""} onChange={(e) => setPhone((x) => ({ ...x, [slotKey]: e.target.value }))}
                           className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent">
                           <option value="">Keep the design&apos;s</option>
@@ -537,7 +537,7 @@ export default function BuilderPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Callout to change</label>
+                        <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Callout to change</label>
                         <input value={callout[slotKey] || ""} onChange={(e) => setCallout((x) => ({ ...x, [slotKey]: e.target.value }))}
                           placeholder="e.g. Happy Mother's Day"
                           className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent" />
@@ -570,15 +570,15 @@ export default function BuilderPage() {
                         <button onClick={() => setLightbox(s.url)} className="group relative block w-full max-w-md" title="Open full screen">
                           <img src={s.url} alt="" className={`w-full rounded-lg border-2 ${s.status === "accepted" ? "border-[#4ade80]" : "border-line"}`}
                             style={sec.key === "section1" ? { background: "#fff" } : undefined} />
-                          <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-sm font-bold text-white opacity-0 transition group-hover:opacity-100">⤢ Open</span>
+                          <span className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-base font-bold text-white opacity-0 transition group-hover:opacity-100">⤢ Open</span>
                         </button>
-                        {s.status === "accepted" && <p className="mt-1 text-sm font-bold text-[#86efac]">✓ Accepted</p>}
+                        {s.status === "accepted" && <p className="mt-1 text-base font-bold text-[#86efac]">✓ Accepted</p>}
 
                         {/* EDIT WHAT LANDED (Gary) - tweak this exact creative instead of re-rolling it.
                             The logo and the chosen deal card are re-stamped after the edit, so iterating
                             can never garble them. */}
                         <div className="mt-2 w-full max-w-md">
-                          <label className="block text-sm font-semibold uppercase tracking-wider text-ink-faint">Change something on this image</label>
+                          <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Change something on this image</label>
                           <div className="mt-1 flex gap-2">
                             <input
                               value={edit[slotKey] || ""}
@@ -614,7 +614,7 @@ export default function BuilderPage() {
             </button>
           )}
           {deals.length > 0 && (
-            <p className="mt-2 text-sm text-ink-faint">Deal library available for the offer step: {deals.slice(0, 4).map(dealText).join("  ·  ")}{deals.length > 4 ? " …" : ""}</p>
+            <p className="mt-2 text-base text-ink-faint">Deal library available for the offer step: {deals.slice(0, 4).map(dealText).join("  ·  ")}{deals.length > 4 ? " …" : ""}</p>
           )}
         </div>
       </main>

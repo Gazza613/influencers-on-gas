@@ -23,7 +23,7 @@ export default function GasStudioPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-        <Link href="/dashboard" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
+        <Link href="/dashboard" className="text-base font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
 
         <div className="mt-4 flex items-center gap-3">
           <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
@@ -79,11 +79,11 @@ export default function GasStudioPage() {
           anything ships.
         </p>
 
-        <h2 className="mt-8 text-sm font-bold uppercase tracking-[0.2em] text-ink-faint">What&apos;s coming, in order</h2>
+        <h2 className="mt-8 text-base font-bold uppercase tracking-[0.2em] text-ink-faint">What&apos;s coming, in order</h2>
         <ol className="mt-3 space-y-2">
           {PHASES.map((p) => (
             <li key={p.n} className="flex gap-3 rounded-xl border border-line bg-surface-1 px-4 py-3">
-              <span className="tabular mt-0.5 h-6 w-6 shrink-0 rounded-full border border-line text-center text-sm font-bold leading-6 text-ink-faint">{p.n}</span>
+              <span className="tabular mt-0.5 h-6 w-6 shrink-0 rounded-full border border-line text-center text-base font-bold leading-6 text-ink-faint">{p.n}</span>
               <div>
                 <p className="text-[17px] font-bold text-ink">{p.title}</p>
                 <p className="mt-0.5 text-[15px] leading-relaxed text-ink-dim">{p.detail}</p>

@@ -15,7 +15,7 @@ export default async function StudioIntakePage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
-        <Link href="/studio" className="text-xs font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
+        <Link href="/studio" className="text-sm font-semibold text-ink-dim transition hover:text-ink">← GAS Studio</Link>
         <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Template intake</h1>
         <p className="mt-1.5 text-[15px] leading-relaxed text-ink-dim">
           Upload the set your team designed by hand. Nothing here is invented: every template is recreated
