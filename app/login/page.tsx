@@ -51,31 +51,31 @@ export default function LoginPage() {
 
       <div className="relative z-10 flex w-full max-w-[480px] flex-col items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/gas-logo.png" alt="GAS" className="login-logo rounded-full" style={{ width: "clamp(104px, 26vw, 158px)", height: "clamp(104px, 26vw, 158px)", filter: "drop-shadow(0 12px 40px rgba(255,90,30,0.55))" }} />
-        <h1 className="mt-7 inline-flex items-baseline gap-[0.32em] font-extrabold" style={{ fontSize: "clamp(19px, 4.6vw, 30px)", letterSpacing: "0.08em" }}>
+        <img src="/gas-logo.png" alt="GAS" className="login-logo rounded-full" style={{ width: "clamp(84px, 24vw, 158px)", height: "clamp(84px, 24vw, 158px)", filter: "drop-shadow(0 12px 40px rgba(255,90,30,0.55))" }} />
+        <h1 className="mt-[clamp(14px,4vw,28px)] inline-flex items-baseline gap-[0.32em] font-extrabold" style={{ fontSize: "clamp(19px, 4.6vw, 30px)", letterSpacing: "0.08em" }}>
           <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>STUDIO ON</span>
           <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
         </h1>
-        <p className="tabular mt-3 text-[14px] uppercase tracking-[0.38em]" style={{ color: "rgba(255,255,255,0.42)" }}>Human led · AI powered</p>
+        <p className="tabular mt-[clamp(8px,2vw,12px)] text-[14px] uppercase tracking-[0.38em]" style={{ color: "rgba(255,255,255,0.42)" }}>Human led · AI powered</p>
 
-        <form onSubmit={submit} className="login-card relative mt-9 w-full rounded-2xl p-9">
-          <div className="tabular mb-6 text-center text-[14px] font-semibold uppercase tracking-[0.34em]" style={{ color: "rgba(168,85,247,0.85)" }}>Studio Access</div>
+        <form onSubmit={submit} className="login-card relative mt-[clamp(20px,5vw,36px)] w-full rounded-2xl p-[clamp(22px,6vw,36px)]">
+          <div className="tabular mb-[clamp(16px,4vw,24px)] text-center text-[14px] font-semibold uppercase tracking-[0.34em]" style={{ color: "rgba(168,85,247,0.85)" }}>Studio Access</div>
           <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your work email" autoComplete="username"
             className="login-input w-full rounded-xl px-5 py-4 text-[19px] text-ink outline-none" />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" autoComplete="current-password"
             className="login-input mt-3.5 w-full rounded-xl px-5 py-4 text-[19px] text-ink outline-none" />
           {error && <p className="mt-3 text-[15px] text-alert">{error}</p>}
           <button type="submit" disabled={busy}
-            className="login-cta mt-6 w-full rounded-full py-4 text-[17px] font-bold uppercase tracking-[0.18em] text-white transition disabled:opacity-70"
+            className="login-cta mt-[clamp(18px,4.5vw,24px)] w-full rounded-full py-4 text-[17px] font-bold uppercase tracking-[0.18em] text-white transition disabled:opacity-70"
             style={{ background: "linear-gradient(135deg,#EC4899 0%,#8B5CF6 100%)", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)" }}>
             {busy ? "Checking…" : "Sign in →"}
           </button>
-          <p className="mt-6 text-center text-[14px] leading-relaxed text-ink-faint">
-            Access is by invitation only. Contact <a href="mailto:grow@gasmarketing.co.za" className="text-accent">grow@gasmarketing.co.za</a>.
+          <p className="mt-[clamp(14px,3.5vw,24px)] text-center text-[14px] leading-relaxed text-ink-faint">
+            Access is by invitation only. Contact <a href="mailto:grow@gasmarketing.co.za" className="text-accent inline-block px-1 py-2.5 underline-offset-2 hover:underline">grow@gasmarketing.co.za</a>.
           </p>
         </form>
 
-        <p className="tabular mt-7 flex items-center gap-2 text-[13px] uppercase tracking-[0.3em] text-ink-faint">
+        <p className="tabular mt-[clamp(16px,4vw,28px)] flex items-center gap-2 text-[13px] uppercase tracking-[0.3em] text-ink-faint">
           <span aria-hidden>🔒</span> Secure Studio Platform
         </p>
       </div>
