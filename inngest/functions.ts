@@ -386,14 +386,19 @@ export const ingestSource = inngest.createFunction(
         // is exactly why this belongs in Inngest rather than in the route.
         const started = await step.run("crawl-start", () => startCrawl(uri, 80));
         let pages: { url: string; title: string; content: string }[] = [];
+        let seen = 0;
         // Up to ~10 minutes. Each wait is its own step, so the function sleeps rather than holding a request.
         for (let i = 0; i < 40; i++) {
           await step.sleep(`crawl-wait-${i}`, "15s");
           const st = await step.run(`crawl-poll-${i}`, () => crawlStatus(started.id));
-          pages = st.pages;
+          pages = st.pages; seen = st.seen;
           if (st.done) break;
         }
-        if (!pages.length) throw new Error("the crawl found no readable pages");
+        if (!pages.length) {
+          throw new Error(seen
+            ? `the crawl fetched ${seen} page${seen === 1 ? "" : "s"} but none had enough readable text - try the page the articles actually live under`
+            : "the crawl found no pages to read - check the address, and that the articles are linked from it");
+        }
         await step.run("usage-crawl", () => recordUsage({ clientId, provider: "firecrawl", model: "crawl", unit: "page", action: "ingest", count: pages.length }));
         // Each page keeps its OWN url and title in metadata, so a passage can always be traced back to the
         // article it came from - which is the difference between a citable brain and a pile of text.

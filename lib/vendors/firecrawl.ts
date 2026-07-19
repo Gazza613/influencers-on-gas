@@ -44,6 +44,11 @@ export async function startCrawl(url: string, limit = 60): Promise<CrawlStarted>
     body: JSON.stringify({
       url,
       limit,                                   // a hard ceiling, so a big site cannot run up an unbounded bill
+      // FOLLOW LINKS OUTSIDE THE STARTING PATH. Firecrawl only descends into sub-paths of the given URL by
+      // default, and that quietly broke the first real crawl: gasmarketing.co.za/articles is an INDEX whose
+      // every article lives at /blog/..., so nothing was under /articles and the crawler followed nothing.
+      // Index-at-one-path, articles-at-another is the normal shape of a blog, not an edge case.
+      allowBackwardLinks: true,
       scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
     }),
   });
@@ -52,7 +57,7 @@ export async function startCrawl(url: string, limit = 60): Promise<CrawlStarted>
   return { id: data.id };
 }
 
-export type CrawlStatus = { status: string; done: boolean; pages: ScrapedPage[] };
+export type CrawlStatus = { status: string; done: boolean; pages: ScrapedPage[]; seen: number };
 
 export async function crawlStatus(id: string): Promise<CrawlStatus> {
   const res = await fetch(`${BASE}/crawl/${id}`, { headers: { Authorization: `Bearer ${await key()}` } });
@@ -62,10 +67,14 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
   };
   if (!res.ok) throw new Error(`Firecrawl status failed (${res.status}): ${(data.error || "").slice(0, 160)}`);
   const status = data.status || "scraping";
+  const all = data.data ?? [];
   return {
     status,
     done: status === "completed" || status === "failed",
-    pages: (data.data ?? [])
+    // `seen` is everything the crawl fetched, before filtering. Reporting both is what tells you whether the
+    // crawler found nothing at all or found plenty and we discarded it.
+    seen: all.length,
+    pages: all
       .map((p) => ({
         url: p.metadata?.sourceURL || p.metadata?.url || "",
         title: p.metadata?.title || p.metadata?.sourceURL || "",
