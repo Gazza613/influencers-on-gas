@@ -26,7 +26,7 @@ import { recordUsage } from "@/lib/usage";
 // AN INTERNAL TOOL. Only Ask the Brain and the brain's own test box call this. Nothing that gets PUBLISHED
 // does: the CEO newsletter and the Journalist build their own prompts from the brain's rules, so the mixed and
 // Claude modes below cannot reach anything that goes out under someone's name. Keep it that way.
-export const maxDuration = 120;
+export const maxDuration = 180;   // live search needs the room
 
 // THREE MODES (Gary). The switch itself is trivial; the safeguards are the design.
 //
@@ -39,7 +39,13 @@ export const maxDuration = 120;
 // be traced to a passage it says so where it is read. For MoMo this matters most of all - a model's general
 // knowledge will happily produce MAU figures, competitor comparisons and pricing, which are precisely the
 // things the doctrine exists to override.
-export type AskMode = "brain" | "mixed" | "claude";
+export type AskMode = "brain" | "mixed" | "claude" | "live";
+
+// LIVE adds a fourth source and a fourth label. The distinction that matters: a FETCHED claim can be cited and
+// a REMEMBERED one cannot. Claude's training data has a cutoff, so its recollection of a client can be simply
+// out of date - it may describe eGifts24 under its previous ownership, because the Stellr acquisition is
+// recent. Collapsing "I looked it up just now, here is the link" into the same label as "I think I remember
+// this" would throw away the only difference that lets someone check it.
 
 const RULES = `You answer questions about a client using ONLY the passages provided from that client's private
 knowledge base. You are their brain, not a general assistant.
@@ -79,6 +85,28 @@ client that only they can confirm.
 HOW TO ANSWER: lead with the answer. Short and direct. UK British spelling. Never an em dash or an en dash:
 use a comma, a full stop or a plain hyphen.`;
 
+// Live: the brain, plus the web searched right now. Three provenances, three labels.
+const LIVE_RULES = `You answer using the client's private knowledge base FIRST, and the web SEARCHED NOW for
+anything current the passages do not cover.
+
+SEARCH THE WEB before answering if the question touches anything that could have changed, or anything outside
+the passages. Do not answer current-state questions from memory when you can look them up.
+
+LABEL EVERY CLAIM, INLINE, with one of three tags:
+- [brain]   drawn from the client's own passages.
+- [web]     found by searching just now. ALWAYS follow it with the source, as (source: publication, date).
+- [general] your own background knowledge, neither in the passages nor freshly looked up.
+
+The difference between [web] and [general] is the point of this mode: a fetched claim can be checked and a
+remembered one cannot. Never label a recollection as [web], and never present a [general] claim about the
+client's current state without saying it may be out of date.
+
+THE PASSAGES WIN over both, on anything the client would know best about themselves - their positioning,
+their products, their own figures. The web wins over your memory on anything current.
+
+HOW TO ANSWER: lead with the answer. Short and direct. UK British spelling. Never an em dash or an en dash:
+use a comma, a full stop or a plain hyphen.`;
+
 // Claude only: no client material is read at all, and the answer must not pretend otherwise.
 const CLAUDE_RULES = `Answer from your own general knowledge. You have NOT been given this client's private
 material and must not imply that you have.
@@ -97,7 +125,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const query = typeof body.query === "string" ? body.query.trim() : "";
   // Default is BRAIN. Leaving the fence is always an explicit choice, never something that happens by
   // omission or by a malformed request.
-  const mode: AskMode = body.mode === "mixed" ? "mixed" : body.mode === "claude" ? "claude" : "brain";
+  const mode: AskMode = body.mode === "mixed" ? "mixed" : body.mode === "claude" ? "claude" : body.mode === "live" ? "live" : "brain";
   if (!query) return NextResponse.json({ error: "Ask the brain a question." }, { status: 400 });
 
   try {
@@ -135,11 +163,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const client = new Anthropic({ apiKey: key });
     const res = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 900,
-      system: mode === "mixed" ? MIXED_RULES : RULES,
+      max_tokens: mode === "live" ? 1600 : 900,
+      system: mode === "live" ? LIVE_RULES : mode === "mixed" ? MIXED_RULES : RULES,
+      // The same web_search tool the Strategist uses for its daily run, capped lower: this is one question,
+      // not a research sweep, and each search costs.
+      ...(mode === "live"
+        ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 } as unknown as Anthropic.Tool] }
+        : {}),
       messages: [{ role: "user", content: `PASSAGES FROM THIS BRAIN:\n\n${passages}\n\nQUESTION: ${query}` }],
     });
-    await recordUsage({ clientId: id, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "brain-answer", count: 1 }).catch(() => {});
+    await recordUsage({ clientId: id, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: mode === "live" ? "brain-answer-live" : "brain-answer", count: 1 }).catch(() => {});
 
     const answer = res.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")

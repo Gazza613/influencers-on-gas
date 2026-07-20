@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const body = (await req.json().catch(() => ({}))) as { question?: string; mode?: string };
   const question = String(body.question ?? "").trim();
-  const mode = body.mode === "mixed" ? "mixed" : body.mode === "claude" ? "claude" : "brain";
+  const mode = body.mode === "mixed" || body.mode === "live" ? "mixed" : body.mode === "claude" ? "claude" : "brain";
   if (!question) return NextResponse.json({ error: "Type a question first." }, { status: 400 });
 
   const key = await getSecret("anthropic");

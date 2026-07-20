@@ -12,14 +12,21 @@ import { useState } from "react";
 // carries a client's proprietary material, and the passages are what make a claim traceable.
 
 type Client = { id: string; name: string };
-type Mode = "brain" | "mixed" | "claude";
+type Mode = "brain" | "mixed" | "claude" | "live";
 
-// THREE SOURCES OF TRUTH, and the reader must always know which one they got. Brain leads and is the default:
-// leaving the fence is a deliberate act, never a thing that happens by leaving a control alone.
+// FOUR SOURCES, and the reader must always know which one they got. Brain leads and is the default: leaving
+// the fence is a deliberate act, never something that happens by leaving a control alone.
+//
+// The distinction that earns "live" its own mode: a FETCHED claim can be cited, a REMEMBERED one cannot.
+// Claude's training data has a cutoff, so its recollection of a client can simply be out of date - it may
+// describe eGifts24 under its previous ownership, because the Stellr acquisition is recent. Collapsing "I
+// looked this up just now, here is the link" into the same label as "I think I remember this" would throw
+// away the only difference that lets someone check it.
 const MODES: { id: Mode; label: string; note: string }[] = [
   { id: "brain", label: "Brain only", note: "Only this client's own material. Says so when it does not know." },
   { id: "mixed", label: "Brain + Claude", note: "The brain first, general knowledge to fill gaps. Every claim is labelled." },
   { id: "claude", label: "Claude only", note: "General knowledge. No client material is read at all." },
+  { id: "live", label: "Brain + live web", note: "The brain, plus the web searched right now. Fetched claims are cited; remembered ones are marked separately." },
 ];
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
@@ -107,7 +114,7 @@ export default function AskBrain({ clients }: { clients: Client[] }) {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button onClick={() => ask()} disabled={busy || !q.trim()}
             className="btn-brand rounded-lg px-5 py-2.5 text-lg font-bold disabled:opacity-50">
-            {busy ? "Reading the brain…" : "Ask"}
+            {busy ? (mode === "live" ? "Searching the web…" : "Reading the brain…") : "Ask"}
           </button>
           <button onClick={sharpen} disabled={sharpening || !q.trim()}
             className="rounded-lg border border-[#a855f7]/40 px-4 py-2.5 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
@@ -142,23 +149,30 @@ export default function AskBrain({ clients }: { clients: Client[] }) {
             <span className={`tabular rounded-full px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.14em] ${
               answeredMode === "brain" ? "bg-ready/15 text-ready"
               : answeredMode === "mixed" ? "bg-[#fbbf24]/15 text-[#fcd34d]"
+              : answeredMode === "live" ? "bg-[#60a5fa]/15 text-[#93c5fd]"
               : "bg-active/15 text-active"}`}>
-              {answeredMode === "brain" ? "brain only" : answeredMode === "mixed" ? "brain + claude" : "claude only — no client material"}
+              {answeredMode === "brain" ? "brain only"
+               : answeredMode === "mixed" ? "brain + claude"
+               : answeredMode === "live" ? "brain + live web"
+               : "claude only — no client material"}
             </span>
           </div>
           {/* In mixed mode the model tags each claim [brain] or [general]. Rendered as coloured chips rather
               than left as raw brackets, so provenance is read at a glance instead of skimmed past. */}
           <p className="whitespace-pre-wrap text-[19px] leading-relaxed text-ink">
-            {answeredMode === "mixed"
-              ? answer.split(/(\[brain\]|\[general\])/g).map((part, i) =>
+            {answeredMode === "mixed" || answeredMode === "live"
+              ? answer.split(/(\[brain\]|\[general\]|\[web\])/g).map((part, i) =>
                   part === "[brain]" ? <span key={i} className="mr-1 rounded bg-ready/15 px-1.5 py-0.5 text-[13px] font-bold uppercase tracking-wide text-ready">brain</span>
+                  : part === "[web]" ? <span key={i} className="mr-1 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[13px] font-bold uppercase tracking-wide text-[#93c5fd]">web</span>
                   : part === "[general]" ? <span key={i} className="mr-1 rounded bg-[#fbbf24]/15 px-1.5 py-0.5 text-[13px] font-bold uppercase tracking-wide text-[#fcd34d]">general</span>
                   : <span key={i}>{part}</span>)
               : answer}
           </p>
-          {answeredMode === "mixed" && (
+          {(answeredMode === "mixed" || answeredMode === "live") && (
             <p className="mt-4 text-[14px] text-[#fcd34d]">
-              Anything marked <b>general</b> did not come from {brainName}. Check it before it reaches a client.
+              Anything marked <b>general</b> did not come from {brainName} and was not looked up - it is
+              recollection, and may be out of date. <b>Web</b> claims were fetched just now and carry a source.
+              Check both before they reach a client.
             </p>
           )}
           {asked && <p className="mt-4 text-[14px] text-ink-faint">You asked: {asked}</p>}
