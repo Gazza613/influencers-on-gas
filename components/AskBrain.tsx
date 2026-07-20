@@ -61,7 +61,7 @@ export default function AskBrain({ clients }: { clients: Client[] }) {
     if (!q.trim() || sharpening) return;
     setSharpening(true); setTip(null);
     const d = await fetch(`/api/brains/${clientId}/sharpen`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, mode }),
     }).then((r) => r.json()).catch(() => null);
     setSharpening(false);
     if (!d?.sharpened) return;

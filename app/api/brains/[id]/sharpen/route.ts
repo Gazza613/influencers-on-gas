@@ -19,8 +19,10 @@ import { recordUsage } from "@/lib/usage";
 // asked; it may never be more specific about the ANSWER.
 export const maxDuration = 60;
 
-const RULES = `You rewrite a question so it retrieves better from a private knowledge base. You are not
-answering it.
+// THE SHARPENER MUST KNOW THE MODE. Written for brain-only, it stripped "use brain and Claude" from a question
+// asked in mixed mode and explained that "retrieval should come from the knowledge base only" - arguing with
+// the setting the user had deliberately chosen. A rewriter that contradicts the mode is worse than none.
+const BASE = `You rewrite a question so it retrieves better. You are not answering it.
 
 WHAT MAKES A QUESTION RETRIEVE WELL:
 - It names the thing being asked about, in the words the source material would use.
@@ -37,6 +39,19 @@ If the question is already good, return it UNCHANGED and say so.
 
 Reply as JSON only: {"sharpened": "...", "changed": true|false, "why": "one short sentence, plain English"}`;
 
+// What each mode allows, appended to the base rules.
+const MODE_NOTE: Record<string, string> = {
+  brain: `The answer will come ONLY from the private knowledge base. If the question asks for outside
+knowledge or comparison to something the knowledge base will not hold, you may note that in "why" - but do NOT
+silently delete the request, because the asker may want to switch modes rather than change the question.`,
+  mixed: `The answer will use the knowledge base FIRST and general knowledge to fill gaps, with every claim
+labelled. So a question that asks for outside context, a market comparison, or a named third party is
+LEGITIMATE - keep it. Never strip an instruction to use general knowledge, and never tell the asker that
+retrieval must come from the knowledge base only: they have deliberately chosen otherwise.`,
+  claude: `The answer will come from general knowledge alone, with no private material read. Questions about
+the wider market, named third parties and comparisons are entirely legitimate here. Keep them.`,
+};
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,8 +59,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const brain = await getBrain(id);
   if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
 
-  const body = (await req.json().catch(() => ({}))) as { question?: string };
+  const body = (await req.json().catch(() => ({}))) as { question?: string; mode?: string };
   const question = String(body.question ?? "").trim();
+  const mode = body.mode === "mixed" ? "mixed" : body.mode === "claude" ? "claude" : "brain";
   if (!question) return NextResponse.json({ error: "Type a question first." }, { status: 400 });
 
   const key = await getSecret("anthropic");
@@ -56,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const res = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 400,
-      system: RULES,
+      system: `${BASE}\n\n${MODE_NOTE[mode]}`,
       // The brain's NAME is the only context given. Enough to use the right vocabulary, not enough to invent
       // subject matter the asker did not raise.
       messages: [{ role: "user", content: `The knowledge base is about: ${brain.name}\n\nQuestion: ${question}` }],
