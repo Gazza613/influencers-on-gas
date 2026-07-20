@@ -194,17 +194,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         wash: "from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.04]",
         accent: "text-[#93c5fd]",
       },
-      {
-        name: <>Audience <span className="brand-grad">on</span> GAS</>,
-        href: "#",
-        mark: <AudienceMark />,
-        blurb: "Building next.",
-        action: "Coming soon",
-        soon: true,
-        ring: "border-line",
-        wash: "from-white/[0.03] to-transparent",
-        accent: "text-ink-faint",
-      },
     ],
   },
   {
@@ -237,7 +226,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   },
   {
     label: "Know",
-    note: "Researched daily, sourced, never assumed",
+    note: "What we know, and how to ask it",
     doors: [
       {
         name: <>Ask the <span className="brand-grad">Brain</span></>,
@@ -245,7 +234,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <AskMark />,
         blurb: "Ask any client's knowledge base a question and get an answer built only from their own material, with the passages it used shown beside it.",
         action: "Ask a question",
-        wide: true,
         ring: "border-[#f472b6]/30 hover:border-[#f472b6]/70 hover:shadow-[0_0_50px_-12px_rgba(244,114,182,0.45)]",
         wash: "from-[#f472b6]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#f9a8d4]",
@@ -269,6 +257,17 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
         accent: "text-[#67e8f9]",
+      },
+      {
+        name: <>Audience <span className="brand-grad">on</span> GAS</>,
+        href: "#",
+        mark: <AudienceMark />,
+        blurb: "Building next.",
+        action: "Coming soon",
+        soon: true,
+        ring: "border-line",
+        wash: "from-white/[0.03] to-transparent",
+        accent: "text-ink-faint",
       },
     ],
   },
