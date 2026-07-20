@@ -49,7 +49,7 @@ const CONF: Record<string, string> = {
   low: "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]",
 };
 
-export default function IntelQueue({ clients, role }: { clients: Client[]; role: "journalist" | "strategist" }) {
+export default function IntelQueue({ clients, configured = [], role }: { clients: Client[]; configured?: string[]; role: "journalist" | "strategist" }) {
   // Land on the client that actually HAS work, not whichever happens to be first in the list. The first live
   // run filed everything under MTN MoMo while the picker defaulted to GAS Marketing (alphabetically earlier),
   // so the queue looked empty when it was full. The server hands us the clients already ordered with the ones
@@ -104,6 +104,9 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
     return bv - av;
   };
   const clientName = clients.find((c) => c.id === clientId)?.name || "us";
+  // A brain with no brief for THIS desk can never produce a finding. Saying "nothing in the queue" for one
+  // describes a run that did not happen as though it had run and found nothing - two very different things.
+  const isConfigured = configured.length === 0 || configured.includes(clientId);
   const material = items.filter((i) => i.material).sort(byRecency);
   const rest = items.filter((i) => !i.material).sort(byRecency);
 
@@ -127,7 +130,19 @@ export default function IntelQueue({ clients, role }: { clients: Client[]; role:
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface-1 p-6 text-center">
-          <p className="text-lg text-ink-dim">Nothing in the queue. The daily run is at 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</p>
+          {isConfigured ? (
+            <p className="text-lg text-ink-dim">Nothing in the queue. The daily run is at 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</p>
+          ) : (
+            <>
+              <p className="text-lg text-ink">
+                <b>{clientName}</b> has no {role === "journalist" ? "Journalist" : "Strategist"} brief yet, so this desk has nothing to research for it.
+              </p>
+              <p className="mt-2 text-lg text-ink-dim">
+                A brief is what tells the desk what this brain is about and what is out of bounds. Until one
+                exists no research can run, and none of another brain&apos;s will ever be borrowed.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <>

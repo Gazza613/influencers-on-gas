@@ -2,6 +2,7 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import IntelQueue from "@/components/IntelQueue";
 import { listStudioClients } from "@/lib/studio";
+import { brainsWithIntel } from "@/lib/intel";
 
 // THE JOURNALIST. Thought leadership for a named executive to post on LinkedIn, written for whichever brain
 // is selected.
@@ -17,6 +18,11 @@ import { listStudioClients } from "@/lib/studio";
 
 export default async function JournalistPage() {
   const clients = await listStudioClients().catch(() => []);
+  // WHICH BRAINS ARE ACTUALLY SET UP FOR THIS DESK. Every brain was offered here regardless, so one with no
+  // brief could be selected and would report "nothing in the queue" - which reads as a failed run rather than
+  // as never having been configured. A brain without a brief cannot produce findings at all.
+  const briefed = await brainsWithIntel().catch(() => []);
+  const configured = briefed.filter((b) => b.journalist).map((b) => b.clientId);
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
@@ -35,7 +41,7 @@ export default async function JournalistPage() {
           carries its own voice, its own hard lines and its own compliance position, and a piece is written
           under those rather than any other client&apos;s.
         </p>
-        <IntelQueue clients={clients} role="journalist" />
+        <IntelQueue clients={clients} configured={configured} role="journalist" />
       </main>
     </div>
   );

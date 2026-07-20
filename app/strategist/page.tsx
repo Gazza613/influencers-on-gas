@@ -2,6 +2,7 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import IntelQueue from "@/components/IntelQueue";
 import { listStudioClients } from "@/lib/studio";
+import { brainsWithIntel } from "@/lib/intel";
 
 // THE STRATEGIST. Daily market and competitor intelligence, so GAS's head strategist can advise MTN MoMo from
 // something better than yesterday's assumptions.
@@ -14,6 +15,11 @@ export const dynamic = "force-dynamic";
 
 export default async function StrategistPage() {
   const clients = await listStudioClients().catch(() => []);
+  // WHICH BRAINS ARE ACTUALLY SET UP FOR THIS DESK. Every brain was offered here regardless, so one with no
+  // brief could be selected and would report "nothing in the queue" - which reads as a failed run rather than
+  // as never having been configured. A brain without a brief cannot produce findings at all.
+  const briefed = await brainsWithIntel().catch(() => []);
+  const configured = briefed.filter((b) => b.strategist).map((b) => b.clientId);
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
@@ -25,7 +31,7 @@ export default async function StrategistPage() {
           <b className="text-ink"> wrong</b> - a competitor move, a regulatory door opening, data that shifts the
           picture. Every finding carries its source and an honest confidence grade. It proposes; you decide.
         </p>
-        <IntelQueue clients={clients} role="strategist" />
+        <IntelQueue clients={clients} configured={configured} role="strategist" />
       </main>
     </div>
   );
