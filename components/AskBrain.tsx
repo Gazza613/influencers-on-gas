@@ -12,6 +12,15 @@ import { useState } from "react";
 // carries a client's proprietary material, and the passages are what make a claim traceable.
 
 type Client = { id: string; name: string };
+type Mode = "brain" | "mixed" | "claude";
+
+// THREE SOURCES OF TRUTH, and the reader must always know which one they got. Brain leads and is the default:
+// leaving the fence is a deliberate act, never a thing that happens by leaving a control alone.
+const MODES: { id: Mode; label: string; note: string }[] = [
+  { id: "brain", label: "Brain only", note: "Only this client's own material. Says so when it does not know." },
+  { id: "mixed", label: "Brain + Claude", note: "The brain first, general knowledge to fill gaps. Every claim is labelled." },
+  { id: "claude", label: "Claude only", note: "General knowledge. No client material is read at all." },
+];
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
 export default function AskBrain({ clients }: { clients: Client[] }) {
@@ -25,6 +34,8 @@ export default function AskBrain({ clients }: { clients: Client[] }) {
   const [tip, setTip] = useState<{ from: string; why: string } | null>(null);
   const [err, setErr] = useState("");
   const [openSources, setOpenSources] = useState(false);
+  const [mode, setMode] = useState<Mode>("brain");
+  const [answeredMode, setAnsweredMode] = useState<Mode>("brain");
 
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
 
@@ -33,12 +44,15 @@ export default function AskBrain({ clients }: { clients: Client[] }) {
     if (!text || !clientId || busy) return;
     setBusy(true); setErr(""); setAnswer(""); setHits([]); setAsked(text); setOpenSources(false);
     const d = await fetch(`/api/brains/${clientId}/query`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: text }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: text, mode }),
     }).then((r) => r.json()).catch(() => null);
     setBusy(false);
     if (!d || d.error) { setErr(d?.error || "Could not reach the brain."); return; }
     setAnswer(d.answer || "");
     setHits(d.hits || []);
+    // The mode the ANSWER was produced under, not whatever the control says now - otherwise changing the
+    // selector after the fact would silently relabel an answer that is already on screen.
+    setAnsweredMode((d.mode as Mode) || mode);
   }
 
   // Rewrite the question so it retrieves better, and SHOW what changed - the point is that the team learns to
@@ -69,6 +83,20 @@ export default function AskBrain({ clients }: { clients: Client[] }) {
           <p className="pb-2 text-[15px] text-ink-faint">
             Answers come only from <b className="text-ink-dim">{brainName}</b>. No other brain is ever read.
           </p>
+        </div>
+
+        <div className="mt-4">
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Where the answer comes from</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {MODES.map((m) => (
+              <button key={m.id} onClick={() => setMode(m.id)}
+                className={`rounded-lg px-3.5 py-2 text-[16px] font-semibold transition ${
+                  mode === m.id ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : "border border-line text-ink-dim hover:text-ink"}`}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[15px] text-ink-faint">{MODES.find((m) => m.id === mode)?.note}</p>
         </div>
 
         <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={3}
@@ -105,8 +133,34 @@ export default function AskBrain({ clients }: { clients: Client[] }) {
 
       {answer && (
         <div className="mt-5 rounded-xl border border-[#a855f7]/35 bg-[#a855f7]/[0.07] p-6">
-          <div className="tabular mb-2 text-sm uppercase tracking-[0.18em] text-[#c79bff]">{brainName} says</div>
-          <p className="whitespace-pre-wrap text-[19px] leading-relaxed text-ink">{answer}</p>
+          {/* THE BADGE. Someone will screenshot an answer and act on it, so it has to carry its own provenance
+              - a blended answer must never be mistaken for client doctrine once it leaves this screen. */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="tabular text-sm uppercase tracking-[0.18em] text-[#c79bff]">
+              {answeredMode === "claude" ? "Claude says" : `${brainName} says`}
+            </span>
+            <span className={`tabular rounded-full px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.14em] ${
+              answeredMode === "brain" ? "bg-ready/15 text-ready"
+              : answeredMode === "mixed" ? "bg-[#fbbf24]/15 text-[#fcd34d]"
+              : "bg-active/15 text-active"}`}>
+              {answeredMode === "brain" ? "brain only" : answeredMode === "mixed" ? "brain + claude" : "claude only — no client material"}
+            </span>
+          </div>
+          {/* In mixed mode the model tags each claim [brain] or [general]. Rendered as coloured chips rather
+              than left as raw brackets, so provenance is read at a glance instead of skimmed past. */}
+          <p className="whitespace-pre-wrap text-[19px] leading-relaxed text-ink">
+            {answeredMode === "mixed"
+              ? answer.split(/(\[brain\]|\[general\])/g).map((part, i) =>
+                  part === "[brain]" ? <span key={i} className="mr-1 rounded bg-ready/15 px-1.5 py-0.5 text-[13px] font-bold uppercase tracking-wide text-ready">brain</span>
+                  : part === "[general]" ? <span key={i} className="mr-1 rounded bg-[#fbbf24]/15 px-1.5 py-0.5 text-[13px] font-bold uppercase tracking-wide text-[#fcd34d]">general</span>
+                  : <span key={i}>{part}</span>)
+              : answer}
+          </p>
+          {answeredMode === "mixed" && (
+            <p className="mt-4 text-[14px] text-[#fcd34d]">
+              Anything marked <b>general</b> did not come from {brainName}. Check it before it reaches a client.
+            </p>
+          )}
           {asked && <p className="mt-4 text-[14px] text-ink-faint">You asked: {asked}</p>}
         </div>
       )}

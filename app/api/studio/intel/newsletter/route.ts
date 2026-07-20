@@ -37,6 +37,13 @@ const PIECE = {
 // not licence to advertise. The moment it quotes a price, pushes an offer or sells a service it becomes an FSP
 // advertisement under FAIS s14 and the whole regime applies. So: what MoMo is FOR and what it makes possible,
 // never what it costs or a call to sign up.
+// BRAIN-ONLY, ALWAYS. This route builds its own prompt from the brain's scope lock and CEO rules and does NOT
+// go through /api/brains/[id]/query, so the three answer modes on Ask the Brain cannot reach it. That is
+// deliberate and must stay true: a piece published under a real executive's name may never contain a claim
+// from a model's general knowledge, however it was labelled on screen at the time.
+//
+// If this is ever refactored onto the shared query path, it must pass mode "brain" explicitly and refuse
+// anything else.
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
