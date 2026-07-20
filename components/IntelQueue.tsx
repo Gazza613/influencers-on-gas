@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { flex } from "@/lib/flex";
 
 // WORTH REVIEWING. The Journalist and The Strategist research daily and file what they find here. They
@@ -50,6 +51,15 @@ const CONF: Record<string, string> = {
 };
 
 export default function IntelQueue({ clients, configured = [], role }: { clients: Client[]; configured?: string[]; role: "journalist" | "strategist" }) {
+  // REFRESH WITHOUT RELOADING. The brain list and the briefs are server-rendered, so a page opened before a
+  // brain was added or briefed keeps showing the old list - which has now twice looked like a bug when the
+  // data was correct all along.
+  //
+  // The instinctive fix, pressing F5, is the one thing that does NOT work here: a reload re-gates and signs
+  // you out (the security posture Gary asked for), so you lose your place and still have to navigate back.
+  // router.refresh() re-runs the server component and updates the props in place, with no page load and so no
+  // re-gate.
+  const router = useRouter();
   // Land on the client that actually HAS work, not whichever happens to be first in the list. The first live
   // run filed everything under MTN MoMo while the picker defaulted to GAS Marketing (alphabetically earlier),
   // so the queue looked empty when it was full. The server hands us the clients already ordered with the ones
@@ -119,6 +129,12 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
             className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-lg text-ink outline-none focus:border-[#60a5fa]">
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          {/* Re-reads the brain list and the briefs in place. F5 would sign you out, so this is the gesture
+              that actually does what refreshing is meant to do. */}
+          <button onClick={() => router.refresh()} title="Re-read the brain list and briefs"
+            className="rounded-lg border border-line px-3 py-1.5 text-lg font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink">
+            ↻ Refresh
+          </button>
         </div>
         <button onClick={runNow} disabled={running || !clientId}
           className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-lg font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
