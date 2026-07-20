@@ -265,9 +265,9 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         blurb: "Building next.",
         action: "Coming soon",
         soon: true,
-        ring: "border-line",
-        wash: "from-white/[0.03] to-transparent",
-        accent: "text-ink-faint",
+        ring: "border-[#34d399]/30 hover:border-[#34d399]/50",
+        wash: "from-[#34d399]/[0.09] to-[#22d3ee]/[0.04]",
+        accent: "text-[#6ee7b7]",
       },
     ],
   },
@@ -279,12 +279,12 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
   // better manners, and someone will click it twice before believing it.
   if (d.soon) {
     return (
-      <div className={`gas-rise relative flex h-full flex-col overflow-hidden rounded-2xl border border-dashed border-line bg-gradient-to-br ${d.wash} p-6 ${d.wide ? "sm:col-span-2" : ""}`}
+      <div className={`gas-rise relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 ${d.wide ? "sm:col-span-2" : ""}`}
         style={{ animationDelay: `${80 + index * 90}ms` }} aria-disabled="true">
-        <span className="relative block text-ink-faint">{d.mark}</span>
-        <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink-dim">{d.name}</h2>
-        <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-faint">{d.blurb}</p>
-        <span className="tabular relative mt-5 inline-flex w-fit items-center rounded-full border border-line px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+        <span className={`relative block ${d.accent}`}>{d.mark}</span>
+        <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink">{d.name}</h2>
+        <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-dim">{d.blurb}</p>
+        <span className={`tabular relative mt-5 inline-flex w-fit items-center rounded-full border border-current/40 px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.16em] ${d.accent}`}>
           {d.action}
         </span>
       </div>
