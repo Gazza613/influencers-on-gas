@@ -106,6 +106,32 @@ function PsiMark() {
   );
 }
 
+function AskMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
+      <defs>
+        <linearGradient id="ask-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#F472B6" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#60A5FA" />
+        </linearGradient>
+      </defs>
+      <path d="M8 6h32a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H22l-10 8v-8H8a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4Z" stroke="url(#ask-g)" strokeWidth="2.6" strokeLinejoin="round" />
+      <path d="M19.5 16.5a4.5 4.5 0 1 1 5.6 4.36c-.9.24-1.6 1-1.6 2.14" stroke="url(#ask-g)" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="23.5" cy="27.5" r="1.6" fill="url(#ask-g)" />
+    </svg>
+  );
+}
+
+function AudienceMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
+      <circle cx="18" cy="17" r="6" stroke="currentColor" strokeWidth="2.6" />
+      <path d="M6 40c1.8-6.6 6.3-10 12-10s10.2 3.4 12 10" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="34" cy="14" r="4.6" stroke="currentColor" strokeWidth="2.2" opacity="0.75" />
+      <path d="M30 32c1.2-4.4 4.2-6.7 8-6.7 1.9 0 3.6.6 5 1.7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" opacity="0.75" />
+    </svg>
+  );
+}
+
 type Door = {
   name: React.ReactNode;
   href: string;
@@ -119,6 +145,11 @@ type Door = {
   // An optional SECOND destination in the corner (the showcase eye). A card can have two jobs: go to work, or
   // go and look at the work.
   peek?: { href: string; label: string };
+  // Full width within its group. Used for the tool that serves every desk rather than being one of them.
+  wide?: boolean;
+  // A desk that does not exist yet. Rendered as a real tile so the shape of the platform is visible, but it
+  // does not pretend to be clickable - a placeholder that looks live is just a dead end with better manners.
+  soon?: boolean;
 };
 
 // The showcase eye. An eye, not a link icon, because the job is "go and SEE the work".
@@ -163,6 +194,17 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         wash: "from-[#60a5fa]/[0.10] to-[#22d3ee]/[0.04]",
         accent: "text-[#93c5fd]",
       },
+      {
+        name: <>Audience <span className="brand-grad">on</span> GAS</>,
+        href: "#",
+        mark: <AudienceMark />,
+        blurb: "Building next.",
+        action: "Coming soon",
+        soon: true,
+        ring: "border-line",
+        wash: "from-white/[0.03] to-transparent",
+        accent: "text-ink-faint",
+      },
     ],
   },
   {
@@ -198,6 +240,17 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
     note: "Researched daily, sourced, never assumed",
     doors: [
       {
+        name: <>Ask the <span className="brand-grad">Brain</span></>,
+        href: "/ask",
+        mark: <AskMark />,
+        blurb: "Ask any client's knowledge base a question and get an answer built only from their own material, with the passages it used shown beside it.",
+        action: "Ask a question",
+        wide: true,
+        ring: "border-[#f472b6]/30 hover:border-[#f472b6]/70 hover:shadow-[0_0_50px_-12px_rgba(244,114,182,0.45)]",
+        wash: "from-[#f472b6]/[0.10] to-[#a855f7]/[0.04]",
+        accent: "text-[#f9a8d4]",
+      },
+      {
         name: <>The Strategist</>,
         href: "/strategist",
         mark: <StrategistMark />,
@@ -222,10 +275,27 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
 ];
 
 function Tile({ d, index = 0 }: { d: Door; index?: number }) {
+  // A DESK THAT DOES NOT EXIST YET is drawn so the shape of the platform is visible, but it is deliberately
+  // not a link and carries no hover lift. A placeholder that behaves like a live tile is just a dead end with
+  // better manners, and someone will click it twice before believing it.
+  if (d.soon) {
+    return (
+      <div className={`gas-rise relative flex h-full flex-col overflow-hidden rounded-2xl border border-dashed border-line bg-gradient-to-br ${d.wash} p-6 ${d.wide ? "sm:col-span-2" : ""}`}
+        style={{ animationDelay: `${80 + index * 90}ms` }} aria-disabled="true">
+        <span className="relative block text-ink-faint">{d.mark}</span>
+        <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink-dim">{d.name}</h2>
+        <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-faint">{d.blurb}</p>
+        <span className="tabular relative mt-5 inline-flex w-fit items-center rounded-full border border-line px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+          {d.action}
+        </span>
+      </div>
+    );
+  }
+
   // The card is a CONTAINER, not itself a link, so a second destination (the showcase eye) can live inside it.
   // Nesting an anchor inside an anchor is invalid HTML and breaks the inner click, so the main destination is a
   // stretched overlay link and the eye sits above it on a higher layer.
-  const cls = `group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 transition duration-300 hover:-translate-y-1`;
+  const cls = `group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 transition duration-300 hover:-translate-y-1 ${d.wide ? "sm:col-span-2" : ""}`;
   // The live products sit on their OWN domains: a plain anchor in a new tab, never a router push (which would
   // try to route them inside this app and 404).
   const label = typeof d.action === "string" ? d.action : "Open";
