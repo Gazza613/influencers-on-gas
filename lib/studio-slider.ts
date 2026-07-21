@@ -38,7 +38,13 @@ export function tidyCallout(callout: string): string {
     let s = p.trim();
     const isLast = i === parts.length - 1;
     if (needsFullStop) {
-      if (isLast && !/[.?!]\s*$/.test(s)) s += ".";        // finish the sentence
+      if (isLast) {
+        // Finish the sentence with ONE terminal mark. A headline that already ends in a comma
+        // (the Producer sometimes writes "...no buffering out,") must not become "out,." - strip the
+        // trailing comma first, THEN add the full stop. Only .?! count as "already finished".
+        s = s.replace(/[,\s]+$/, "");
+        if (!/[.?!]$/.test(s)) s += ".";
+      }
     } else {
       s = s.replace(/\s*\.+\s*$/, "");                     // a bare phrase: drop any stray full stop
     }
