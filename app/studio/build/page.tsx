@@ -129,6 +129,9 @@ export default function BuilderPage() {
     pointing: " There is exactly ONE phone in the whole image and they point at that single phone's screen, which shows the MoMo app. There is no second phone anywhere.",
     none: " There is NO phone anywhere in the image - nobody holds, looks at or points at a phone.",
   };
+  // When a real phone screen is chosen, the model must draw a CHROMA-GREEN screen instead of inventing an app -
+  // we composite the actual screenshot onto that green afterwards. Overrides the phone treatment's "MoMo app".
+  const GREEN_SCREEN_HINT = " There is exactly ONE phone in the whole image, held with its screen facing the viewer. That screen is a SOLID BRIGHT GREEN rectangle (chroma-key green), completely filling the screen edge to edge, with NO app, NO icons, NO text and NO content on it - just flat bright green. They are not looking at or holding any other phone.";
 
   useEffect(() => {
     fetch("/api/studio").then((r) => r.json()).then((d) => {
@@ -260,7 +263,7 @@ export default function BuilderPage() {
         body: JSON.stringify({
           clientId, kind,
           referenceUrl: picked[slotKey] || "",              // optional - the expert picks one if none chosen
-          subject: subj + (PHONE_MAP[phone[slotKey]] || ""), // fold the phone treatment into the direction
+          subject: subj + (screenSel[slotKey] ? GREEN_SCREEN_HINT : (PHONE_MAP[phone[slotKey]] || "")), // fold the phone treatment (or the green-screen hint) into the direction
           deal, callout: o.callout, theme: o.theme,
           dealCardUrl: cardSel[slotKey] || "", scene: scene[slotKey] || "",
           phoneScreenUrl: screenSel[slotKey] || "",
@@ -328,7 +331,7 @@ export default function BuilderPage() {
         body: JSON.stringify({
           // Edit the CLEAN pre-stamp render, not the stamped one, so the logo and deal are never doubled.
           clientId, kind, imageUrl: s.clean || s.url, instruction,
-          referenceUrl: picked[slotKey] || "", dealCardUrl: cardSel[slotKey] || "",
+          referenceUrl: picked[slotKey] || "", dealCardUrl: cardSel[slotKey] || "", phoneScreenUrl: screenSel[slotKey] || "",
         }),
       }).then(readJson) as any;
       if (d.url) { setShot((x) => ({ ...x, [slotKey]: { url: d.url, clean: d.cleanUrl || d.url, status: "new" } })); setEdit((x) => ({ ...x, [slotKey]: "" })); }

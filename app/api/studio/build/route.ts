@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
-import { balanceHeadline, tidyCallout, stampRealLogo, stampDealCard, stampTypesetDeal } from "@/lib/studio-slider";
+import { balanceHeadline, tidyCallout, stampRealLogo, stampDealCard, stampTypesetDeal, stampPhoneScreen } from "@/lib/studio-slider";
 import { onFunnelBackground, flattenSection1ToWhite, flattenMastheadToNavy, cleanBlueGlowBehindDisc } from "@/lib/studio-cutout";
 import { SLIDER_GRADE } from "@/lib/studio-refmatch";
 import { putBytes } from "@/lib/blob";
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; theme?: string; dealCardUrl?: string; deal?: import("@/lib/studio-producer").Deal | null };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; theme?: string; dealCardUrl?: string; phoneScreenUrl?: string; deal?: import("@/lib/studio-producer").Deal | null };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
   let referenceUrl = String(b.referenceUrl || "");
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
   const callout = String(b.callout || "").trim();
   const theme = String(b.theme || "").trim();
   const dealCardUrl = String(b.dealCardUrl || "").trim();
+  const phoneScreenUrl = String(b.phoneScreenUrl || "").trim();
   if (!clientId || !subject) return NextResponse.json({ error: "Describe who should be in it." }, { status: 400 });
 
   try {
@@ -148,6 +149,8 @@ export async function POST(req: Request) {
     // client's own card design (dynamic deals, every character exact).
     if (dealCardUrl) locked = await stampDealCard(clientId, locked, dealCardUrl, referenceUrl);
     else if (b.deal && b.deal.label) locked = await stampTypesetDeal(clientId, locked, b.deal, referenceUrl);
+    // THE PHONE SCREEN, composited onto the model's green chroma screen - a real screenshot, never invented.
+    if (phoneScreenUrl) locked = await stampPhoneScreen(clientId, locked, phoneScreenUrl);
     // cleanUrl is the render BEFORE the logo and deal are stamped on. A re-run/edit must start from THIS, not
     // from `locked`, or the AI reproduces the baked logo and deal and the fresh stamp doubles them (Gary).
     return NextResponse.json({ ok: true, url: locked, cleanUrl: finalUrl });

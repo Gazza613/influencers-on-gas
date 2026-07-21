@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
-import { stampRealLogo, stampDealCard } from "@/lib/studio-slider";
+import { stampRealLogo, stampDealCard, stampPhoneScreen } from "@/lib/studio-slider";
 import { flattenSection1ToWhite, flattenMastheadToNavy, cleanBlueGlowBehindDisc } from "@/lib/studio-cutout";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
   const b = (await req.json().catch(() => ({}))) as {
-    clientId?: string; kind?: string; imageUrl?: string; instruction?: string; referenceUrl?: string; dealCardUrl?: string;
+    clientId?: string; kind?: string; imageUrl?: string; instruction?: string; referenceUrl?: string; dealCardUrl?: string; phoneScreenUrl?: string;
   };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
   const instruction = String(b.instruction || "").trim();
   const referenceUrl = String(b.referenceUrl || "");
   const dealCardUrl = String(b.dealCardUrl || "").trim();
+  const phoneScreenUrl = String(b.phoneScreenUrl || "").trim();
 
   if (!clientId || !imageUrl) return NextResponse.json({ error: "Nothing to edit yet." }, { status: 400 });
   if (instruction.length < 3) return NextResponse.json({ error: "Say what you want changed." }, { status: 400 });
@@ -53,6 +54,8 @@ export async function POST(req: Request) {
     // deal for the model to reproduce - which is what doubled them on a re-run. We only need to keep the model
     // from DRAWING an offer, since we re-composite the real card below.
     if (dealCardUrl) changes.push(`Do NOT draw any deal card, offer badge, price bubble, pill or promotional element anywhere, and no prices - the real deal card is composited on afterwards. Leave the top-right as clean background.`);
+    // The clean input carries a green chroma phone screen; keep it flat green (the real screenshot is composited on after).
+    if (phoneScreenUrl) changes.push(`KEEP the phone screen a SOLID BRIGHT GREEN rectangle (chroma key), completely flat and filling the screen - do NOT draw an app, icons, text or any content on it. The real screenshot is composited onto that green afterwards.`);
 
     const ed = await forensicRetheme(imageUrl, { changes, ratio, resolution: "2k", solidBackground: isDisc });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `edit-${kind || "creative"}`, count: 1 }).catch(() => {});
@@ -74,6 +77,7 @@ export async function POST(req: Request) {
     // Re-apply the brand locks so iterating can never degrade them.
     let out = isDisc ? base : await stampRealLogo(clientId, referenceUrl || imageUrl, base);
     if (dealCardUrl) out = await stampDealCard(clientId, out, dealCardUrl, referenceUrl || undefined);
+    if (phoneScreenUrl) out = await stampPhoneScreen(clientId, out, phoneScreenUrl);
     // Return the pre-stamp render too, so the NEXT edit again starts from a clean image and never doubles.
     return NextResponse.json({ ok: true, url: out, cleanUrl: base });
   } catch (e) {

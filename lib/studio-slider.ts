@@ -437,3 +437,54 @@ export async function stampRealLogo(clientId: string, referenceUrl: string, imag
     return imageUrl;
   }
 }
+
+// THE PHONE SCREEN, composited - never AI-invented (Gary: "use a real screenshot"). The model is told to render
+// the handset with a SOLID BRIGHT GREEN screen (a chroma key); here we find that green, key it out to a black
+// bezel, and drop the client's real screenshot onto it - aligned to the phone's tilt, so a hand-held angle
+// looks natural. Green is used because it is trivial to detect and distinct from skin, the scene and the brand
+// yellow/navy. If no green screen is found (the model did not comply) we return the image unchanged; if a green
+// screen IS found but no screenshot was chosen, we still key it to black so raw chroma never ships.
+export async function stampPhoneScreen(clientId: string, imageUrl: string, screenUrl: string | null): Promise<string> {
+  try {
+    const buf = Buffer.from(new Uint8Array(await (await fetch(imageUrl)).arrayBuffer()));
+    const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const W = info.width, H = info.height, C = info.channels;
+
+    // 1. Find the bright chroma-green pixels.
+    let n = 0, sx = 0, sy = 0; const gi: number[] = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * C, r = data[i], g = data[i + 1], b = data[i + 2];
+      if (g > 140 && g - r > 70 && g - b > 70) { n++; sx += x; sy += y; gi.push(y * W + x); }
+    }
+    if (n < W * H * 0.0015) return imageUrl;   // no convincing green screen - leave the render as it is
+    const cx = sx / n, cy = sy / n;
+
+    // 2. The phone's tilt, from the green region's principal (long) axis.
+    let sxx = 0, syy = 0, sxy = 0;
+    for (const p of gi) { const x = p % W, y = (p / W) | 0, dx = x - cx, dy = y - cy; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);        // long-axis angle from +x (~90deg = upright)
+    const cos = Math.cos(theta), sin = Math.sin(theta);
+    let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+    for (const p of gi) { const x = p % W, y = (p / W) | 0, dx = x - cx, dy = y - cy; const u = dx * cos + dy * sin, v = -dx * sin + dy * cos; if (u < uMin) uMin = u; if (u > uMax) uMax = u; if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
+    const longLen = uMax - uMin, shortLen = vMax - vMin;
+
+    // 3. Key the green out to a black bezel, so no chroma survives even at the screen's edge.
+    for (const p of gi) { const i = p * C; data[i] = 10; data[i + 1] = 10; data[i + 2] = 12; }
+    const base = await sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
+    if (!screenUrl) {   // green found but nothing chosen: a clean black (off) screen beats raw green
+      return await putBytes(base, `studio/${clientId}/phone-screen`, "png", "image/png");
+    }
+
+    // 4. Drop the real screenshot on, sized to the screen and rotated to the phone's tilt.
+    const screenSrc = Buffer.from(new Uint8Array(await (await fetch(screenUrl)).arrayBuffer()));
+    const rotDeg = (theta * 180) / Math.PI - 90;
+    const sw = Math.max(4, Math.round(shortLen * 1.03)), sh = Math.max(4, Math.round(longLen * 1.03));
+    const screen = await sharp(screenSrc).resize(sw, sh, { fit: "fill" }).rotate(rotDeg, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+    const sm = await sharp(screen).metadata();
+    const out = await sharp(base).composite([{ input: screen, left: Math.round(cx - (sm.width || sw) / 2), top: Math.round(cy - (sm.height || sh) / 2) }]).png().toBuffer();
+    return await putBytes(out, `studio/${clientId}/phone-screen`, "png", "image/png");
+  } catch (e) {
+    console.error("[stampPhoneScreen] composite failed, returning image unchanged:", e);
+    return imageUrl;
+  }
+}
