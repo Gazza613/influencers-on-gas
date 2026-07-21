@@ -149,6 +149,22 @@ export async function buildCeoCreatives(
   if (cached) {
     cut = Buffer.from(new Uint8Array(await (await fetch(cached.url)).arrayBuffer()));
   } else {
+    // ALREADY CUT OUT? Use it as-is. A photo supplied on a clean background is often already a proper matte
+    // (Suzanne's was 57% transparent), and re-matting an already-transparent image through BiRefNet FRAYS the
+    // edge it should have left alone - the ragged outline Gary saw. If a good alpha channel is already present,
+    // the best cut-out is the one we were given.
+    const rawPhoto = Buffer.from(new Uint8Array(await (await fetch(photo.url)).arrayBuffer()));
+    const meta = await sharp(rawPhoto).metadata();
+    let transparentFrac = 0;
+    if (meta.hasAlpha) {
+      const { data, info } = await sharp(rawPhoto).ensureAlpha().extractChannel(3).raw().toBuffer({ resolveWithObject: true });
+      let clear = 0; for (let i = 0; i < data.length; i++) if (data[i] < 16) clear++;
+      transparentFrac = clear / (info.width * info.height);
+    }
+    if (transparentFrac > 0.12) {
+      // Genuinely pre-cut. Skip fal entirely - no spend, no fraying.
+      cut = rawPhoto;
+    } else {
     const matted = await removeBackground(photo.url).catch(() => ({ url: null as string | null, error: "matting failed" }));
     // METER IT. This is a paid fal call and it was going unrecorded, so the Journalist's desk under-reported
     // every CEO creative it produced. Recorded INSIDE the cache miss, never on a cache hit, because a hit
@@ -161,6 +177,7 @@ export async function buildCeoCreatives(
       const fb = await cutoutToTransparent(raw).catch(() => null);
       if (!fb) return { creatives: [], error: `Could not cut the CEO photo out (${matted.error || "no matting"}).` };
       cut = fb;
+    }
     }
     cut = await sharp(cut).trim().png().toBuffer(); // tighten to the subject before caching
     // Store it so every future render skips the matting entirely. Best effort: a failed cache write must never
@@ -190,7 +207,7 @@ export async function buildCeoCreatives(
   //   1. a CONTACT SHADOW - their own silhouette, blurred and dimmed, sitting behind and just off them.
   //   2. a TONE MATCH - pull saturation and brightness so they share the backdrop's grade. On a LIGHT field a
   //      near-black grade would over-darken the figure and a heavy shadow would smudge; both are lightened.
-  const tone = design.scheme === "light" ? { brightness: 0.99, saturation: 0.94 } : { brightness: 0.94, saturation: 0.88 };
+  const tone = design.scheme === "light" ? { brightness: 1.0, saturation: 1.0 } : { brightness: 0.94, saturation: 0.88 };
   const shadowGain = design.scheme === "light" ? 0.42 : 0.5;
   const figure = await sharp(figureRaw).modulate(tone).png().toBuffer();
   const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
@@ -215,13 +232,26 @@ export async function buildCeoCreatives(
   // 3. The foreground overlay - message, name plate, compliance, logo, mark - one render, in the brand's design.
   const overlay = await renderCeoOverlay(W, H, message, name, title, legal, fonts, design);
 
-  // 4. Three backdrops in the brand's own register (dark for MoMo, light for BrightRock), then composite each.
-  const prompts = design.backdrops.map((d) =>
-    `${d}. NO people, NO faces, NO text, NO lettering, NO numbers, NO logo, NO graphics of any kind - it is a ` +
-    `plain branded BACKGROUND only. Leave the LEFT and LOWER-LEFT calmer for a headline and a name plate; the ` +
-    `RIGHT side can carry the light. Sharp, high resolution.`);
-  const shots = await generateBatchDetailed(prompts, "nano_banana_pro", "1:1", { resolution: "2k" }, null);
-  await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
+  // 4. The three fields.
+  //
+  //   - DARK (MoMo): AI-generated navy backdrops - studio, HQ, dusk - which give a rich, real depth behind him.
+  //   - LIGHT (BrightRock): DESIGNED gradient fields, NOT AI. Gary asked for "no background, corporate", and an
+  //     AI office for a light insurer came back flat and cheap while WASHING HER OUT - a light figure on a
+  //     light AI field with no tonal control disappears. A designed field guarantees the one thing that fixes
+  //     that: a soft deepening behind and below her so she always separates from the background. It is also
+  //     cleaner, more corporate, and costs no generation. Three subtle variants so the team still picks from
+  //     three.
+  let shots: { url: string | null }[];
+  if (design.scheme === "light") {
+    shots = [{ url: null }, { url: null }, { url: null }]; // designed per-index in the composite loop
+  } else {
+    const prompts = design.backdrops.map((d) =>
+      `${d}. NO people, NO faces, NO text, NO lettering, NO numbers, NO logo, NO graphics of any kind - it is a ` +
+      `plain branded BACKGROUND only. Leave the LEFT and LOWER-LEFT calmer for a headline and a name plate; the ` +
+      `RIGHT side can carry the light. Sharp, high resolution.`);
+    shots = await generateBatchDetailed(prompts, "nano_banana_pro", "1:1", { resolution: "2k" }, null);
+    await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
+  }
 
   // The logo lockup that reads on THIS field. A dark field wants the light/reversed mark; a light field wants
   // the dark one. logoPrefersLight flips the whole score, so the same picker serves both.
@@ -243,10 +273,13 @@ export async function buildCeoCreatives(
   for (let i = 0; i < shots.length; i++) {
     try {
       const bgUrl = shots[i]?.url;
-      // A generated backdrop is ideal; if one failed, fall back to the brand's own field so we still return three.
-      const bg = bgUrl
-        ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
-        : await brandField(W, H, design.field);
+      // LIGHT: a designed field with a soft deepening where she stands, so she separates. Three subtle variants.
+      // DARK: the AI backdrop, or the brand field as a fallback.
+      const bg = design.scheme === "light"
+        ? await lightField(W, H, i)
+        : bgUrl
+          ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
+          : await brandField(W, H, design.field);
 
       // DARK allows up to a 50% right bleed; LIGHT keeps her whole - clamp so her right edge stays on-canvas.
       const x = design.scheme === "light"
@@ -325,6 +358,34 @@ ${nameplateCss(0.42)}
 </body></html>`;
   const { png } = await renderPng({ html, width: W, height: H, scale: 1, transparent: true });
   return png;
+}
+
+// THE DESIGNED LIGHT FIELD - a clean corporate backdrop, no AI (Gary: "no background, corporate"). A warm-white
+// base with a soft radial deepening on the right where she stands, so a light figure on a light field always
+// separates instead of washing out. Three subtle variants by index so the team still picks from three: warm
+// neutral, cooler grey, a faint warm-gold. The deepening is what carries the whole thing.
+async function lightField(W: number, H: number, variant: number): Promise<Buffer> {
+  const bases: [string, string, string][] = [
+    ["#f8f7f5", "#eceae6", "#dcd9d3"], // warm neutral
+    ["#f6f7f8", "#e9ebed", "#d6dade"], // cooler grey
+    ["#faf7f1", "#f0ead9", "#e6ddcb"], // faint warm gold
+  ];
+  const [top, mid, edge] = bases[variant % bases.length];
+  const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="base" x1="0" y1="0" x2="0.2" y2="1">
+        <stop offset="0" stop-color="${top}"/><stop offset="0.55" stop-color="${mid}"/><stop offset="1" stop-color="${edge}"/>
+      </linearGradient>
+      <radialGradient id="depth" cx="0.72" cy="0.62" r="0.6">
+        <stop offset="0" stop-color="#c9c4ba" stop-opacity="0.55"/>
+        <stop offset="0.55" stop-color="#c9c4ba" stop-opacity="0.20"/>
+        <stop offset="1" stop-color="#c9c4ba" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#base)"/>
+    <rect width="100%" height="100%" fill="url(#depth)"/>
+  </svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 // The brand's own field, used only as a fallback when a generated backdrop fails. `stops` is "top|bottom".
