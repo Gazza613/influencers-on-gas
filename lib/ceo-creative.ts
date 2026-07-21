@@ -9,35 +9,83 @@ import { getBrandKit, listAssets, addAsset } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
 
-// THE CEO CREATIVE - Kagiso Mothibi, forensically HIM, in every newsletter push (Gary).
+// THE CEO CREATIVE - the client's real CEO, forensically THEM, in every newsletter push (Gary).
 //
-// The face is never generated. We cut his REAL photo out of its studio background and composite it onto a MoMo
-// navy field, with the article's line as the message, the MoMo logo, his name plate, and the compliance line.
-// Everything typeset or composited by us; the only AI step is the BACKGROUND behind him, which carries no face
+// The face is never generated. We cut their REAL photo out of its background and composite it onto a BRANDED
+// field, with the article's line as the message, the client's logo, a name plate, and a compliance line.
+// Everything typeset or composited by us; the only AI step is the BACKGROUND behind them, which carries no face
 // and no text.
 //
-// THREE OUTPUTS (Gary: "give 3 output images, we will select the best"). Same forensic cut-out and layout on
-// three different MoMo backdrops, so the team picks the strongest without spending three separate runs.
+// BRAND-DRIVEN, not one-client. This began as a MoMo-only builder - navy field, white type - and would have
+// put GAS's fintech look on a life insurer if pointed at BrightRock. The design now comes from a per-brand
+// CeoDesign: MoMo keeps its exact navy-and-white, BrightRock gets a light editorial charcoal-and-gold, and the
+// next client gets its own rather than borrowing MoMo's. Only the DESIGN changes; the plumbing - the forensic
+// cut-out, the caching, the figure blend, the three-backdrop spread - is shared.
 
-// Three backdrop directions. Abstract and branded, never a busy human scene - a clean studio cut-out sits
-// naturally on a simple MoMo field and looks pasted on a crowded street. This is also how his real exec cards
-// are built.
-// THREE GENUINELY DIFFERENT PLACES (Gary: the first set were all much the same). One studio, one corporate
-// interior, one with a view - so the choice is a real choice.
-//
-// NOTE ON BRANDING: we describe a modern corporate headquarters, never "the MTN building" with signage. An AI
-// drawing MTN branding would be inventing a brand asset, which is the one thing we never do - the real logo is
-// composited on afterwards.
-const BACKDROPS = [
-  // 1. Corporate studio - the clean, formal option that already works.
-  "a premium deep navy studio backdrop with a soft top-lit gradient, clean, formal, corporate portrait lighting",
-  // 2. Inside a modern corporate HQ.
-  "the interior of a modern corporate headquarters office in Johannesburg: glass partitions, warm downlighting, " +
-  "dark tones, softly out of focus at a shallow depth of field so it reads as a real place behind the subject",
-  // 3. A skyline view, evening.
-  "a modern executive office at dusk with floor-to-ceiling windows and a softly blurred Johannesburg city " +
-  "skyline glowing beyond the glass, deep blue evening tones, shallow depth of field",
-];
+// The whole visual identity of a CEO creative, per brand. A light design and a dark design fail in opposite
+// places, so nearly every value here has a light/dark consequence and the two brands set them differently.
+type CeoDesign = {
+  scheme: "light" | "dark";     // drives text colour, the scrim direction and the figure tone-match
+  field: string;                // fallback field SVG gradient stops, used when a backdrop fails
+  textColor: string;            // headline, nameplate
+  subColor: string;             // title line
+  accent: string;               // the hairline rules and the mark
+  fspColor: string;             // the compliance line, quietest thing on the canvas
+  backdrops: string[];          // three AI backdrop prompts, in the brand's own light/dark register
+  logoPrefersLight: boolean;    // true = pick a light-reading logo (for a dark field), false = a dark one
+  compliance: string;           // the exact regulated line, or "" for just the AI disclosure
+};
+
+const MOMO_DESIGN: CeoDesign = {
+  scheme: "dark",
+  field: "#0e4a68|#04263a",
+  textColor: "#ffffff",
+  subColor: "rgba(255,255,255,.82)",
+  accent: "#F9CB0F",
+  fspColor: "rgba(255,255,255,.78)",
+  // The original three: a clean studio, a corporate HQ, a dusk skyline - all deep navy so white type reads.
+  backdrops: [
+    "a premium deep navy studio backdrop with a soft top-lit gradient, clean, formal, corporate portrait lighting",
+    "the interior of a modern corporate headquarters office in Johannesburg: glass partitions, warm downlighting, " +
+    "dark tones, softly out of focus at a shallow depth of field so it reads as a real place behind the subject",
+    "a modern executive office at dusk with floor-to-ceiling windows and a softly blurred Johannesburg city " +
+    "skyline glowing beyond the glass, deep blue evening tones, shallow depth of field",
+  ],
+  logoPrefersLight: true,
+  compliance: "",   // MoMo carries only the AI disclosure - a point of view, not an FSP advertisement
+};
+
+// BrightRock: the light editorial look proven before this was built. Charcoal on a warm-white field, a single
+// gold hairline drawn from the dot on their own "i", and the FSP licence line because they are a licensed
+// insurer and a post showing their name may carry it. The opposite of MoMo at every turn, on purpose.
+const BRIGHTROCK_DESIGN: CeoDesign = {
+  scheme: "light",
+  field: "#f7f6f4|#e4e1dc",
+  textColor: "#2b2b2b",
+  subColor: "#3a3a3a",
+  accent: "#f0a818",
+  fspColor: "#8a8781",
+  // LIGHT and human, never navy - a calm, permanent, trustworthy register for a life insurer, not fintech energy.
+  backdrops: [
+    "a clean, bright, softly-lit studio backdrop in warm off-white and pale grey, a gentle top-light gradient, " +
+    "calm and premium, corporate portrait lighting",
+    "the interior of a bright modern insurance-company office in Cape Town: pale walls, warm natural daylight, " +
+    "soft neutral tones, softly out of focus at a shallow depth of field so it reads as a real place",
+    "a light, airy modern office with large windows and soft daylight, warm neutral and pale-grey tones, a hint " +
+    "of warm gold in the light, shallow depth of field, calm and reassuring",
+  ],
+  logoPrefersLight: false,   // the charcoal wordmark, for a light field
+  compliance: "BrightRock Life Ltd is a licensed financial services provider and life insurer. FSP 11643.",
+};
+
+// Which design a brain gets. Keyed by client_id, defaulting to MoMo's scheme so nothing that predates this
+// changes. A future client is added here with its own CeoDesign.
+const MOMO_ID = "e44295d7-dc10-4422-bede-4e9ddcad7b2d";
+const BRIGHTROCK_ID = "dfc2efbf-7949-428b-a34d-1c5e92b88875";
+function designFor(clientId: string): CeoDesign {
+  if (clientId === BRIGHTROCK_ID) return BRIGHTROCK_DESIGN;
+  return MOMO_DESIGN;
+}
 
 export type CeoCreative = { url: string; error?: string };
 
@@ -45,6 +93,7 @@ export async function buildCeoCreatives(
   clientId: string,
   opts: { message: string; name?: string; title?: string },
 ): Promise<{ creatives: CeoCreative[]; error: string | null }> {
+  const design = designFor(clientId);
   // 1. His real photo. VARIED, not always the same one (Gary: "does Kagiso always have to be wearing the same
   //    clothes - this will make the post very stale").
   //
@@ -129,44 +178,51 @@ export async function buildCeoCreatives(
   // Gary saw. Allow a mild 1.15x at most, otherwise render him at his native size and let him sit slightly
   // smaller in frame. Crisp and smaller beats big and mushy on a CEO.
   const nativeH = cm.height || 0;
-  const figH = Math.min(Math.round(H * 0.96), Math.round((nativeH || H) * 1.15)); // bigger presence (Gary)
+  // A LIGHT design needs the figure a touch smaller and pushed further right: on a light field the message and
+  // the nameplate live in the negative space, and a figure at MoMo's near-full-bleed size would crowd them.
+  const figScale = design.scheme === "light" ? 0.82 : 0.96;
+  const figH = Math.min(Math.round(H * figScale), Math.round((nativeH || H) * 1.15));
   const figW = Math.round((cm.width || 800) * (figH / (nativeH || 1000)));
   const figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
 
   // BLEND HIM INTO THE SCENE. A hard cut-out on a generated backdrop reads as two separate pictures (Gary:
   // "looks detached"). Two cheap, physical fixes do most of the work:
-  //   1. a CONTACT SHADOW - his own silhouette, blurred and dimmed, sitting behind and just off him. Without a
-  //      shadow the eye reads a sticker; with one it reads a person standing in a room.
-  //   2. a TONE MATCH - pull his saturation and brightness down a touch so he shares the backdrop's cooler,
-  //      dimmer grade instead of popping like a brighter layer pasted on top.
-  const figure = await sharp(figureRaw).modulate({ brightness: 0.94, saturation: 0.88 }).png().toBuffer();
-  const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(30).linear(0.5, 0).toColourspace("b-w").toBuffer();
+  //   1. a CONTACT SHADOW - their own silhouette, blurred and dimmed, sitting behind and just off them.
+  //   2. a TONE MATCH - pull saturation and brightness so they share the backdrop's grade. On a LIGHT field a
+  //      near-black grade would over-darken the figure and a heavy shadow would smudge; both are lightened.
+  const tone = design.scheme === "light" ? { brightness: 0.99, saturation: 0.94 } : { brightness: 0.94, saturation: 0.88 };
+  const shadowGain = design.scheme === "light" ? 0.42 : 0.5;
+  const figure = await sharp(figureRaw).modulate(tone).png().toBuffer();
+  const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
   const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
   const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
-  // He sits a little further LEFT now (Gary), while his leftmost point still clears the message column so the
-  // headline can never reach him. If he is wide, he bleeds further off the right edge instead.
-  const figLeft = Math.max(Math.round(W * 0.45), W - figW);
+  // The figure sits right, bottom-anchored, its leftmost point clearing the message column so the headline can
+  // never reach it. A light design pushes it further right (55% floor) than MoMo's (45%).
+  const figFloor = design.scheme === "light" ? 0.55 : 0.45;
+  const figLeft = Math.max(Math.round(W * figFloor), W - figW);
   const figTop = H - figH;
 
-  // 3. The foreground overlay - message (left), name plate (bottom-left), compliance (footer) - one render.
-  const overlay = await renderCeoOverlay(W, H, message, name, title, legal, fonts);
+  // 3. The foreground overlay - message, name plate, compliance, logo, mark - one render, in the brand's design.
+  const overlay = await renderCeoOverlay(W, H, message, name, title, legal, fonts, design);
 
-  // 4. Three backdrops, then composite each: bg -> figure -> overlay -> logo.
-  const prompts = BACKDROPS.map((d) =>
+  // 4. Three backdrops in the brand's own register (dark for MoMo, light for BrightRock), then composite each.
+  const prompts = design.backdrops.map((d) =>
     `${d}. NO people, NO faces, NO text, NO lettering, NO numbers, NO logo, NO graphics of any kind - it is a ` +
-    `plain branded BACKGROUND only. Leave the LEFT and LOWER-LEFT darker and calmer for a headline and a name ` +
-    `plate; the RIGHT side can carry the light. Sharp, high resolution.`);
+    `plain branded BACKGROUND only. Leave the LEFT and LOWER-LEFT calmer for a headline and a name plate; the ` +
+    `RIGHT side can carry the light. Sharp, high resolution.`);
   const shots = await generateBatchDetailed(prompts, "nano_banana_pro", "1:1", { resolution: "2k" }, null);
   await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
 
-  // THE YELLOW LOGO for a dark field (Gary). The CEO backdrop is always deep navy, so pick the light-reading
-  // lockup - yellow / white / reversed - not the navy-on-navy one that vanishes.
+  // The logo lockup that reads on THIS field. A dark field wants the light/reversed mark; a light field wants
+  // the dark one. logoPrefersLight flips the whole score, so the same picker serves both.
   const logos = (kit?.logos || []) as { name: string | null; url: string }[];
   const logoScore = (n: string) => {
     const s = (n || "").toLowerCase(); let v = 0;
-    if (/yellow|white|reverse|reversed|light|mono.?white|on.?dark/.test(s)) v += 6;
-    if (/navy|blue|black|dark|on.?light/.test(s)) v -= 5;
-    if (/horiz|primary|full/.test(s)) v += 2;
+    const light = /yellow|white|reverse|reversed|light|mono.?white|on.?dark/.test(s);
+    const dark = /navy|blue|black|charcoal|dark|mono.?black|on.?light/.test(s);
+    if (light) v += design.logoPrefersLight ? 6 : -5;
+    if (dark) v += design.logoPrefersLight ? -5 : 6;
+    if (/horiz|primary|full|wordmark/.test(s)) v += 2;
     if (/stack|vert|icon|mark/.test(s)) v -= 2;
     return v;
   };
@@ -177,10 +233,10 @@ export async function buildCeoCreatives(
   for (let i = 0; i < shots.length; i++) {
     try {
       const bgUrl = shots[i]?.url;
-      // A generated backdrop is ideal; if one failed, fall back to a solid MoMo navy so we still return three.
+      // A generated backdrop is ideal; if one failed, fall back to the brand's own field so we still return three.
       const bg = bgUrl
         ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
-        : await navyField(W, H);
+        : await brandField(W, H, design.field);
 
       const x = Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
       let out = await sharp(bg)
@@ -191,7 +247,7 @@ export async function buildCeoCreatives(
           { input: overlay, left: 0, top: 0 },
         ])
         .png().toBuffer();
-      if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: 24 })) as Buffer;
+      if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 5, wPct: design.scheme === "light" ? 20 : 24 })) as Buffer;
 
       const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
       creatives.push({ url });
@@ -203,9 +259,15 @@ export async function buildCeoCreatives(
   return { creatives: ok.length ? creatives : [], error: ok.length ? null : "All three renders failed. Try again." };
 }
 
-// The message + name plate + compliance, as one transparent overlay. Left-aligned - the CEO sits on the right,
-// so the words live in the calm negative space on the left.
-async function renderCeoOverlay(W: number, H: number, message: string, name: string, title: string, legal: string, fonts: { family: string; url: string }[]): Promise<Buffer> {
+// The message + name plate + compliance, as one transparent overlay, in the brand's design. Left-aligned - the
+// CEO sits on the right, so the words live in the calm negative space on the left.
+//
+// A LIGHT design takes a different overlay entirely, not a recoloured MoMo one. On a light field, white type
+// and a dark wash would be inverted nonsense, and the biggest lesson from the proof was that charcoal text
+// vanishes wherever the dark suit sits - so the light overlay carries its OWN light scrim to guarantee a clean
+// backing for the text, which the dark design gets for free.
+async function renderCeoOverlay(W: number, H: number, message: string, name: string, title: string, legal: string, fonts: { family: string; url: string }[], design: CeoDesign): Promise<Buffer> {
+  if (design.scheme === "light") return renderLightOverlay(W, H, message, name, title, legal, fonts, design);
   const esc = (t: string) => String(t || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // THE MESSAGE LIVES IN A LEFT COLUMN THAT NEVER REACHES HIM. His figure's leftmost is forced to >= 50% of the
   // width, so the column is capped at 42% and auto-sized so even the LONGEST WORD fits inside it - a long word
@@ -252,11 +314,51 @@ ${nameplateCss(0.42)}
   return png;
 }
 
-// A plain MoMo navy gradient, used only as a fallback when a generated backdrop fails.
-async function navyField(W: number, H: number): Promise<Buffer> {
+// The brand's own field, used only as a fallback when a generated backdrop fails. `stops` is "top|bottom".
+async function brandField(W: number, H: number, stops: string): Promise<Buffer> {
+  const [top, bottom] = stops.split("|");
   const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">` +
     `<defs><linearGradient id="g" x1="0" y1="0" x2="0.3" y2="1">` +
-    `<stop offset="0" stop-color="#0e4a68"/><stop offset="1" stop-color="#04263a"/></linearGradient></defs>` +
+    `<stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient></defs>` +
     `<rect width="100%" height="100%" fill="url(#g)"/></svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+// THE LIGHT OVERLAY (BrightRock and any future light brand). Charcoal type, a gold hairline drawn from the dot
+// on their own wordmark, an understated nameplate and the FSP compliance line. Its own left scrim is the fix
+// the proof forced: charcoal text over the dark suit disappeared, so the text zone always carries a light wash.
+async function renderLightOverlay(W: number, H: number, message: string, name: string, title: string, legal: string, fonts: { family: string; url: string }[], design: CeoDesign): Promise<Buffer> {
+  const esc = (t: string) => String(t || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const colW = W * 0.42;
+  const longestWord = Math.max(...message.split(/\s+/).map((w) => w.length), 1);
+  const msgSize = Math.max(Math.round(H * 0.038), Math.min(Math.round(H * 0.052), Math.floor(colW / (longestWord * 0.58))));
+  const fam = fonts[0]?.family || "Helvetica Neue";
+  // The FSP line and the AI disclosure ride together, quietly, at the foot.
+  const foot = [design.compliance, legal].filter(Boolean).join(" ");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+${fontFaceCss(fonts)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent;font-family:'${fam}','Helvetica Neue',Arial,sans-serif}
+/* THE SCRIM. A light wash across the left, fading out before the figure, so charcoal text always has a clean
+   backing - the single fix that made the nameplate legible where the dark suit sits. */
+.scrim{position:absolute;inset:0;background:linear-gradient(90deg, #f4f2ef 0%, #f4f2ef 36%, rgba(244,242,239,.72) 50%, rgba(244,242,239,0) 62%)}
+.rule{position:absolute;left:6%;top:33%;width:${Math.round(H * 0.043)}px;height:${Math.round(H * 0.004)}px;background:${design.accent};border-radius:3px}
+.msg{position:absolute;left:6%;top:36%;width:42%;color:${design.textColor};font-weight:700;font-size:${msgSize}px;line-height:1.1;letter-spacing:-1.2px}
+.plate{position:absolute;left:6%;bottom:12.5%}
+.plate .nm{font-weight:800;font-size:${Math.round(H * 0.025)}px;color:${design.textColor};letter-spacing:-0.3px}
+.plate .tl{margin-top:3px;font-weight:600;font-size:${Math.round(H * 0.016)}px;color:${design.subColor};letter-spacing:0.2px}
+.plate .br{width:${Math.round(H * 0.032)}px;height:${Math.round(H * 0.0033)}px;background:${design.accent};margin-top:12px;border-radius:2px}
+.fsp{position:absolute;left:6%;width:44%;bottom:5%;font-size:${Math.round(H * 0.0112)}px;line-height:1.5;color:${design.fspColor};font-weight:500}
+.ai{position:absolute;right:5%;bottom:5%;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+  border:1px solid rgba(43,43,43,.16);background:rgba(255,255,255,.55);font-weight:600;font-size:${Math.round(H * 0.0125)}px;color:#6b6862}
+</style></head><body>
+<div class="scrim"></div>
+<div class="rule"></div>
+<div class="msg">${esc(message)}</div>
+<div class="plate"><div class="nm">${esc(name)}</div><div class="tl">${esc(title)}</div><div class="br"></div></div>
+<div class="fsp">${esc(foot)}</div>
+<div class="ai">✦ <span>${esc(legal)}</span></div>
+</body></html>`;
+  const { png } = await renderPng({ html, width: W, height: H, scale: 1, transparent: true });
+  return png;
 }
