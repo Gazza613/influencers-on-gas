@@ -65,18 +65,24 @@ const BRIGHTROCK_DESIGN: CeoDesign = {
   subColor: "#3a3a3a",
   accent: "#f0a818",
   fspColor: "#8a8781",
-  // THREE REAL CORPORATE BOARDROOMS (Gary), light and premium - depth and impact, not a flat studio card.
-  // Bright and neutral so charcoal type still reads over a light scrim, and softly blurred so she stays the
-  // subject.
+  // THREE SOPHISTICATED FINANCIAL-SERVICES INTERIORS (Gary: "more corporate and sophisticated, financial
+  // services"). Not a generic meeting room - the executive floor of a wealth-and-insurance headquarters: glass,
+  // stone, walnut, a moneyed skyline. Bright and neutral so charcoal type still reads over the left panel, shot
+  // like high-end architectural photography and held at a shallow depth of field so she stays the subject.
   backdrops: [
-    "the interior of a premium modern corporate boardroom, a long polished table, elegant leather chairs, floor-" +
-    "to-ceiling windows with soft bright daylight, warm neutral and pale tones, richly detailed but softly out " +
-    "of focus at a shallow depth of field so it reads as a real, high-end room behind the subject",
-    "a bright modern executive boardroom with a city skyline through large windows, pale walls, warm wood and " +
-    "soft grey tones, glass and steel, natural daylight, shallow depth of field, calm and premium",
-    "an elegant contemporary boardroom with warm timber panelling, soft ambient lighting, large windows with " +
-    "diffused daylight, neutral and warm tones with a faint gold warmth, shallow depth of field, sophisticated " +
-    "and reassuring",
+    "the executive floor of a premium financial-services headquarters: floor-to-ceiling glass framing a soft " +
+    "sunlit business-district skyline, a long boardroom table in warm walnut, sculptural designer chairs, a " +
+    "polished stone floor, an understated palette of stone, ivory and charcoal, calm and moneyed, shot like " +
+    "high-end architectural photography on medium format, softly out of focus at a shallow depth of field so it " +
+    "reads as a real, sophisticated room",
+    "a sophisticated boardroom high in a modern insurance headquarters, full-height windows framing a bright hazy " +
+    "city skyline, pale marble and warm timber, brushed-brass detailing, soft diffused daylight, a refined " +
+    "palette of stone, ivory and warm grey, deep and expensive, shallow depth of field, richly detailed yet " +
+    "gently blurred behind the subject",
+    "an elegant executive lounge on a high floor of a financial-services tower, floor-to-ceiling glass with a " +
+    "warm out-of-focus city view, low walnut panelling, soft architectural lighting, calm neutral tones with a " +
+    "faint gold warmth, refined and reassuring, shot on medium format with a shallow depth of field so the room " +
+    "falls softly out of focus",
   ],
   logoPrefersLight: false,   // the charcoal wordmark, for a light field
   compliance: "BrightRock Life Ltd is a licensed financial services provider and life insurer. FSP 11643.",
@@ -199,9 +205,11 @@ export async function buildCeoCreatives(
   // Gary saw. Allow a mild 1.15x at most, otherwise render him at his native size and let him sit slightly
   // smaller in frame. Crisp and smaller beats big and mushy on a CEO.
   const nativeH = cm.height || 0;
-  // A LIGHT design needs the figure a touch smaller and pushed further right: on a light field the message and
-  // the nameplate live in the negative space, and a figure at MoMo's near-full-bleed size would crowd them.
-  const figScale = design.scheme === "light" ? 0.82 : 0.96;
+  // She is the hero and sits PROMINENT on both schemes - a shrunk figure floating in the corner is not a CEO
+  // portrait. A head-and-shoulders cut-out is naturally near-square (wide crossed arms, a narrow head), so the
+  // light layout does NOT try to fit her whole width beside the panel; it centres her by the HEAD and lets the
+  // wide arms tuck behind the panel and bleed gently off frame, the way an executive portrait actually sits.
+  const figScale = design.scheme === "light" ? 0.88 : 0.96;
   const figH = Math.min(Math.round(H * figScale), Math.round((nativeH || H) * 1.15));
   const figW = Math.round((cm.width || 800) * (figH / (nativeH || 1000)));
   const figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
@@ -228,8 +236,13 @@ export async function buildCeoCreatives(
   //     keeping her whole would cross into the text column - in which case the figure was over-scaled upstream.
   let figLeft: number;
   if (design.scheme === "light") {
-    const rightMargin = Math.round(W * 0.03);
-    figLeft = Math.max(Math.round(W * 0.48), W - figW - rightMargin);
+    // CENTRE HER BY THE HEAD in the office (Gary: "moved over and centred in this section"). Her head sits at
+    // the horizontal centre of the cut-out, so putting the figure centre near 63% of the frame places her head
+    // in the middle of the room. The wide arms then tuck behind the panel on the left and bleed a little off the
+    // right - both are low, soft parts of the silhouette, never her face. Bleed is capped to ~6% so "cut off on
+    // the right" never returns.
+    const headCentre = Math.round(W * 0.63);
+    figLeft = Math.min(headCentre - Math.round(figW / 2), W - Math.round(figW * 0.94));
   } else {
     figLeft = Math.max(Math.round(W * 0.45), W - figW);
   }
@@ -280,9 +293,10 @@ export async function buildCeoCreatives(
         ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
         : design.scheme === "light" ? await lightField(W, H, i) : await brandField(W, H, design.field);
 
-      // DARK allows up to a 50% right bleed; LIGHT keeps her whole - clamp so her right edge stays on-canvas.
+      // DARK allows up to a 50% right bleed; LIGHT allows the small (~6%) arm bleed figLeft already sized, so
+      // her head stays centred in the room rather than being shoved back on-canvas.
       const x = design.scheme === "light"
-        ? Math.max(0, Math.min(figLeft, W - figW))
+        ? Math.max(0, figLeft)
         : Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
       // NO CONTACT SHADOW ON LIGHT. A blurred black shadow bleeds through her translucent hair and shoulder
       // edges as grey murk on a light field - the "shading on her face" Gary saw. A photographic boardroom
@@ -295,7 +309,7 @@ export async function buildCeoCreatives(
             { input: overlay, left: 0, top: 0 },
           ];
       let out = await sharp(bg).composite(layers).png().toBuffer();
-      if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 5, wPct: design.scheme === "light" ? 20 : 24 })) as Buffer;
+      if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 5, wPct: design.scheme === "light" ? 26 : 24 })) as Buffer;
 
       const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
       creatives.push({ url });
@@ -417,24 +431,22 @@ ${fontFaceCss(fonts)}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent;font-family:'${fam}','Helvetica Neue',Arial,sans-serif}
 /* THE SCRIM. A light wash across the left, fading out before the figure, so charcoal text always has a clean
    backing - the single fix that made the nameplate legible where the dark suit sits. */
-/* A clean cream panel holding the text, over a photographic boardroom. It is SOLID to 38% and fully gone by
-   45% - she begins around 48%, so the panel gives charcoal type a firm backing and NEVER reaches her face
-   (the veil that shaded her before). A hair-line gold edge where it meets the room reads as a design panel
-   rather than a fade. */
-.scrim{position:absolute;inset:0;background:linear-gradient(90deg, #f5f3f0 0%, #f5f3f0 38%, rgba(245,243,240,.92) 42%, rgba(245,243,240,0) 45%)}
-.edge{position:absolute;top:0;bottom:0;left:44.4%;width:3px;background:linear-gradient(to bottom, transparent, rgba(240,168,24,.55) 30%, rgba(240,168,24,.55) 70%, transparent)}
+/* A clean cream panel holding the text, over a photographic boardroom. SOLID to 27% then a GRACEFUL editorial
+   fade, fully gone by 45% - she begins at ~46%, so the panel gives charcoal type a firm backing and NEVER
+   reaches her face (the veil that shaded her before). No hard divider line: a top-1% layout lets the room
+   breathe into the panel rather than slicing the frame with a rule. */
+.scrim{position:absolute;inset:0;background:linear-gradient(90deg, #f4f2ef 0%, #f4f2ef 40%, rgba(244,242,239,.85) 43%, rgba(244,242,239,0) 45%)}
 .rule{position:absolute;left:6%;top:33%;width:${Math.round(H * 0.043)}px;height:${Math.round(H * 0.004)}px;background:${design.accent};border-radius:3px}
 .msg{position:absolute;left:6%;top:36%;width:42%;color:${design.textColor};font-weight:700;font-size:${msgSize}px;line-height:1.1;letter-spacing:-1.2px}
 .plate{position:absolute;left:6%;bottom:12.5%}
 .plate .nm{font-weight:800;font-size:${Math.round(H * 0.025)}px;color:${design.textColor};letter-spacing:-0.3px}
 .plate .tl{margin-top:3px;font-weight:600;font-size:${Math.round(H * 0.016)}px;color:${design.subColor};letter-spacing:0.2px}
 .plate .br{width:${Math.round(H * 0.032)}px;height:${Math.round(H * 0.0033)}px;background:${design.accent};margin-top:12px;border-radius:2px}
-.fsp{position:absolute;left:6%;width:44%;bottom:5%;font-size:${Math.round(H * 0.0112)}px;line-height:1.5;color:${design.fspColor};font-weight:500}
+.fsp{position:absolute;left:6%;width:34%;bottom:5%;font-size:${Math.round(H * 0.0112)}px;line-height:1.5;color:${design.fspColor};font-weight:500}
 .ai{position:absolute;right:5%;bottom:5%;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
   border:1px solid rgba(43,43,43,.16);background:rgba(255,255,255,.55);font-weight:600;font-size:${Math.round(H * 0.0125)}px;color:#6b6862}
 </style></head><body>
 <div class="scrim"></div>
-<div class="edge"></div>
 <div class="rule"></div>
 <div class="msg">${esc(message)}</div>
 <div class="plate"><div class="nm">${esc(name)}</div><div class="tl">${esc(title)}</div><div class="br"></div></div>
