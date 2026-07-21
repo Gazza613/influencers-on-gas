@@ -104,8 +104,10 @@ export async function onBackground(pngBuf: Buffer, hex: string): Promise<Buffer>
 // transparent PNG whose ragged edge fights us, we flatten the design onto the EXACT colour of the Webflow
 // section it embeds into, so it reads as seamlessly placed and the edge halo simply disappears into the match.
 //
-// Colours read straight from the live funnel CSS (mtn-momo.webflow.shared.css):
-//   masthead -> the hero section .section-1---hero: linear-gradient(167deg, #0b425d, #02293d)
+// Colours read straight from the live funnel:
+//   masthead -> the hero section, FLAT #083a51 (Gary supplied the exact swatch; the section is now a solid
+//               fill, not the old #0b425d->#02293d gradient, so the creative must be that one flat colour edge
+//               to edge or the seam shows against the Webflow band).
 //   section1 -> the white sections: #ffffff
 // FORCE THE SECTION-1 BACKGROUND TO PURE WHITE (Gary: "smudges top right and top left... it happens with almost
 // all outputs for section 1 - fix it and lock it in").
@@ -127,6 +129,9 @@ export async function onBackground(pngBuf: Buffer, hex: string): Promise<Buffer>
 // halo around the design and only clean beyond it.
 const BG_MIN_LUM = 185;    // lighter than this to count as background
 const BG_MAX_SAT = 40;     // and near-neutral (max-min channel spread)
+// THE EXACT WEBFLOW MASTHEAD COLOUR. Gary supplied the swatch: #083a51 (rgb 8,58,81). The masthead creative's
+// field must be this to the byte or the seam against the Webflow band is visible. One constant, one source.
+export const MASTHEAD_NAVY = "#083a51";
 // Tuned on a test rig, not guessed: at 0.035 the fill breached a drop shadow at an unprotected point and then
 // ate the whole thing (shadow pixels are background-like, so once inside it spreads through). 0.06 keeps the
 // shadow (226 stays 226) while still cleaning corner smudges to pure white. 0.09 gains nothing.
@@ -239,6 +244,47 @@ export async function flattenSection1ToWhite(buf: Buffer): Promise<Buffer> {
   return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
 }
 
+// FORCE THE MASTHEAD FIELD TO EXACTLY #083a51 (the mirror of flattenSection1ToWhite, for the dark band). The
+// retheme is an AI regeneration, so even with a flat #083a51 base it can drift the field a shade or leave a
+// faint gradient - and a shade off is a visible seam when the image drops into the Webflow masthead section.
+// So we do not rely on the model: we flood-fill the NAVY BACKGROUND inward from the edges to the exact colour,
+// stopping dead at the yellow disc, the light streak and the subject (none of which are dark-blue), and
+// protecting a halo so the subject's own contact shadow survives. The result: every edge pixel is #083a51.
+export async function flattenMastheadToNavy(buf: Buffer): Promise<Buffer> {
+  const target = [8, 58, 81];   // #083a51
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, C = info.channels;
+
+  // A masthead-background pixel is one that is ALREADY CLOSE to the field colour #083a51. The tolerance is wide
+  // enough to swallow the whole range the AI might drift the flat field to (it comfortably covers the old
+  // #0b425d -> #02293d gradient), but tight enough that the subject's clothing, skin and hair - and any darker
+  // contact shadow beneath them - fall outside it and are left untouched. No halo, no blur: the colour test
+  // itself preserves the shadow, and flood-filling only from the EDGES means an interior region that happens to
+  // match the field is never reached unless the field connects to it.
+  const near = (i: number): boolean =>
+    Math.abs(data[i] - target[0]) <= 26 && Math.abs(data[i + 1] - target[1]) <= 30 && Math.abs(data[i + 2] - target[2]) <= 34;
+
+  const seen = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  let sp = 0;
+  const push = (x: number, y: number) => { const p = y * W + x; if (!seen[p]) { seen[p] = 1; stack[sp++] = p; } };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+  for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+
+  while (sp > 0) {
+    const p = stack[--sp];
+    const i = p * C;
+    if (!near(i)) continue;               // a non-field pixel is a wall: the subject and its shadow stop the fill
+    data[i] = target[0]; data[i + 1] = target[1]; data[i + 2] = target[2];
+    const x = p % W, y = (p / W) | 0;
+    if (x > 0) push(x - 1, y);
+    if (x < W - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < H - 1) push(x, y + 1);
+  }
+  return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
+}
+
 export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "section1"): Promise<Buffer> {
   const meta = await sharp(pngBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 811;
@@ -247,11 +293,8 @@ export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "sec
     return sharp({ create: { width: W, height: H, channels: 3, background: "#ffffff" } })
       .composite([{ input: pngBuf }]).png().toBuffer();
   }
-  // Masthead: the hero navy gradient, top #0b425d to bottom #02293d (167deg ~ near-vertical, slight left).
-  const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">` +
-    `<defs><linearGradient id="g" x1="0.1" y1="0" x2="-0.1" y2="1">` +
-    `<stop offset="0" stop-color="#0b425d"/><stop offset="1" stop-color="#02293d"/></linearGradient></defs>` +
-    `<rect width="100%" height="100%" fill="url(#g)"/></svg>`;
-  const bg = await sharp(Buffer.from(svg)).png().toBuffer();
-  return sharp(bg).composite([{ input: pngBuf }]).png().toBuffer();
+  // Masthead: the hero band, FLAT #083a51 (MASTHEAD_NAVY) - the exact Webflow colour, so the base already
+  // matches the section it drops into. flattenMastheadToNavy re-asserts it deterministically after the retheme.
+  return sharp({ create: { width: W, height: H, channels: 3, background: MASTHEAD_NAVY } })
+    .composite([{ input: pngBuf }]).png().toBuffer();
 }

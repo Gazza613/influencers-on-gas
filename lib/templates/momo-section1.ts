@@ -14,7 +14,11 @@ import type { Deal } from "../studio-producer";
 // WHY THEY SIT LEFT AND RIGHT, NOT OVER THE SUBJECT: the cards win attention on LUMINANCE (dark navy on a
 // bright field) and ENCLOSURE. Both of those collapse if the card overlaps the busy edge of a cut-out.
 
-const MOMO_BLUE = "#004F71";
+// SECTION 1 IS PURE WHITE (Gary: "plain white background #FFFFFF, lock it in"). It drops into the white Webflow
+// section, so the field is #ffffff - not the MoMo blue the masthead uses. The disc, the navy deal cards and the
+// subject all read cleanly on white; the blue glow that lifted the subject off a blue field is removed, because
+// on white it would only haze the clean background Gary asked for.
+const SECTION1_WHITE = "#ffffff";
 const MOMO_YELLOW = "#F9CB0F";
 const CARD_TOP = "#0E3A55";
 const CARD_BOT = "#07212E";
@@ -55,12 +59,10 @@ export function renderMomoSection1(slots: Section1Slots, fonts: { family: string
 ${fontFaceCss(fonts)}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:1239px;height:1080px;overflow:hidden}
-.canvas{position:relative;width:1239px;height:1080px;overflow:hidden;background:${MOMO_BLUE};
+.canvas{position:relative;width:1239px;height:1080px;overflow:hidden;background:${SECTION1_WHITE};
   font-family:'MTNBrighterSans',sans-serif;-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums lining-nums}
 
-.glow{position:absolute;left:50%;top:48%;width:1500px;height:1500px;transform:translate(-50%,-50%);
-  background:radial-gradient(circle,rgba(0,120,166,.55) 0%,rgba(0,90,128,.22) 45%,transparent 70%)}
  /* FLAT. A radial 3D gradient turns the brand's signature disc into a lemon - the fastest route to clip art. */
 .disc{position:absolute;left:50%;top:52%;width:640px;height:640px;transform:translate(-50%,-50%);
   border-radius:50%;background:${MOMO_YELLOW}}
@@ -105,7 +107,6 @@ html,body{width:1239px;height:1080px;overflow:hidden}
   font-weight:400;font-size:28px;line-height:1.3;color:rgba(255,255,255,.94)}
 </style></head><body>
 <div class="canvas">
-  <div class="glow"></div>
   <div class="disc"></div>
   <div class="streak-back"></div>
   <img class="subject" src="${slots.subject}" alt="">

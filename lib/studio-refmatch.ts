@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
 import { forensicSwap, forensicRetheme } from "./vendors/higgsfield";
-import { onFunnelBackground, applyReferenceAlpha, flattenSection1ToWhite } from "./studio-cutout";
+import { onFunnelBackground, applyReferenceAlpha, flattenSection1ToWhite, flattenMastheadToNavy } from "./studio-cutout";
 import { overlayPill, balanceHeadline, tidyCallout, stampRealLogo } from "./studio-slider";
 import { detectLayout } from "./studio-layout";
 import { getBrandKit } from "./studio";
@@ -170,13 +170,19 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     totalCalls += 1;
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "retheme failed" }; }
 
-    // SECTION 1 MUST BE PURE WHITE for its Webflow section - deterministic, because no prompt has held.
+    // SECTION 1 MUST BE PURE WHITE, MASTHEAD EXACTLY #083a51 - deterministic on both, because no prompt has held
+    // and the seam against the Webflow section is unforgiving.
     let cleanUrl = url;
     if (j.kind === "section1") {
       try {
         const cleaned = await flattenSection1ToWhite(await bufOf(url));
         cleanUrl = await putBytes(cleaned, `studio/${clientId}/section1-white`, "png", "image/png");
       } catch (e) { console.error("[produceRefMatch] section-1 white flatten failed:", e); }
+    } else if (j.kind === "masthead") {
+      try {
+        const navy = await flattenMastheadToNavy(await bufOf(url));
+        cleanUrl = await putBytes(navy, `studio/${clientId}/masthead-navy`, "png", "image/png");
+      } catch (e) { console.error("[produceRefMatch] masthead navy flatten failed:", e); }
     }
     // Sliders get the REAL stamped lockup (the retheme draws none, so it is the only logo and can never say
     // "from HTN"). Masthead/section-1 get NO logo (Gary) - the Webflow funnel page already carries it.

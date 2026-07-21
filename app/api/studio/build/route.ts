@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
 import { balanceHeadline, tidyCallout, stampRealLogo, stampDealCard, stampTypesetDeal } from "@/lib/studio-slider";
-import { onFunnelBackground, flattenSection1ToWhite } from "@/lib/studio-cutout";
+import { onFunnelBackground, flattenSection1ToWhite, flattenMastheadToNavy } from "@/lib/studio-cutout";
 import { SLIDER_GRADE } from "@/lib/studio-refmatch";
 import { putBytes } from "@/lib/blob";
 import { listAssets } from "@/lib/studio";
@@ -62,9 +62,17 @@ export async function POST(req: Request) {
       }
       // One grade across all three sliders, whatever the setting, so the set hangs together in the funnel.
       changes.push(SLIDER_GRADE);
+      // CAROUSEL ALIGNMENT (Gary): the three sliders sit together as one carousel, so their accent must be
+      // identical - not merely "yellow" but the SAME yellow, at the same strength, on every slide. Locked to
+      // the brand hex so it cannot drift warmer or paler between generations.
+      changes.push(`ACCENT LOCK: the only accent colour is MoMo yellow #F9CB0F, used IDENTICALLY on every slider in this set - the yellow headline line and any yellow light accent must be the exact same hue and strength on all three, so the carousel reads as one aligned set. The blue is MoMo blue #004F71. Introduce no other accent colour anywhere.`);
     } else {
       // masthead / section 1: the callout is the copy on the design's CALLOUT PILL.
       if (callout) changes.push(`Change the CALLOUT PILL / lozenge copy to "${callout}", keeping the pill's exact shape, colour, 3D style and any yellow banner or underline, matched to the design's own font.`);
+      // SECTION 1 IS ALWAYS PURE WHITE (Gary: "plain white background #FFFFFF, lock it in"). The base is already
+      // white and we re-assert it deterministically after, but we also tell the model plainly so it stops
+      // painting a room or a tint behind the design in the first place.
+      if (kind === "section1") changes.push(`BACKGROUND: the entire background MUST be pure solid white #FFFFFF - no room, no scene, no gradient, no vignette, no tint and no shadow wash behind the design. Only the people, the deal cards / bubbles and the yellow disc sit on clean white. This drops into a white Webflow section, so any colour behind the design is a seam and a defect.`);
     }
     // The "who should be in it" field: a people change (or a verbatim instruction if it reads like one).
     if (subject) changes.push(/^\s*(change|keep|replace|make|remove|add|use)\b/i.test(subject) ? subject : `Change the people in the advert to: ${subject}.`);
@@ -113,6 +121,15 @@ export async function POST(req: Request) {
         const cleaned = await flattenSection1ToWhite(Buffer.from(new Uint8Array(await (await fetch(ed.url)).arrayBuffer())));
         finalUrl = await putBytes(cleaned, `studio/${clientId}/section1-white`, "png", "image/png");
       } catch (e) { console.error("[build] section-1 white flatten failed, keeping the render:", e); }
+    }
+    // MASTHEAD IS ALWAYS EXACTLY #083a51 at the edges - the seam fix (Gary). Same deterministic move as section
+    // 1's white: re-assert the exact Webflow band colour after the AI retheme, so the field can never drift a
+    // shade off the section it drops into.
+    if (kind === "masthead") {
+      try {
+        const navy = await flattenMastheadToNavy(Buffer.from(new Uint8Array(await (await fetch(ed.url)).arrayBuffer())));
+        finalUrl = await putBytes(navy, `studio/${clientId}/masthead-navy`, "png", "image/png");
+      } catch (e) { console.error("[build] masthead navy flatten failed, keeping the render:", e); }
     }
 
     let locked = isDisc ? finalUrl : await stampRealLogo(clientId, referenceUrl, finalUrl);
