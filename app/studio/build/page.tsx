@@ -132,7 +132,9 @@ export default function BuilderPage() {
     fetch("/api/studio").then((r) => r.json()).then((d) => {
       const cs: Client[] = d.clients || [];
       setClients(cs);
-      if (cs[0]) setClientId(cs[0].id);
+      // DEFAULT TO MTN MoMo (Gary), not just whoever is first in the list; the rest of the dropdown is unchanged.
+      const first = cs.find((c) => /mo\s*mo|mtn/i.test(c.name)) || cs[0];
+      if (first) setClientId(first.id);
     }).catch(() => {});
   }, []);
 
