@@ -80,6 +80,10 @@ export async function POST(req: Request) {
     }
     // The "who should be in it" field: a people change (or a verbatim instruction if it reads like one).
     if (subject) changes.push(/^\s*(change|keep|replace|make|remove|add|use)\b/i.test(subject) ? subject : `Change the people in the advert to: ${subject}.`);
+    // PHONE REALISM (Gary): a phone someone is LOOKING AT faces THEM, so the camera sees its dark BACK, not the
+    // screen. The model defaults to a screen-forward phone even when people are peering into it, which is
+    // physically impossible. A screen may face the viewer ONLY when the person is presenting it to camera.
+    changes.push(`PHONE REALISM: if anyone in the image is looking at, watching or peering into a phone, that phone must be held naturally with its BACK toward the viewer - the dark rear of the handset with its camera bump - NOT the bright screen facing the viewer while the person looks into it from the other side, which is physically impossible. Only show a phone SCREEN facing the viewer when the person is deliberately holding it OUT to the camera to present it, not looking into it themselves.`);
     // SETTING / BACKGROUND - sliders only. A slider is a photograph, so re-setting it is safe. A masthead or
     // section 1 must keep the flat funnel colour or it stops matching the Webflow section it drops into, so the
     // control is never offered there and we ignore it if it somehow arrives.

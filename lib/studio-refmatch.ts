@@ -151,6 +151,9 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
       changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in WHITE${hl2 ? ` then "${hl2}" in YELLOW` : ""}. NEVER more than two lines - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Set the punctuation exactly as written, character for character - do not add or remove a full stop or a comma. Keep any yellow underline beneath it exactly where it is.`);
     }
     if (j.person) changes.push(`Change the people in the advert to: ${j.person}.`);
+    // PHONE REALISM (Gary): a phone someone is looking at faces THEM, so the camera sees its dark back, not the
+    // screen. Only a phone presented OUT to the camera may show its screen to the viewer.
+    changes.push(`PHONE REALISM: if anyone in the image is looking at, watching or peering into a phone, that phone must be held naturally with its BACK toward the viewer - the dark rear of the handset with its camera bump - NOT the bright screen facing the viewer while the person looks into it from the other side, which is physically impossible. Only show a phone SCREEN facing the viewer when the person is deliberately holding it OUT to the camera to present it, not looking into it themselves.`);
     // ONE GRADE ACROSS ALL THREE SLIDERS (Gary): they sit next to each other in the funnel, so an outdoor
     // daylight slider beside a warm indoor one reads as a mismatched set. Same accent and tone, always.
     if (j.construction === "scene") changes.push(SLIDER_GRADE);
