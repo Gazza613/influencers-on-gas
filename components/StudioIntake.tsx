@@ -162,7 +162,16 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
       {/* BRAND KIT - fonts first: without the licensed files, server-rendered text can never match the design. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Brand kit</div>
+          <div className="flex items-center gap-3">
+            <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Brand kit</div>
+            {/* Re-reads from the server in place. A page reload would re-gate and sign you out, so this is the
+                gesture that actually refreshes - here especially, because this is where assets are managed and
+                "did my change land?" is a constant question. */}
+            <button onClick={() => refresh(clientId)} title="Re-read the brand kit from the server"
+              className="rounded-md border border-line px-2.5 py-1 text-[13px] font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink">
+              ↻ Refresh
+            </button>
+          </div>
           {/* A standing receipt of what we hold, so you never have to wonder whether an upload landed. */}
           <div className="flex flex-wrap items-center gap-2">
             <span className={`tabular rounded-full border px-2.5 py-1 text-[14px] font-bold ${fonts.length ? "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" : "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]"}`}>
