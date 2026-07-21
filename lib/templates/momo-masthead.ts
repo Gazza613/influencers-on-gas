@@ -29,12 +29,12 @@ export type MastheadSlots = {
   complianceText?: string | null;
 };
 
-// THE WEBFLOW MASTHEAD SECTION COLOUR. LOCKED. This is the dark navy the funnel PAGE is painted in, behind the
-// whole masthead - measured from Gary's own assets as #023854 (rgb 2,56,84), the same flat navy every slider
-// background uses. NOT the bright blue field inside the hero graphic (#005080), and not the nav bar or callout
-// box. The image drops INTO this section, so its field must be this colour to the byte. If Webflow ever
-// repaints the section, change this one value (keep it in step with MASTHEAD_NAVY in studio-cutout.ts).
-const MOMO_BLUE = "#023854";
+// THE WEBFLOW MASTHEAD SECTION COLOUR. LOCKED. The dark navy the funnel PAGE is painted in, behind the whole
+// masthead - sampled from Gary's own live masthead screenshot as #083a52 (rgb 8,58,82). NOT the bright field
+// inside the hero graphic (#005080), and not the nav bar or callout box. The image drops INTO this section, so
+// its field must be this colour to the byte. If Webflow ever repaints it, change this one value (keep it in
+// step with MASTHEAD_NAVY in studio-cutout.ts).
+const MOMO_BLUE = "#083a52";
 const MOMO_YELLOW = "#F9CB0F";
 
 export function renderMomoMasthead(slots: MastheadSlots, fonts: { family: string; url: string }[]): string {

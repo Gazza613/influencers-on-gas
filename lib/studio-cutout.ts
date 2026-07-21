@@ -129,12 +129,13 @@ export async function onBackground(pngBuf: Buffer, hex: string): Promise<Buffer>
 // halo around the design and only clean beyond it.
 const BG_MIN_LUM = 185;    // lighter than this to count as background
 const BG_MAX_SAT = 40;     // and near-neutral (max-min channel spread)
-// THE WEBFLOW MASTHEAD SECTION COLOUR. This is the dark navy the funnel PAGE is painted in - the background
-// behind the whole masthead - NOT the bright blue field inside the hero graphic (#005080), and not the nav bar
-// or the "Welcome" callout box (Gary: "those are different blues"). Measured from Gary's own assets: every
-// slider background is #023854 (rgb 2,56,84), the brand's flat dark navy, and the masthead section uses the
-// same. One constant; the deterministic flatten locks the creative's field to it for a seamless drop.
-export const MASTHEAD_NAVY: [number, number, number] = [2, 56, 84];
+// THE WEBFLOW MASTHEAD SECTION COLOUR. The dark navy the funnel PAGE is painted in, behind the whole masthead -
+// NOT the bright field inside the hero graphic (#005080), and NOT the nav bar or callout box (lighter navies
+// Gary told us to ignore). SAMPLED from Gary's own live masthead screenshot (uploaded to CI intake): the
+// background fills 37% of the frame and every pure-background point reads exactly #083a52 (rgb 8,58,82). This
+// vindicates Gary's original #083a51 - the earlier drop-in seam was a stale creative, not a wrong colour. The
+// deterministic flatten locks the creative's field to this for a seamless drop.
+export const MASTHEAD_NAVY: [number, number, number] = [8, 58, 82];
 const rgbHex = (c: [number, number, number]) => "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
 // Tuned on a test rig, not guessed: at 0.035 the fill breached a drop shadow at an unprotected point and then
 // ate the whole thing (shadow pixels are background-like, so once inside it spreads through). 0.06 keeps the
