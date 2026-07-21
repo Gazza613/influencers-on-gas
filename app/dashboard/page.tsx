@@ -218,6 +218,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <PsiMark />,
         blurb: "Pre-Sales Intelligence. Qualifies and nurtures every prospect until they are a high-intent lead worth handing over.",
         action: "Open PSI",
+        peek: { href: "https://psi.gasmarketing.co.za/c/brightrock", label: "Preview the BrightRock PSI" },
         ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#f9a8d4]",
