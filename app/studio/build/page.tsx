@@ -124,9 +124,9 @@ export default function BuilderPage() {
   // ("they hold up a phone") ADDED a handset to a design that already had one, so the subject ended up looking
   // at one phone while holding up another.
   const PHONE_MAP: Record<string, string> = {
-    app: " There is exactly ONE phone in the whole image and they hold up that single phone, screen facing the viewer, showing the MoMo app. They are not looking at or holding any other phone.",
-    looking: " There is exactly ONE phone in the whole image and they look at that single phone in their hand; its screen shows the MoMo app. There is no second phone anywhere.",
-    pointing: " There is exactly ONE phone in the whole image and they point at that single phone's screen, which shows the MoMo app. There is no second phone anywhere.",
+    app: " There is exactly ONE phone in the whole image and they hold up that single phone, presenting it OUT toward the camera so its SCREEN (the front) faces the viewer, showing the MoMo app. They are not looking at or holding any other phone.",
+    looking: " There is exactly ONE phone in the whole image and they look down at that single phone in their own hand; because they are looking at the screen, the camera sees the BACK of the handset (its dark rear shell and camera bump), NOT the screen. There is no second phone anywhere.",
+    pointing: " There is exactly ONE phone in the whole image, held out toward the camera with its SCREEN (the front) facing the viewer, and they point at that screen. There is no second phone anywhere.",
     none: " There is NO phone anywhere in the image - nobody holds, looks at or points at a phone.",
   };
   // When a real phone screen is chosen, the model must draw a CHROMA-GREEN screen instead of inventing an app -
@@ -551,9 +551,9 @@ export default function BuilderPage() {
                         <select value={phone[slotKey] || ""} onChange={(e) => setPhone((x) => ({ ...x, [slotKey]: e.target.value }))}
                           className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent">
                           <option value="">Keep the design&apos;s</option>
-                          <option value="app">Phone screen to camera (app)</option>
-                          <option value="looking">Looking at the screen</option>
-                          <option value="pointing">Pointing at the screen</option>
+                          <option value="app">Presenting the phone (screen to camera)</option>
+                          <option value="looking">Looking at their phone (back to camera)</option>
+                          <option value="pointing">Pointing at the screen (screen to camera)</option>
                           <option value="none">No phone</option>
                         </select>
                         {/* PHONE-SCREEN LIBRARY (Gary): pick a real screenshot to show on the phone, like the deal
