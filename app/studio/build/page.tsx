@@ -278,6 +278,17 @@ export default function BuilderPage() {
   function setCustomField(slotKey: string, field: keyof Deal, value: string) {
     setCustom((x) => ({ ...x, [slotKey]: { ...(x[slotKey] || { id: "", label: "", amount: "", price: "", validity: "" }), [field]: value } as Deal }));
     setDealPrev((p) => ({ ...p, [slotKey]: "" })); // the preview is stale the moment the numbers change
+    setCardSel((x) => ({ ...x, [slotKey]: "" }));  // typing a deal DESELECTS any chosen card - a slot has one deal, not both
+  }
+  // Choosing a card artwork clears any typed deal for that slot, so the two never fight (a slot carries ONE
+  // deal). This is what keeps the "type a deal" fields responsive: they switch rather than lock.
+  function chooseCard(slotKey: string, url: string) {
+    setCardSel((x) => ({ ...x, [slotKey]: url }));
+    if (url) {
+      setCustom((x) => { const n = { ...x }; delete n[slotKey]; return n; });
+      setDealSel((x) => ({ ...x, [slotKey]: "" }));
+      setDealPrev((p) => ({ ...p, [slotKey]: "" }));
+    }
   }
 
   // Render the typed deal as the ACTUAL card that will land, so the team can check it before spending a
@@ -459,12 +470,12 @@ export default function BuilderPage() {
                       <div className="sm:col-span-2">
                         <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Deal card / pill (top right)</label>
                         <div className="mt-1 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface-2 p-1.5">
-                          <button onClick={() => setCardSel((x) => ({ ...x, [slotKey]: "" }))}
+                          <button onClick={() => chooseCard(slotKey, "")}
                             className={`rounded border px-2 py-1 text-[14px] font-bold ${!cardSel[slotKey] ? "border-accent text-accent" : "border-line text-ink-dim"}`}>
                             None
                           </button>
                           {cards.map((c) => (
-                            <button key={c.id} onClick={() => setCardSel((x) => ({ ...x, [slotKey]: c.url }))}
+                            <button key={c.id} onClick={() => chooseCard(slotKey, c.url)}
                               title={c.name.replace(/\.(png|jpe?g)$/i, "")}
                               className={`rounded border p-0.5 ${cardSel[slotKey] === c.url ? "border-accent ring-1 ring-accent" : "border-line"}`}>
                               <img src={c.url} alt={c.name} className="h-11 w-auto rounded-sm bg-white/5 object-contain" />
@@ -478,26 +489,25 @@ export default function BuilderPage() {
                         <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">…or type a deal (we typeset it)</label>
                         <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                           <input value={custom[slotKey]?.label || ""} onChange={(e) => setCustomField(slotKey, "label", e.target.value)}
-                            disabled={!!cardSel[slotKey]} placeholder="Social Pass"
+                            placeholder="Social Pass"
                             className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[14px] outline-none focus:border-accent disabled:opacity-40" />
                           <input value={custom[slotKey]?.amount || ""} onChange={(e) => setCustomField(slotKey, "amount", e.target.value)}
-                            disabled={!!cardSel[slotKey]} placeholder="5GB"
+                            placeholder="5GB"
                             className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[14px] outline-none focus:border-accent disabled:opacity-40" />
                           <input value={custom[slotKey]?.price || ""} onChange={(e) => setCustomField(slotKey, "price", e.target.value)}
-                            disabled={!!cardSel[slotKey]} placeholder="R49"
+                            placeholder="R49"
                             className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[14px] outline-none focus:border-accent disabled:opacity-40" />
                           <input value={custom[slotKey]?.validity || ""} onChange={(e) => setCustomField(slotKey, "validity", e.target.value)}
-                            disabled={!!cardSel[slotKey]} placeholder="*Valid for 7 Days"
+                            placeholder="*Valid for 7 Days"
                             className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[14px] outline-none focus:border-accent disabled:opacity-40" />
                         </div>
                         <div className="mt-1.5 flex items-center gap-2">
                           <button onClick={() => previewDeal(slotKey)}
-                            disabled={!!cardSel[slotKey] || !(custom[slotKey]?.label && custom[slotKey]?.price) || !!busy[`dp-${slotKey}`]}
+                            disabled={!(custom[slotKey]?.label && custom[slotKey]?.price) || !!busy[`dp-${slotKey}`]}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-[14px] font-bold text-ink-dim hover:text-ink disabled:opacity-40">
                             {busy[`dp-${slotKey}`] && <Spinner className="h-3 w-3" />} Preview card
                           </button>
-                          <select value={dealSel[slotKey] || ""} onChange={(e) => { const d = deals.find((x) => x.id === e.target.value); setDealSel((x) => ({ ...x, [slotKey]: e.target.value })); if (d) setCustom((x) => ({ ...x, [slotKey]: { id: d.id, label: d.label, amount: d.amount, amountSuffix: d.amountSuffix || "", price: d.price, validity: d.validity } })); setDealPrev((p) => ({ ...p, [slotKey]: "" })); }}
-                            disabled={!!cardSel[slotKey]}
+                          <select value={dealSel[slotKey] || ""} onChange={(e) => { const d = deals.find((x) => x.id === e.target.value); setDealSel((x) => ({ ...x, [slotKey]: e.target.value })); if (d) { setCustom((x) => ({ ...x, [slotKey]: { id: d.id, label: d.label, amount: d.amount, amountSuffix: d.amountSuffix || "", price: d.price, validity: d.validity } })); setCardSel((x) => ({ ...x, [slotKey]: "" })); } setDealPrev((p) => ({ ...p, [slotKey]: "" })); }}
                             className="flex-1 rounded-lg border border-line bg-surface-2 px-2 py-1 text-[14px] outline-none focus:border-accent disabled:opacity-40">
                             <option value="">…or start from the deal library</option>
                             {deals.map((d) => <option key={d.id} value={d.id}>{d.label} · {d.amount}{d.amountSuffix || ""} · {d.price}</option>)}
