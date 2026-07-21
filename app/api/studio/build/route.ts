@@ -148,7 +148,9 @@ export async function POST(req: Request) {
     // client's own card design (dynamic deals, every character exact).
     if (dealCardUrl) locked = await stampDealCard(clientId, locked, dealCardUrl, referenceUrl);
     else if (b.deal && b.deal.label) locked = await stampTypesetDeal(clientId, locked, b.deal, referenceUrl);
-    return NextResponse.json({ ok: true, url: locked });
+    // cleanUrl is the render BEFORE the logo and deal are stamped on. A re-run/edit must start from THIS, not
+    // from `locked`, or the AI reproduces the baked logo and deal and the fresh stamp doubles them (Gary).
+    return NextResponse.json({ ok: true, url: locked, cleanUrl: finalUrl });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
   }

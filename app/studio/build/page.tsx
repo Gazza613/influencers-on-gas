@@ -14,7 +14,7 @@ import AppHeader from "@/components/AppHeader";
 type Deal = { id: string; label: string; amount: string; amountSuffix?: string; price: string; validity: string };
 type Ref = { id: string; kind: string; name: string | null; url: string };
 type Client = { id: string; name: string };
-type Shot = { url: string; status: "new" | "accepted" };
+type Shot = { url: string; clean?: string; status: "new" | "accepted" };
 
 const SECTIONS = [
   { key: "masthead", title: "Masthead", match: /hero/i, count: 1, hint: "The banner at the top of the funnel. One design." },
@@ -261,7 +261,7 @@ export default function BuilderPage() {
           dealCardUrl: cardSel[slotKey] || "", scene: scene[slotKey] || "",
         }),
       }).then(readJson) as any;
-      if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, status: "new" } }));
+      if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, clean: d.cleanUrl || d.url, status: "new" } }));
       else setErr(`${slotTitle(slotKey)}: ${d.error || "generation failed"}`);
     } catch (e) {
       setErr(`${slotTitle(slotKey)}: ${String((e as Error)?.message || e)}`);
@@ -321,11 +321,12 @@ export default function BuilderPage() {
       const d = await fetch("/api/studio/edit", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientId, kind, imageUrl: s.url, instruction,
+          // Edit the CLEAN pre-stamp render, not the stamped one, so the logo and deal are never doubled.
+          clientId, kind, imageUrl: s.clean || s.url, instruction,
           referenceUrl: picked[slotKey] || "", dealCardUrl: cardSel[slotKey] || "",
         }),
       }).then(readJson) as any;
-      if (d.url) { setShot((x) => ({ ...x, [slotKey]: { url: d.url, status: "new" } })); setEdit((x) => ({ ...x, [slotKey]: "" })); }
+      if (d.url) { setShot((x) => ({ ...x, [slotKey]: { url: d.url, clean: d.cleanUrl || d.url, status: "new" } })); setEdit((x) => ({ ...x, [slotKey]: "" })); }
       else setErr(d.error || "the edit failed");
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setBusy((b) => ({ ...b, [slotKey]: false })); }

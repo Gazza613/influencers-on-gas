@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
 import { stampRealLogo, stampDealCard } from "@/lib/studio-slider";
+import { flattenSection1ToWhite, flattenMastheadToNavy, cleanBlueGlowBehindDisc } from "@/lib/studio-cutout";
+import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 
 // EDIT THE CREATIVE THAT LANDED. Gary: "need a prompt box when render lands so we can edit the image landed and
@@ -47,28 +49,33 @@ export async function POST(req: Request) {
     const isDisc = kind === "masthead" || kind === "section1";
 
     const changes: string[] = [instruction];
-    // THE BRAND LOCKS ARE ALREADY BAKED INTO THIS IMAGE from the previous run. We re-stamp them afterwards, so
-    // the model must first REMOVE the existing ones and reconstruct clean background - otherwise the old logo
-    // and old deal stay in the pixels and the fresh stamp lands ON TOP, doubling the logo and pasting the new
-    // deal over the old one instead of replacing it (Gary's exact bug on a re-run).
-    if (!isDisc) {
-      // Sliders get the real logo re-stamped, so the baked one must go first.
-      changes.push(`REMOVE the existing MoMo logo lockup completely (it is composited back on afterwards): erase it and cleanly reconstruct the background/photograph where it sat, leaving that corner clean with NO logo and no faint or partial remnant of one.`);
-    }
-    if (dealCardUrl) {
-      // Adding/changing the deal: strip whatever offer element is already in the top-right so the new card
-      // REPLACES it rather than overlapping it.
-      changes.push(`REMOVE any deal card, offer badge, price bubble, pill or promotional element ALREADY PRESENT in the top-right (and anywhere else) and cleanly reconstruct the background there, so the top-right comes back completely clean. Draw NO new deal, price or offer of any kind - the real deal card is composited on afterwards.`);
-    }
+    // The image we edit is the CLEAN, pre-stamp render (the UI passes cleanUrl), so there is no baked logo or
+    // deal for the model to reproduce - which is what doubled them on a re-run. We only need to keep the model
+    // from DRAWING an offer, since we re-composite the real card below.
+    if (dealCardUrl) changes.push(`Do NOT draw any deal card, offer badge, price bubble, pill or promotional element anywhere, and no prices - the real deal card is composited on afterwards. Leave the top-right as clean background.`);
 
     const ed = await forensicRetheme(imageUrl, { changes, ratio, resolution: "2k", solidBackground: isDisc });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `edit-${kind || "creative"}`, count: 1 }).catch(() => {});
     if (!ed.url) return NextResponse.json({ error: ed.error || "the edit did not come back" }, { status: 500 });
 
+    // Re-assert the colour hard locks on an edit too, so iterating a masthead or section 1 never reintroduces a
+    // cream background or drifts the navy (the same deterministic step the build route runs).
+    let base = ed.url;
+    try {
+      if (kind === "section1") {
+        const cleaned = await flattenSection1ToWhite(Buffer.from(new Uint8Array(await (await fetch(ed.url)).arrayBuffer())));
+        base = await putBytes(await cleanBlueGlowBehindDisc(cleaned), `studio/${clientId}/section1-white`, "png", "image/png");
+      } else if (kind === "masthead") {
+        const navy = await flattenMastheadToNavy(Buffer.from(new Uint8Array(await (await fetch(ed.url)).arrayBuffer())));
+        base = await putBytes(navy, `studio/${clientId}/masthead-navy`, "png", "image/png");
+      }
+    } catch (e) { console.error("[edit] colour lock failed, keeping the render:", e); }
+
     // Re-apply the brand locks so iterating can never degrade them.
-    let out = isDisc ? ed.url : await stampRealLogo(clientId, referenceUrl || imageUrl, ed.url);
+    let out = isDisc ? base : await stampRealLogo(clientId, referenceUrl || imageUrl, base);
     if (dealCardUrl) out = await stampDealCard(clientId, out, dealCardUrl, referenceUrl || undefined);
-    return NextResponse.json({ ok: true, url: out });
+    // Return the pre-stamp render too, so the NEXT edit again starts from a clean image and never doubles.
+    return NextResponse.json({ ok: true, url: out, cleanUrl: base });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
   }
