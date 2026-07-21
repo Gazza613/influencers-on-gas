@@ -129,9 +129,13 @@ export async function onBackground(pngBuf: Buffer, hex: string): Promise<Buffer>
 // halo around the design and only clean beyond it.
 const BG_MIN_LUM = 185;    // lighter than this to count as background
 const BG_MAX_SAT = 40;     // and near-neutral (max-min channel spread)
-// THE EXACT WEBFLOW MASTHEAD COLOUR. Gary supplied the swatch: #083a51 (rgb 8,58,81). The masthead creative's
-// field must be this to the byte or the seam against the Webflow band is visible. One constant, one source.
-export const MASTHEAD_NAVY = "#083a51";
+// THE WEBFLOW MASTHEAD SECTION COLOUR. This is the dark navy the funnel PAGE is painted in - the background
+// behind the whole masthead - NOT the bright blue field inside the hero graphic (#005080), and not the nav bar
+// or the "Welcome" callout box (Gary: "those are different blues"). Measured from Gary's own assets: every
+// slider background is #023854 (rgb 2,56,84), the brand's flat dark navy, and the masthead section uses the
+// same. One constant; the deterministic flatten locks the creative's field to it for a seamless drop.
+export const MASTHEAD_NAVY: [number, number, number] = [2, 56, 84];
+const rgbHex = (c: [number, number, number]) => "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
 // Tuned on a test rig, not guessed: at 0.035 the fill breached a drop shadow at an unprotected point and then
 // ate the whole thing (shadow pixels are background-like, so once inside it spreads through). 0.06 keeps the
 // shadow (226 stays 226) while still cleaning corner smudges to pure white. 0.09 gains nothing.
@@ -250,17 +254,15 @@ export async function flattenSection1ToWhite(buf: Buffer): Promise<Buffer> {
 // So we do not rely on the model: we flood-fill the NAVY BACKGROUND inward from the edges to the exact colour,
 // stopping dead at the yellow disc, the light streak and the subject (none of which are dark-blue), and
 // protecting a halo so the subject's own contact shadow survives. The result: every edge pixel is #083a51.
-export async function flattenMastheadToNavy(buf: Buffer): Promise<Buffer> {
-  const target = [8, 58, 81];   // #083a51
+export async function flattenMastheadToNavy(buf: Buffer, target: [number, number, number] = MASTHEAD_NAVY): Promise<Buffer> {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, C = info.channels;
 
-  // A masthead-background pixel is one that is ALREADY CLOSE to the field colour #083a51. The tolerance is wide
-  // enough to swallow the whole range the AI might drift the flat field to (it comfortably covers the old
-  // #0b425d -> #02293d gradient), but tight enough that the subject's clothing, skin and hair - and any darker
-  // contact shadow beneath them - fall outside it and are left untouched. No halo, no blur: the colour test
-  // itself preserves the shadow, and flood-filling only from the EDGES means an interior region that happens to
-  // match the field is never reached unless the field connects to it.
+  // A masthead-background pixel is one ALREADY CLOSE to the target field colour. The tolerance is wide enough to
+  // swallow the range the AI might drift the flat field to, but tight enough that the subject's clothing, skin
+  // and hair - and any darker contact shadow beneath them - fall outside it and are left untouched. No halo, no
+  // blur: the colour test itself preserves the shadow, and flood-filling only from the EDGES means an interior
+  // region that happens to match the field is never reached unless the field connects to it.
   const near = (i: number): boolean =>
     Math.abs(data[i] - target[0]) <= 26 && Math.abs(data[i + 1] - target[1]) <= 30 && Math.abs(data[i + 2] - target[2]) <= 34;
 
@@ -351,7 +353,7 @@ export async function cleanBlueGlowBehindDisc(buf: Buffer): Promise<Buffer> {
   return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
 }
 
-export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "section1"): Promise<Buffer> {
+export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "section1", navy: [number, number, number] = MASTHEAD_NAVY): Promise<Buffer> {
   const meta = await sharp(pngBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 811;
 
@@ -359,8 +361,9 @@ export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "sec
     return sharp({ create: { width: W, height: H, channels: 3, background: "#ffffff" } })
       .composite([{ input: pngBuf }]).png().toBuffer();
   }
-  // Masthead: the hero band, FLAT #083a51 (MASTHEAD_NAVY) - the exact Webflow colour, so the base already
-  // matches the section it drops into. flattenMastheadToNavy re-asserts it deterministically after the retheme.
-  return sharp({ create: { width: W, height: H, channels: 3, background: MASTHEAD_NAVY } })
+  // Masthead: the hero band as a FLAT fill of the funnel blue - sampled from the reference, or the measured
+  // #005080 default - so the base already matches the section it drops into. flattenMastheadToNavy re-asserts
+  // the exact colour deterministically after the retheme.
+  return sharp({ create: { width: W, height: H, channels: 3, background: rgbHex(navy) } })
     .composite([{ input: pngBuf }]).png().toBuffer();
 }
