@@ -73,6 +73,10 @@ export async function POST(req: Request) {
       // white and we re-assert it deterministically after, but we also tell the model plainly so it stops
       // painting a room or a tint behind the design in the first place.
       if (kind === "section1") changes.push(`BACKGROUND: the entire background MUST be pure solid white #FFFFFF - no room, no scene, no gradient, no vignette, no tint and no shadow wash behind the design. Behind and around the yellow disc keep it PURE CLEAN WHITE: draw NO blue light, NO glow, NO rays, arcs, streaks or sparkles of any kind - that blue accent is composited on afterwards, so any blue you draw behind the disc is a defect. Only the people, the deal cards / bubbles and the yellow disc sit on clean white. This drops into a white Webflow section, so any colour behind the design is a seam and a defect.`);
+      // MASTHEAD: NO blue burst behind the yellow disc (Gary: "that blue behind the yellow is poor, just not
+      // have it in"). The AI renders that light burst raggedly, so we remove it rather than chase it: the disc
+      // sits directly on the flat navy field, clean to its edge.
+      if (kind === "masthead") changes.push(`BEHIND AND AROUND THE YELLOW DISC keep the navy background CLEAN and FLAT, right up to the edge of the disc: draw NO blue light burst, NO glow, NO rays, halo, shine, sparks or streaks of any kind behind or around the disc. The yellow disc sits directly on the plain flat navy field. Keep the people, the floating icon bubbles, the phone and every other element exactly as they are - only the blue burst behind the disc is removed.`);
     }
     // The "who should be in it" field: a people change (or a verbatim instruction if it reads like one).
     if (subject) changes.push(/^\s*(change|keep|replace|make|remove|add|use)\b/i.test(subject) ? subject : `Change the people in the advert to: ${subject}.`);

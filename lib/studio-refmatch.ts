@@ -143,6 +143,9 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
       // SECTION 1: leave clean white behind the disc - the blue halo is composited afterwards, so any blue the
       // model paints there is a defect (Gary: "the blue design behind the circle is not clean").
       if (j.kind === "section1") changes.push(`BACKGROUND: pure solid white #FFFFFF everywhere behind the design. Behind and around the yellow disc keep it PURE CLEAN WHITE - draw NO blue light, glow, rays, arcs, streaks or sparkles of any kind; that blue accent is composited on afterwards. Only the people, the deal cards / bubbles and the yellow disc sit on clean white.`);
+      // MASTHEAD: remove the blue burst behind the disc (Gary: "that blue behind the yellow is poor, just not
+      // have it in"). The disc sits directly on the flat navy field, clean to its edge.
+      if (j.kind === "masthead") changes.push(`BEHIND AND AROUND THE YELLOW DISC keep the navy background CLEAN and FLAT, right up to the edge of the disc: draw NO blue light burst, glow, rays, halo, shine, sparks or streaks of any kind behind or around the disc. The yellow disc sits directly on the plain flat navy field. Keep the people, the floating icon bubbles, the phone and every other element exactly as they are - only the blue burst behind the disc is removed.`);
     } else if (j.headline) {
       const [hl1, hl2] = balanceHeadline(tidyCallout(j.headline));
       changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in WHITE${hl2 ? ` then "${hl2}" in YELLOW` : ""}. NEVER more than two lines - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Set the punctuation exactly as written, character for character - do not add or remove a full stop or a comma. Keep any yellow underline beneath it exactly where it is.`);
