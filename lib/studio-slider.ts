@@ -128,7 +128,7 @@ ${legalLine ? `<div class="legal">${esc(legalLine)}</div>` : ""}
 //
 // `box` is the detected logo position as fractions of the canvas (xPct/yPct top-left, wPct width). We place the
 // real logo to match its width and add a small margin so no garbled edge peeks out.
-export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xPct: number; yPct: number; wPct: number }): Promise<Buffer> {
+export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xPct: number; yPct: number; wPct: number }, opts?: { halo?: boolean }): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
   const b = box || { xPct: 4, yPct: 4, wPct: 28 };
@@ -145,27 +145,28 @@ export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xP
   const targetW = Math.round(W * clampedW);
   const logo = await sharp(trimmed).resize({ width: targetW }).png().toBuffer();
   const lm = await sharp(logo).metadata();
-  const left = Math.max(0, Math.min(Math.round(W * xFrac), W - (lm.width || targetW)));
-  const top = Math.max(0, Math.min(Math.round(H * yFrac), H - (lm.height || 0)));
-  return sharp(baseBuf).composite([{ input: logo, left, top }]).png().toBuffer();
-}
+  const lw = lm.width || targetW, lh = lm.height || 0;
+  const left = Math.max(0, Math.min(Math.round(W * xFrac), W - lw));
+  const top = Math.max(0, Math.min(Math.round(H * yFrac), H - lh));
 
-// Average luminance (0-255) of a region of the image, so we can pick the logo colour that will READ there.
-async function regionLuminance(buf: Buffer, box: { xPct: number; yPct: number; wPct: number }): Promise<number> {
-  try {
-    const meta = await sharp(buf).metadata();
-    const W = meta.width || 1080, H = meta.height || 1080;
-    const xF = box.xPct > 1 ? box.xPct / 100 : box.xPct;
-    const yF = box.yPct > 1 ? box.yPct / 100 : box.yPct;
-    const wF = box.wPct > 1 ? box.wPct / 100 : box.wPct;
-    const left = Math.max(0, Math.round(W * xF));
-    const top = Math.max(0, Math.round(H * yF));
-    const width = Math.max(8, Math.min(Math.round(W * Math.max(wF, 0.1)), W - left));
-    const height = Math.max(8, Math.min(Math.round(H * 0.12), H - top));
-    const { channels } = await sharp(buf).extract({ left, top, width, height }).stats();
-    const [r, g, b] = channels.map((c) => c.mean);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  } catch { return 128; }
+  // THE LEGIBILITY HALO (sliders). One logo colour is used across the whole carousel so the set stays
+  // consistent, and this soft dark halo - drawn from the logo's OWN shape, blurred and spread - is what keeps
+  // it readable on any background. On the dark, warm-graded slides it is invisible (dark on dark); on a lighter
+  // patch it quietly outlines the logo so the copy is never lost. It travels with the logo, so there is no box
+  // or scrim to look out of place. Off by default, so the CEO creative's own logo is untouched.
+  if (opts?.halo) {
+    const pad = Math.max(6, Math.round(targetW * 0.05));
+    const padded = await sharp(logo).extend({ top: pad, bottom: pad, left: pad, right: pad, background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+    const bigW = lw + 2 * pad, bigH = lh + 2 * pad;
+    // A blurred, strengthened copy of the logo's alpha becomes a soft dark glow that reaches just past its edge.
+    const haloAlpha = await sharp(padded).ensureAlpha().extractChannel(3).blur(pad * 0.7).linear(1.7, 0).toColourspace("b-w").toBuffer();
+    const haloRgb = await sharp({ create: { width: bigW, height: bigH, channels: 3, background: "#0a1622" } }).png().toBuffer();
+    const halo = await sharp(haloRgb).joinChannel(haloAlpha).png().toBuffer();
+    const combined = await sharp(halo).composite([{ input: logo, left: pad, top: pad }]).png().toBuffer();
+    const cl = Math.max(0, Math.min(left - pad, W - bigW)), ct = Math.max(0, Math.min(top - pad, H - bigH));
+    return sharp(baseBuf).composite([{ input: combined, left: cl, top: ct }]).png().toBuffer();
+  }
+  return sharp(baseBuf).composite([{ input: logo, left, top }]).png().toBuffer();
 }
 
 // FINISH A SLIDER: typeset the campaign headline over the baked one, and stamp the REAL logo over whatever the
@@ -175,25 +176,22 @@ import { getBrandKit } from "./studio";
 import { detectLayout } from "./studio-layout";
 import { putBytes } from "./blob";
 
-// Pick the logo lockup that will READ on this background. Gary: "you use blue and yellow logos - choose the
-// best for visibility." A DARK background wants the light-reading variant (yellow/white lockup); a LIGHT
-// background wants the navy/colour variant. Falls back to the strongest horizontal/colour lockup by name.
-function pickLogoForBg(logos: { name: string | null; url: string }[], bgLum: number): { url: string } | null {
+// ONE LOGO FOR THE WHOLE CAROUSEL (Gary). The three sliders sit together, so a per-slide colour pick could hand
+// you yellow, yellow, blue - which reads as a mismatched set. So the carousel does NOT switch colour by
+// background: it always uses the light-reading lockup (the sliders carry a warm, dark grade), and the halo in
+// compositeLogo is what keeps that one lockup legible even where a slide runs light. Consistent AND readable,
+// instead of consistent-OR-readable.
+function pickCarouselLogo(logos: { name: string | null; url: string }[]): { url: string } | null {
   if (!logos?.length) return null;
-  const dark = bgLum < 130; // background luminance 0-255
   const score = (n: string) => {
     const s = (n || "").toLowerCase();
     let v = 0;
     if (/momo/.test(s)) v += 1;
     if (/horiz|primary|full/.test(s)) v += 2;
     if (/stack|vert|icon|mark/.test(s)) v -= 2;
-    if (dark) { // want a light-reading logo
-      if (/white|reverse|reversed|yellow|light|on.?dark|dark.?bg/.test(s)) v += 5;
-      if (/navy|blue|black|on.?light|light.?bg/.test(s)) v -= 4;
-    } else { // want a dark/colour logo
-      if (/navy|blue|colou?r|dark|primary|on.?light/.test(s)) v += 5;
-      if (/white|reverse|reversed|mono.?white|on.?dark/.test(s)) v -= 4;
-    }
+    // Always prefer the light-reading variant - the carousel standard.
+    if (/white|reverse|reversed|yellow|light|on.?dark|dark.?bg/.test(s)) v += 5;
+    if (/navy|blue|black|on.?light|light.?bg/.test(s)) v -= 4;
     return v;
   };
   return [...logos].sort((a, b) => score(b.name || "") - score(a.name || ""))[0];
@@ -299,15 +297,14 @@ export async function finishSlider(clientId: string, referenceUrl: string, swapU
     try { out = (await overlayDeal(out, deal, fonts, layout?.callout)) as Buffer; }
     catch (e) { console.error("[finishSlider] deal overlay failed:", e); }
   }
-  // Logo: place the real lockup at the reference's own logo box, and choose the colour variant that reads on the
-  // background there (yellow/white on a dark photo, navy/colour on a light one).
+  // Logo: place the ONE carousel lockup at the reference's own logo box, kept legible by its halo - the same
+  // consistent logo on every slider, never a per-slide colour switch that would mismatch the set.
   const logoBox = layout?.logo || { xPct: 4, yPct: 4, wPct: 28 };
-  const bgLum = await regionLuminance(out, logoBox);
-  const logo = pickLogoForBg((kit?.logos || []) as { name: string | null; url: string }[], bgLum);
+  const logo = pickCarouselLogo((kit?.logos || []) as { name: string | null; url: string }[]);
   if (logo) {
     try {
       const logoBuf = Buffer.from(await (await fetch(logo.url)).arrayBuffer());
-      out = (await compositeLogo(out, logoBuf, logoBox)) as Buffer;
+      out = (await compositeLogo(out, logoBuf, logoBox, { halo: true })) as Buffer;
     } catch (e) { console.error("[finishSlider] logo composite failed:", e); }
   }
   return putBytes(out, `studio/${clientId}/slider`, "png", "image/png");
@@ -421,12 +418,13 @@ export async function stampRealLogo(clientId: string, referenceUrl: string, imag
     // the same box lands right on top of the garbled one.
     const layout = await detectLayout(referenceUrl).catch(() => null);
     const logoBox = layout?.logo || { xPct: 4, yPct: 4, wPct: 28 };
-    const bgLum = await regionLuminance(out, logoBox);
-    const logo = pickLogoForBg(logos, bgLum);
+    // ONE consistent lockup for every slider in the carousel, kept legible by the halo - not a per-slide colour
+    // pick that could leave the set mismatched.
+    const logo = pickCarouselLogo(logos);
     if (!logo) return imageUrl;
 
     const logoBuf = Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer()));
-    out = (await compositeLogo(out, logoBuf, logoBox)) as Buffer;
+    out = (await compositeLogo(out, logoBuf, logoBox, { halo: true })) as Buffer;
     return await putBytes(out, `studio/${clientId}/logo-locked`, "png", "image/png");
   } catch (e) {
     console.error("[stampRealLogo] logo hard lock failed, returning un-stamped image:", e);
