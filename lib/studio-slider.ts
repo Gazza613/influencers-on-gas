@@ -479,9 +479,25 @@ export async function stampPhoneScreen(clientId: string, imageUrl: string, scree
 
     // 4. Drop the real screenshot on, sized to the screen and rotated to the phone's tilt.
     const screenSrc = Buffer.from(new Uint8Array(await (await fetch(screenUrl)).arrayBuffer()));
-    const rotDeg = (theta * 180) / Math.PI - 90;
-    const sw = Math.max(4, Math.round(shortLen * 1.03)), sh = Math.max(4, Math.round(longLen * 1.03));
-    const screen = await sharp(screenSrc).resize(sw, sh, { fit: "fill" }).rotate(rotDeg, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+    // The principal axis has a 180deg AMBIGUITY (an axis has no up/down), which flipped the screenshot upside
+    // down. Phones in these ads are held roughly upright, so normalise the rotation into (-90, 90] - the
+    // orientation closest to upright - and it can never come out inverted.
+    let rotDeg = (theta * 180) / Math.PI - 90;
+    while (rotDeg > 90) rotDeg -= 180;
+    while (rotDeg <= -90) rotDeg += 180;
+    // The green region can be a hair wider than the glass (spill past the bezel), so size to it exactly, no
+    // oversize, and inset slightly so the screenshot sits INSIDE the bezel rather than pasted over its edge.
+    const sw = Math.max(4, Math.round(shortLen * 0.97)), sh = Math.max(4, Math.round(longLen * 0.97));
+    // A soft diagonal gloss baked onto the screenshot so it reads as glass under the scene's light, not a flat
+    // paste. It rotates with the screen, so it always falls the right way.
+    const gloss = `<svg width="${sw}" height="${sh}" xmlns="http://www.w3.org/2000/svg"><defs>` +
+      `<linearGradient id="g" x1="0" y1="0" x2="0.85" y2="1">` +
+      `<stop offset="0" stop-color="#fff" stop-opacity="0.20"/><stop offset="0.4" stop-color="#fff" stop-opacity="0.04"/>` +
+      `<stop offset="1" stop-color="#000" stop-opacity="0.10"/></linearGradient></defs>` +
+      `<rect width="100%" height="100%" fill="url(#g)"/></svg>`;
+    const screen = await sharp(screenSrc).resize(sw, sh, { fit: "fill" })
+      .composite([{ input: Buffer.from(gloss), blend: "over" }])
+      .rotate(rotDeg, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
     const sm = await sharp(screen).metadata();
     const out = await sharp(base).composite([{ input: screen, left: Math.round(cx - (sm.width || sw) / 2), top: Math.round(cy - (sm.height || sh) / 2) }]).png().toBuffer();
     return await putBytes(out, `studio/${clientId}/phone-screen`, "png", "image/png");
