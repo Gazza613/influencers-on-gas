@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { planCampaign, type CampaignPlan } from "./studio-producer";
 import { listAssets } from "./studio";
 import { forensicSwap, forensicRetheme } from "./vendors/higgsfield";
-import { onFunnelBackground, applyReferenceAlpha, flattenSection1ToWhite, flattenMastheadToNavy } from "./studio-cutout";
+import { onFunnelBackground, applyReferenceAlpha, flattenSection1ToWhite, flattenMastheadToNavy, cleanBlueGlowBehindDisc } from "./studio-cutout";
 import { overlayPill, balanceHeadline, tidyCallout, stampRealLogo } from "./studio-slider";
 import { detectLayout } from "./studio-layout";
 import { getBrandKit } from "./studio";
@@ -140,6 +140,9 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     const changes: string[] = [];
     if (j.construction === "disc") {
       if (j.callout) changes.push(`Change the CALLOUT PILL / lozenge copy to "${j.callout}", keeping the pill's exact shape, colour, 3D style and any yellow banner or underline, matched to the design's own font.`);
+      // SECTION 1: leave clean white behind the disc - the blue halo is composited afterwards, so any blue the
+      // model paints there is a defect (Gary: "the blue design behind the circle is not clean").
+      if (j.kind === "section1") changes.push(`BACKGROUND: pure solid white #FFFFFF everywhere behind the design. Behind and around the yellow disc keep it PURE CLEAN WHITE - draw NO blue light, glow, rays, arcs, streaks or sparkles of any kind; that blue accent is composited on afterwards. Only the people, the deal cards / bubbles and the yellow disc sit on clean white.`);
     } else if (j.headline) {
       const [hl1, hl2] = balanceHeadline(tidyCallout(j.headline));
       changes.push(`Change the main bottom HEADLINE to read EXACTLY two lines: "${hl1}" in WHITE${hl2 ? ` then "${hl2}" in YELLOW` : ""}. NEVER more than two lines - do NOT add a third line, a price line, a deal line or any extra copy beneath it. Set the punctuation exactly as written, character for character - do not add or remove a full stop or a comma. Keep any yellow underline beneath it exactly where it is.`);
@@ -176,8 +179,9 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     if (j.kind === "section1") {
       try {
         const cleaned = await flattenSection1ToWhite(await bufOf(url));
-        cleanUrl = await putBytes(cleaned, `studio/${clientId}/section1-white`, "png", "image/png");
-      } catch (e) { console.error("[produceRefMatch] section-1 white flatten failed:", e); }
+        const glowed = await cleanBlueGlowBehindDisc(cleaned);
+        cleanUrl = await putBytes(glowed, `studio/${clientId}/section1-white`, "png", "image/png");
+      } catch (e) { console.error("[produceRefMatch] section-1 white/glow failed:", e); }
     } else if (j.kind === "masthead") {
       try {
         const navy = await flattenMastheadToNavy(await bufOf(url));

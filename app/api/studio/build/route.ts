@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import sharp from "sharp";
 import { forensicRetheme } from "@/lib/vendors/higgsfield";
 import { balanceHeadline, tidyCallout, stampRealLogo, stampDealCard, stampTypesetDeal } from "@/lib/studio-slider";
-import { onFunnelBackground, flattenSection1ToWhite, flattenMastheadToNavy } from "@/lib/studio-cutout";
+import { onFunnelBackground, flattenSection1ToWhite, flattenMastheadToNavy, cleanBlueGlowBehindDisc } from "@/lib/studio-cutout";
 import { SLIDER_GRADE } from "@/lib/studio-refmatch";
 import { putBytes } from "@/lib/blob";
 import { listAssets } from "@/lib/studio";
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       // SECTION 1 IS ALWAYS PURE WHITE (Gary: "plain white background #FFFFFF, lock it in"). The base is already
       // white and we re-assert it deterministically after, but we also tell the model plainly so it stops
       // painting a room or a tint behind the design in the first place.
-      if (kind === "section1") changes.push(`BACKGROUND: the entire background MUST be pure solid white #FFFFFF - no room, no scene, no gradient, no vignette, no tint and no shadow wash behind the design. Only the people, the deal cards / bubbles and the yellow disc sit on clean white. This drops into a white Webflow section, so any colour behind the design is a seam and a defect.`);
+      if (kind === "section1") changes.push(`BACKGROUND: the entire background MUST be pure solid white #FFFFFF - no room, no scene, no gradient, no vignette, no tint and no shadow wash behind the design. Behind and around the yellow disc keep it PURE CLEAN WHITE: draw NO blue light, NO glow, NO rays, arcs, streaks or sparkles of any kind - that blue accent is composited on afterwards, so any blue you draw behind the disc is a defect. Only the people, the deal cards / bubbles and the yellow disc sit on clean white. This drops into a white Webflow section, so any colour behind the design is a seam and a defect.`);
     }
     // The "who should be in it" field: a people change (or a verbatim instruction if it reads like one).
     if (subject) changes.push(/^\s*(change|keep|replace|make|remove|add|use)\b/i.test(subject) ? subject : `Change the people in the advert to: ${subject}.`);
@@ -119,8 +119,11 @@ export async function POST(req: Request) {
     if (kind === "section1") {
       try {
         const cleaned = await flattenSection1ToWhite(Buffer.from(new Uint8Array(await (await fetch(ed.url)).arrayBuffer())));
-        finalUrl = await putBytes(cleaned, `studio/${clientId}/section1-white`, "png", "image/png");
-      } catch (e) { console.error("[build] section-1 white flatten failed, keeping the render:", e); }
+        // Then composite our OWN clean blue halo behind the disc, so the blue accent is crisp and identical
+        // every time instead of the ragged arcs the AI paints (Gary).
+        const glowed = await cleanBlueGlowBehindDisc(cleaned);
+        finalUrl = await putBytes(glowed, `studio/${clientId}/section1-white`, "png", "image/png");
+      } catch (e) { console.error("[build] section-1 white/glow failed, keeping the render:", e); }
     }
     // MASTHEAD IS ALWAYS EXACTLY #083a51 at the edges - the seam fix (Gary). Same deterministic move as section
     // 1's white: re-assert the exact Webflow band colour after the AI retheme, so the field can never drift a

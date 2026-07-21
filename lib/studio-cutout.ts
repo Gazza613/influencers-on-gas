@@ -285,6 +285,72 @@ export async function flattenMastheadToNavy(buf: Buffer): Promise<Buffer> {
   return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
 }
 
+// THE CLEAN BLUE HALO behind the section-1 disc (Gary: "the blue design behind the circle is not clean"). The
+// AI draws the blue light motif raggedly and no prompt makes it crisp, so we take the element out of its hands:
+// the model is told to leave clean white behind the disc, and we composite a SMOOTH blue glow-ring ourselves,
+// centred on the disc and MASKED to the white background - so it reads as a clean halo BEHIND the disc and the
+// subject (both of which are non-white, so the mask leaves them untouched), identical on every render.
+export async function cleanBlueGlowBehindDisc(buf: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, C = info.channels;
+
+  // 1. FIND THE YELLOW DISC. The subject stands in front of it, so only an arc of yellow shows - but its
+  //    left/right/top extent still gives the disc's bounding box, and from that its centre and radius.
+  let minX = W, maxX = 0, minY = H, maxY = 0, n = 0;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * C, r = data[i], g = data[i + 1], b = data[i + 2];
+      if (r > 170 && g > 130 && b < 115 && r - b > 100 && g - b > 45) {
+        n++; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+  }
+  // No convincing disc found: leave the image alone rather than dropping a halo in the wrong place.
+  if (n < (W * H) * 0.01) return sharp(buf).png().toBuffer();
+  const cx = Math.round((minX + maxX) / 2), cy = Math.round((minY + maxY) / 2);
+  const R = Math.round(((maxX - minX) + (maxY - minY)) / 4);
+
+  // 2. A SMOOTH RADIAL ALPHA for the glow: a TIGHT halo hugging the disc - nothing at the centre (the disc
+  //    covers it), brightest just outside the disc edge, gone by ~1.5R so it never washes the whole frame.
+  const rr = 1.5 * R;
+  const stop = (mult: number) => Math.min(1, mult * R / rr).toFixed(4);
+  const alphaSvg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"><defs>` +
+    `<radialGradient id="a" cx="${cx}" cy="${cy}" r="${rr}" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="#000"/>` +
+    `<stop offset="${stop(0.86)}" stop-color="#1a1a1a"/>` +
+    `<stop offset="${stop(1.02)}" stop-color="#fff"/>` +
+    `<stop offset="${stop(1.24)}" stop-color="#7a7a7a"/>` +
+    `<stop offset="1" stop-color="#000"/>` +
+    `</radialGradient></defs><rect width="100%" height="100%" fill="url(#a)"/></svg>`;
+  const alpha = await sharp(Buffer.from(alphaSvg)).greyscale().raw().toBuffer();
+
+  // 3. COMPOSITE brand-blue over the image, only where the background is white, scaled by the radial alpha. A
+  //    two-tone blue (bright azure near the disc, deeper MoMo blue outward) gives the halo depth without arcs.
+  //    An EDGE RAMP forces the glow to nothing within the outer margin, so the section-1 border stays pure
+  //    white and the Webflow seam is never re-broken, whatever the disc's size or position.
+  const PEAK = 0.5;                        // top opacity of the glow at its brightest ring
+  const inner = [46, 160, 224], outer = [10, 84, 122];  // #2ea0e0 -> #0a547a
+  const margin = Math.round(W * 0.06);
+  for (let p = 0; p < W * H; p++) {
+    const i = p * C, r = data[i], g = data[i + 1], b = data[i + 2];
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // white-background test: bright and near-neutral. Disc (yellow), subject, cards, bottom bar all fail it.
+    if (lum < 236 || Math.max(r, g, b) - Math.min(r, g, b) > 18) continue;
+    const x = p % W, y = (p / W) | 0;
+    const ef = Math.min(1, Math.min(x, W - 1 - x, y, H - 1 - y) / margin);   // 0 at the border -> 1 inside
+    const a = (alpha[p] / 255) * PEAK * ef;
+    if (a <= 0.003) continue;
+    const t = alpha[p] / 255;                // brighter = nearer the disc -> bluer azure
+    const br = Math.round(outer[0] + (inner[0] - outer[0]) * t);
+    const bg = Math.round(outer[1] + (inner[1] - outer[1]) * t);
+    const bb = Math.round(outer[2] + (inner[2] - outer[2]) * t);
+    data[i] = Math.round(r * (1 - a) + br * a);
+    data[i + 1] = Math.round(g * (1 - a) + bg * a);
+    data[i + 2] = Math.round(b * (1 - a) + bb * a);
+  }
+  return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
+}
+
 export async function onFunnelBackground(pngBuf: Buffer, kind: "masthead" | "section1"): Promise<Buffer> {
   const meta = await sharp(pngBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 811;
