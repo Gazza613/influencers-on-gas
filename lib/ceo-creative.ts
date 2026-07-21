@@ -65,14 +65,18 @@ const BRIGHTROCK_DESIGN: CeoDesign = {
   subColor: "#3a3a3a",
   accent: "#f0a818",
   fspColor: "#8a8781",
-  // LIGHT and human, never navy - a calm, permanent, trustworthy register for a life insurer, not fintech energy.
+  // THREE REAL CORPORATE BOARDROOMS (Gary), light and premium - depth and impact, not a flat studio card.
+  // Bright and neutral so charcoal type still reads over a light scrim, and softly blurred so she stays the
+  // subject.
   backdrops: [
-    "a clean, bright, softly-lit studio backdrop in warm off-white and pale grey, a gentle top-light gradient, " +
-    "calm and premium, corporate portrait lighting",
-    "the interior of a bright modern insurance-company office in Cape Town: pale walls, warm natural daylight, " +
-    "soft neutral tones, softly out of focus at a shallow depth of field so it reads as a real place",
-    "a light, airy modern office with large windows and soft daylight, warm neutral and pale-grey tones, a hint " +
-    "of warm gold in the light, shallow depth of field, calm and reassuring",
+    "the interior of a premium modern corporate boardroom, a long polished table, elegant leather chairs, floor-" +
+    "to-ceiling windows with soft bright daylight, warm neutral and pale tones, richly detailed but softly out " +
+    "of focus at a shallow depth of field so it reads as a real, high-end room behind the subject",
+    "a bright modern executive boardroom with a city skyline through large windows, pale walls, warm wood and " +
+    "soft grey tones, glass and steel, natural daylight, shallow depth of field, calm and premium",
+    "an elegant contemporary boardroom with warm timber panelling, soft ambient lighting, large windows with " +
+    "diffused daylight, neutral and warm tones with a faint gold warmth, shallow depth of field, sophisticated " +
+    "and reassuring",
   ],
   logoPrefersLight: false,   // the charcoal wordmark, for a light field
   compliance: "BrightRock Life Ltd is a licensed financial services provider and life insurer. FSP 11643.",
@@ -209,7 +213,9 @@ export async function buildCeoCreatives(
   //      near-black grade would over-darken the figure and a heavy shadow would smudge; both are lightened.
   const tone = design.scheme === "light" ? { brightness: 1.0, saturation: 1.0 } : { brightness: 0.94, saturation: 0.88 };
   const shadowGain = design.scheme === "light" ? 0.42 : 0.5;
-  const figure = await sharp(figureRaw).modulate(tone).png().toBuffer();
+  const figure = design.scheme === "light"
+    ? await sharp(figureRaw).modulate(tone).sharpen({ sigma: 1.1 }).png().toBuffer()
+    : await sharp(figureRaw).modulate(tone).png().toBuffer();
   const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
   const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
   const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
@@ -241,17 +247,12 @@ export async function buildCeoCreatives(
   //     that: a soft deepening behind and below her so she always separates from the background. It is also
   //     cleaner, more corporate, and costs no generation. Three subtle variants so the team still picks from
   //     three.
-  let shots: { url: string | null }[];
-  if (design.scheme === "light") {
-    shots = [{ url: null }, { url: null }, { url: null }]; // designed per-index in the composite loop
-  } else {
-    const prompts = design.backdrops.map((d) =>
-      `${d}. NO people, NO faces, NO text, NO lettering, NO numbers, NO logo, NO graphics of any kind - it is a ` +
-      `plain branded BACKGROUND only. Leave the LEFT and LOWER-LEFT calmer for a headline and a name plate; the ` +
-      `RIGHT side can carry the light. Sharp, high resolution.`);
-    shots = await generateBatchDetailed(prompts, "nano_banana_pro", "1:1", { resolution: "2k" }, null);
-    await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
-  }
+  const prompts = design.backdrops.map((d) =>
+    `${d}. NO people, NO faces, NO text, NO lettering, NO numbers, NO logo, NO graphics of any kind - it is a ` +
+    `plain BACKGROUND only. Keep the LEFT third calmer and less busy so a headline can sit over it; the RIGHT ` +
+    `side carries the room. Sharp, high resolution.`);
+  const shots = await generateBatchDetailed(prompts, "nano_banana_pro", "1:1", { resolution: "2k" }, null);
+  await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
 
   // The logo lockup that reads on THIS field. A dark field wants the light/reversed mark; a light field wants
   // the dark one. logoPrefersLight flips the whole score, so the same picker serves both.
@@ -275,24 +276,25 @@ export async function buildCeoCreatives(
       const bgUrl = shots[i]?.url;
       // LIGHT: a designed field with a soft deepening where she stands, so she separates. Three subtle variants.
       // DARK: the AI backdrop, or the brand field as a fallback.
-      const bg = design.scheme === "light"
-        ? await lightField(W, H, i)
-        : bgUrl
-          ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
-          : await brandField(W, H, design.field);
+      const bg = bgUrl
+        ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
+        : design.scheme === "light" ? await lightField(W, H, i) : await brandField(W, H, design.field);
 
       // DARK allows up to a 50% right bleed; LIGHT keeps her whole - clamp so her right edge stays on-canvas.
       const x = design.scheme === "light"
         ? Math.max(0, Math.min(figLeft, W - figW))
         : Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
-      let out = await sharp(bg)
-        .composite([
-          // The contact shadow goes down FIRST, offset slightly left and down, so he sits IN the scene.
-          { input: shadow, left: Math.max(0, x - Math.round(figW * 0.03)), top: Math.max(0, figTop + Math.round(figH * 0.012)) },
-          { input: figure, left: x, top: figTop },
-          { input: overlay, left: 0, top: 0 },
-        ])
-        .png().toBuffer();
+      // NO CONTACT SHADOW ON LIGHT. A blurred black shadow bleeds through her translucent hair and shoulder
+      // edges as grey murk on a light field - the "shading on her face" Gary saw. A photographic boardroom
+      // separates her by its own depth of field, so the shadow only hurts. MoMo keeps its shadow on dark.
+      const layers = design.scheme === "light"
+        ? [{ input: figure, left: x, top: figTop }, { input: overlay, left: 0, top: 0 }]
+        : [
+            { input: shadow, left: Math.max(0, x - Math.round(figW * 0.03)), top: Math.max(0, figTop + Math.round(figH * 0.012)) },
+            { input: figure, left: x, top: figTop },
+            { input: overlay, left: 0, top: 0 },
+          ];
+      let out = await sharp(bg).composite(layers).png().toBuffer();
       if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 5, wPct: design.scheme === "light" ? 20 : 24 })) as Buffer;
 
       const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
@@ -415,7 +417,12 @@ ${fontFaceCss(fonts)}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent;font-family:'${fam}','Helvetica Neue',Arial,sans-serif}
 /* THE SCRIM. A light wash across the left, fading out before the figure, so charcoal text always has a clean
    backing - the single fix that made the nameplate legible where the dark suit sits. */
-.scrim{position:absolute;inset:0;background:linear-gradient(90deg, #f4f2ef 0%, #f4f2ef 36%, rgba(244,242,239,.72) 50%, rgba(244,242,239,0) 62%)}
+/* A clean cream panel holding the text, over a photographic boardroom. It is SOLID to 38% and fully gone by
+   45% - she begins around 48%, so the panel gives charcoal type a firm backing and NEVER reaches her face
+   (the veil that shaded her before). A hair-line gold edge where it meets the room reads as a design panel
+   rather than a fade. */
+.scrim{position:absolute;inset:0;background:linear-gradient(90deg, #f5f3f0 0%, #f5f3f0 38%, rgba(245,243,240,.92) 42%, rgba(245,243,240,0) 45%)}
+.edge{position:absolute;top:0;bottom:0;left:44.4%;width:3px;background:linear-gradient(to bottom, transparent, rgba(240,168,24,.55) 30%, rgba(240,168,24,.55) 70%, transparent)}
 .rule{position:absolute;left:6%;top:33%;width:${Math.round(H * 0.043)}px;height:${Math.round(H * 0.004)}px;background:${design.accent};border-radius:3px}
 .msg{position:absolute;left:6%;top:36%;width:42%;color:${design.textColor};font-weight:700;font-size:${msgSize}px;line-height:1.1;letter-spacing:-1.2px}
 .plate{position:absolute;left:6%;bottom:12.5%}
@@ -427,6 +434,7 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent;font
   border:1px solid rgba(43,43,43,.16);background:rgba(255,255,255,.55);font-weight:600;font-size:${Math.round(H * 0.0125)}px;color:#6b6862}
 </style></head><body>
 <div class="scrim"></div>
+<div class="edge"></div>
 <div class="rule"></div>
 <div class="msg">${esc(message)}</div>
 <div class="plate"><div class="nm">${esc(name)}</div><div class="tl">${esc(title)}</div><div class="br"></div></div>
