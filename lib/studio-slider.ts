@@ -205,17 +205,18 @@ function pickCarouselLogo(logos: { name: string | null; url: string }[]): { url:
 
 // Render OUR real deal card (vertical) as a transparent PNG, then composite it TOP-RIGHT over the slider's
 // deal-card position - so the deal is the campaign's chosen one, pixel-clean, never the reference's baked card.
-async function overlayDeal(baseBuf: Buffer, deal: Deal, fonts: { family: string; url: string }[], box?: { xPct: number; yPct: number; wPct: number } | null): Promise<Buffer> {
+async function overlayDeal(baseBuf: Buffer, deal: Deal, fonts: { family: string; url: string }[], box?: { xPct: number; yPct: number; wPct: number } | null, orientation: "vertical" | "horizontal" = "vertical"): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
-  // Render the vertical card big, trim to it, then resize to an exact width - guarantees the whole card (down
-  // to the validity line) is present and correctly sized.
+  // Render the card big, trim to it, then resize to an exact width - guarantees the whole card (down to the
+  // validity line) is present and correctly sized.
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss(fonts)}
     *{margin:0;box-sizing:border-box}body{background:transparent;padding:20px}${dealCardCss(0.5)}</style></head>
-    <body>${dealCardHtml(deal, "vertical")}</body></html>`;
-  const { png } = await renderPng({ html, width: 1400, height: 1800, scale: 1, transparent: true });
+    <body>${dealCardHtml(deal, orientation)}</body></html>`;
+  const { png } = await renderPng({ html, width: 2600, height: 1800, scale: 1, transparent: true });
   // Size to the reference deal-card box (a touch bigger, to fully COVER the baked one), else default top-right.
-  const wFrac = box ? Math.min(0.32, Math.max(0.18, (box.wPct > 1 ? box.wPct / 100 : box.wPct) * 1.08)) : 0.24;
+  // Landscape needs more width to read, so it gets a wider footprint than the vertical badge.
+  const wFrac = box ? Math.min(orientation === "horizontal" ? 0.5 : 0.32, Math.max(0.18, (box.wPct > 1 ? box.wPct / 100 : box.wPct) * 1.08)) : (orientation === "horizontal" ? 0.42 : 0.24);
   const cardW = Math.round(W * wFrac);
   const card = await sharp(png).trim({ threshold: 10 }).resize({ width: cardW }).png().toBuffer();
   const cm = await sharp(card).metadata();
@@ -327,13 +328,14 @@ export async function stampTypesetDeal(
   imageUrl: string,
   deal: Deal,
   referenceUrl?: string,
+  orientation: "vertical" | "horizontal" = "vertical",
 ): Promise<string> {
   try {
     const kit = await getBrandKit(clientId).catch(() => null);
     const fonts = (kit?.fonts || []) as { family: string; url: string }[];
     const buf: Buffer = Buffer.from(new Uint8Array(await (await fetch(imageUrl)).arrayBuffer()));
     const layout = referenceUrl ? await detectLayout(referenceUrl).catch(() => null) : null;
-    const out = await overlayDeal(buf, deal, fonts, layout?.callout);
+    const out = await overlayDeal(buf, deal, fonts, layout?.callout, orientation);
     return await putBytes(out, `studio/${clientId}/deal-typeset`, "png", "image/png");
   } catch (e) {
     console.error("[stampTypesetDeal] failed, returning image without the deal:", e);

@@ -31,9 +31,16 @@ export type CardOrientation = "vertical" | "horizontal";
 export function dealCardCss(s = 1): string {
   const px = (n: number) => `${(n * s).toFixed(1)}px`;
   return `
-.dc{position:relative;display:inline-block;background:${CARD_NAVY};
-  border:${px(12)} solid #fff;border-radius:${px(58)};
-  box-shadow:0 ${px(18)} ${px(44)} rgba(0,0,0,.42);
+/* 3D EXTRUDED CARD (Gary: same look as the library deal cards, not a flat rectangle). Volume comes from a navy
+   GRADIENT (lit top-left, deep bottom-right), a big drop shadow that floats it off the photo, and TWO inset
+   shadows - a bright top highlight and a dark bottom shadow - that bevel it like a moulded 3D badge. The white
+   border is the rim. All shadow, no overlay, so the type stays crisp on top. */
+.dc{position:relative;display:inline-block;
+  background:linear-gradient(158deg, #15597f 0%, ${CARD_NAVY} 48%, #06293e 100%);
+  border:${px(11)} solid #fff;border-radius:${px(58)};
+  box-shadow:0 ${px(22)} ${px(48)} rgba(0,0,0,.5),
+    inset 0 ${px(9)} ${px(18)} rgba(255,255,255,.24),
+    inset 0 ${px(-14)} ${px(26)} rgba(0,0,0,.42);
   font-family:'MTNBrighterSans',sans-serif;font-style:italic;font-weight:800;
   font-variant-numeric:tabular-nums lining-nums;text-align:center;line-height:1}
 

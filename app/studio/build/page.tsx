@@ -109,6 +109,7 @@ export default function BuilderPage() {
   // the price is never handed to the model (Gary: "deals are dynamic from the client").
   const [custom, setCustom] = useState<Record<string, Deal>>({});      // slotKey -> typed deal
   const [dealPrev, setDealPrev] = useState<Record<string, string>>({}); // slotKey -> rendered card preview url
+  const [dealOrient, setDealOrient] = useState<Record<string, "vertical" | "horizontal">>({}); // slotKey -> typeset card shape
   const [err, setErr] = useState("");
 
   // Start a clean campaign - clear everything from the previous one.
@@ -266,7 +267,7 @@ export default function BuilderPage() {
           subject: subj + (screenSel[slotKey] ? GREEN_SCREEN_HINT : (PHONE_MAP[phone[slotKey]] || "")), // fold the phone treatment (or the green-screen hint) into the direction
           deal, callout: o.callout, theme: o.theme,
           dealCardUrl: cardSel[slotKey] || "", scene: scene[slotKey] || "",
-          phoneScreenUrl: screenSel[slotKey] || "",
+          phoneScreenUrl: screenSel[slotKey] || "", dealOrientation: dealOrient[slotKey] || "vertical",
         }),
       }).then(readJson) as any;
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, clean: d.cleanUrl || d.url, status: "new" } }));
@@ -310,7 +311,7 @@ export default function BuilderPage() {
     try {
       const d = await fetch("/api/studio/deal-preview", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, deal }),
+        body: JSON.stringify({ clientId, deal, orientation: dealOrient[slotKey] || "vertical" }),
       }).then(readJson) as any;
       if (d.url) setDealPrev((p) => ({ ...p, [slotKey]: d.url }));
       else setErr(d.error || "could not render the card");
@@ -511,6 +512,15 @@ export default function BuilderPage() {
                           <input value={custom[slotKey]?.validity || ""} onChange={(e) => setCustomField(slotKey, "validity", e.target.value)}
                             placeholder="*Valid for 7 Days"
                             className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-[14px] outline-none focus:border-accent disabled:opacity-40" />
+                        </div>
+                        {/* Shape toggle - the typeset card renders in the same 3D look, vertical or landscape. */}
+                        <div className="mt-1.5 flex items-center gap-1">
+                          {(["vertical", "horizontal"] as const).map((o) => (
+                            <button key={o} onClick={() => { setDealOrient((x) => ({ ...x, [slotKey]: o })); setDealPrev((p) => ({ ...p, [slotKey]: "" })); }}
+                              className={`rounded-lg border px-2.5 py-1 text-[13px] font-bold ${(dealOrient[slotKey] || "vertical") === o ? "border-accent text-accent" : "border-line text-ink-dim hover:text-ink"}`}>
+                              {o === "vertical" ? "Vertical" : "Landscape"}
+                            </button>
+                          ))}
                         </div>
                         <div className="mt-1.5 flex items-center gap-2">
                           <button onClick={() => previewDeal(slotKey)}

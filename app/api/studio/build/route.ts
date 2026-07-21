@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; theme?: string; dealCardUrl?: string; phoneScreenUrl?: string; deal?: import("@/lib/studio-producer").Deal | null };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; kind?: string; referenceUrl?: string; subject?: string; scene?: string; callout?: string; theme?: string; dealCardUrl?: string; phoneScreenUrl?: string; dealOrientation?: string; deal?: import("@/lib/studio-producer").Deal | null };
   const clientId = String(b.clientId || "");
   const kind = String(b.kind || "");
   let referenceUrl = String(b.referenceUrl || "");
@@ -34,6 +34,7 @@ export async function POST(req: Request) {
   const theme = String(b.theme || "").trim();
   const dealCardUrl = String(b.dealCardUrl || "").trim();
   const phoneScreenUrl = String(b.phoneScreenUrl || "").trim();
+  const dealOrientation: "vertical" | "horizontal" = b.dealOrientation === "horizontal" ? "horizontal" : "vertical";
   if (!clientId || !subject) return NextResponse.json({ error: "Describe who should be in it." }, { status: 400 });
 
   try {
@@ -148,7 +149,7 @@ export async function POST(req: Request) {
     // THE OFFER, composited - never AI-drawn. Chosen artwork wins; otherwise a typed deal is typeset in the
     // client's own card design (dynamic deals, every character exact).
     if (dealCardUrl) locked = await stampDealCard(clientId, locked, dealCardUrl, referenceUrl);
-    else if (b.deal && b.deal.label) locked = await stampTypesetDeal(clientId, locked, b.deal, referenceUrl);
+    else if (b.deal && b.deal.label) locked = await stampTypesetDeal(clientId, locked, b.deal, referenceUrl, dealOrientation);
     // THE PHONE SCREEN, composited onto the model's green chroma screen - a real screenshot, never invented.
     if (phoneScreenUrl) locked = await stampPhoneScreen(clientId, locked, phoneScreenUrl);
     // cleanUrl is the render BEFORE the logo and deal are stamped on. A re-run/edit must start from THIS, not
