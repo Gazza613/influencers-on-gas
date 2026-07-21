@@ -47,8 +47,19 @@ export async function POST(req: Request) {
     const isDisc = kind === "masthead" || kind === "section1";
 
     const changes: string[] = [instruction];
-    // A stamped deal card must not be redrawn either - we re-composite the real one below.
-    if (dealCardUrl) changes.push(`Do NOT draw any deal card, offer badge, price bubble or pill anywhere, and no prices. Leave the top-right area as clean background - the real deal card is composited on afterwards.`);
+    // THE BRAND LOCKS ARE ALREADY BAKED INTO THIS IMAGE from the previous run. We re-stamp them afterwards, so
+    // the model must first REMOVE the existing ones and reconstruct clean background - otherwise the old logo
+    // and old deal stay in the pixels and the fresh stamp lands ON TOP, doubling the logo and pasting the new
+    // deal over the old one instead of replacing it (Gary's exact bug on a re-run).
+    if (!isDisc) {
+      // Sliders get the real logo re-stamped, so the baked one must go first.
+      changes.push(`REMOVE the existing MoMo logo lockup completely (it is composited back on afterwards): erase it and cleanly reconstruct the background/photograph where it sat, leaving that corner clean with NO logo and no faint or partial remnant of one.`);
+    }
+    if (dealCardUrl) {
+      // Adding/changing the deal: strip whatever offer element is already in the top-right so the new card
+      // REPLACES it rather than overlapping it.
+      changes.push(`REMOVE any deal card, offer badge, price bubble, pill or promotional element ALREADY PRESENT in the top-right (and anywhere else) and cleanly reconstruct the background there, so the top-right comes back completely clean. Draw NO new deal, price or offer of any kind - the real deal card is composited on afterwards.`);
+    }
 
     const ed = await forensicRetheme(imageUrl, { changes, ratio, resolution: "2k", solidBackground: isDisc });
     await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: `edit-${kind || "creative"}`, count: 1 }).catch(() => {});
