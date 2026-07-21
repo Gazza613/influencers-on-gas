@@ -99,6 +99,8 @@ export default function BuilderPage() {
   const [dealSel, setDealSel] = useState<Record<string, string>>({});  // slotKey -> deal id ("" = none)
   const [cards, setCards] = useState<{ id: string; name: string; url: string }[]>([]); // intake deal-card artwork
   const [cardSel, setCardSel] = useState<Record<string, string>>({});  // slotKey -> deal_card asset url ("" = none)
+  const [screens, setScreens] = useState<{ id: string; name: string; url: string }[]>([]); // intake phone-screen artwork
+  const [screenSel, setScreenSel] = useState<Record<string, string>>({}); // slotKey -> phone_screen asset url ("" = none)
   const [callout, setCallout] = useState<Record<string, string>>({});  // slotKey -> callout text to feature
   const [lightbox, setLightbox] = useState("");                        // url of the creative opened full-screen
   const [edit, setEdit] = useState<Record<string, string>>({});        // slotKey -> edit instruction for the landed render
@@ -112,7 +114,7 @@ export default function BuilderPage() {
   // Start a clean campaign - clear everything from the previous one.
   function startNext() {
     setBrief(""); setTheme(""); setPicked({}); setSubject({}); setShot({}); setConcept({});
-    setFlags([]); setPhone({}); setDealSel({}); setCardSel({}); setCallout({}); setScene({}); setEdit({});
+    setFlags([]); setPhone({}); setDealSel({}); setCardSel({}); setScreenSel({}); setCallout({}); setScene({}); setEdit({});
     setCustom({}); setDealPrev({}); setErr("");
   }
 
@@ -146,6 +148,8 @@ export default function BuilderPage() {
     fetch(`/api/studio/deals?clientId=${clientId}`).then((r) => r.json()).then((d) => setDeals(d.deals || [])).catch(() => {});
     // The client's own deal-card / pill artwork from intake - we composite the chosen one, never draw it.
     fetch(`/api/studio/deal-cards?clientId=${clientId}`).then((r) => r.json()).then((d) => setCards(d.cards || [])).catch(() => {});
+    // The client's own phone-screen screenshots from intake - picked like the deal cards, composited (never invented).
+    fetch(`/api/studio/phone-screens?clientId=${clientId}`).then((r) => r.json()).then((d) => setScreens(d.screens || [])).catch(() => {});
   }, [clientId]);
 
   const [theme, setTheme] = useState("");
@@ -259,6 +263,7 @@ export default function BuilderPage() {
           subject: subj + (PHONE_MAP[phone[slotKey]] || ""), // fold the phone treatment into the direction
           deal, callout: o.callout, theme: o.theme,
           dealCardUrl: cardSel[slotKey] || "", scene: scene[slotKey] || "",
+          phoneScreenUrl: screenSel[slotKey] || "",
         }),
       }).then(readJson) as any;
       if (d.url) setShot((s) => ({ ...s, [slotKey]: { url: d.url, clean: d.cleanUrl || d.url, status: "new" } }));
@@ -548,6 +553,27 @@ export default function BuilderPage() {
                           <option value="pointing">Pointing at the screen</option>
                           <option value="none">No phone</option>
                         </select>
+                        {/* PHONE-SCREEN LIBRARY (Gary): pick a real screenshot to show on the phone, like the deal
+                            cards. Composited, never AI-invented. Only relevant when the screen faces the camera. */}
+                        {screens.length > 0 && (phone[slotKey] === "app" || phone[slotKey] === "pointing") && (
+                          <div className="mt-2">
+                            <div className="mb-1 text-[13px] uppercase tracking-wider text-ink-faint">Phone screen</div>
+                            <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface-2 p-1.5">
+                              <button onClick={() => setScreenSel((x) => ({ ...x, [slotKey]: "" }))}
+                                className={`rounded border px-2 py-1 text-[13px] font-bold ${!screenSel[slotKey] ? "border-accent text-accent" : "border-line text-ink-dim"}`}>
+                                None
+                              </button>
+                              {screens.map((sc) => (
+                                <button key={sc.id} onClick={() => setScreenSel((x) => ({ ...x, [slotKey]: sc.url }))}
+                                  title={sc.name.replace(/\.(png|jpe?g)$/i, "")}
+                                  className={`rounded border p-0.5 ${screenSel[slotKey] === sc.url ? "border-accent ring-1 ring-accent" : "border-line"}`}>
+                                  <img src={sc.url} alt={sc.name} className="h-14 w-auto rounded-sm bg-white/5 object-contain" />
+                                </button>
+                              ))}
+                            </div>
+                            {screenSel[slotKey] && <p className="mt-1 text-[13px] text-[#86efac]">✓ Real screenshot - composited exactly, never redrawn.</p>}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Callout to change</label>
