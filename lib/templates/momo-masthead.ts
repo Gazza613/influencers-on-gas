@@ -29,7 +29,12 @@ export type MastheadSlots = {
   complianceText?: string | null;
 };
 
-const MOMO_BLUE = "#004F71";
+// THE WEBFLOW MASTHEAD COLOUR. LOCKED. Gary supplied the exact hex the funnel's masthead SECTION is painted
+// in on Webflow: #083a51 (rgb 8,58,81). The masthead image drops INTO that section, so its field must be this
+// colour to the byte - one shade off and the seam between the page and the image is visible. This is not the
+// general MoMo web blue (#004F71, still used by the slider and section 1); it is specifically the masthead
+// band, and it must never drift from it. If Webflow ever repaints that section, change this one value.
+const MOMO_BLUE = "#083a51";
 const MOMO_YELLOW = "#F9CB0F";
 
 export function renderMomoMasthead(slots: MastheadSlots, fonts: { family: string; url: string }[]): string {
@@ -40,9 +45,12 @@ html,body{width:1080px;height:811px;overflow:hidden}
 .canvas{position:relative;width:1080px;height:811px;overflow:hidden;background:${MOMO_BLUE};
   font-family:'MTNBrighterSans',sans-serif;-webkit-font-smoothing:antialiased}
 
-/* 2. The glow. Warm, off-centre, sitting under the disc - it stops the flat blue reading as a colour swatch. */
-.glow{position:absolute;left:50%;top:46%;width:1300px;height:1300px;transform:translate(-50%,-50%);
-  background:radial-gradient(circle,rgba(0,120,166,.55) 0%,rgba(0,90,128,.22) 45%,transparent 70%)}
+/* 2. The glow. Warm, off-centre, sitting under the disc - it stops the flat blue reading as a colour swatch.
+   CLAMPED so it fully fades before every canvas edge (the top edge is nearest, ~373px from this centre):
+   at 900px the outer stop lands at ~324px, so the whole perimeter stays pure #083a51 and the funnel insert is
+   seamless. Never widen this past the point where the transparent stop clears the top edge, or the seam returns. */
+.glow{position:absolute;left:50%;top:46%;width:900px;height:900px;transform:translate(-50%,-50%);
+  background:radial-gradient(circle closest-side,rgba(0,120,166,.5) 0%,rgba(0,90,128,.2) 42%,transparent 72%)}
 
 /* 3. THE YELLOW DISC. FLAT. The brand's signature shape is a disc, not a sphere - a radial 3D gradient turns
    it into a lemon, which is the single fastest way to make this look like clip art. One flat brand yellow,
