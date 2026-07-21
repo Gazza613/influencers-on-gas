@@ -561,17 +561,22 @@ export default function BuilderPage() {
                         {screens.length > 0 && (phone[slotKey] === "app" || phone[slotKey] === "pointing") && (
                           <div className="mt-2">
                             <div className="mb-1 text-[13px] uppercase tracking-wider text-ink-faint">Phone screen</div>
-                            <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface-2 p-1.5">
+                            <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto rounded-lg border border-line bg-surface-2 p-2">
                               <button onClick={() => setScreenSel((x) => ({ ...x, [slotKey]: "" }))}
-                                className={`rounded border px-2 py-1 text-[13px] font-bold ${!screenSel[slotKey] ? "border-accent text-accent" : "border-line text-ink-dim"}`}>
+                                className={`h-32 rounded border px-2 text-[13px] font-bold ${!screenSel[slotKey] ? "border-accent text-accent" : "border-line text-ink-dim"}`}>
                                 None
                               </button>
                               {screens.map((sc) => (
-                                <button key={sc.id} onClick={() => setScreenSel((x) => ({ ...x, [slotKey]: sc.url }))}
-                                  title={sc.name.replace(/\.(png|jpe?g)$/i, "")}
-                                  className={`rounded border p-0.5 ${screenSel[slotKey] === sc.url ? "border-accent ring-1 ring-accent" : "border-line"}`}>
-                                  <img src={sc.url} alt={sc.name} className="h-14 w-auto rounded-sm bg-white/5 object-contain" />
-                                </button>
+                                <div key={sc.id} className="relative">
+                                  <button onClick={() => setScreenSel((x) => ({ ...x, [slotKey]: sc.url }))}
+                                    title={sc.name.replace(/\.(png|jpe?g)$/i, "")}
+                                    className={`block rounded border p-0.5 ${screenSel[slotKey] === sc.url ? "border-accent ring-1 ring-accent" : "border-line"}`}>
+                                    <img src={sc.url} alt={sc.name} className="h-32 w-auto rounded-sm bg-white/5 object-contain" />
+                                  </button>
+                                  {/* Click to enlarge in the lightbox, so the screen content is readable before picking. */}
+                                  <button onClick={(e) => { e.stopPropagation(); setLightbox(sc.url); }} title="Enlarge"
+                                    className="absolute right-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[13px] leading-none text-white hover:bg-black/80">⤢</button>
+                                </div>
                               ))}
                             </div>
                             {screenSel[slotKey] && <p className="mt-1 text-[13px] text-[#86efac]">✓ Real screenshot - composited exactly, never redrawn.</p>}
