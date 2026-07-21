@@ -331,8 +331,10 @@ export async function cleanBlueGlowBehindDisc(buf: Buffer): Promise<Buffer> {
   //    two-tone blue (bright azure near the disc, deeper MoMo blue outward) gives the halo depth without arcs.
   //    An EDGE RAMP forces the glow to nothing within the outer margin, so the section-1 border stays pure
   //    white and the Webflow seam is never re-broken, whatever the disc's size or position.
-  const PEAK = 0.5;                        // top opacity of the glow at its brightest ring
-  const inner = [46, 160, 224], outer = [10, 84, 122];  // #2ea0e0 -> #0a547a
+  // SUBTLE, and in MOMO BLUE so it matches the pills and icon bubbles (Gary), not a bright azure. Both tones sit
+  // in the #004F71 family; the low peak keeps it a whisper of a halo rather than a burst.
+  const PEAK = 0.32;                       // top opacity of the glow at its brightest ring
+  const inner = [0, 79, 113], outer = [0, 58, 85];  // exact MoMo blue #004F71 -> deeper, to match the bubbles/pill
   const margin = Math.round(W * 0.06);
   for (let p = 0; p < W * H; p++) {
     const i = p * C, r = data[i], g = data[i + 1], b = data[i + 2];

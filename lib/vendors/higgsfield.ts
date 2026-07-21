@@ -494,6 +494,14 @@ export async function forensicRetheme(url: string, opts: { changes: string[]; ra
         `ear, rest one nearby, or have one floating. If @image1 already contains a phone, keep that ONE and never ` +
         `add another. Before you finish, count the phones: the answer must be one, or none. Two phones is a ` +
         `defect and the image is wrong. ` +
+        // HARD RULE, ALSO STATED FIRST. Gary, repeatedly: people looking at a phone must show its BACK, not the
+        // screen. Phone orientation is the single thing this model gets wrong most, so it goes at the very top.
+        `\n\nHARD RULE - A PHONE FACES ITS USER: if ANY person is looking at, watching, reacting to or leaning ` +
+        `toward a phone, that phone is turned AWAY from the camera so the viewer sees ONLY ITS BACK - the dark ` +
+        `rear shell with the camera bump - and NEVER the screen. The bright screen may face the camera ONLY when ` +
+        `a person deliberately holds the phone OUT to present it to the viewer and is NOT looking into it. A ` +
+        `screen facing us while its owner looks at it from the other side is physically impossible and a defect: ` +
+        `show the back of the handset instead. ` +
         `\n\n@image1 is a FINISHED MTN MoMo advert. Reproduce it EXACTLY and identically, pixel-for-pixel: the SAME ` +
         `people and faces, the SAME poses and framing, the SAME background and scene, the SAME signature curved ` +
         `light SWISH / glowing ribbons, the SAME layout and spacing, the SAME fonts, sizes, ` +
