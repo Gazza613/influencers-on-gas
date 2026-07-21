@@ -384,7 +384,7 @@ export default function BuilderPage() {
           </div>
           <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
             placeholder="What is the campaign? e.g. Mother's Day - celebrate mums, send money and airtime to your mother through MoMo, zero fees."
-            className="mt-3 w-full rounded-xl border border-line bg-surface-2 p-4 text-base leading-relaxed outline-none focus:border-accent" />
+            className="mt-3 w-full resize-y rounded-xl border border-line bg-surface-2 p-4 text-base leading-relaxed outline-none focus:border-accent" />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={buildAll} disabled={!!busy.all || brief.trim().length < 6}
               className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#818cf8] to-[#f472b6] px-5 py-2.5 text-base font-bold text-black disabled:opacity-40">
@@ -459,9 +459,9 @@ export default function BuilderPage() {
                     </div>
 
                     <label className="mt-3 block text-base font-semibold uppercase tracking-wider text-ink-faint">Who should be in it? (bring the theme in)</label>
-                    <input value={subject[slotKey] || ""} onChange={(e) => setSubject((x) => ({ ...x, [slotKey]: e.target.value }))}
+                    <textarea value={subject[slotKey] || ""} onChange={(e) => setSubject((x) => ({ ...x, [slotKey]: e.target.value }))} rows={2}
                       placeholder="e.g. a mother and her adult daughter smiling together"
-                      className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] outline-none focus:border-accent" />
+                      className="mt-1 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] leading-snug outline-none focus:border-accent" />
 
                     {/* per-creative controls: deal card, deal text, phone, callout */}
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -525,9 +525,9 @@ export default function BuilderPage() {
                       {sec.key === "slider" ? (
                         <div>
                           <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Setting / background</label>
-                          <input value={scene[slotKey] || ""} onChange={(e) => setScene((x) => ({ ...x, [slotKey]: e.target.value }))}
+                          <textarea value={scene[slotKey] || ""} onChange={(e) => setScene((x) => ({ ...x, [slotKey]: e.target.value }))} rows={2}
                             placeholder="Keep the design's"
-                            className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent" />
+                            className="mt-1 w-full resize-y rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] leading-snug outline-none focus:border-accent" />
                         </div>
                       ) : (
                         <div>
@@ -550,9 +550,9 @@ export default function BuilderPage() {
                       </div>
                       <div>
                         <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Callout to change</label>
-                        <input value={callout[slotKey] || ""} onChange={(e) => setCallout((x) => ({ ...x, [slotKey]: e.target.value }))}
+                        <textarea value={callout[slotKey] || ""} onChange={(e) => setCallout((x) => ({ ...x, [slotKey]: e.target.value }))} rows={2}
                           placeholder="e.g. Happy Mother's Day"
-                          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent" />
+                          className="mt-1 w-full resize-y rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] leading-snug outline-none focus:border-accent" />
                       </div>
                     </div>
 
@@ -591,13 +591,14 @@ export default function BuilderPage() {
                             can never garble them. */}
                         <div className="mt-2 w-full max-w-md">
                           <label className="block text-base font-semibold uppercase tracking-wider text-ink-faint">Change something on this image</label>
-                          <div className="mt-1 flex gap-2">
-                            <input
+                          <div className="mt-1 flex items-start gap-2">
+                            <textarea
                               value={edit[slotKey] || ""}
                               onChange={(e) => setEdit((x) => ({ ...x, [slotKey]: e.target.value }))}
-                              onKeyDown={(e) => { if (e.key === "Enter") applyEdit(slotKey, sec.key); }}
+                              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); applyEdit(slotKey, sec.key); } }}
+                              rows={2}
                               placeholder="e.g. lose the second phone · make her cardigan navy · warmer light"
-                              className="flex-1 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] outline-none focus:border-accent"
+                              className="flex-1 resize-y rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[15px] leading-snug outline-none focus:border-accent"
                             />
                             <button onClick={() => applyEdit(slotKey, sec.key)} disabled={!!busy[slotKey] || (edit[slotKey] || "").trim().length < 3}
                               className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-base font-bold text-ink-dim hover:text-ink disabled:opacity-40">
