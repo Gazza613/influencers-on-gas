@@ -137,10 +137,6 @@ const BG_MAX_SAT = 40;     // and near-neutral (max-min channel spread)
 // deterministic flatten locks the creative's field to this for a seamless drop.
 export const MASTHEAD_NAVY: [number, number, number] = [8, 58, 82];
 const rgbHex = (c: [number, number, number]) => "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
-// Tuned on a test rig, not guessed: at 0.035 the fill breached a drop shadow at an unprotected point and then
-// ate the whole thing (shadow pixels are background-like, so once inside it spreads through). 0.06 keeps the
-// shadow (226 stays 226) while still cleaning corner smudges to pure white. 0.09 gains nothing.
-const HALO_FRAC = 0.06;    // protected shadow zone around the design, as a fraction of the width
 
 // CUT A PERSON OUT OF A CLEAN STUDIO SHOT to a transparent PNG. Used for the CEO creative: his real photo on a
 // white studio background becomes a floating cut-out we composite onto a MoMo field - forensically his face,
@@ -204,47 +200,86 @@ export async function flattenSection1ToWhite(buf: Buffer): Promise<Buffer> {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, C = info.channels;
 
+  // SAMPLE THE ACTUAL BACKGROUND from the four corners - on a section-1 the corners are always background, so
+  // this reads whatever the model painted there (white, or the cream/tan studio it sometimes slips in) and lets
+  // us flood-fill THAT colour to white, not just near-white pixels. This is the fix for the cream backgrounds
+  // that beat the old "light + neutral" test: a warm tan sits at luminance ~174, below the 185 floor, so it
+  // survived. Median-of-four guards against one corner that happens to clip the design.
+  const cornerAvg = (x0: number, y0: number): [number, number, number] => {
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let y = y0; y < Math.min(y0 + 24, H); y++) for (let x = x0; x < Math.min(x0 + 24, W); x++) {
+      const i = (y * W + x) * C; r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+    }
+    return n ? [r / n, g / n, b / n] : [255, 255, 255];
+  };
+  const corners = [cornerAvg(0, 0), cornerAvg(W - 24, 0), cornerAvg(0, H - 24), cornerAvg(W - 24, H - 24)];
+  const med = (k: number) => { const s = corners.map((c) => c[k]).sort((a, b) => a - b); return (s[1] + s[2]) / 2; };
+  const bg: [number, number, number] = [med(0), med(1), med(2)];
+  const bgLum = 0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2];
+  // Is the background a COLOURED studio (cream/tan) rather than plain white? A warm cast shows as channel spread,
+  // and a mid-tone shows as a lower luminance. This decides two things below: on a coloured bg the sampled-colour
+  // test alone finds the background and its darker shadow is spared automatically, so we skip the light-neutral
+  // fallback (which would grab light clothing) and use only a hairline halo. On white we keep the original,
+  // generous behaviour so the design's soft drop-shadows survive.
+  const bgSpread = Math.max(bg[0], bg[1], bg[2]) - Math.min(bg[0], bg[1], bg[2]);
+  const coloredBg = bgSpread > 12 || bgLum < 215;
+
   const isBgPixel = (i: number): boolean => {
     const r = data[i], g = data[i + 1], b = data[i + 2];
+    // Near the sampled background colour (a cream/tan studio is caught as readily as white). Tolerance is tight
+    // enough that skin (warmer, more saturated) and a darker drop-shadow (lower luminance) are left alone.
+    if (bgLum > 140 && Math.abs(r - bg[0]) <= 30 && Math.abs(g - bg[1]) <= 30 && Math.abs(b - bg[2]) <= 30) return true;
+    // On a coloured studio the sampled colour IS the whole background - do not also sweep light neutrals, or a
+    // light-grey cardigan or a white shirt gets whitened. Only white backgrounds fall through to the safety net.
+    if (coloredBg) return false;
     const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    if (lum < BG_MIN_LUM) return false;
-    return Math.max(r, g, b) - Math.min(r, g, b) <= BG_MAX_SAT;
+    return lum >= BG_MIN_LUM && Math.max(r, g, b) - Math.min(r, g, b) <= BG_MAX_SAT;
   };
 
-  // 1. The DESIGN mask: everything that is not background-like (the disc, the bubbles, the person, the pill).
-  const design = Buffer.alloc(W * H);
-  for (let p = 0; p < W * H; p++) design[p] = isBgPixel(p * C) ? 0 : 255;
+  // Whiten the background.
+  if (coloredBg) {
+    // GLOBAL, NO HALO on a coloured studio: the sampled tan/cream is a distinct colour from every design element
+    // (the yellow disc, the navy bubbles, skin, clothing), so we whiten it wherever it appears - edge-connected
+    // OR trapped in a pocket between the disc and the subject, which an edge-only flood cannot reach (that was
+    // the leftover tan wedge). No halo is needed: a darker drop-shadow and the saturated design are not near the
+    // sampled colour, so the colour test spares them by itself.
+    for (let p = 0; p < W * H; p++) {
+      const i = p * C;
+      if (isBgPixel(i)) { data[i] = 255; data[i + 1] = 255; data[i + 2] = 255; }
+    }
+  } else {
+    // CONNECTIVITY on white, with a halo protecting the design's soft drop-shadows: a light near-white area is
+    // whitened ONLY if it truly connects to the border, so the design's own depth survives. (An over-wide
+    // protected patch is harmless here - it just stays white.)
+    const design = Buffer.alloc(W * H);
+    for (let p = 0; p < W * H; p++) design[p] = isBgPixel(p * C) ? 0 : 255;
+    const radius = Math.max(4, Math.round(W * 0.05));
+    const haloRaw = await sharp(design, { raw: { width: W, height: H, channels: 1 } }).blur(radius).raw().toBuffer();
+    const halo = new Uint8Array(W * H);
+    for (let p = 0; p < W * H; p++) halo[p] = haloRaw[p] > 36 ? 1 : 0;
 
-  // 2. Dilate it into a halo, so the design's own soft shadows sit INSIDE the protected zone and survive.
-  const radius = Math.max(4, Math.round(W * HALO_FRAC));
-  const halo = await sharp(design, { raw: { width: W, height: H, channels: 1 } })
-    .blur(radius)          // spreads the mask outward
-    .threshold(8)          // anything the blur touched at all becomes protected
-    .raw()
-    .toBuffer();
+    const seen = new Uint8Array(W * H);
+    const stack = new Int32Array(W * H);
+    let sp = 0;
+    const push = (x: number, y: number) => {
+      const p = y * W + x;
+      if (!seen[p]) { seen[p] = 1; stack[sp++] = p; }
+    };
+    for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+    for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
 
-  // 3. Flood-fill background-like pixels inward from the edges, never entering the halo.
-  const seen = new Uint8Array(W * H);
-  const stack = new Int32Array(W * H);
-  let sp = 0;
-  const push = (x: number, y: number) => {
-    const p = y * W + x;
-    if (!seen[p]) { seen[p] = 1; stack[sp++] = p; }
-  };
-  for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
-  for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
-
-  while (sp > 0) {
-    const p = stack[--sp];
-    if (halo[p]) continue;             // protected: the design or its shadow - leave it alone
-    const i = p * C;
-    if (!isBgPixel(i)) continue;       // a non-background pixel is a wall: do not spread through it
-    data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
-    const x = p % W, y = (p / W) | 0;
-    if (x > 0) push(x - 1, y);
-    if (x < W - 1) push(x + 1, y);
-    if (y > 0) push(x, y - 1);
-    if (y < H - 1) push(x, y + 1);
+    while (sp > 0) {
+      const p = stack[--sp];
+      if (halo[p]) continue;             // protected: the design or its shadow - leave it alone
+      const i = p * C;
+      if (!isBgPixel(i)) continue;       // a non-background pixel is a wall: do not spread through it
+      data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
+      const x = p % W, y = (p / W) | 0;
+      if (x > 0) push(x - 1, y);
+      if (x < W - 1) push(x + 1, y);
+      if (y > 0) push(x, y - 1);
+      if (y < H - 1) push(x, y + 1);
+    }
   }
   return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
 }
