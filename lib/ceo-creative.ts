@@ -196,10 +196,20 @@ export async function buildCeoCreatives(
   const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
   const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
   const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
-  // The figure sits right, bottom-anchored, its leftmost point clearing the message column so the headline can
-  // never reach it. A light design pushes it further right (55% floor) than MoMo's (45%).
-  const figFloor = design.scheme === "light" ? 0.55 : 0.45;
-  const figLeft = Math.max(Math.round(W * figFloor), W - figW);
+  // WHERE THE FIGURE SITS, bottom-anchored, leftmost point clearing the message column so the headline never
+  // reaches it.
+  //   - DARK (MoMo): a small RIGHT BLEED - the figure runs off the right edge, which suits a full-bleed navy
+  //     composition. Floor 45%.
+  //   - LIGHT (BrightRock): she must sit WHOLE, not cut off (Gary). Right-align her against a small right
+  //     margin so the whole person is in frame, and only fall back to the 48% floor if she is so wide that
+  //     keeping her whole would cross into the text column - in which case the figure was over-scaled upstream.
+  let figLeft: number;
+  if (design.scheme === "light") {
+    const rightMargin = Math.round(W * 0.03);
+    figLeft = Math.max(Math.round(W * 0.48), W - figW - rightMargin);
+  } else {
+    figLeft = Math.max(Math.round(W * 0.45), W - figW);
+  }
   const figTop = H - figH;
 
   // 3. The foreground overlay - message, name plate, compliance, logo, mark - one render, in the brand's design.
@@ -238,7 +248,10 @@ export async function buildCeoCreatives(
         ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
         : await brandField(W, H, design.field);
 
-      const x = Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
+      // DARK allows up to a 50% right bleed; LIGHT keeps her whole - clamp so her right edge stays on-canvas.
+      const x = design.scheme === "light"
+        ? Math.max(0, Math.min(figLeft, W - figW))
+        : Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
       let out = await sharp(bg)
         .composite([
           // The contact shadow goes down FIRST, offset slightly left and down, so he sits IN the scene.
