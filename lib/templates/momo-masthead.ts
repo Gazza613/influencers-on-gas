@@ -1,4 +1,5 @@
 import { fontFaceCss } from "../studio-render";
+import { MASTHEAD_NAVY } from "../studio-cutout";
 
 // MTN MOMO — FUNNEL MASTHEAD. Locked canvas 1080x811. Read off the client's own best-performing work.
 //
@@ -34,7 +35,7 @@ export type MastheadSlots = {
 // inside the hero graphic (#005080), and not the nav bar or callout box. The image drops INTO this section, so
 // its field must be this colour to the byte. If Webflow ever repaints it, change this one value (keep it in
 // step with MASTHEAD_NAVY in studio-cutout.ts).
-const MOMO_BLUE = "#083a52";
+const MOMO_BLUE = "#" + MASTHEAD_NAVY.map((v) => v.toString(16).padStart(2, "0")).join("");
 const MOMO_YELLOW = "#F9CB0F";
 
 export function renderMomoMasthead(slots: MastheadSlots, fonts: { family: string; url: string }[]): string {
@@ -47,7 +48,7 @@ html,body{width:1080px;height:811px;overflow:hidden}
 
 /* 2. The glow. Warm, off-centre, sitting under the disc - it stops the flat blue reading as a colour swatch.
    CLAMPED so it fully fades before every canvas edge (the top edge is nearest, ~373px from this centre):
-   at 900px the outer stop lands at ~324px, so the whole perimeter stays pure #083a51 and the funnel insert is
+   at 900px the outer stop lands at ~324px, so the whole perimeter stays pure #083a52 and the funnel insert is
    seamless. Never widen this past the point where the transparent stop clears the top edge, or the seam returns. */
 .glow{position:absolute;left:50%;top:46%;width:900px;height:900px;transform:translate(-50%,-50%);
   background:radial-gradient(circle closest-side,rgba(0,120,166,.5) 0%,rgba(0,90,128,.2) 42%,transparent 72%)}

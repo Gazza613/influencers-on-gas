@@ -135,7 +135,7 @@ export async function POST(req: Request) {
         finalUrl = await putBytes(glowed, `studio/${clientId}/section1-white`, "png", "image/png");
       } catch (e) { console.error("[build] section-1 white/glow failed, keeping the render:", e); }
     }
-    // MASTHEAD IS ALWAYS EXACTLY #083a51 at the edges - the seam fix (Gary). Same deterministic move as section
+    // MASTHEAD IS ALWAYS EXACTLY #083a52 at the edges - the seam fix (Gary). Same deterministic move as section
     // 1's white: re-assert the exact Webflow band colour after the AI retheme, so the field can never drift a
     // shade off the section it drops into.
     if (kind === "masthead") {

@@ -105,7 +105,7 @@ export async function onBackground(pngBuf: Buffer, hex: string): Promise<Buffer>
 // section it embeds into, so it reads as seamlessly placed and the edge halo simply disappears into the match.
 //
 // Colours read straight from the live funnel:
-//   masthead -> the hero section, FLAT #083a51 (Gary supplied the exact swatch; the section is now a solid
+//   masthead -> the hero section, FLAT #083a52 (Gary supplied the exact swatch; the section is now a solid
 //               fill, not the old #0b425d->#02293d gradient, so the creative must be that one flat colour edge
 //               to edge or the seam shows against the Webflow band).
 //   section1 -> the white sections: #ffffff
@@ -133,7 +133,7 @@ const BG_MAX_SAT = 40;     // and near-neutral (max-min channel spread)
 // NOT the bright field inside the hero graphic (#005080), and NOT the nav bar or callout box (lighter navies
 // Gary told us to ignore). SAMPLED from Gary's own live masthead screenshot (uploaded to CI intake): the
 // background fills 37% of the frame and every pure-background point reads exactly #083a52 (rgb 8,58,82). This
-// vindicates Gary's original #083a51 - the earlier drop-in seam was a stale creative, not a wrong colour. The
+// validates the matched Webflow swatch (#083a52) - the earlier drop-in seam was a stale creative, not a wrong colour. The
 // deterministic flatten locks the creative's field to this for a seamless drop.
 export const MASTHEAD_NAVY: [number, number, number] = [8, 58, 82];
 const rgbHex = (c: [number, number, number]) => "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
@@ -284,12 +284,12 @@ export async function flattenSection1ToWhite(buf: Buffer): Promise<Buffer> {
   return sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer();
 }
 
-// FORCE THE MASTHEAD FIELD TO EXACTLY #083a51 (the mirror of flattenSection1ToWhite, for the dark band). The
-// retheme is an AI regeneration, so even with a flat #083a51 base it can drift the field a shade or leave a
+// FORCE THE MASTHEAD FIELD TO EXACTLY #083a52 (the mirror of flattenSection1ToWhite, for the dark band). The
+// retheme is an AI regeneration, so even with a flat #083a52 base it can drift the field a shade or leave a
 // faint gradient - and a shade off is a visible seam when the image drops into the Webflow masthead section.
 // So we do not rely on the model: we flood-fill the NAVY BACKGROUND inward from the edges to the exact colour,
 // stopping dead at the yellow disc, the light streak and the subject (none of which are dark-blue), and
-// protecting a halo so the subject's own contact shadow survives. The result: every edge pixel is #083a51.
+// protecting a halo so the subject's own contact shadow survives. The result: every edge pixel is #083a52.
 export async function flattenMastheadToNavy(buf: Buffer, target: [number, number, number] = MASTHEAD_NAVY): Promise<Buffer> {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, C = info.channels;

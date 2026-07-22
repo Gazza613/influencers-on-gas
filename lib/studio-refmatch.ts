@@ -179,7 +179,7 @@ export async function produceRefMatch(clientId: string, brief: string): Promise<
     totalCalls += 1;
     if (!url) { warnings.push(`${j.kind}: ${error}`); return { kind: j.kind, index: j.index, refName: j.ref.name, refUrl: j.ref.url, url: "", error: error || "retheme failed" }; }
 
-    // SECTION 1 MUST BE PURE WHITE, MASTHEAD EXACTLY #083a51 - deterministic on both, because no prompt has held
+    // SECTION 1 MUST BE PURE WHITE, MASTHEAD EXACTLY #083a52 - deterministic on both, because no prompt has held
     // and the seam against the Webflow section is unforgiving.
     let cleanUrl = url;
     if (j.kind === "section1") {
