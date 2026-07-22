@@ -407,6 +407,32 @@ export async function stampDealCard(
   }
 }
 
+// Hide any logo the model drew in the top-left, by melting a soft patch of the surrounding scene colour over
+// the logo zone. The zone is the reference's logo box widened to the RIGHT (a garbled wordmark runs past ours)
+// with a margin; the colour is sampled from just below it (open scene), and the patch is heavily blurred so it
+// feathers into the photograph instead of reading as a block. Our real logo is then stamped onto clean pixels.
+async function coverDrawnLogo(buf: Buffer, box: { xPct: number; yPct: number; wPct: number }): Promise<Buffer> {
+  const meta = await sharp(buf).metadata();
+  const W = meta.width || 1080, H = meta.height || 1080;
+  const xF = box.xPct > 1 ? box.xPct / 100 : box.xPct;
+  const yF = box.yPct > 1 ? box.yPct / 100 : box.yPct;
+  const wF = box.wPct > 1 ? box.wPct / 100 : box.wPct;
+  const m = Math.round(W * 0.012);
+  const zx = Math.max(0, Math.round(W * xF) - m);
+  const zy = Math.max(0, Math.round(H * yF) - m);
+  const zw = Math.min(W - zx, Math.round(W * wF * 1.6) + 2 * m);
+  const zh = Math.min(H - zy, Math.round(W * wF * 0.6) + 2 * m);
+  if (zw < 8 || zh < 8) return buf;
+  const sy = zy + zh;
+  const region = (sy + zh <= H) ? { left: zx, top: sy, width: zw, height: zh } : { left: zx, top: zy, width: zw, height: zh };
+  const { channels } = await sharp(buf).extract(region).stats();
+  const [r, g, b] = channels.slice(0, 3).map((c) => Math.round(c.mean));
+  const rad = Math.round(Math.min(zw, zh) * 0.28);
+  const svg = `<svg width="${zw}" height="${zh}" xmlns="http://www.w3.org/2000/svg"><rect x="${m}" y="${m}" width="${zw - 2 * m}" height="${zh - 2 * m}" rx="${rad}" fill="rgb(${r},${g},${b})"/></svg>`;
+  const patch = await sharp(Buffer.from(svg)).blur(Math.max(6, m)).png().toBuffer();
+  return sharp(buf).composite([{ input: patch, left: zx, top: zy }]).png().toBuffer();
+}
+
 // THE LOGO HARD LOCK (Gary). The retheme keeps the design beautifully, but nano_banana re-draws the MoMo
 // lockup and garbles the wordmark - "MoMo from HTN" instead of "from MTN". That is unshippable brand damage,
 // and no prompt wording fixes it reliably, so we stop asking: after every retheme we stamp the REAL lockup from
@@ -431,6 +457,12 @@ export async function stampRealLogo(clientId: string, referenceUrl: string, imag
     const logo = pickCarouselLogo(logos);
     if (!logo) return imageUrl;
 
+    // COVER ANY LOGO THE MODEL DREW before we stamp ours. Despite being told not to, the retheme sometimes
+    // paints a garbled lockup ("MoM8 from MTN") that is wider and offset from ours, so its edges ghost out past
+    // our stamp. We lay a soft, feathered patch of the SURROUNDING scene colour over the logo zone (extended
+    // right, where the ghost pokes) - it blends into the photo and hides the drawn logo; our real one then
+    // stamps onto clean pixels. Best-effort: a failure here must not stop the logo lock.
+    try { out = await coverDrawnLogo(out, logoBox); } catch (e) { console.error("[stampRealLogo] logo-area cover failed:", e); }
     const logoBuf = Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer()));
     out = (await compositeLogo(out, logoBuf, logoBox, { halo: true })) as Buffer;
     return await putBytes(out, `studio/${clientId}/logo-locked`, "png", "image/png");
