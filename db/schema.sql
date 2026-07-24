@@ -675,3 +675,19 @@ alter table knowledge_sources add column if not exists error text;
 -- Restrict a crawl to one section of a site. Without it a crawl wanders: the first real one pulled a case
 -- study, a solutions page and the sitemap alongside the articles it was asked for.
 alter table knowledge_sources add column if not exists include_path text;
+
+-- THE RESEARCHER (Gary, July 2026) - a third intel role beside the Journalist and the Strategist.
+--
+-- WHY IT IS ITS OWN ROLE AND NOT A SECOND STRATEGIST. The Strategist is a WATCHER: it runs daily on a cron and
+-- is gated hard on recency, because its whole job is "what changed". The Researcher is an ANALYST: it is
+-- commissioned on demand and answers "where do we actually stand", which is mostly NOT news. A structural gap,
+-- an entrenched competitor position, or a global campaign worth stealing can be two years old and still be the
+-- most useful thing on the page - so the Researcher deliberately does NOT inherit the daily recency gate.
+alter table intel_briefs add column if not exists researcher text;
+
+-- Findings are filed into the same queue (so accept/bin and "publish as a CEO article" work unchanged), but a
+-- Researcher finding also carries WHICH of the five sections it belongs to.
+alter table studio_intel add column if not exists section text;
+alter table studio_intel drop constraint if exists studio_intel_role_check;
+alter table studio_intel add constraint studio_intel_role_check
+  check (role in ('journalist','strategist','researcher'));

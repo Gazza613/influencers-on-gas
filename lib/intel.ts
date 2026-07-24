@@ -24,6 +24,8 @@ import { getBrandKit } from "./studio";
 export type Intel = {
   id: string;
   role: string;
+  // Only the Researcher sets this: which of its five sections the finding belongs under.
+  section?: string | null;
   headline: string;
   why_it_matters: string;
   detail: string | null;
@@ -78,6 +80,9 @@ export type IntelBrief = {
   scope: string;
   journalist: string | null;
   strategist: string | null;
+  // The Researcher's remit for this brain. On-demand only, and it does NOT use windowDays - structural research
+  // is not gated on recency the way the daily watch is.
+  researcher: string | null;
   windowDays: number;
   emailIntro: string | null;
   // THE CEO'S VOICE, PER BRAIN. These were hardcoded to MTN MoMo in the newsletter route and in the creative:
@@ -92,8 +97,8 @@ export type IntelBrief = {
 
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const rows = (await db().query(
-    `select b.client_id, c.name as client_name, b.scope, b.journalist, b.strategist, b.window_days, b.email_intro,
-            b.ceo_rules, b.ceo_name, b.ceo_title
+    `select b.client_id, c.name as client_name, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
+            b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title
      from intel_briefs b join clients c on c.id = b.client_id
      where b.client_id = $1`,
     [clientId],
@@ -106,6 +111,7 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
     scope: String(r.scope),
     journalist: (r.journalist as string) || null,
     strategist: (r.strategist as string) || null,
+    researcher: (r.researcher as string) || null,
     windowDays: Number(r.window_days) || 30,
     emailIntro: (r.email_intro as string) || null,
     ceoRules: (r.ceo_rules as string) || null,
