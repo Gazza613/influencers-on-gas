@@ -10,10 +10,14 @@ import { recordUsage } from "./usage";
 //
 // WHY THIS IS NOT THE STRATEGIST RUNNING HARDER. The Strategist is a WATCHER: it runs daily on a cron and is
 // gated hard on recency, because its entire job is "what changed". The Researcher is an ANALYST: it is
-// commissioned on demand and answers "where do we stand, and what should we do about it" - which is mostly NOT
-// news. An entrenched competitor position, a structural gap in the category, or a campaign from two years ago
-// worth stealing can be the most useful thing on the page. So the Researcher deliberately does NOT inherit the
-// daily recency gate; applying it would gut the dossier and leave only headlines.
+// commissioned on demand and answers "where do we stand, and what should we do about it". It reads structural
+// truth - an entrenched competitor position, a category norm - but it must do so through CURRENT evidence.
+//
+// RECENCY, 90 DAYS (Gary). A finding has to rest on a development, publication or move from the last
+// RECENCY_DAYS. Year-old news dressed up as a finding is exactly what makes research feel stale, so a dated
+// finding older than the window is dropped. Older material may still inform the READ - "Mukuru has operated
+// since 2004" is background, not a finding. The ONE carve-out is the trends-and-campaigns-to-steal section,
+// where a proven older campaign is legitimately a craft reference; everywhere else, current or it does not run.
 //
 // WHAT IT KEEPS FROM THE DAILY ENGINE, because these are the parts that make research trustworthy:
 //   - THE BRAIN IS THE RINGFENCE. Scope lock and remit come from THIS brain's row; no brief means we refuse to
@@ -26,6 +30,10 @@ import { recordUsage } from "./usage";
 // FIVE SECTIONS, ALWAYS THE SAME. A dossier that changes shape run to run cannot be compared to the last one.
 
 export type ResearchSection = "threat" | "opportunity" | "gap" | "positioning" | "trend";
+
+// The recency window for a finding. Structural context can be older, but the FINDING itself must be current -
+// year-old news dressed as research is the thing Gary called out. Tune here; everything downstream reads it.
+export const RECENCY_DAYS = 90;
 
 export const SECTIONS: { id: ResearchSection; label: string; blurb: string }[] = [
   { id: "threat", label: "Threats", blurb: "What could damage this client's position" },
@@ -58,9 +66,12 @@ const HONESTY = `HONESTY RULES:
   itself - the primary thing - NOT a Google or search-results page, NOT a link aggregator, and NOT a bare
   homepage. If a claim comes from a video, link the video; from a regulator, link the regulator's own document.
   A reader must be able to click the link and land on the exact source of the claim.
-- NO RECENCY GATE. This is not a news run. Structural truth is what matters: a competitor's entrenched position,
-  a category norm, a campaign from two years ago that still works. Date what you can, and say plainly when
-  something is historical versus current - but never discard a finding merely for being old.
+- RECENCY, 90 DAYS. A finding must rest on a development, publication or move from the last 90 days (you are
+  told the cutoff date below). Older structural context may inform your READ, but it cannot BE the finding:
+  "Mukuru has operated since 2004" is background, not a finding, and last year's partnership is not this
+  quarter's news. If you cannot date a claim to within the window, do not present it as current. The ONE
+  exception is the trends-and-campaigns-to-steal section, where a proven older campaign may be cited as a craft
+  reference - and even there, lead with why it is worth acting on now.
 - SAY WHEN SOMETHING IS CURRENT. If a fact could have moved since publication, say so rather than implying it
   still holds.
 - DO NOT REPORT THE BRAIN'S OWN DOCTRINE BACK. You are given what we already know. A finding must ADD to it,
@@ -105,7 +116,7 @@ const SCHEMA = {
               required: ["name", "url"],
             },
           },
-          published_at: { type: "string", description: "Date the SOURCE was published as YYYY-MM-DD, if you can establish it. Empty string if not - unlike the daily run, an undated finding is ACCEPTED here, because structural research is not news." },
+          published_at: { type: "string", description: "Date the SOURCE was published as YYYY-MM-DD. Findings must be current, so date every one you can. A dated finding older than the 90-day window is DROPPED (except in the trend / campaigns-to-steal section). Empty string only if genuinely undateable - accepted but weaker." },
           period: { type: "string", description: "What the DATA covers if different from publication (e.g. 'FY2025'). Empty if not applicable." },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           material: { type: "boolean", description: "Would this actually change what we say, make or spend? Be ruthless." },
@@ -142,6 +153,13 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const client = new Anthropic({ apiKey: key });
   const kit = await getBrandKit(clientId).catch(() => null);
 
+  // THE 90-DAY WINDOW (Gary). Research must be current: a finding older than this reads as stale, not
+  // structural. Computed from the run date so it always tracks "today", and passed to the model AND enforced in
+  // code below - the prompt asks for recency, the filter guarantees it, because a model will drift.
+  const cutoff = new Date(`${today}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - RECENCY_DAYS);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
   const sectionList = SECTIONS.map((s) => `- ${s.label} (${s.id}): ${s.blurb}`).join("\n");
   const askedFor = focus?.trim()
     ? `\n\nTHE COMMISSION - what this particular dossier is for, which should bias what you dig into:\n${focus.trim()}`
@@ -154,9 +172,13 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     `Work the five sections:\n${sectionList}${askedFor}\n\n` +
     `WHAT WE ALREADY KNOW (do NOT report this back - only what ADDS to, sharpens or CONTRADICTS it):\n` +
     `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n\n` +
+    `RECENCY: every finding must rest on something from the LAST ${RECENCY_DAYS} DAYS, i.e. on or after ` +
+    `${cutoffStr}. Prioritise your searches to that window. Older material may inform your understanding, but do ` +
+    `not present it as a finding - the one exception is a landmark campaign cited as a craft reference in the ` +
+    `trends-to-steal section.\n\n` +
     `Search the web now, properly and widely: the client, their competitors, their category, their regulators, ` +
     `and the best global marketing work in adjacent categories. Then set out what you actually found, with the ` +
-    `real source for each. Go deep on the few things that would change a decision.`;
+    `real source and its date for each. Go deep on the few current things that would change a decision.`;
 
   const research = await client.messages.create({
     model: PREMIUM,
@@ -173,7 +195,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 8000,
-    system: `${cfg.scope}\n\n${HONESTY}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings under the five sections. Carry the REAL source URLs through - never invent one. Name any section you genuinely found nothing for in thin_sections rather than padding it.`,
+    system: `${cfg.scope}\n\n${HONESTY}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings under the five sections. Carry the REAL source URLs and their dates through - never invent one. Every finding must be dated on or after ${cutoffStr} (last ${RECENCY_DAYS} days); drop anything older unless it is a craft reference in the trends-to-steal section. Name any section you genuinely found nothing for in thin_sections rather than padding it.`,
     tools: [{ name: "dossier", description: "The research dossier, every finding sourced.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "dossier" },   // FORCED - a dossier always comes back
     messages: [{ role: "user", content: `Research notes:\n\n${notes.slice(0, 24000)}` }],
@@ -206,6 +228,12 @@ export async function runResearch(clientId: string, today: string, focus?: strin
       .slice(0, 8);
     // Sourcing is the product here: an unsourced "finding" is an opinion, so it never reaches the queue.
     if (!srcs.length) continue;
+
+    // THE 90-DAY GATE, enforced in code because a model drifts. A finding dated before the cutoff is stale and
+    // dropped - EXCEPT in the trends-to-steal section, where a landmark older campaign is a legitimate craft
+    // reference. Undated findings pass (we cannot prove them stale), but the prompt pushes hard to date them.
+    const pub = /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? String(f.published_at) : null;
+    if (pub && pub < cutoffStr && section !== "trend") continue;
     const rows = (await db().query(
       `insert into studio_intel (client_id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
        values ($1,'researcher',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
