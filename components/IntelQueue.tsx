@@ -115,9 +115,9 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
         body: JSON.stringify({ clientId, focus }),
       }).then((x) => x.json()).catch(() => null);
       setRunning(false);
-      if (!r?.ok) { setNote(r?.error || "Couldn't commission the dossier."); flex(r?.error || "Couldn't commission the dossier."); await refresh(clientId); return; }
-      setNote(r.count ? "" : "The dossier ran clean and found nothing worth filing. That is a real answer, not a gap.");
-      flex(`Dossier ready. Filed ${r.count} finding${r.count === 1 ? "" : "s"} across the five sections.`);
+      if (!r?.ok) { setNote(r?.error || "Couldn't run the deep research."); flex(r?.error || "Couldn't run the deep research."); await refresh(clientId); return; }
+      setNote(r.count ? "" : "The deep research ran clean and found nothing worth filing. That is a real answer, not a gap.");
+      flex(`Deep research done. Filed ${r.count} finding${r.count === 1 ? "" : "s"} across the five sections.`);
       await refresh(clientId);
       return;
     }
@@ -178,7 +178,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
           button, not one you press idly. */}
       {isResearcher && (
         <div className="rounded-xl border border-line bg-surface-1 p-4">
-          <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Focus for this dossier (optional)</label>
+          <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Focus for this deep research (optional)</label>
           <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2}
             placeholder="e.g. gaps vs Capitec Pay on trust, or a specific competitor's new move. Leave blank for the full standing remit."
             className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg leading-relaxed text-ink outline-none focus:border-[#a855f7]" />

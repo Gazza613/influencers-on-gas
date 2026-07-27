@@ -137,7 +137,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const cfg = await loadIntelBrief(clientId);
   if (!cfg) throw new Error("This brain has no intel brief, so its scope lock is unknown. Refusing to research it rather than borrow another brain's scope.");
   const remit = cfg.researcher;
-  if (!remit) throw new Error(`${cfg.clientName} has no Researcher remit set yet. Add one on the brain before commissioning a dossier.`);
+  if (!remit) throw new Error(`${cfg.clientName} has no Researcher remit set yet. Add one on the brain before running the deep research.`);
 
   const client = new Anthropic({ apiKey: key });
   const kit = await getBrandKit(clientId).catch(() => null);
@@ -165,7 +165,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 18 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
-  await recordUsage({ clientId, provider: "anthropic", model: PREMIUM, unit: "request", action: "research-dossier", count: 1 }).catch(() => {});
+  await recordUsage({ clientId, provider: "anthropic", model: PREMIUM, unit: "request", action: "deep-research", count: 1 }).catch(() => {});
 
   const notes = research.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   if (!notes) return [];
