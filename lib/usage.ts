@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { getZarPerUsd } from "./fx";
-import { rollUpByDesk, type DeskSpend } from "./desks";
+import { rollUpByDesk, deskOf, DESK_ORDER, DESK_TINT, type Desk, type DeskSpend } from "./desks";
 
 // Higgsfield Ultra: $375 / 9,000 credits per month ⇒ ≈ $0.0417 per credit (USD_PER_CREDIT).
 // The Rand value of a credit is now WIRED TO THE LIVE USD/ZAR RATE (lib/fx.ts) via
@@ -131,6 +131,9 @@ export type CostReport = {
   total: { credits: number; cents: number; events: number };
   split: { image: { count: number; cents: number }; video: { count: number; cents: number }; other: { count: number; cents: number } };
   byUser: { user_email: string; credits: number; cents: number; events: number }[];
+  // Team member x section cross-tab (Gary): each member's spend broken down by desk, plus their total, so one
+  // view answers "what did each person cost, and on which section". Empty desks are dropped per member.
+  byUserDesk: { user_email: string; total_cents: number; desks: { desk: string; cents: number; tint: string }[] }[];
   byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
   byAction: { action: string; credits: number; cents: number; events: number }[];
@@ -189,6 +192,25 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
     from usage_events u left join influencers i on i.id = u.influencer_id ${where}
     group by i.id, i.name order by max(u.created_at) desc limit 200`)) as CostReport["byInfluencer"];
 
+  // TEAM MEMBER x SECTION cross-tab. Grouped by the same normalized user + action, then rolled to desks in TS
+  // (one mapping, next to the call sites). Gives "each section by team member" and the per-member total in one.
+  const userDeskRows = (await db().query(
+    `select case when u.user_email is null or lower(u.user_email) = $${byUserParams.length} then 'Super Admin' else u.user_email end as user_email,
+            coalesce(u.action,'(other)') as action, sum(u.cents)::int as cents
+     from usage_events u ${where} group by 1, u.action`, byUserParams)) as { user_email: string; action: string; cents: number }[];
+  const perUser = new Map<string, Map<Desk, number>>();
+  for (const r of userDeskRows) {
+    const d = deskOf(r.action);
+    if (!perUser.has(r.user_email)) perUser.set(r.user_email, new Map());
+    const m = perUser.get(r.user_email)!;
+    m.set(d, (m.get(d) ?? 0) + (Number(r.cents) || 0));
+  }
+  const byUserDesk: CostReport["byUserDesk"] = [...perUser.entries()].map(([user_email, m]) => ({
+    user_email,
+    total_cents: [...m.values()].reduce((a, b) => a + b, 0),
+    desks: DESK_ORDER.map((d) => ({ desk: d as string, cents: m.get(d) ?? 0, tint: DESK_TINT[d] })).filter((x) => x.cents > 0),
+  })).sort((a, b) => b.total_cents - a.total_cents);
+
   const byProvider = (await q(`select u.provider, sum(u.credits)::float as credits, sum(u.cents)::int as cents from usage_events u ${where} group by u.provider order by cents desc`)) as CostReport["byProvider"];
   const byAction = (await q(`select coalesce(u.action,'(other)') as action, sum(u.credits)::float as credits, sum(u.cents)::int as cents, count(*)::int as events from usage_events u ${where} group by u.action order by cents desc`)) as CostReport["byAction"];
   // Which DESK spent it. Rolled up from the action rows in TypeScript (see lib/desks.ts) rather than a SQL
@@ -200,7 +222,7 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
   const influencers = (await db().query(`select id, name from influencers order by created_at desc limit 500`)) as { id: string; name: string }[];
   const providers = (await db().query(`select distinct provider from usage_events order by provider`) as { provider: string }[]).map((r) => r.provider);
 
-  return { total, split, byUser, byInfluencer, byProvider, byAction, byDesk, byDay, influencers, providers };
+  return { total, split, byUser, byUserDesk, byInfluencer, byProvider, byAction, byDesk, byDay, influencers, providers };
 }
 
 // Total ledger credits/cents recorded since a date (for cycle reconciliation).

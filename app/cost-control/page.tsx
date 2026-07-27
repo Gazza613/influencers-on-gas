@@ -8,6 +8,7 @@ type Report = {
   total: { credits: number; cents: number; events: number };
   split: { image: { count: number; cents: number }; video: { count: number; cents: number }; other: { count: number; cents: number } };
   byUser: { user_email: string; credits: number; cents: number; events: number }[];
+  byUserDesk: { user_email: string; total_cents: number; desks: { desk: string; cents: number; tint: string }[] }[];
   byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
   byAction: { action: string; credits: number; cents: number; events: number }[];
@@ -326,6 +327,9 @@ export default function CostControlPage() {
 
         {/* Tables */}
         <Section title="By team member">{report && <Table rows={report.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, credits: u.credits, cents: u.cents, sub: `${u.events} jobs` }))} />}</Section>
+
+        {/* Team member x section: each person's total, split by the sections they spent on (Gary). */}
+        {report && report.byUserDesk.length > 0 && <TeamBySection rows={report.byUserDesk} />}
         <Section title="By influencer (latest builds first)">
           {report && <Table rows={report.byInfluencer.map((i) => ({ label: i.name, credits: i.credits, cents: i.cents, sub: `${i.images} img · ${i.videos} vid · last ${i.last_at}` }))} />}
         </Section>
@@ -407,6 +411,41 @@ export default function CostControlPage() {
 //
 // Shares are computed from the true total, but a desk with real cost that rounds under 1% still gets a
 // visible sliver: a zero-width segment reads as "this desk is free", the exact misreading this fixes.
+// TEAM MEMBER x SECTION (Gary). One row per person: their total, a stacked bar of the sections they spent on,
+// and a labelled chip per section with the rand amount. Answers "what did each person cost, and where" at a
+// glance - the detail the per-section and per-member tables can only show one filter at a time.
+type UserDeskRow = { user_email: string; total_cents: number; desks: { desk: string; cents: number; tint: string }[] };
+function TeamBySection({ rows }: { rows: UserDeskRow[] }) {
+  return (
+    <section className="mt-6">
+      <h2 className="tabular mb-2 text-sm uppercase tracking-[0.2em] text-ink-faint">By team member, per section</h2>
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface-1">
+        {rows.map((u) => (
+          <div key={u.user_email} className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-semibold text-ink">{u.user_email === "(system)" ? "Super Admin" : u.user_email}</span>
+              <span className="tabular font-bold text-ink">{rand(u.total_cents)}</span>
+            </div>
+            <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
+              {u.desks.map((d) => (
+                <div key={d.desk} title={`${d.desk}: ${rand(d.cents)}`} style={{ width: `${u.total_cents > 0 ? (d.cents / u.total_cents) * 100 : 0}%`, background: d.tint }} />
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              {u.desks.map((d) => (
+                <span key={d.desk} className="tabular inline-flex items-center gap-1.5 text-[13px] text-ink-dim">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.tint }} />
+                  {d.desk} <span className="text-ink">{rand(d.cents)}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 type DeskRow = { desk: string; credits: number; cents: number; events: number; tint: string };
 function DeskSplit({ desks, fixedByDesk }: { desks: DeskRow[]; fixedByDesk: Record<string, number> }) {
   const trueOf = (d: DeskRow) => d.cents + (fixedByDesk[d.desk] ?? 0);
