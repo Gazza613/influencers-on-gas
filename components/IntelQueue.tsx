@@ -21,7 +21,7 @@ const SECTIONS: { id: string; label: string; accent: string }[] = [
 ];
 
 type Intel = {
-  id: string; role: string; section?: string | null; request?: string | null; headline: string; why_it_matters: string; detail: string | null;
+  id: string; role: string; section?: string | null; request?: string | null; verification?: string | null; headline: string; why_it_matters: string; detail: string | null;
   source_url: string | null; source_name: string | null;
   sources: { name: string; url: string }[];
   published_at: string | null; period: string | null;
@@ -517,6 +517,18 @@ function Card({ i, busy, decide, clientId, clientName, deepen, running }: { i: I
               <span className="tabular rounded border border-line px-1.5 py-0.5 text-[18px] font-semibold text-ink-faint">
                 Data covers {i.period}
               </span>
+            )}
+            {/* SOURCE VERIFICATION. We fetched the cited page and read its real date - this says how far that
+                got. "Source verified" means the page was reached and it supports the claim; "Source not reached"
+                means it bot-blocked our fetch (kept, but check it by hand). Refuted findings never reach here. */}
+            {i.verification === "verified" && (
+              <span className="tabular rounded border border-[#4ade80]/45 bg-[#4ade80]/10 px-1.5 py-0.5 text-[18px] font-semibold text-[#86efac]">✓ Source verified</span>
+            )}
+            {i.verification === "partial" && (
+              <span className="tabular rounded border border-line px-1.5 py-0.5 text-[18px] font-semibold text-ink-dim">Source reached</span>
+            )}
+            {i.verification === "unverified" && (
+              <span className="tabular rounded border border-[#fbbf24]/45 bg-[#fbbf24]/10 px-1.5 py-0.5 text-[18px] font-semibold text-[#fcd34d]">⚠ Source not reached</span>
             )}
           </div>
         );

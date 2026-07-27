@@ -512,6 +512,11 @@ alter table studio_intel add column if not exists newsletter_options jsonb not n
 alter table studio_intel add column if not exists impact_risk text;
 alter table studio_intel add column if not exists campaign_response text;
 
+-- The Researcher's machine-verification verdict on the cited source: 'verified' (page reached and it supports
+-- the claim), 'partial' (reached, support not graded), 'unverified' (page could not be fetched). A 'refuted'
+-- finding is dropped at file time and never stored. NULL for older rows and for the daily desks.
+alter table studio_intel add column if not exists verification text;
+
 -- ── PER-CLIENT INTEL BRIEFS ─────────────────────────────────────────────────
 -- WHAT EACH CLIENT'S RESEARCHERS ARE ALLOWED TO RESEARCH. This table exists to stop CROSS-CLIENT CONTAMINATION
 -- (Gary, on adding GAS Marketing's own research alongside MTN MoMo's: "I do not want to contaminate MoMo - how

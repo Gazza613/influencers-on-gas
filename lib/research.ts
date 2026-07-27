@@ -1,10 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { PREMIUM } from "./vendors/anthropic";
+import { PREMIUM, INGEST } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
 import { loadIntelBrief, type Intel } from "./intel";
 import { recordUsage } from "./usage";
+import { verifyFinding, toISODate } from "./verify";
 
 // THE RESEARCHER - a commissioned deep dive on where a client actually stands.
 //
@@ -256,34 +257,62 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   // to what you asked for. A blank commission is the full standing remit.
   const request = focus?.trim() ? focus.trim().slice(0, 300) : "Standing remit";
 
+  // SHAPE THE CANDIDATES. A finding with no usable source is an opinion and never reaches the queue.
   const valid = new Set(SECTIONS.map((s) => s.id));
-  const saved: Intel[] = [];
-  for (const f of findings) {
+  const candidates = findings.map((f) => {
     const section = valid.has(String(f.section) as ResearchSection) ? String(f.section) : "positioning";
     const srcs = (Array.isArray(f.sources) ? f.sources : [])
       .filter((s): s is { name: string; url: string } => !!s && typeof (s as { url?: string }).url === "string" && /^https?:\/\//i.test((s as { url: string }).url))
       .slice(0, 8);
-    // Sourcing is the product here: an unsourced "finding" is an opinion, so it never reaches the queue.
-    if (!srcs.length) continue;
+    return { f, section, srcs };
+  }).filter((c) => c.srcs.length > 0);
+  if (!candidates.length) return [];
 
-    // THE 90-DAY GATE, enforced in code because a model drifts. A finding dated before the cutoff is stale and
-    // dropped - EXCEPT in the trends-to-steal section, where a landmark older campaign is a legitimate craft
-    // reference. Undated findings pass (we cannot prove them stale), but the prompt pushes hard to date them.
-    const pub = /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? String(f.published_at) : null;
+  // VERIFIED RETRIEVAL - the trust layer (Gary's #1). We do not take the model's word that a source exists, says
+  // what it claims, or carries the date it claims. For each finding we FETCH the cited page, read its REAL
+  // publish date off the page, and ask the cheap model whether the page actually supports the claim. The date we
+  // gate and display is the one we read, not the one the model guessed; a finding whose own page does not support
+  // it is dropped as a fabrication. A page we simply could not reach (bot-blocked) is kept but flagged, never
+  // binned - blocking robots is not lying.
+  emit({ t: "phase", label: `Verifying the sources on ${candidates.length} finding${candidates.length === 1 ? "" : "s"}` });
+  let verifyCalls = 0;
+  const verdicts = await Promise.all(candidates.map((c) =>
+    verifyFinding(
+      { headline: String(c.f.headline || ""), detail: String(c.f.detail || ""), published_at: String(c.f.published_at || "") },
+      c.srcs, client, () => { verifyCalls += 1; },
+    ).catch(() => ({ status: "unverified" as const, supported: null, date: toISODate(c.f.published_at), checkedUrl: c.srcs[0]?.url || null, note: "" })),
+  ));
+  if (verifyCalls) await recordUsage({ clientId, provider: "anthropic", model: INGEST, unit: "request", action: "research-verify", count: verifyCalls }).catch(() => {});
+
+  const saved: Intel[] = [];
+  for (let k = 0; k < candidates.length; k++) {
+    const { f, section, srcs } = candidates[k];
+    const v = verdicts[k];
+
+    // DROP A FABRICATION. The page was reachable and it does NOT support the claim - exactly the failure that
+    // makes research untrustworthy. Refuted only ever means "we read the page and it isn't there".
+    if (v.status === "refuted") continue;
+
+    // THE RECENCY GATE, now on the VERIFIED date. A finding dated before the cutoff is stale and dropped - except
+    // the trends-to-steal section, which runs the 12-month window. Undated findings pass (we cannot prove them
+    // stale). Because the date is read off the page, the model can no longer fabricate its way past this.
+    const date = v.date && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : null;
     const limit = section === "trend" ? trendCutoffStr : cutoffStr;
-    if (pub && pub < limit) continue;
+    if (date && date < limit) continue;
+
     const rows = (await db().query(
-      `insert into studio_intel (client_id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
-       values ($1,'researcher',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       returning id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at`,
+      `insert into studio_intel (client_id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, verification)
+       values ($1,'researcher',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       returning id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, verification, status, found_at`,
       [clientId, section, request, noDash(f.headline).slice(0, 300), noDash(f.why_it_matters).slice(0, 1200),
        noDash(f.detail).slice(0, 4000), JSON.stringify(srcs),
        srcs[0]?.url ?? null, srcs.map((s) => s.name).join(" · ").slice(0, 200) || null,
-       /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? f.published_at : null,
+       date,
        String(f.period || "").slice(0, 60) || null,
        ["high", "medium", "low"].includes(String(f.confidence)) ? f.confidence : "medium", f.material === true,
        noDash(f.impact_risk).slice(0, 3000) || null,
-       noDash(f.campaign_response).slice(0, 3000) || null],
+       noDash(f.campaign_response).slice(0, 3000) || null,
+       v.status],
     )) as Intel[];
     saved.push(rows[0]);
     emit({ t: "finding", section, headline: noDash(f.headline).slice(0, 120) });
@@ -295,7 +324,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
 export async function listResearch(clientId: string, status = "new"): Promise<Intel[]> {
   return (await db().query(
     `select id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name,
-            published_at, period, confidence, material, impact_risk, campaign_response, newsletter, newsletter_art,
+            published_at, period, confidence, material, impact_risk, campaign_response, verification, newsletter, newsletter_art,
             newsletter_options, status, found_at
      from studio_intel
      where client_id = $1 and role = 'researcher' and status = $2

@@ -26,6 +26,10 @@ export type Intel = {
   role: string;
   // Only the Researcher sets this: which of its five sections the finding belongs under.
   section?: string | null;
+  // Only the Researcher sets this: the machine-verification verdict on the cited source - "verified" (page
+  // reached and it supports the claim), "partial" (reached, support not graded), "unverified" (page could not
+  // be fetched, e.g. bot-blocked). A "refuted" finding is never stored; it is dropped at file time.
+  verification?: string | null;
   headline: string;
   why_it_matters: string;
   detail: string | null;
