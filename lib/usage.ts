@@ -64,8 +64,12 @@ export async function recordUsage(o: UsageInput): Promise<void> {
 // The flat "request" rate is a crude proxy: a deep-research Opus call with 18 web searches and a long output
 // costs nothing like a one-line classification, yet both metered R5. For real per-member, per-section cost
 // monitoring (Gary), Anthropic calls now meter by ACTUAL tokens. The API hands back exact input/output/cache
-// token counts and the web-search count on every call; we price them off rate_card rows priced per MILLION
-// tokens (unit mtok_in / mtok_out) and per web search (model 'web_search', unit 'search'), in ZAR.
+// token counts and the web-search count on every call.
+//
+// PRICED IN USD, CONVERTED AT THE LIVE RATE AS-USED (Gary): the USD price is the fixed truth (Anthropic bills in
+// dollars); the ZAR is derived at the LIVE USD/ZAR rate at the moment of the call, so the ledger never drifts on
+// a stale exchange rate and needs no manual recalibrate. The USD price per MILLION tokens (unit mtok_in /
+// mtok_out) and per web search (model 'web_search', unit 'search') is held in rate_card.credits_per_unit.
 //
 // Cache economics are Anthropic's published multipliers: a cache READ bills ~0.1x input, a cache WRITE ~1.25x.
 // We fold those into the input side so a cached research run prices correctly rather than at full input.
@@ -75,15 +79,16 @@ export async function recordTokens(o: {
   inputTokens: number; outputTokens: number;
   cacheReadTokens?: number; cacheCreationTokens?: number; webSearches?: number;
 }): Promise<void> {
-  const inRate = await getRate("anthropic", o.model, "mtok_in");
-  const outRate = await getRate("anthropic", o.model, "mtok_out");
-  const searchRate = await getRate("anthropic", "web_search", "search");
+  const inRate = await getRate("anthropic", o.model, "mtok_in");   // credits_per_unit = USD per 1M input tokens
+  const outRate = await getRate("anthropic", o.model, "mtok_out"); // USD per 1M output tokens
+  const searchRate = await getRate("anthropic", "web_search", "search"); // USD per web search
+  const zar = await getZarPerUsd(); // LIVE rate, cached ~12h - priced as-used, never a frozen basis
   const billedInput = (o.inputTokens || 0) + 1.25 * (o.cacheCreationTokens || 0) + 0.1 * (o.cacheReadTokens || 0);
-  const cents = Math.round(
-    inRate.cents * (billedInput / 1_000_000) +
-    outRate.cents * ((o.outputTokens || 0) / 1_000_000) +
-    searchRate.cents * (o.webSearches || 0),
-  );
+  const usd =
+    inRate.credits * (billedInput / 1_000_000) +
+    outRate.credits * ((o.outputTokens || 0) / 1_000_000) +
+    searchRate.credits * (o.webSearches || 0);
+  const cents = Math.round(usd * zar * 100);
   await db().query(
     `insert into usage_events (influencer_id, client_id, user_email, provider, model, action, credits, cents, count)
      values ($1,$2,$3,'anthropic',$4,$5,0,$6,$7)`,
@@ -109,16 +114,17 @@ export async function meterClaude(
   }).catch(() => {});
 }
 
-// Seed / recalibrate an Anthropic token rate from its USD price (per million tokens, or per web search),
-// converted to ZAR cents at the live FX rate - the same basis every other rate on the card uses.
+// Set an Anthropic token USD price. It is stored in credits_per_unit as the DOLLAR price (the fixed truth);
+// recordTokens converts to Rand at the LIVE rate on every call, so there is no ZAR to drift. price_cents_per_unit
+// is kept as an indicative ZAR snapshot at today's rate, for the rate-card display only - it does not drive cost.
 export async function setTokenRate(model: string, unit: string, usdPerUnit: number): Promise<void> {
   const zar = await getZarPerUsd();
-  const cents = usdPerUnit * zar * 100;
+  const snapshotCents = usdPerUnit * zar * 100;
   await db().query(
     `insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
-     values ('anthropic',$1,$2,0,$3,true)
-     on conflict (provider, model, unit) do update set price_cents_per_unit = $3, active = true`,
-    [model, unit, cents],
+     values ('anthropic',$1,$2,$3,$4,true)
+     on conflict (provider, model, unit) do update set credits_per_unit = $3, price_cents_per_unit = $4, active = true`,
+    [model, unit, usdPerUnit, snapshotCents],
   );
 }
 

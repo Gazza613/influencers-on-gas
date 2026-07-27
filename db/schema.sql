@@ -384,17 +384,18 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('voyage','voyage-3.5','embedding', 0, 0, true),
   -- Shotstack render: PAY-AS-YOU-GO (not a subscription) ~$0.30/rendered min => ~$0.24 per 45s cut.
   ('shotstack','edit','render', 0, 450, true),
-  -- TOKEN-ACCURATE Anthropic rates for the Researcher (Gary): ZAR cents per MILLION tokens, and per web
-  -- search, derived from the published USD prices at ~R18.5/$ (Opus 4.8 $5/$25, Haiku 4.5 $1/$5, web
-  -- search $0.01). setTokenRate() / Recalibrate refresh these at live FX. The flat 'request' rows above
-  -- stay for sections not yet moved to token metering.
-  ('anthropic','claude-opus-4-8','mtok_in', 0, 9250, true),
-  ('anthropic','claude-opus-4-8','mtok_out', 0, 46250, true),
-  ('anthropic','claude-sonnet-4-6','mtok_in', 0, 5550, true),   -- daily Strategist watcher runs here ($3/1M)
-  ('anthropic','claude-sonnet-4-6','mtok_out', 0, 27750, true), -- ($15/1M)
-  ('anthropic','claude-haiku-4-5','mtok_in', 0, 1850, true),
-  ('anthropic','claude-haiku-4-5','mtok_out', 0, 9250, true),
-  ('anthropic','web_search','search', 0, 18.5, true)
+  -- TOKEN-ACCURATE Anthropic rates. credits_per_unit holds the USD price (the fixed truth): per MILLION tokens
+  -- (mtok_in / mtok_out) and per web search. recordTokens() converts to Rand at the LIVE USD/ZAR rate on every
+  -- call, so nothing drifts on a stale exchange rate. price_cents_per_unit is only an indicative ZAR snapshot
+  -- (~R18.5/$ here) for the rate-card display. Published USD: Opus 4.8 $5/$25, Sonnet 4.6 $3/$15, Haiku 4.5
+  -- $1/$5, web search $0.01. The flat 'request' rows above stay for sections not yet moved to token metering.
+  ('anthropic','claude-opus-4-8','mtok_in', 5, 9250, true),
+  ('anthropic','claude-opus-4-8','mtok_out', 25, 46250, true),
+  ('anthropic','claude-sonnet-4-6','mtok_in', 3, 5550, true),
+  ('anthropic','claude-sonnet-4-6','mtok_out', 15, 27750, true),
+  ('anthropic','claude-haiku-4-5','mtok_in', 1, 1850, true),
+  ('anthropic','claude-haiku-4-5','mtok_out', 5, 9250, true),
+  ('anthropic','web_search','search', 0.01, 18.5, true)
 on conflict (provider, model, unit) do nothing;
 
 -- ============================================================================
