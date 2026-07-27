@@ -20,23 +20,19 @@ type Report = {
 type Audit = { taken_at: string; remaining: number | null; ledger_credits: number; ledger_cents: number; note: string | null }[];
 
 const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd = (cents: number, zarPerUsd: number) => zarPerUsd ? "$" + (cents / 100 / zarPerUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
 const PROVIDER_LABEL: Record<string, string> = {
-  higgsfield: "Higgsfield · images, scene shots & upscale",
-  fal: "fal.ai · talking shots (OmniHuman)",
-  heygen: "HeyGen · presenter",
-  anthropic: "Claude · co-pilot & QA",
-  elevenlabs: "ElevenLabs · voice",
-  voyage: "Voyage · embeddings",
-  firecrawl: "Firecrawl · crawl",
+  higgsfield: "Higgsfield · images & scenes", fal: "fal.ai · talking shots", heygen: "HeyGen · presenter",
+  anthropic: "Claude · research, copy & QA", elevenlabs: "ElevenLabs · voice", voyage: "Voyage · embeddings", firecrawl: "Firecrawl · crawl",
 };
 const ACTION_LABEL: Record<string, string> = {
-  casting: "Casting (looks)", photoshoot: "Photoshoot", soul: "Lock-down (legacy Soul)", humaniser: "Humaniser",
-  presenter: "Presenter", bible: "Character Casting", ingest: "Brain ingestion", creative: "Wardrobe & Set", wardrobe: "Wardrobe lock",
-  qa: "AI Vision QA", compose: "Scene writing", research: "Daily research", tagline: "Tagline",
-  aroll: "Talking shot", broll: "Scene shot",
+  casting: "Casting", photoshoot: "Photoshoot", soul: "Lock-down", humaniser: "Humaniser", presenter: "Presenter",
+  bible: "Character casting", ingest: "Brain ingestion", creative: "Wardrobe & set", wardrobe: "Wardrobe lock", qa: "Vision QA",
+  compose: "Scene writing", "deep-research": "Deep research", "research-file": "Research filing", "research-verify": "Source check",
+  "daily-intel": "Strategist watch", "ceo-newsletter": "CEO article", tagline: "Tagline", aroll: "Talking shot", broll: "Scene shot",
+  "fonts-extract": "Fonts from doc", storyboard: "Storyboard", script: "Script", voice_script: "Voice script", voice_design: "Voice design",
 };
 
-const usd = (cents: number, zarPerUsd: number) => zarPerUsd ? "$" + (cents / 100 / zarPerUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const today = () => new Date().toISOString().slice(0, 10);
 function addDays(s: string, n: number) { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return ymd(d); }
@@ -54,7 +50,7 @@ const PERIODS = [
   { key: "all", label: "All time", range: () => ({ from: "", to: "" }) },
 ];
 
-// Previous equal-length window immediately before [from,to] (for week-on-week etc.).
+// Previous equal-length window immediately before [from,to] (for the "vs previous" delta).
 function prevWindow(from: string, to: string): { cmpFrom: string; cmpTo: string } | null {
   if (!from) return null;
   const end = to || today();
@@ -71,8 +67,6 @@ export default function CostControlPage() {
   const [userEmail, setUserEmail] = useState("");
 
   const [report, setReport] = useState<Report | null>(null);
-  // Fixed-cost allocation per desk, loaded by the FixedCosts panel and shared with the desk split so both
-  // views agree on what a desk actually costs.
   const [fixedByDesk, setFixedByDesk] = useState<Record<string, number>>({});
   const [audit, setAudit] = useState<Audit>([]);
   const [prev, setPrev] = useState<{ cents: number; credits: number } | null>(null);
@@ -83,7 +77,6 @@ export default function CostControlPage() {
   const [isSuper, setIsSuper] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
   const [calMsg, setCalMsg] = useState("");
-  // Per-build cost target (drives the build header's amber/red chip). Rands in the input; cents on the wire.
   const [buildTarget, setBuildTarget] = useState<string>("");
   const [targetBusy, setTargetBusy] = useState(false);
   const [targetMsg, setTargetMsg] = useState("");
@@ -120,8 +113,7 @@ export default function CostControlPage() {
     setTargetMsg(r?.ok ? (perBuildCents > 0 ? "Target saved" : "Target cleared") : (r?.error || "Could not save"));
   }
 
-  // Self-heal the daily audit: snapshot once a day when someone opens Cost Control,
-  // so it stays current even if the cron hasn't fired.
+  // Self-heal the daily audit: snapshot once a day when someone opens Cost Control.
   const snapped = useRef(false);
   useEffect(() => {
     if (snapped.current || loading) return;
@@ -133,16 +125,14 @@ export default function CostControlPage() {
   async function calibrate() {
     if (calibrating) return;
     setCalibrating(true); setCalMsg("");
-    // 1) Apply the latest static rate-card rows (Kling b-roll, ElevenLabs music, Shotstack render).
     const seed = await fetch("/api/cost-control/seed-rates").then((r) => r.json()).catch(() => null);
     const applied = Array.isArray(seed?.applied) ? seed.applied.length : 0;
-    // 2) True up Higgsfield's per-model credit costs via get_cost.
     const d = await fetch("/api/cost-control/calibrate", { method: "POST" }).then((r) => r.json()).catch(() => null);
     setCalibrating(false);
     const seedMsg = applied ? `${applied} rate${applied === 1 ? "" : "s"} applied. ` : "";
     if (d?.results) {
       const ok = d.results.filter((r: { updated: boolean }) => r.updated).map((r: { model: string; credits: number }) => `${r.model}=${r.credits}cr`);
-      setCalMsg(seedMsg + (ok.length ? `Higgsfield trued up: ${ok.join(", ")}` : "Higgsfield get_cost unavailable - check connection."));
+      setCalMsg(seedMsg + (ok.length ? `Higgsfield trued up: ${ok.join(", ")}` : "Higgsfield get_cost unavailable."));
     } else setCalMsg(seedMsg + (applied ? "Higgsfield calibration unavailable." : "Calibration failed."));
     load();
   }
@@ -154,411 +144,264 @@ export default function CostControlPage() {
   }
 
   const pct = bal?.remaining != null ? Math.max(0, Math.min(100, (bal.remaining / bal.monthly) * 100)) : null;
-  const lastAudit = audit[0];
-  const auditDelta = lastAudit && lastAudit.remaining != null ? (bal?.monthly ?? 9000) - lastAudit.remaining - lastAudit.ledger_credits : null;
-  // Spend delta vs the previous equal-length period.
-  const curCents = report?.total.cents ?? 0;
-  const delta = prev && prev.cents > 0 ? Math.round(((curCents - prev.cents) / prev.cents) * 100) : null;
+  const delta = prev && prev.cents > 0 ? Math.round((((report?.total.cents ?? 0) - prev.cents) / prev.cents) * 100) : null;
+  const periodLabel = PERIODS.find((p) => p.key === preset)?.label ?? (from ? `${from} to ${to || "today"}` : "All time");
+  const members = report?.byUserDesk?.length ? report.byUserDesk : (report?.byUser ?? []).map((u) => ({ user_email: u.user_email, total_cents: u.cents, desks: [] as { desk: string; cents: number; tint: string }[] }));
+  const anyFilter = influencerId || provider || userEmail || preset !== "month";
 
   return (
     <div className="min-h-dvh bg-surface-0 text-ink">
       <AppHeader />
+      <main className="mx-auto max-w-4xl px-5 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-4xl font-extrabold tracking-tight">Cost Control</h1>
+          <button onClick={() => load()} disabled={loading}
+            className="rounded-lg border border-line px-4 py-2 text-lg font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink disabled:opacity-60">
+            {loading ? "Refreshing…" : "↻ Refresh"}
+          </button>
+        </div>
+        <p className="mt-1 text-lg text-ink-dim">What the platform spends, and who spent it. Priced live, per team member and per section.</p>
 
-      <main className="mx-auto max-w-5xl px-5 py-7">
-        <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Cost Control</h1>
-            <p className="mt-1 text-base text-ink-dim">Every credit and Rand this platform spends, by member, influencer, tool and function. Audited daily against the live balance.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isSuper && (
-              <div className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1" title="Per-build cost target. Colours the running-cost chip on each build: amber past 60%, red at/over it. Leave blank to clear.">
-                <span className="tabular text-[14px] uppercase tracking-wide text-ink-faint">Build target</span>
-                <span className="text-sm text-ink-dim">R</span>
-                <input value={buildTarget} onChange={(e) => setBuildTarget(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="1000"
-                  className="tabular w-16 rounded border border-line bg-surface-2 px-1.5 py-0.5 text-sm text-ink outline-none focus:border-[#a855f7]" />
-                <button onClick={saveBuildTarget} disabled={targetBusy} className="rounded border border-[#a855f7]/30 px-2 py-0.5 text-[15px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{targetBusy ? "…" : "Save"}</button>
-                {targetMsg && <span className="tabular text-[14px] text-ink-faint">{targetMsg}</span>}
-              </div>
-            )}
-            {isSuper && (
-              <button onClick={calibrate} disabled={calibrating} title="Apply the latest rates (Kling scene shots, ElevenLabs music, Shotstack) and read each model's real credit cost from Higgsfield"
-                className="rounded-lg border border-[#a855f7]/30 px-3 py-1.5 text-sm font-semibold text-[#c79bff] hover:border-[#a855f7]/60 hover:bg-[#a855f7]/10 disabled:opacity-50">
-                {calibrating ? "Calibrating…" : "Recalibrate costs"}
-              </button>
-            )}
-            <button onClick={() => load()} disabled={loading} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-60">
-              {loading ? <span className="spinner-ring" /> : <span>↻</span>}{loading ? "Refreshing…" : "Refresh"}
+        {/* Date range */}
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          {PERIODS.map((p) => (
+            <button key={p.key} onClick={() => applyPreset(p.key)}
+              className={`rounded-full px-4 py-2 text-lg font-semibold transition ${preset === p.key ? "bg-[#a855f7]/20 text-[#c79bff]" : "border border-line text-ink-dim hover:text-ink"}`}>
+              {p.label}
             </button>
-          </div>
-        </div>
-        {calMsg && <p className="tabular mt-1 text-[15px] text-ink-faint">{calMsg}</p>}
-
-        {/* Hero KPIs */}
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Kpi label="Live Higgsfield credits">
-            {bal?.remaining != null ? (
-              <>
-                <div className="tabular text-2xl font-bold">{bal.remaining.toLocaleString()}<span className="text-base font-normal text-ink-dim"> / {bal.monthly.toLocaleString()}</span></div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
-                  <div className={`h-full ${pct != null && pct < 12 ? "bg-alert" : "bg-ready"}`} style={{ width: `${pct ?? 0}%` }} />
-                </div>
-              </>
-            ) : <div className="text-base text-ink-faint">reading…</div>}
-          </Kpi>
-          <Kpi label="Total spend (period)">
-            <div className="tabular text-2xl font-bold">{report ? rand(report.total.cents) : "…"}</div>
-            <div className="tabular mt-1 text-sm text-ink-dim">
-              {report ? `${rate > 0 ? usd(report.total.cents, rate) + " · " : ""}${Math.round(report.total.credits).toLocaleString()} credits used` : ""}
-            </div>
-            {delta != null && (
-              <div className={`tabular mt-1 text-[15px] font-semibold ${delta > 0 ? "text-active" : "text-ready"}`}>
-                {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}% vs previous period
-              </div>
-            )}
-          </Kpi>
-          <Kpi label="Jobs run (period)">
-            <div className="tabular text-2xl font-bold">{report ? report.total.events.toLocaleString() : "…"}</div>
-            <div className="tabular mt-1 text-sm text-ink-dim">{report ? `${report.split.image.count} images · ${report.split.video.count} videos` : ""}</div>
-          </Kpi>
-          <Kpi label="Daily audit">
-            {lastAudit ? (
-              <>
-                <div className={`text-base font-semibold ${auditDelta != null && Math.abs(auditDelta) > 50 ? "text-active" : "text-ready"}`}>
-                  {auditDelta != null && Math.abs(auditDelta) > 50 ? "⚠ review" : "✓ reconciled"}
-                </div>
-                <div className="tabular mt-1 text-[15px] text-ink-faint">last {lastAudit.taken_at}</div>
-              </>
-            ) : <div className="text-[15px] text-ink-faint">first audit pending</div>}
-          </Kpi>
+          ))}
         </div>
 
-        {/* Cycle reconciliation: platform ledger vs actual Higgsfield balance */}
-        {bal?.remaining != null && cycle && (() => {
-          const cz = bal.creditZarCents || 77;
-          const crR = (cr: number) => "R" + ((cr * cz) / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          const crU = (cr: number) => (rate ? " ($" + ((cr * cz) / 100 / rate).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ")" : "");
-          const actualUsed = Math.max(0, bal.monthly - (bal.remaining ?? 0));
-          const tracked = cycle.trackedCredits;
-          const direct = actualUsed - tracked;
-          const Row = ({ label, cr, strong, tone }: { label: string; cr: number; strong?: boolean; tone?: string }) => (
-            <div className="flex items-center justify-between border-b border-line/60 py-2 last:border-0">
-              <span className={`text-base ${strong ? "font-semibold text-ink" : "text-ink-dim"}`}>{label}</span>
-              <span className={`tabular text-base ${tone ?? "text-ink"}`}>{Math.round(cr).toLocaleString()} cr · {crR(cr)}<span className="text-ink-faint">{crU(cr)}</span></span>
-            </div>
-          );
-          return (
-            <section className="mt-6 rounded-xl border border-line bg-surface-1 p-5">
-              <div className="tabular text-sm uppercase tracking-[0.2em] brand-grad font-semibold">Cycle reconciliation · since {cycle.start}</div>
-              <p className="mt-1 text-[15px] text-ink-faint">Higgsfield tops up {bal.monthly.toLocaleString()} credits each cycle. This reconciles what the platform tracked against what Higgsfield actually consumed.</p>
-              <div className="mt-3">
-                <Row label="Higgsfield actually used (live balance)" cr={actualUsed} strong />
-                <Row label="Tracked by this platform" cr={tracked} tone="text-ready" />
-                <Row label={direct >= 0 ? "Direct / outside the platform" : "Platform over-estimate (re-calibrate)"} cr={Math.abs(direct)} strong tone={direct > 50 ? "text-active" : "text-ink-dim"} />
-              </div>
-              <p className="mt-2 text-[15px] text-ink-faint">
-                {direct >= 0
-                  ? "“Direct” = credits spent straight on Higgsfield (manual generations) or beyond what we metered - so nothing is hidden."
-                  : "Our per-model estimates are running higher than Higgsfield's actual burn. Hit “Recalibrate costs” to true them up via get_cost."}
-              </p>
-            </section>
-          );
-        })()}
-
-        {/* Pickers */}
-        <div className="mt-6 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface-1 p-4">
-          <div>
-            <div className="tabular mb-1 text-[14px] uppercase tracking-[0.2em] text-ink-faint">Range</div>
-            <div className="flex flex-wrap gap-1">
-              {PERIODS.map((p) => (
-                <button key={p.key} onClick={() => applyPreset(p.key)}
-                  className={`rounded-md px-2.5 py-1.5 text-sm font-semibold ${preset === p.key ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:bg-surface-2"}`}>{p.label}</button>
-              ))}
-            </div>
-          </div>
-          <Picker label="From"><input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset(""); }} className="rounded-md border border-line bg-surface-2 px-2 py-1.5 text-sm text-ink outline-none" /></Picker>
-          <Picker label="To"><input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset(""); }} className="rounded-md border border-line bg-surface-2 px-2 py-1.5 text-sm text-ink outline-none" /></Picker>
-          <Picker label="Influencer">
-            <select value={influencerId} onChange={(e) => setInfluencerId(e.target.value)} className="rounded-md border border-line bg-surface-2 px-2 py-1.5 text-sm text-ink outline-none">
-              <option value="">All influencers</option>
-              {report?.influencers.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
-          </Picker>
-          <Picker label="Platform / tool">
-            <select value={provider} onChange={(e) => setProvider(e.target.value)} className="rounded-md border border-line bg-surface-2 px-2 py-1.5 text-sm text-ink outline-none">
-              <option value="">All tools</option>
-              {report?.providers.map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p] ?? p}</option>)}
-            </select>
-          </Picker>
-          <Picker label="Team member">
-            <select value={userEmail} onChange={(e) => setUserEmail(e.target.value)} className="rounded-md border border-line bg-surface-2 px-2 py-1.5 text-sm text-ink outline-none">
-              <option value="">Everyone</option>
-              {report?.byUser.map((u) => <option key={u.user_email} value={u.user_email}>{u.user_email === "(system)" ? "Super Admin" : u.user_email}</option>)}
-            </select>
-          </Picker>
-          {(influencerId || provider || userEmail || preset !== "month") && (
-            <button onClick={() => { setInfluencerId(""); setProvider(""); setUserEmail(""); applyPreset("month"); }} className="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim hover:text-ink">Clear</button>
+        {/* Filters (compact) */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select value={userEmail} onChange={(e) => setUserEmail(e.target.value)}
+            className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg text-ink outline-none focus:border-[#a855f7]">
+            <option value="">Everyone</option>
+            {report?.byUser.map((u) => <option key={u.user_email} value={u.user_email}>{u.user_email === "(system)" ? "Super Admin" : u.user_email}</option>)}
+          </select>
+          <select value={provider} onChange={(e) => setProvider(e.target.value)}
+            className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg text-ink outline-none focus:border-[#a855f7]">
+            <option value="">All tools</option>
+            {report?.providers.map((p) => <option key={p} value={p}>{PROVIDER_LABEL[p] ?? p}</option>)}
+          </select>
+          <select value={influencerId} onChange={(e) => setInfluencerId(e.target.value)}
+            className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg text-ink outline-none focus:border-[#a855f7]">
+            <option value="">All influencers</option>
+            {report?.influencers.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+          {anyFilter && (
+            <button onClick={() => { setInfluencerId(""); setProvider(""); setUserEmail(""); applyPreset("month"); }}
+              className="rounded-lg border border-line px-3 py-2 text-lg text-ink-dim hover:text-ink">Clear</button>
           )}
         </div>
 
-        {/* Image vs video split */}
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-ready/25 bg-ready/5 p-5">
-            <div className="tabular text-sm uppercase tracking-[0.2em] text-ready">Images</div>
-            <div className="tabular mt-1 text-xl font-bold">{report?.split.image.count ?? 0} <span className="text-base font-normal text-ink-dim">generated</span></div>
-            <div className="tabular mt-1 text-base text-ink-dim">{report ? rand(report.split.image.cents) : ""}</div>
+        {/* HERO: total */}
+        <div className="mt-6 rounded-2xl border border-line bg-surface-1 p-7">
+          <div className="text-base uppercase tracking-[0.15em] text-ink-faint">Total spend · {periodLabel}</div>
+          <div className="mt-2 flex flex-wrap items-end gap-4">
+            <div className="tabular text-6xl font-extrabold leading-none">{report ? rand(report.total.cents) : "…"}</div>
+            {rate > 0 && report && <div className="tabular pb-1 text-2xl text-ink-dim">{usd(report.total.cents, rate)}</div>}
+            {delta != null && (
+              <div className={`tabular pb-2 text-xl font-bold ${delta > 0 ? "text-active" : "text-ready"}`}>
+                {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}% vs previous
+              </div>
+            )}
           </div>
-          <div className="rounded-xl border border-active/25 bg-active/5 p-5">
-            <div className="tabular text-sm uppercase tracking-[0.2em] text-active">Video / presenter</div>
-            <div className="tabular mt-1 text-xl font-bold">{report?.split.video.count ?? 0} <span className="text-base font-normal text-ink-dim">jobs</span></div>
-            <div className="tabular mt-1 text-base text-ink-dim">{report ? rand(report.split.video.cents) : ""}</div>
-          </div>
+          <div className="mt-2 text-lg text-ink-faint">{report ? `${report.total.events.toLocaleString()} paid actions in this period` : ""}</div>
         </div>
 
-        {/* WHICH DESK SPENT IT (Gary). The question Cost Control could not answer until now: the ledger knew
-            what was bought but not which of the six desks bought it. Sits above the older tables because it is
-            the first thing anyone actually wants to know. */}
-        {report && report.byDesk.length > 0 && <DeskSplit desks={report.byDesk} fixedByDesk={fixedByDesk} />}
+        {/* TEAM MEMBERS - the number that matters most to Gary */}
+        <TeamMembers rows={members} />
 
-        {/* The standing cost of the stack, and where it lands. Below the desk split because the desks are the
-            answer and this is the working. */}
+        {/* BY SECTION */}
+        {report && report.byDesk.length > 0 && <SectionSplit desks={report.byDesk} fixedByDesk={fixedByDesk} />}
+
+        {/* MONTHLY SUBSCRIPTIONS */}
         <FixedCosts isSuperAdmin={isSuper}
           onLoaded={(a) => setFixedByDesk(Object.fromEntries(a.byDesk.map((d) => [d.desk, d.cents])))} />
 
-        {/* Tables */}
-        <Section title="By team member">{report && <Table rows={report.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, credits: u.credits, cents: u.cents, sub: `${u.events} jobs` }))} />}</Section>
+        {/* DAILY TREND */}
+        {report && report.byDay.length > 1 && (
+          <section className="mt-8">
+            <h2 className="mb-3 text-xl font-bold">Daily spend</h2>
+            <div className="rounded-xl border border-line bg-surface-1 p-5"><LineChart data={report.byDay.map((d) => ({ x: d.day.slice(5), y: d.cents / 100 }))} /></div>
+          </section>
+        )}
 
-        {/* Team member x section: each person's total, split by the sections they spent on (Gary). */}
-        {report && report.byUserDesk.length > 0 && <TeamBySection rows={report.byUserDesk} />}
-        <Section title="By influencer (latest builds first)">
-          {report && <Table rows={report.byInfluencer.map((i) => ({ label: i.name, credits: i.credits, cents: i.cents, sub: `${i.images} img · ${i.videos} vid · last ${i.last_at}` }))} />}
-        </Section>
-        <Section title="By platform / API">{report && <Table rows={report.byProvider.map((p) => ({ label: PROVIDER_LABEL[p.provider] ?? p.provider, credits: p.credits, cents: p.cents }))} />}</Section>
-        <Section title="By function">{report && <Table rows={report.byAction.map((a) => ({ label: ACTION_LABEL[a.action] ?? a.action, credits: a.credits, cents: a.cents }))} />}</Section>
-
-        {/* Charts */}
-        <h2 className="tabular mt-9 mb-3 text-sm uppercase tracking-[0.2em] text-ink-faint">Visualisations</h2>
-        <div className="rounded-xl border border-line bg-surface-1 p-5">
-          <div className="text-base font-semibold text-ink">Daily spend (Rand)</div>
-          {report && <LineChart data={report.byDay.map((d) => ({ x: d.day.slice(5), y: d.cents / 100 }))} />}
-        </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-line bg-surface-1 p-5">
-            <div className="text-base font-semibold text-ink">Spend by tool</div>
-            {report && <Bars data={report.byProvider.map((p) => ({ label: (PROVIDER_LABEL[p.provider] ?? p.provider).split(" ·")[0], v: p.cents }))} />}
+        {/* MORE DETAIL - collapsed by default so the main view stays clean */}
+        <details className="mt-8 rounded-xl border border-line bg-surface-1 p-5">
+          <summary className="cursor-pointer text-xl font-bold text-ink">More detail (by tool, function, influencer)</summary>
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            <DetailTable title="By tool / platform" rows={(report?.byProvider ?? []).map((p) => ({ label: PROVIDER_LABEL[p.provider] ?? p.provider, cents: p.cents }))} />
+            <DetailTable title="By function" rows={(report?.byAction ?? []).map((a) => ({ label: ACTION_LABEL[a.action] ?? a.action, cents: a.cents }))} />
+            <DetailTable title="By influencer" rows={(report?.byInfluencer ?? []).map((i) => ({ label: i.name, cents: i.cents, sub: `${i.images} img · ${i.videos} vid` }))} />
           </div>
-          <div className="rounded-xl border border-line bg-surface-1 p-5">
-            <div className="text-base font-semibold text-ink">Spend by influencer</div>
-            {report && <Bars data={report.byInfluencer.slice(0, 8).map((i) => ({ label: i.name, v: i.cents }))} />}
-          </div>
-        </div>
+        </details>
 
-        {/* Audit trail */}
-        <Section title="Daily cost audit (ledger vs live balance)">
-          <p className="px-4 pt-3 text-[15px] text-ink-faint">A cron snapshots the live Higgsfield balance every day and compares it to our ledger, so the numbers above stay provably accurate.</p>
-          {audit.length ? (
-            <table className="w-full text-sm">
-              <thead><tr className="text-ink-faint">
-                <th className="px-4 py-2 text-left font-medium">When</th><th className="px-4 py-2 text-right font-medium">Live credits</th>
-                <th className="px-4 py-2 text-right font-medium">Ledger credits</th><th className="px-4 py-2 text-right font-medium">Ledger R</th>
-              </tr></thead>
-              <tbody>{audit.map((a, i) => (
-                <tr key={i} className="border-t border-line">
-                  <td className="tabular px-4 py-2 text-ink-dim">{a.taken_at}</td>
-                  <td className="tabular px-4 py-2 text-right text-ink">{a.remaining != null ? Math.round(a.remaining).toLocaleString() : "-"}</td>
-                  <td className="tabular px-4 py-2 text-right text-ink-dim">{Math.round(a.ledger_credits).toLocaleString()}</td>
-                  <td className="tabular px-4 py-2 text-right text-ink-dim">{rand(a.ledger_cents)}</td>
-                </tr>
-              ))}</tbody>
-            </table>
-          ) : <div className="px-4 py-5 text-center text-sm text-ink-faint">No audits yet - the first daily snapshot will appear here.</div>}
-        </Section>
-
-        {(() => {
-          // Fixed monthly subscriptions are billed in USD; show the ZAR equivalent at the live FX rate
-          // (rate = ZAR per $1, from lib/fx.ts) so this ZA business reads its base cost in Rand.
-          const zar = (u: number) => (rate > 0 ? "R" + Math.round(u * rate).toLocaleString("en-ZA") : "");
-          const line = (u: number) => `$${u}${rate > 0 ? ` ≈ ${zar(u)}` : ""}`;
-          return (
-            <div className="mt-8 text-sm text-ink-faint">
-              <div className="font-semibold text-ink-dim">Fixed monthly subscriptions (base cost ${573}/mo{rate > 0 ? ` ≈ ${zar(573)}/mo` : ""})</div>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                <span>Higgsfield Ultra <span className="text-ink">{line(375)}</span> · 9,000 credits · renews 10th</span>
-                <span>HeyGen Pro <span className="text-ink">{line(99)}</span> · ~121 video min · renews 29th</span>
-                <span>ElevenLabs Pro <span className="text-ink">{line(99)}</span> · 500k chars</span>
+        {/* ADMIN & AUDIT - super-admin only, out of the team's way */}
+        {isSuper && (
+          <details className="mt-4 rounded-xl border border-line bg-surface-1 p-5">
+            <summary className="cursor-pointer text-xl font-bold text-ink">Admin &amp; audit</summary>
+            <div className="mt-4 space-y-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={calibrate} disabled={calibrating}
+                  className="rounded-lg border border-[#a855f7]/30 px-4 py-2 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+                  {calibrating ? "Calibrating…" : "Recalibrate costs"}
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg text-ink-dim">Per-build target R</span>
+                  <input value={buildTarget} onChange={(e) => setBuildTarget(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="1000"
+                    className="tabular w-24 rounded border border-line bg-surface-2 px-2 py-1.5 text-lg text-ink outline-none focus:border-[#a855f7]" />
+                  <button onClick={saveBuildTarget} disabled={targetBusy} className="rounded border border-[#a855f7]/30 px-3 py-1.5 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{targetBusy ? "…" : "Save"}</button>
+                  {targetMsg && <span className="text-lg text-ink-faint">{targetMsg}</span>}
+                </div>
               </div>
-              <div className="mt-1">
-                All per-job prices in the rate_card are in <span className="text-ink-dim">Rand</span>; USD subscriptions are converted at the live rate {rate > 0 ? `(~R${rate.toFixed(2)}/$)` : ""}. Usage within each plan&apos;s allotment is covered by the flat fee. {loading ? "Updating…" : ""}
-              </div>
+              {calMsg && <p className="text-lg text-ink-faint">{calMsg}</p>}
+              {bal?.remaining != null && (
+                <div>
+                  <div className="text-lg font-semibold text-ink">Higgsfield credits: <span className="tabular">{bal.remaining.toLocaleString()} / {bal.monthly.toLocaleString()}</span>{cycle ? <span className="text-ink-faint"> · cycle since {cycle.start}</span> : ""}</div>
+                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-2"><div className={`h-full ${pct != null && pct < 12 ? "bg-alert" : "bg-ready"}`} style={{ width: `${pct ?? 0}%` }} /></div>
+                </div>
+              )}
+              {audit.length > 0 && (
+                <div>
+                  <div className="mb-2 text-lg font-semibold text-ink">Daily audit (ledger vs live balance)</div>
+                  <table className="w-full text-lg">
+                    <tbody>{audit.slice(0, 10).map((a, i) => (
+                      <tr key={i} className="border-t border-line">
+                        <td className="tabular py-2 text-ink-dim">{a.taken_at}</td>
+                        <td className="tabular py-2 text-right text-ink">{a.remaining != null ? Math.round(a.remaining).toLocaleString() : "-"} cr live</td>
+                        <td className="tabular py-2 text-right text-ink-dim">{rand(a.ledger_cents)} ledger</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          );
-        })()}
+          </details>
+        )}
       </main>
     </div>
   );
 }
 
-// SPEND BY DESK - TRUE COST, not marginal cost.
-//
-// This panel first shipped showing metered spend only, which reported the creative factory at R0 across 204
-// real jobs. True at the margin and wrong about the business (Gary): the Higgsfield Ultra plan is $375 a
-// month whether it renders one image or a thousand, so "free" images are free only after the subscription is
-// already paid. A cost centre that hides a $375 standing commitment is not a cost centre.
-//
-// So each desk now carries two numbers: what its jobs cost at the margin, and its share of the subscriptions
-// its work runs on, allocated by job count. The desk total is the sum - what the agency actually spends to
-// run that desk.
-//
-// Shares are computed from the true total, but a desk with real cost that rounds under 1% still gets a
-// visible sliver: a zero-width segment reads as "this desk is free", the exact misreading this fixes.
-// TEAM MEMBER x SECTION (Gary). One row per person: their total, a stacked bar of the sections they spent on,
-// and a labelled chip per section with the rand amount. Answers "what did each person cost, and where" at a
-// glance - the detail the per-section and per-member tables can only show one filter at a time.
-type UserDeskRow = { user_email: string; total_cents: number; desks: { desk: string; cents: number; tint: string }[] };
-function TeamBySection({ rows }: { rows: UserDeskRow[] }) {
+// TEAM MEMBERS - who spent what, and on which section. The primary view (Gary): big totals, a stacked bar of
+// the sections each person spent on, and a labelled amount per section. One place, no filter-juggling.
+type MemberRow = { user_email: string; total_cents: number; desks: { desk: string; cents: number; tint: string }[] };
+function TeamMembers({ rows }: { rows: MemberRow[] }) {
+  if (!rows.length) return <p className="mt-8 text-lg text-ink-faint">No spend in this period yet.</p>;
   return (
-    <section className="mt-6">
-      <h2 className="tabular mb-2 text-sm uppercase tracking-[0.2em] text-ink-faint">By team member, per section</h2>
-      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface-1">
-        {rows.map((u) => (
-          <div key={u.user_email} className="p-4">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-semibold text-ink">{u.user_email === "(system)" ? "Super Admin" : u.user_email}</span>
-              <span className="tabular font-bold text-ink">{rand(u.total_cents)}</span>
+    <section className="mt-8">
+      <h2 className="text-xl font-bold">Team members</h2>
+      <p className="mt-0.5 text-lg text-ink-dim">Who spent what this period, and on which section.</p>
+      <div className="mt-3 space-y-3">
+        {rows.map((u) => {
+          const name = u.user_email === "(system)" ? "Super Admin" : u.user_email;
+          return (
+            <div key={u.user_email} className="rounded-xl border border-line bg-surface-1 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xl font-bold text-ink">{name}</span>
+                <span className="tabular text-2xl font-extrabold text-ink">{rand(u.total_cents)}</span>
+              </div>
+              {u.desks.length > 0 && (
+                <>
+                  <div className="mt-3 flex h-3 w-full overflow-hidden rounded-full bg-surface-2">
+                    {u.desks.map((d) => <div key={d.desk} title={`${d.desk}: ${rand(d.cents)}`} style={{ width: `${u.total_cents > 0 ? (d.cents / u.total_cents) * 100 : 0}%`, background: d.tint }} />)}
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5">
+                    {u.desks.map((d) => (
+                      <span key={d.desk} className="tabular inline-flex items-center gap-1.5 text-base text-ink-dim">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: d.tint }} />
+                        {d.desk} <span className="font-semibold text-ink">{rand(d.cents)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-            <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
-              {u.desks.map((d) => (
-                <div key={d.desk} title={`${d.desk}: ${rand(d.cents)}`} style={{ width: `${u.total_cents > 0 ? (d.cents / u.total_cents) * 100 : 0}%`, background: d.tint }} />
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-              {u.desks.map((d) => (
-                <span key={d.desk} className="tabular inline-flex items-center gap-1.5 text-[13px] text-ink-dim">
-                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.tint }} />
-                  {d.desk} <span className="text-ink">{rand(d.cents)}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
 }
 
+// BY SECTION - each section's true cost: pay-per-use plus its share of the subscriptions its work runs on.
 type DeskRow = { desk: string; credits: number; cents: number; events: number; tint: string };
-function DeskSplit({ desks, fixedByDesk }: { desks: DeskRow[]; fixedByDesk: Record<string, number> }) {
+function SectionSplit({ desks, fixedByDesk }: { desks: DeskRow[]; fixedByDesk: Record<string, number> }) {
   const trueOf = (d: DeskRow) => d.cents + (fixedByDesk[d.desk] ?? 0);
   const total = desks.reduce((s, d) => s + trueOf(d), 0);
   const pct = (c: number) => (total > 0 ? (c / total) * 100 : 0);
   const anyFixed = Object.values(fixedByDesk).some((v) => v > 0);
-
   return (
-    <section className="mt-6">
-      <h2 className="tabular mb-2 text-sm uppercase tracking-[0.2em] text-ink-faint">
-        By desk {anyFixed && <span className="normal-case tracking-normal text-ink-dim">· pay-per-job plus its share of the subscriptions</span>}
-      </h2>
-      <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-2">
-          {desks.map((d) => (
-            <div key={d.desk} title={`${d.desk} · ${rand(trueOf(d))}`} style={{ width: `${Math.max(pct(trueOf(d)), trueOf(d) > 0 ? 0.8 : 0)}%`, background: d.tint }} />
-          ))}
+    <section className="mt-8">
+      <h2 className="text-xl font-bold">By section</h2>
+      {anyFixed && <p className="mt-0.5 text-lg text-ink-dim">Pay-per-use plus each section&apos;s share of the subscriptions.</p>}
+      <div className="mt-3 rounded-xl border border-line bg-surface-1 p-5">
+        <div className="flex h-4 w-full overflow-hidden rounded-full bg-surface-2">
+          {desks.map((d) => <div key={d.desk} title={`${d.desk} · ${rand(trueOf(d))}`} style={{ width: `${Math.max(pct(trueOf(d)), trueOf(d) > 0 ? 0.8 : 0)}%`, background: d.tint }} />)}
         </div>
-
-        <div className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div className="mt-4 space-y-3">
           {desks.map((d) => {
             const fixed = fixedByDesk[d.desk] ?? 0;
             return (
-              <div key={d.desk} className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-2.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.tint }} />
-                  <span className="truncate text-base font-semibold text-ink">{d.desk}</span>
-                  <span className="tabular shrink-0 text-[15px] text-ink-faint">{d.events.toLocaleString()} jobs</span>
+              <div key={d.desk} className="flex items-center justify-between gap-3 border-b border-line/60 pb-3 last:border-0">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: d.tint }} />
+                  <span className="truncate text-lg font-semibold text-ink">{d.desk}</span>
+                  <span className="tabular shrink-0 text-base text-ink-faint">{d.events.toLocaleString()} jobs</span>
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="tabular text-base font-bold text-ink">{rand(trueOf(d))}</div>
-                  {/* Show the split whenever a subscription lands here, so nobody has to guess whether a big
-                      number is jobs or standing cost. This is also what stops a zero-marginal desk reading as
-                      broken: it is not "free", it is carrying its slice of the plans it runs on. */}
-                  {fixed > 0
-                    ? <div className="tabular text-[15px] text-ink-faint">{rand(d.cents)} jobs + {rand(fixed)} plans · {pct(trueOf(d)).toFixed(1)}%</div>
-                    : <div className="tabular text-[15px] text-ink-faint">{pct(trueOf(d)).toFixed(1)}%{d.credits >= 1 && ` · ${Math.round(d.credits).toLocaleString()} cr`}</div>}
+                  <div className="tabular text-xl font-bold text-ink">{rand(trueOf(d))}</div>
+                  <div className="tabular text-base text-ink-faint">{fixed > 0 ? `${rand(d.cents)} use + ${rand(fixed)} plans` : `${pct(trueOf(d)).toFixed(0)}%`}</div>
                 </div>
               </div>
             );
           })}
         </div>
-
-        {desks.some((d) => d.desk === "Unattributed") && (
-          <p className="mt-3 text-[15px] text-ink-faint">
-            <strong className="text-ink-dim">Unattributed</strong> means a new job type has shipped that no desk claims yet. Map its action in <code>lib/desks.ts</code> and it moves to the right desk, including its history.
-          </p>
-        )}
       </div>
     </section>
   );
 }
 
-function Kpi({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="rounded-xl border border-line bg-surface-1 p-4"><div className="tabular text-[14px] uppercase tracking-[0.22em] text-ink-faint">{label}</div><div className="mt-1.5">{children}</div></div>;
-}
-function Picker({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><div className="tabular mb-1 text-[14px] uppercase tracking-[0.2em] text-ink-faint">{label}</div>{children}</div>;
-}
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="mt-6"><h2 className="tabular mb-2 text-sm uppercase tracking-[0.2em] text-ink-faint">{title}</h2><div className="overflow-hidden rounded-xl border border-line bg-surface-1">{children}</div></section>;
-}
-function Table({ rows }: { rows: { label: string; credits: number; cents: number; sub?: string }[] }) {
-  if (!rows.length) return <div className="px-4 py-6 text-center text-sm text-ink-faint">No spend in this view yet.</div>;
+function DetailTable({ title, rows }: { title: string; rows: { label: string; cents: number; sub?: string }[] }) {
+  const shown = rows.filter((r) => r.cents > 0);
   return (
-    <table className="w-full text-base">
-      <tbody>{rows.map((r, i) => (
-        <tr key={i} className="border-b border-line last:border-0">
-          <td className="px-4 py-2.5 text-ink">{r.label}{r.sub && <span className="ml-2 text-[15px] text-ink-faint">{r.sub}</span>}</td>
-          <td className="tabular px-4 py-2.5 text-right text-ink-dim">{Math.round(r.credits).toLocaleString()} cr</td>
-          <td className="tabular px-4 py-2.5 text-right font-semibold text-ink">{rand(r.cents)}</td>
-        </tr>
-      ))}</tbody>
-    </table>
+    <div>
+      <div className="mb-1.5 text-lg font-semibold text-ink">{title}</div>
+      {shown.length ? (
+        <table className="w-full text-lg">
+          <tbody>{shown.map((r, i) => (
+            <tr key={i} className="border-b border-line/60 last:border-0">
+              <td className="py-2 pr-2 text-ink">{r.label}{r.sub && <span className="ml-2 text-base text-ink-faint">{r.sub}</span>}</td>
+              <td className="tabular py-2 text-right font-semibold text-ink">{rand(r.cents)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      ) : <div className="py-3 text-base text-ink-faint">Nothing here yet.</div>}
+    </div>
   );
 }
 
-// Lightweight SVG charts (no deps).
+// Lightweight daily-spend line (no deps).
 function LineChart({ data }: { data: { x: string; y: number }[] }) {
-  const W = 760, H = 160, P = 28;
-  if (data.length < 2) return <div className="mt-3 py-8 text-center text-sm text-ink-faint">Not enough days yet to chart.</div>;
+  const W = 760, H = 170, P = 30;
+  if (data.length < 2) return <div className="py-8 text-center text-lg text-ink-faint">Not enough days yet to chart.</div>;
   const max = Math.max(...data.map((d) => d.y), 1);
   const stepX = (W - P * 2) / (data.length - 1);
   const pts = data.map((d, i) => [P + i * stepX, H - P - (d.y / max) * (H - P * 2)]);
   const path = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
   const area = `${path} L${pts[pts.length - 1][0].toFixed(1)},${H - P} L${pts[0][0].toFixed(1)},${H - P} Z`;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 w-full">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
       <defs><linearGradient id="cc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a855f7" stopOpacity="0.35" /><stop offset="100%" stopColor="#a855f7" stopOpacity="0" /></linearGradient></defs>
       <path d={area} fill="url(#cc)" />
-      <path d={path} fill="none" stroke="#c79bff" strokeWidth="2" />
+      <path d={path} fill="none" stroke="#c79bff" strokeWidth="2.5" />
       {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2.5" fill="#c79bff" />)}
       {data.map((d, i) => i % Math.ceil(data.length / 8) === 0 && (
-        <text key={i} x={P + i * stepX} y={H - 8} textAnchor="middle" className="fill-current text-ink-faint" style={{ fontSize: 9 }}>{d.x}</text>
+        <text key={i} x={P + i * stepX} y={H - 9} textAnchor="middle" className="fill-current text-ink-faint" style={{ fontSize: 11 }}>{d.x}</text>
       ))}
-      <text x={P} y={14} className="fill-current text-ink-faint" style={{ fontSize: 9 }}>R{max.toFixed(0)}</text>
+      <text x={P} y={16} className="fill-current text-ink-faint" style={{ fontSize: 11 }}>R{max.toFixed(0)}</text>
     </svg>
-  );
-}
-function Bars({ data }: { data: { label: string; v: number }[] }) {
-  if (!data.length) return <div className="mt-3 py-8 text-center text-sm text-ink-faint">No data.</div>;
-  const max = Math.max(...data.map((d) => d.v), 1);
-  return (
-    <div className="mt-3 space-y-2">
-      {data.map((d, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="w-28 shrink-0 truncate text-[15px] text-ink-dim">{d.label}</span>
-          <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full" style={{ width: `${(d.v / max) * 100}%`, background: "linear-gradient(90deg,#ec4899,#8b5cf6)" }} />
-          </div>
-          <span className="tabular w-16 shrink-0 text-right text-[15px] text-ink-dim">{rand(d.v)}</span>
-        </div>
-      ))}
-    </div>
   );
 }
