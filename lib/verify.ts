@@ -19,6 +19,8 @@ export type Verdict = {
   date: string | null;      // the REAL publish date we established, YYYY-MM-DD, or null
   checkedUrl: string | null;
   note: string;
+  // Token usage for the support-check call, so the caller can meter it accurately (null when no call ran).
+  usage?: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreationTokens: number } | null;
 };
 
 // A DEAD link is one the server explicitly says does not exist. This is the facebook.com/business/help/
@@ -144,7 +146,9 @@ export async function verifyFinding(
     const out = (b && b.type === "tool_use" ? b.input : {}) as { supported?: boolean; published_date?: string; note?: string };
     const date = toISODate(out.published_date) || pg.date || toISODate(claim.published_at);
     const supported = out.supported === true;
-    return { status: supported ? "verified" : "refuted", supported, date, checkedUrl: url, note: String(out.note || "").slice(0, 300) };
+    const u = r.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+    const usage = { inputTokens: u?.input_tokens || 0, outputTokens: u?.output_tokens || 0, cacheReadTokens: u?.cache_read_input_tokens || 0, cacheCreationTokens: u?.cache_creation_input_tokens || 0 };
+    return { status: supported ? "verified" : "refuted", supported, date, checkedUrl: url, note: String(out.note || "").slice(0, 300), usage };
   } catch {
     // We reached the page and can date it; we just could not grade support. Keep it, flagged partial.
     return { status: "partial", supported: null, date: pg.date || toISODate(claim.published_at), checkedUrl: url, note: "Source reached; support check unavailable." };

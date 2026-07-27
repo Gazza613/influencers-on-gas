@@ -4,7 +4,7 @@ import { getSecret } from "./connections";
 import { PREMIUM, INGEST } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
 import { loadIntelBrief, type Intel } from "./intel";
-import { recordUsage } from "./usage";
+import { recordTokens } from "./usage";
 import { verifyFinding, toISODate } from "./verify";
 
 // THE RESEARCHER - a commissioned deep dive on where a client actually stands.
@@ -207,6 +207,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   // the sources it pulled - both are real progress, not a simulated bar.
   emit({ t: "phase", label: `Searching the web on ${cfg.clientName}, last ${RECENCY_DAYS} days` });
   let sourcesRead = 0;
+  let searchCount = 0;
   const stream = client.messages.stream({
     model: PREMIUM,
     max_tokens: 8000,
@@ -217,6 +218,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   stream.on("contentBlock", (blk) => {
     const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
     if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) {
+      searchCount += 1;
       emit({ t: "search", q: String(b.input.query).slice(0, 160) });
     } else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
       sourcesRead += b.content.length;
@@ -224,7 +226,15 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     }
   });
   const research = await stream.finalMessage();
-  await recordUsage({ clientId, userEmail, provider: "anthropic", model: PREMIUM, unit: "request", action: "deep-research", count: 1 }).catch(() => {});
+  // TOKEN-ACCURATE (Gary): meter the real tokens + web searches this run spent, not a flat proxy. The usage
+  // field carries the web-search count when the API reports it; fall back to what we counted off the stream.
+  const ru = research.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
+  await recordTokens({
+    clientId, userEmail, model: PREMIUM, action: "deep-research",
+    inputTokens: ru?.input_tokens || 0, outputTokens: ru?.output_tokens || 0,
+    cacheReadTokens: ru?.cache_read_input_tokens || 0, cacheCreationTokens: ru?.cache_creation_input_tokens || 0,
+    webSearches: ru?.server_tool_use?.web_search_requests ?? searchCount,
+  }).catch(() => {});
 
   const notes = research.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   if (!notes) return [];
@@ -238,7 +248,12 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     tool_choice: { type: "tool", name: "dossier" },   // FORCED - a dossier always comes back
     messages: [{ role: "user", content: `Research notes:\n\n${notes.slice(0, 24000)}` }],
   });
-  await recordUsage({ clientId, userEmail, provider: "anthropic", model: PREMIUM, unit: "request", action: "research-file", count: 1 }).catch(() => {});
+  const fu = res.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+  await recordTokens({
+    clientId, userEmail, model: PREMIUM, action: "research-file",
+    inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0,
+    cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0,
+  }).catch(() => {});
 
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") return [];
@@ -280,9 +295,16 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     verifyFinding(
       { headline: String(c.f.headline || ""), detail: String(c.f.detail || ""), published_at: String(c.f.published_at || "") },
       c.srcs, client, () => { verifyCalls += 1; },
-    ).catch(() => ({ status: "unverified" as const, supported: null, date: toISODate(c.f.published_at), checkedUrl: c.srcs[0]?.url || null, note: "" })),
+    ).catch(() => ({ status: "unverified" as const, supported: null, date: toISODate(c.f.published_at), checkedUrl: c.srcs[0]?.url || null, note: "", usage: null })),
   ));
-  if (verifyCalls) await recordUsage({ clientId, userEmail, provider: "anthropic", model: INGEST, unit: "request", action: "research-verify", count: verifyCalls }).catch(() => {});
+  if (verifyCalls) {
+    // Sum the real tokens across every verify call and meter them as one Haiku line, tagged to this user.
+    let vin = 0, vout = 0, vcr = 0, vcc = 0;
+    for (const v of verdicts) {
+      if (v.usage) { vin += v.usage.inputTokens; vout += v.usage.outputTokens; vcr += v.usage.cacheReadTokens; vcc += v.usage.cacheCreationTokens; }
+    }
+    await recordTokens({ clientId, userEmail, model: INGEST, action: "research-verify", calls: verifyCalls, inputTokens: vin, outputTokens: vout, cacheReadTokens: vcr, cacheCreationTokens: vcc }).catch(() => {});
+  }
 
   const saved: Intel[] = [];
   for (let k = 0; k < candidates.length; k++) {

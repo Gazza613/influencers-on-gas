@@ -383,7 +383,16 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('anthropic','claude-sonnet-4-6','bible', 0, 200, true),
   ('voyage','voyage-3.5','embedding', 0, 0, true),
   -- Shotstack render: PAY-AS-YOU-GO (not a subscription) ~$0.30/rendered min => ~$0.24 per 45s cut.
-  ('shotstack','edit','render', 0, 450, true)
+  ('shotstack','edit','render', 0, 450, true),
+  -- TOKEN-ACCURATE Anthropic rates for the Researcher (Gary): ZAR cents per MILLION tokens, and per web
+  -- search, derived from the published USD prices at ~R18.5/$ (Opus 4.8 $5/$25, Haiku 4.5 $1/$5, web
+  -- search $0.01). setTokenRate() / Recalibrate refresh these at live FX. The flat 'request' rows above
+  -- stay for sections not yet moved to token metering.
+  ('anthropic','claude-opus-4-8','mtok_in', 0, 9250, true),
+  ('anthropic','claude-opus-4-8','mtok_out', 0, 46250, true),
+  ('anthropic','claude-haiku-4-5','mtok_in', 0, 1850, true),
+  ('anthropic','claude-haiku-4-5','mtok_out', 0, 9250, true),
+  ('anthropic','web_search','search', 0, 18.5, true)
 on conflict (provider, model, unit) do nothing;
 
 -- ============================================================================
