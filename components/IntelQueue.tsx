@@ -10,8 +10,18 @@ import { flex } from "@/lib/flex";
 // Every item carries its real source and an honest confidence grade, because an unsourced "insight" is worse
 // than no insight: it becomes a fact nobody can trace and every future piece of work inherits it.
 
+// The Researcher's five fixed sections. Kept here (not imported from lib/research, a server module) so this
+// client component stays clean.
+const SECTIONS: { id: string; label: string; accent: string }[] = [
+  { id: "threat", label: "Threats", accent: "#f87171" },
+  { id: "opportunity", label: "Opportunities", accent: "#4ade80" },
+  { id: "gap", label: "Gaps", accent: "#fbbf24" },
+  { id: "positioning", label: "Positioning", accent: "#60a5fa" },
+  { id: "trend", label: "Trends & campaigns to steal", accent: "#c79bff" },
+];
+
 type Intel = {
-  id: string; role: string; headline: string; why_it_matters: string; detail: string | null;
+  id: string; role: string; section?: string | null; headline: string; why_it_matters: string; detail: string | null;
   source_url: string | null; source_name: string | null;
   sources: { name: string; url: string }[];
   published_at: string | null; period: string | null;
@@ -50,7 +60,10 @@ const CONF: Record<string, string> = {
   low: "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]",
 };
 
-export default function IntelQueue({ clients, configured = [], role }: { clients: Client[]; configured?: string[]; role: "journalist" | "strategist" }) {
+export default function IntelQueue({ clients, configured = [], role }: { clients: Client[]; configured?: string[]; role: "journalist" | "strategist" | "researcher" }) {
+  // The Researcher is COMMISSIONED, not watched: an on-demand focus line lets you point a dossier at a
+  // question ("their new bank partnership", "gaps vs Capitec"). Empty = the full standing remit.
+  const isResearcher = role === "researcher";
   // REFRESH WITHOUT RELOADING. The brain list and the briefs are server-rendered, so a page opened before a
   // brain was added or briefed keeps showing the old list - which has now twice looked like a bug when the
   // data was correct all along.
@@ -69,10 +82,13 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
   const [note, setNote] = useState("");
+  const [focus, setFocus] = useState("");
 
   const refresh = useCallback(async (id: string) => {
     if (!id) return;
-    const d = await fetch(`/api/studio/intel?clientId=${id}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+    // The Researcher has its own on-demand queue; the daily desks share the intel queue.
+    const url = role === "researcher" ? `/api/studio/research?clientId=${id}` : `/api/studio/intel?clientId=${id}`;
+    const d = await fetch(url, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
     setItems(((d?.intel as Intel[]) || []).filter((i) => i.role === role));
   }, [role]);
 
@@ -88,11 +104,23 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
     await refresh(clientId);
   }
 
-  // Manual trigger, so you never have to wait for tomorrow's cron to see it work.
-  // Runs BOTH roles (they share one research pass), then shows this role's findings. Reports honestly: a run
-  // that found nothing and a run that broke must never look the same from the outside.
+  // Manual trigger. The Researcher COMMISSIONS a fresh dossier on demand (metered, deep); the daily desks run
+  // the shared cron pass. Either way, report honestly - a run that found nothing and a run that broke must
+  // never look the same from the outside.
   async function runNow() {
     setRunning(true); setNote("");
+    if (isResearcher) {
+      const r = await fetch(`/api/studio/research`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, focus }),
+      }).then((x) => x.json()).catch(() => null);
+      setRunning(false);
+      if (!r?.ok) { setNote(r?.error || "Couldn't commission the dossier."); flex(r?.error || "Couldn't commission the dossier."); await refresh(clientId); return; }
+      setNote(r.count ? "" : "The dossier ran clean and found nothing worth filing. That is a real answer, not a gap.");
+      flex(`Dossier ready. Filed ${r.count} finding${r.count === 1 ? "" : "s"} across the five sections.`);
+      await refresh(clientId);
+      return;
+    }
     const r = await fetch(`/api/cron/daily-intel?clientId=${clientId}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
     setRunning(false);
     if (!r?.ok) { flex(r?.error || "Couldn't run the research."); return; }
@@ -138,20 +166,37 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
         </div>
         <button onClick={runNow} disabled={running || !clientId}
           className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-lg font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
-          {running ? "Researching…" : "↻ Run research now"}
+          {running ? (isResearcher ? "Researching the dossier…" : "Researching…") : (isResearcher ? "✦ Commission a dossier" : "↻ Run research now")}
         </button>
       </div>
+
+      {/* The Researcher is commissioned. An optional focus line points the dossier at a question; left empty it
+          works the brain's full standing remit. Each run is metered, deep web research - so it is a considered
+          button, not one you press idly. */}
+      {isResearcher && (
+        <div className="rounded-xl border border-line bg-surface-1 p-4">
+          <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Focus for this dossier (optional)</label>
+          <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2}
+            placeholder="e.g. gaps vs Capitec Pay on trust, or a specific competitor's new move. Leave blank for the full standing remit."
+            className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
+          <p className="mt-1.5 text-[15px] text-ink-faint">Deep, on-demand web research across five sections: threats, opportunities, gaps, positioning, and trends to steal. Each run is metered and appears in Cost Control.</p>
+        </div>
+      )}
 
       {note && <p className="rounded-lg border border-[#fbbf24]/35 bg-[#fbbf24]/[0.07] px-3 py-2 text-[22px] text-[#fcd34d]">{note}</p>}
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface-1 p-6 text-center">
           {isConfigured ? (
-            <p className="text-lg text-ink-dim">Nothing in the queue. The daily run is at 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</p>
+            <p className="text-lg text-ink-dim">
+              {isResearcher
+                ? <>No dossier yet. Add a focus if you like, then hit <b className="text-ink">Commission a dossier</b>.</>
+                : <>Nothing in the queue. The daily run is at 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</>}
+            </p>
           ) : (
             <>
               <p className="text-lg text-ink">
-                <b>{clientName}</b> has no {role === "journalist" ? "Journalist" : "Strategist"} brief yet, so this desk has nothing to research for it.
+                <b>{clientName}</b> has no {role === "journalist" ? "Journalist" : role === "researcher" ? "Researcher" : "Strategist"} brief yet, so this desk has nothing to research for it.
               </p>
               <p className="mt-2 text-lg text-ink-dim">
                 A brief is what tells the desk what this brain is about and what is out of bounds. Until one
@@ -160,6 +205,21 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
             </>
           )}
         </div>
+      ) : isResearcher ? (
+        // THE DOSSIER, in its five fixed sections so two dossiers read the same way. A section with nothing is
+        // simply not shown - the Researcher is told padding a section is a failure, so an empty one is honest.
+        <>
+          {SECTIONS.map((s) => {
+            const inSec = items.filter((i) => (i.section || "positioning") === s.id).sort(byRecency);
+            if (!inSec.length) return null;
+            return (
+              <div key={s.id}>
+                <p className="tabular mb-2 mt-6 text-lg uppercase tracking-[0.2em]" style={{ color: s.accent }}>{s.label} — {inSec.length}</p>
+                <div className="space-y-3">{inSec.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} clientName={clientName} />)}</div>
+              </div>
+            );
+          })}
+        </>
       ) : (
         <>
           {material.length > 0 && (
@@ -412,7 +472,9 @@ function Card({ i, busy, decide, clientId, clientName }: { i: Intel; busy: boole
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        {i.role === "journalist" && (
+        {/* Publish as a CEO article - from a Journalist finding, or now a Researcher one (its primary home).
+            A Strategist finding is internal and names competitors, so it is deliberately never eligible. */}
+        {(i.role === "journalist" || i.role === "researcher") && (
           <button onClick={writeNewsletter} disabled={writing}
             className="mr-auto inline-flex items-center gap-2 rounded-lg border border-[#818cf8]/40 px-3 py-1 text-[18px] font-bold text-[#a5b4fc] hover:bg-[#818cf8]/10 disabled:opacity-40">
             {writing && (
@@ -421,7 +483,7 @@ function Card({ i, busy, decide, clientId, clientName }: { i: Intel; busy: boole
                 <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
               </svg>
             )}
-            {writing ? "Writing…" : letter ? "Rewrite newsletter" : "✎ Make this a CEO newsletter"}
+            {writing ? "Writing…" : letter ? "Rewrite the article" : "✎ Publish as a CEO article"}
           </button>
         )}
         <button onClick={() => decide(i.id, "accepted")} disabled={busy}

@@ -46,16 +46,18 @@ function StudioMark() {
   );
 }
 
-function JournalistMark() {
+// The Researcher: a magnifying glass over a small bar chart - analysis, not reporting.
+function ResearcherMark() {
   return (
     <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
       <defs>
-        <linearGradient id="jr-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+        <linearGradient id="rs-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
           <stop stopColor="#22D3EE" /><stop offset="0.55" stopColor="#60A5FA" /><stop offset="1" stopColor="#818CF8" />
         </linearGradient>
       </defs>
-      <path d="M8 40l4.5-12.5L32 8a4.2 4.2 0 0 1 6 6L18.5 33.5 8 40Z" stroke="url(#jr-g)" strokeWidth="2.6" strokeLinejoin="round" />
-      <path d="M28 12l8 8M12.5 27.5l8 8" stroke="url(#jr-g)" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="21" cy="21" r="13" stroke="url(#rs-g)" strokeWidth="2.6" />
+      <path d="M31 31l8 8" stroke="url(#rs-g)" strokeWidth="2.8" strokeLinecap="round" />
+      <path d="M16 24v-4M21 24v-8M26 24v-6" stroke="url(#rs-g)" strokeWidth="2.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -240,6 +242,16 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#f9a8d4]",
       },
       {
+        name: <>The Researcher</>,
+        href: "/researcher",
+        mark: <ResearcherMark />,
+        blurb: "A commissioned deep dive on the selected client: threats, opportunities, gaps, positioning, and global campaigns worth stealing. Any finding can become the CEO's article.",
+        action: "Open the desk",
+        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
+        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
+        accent: "text-[#67e8f9]",
+      },
+      {
         name: <>The Strategist</>,
         href: "/strategist",
         mark: <StrategistMark />,
@@ -248,16 +260,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
         wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#a5b4fc]",
-      },
-      {
-        name: <>The Journalist</>,
-        href: "/journalist",
-        mark: <JournalistMark />,
-        blurb: "Thought leadership a named executive can put their name to. Built from primary sources, sourced and dated, never opinion.",
-        action: "Open the desk",
-        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
-        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
-        accent: "text-[#67e8f9]",
       },
       {
         name: <>Audience <span className="brand-grad">on</span> GAS</>,

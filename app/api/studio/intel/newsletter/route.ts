@@ -69,9 +69,12 @@ export async function POST(req: Request) {
   if (!clientId || !id) return NextResponse.json({ error: "clientId and id required" }, { status: 400 });
 
   try {
+    // A CEO article can be published from a JOURNALIST finding or a RESEARCHER one (Gary): the Researcher desk
+    // is now the primary home for turning a finding into the CEO's LinkedIn piece. A Strategist finding stays
+    // internal (blunt, names competitors) and is deliberately NOT eligible.
     const rows = (await db().query(
       `select headline, why_it_matters, detail, sources, published_at from studio_intel
-       where id = $1 and client_id = $2 and role = 'journalist'`,
+       where id = $1 and client_id = $2 and role in ('journalist','researcher')`,
       [id, clientId],
     )) as Record<string, unknown>[];
     const f = rows[0];
