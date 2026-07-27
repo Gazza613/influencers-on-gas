@@ -105,8 +105,24 @@ export async function POST(req: Request) {
       `THE SUBSTANCE\n${String(f.detail || "")}\n\n` +
       `SOURCES: ${srcs.map((s) => `${s.name} (${s.url})`).join(" · ") || "none recorded"}\n` +
       `PUBLISHED: ${String(f.published_at || "date not established")}\n\n` +
-      `WHAT WE KNOW ABOUT MoMo (his own ground truth - use it, do not contradict it):\n` +
+      `WHAT WE KNOW ABOUT ${cfg.clientName} (their own ground truth - use it, do not contradict it):\n` +
       `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 7000)}`;
+
+    // REGISTER + COMPLIANCE BACKSTOP, brain-aware. The specific voice is the brain's ceoRules; this only makes
+    // sure the piece lands in the register a business of this size and category would actually publish, and
+    // stays inside its regulatory position - so a life insurer reads as measured, corporate and trustworthy yet
+    // engaging and understandable, and never says anything that reads as advice, a guarantee, or an
+    // unsubstantiated claim. The scope lock tells the model what kind of client this is.
+    const REGISTER = `TONE AND COMPLIANCE (on top of the CEO rules above, never overriding them):
+- Write in the register a serious business of THIS size and category would publish under its CEO's name:
+  corporate and credible, but genuinely engaging and easy to understand - never stiff, jargon-heavy or dull,
+  and never flippant or salesy.
+- For a licensed financial services client (a life insurer, a bank, a fintech) NOTHING may read as financial
+  advice, a promise or guarantee of an outcome, or a claim that cannot be substantiated. Anything the piece
+  says must survive that client's regulatory regime (for SA life cover: FSCA, FAIS, PPR). When in doubt, make
+  the point about what the company stands for and what it makes possible, not about a product, a price or a
+  benefit you cannot prove.
+- UK British spelling. Never an em dash or an en dash.`;
 
     const client = new Anthropic({ apiKey: key });
     const res = await client.messages.create({
@@ -114,7 +130,9 @@ export async function POST(req: Request) {
       max_tokens: 2000,
       system: `${cfg.scope}
 
-${cfg.ceoRules}`,
+${cfg.ceoRules}
+
+${REGISTER}`,
       tools: [{ name: "piece", description: "The CEO's newsletter piece and the art direction for its image.", input_schema: PIECE }],
       tool_choice: { type: "tool", name: "piece" }, // FORCED - a piece always comes back
       messages: [{

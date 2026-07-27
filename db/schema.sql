@@ -691,3 +691,8 @@ alter table studio_intel add column if not exists section text;
 alter table studio_intel drop constraint if exists studio_intel_role_check;
 alter table studio_intel add constraint studio_intel_role_check
   check (role in ('journalist','strategist','researcher'));
+
+-- THE RESEARCHER'S REQUEST (Gary). Each dossier finding remembers WHAT was asked for - the focus line typed
+-- when it was commissioned, or "Standing remit" when the full remit was run - so the desk can tag each finding
+-- with the research it came from and you can refer back to the subject.
+alter table studio_intel add column if not exists request text;

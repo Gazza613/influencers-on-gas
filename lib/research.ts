@@ -36,6 +36,12 @@ export const SECTIONS: { id: ResearchSection; label: string; blurb: string }[] =
 ];
 
 const STYLE = `HOW TO WRITE THIS (read by busy marketers and by the client's own team, not by analysts):
+- MATCH THE CLIENT'S OWN PROFESSIONAL REGISTER, which the scope lock tells you. Write as a senior brand would
+  for a business of THIS size and category: corporate and credible, but engaging and genuinely understandable,
+  never stiff, never flippant, never breezy. For a licensed financial services client (a life insurer, a bank,
+  a fintech) the register is measured and trustworthy, and NOTHING you write may read as financial advice, a
+  guarantee, or a claim that cannot be substantiated - anything that could reach the public must survive that
+  client's regulatory regime (for SA life cover: FSCA, FAIS, PPR).
 - Plain, direct English. Short sentences. Everyday words. Say the thing itself, not the jargon for it.
 - SIMPLER LANGUAGE, SAME SUBSTANCE. Never dilute to sound readable: keep every number, name, date and honest
   uncertainty exactly as it is.
@@ -48,6 +54,10 @@ const STYLE = `HOW TO WRITE THIS (read by busy marketers and by the client's own
 const HONESTY = `HONESTY RULES:
 - EVERY finding carries a REAL source URL you actually read. If you cannot source it, do not report it. A
   research desk that cannot be checked is worthless.
+- CITE THE ORIGINAL. Each source URL must point to the ORIGINAL article, report, filing, company page or video
+  itself - the primary thing - NOT a Google or search-results page, NOT a link aggregator, and NOT a bare
+  homepage. If a claim comes from a video, link the video; from a regulator, link the regulator's own document.
+  A reader must be able to click the link and land on the exact source of the claim.
 - NO RECENCY GATE. This is not a news run. Structural truth is what matters: a competitor's entrenched position,
   a category norm, a campaign from two years ago that still works. Date what you can, and say plainly when
   something is historical versus current - but never discard a finding merely for being old.
@@ -88,7 +98,7 @@ const SCHEMA = {
           detail: { type: "string", description: "The substance, with the real numbers, names and dates." },
           sources: {
             type: "array",
-            description: "EVERY source you actually read for this finding. A real URL each - never invent one.",
+            description: "EVERY source you actually read for this finding. Each url must be the ORIGINAL article, report, filing, company page or video itself - never a search-results page, an aggregator, or a bare homepage. Never invent a URL.",
             items: {
               type: "object", additionalProperties: false,
               properties: { name: { type: "string" }, url: { type: "string" } },
@@ -183,6 +193,10 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     .replace(/\s*[—–]\s*/g, " - ")
     .trim();
 
+  // The request this dossier answered, stamped on every finding so the desk can tag it and you can refer back
+  // to what you asked for. A blank commission is the full standing remit.
+  const request = focus?.trim() ? focus.trim().slice(0, 300) : "Standing remit";
+
   const valid = new Set(SECTIONS.map((s) => s.id));
   const saved: Intel[] = [];
   for (const f of findings) {
@@ -193,10 +207,10 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     // Sourcing is the product here: an unsourced "finding" is an opinion, so it never reaches the queue.
     if (!srcs.length) continue;
     const rows = (await db().query(
-      `insert into studio_intel (client_id, role, section, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
-       values ($1,'researcher',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-       returning id, role, section, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at`,
-      [clientId, section, noDash(f.headline).slice(0, 300), noDash(f.why_it_matters).slice(0, 1200),
+      `insert into studio_intel (client_id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
+       values ($1,'researcher',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       returning id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at`,
+      [clientId, section, request, noDash(f.headline).slice(0, 300), noDash(f.why_it_matters).slice(0, 1200),
        noDash(f.detail).slice(0, 4000), JSON.stringify(srcs),
        srcs[0]?.url ?? null, srcs.map((s) => s.name).join(" · ").slice(0, 200) || null,
        /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? f.published_at : null,
@@ -213,8 +227,8 @@ export async function runResearch(clientId: string, today: string, focus?: strin
 /** The dossier for a brain, newest first, grouped by the caller. */
 export async function listResearch(clientId: string, status = "new"): Promise<Intel[]> {
   return (await db().query(
-    `select id, role, section, headline, why_it_matters, detail, sources, source_url, source_name, published_at,
-            period, confidence, material, impact_risk, campaign_response, newsletter, newsletter_art,
+    `select id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name,
+            published_at, period, confidence, material, impact_risk, campaign_response, newsletter, newsletter_art,
             newsletter_options, status, found_at
      from studio_intel
      where client_id = $1 and role = 'researcher' and status = $2

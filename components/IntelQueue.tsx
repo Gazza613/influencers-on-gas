@@ -21,7 +21,7 @@ const SECTIONS: { id: string; label: string; accent: string }[] = [
 ];
 
 type Intel = {
-  id: string; role: string; section?: string | null; headline: string; why_it_matters: string; detail: string | null;
+  id: string; role: string; section?: string | null; request?: string | null; headline: string; why_it_matters: string; detail: string | null;
   source_url: string | null; source_name: string | null;
   sources: { name: string; url: string }[];
   published_at: string | null; period: string | null;
@@ -141,6 +141,9 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
     const bv = b.published_at ? new Date(b.published_at).getTime() : -Infinity;
     return bv - av;
   };
+  // The Researcher orders by WHEN WE RESEARCHED IT (found_at), so the latest deep dive sits at the top - a
+  // just-commissioned dossier is what you want to read, not the oldest source in the pile (Gary).
+  const byFound = (a: Intel, b: Intel) => new Date(b.found_at).getTime() - new Date(a.found_at).getTime();
   const clientName = clients.find((c) => c.id === clientId)?.name || "us";
   // A brain with no brief for THIS desk can never produce a finding. Saying "nothing in the queue" for one
   // describes a run that did not happen as though it had run and found nothing - two very different things.
@@ -166,7 +169,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
         </div>
         <button onClick={runNow} disabled={running || !clientId}
           className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-lg font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
-          {running ? (isResearcher ? "Researching the dossier…" : "Researching…") : (isResearcher ? "✦ Commission a dossier" : "↻ Run research now")}
+          {running ? (isResearcher ? "Researching…" : "Researching…") : (isResearcher ? "✦ Deep Dive Research" : "↻ Run research now")}
         </button>
       </div>
 
@@ -190,7 +193,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
           {isConfigured ? (
             <p className="text-lg text-ink-dim">
               {isResearcher
-                ? <>No dossier yet. Add a focus if you like, then hit <b className="text-ink">Commission a dossier</b>.</>
+                ? <>No research yet. Add a focus if you like, then hit <b className="text-ink">Deep Dive Research</b>.</>
                 : <>Nothing in the queue. The daily run is at 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</>}
             </p>
           ) : (
@@ -210,7 +213,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
         // simply not shown - the Researcher is told padding a section is a failure, so an empty one is honest.
         <>
           {SECTIONS.map((s) => {
-            const inSec = items.filter((i) => (i.section || "positioning") === s.id).sort(byRecency);
+            const inSec = items.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
             if (!inSec.length) return null;
             return (
               <div key={s.id}>
@@ -316,6 +319,15 @@ function Card({ i, busy, decide, clientId, clientName }: { i: Intel; busy: boole
   }
   return (
     <div className={`rounded-xl border p-4 ${i.material ? "border-[#4ade80]/30 bg-[#4ade80]/[0.04]" : "border-line bg-surface-1"}`}>
+      {/* THE REQUEST TAG (Gary). Which deep dive this finding came from - the focus you typed, or the standing
+          remit - so you can always refer back to what was asked, even when a section mixes several dossiers. */}
+      {i.request && (
+        <div className="mb-2">
+          <span className="tabular inline-flex items-center gap-1.5 rounded-full border border-[#c79bff]/40 bg-[#c79bff]/10 px-2.5 py-0.5 text-[16px] font-semibold text-[#c79bff]">
+            ✦ Researched: {i.request}
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="text-[28px] font-bold leading-snug text-ink">{i.headline}</p>
         <span className={`tabular shrink-0 rounded-full border px-2 py-0.5 text-[18px] font-bold ${CONF[i.confidence] || CONF.medium}`}>{i.confidence}</span>
