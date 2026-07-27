@@ -395,6 +395,13 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('anthropic','claude-sonnet-4-6','mtok_out', 15, 27750, true),
   ('anthropic','claude-haiku-4-5','mtok_in', 1, 1850, true),
   ('anthropic','claude-haiku-4-5','mtok_out', 5, 9250, true),
+  -- Insurance for a future model upgrade (current-gen prices) so nothing ever silently meters $0.
+  ('anthropic','claude-opus-5','mtok_in', 5, 9250, true),
+  ('anthropic','claude-opus-5','mtok_out', 25, 46250, true),
+  ('anthropic','claude-sonnet-5','mtok_in', 3, 5550, true),
+  ('anthropic','claude-sonnet-5','mtok_out', 15, 27750, true),
+  ('anthropic','claude-fable-5','mtok_in', 10, 18500, true),
+  ('anthropic','claude-fable-5','mtok_out', 50, 92500, true),
   ('anthropic','web_search','search', 0.01, 18.5, true)
 on conflict (provider, model, unit) do nothing;
 
