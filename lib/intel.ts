@@ -68,6 +68,40 @@ const STYLE = `HOW TO WRITE THIS (it is read by busy marketers and by the client
 // SPENDS. Shared by both engines so the standard is identical.
 export const MARKETING_LENS = `YOUR LENS - you are a top 1% MARKETING strategist and researcher, the calibre a leading agency puts in the room. Read EVERYTHING through a marketing lens first: brand positioning and perception, category and competitor share of voice, messaging and narrative, creative and campaign craft, the media and channel mix, the funnel from awareness to conversion, price and value perception, and the consumer psychology and behaviour underneath it all. Regulation, product and market facts matter for what they mean for the MARKETING - how the brand should be positioned, what it should say, what it should make, and where it should spend. Every finding must ultimately answer: what does this change about our marketing, and what is the move?`;
 
+// RESEARCH ANY CRAWLED BRAIN, no hand-written brief needed (Gary: crawled 100 pages into a brain, Researcher
+// said "nothing configured"). A brain that has KNOWLEDGE is researchable: we derive a scope lock and a marketing
+// remit from the brain's OWN name and crawled material. This does NOT break the ringfence - the derived scope
+// is strictly this-client-only and uses only this brain's own data, so no other brain's scope is ever borrowed.
+// Explicit intel_briefs still win where they exist; this is only the fallback.
+export async function deriveResearchBrief(clientId: string): Promise<{ clientName: string; scope: string; remit: string; doctrine: string } | null> {
+  const cr = (await db().query(`select name from clients where id = $1`, [clientId])) as { name: string }[];
+  const name = cr[0]?.name;
+  if (!name) return null;
+  const chunks = (await db().query(
+    `select content from knowledge_chunks where client_id = $1 order by created_at desc limit 40`,
+    [clientId],
+  )) as { content: string }[];
+  const doctrine = chunks.map((c) => c.content).join("\n\n").slice(0, 7000);
+  const scope = `SCOPE LOCK. You are researching ${name}, and ONLY ${name}. ${name} is the SUBJECT of every finding; ` +
+    `any other company may appear only as its competitor, partner or market context, never as the subject. Everything ` +
+    `you report must be about ${name}, its category, its market and its competitive set. Do not drift onto another brand.`;
+  const remit = `Do a world-class marketing deep dive on ${name}: establish where ${name} stands and what it should do, ` +
+    `across the five sections. Ground it in ${name}'s own material below and in current, verifiable web research about ` +
+    `${name} and its market.`;
+  return { clientName: name, scope, remit, doctrine };
+}
+
+// Which brains the Researcher can run: any with an explicit researcher remit, OR any that has crawled knowledge
+// (so a freshly-crawled brain is immediately researchable via the derived brief above).
+export async function researchableClientIds(): Promise<string[]> {
+  const rows = (await db().query(
+    `select distinct c.id from clients c
+     where exists (select 1 from intel_briefs b where b.client_id = c.id and b.researcher is not null)
+        or exists (select 1 from knowledge_chunks k where k.client_id = c.id)`,
+  )) as { id: string }[];
+  return rows.map((r) => String(r.id));
+}
+
 // AGENTS WORKING TOGETHER (Gary). Recent findings a HUMAN accepted into the brain from the OTHER desk, so the
 // Strategist watches what the Researcher established and the Researcher builds on what the Strategist has seen.
 // Accepted only - the validated signal - and recent, capped, headline + why so it stays cheap to carry.

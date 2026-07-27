@@ -2,7 +2,7 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import IntelQueue from "@/components/IntelQueue";
 import { listStudioClients } from "@/lib/studio";
-import { brainsWithIntel } from "@/lib/intel";
+import { brainsWithIntel, researchableClientIds } from "@/lib/intel";
 
 // THE RESEARCHER. A commissioned, world-class deep dive on where a selected client actually stands - the
 // analyst to the Strategist's newswire. Where the Strategist runs daily and reports what CHANGED, the
@@ -17,7 +17,9 @@ import { brainsWithIntel } from "@/lib/intel";
 export default async function ResearcherPage() {
   const clients = await listStudioClients().catch(() => []);
   const briefed = await brainsWithIntel().catch(() => []);
-  const configured = briefed.filter((b) => b.researcher).map((b) => b.clientId);
+  // Researchable = an explicit Researcher remit OR any crawled knowledge. A freshly-crawled brain (like Amber
+  // Room) is immediately researchable; runResearch derives its scope from its own material. See lib/intel.ts.
+  const configured = await researchableClientIds().catch(() => briefed.filter((b) => b.researcher).map((b) => b.clientId));
   // A finding can only become a CEO article on a brain that HAS a CEO voice to write in. Brains without CEO
   // rules never show the publish button (it errored on click before), and are told what is missing instead.
   const canPublish = briefed.filter((b) => b.ceoRules).map((b) => b.clientId);

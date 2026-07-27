@@ -3,7 +3,7 @@ import { db } from "./db";
 import { getSecret } from "./connections";
 import { PREMIUM, INGEST } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
-import { loadIntelBrief, loadDeskContext, MARKETING_LENS, type Intel } from "./intel";
+import { loadIntelBrief, deriveResearchBrief, loadDeskContext, MARKETING_LENS, type Intel } from "./intel";
 import { recordTokens } from "./usage";
 import { verifyFinding, toISODate } from "./verify";
 
@@ -188,14 +188,24 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
 
-  // THE RINGFENCE. Scope and remit come from THIS brain, or we do not run at all.
-  const cfg = await loadIntelBrief(clientId);
-  if (!cfg) throw new Error("This brain has no intel brief, so its scope lock is unknown. Refusing to research it rather than borrow another brain's scope.");
-  const remit = cfg.researcher;
-  if (!remit) throw new Error(`${cfg.clientName} has no Researcher remit set yet. Add one on the brain before running the deep research.`);
-
   const client = new Anthropic({ apiKey: key });
   const kit = await getBrandKit(clientId).catch(() => null);
+
+  // THE RINGFENCE. Scope and remit come from THIS brain. An explicit Researcher brief wins; if there is none, we
+  // DERIVE one from the brain's own name and crawled knowledge (Gary: a freshly-crawled brain should just be
+  // researchable). Either way it is strictly this-client-only - no other brain's scope is ever borrowed.
+  const realCfg = await loadIntelBrief(clientId);
+  let brainName: string, scope: string, remit: string, doctrine: string;
+  if (realCfg?.researcher) {
+    brainName = realCfg.clientName; scope = realCfg.scope; remit = realCfg.researcher;
+    doctrine = kit?.tone_notes || "";
+  } else {
+    const d = await deriveResearchBrief(clientId);
+    if (!d) throw new Error("This brain has nothing to research yet. Crawl its site into the brain, or add a Researcher brief, then run again.");
+    brainName = d.clientName; scope = d.scope; remit = d.remit;
+    doctrine = (kit?.tone_notes && kit.tone_notes.trim()) ? kit.tone_notes : d.doctrine;
+  }
+  const cfg = { clientName: brainName, scope }; // downstream shorthand; remit + doctrine are their own vars
   const seen = await loadSeenResearch(clientId).catch(() => ({ headlines: [] as string[], keys: new Set<string>(), urls: new Set<string>() }));
   // WORK WITH THE STRATEGIST (Gary): the deep dive folds in what the weekly watch has recently flagged, so the
   // two desks build one picture rather than two.
@@ -232,7 +242,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const brief = `Today is ${today}. Research ${cfg.clientName} in depth, strictly inside your scope lock.\n\n` +
     `Work the five sections:\n${sectionList}${askedFor}\n\n` +
     `WHAT WE ALREADY KNOW (do NOT report this back - only what ADDS to, sharpens or CONTRADICTS it):\n` +
-    `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n` +
+    `${(doctrine || "(no doctrine loaded)").slice(0, 6000)}\n` +
     `${alreadyFiled}${watchContext}\n` +
     `RECENCY: every finding must rest on something from the LAST ${RECENCY_DAYS} DAYS, i.e. on or after ` +
     `${cutoffStr}. Prioritise your searches to that window. Older material may inform your understanding, but do ` +

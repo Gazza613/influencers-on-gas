@@ -400,10 +400,20 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
                 ? <>No research yet. Add a focus if you like, then hit <b className="text-ink">Deep Dive Research</b>.</>
                 : <>Nothing in the queue. The weekly run is Friday 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</>}
             </p>
+          ) : isResearcher ? (
+            <>
+              <p className="text-lg text-ink">
+                <b>{clientName}</b> has nothing to research yet: no crawled knowledge and no Researcher brief.
+              </p>
+              <p className="mt-2 text-lg text-ink-dim">
+                Feed this brain first: crawl its site under <b className="text-ink">Ask the Brain</b>, or add a
+                Researcher brief. Once it has either, the Researcher can run a full deep dive on it.
+              </p>
+            </>
           ) : (
             <>
               <p className="text-lg text-ink">
-                <b>{clientName}</b> has no {role === "journalist" ? "Journalist" : role === "researcher" ? "Researcher" : "Strategist"} brief yet, so this desk has nothing to research for it.
+                <b>{clientName}</b> has no {role === "journalist" ? "Journalist" : "Strategist"} brief yet, so this desk has nothing to research for it.
               </p>
               <p className="mt-2 text-lg text-ink-dim">
                 A brief is what tells the desk what this brain is about and what is out of bounds. Until one
