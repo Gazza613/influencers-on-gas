@@ -3,7 +3,7 @@ import { db } from "./db";
 import { getSecret } from "./connections";
 import { PREMIUM, INGEST } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
-import { loadIntelBrief, deriveResearchBrief, loadDeskContext, MARKETING_LENS, type Intel } from "./intel";
+import { loadIntelBrief, deriveResearchBrief, loadDeskContext, siteAnchor, MARKETING_LENS, type Intel } from "./intel";
 import { recordTokens } from "./usage";
 import { verifyFinding, toISODate } from "./verify";
 
@@ -197,7 +197,8 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const realCfg = await loadIntelBrief(clientId);
   let brainName: string, scope: string, remit: string, doctrine: string;
   if (realCfg?.researcher) {
-    brainName = realCfg.clientName; scope = realCfg.scope; remit = realCfg.researcher;
+    // Anchor even an explicit brief to the client's own website, so it validates the entity too (Gary).
+    brainName = realCfg.clientName; scope = realCfg.scope + siteAnchor(realCfg.clientName, realCfg.website); remit = realCfg.researcher;
     doctrine = kit?.tone_notes || "";
   } else {
     const d = await deriveResearchBrief(clientId);

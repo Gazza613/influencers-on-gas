@@ -82,12 +82,14 @@ export async function deriveResearchBrief(clientId: string): Promise<{ clientNam
     [clientId],
   )) as { content: string }[];
   const doctrine = chunks.map((c) => c.content).join("\n\n").slice(0, 7000);
+  const website = await clientWebsite(clientId);
   const scope = `SCOPE LOCK. You are researching ${name}, and ONLY ${name}. ${name} is the SUBJECT of every finding; ` +
     `any other company may appear only as its competitor, partner or market context, never as the subject. Everything ` +
-    `you report must be about ${name}, its category, its market and its competitive set. Do not drift onto another brand.`;
+    `you report must be about ${name}, its category, its market and its competitive set. Do not drift onto another brand.` +
+    siteAnchor(name, website);
   const remit = `Do a world-class marketing deep dive on ${name}: establish where ${name} stands and what it should do, ` +
-    `across the five sections. Ground it in ${name}'s own material below and in current, verifiable web research about ` +
-    `${name} and its market.`;
+    `across the five sections. Ground it in ${name}'s own material below${website ? ` (its site is ${website})` : ""} and in ` +
+    `current, verifiable web research about ${name} and its market.`;
   return { clientName: name, scope, remit, doctrine };
 }
 
@@ -151,11 +153,14 @@ export type IntelBrief = {
   ceoRules: string | null;
   ceoName: string | null;
   ceoTitle: string | null;
+  // The client's OWN official website - the ground truth the desks must stay inside (Gary). Both desks anchor
+  // to it so they can never research a same-named but different business.
+  website: string | null;
 };
 
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const rows = (await db().query(
-    `select b.client_id, c.name as client_name, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
+    `select b.client_id, c.name as client_name, c.website, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
             b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title
      from intel_briefs b join clients c on c.id = b.client_id
      where b.client_id = $1`,
@@ -175,7 +180,28 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
     ceoRules: (r.ceo_rules as string) || null,
     ceoName: (r.ceo_name as string) || null,
     ceoTitle: (r.ceo_title as string) || null,
+    website: (r.website as string) || null,
   };
+}
+
+// THE GROUND-TRUTH ANCHOR (Gary, material): the desks kept drifting to a same-named but different business
+// ("theamberroom.co.za" instead of the client's "the-amber-room.co.za"). This block, injected into every intel
+// scope, forces the research to validate every source against the client's OWN website and reject look-alikes.
+export function siteAnchor(name: string, website: string | null | undefined): string {
+  if (!website) return "";
+  return `\n\nGROUND-TRUTH ANCHOR (non-negotiable). The client is ${name}, the organisation at its OWN official website ${website}. Research and report ONLY that organisation. Businesses that merely SHARE the name are a different entity and must never be researched or cited. Every source has to be clearly about the organisation at ${website} - its own pages, or a third party explicitly about that same organisation. If a source is about a same-named but different business, DISCARD it. If you cannot confirm a source is about ${website}'s organisation, leave it out. Before you report anything, confirm it is the ${name} at ${website}.`;
+}
+
+// The client's canonical website: the explicit one they set, else the domain their crawled knowledge came from.
+export async function clientWebsite(clientId: string): Promise<string | null> {
+  const c = (await db().query(`select website from clients where id = $1`, [clientId])) as { website: string | null }[];
+  if (c[0]?.website) return c[0].website;
+  const dom = (await db().query(
+    `select substring(metadata->>'url' from '^https?://[^/]+') as host, count(*)::int as n
+     from knowledge_chunks where client_id = $1 and metadata->>'url' is not null
+     group by 1 order by n desc limit 1`, [clientId],
+  )) as { host: string | null; n: number }[];
+  return dom[0]?.host ? `${dom[0].host}/` : null;
 }
 
 // Which brains have research configured at all. The daily run iterates THESE, so adding a brain's brief is what
@@ -299,7 +325,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
-    system: `${cfg.scope}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays)}\n\n${STYLE}`,
+    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website)}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays)}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -324,7 +350,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     max_tokens: 6000,
     // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
     // never carried the UK-spelling / no-em-dash rule at all, which is how em dashes kept reaching the inbox.
-    system: `${cfg.scope}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website)}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],

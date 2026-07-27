@@ -32,8 +32,10 @@ create table if not exists clients (
   heygen_avatar_id   text,                               -- HeyGen
   higgsfield_soul_id text,                               -- Higgsfield Soul 2.0
   default_currency   text default 'ZAR',
+  website            text,                                -- the client's OWN official site; the ground-truth anchor the intel desks stay inside
   created_at         timestamptz not null default now()
 );
+alter table clients add column if not exists website text;
 
 create table if not exists client_profiles (
   id                  uuid primary key default gen_random_uuid(),

@@ -95,6 +95,25 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
   // FILTERS (Researcher desk): narrow the runs by section and by when they were researched.
   const [secFilter, setSecFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  // GROUND-TRUTH WEBSITE (Gary): the team offers up the client's real site, and both desks anchor to it so they
+  // can never research a same-named but different business. Loaded per client, saved on demand.
+  const [website, setWebsite] = useState("");
+  const [siteSaved, setSiteSaved] = useState(false);
+  useEffect(() => {
+    if (!isResearcher || !clientId) return;
+    let live = true;
+    fetch(`/api/studio/client-website?clientId=${clientId}`, { cache: "no-store" })
+      .then((r) => r.json()).then((d) => { if (live) { setWebsite(d?.website || ""); setSiteSaved(false); } }).catch(() => {});
+    return () => { live = false; };
+  }, [clientId, isResearcher]);
+  async function saveWebsite() {
+    const r = await fetch("/api/studio/client-website", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, website }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) { setWebsite(r.website || ""); setSiteSaved(true); setTimeout(() => setSiteSaved(false), 1800); router.refresh(); }
+    else flex(r?.error || "Couldn't save the website.");
+  }
 
   useEffect(() => {
     if (!progress) { setElapsed(0); return; }
@@ -337,6 +356,25 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
           {running ? "Researching…" : (isResearcher ? "✦ Deep Dive Research" : "↻ Run research now")}
         </button>
       </div>
+
+      {/* GROUND-TRUTH WEBSITE. The team confirms the client's real site; every run anchors to it and validates
+          each source is that exact organisation, so the desk can never drift to a same-named business (Gary). */}
+      {isResearcher && (
+        <div className="rounded-xl border border-line bg-surface-1 p-4">
+          <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Client website (the ground truth)</label>
+          <p className="mt-1 text-[14px] text-ink-faint">Both the Researcher and Strategist stay strictly inside this site and reject any same-named but different business.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input value={website} onChange={(e) => { setWebsite(e.target.value); setSiteSaved(false); }}
+              placeholder="https://www.the-amber-room.co.za/"
+              className="min-w-[280px] flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg text-ink outline-none focus:border-[#a855f7]" />
+            <button onClick={saveWebsite} disabled={running}
+              className="rounded-lg border border-[#a855f7]/40 px-3 py-2 text-lg font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
+              {siteSaved ? "Saved ✓" : "Save website"}
+            </button>
+          </div>
+          {!website && <p className="mt-1.5 text-[14px] text-[#fcd34d]">⚠ No website set. Without it the desk anchors only to the crawled pages, and a same-named business could slip in. Set it before running.</p>}
+        </div>
+      )}
 
       {/* The Researcher is commissioned. An optional focus line points the dossier at a question; left empty it
           works the brain's full standing remit. Each run is metered, deep web research - so it is a considered
