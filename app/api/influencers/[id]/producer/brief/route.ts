@@ -52,8 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       cta: typeof b.cta === "string" ? b.cta.slice(0, 300) : "",
       tone: typeof b.tone === "string" ? b.tone.slice(0, 200) : "",
       durationSeconds, audience, keyMessage, proof, brainFacts,
-    });
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "brief", count: 1 }).catch(() => {});
+    }, { influencerId: id, userEmail: session.user.email ?? null });
     return NextResponse.json({ ...out, usedBrain: !!brainFacts });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

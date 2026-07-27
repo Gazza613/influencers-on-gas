@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer } from "@/lib/influencers";
-import { shapeStory, PREMIUM } from "@/lib/vendors/anthropic";
+import { shapeStory } from "@/lib/vendors/anthropic";
 import { recordUsage } from "@/lib/usage";
 import { retrieve } from "@/lib/rag";
 
@@ -55,10 +55,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       tone: typeof b.tone === "string" ? b.tone.slice(0, 200) : "",
       setting: typeof b.setting === "string" ? b.setting.slice(0, 200) : "",
       durationSeconds, brainFacts,
-    });
-    // shapeStory runs on PREMIUM (it sets the pipeline's quality ceiling), so meter it as PREMIUM/request -
-    // metering it as Sonnet undercounted every sharpen in Cost Control.
-    await recordUsage({ influencerId: id, clientId: inf.client_id, userEmail: session.user.email ?? null, provider: "anthropic", model: PREMIUM, unit: "request", action: "story", count: 1 }).catch(() => {});
+    }, { influencerId: id, clientId: inf.client_id, userEmail: session.user.email ?? null });
+    // shapeStory meters its own PREMIUM cost token-accurately inside the helper (lib/vendors/anthropic).
     return NextResponse.json({ ...out, usedBrain: !!brainFacts });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

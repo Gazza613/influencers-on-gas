@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer } from "@/lib/influencers";
 import { refineCreativePrompt, friendlyAnthropicError } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
 
 // "Perfect with AI": turn a rough idea into a polished, art-directed image prompt.
 export const maxDuration = 30;
@@ -17,8 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { scene } = await req.json().catch(() => ({}));
 
   try {
-    const refined = await refineCreativePrompt(inf.name, (persona.bible as Record<string, unknown>) ?? {}, typeof scene === "string" ? scene : "");
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "bible", action: "creative", count: 1 }).catch(() => {});
+    const refined = await refineCreativePrompt(inf.name, (persona.bible as Record<string, unknown>) ?? {}, typeof scene === "string" ? scene : "", { influencerId: id, userEmail: session.user.email ?? null });
     return NextResponse.json({ refined });
   } catch (e) {
     return NextResponse.json({ error: friendlyAnthropicError(e) }, { status: 500 });

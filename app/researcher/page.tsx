@@ -32,7 +32,7 @@ export default async function ResearcherPage() {
           <b className="text-ink"> threats, opportunities, gaps, positioning</b>, and <b className="text-ink">global
           trends and campaigns worth stealing</b> - every finding sourced and read through that client&apos;s own
           doctrine. You accept or bin each one, and any finding can become the CEO&apos;s LinkedIn article. Each
-          brain is researched under its own scope alone; none is ever borrowed.
+          brain is researched under its own scope alone.
         </p>
         <IntelQueue clients={clients} configured={configured} canPublish={canPublish} role="researcher" />
       </main>

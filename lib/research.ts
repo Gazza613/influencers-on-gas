@@ -3,7 +3,7 @@ import { db } from "./db";
 import { getSecret } from "./connections";
 import { PREMIUM, INGEST } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
-import { loadIntelBrief, type Intel } from "./intel";
+import { loadIntelBrief, loadDeskContext, MARKETING_LENS, type Intel } from "./intel";
 import { recordTokens } from "./usage";
 import { verifyFinding, toISODate } from "./verify";
 
@@ -197,6 +197,12 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const client = new Anthropic({ apiKey: key });
   const kit = await getBrandKit(clientId).catch(() => null);
   const seen = await loadSeenResearch(clientId).catch(() => ({ headlines: [] as string[], keys: new Set<string>(), urls: new Set<string>() }));
+  // WORK WITH THE STRATEGIST (Gary): the deep dive folds in what the weekly watch has recently flagged, so the
+  // two desks build one picture rather than two.
+  const priorWatch = await loadDeskContext(clientId, "strategist").catch(() => []);
+  const watchContext = priorWatch.length
+    ? `\n\nRECENT MOVEMENTS the weekly Strategist watch has flagged for ${cfg.clientName} - fold these into the deep dive where they matter, and go deeper than the headline:\n${priorWatch.map((r) => `- ${r.headline}${r.why ? `: ${r.why}` : ""}`).join("\n").slice(0, 3000)}\n`
+    : "";
 
   // THE 90-DAY WINDOW (Gary). Research must be current: a finding older than this reads as stale, not
   // structural. Computed from the run date so it always tracks "today", and passed to the model AND enforced in
@@ -227,7 +233,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     `Work the five sections:\n${sectionList}${askedFor}\n\n` +
     `WHAT WE ALREADY KNOW (do NOT report this back - only what ADDS to, sharpens or CONTRADICTS it):\n` +
     `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n` +
-    `${alreadyFiled}\n` +
+    `${alreadyFiled}${watchContext}\n` +
     `RECENCY: every finding must rest on something from the LAST ${RECENCY_DAYS} DAYS, i.e. on or after ` +
     `${cutoffStr}. Prioritise your searches to that window. Older material may inform your understanding, but do ` +
     `not present it as a finding. The one wider window is the trends-to-steal section: a globally effective ` +
@@ -245,7 +251,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const stream = client.messages.stream({
     model: PREMIUM,
     max_tokens: 8000,
-    system: `${cfg.scope}\n\n${remit}\n\n${ASSESSMENT}\n\n${HONESTY}\n\n${STYLE}`,
+    system: `${cfg.scope}\n\n${remit}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 18 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -277,7 +283,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 8000,
-    system: `${cfg.scope}\n\n${HONESTY}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings under the five sections. Carry the REAL source URLs and their dates through - never invent one. Every finding must be dated on or after ${cutoffStr} (last ${RECENCY_DAYS} days); the trends-to-steal section may go back to ${trendCutoffStr} (12 months) for a globally effective campaign. Drop anything older. Name any section you genuinely found nothing for in thin_sections rather than padding it.`,
+    system: `${cfg.scope}\n\n${MARKETING_LENS}\n\n${HONESTY}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings under the five sections. Carry the REAL source URLs and their dates through - never invent one. Every finding must be dated on or after ${cutoffStr} (last ${RECENCY_DAYS} days); the trends-to-steal section may go back to ${trendCutoffStr} (12 months) for a globally effective campaign. Drop anything older. Name any section you genuinely found nothing for in thin_sections rather than padding it.`,
     tools: [{ name: "dossier", description: "The research dossier, every finding sourced.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "dossier" },   // FORCED - a dossier always comes back
     messages: [{ role: "user", content: `Research notes:\n\n${notes.slice(0, 24000)}` }],

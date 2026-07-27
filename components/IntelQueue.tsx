@@ -92,6 +92,9 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
   const [progress, setProgress] = useState<null | { label: string; searches: string[]; sources: number; filed: { section: string; headline: string }[] }>(null);
   const [elapsed, setElapsed] = useState(0);
   const [exported, setExported] = useState("");
+  // FILTERS (Researcher desk): narrow the runs by section and by when they were researched.
+  const [secFilter, setSecFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
 
   useEffect(() => {
     if (!progress) { setElapsed(0); return; }
@@ -223,13 +226,38 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
     runNow(seed);
   }
 
-  // EXPORT THE DOSSIER. The whole run as clean Markdown, so it drops straight into a deck, a brief or an email.
-  // Grouped exactly as the desk reads it, sources kept as links, and the internal impact/response lines labelled
-  // so a copy-paste never leaks them into a client-facing document by accident.
-  function dossierMarkdown(): string {
-    const out: string[] = [`# ${clientName} - Researcher dossier`, ""];
+  // THE FILTERED VIEW. Section and date-range dropdowns narrow what the desk shows, counts and exports (Gary).
+  // Date is by WHEN WE RESEARCHED IT (found_at) - "these research runs" - not the source's own publish date.
+  function inRange(i: Intel): boolean {
+    if (dateFilter === "all") return true;
+    const t = new Date(i.found_at).getTime();
+    if (Number.isNaN(t)) return false;
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const back = (n: number) => startToday - n * 86400000;
+    switch (dateFilter) {
+      case "today": return t >= startToday;
+      case "yesterday": return t >= back(1) && t < startToday;
+      case "7d": return t >= back(7);
+      case "14d": return t >= back(14);
+      case "30d": return t >= back(30);
+      case "lastmonth": {
+        const firstThis = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const firstLast = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+        return t >= firstLast && t < firstThis;
+      }
+      default: return true;
+    }
+  }
+  const shown = items.filter((i) => (secFilter === "all" || (i.section || "positioning") === secFilter) && inRange(i));
+
+  // EXPORT. Copy = clean Markdown (drops into email/Slack). Download = Word (.doc), an editable, shareable
+  // document for a brief or a client deck. Both honour the current filters, are grouped as the desk reads them,
+  // keep sources as links, and label the internal impact/response lines so a paste never leaks them by accident.
+  function researchMarkdown(): string {
+    const out: string[] = [`# ${clientName} - Research`, ""];
     for (const s of SECTIONS) {
-      const inSec = items.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
+      const inSec = shown.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
       if (!inSec.length) continue;
       out.push(`## ${s.label}`, "");
       for (const i of inSec) {
@@ -248,17 +276,42 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
     }
     return out.join("\n").trim() + "\n";
   }
-  async function copyDossier() {
-    try { await navigator.clipboard?.writeText(dossierMarkdown()); setExported("copied"); }
+  function researchHtml(): string {
+    const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const p: string[] = [
+      `<h1 style="font-family:Arial,sans-serif;color:#0b1220;margin:0 0 4px;">${esc(clientName)} — Research</h1>`,
+      `<p style="font-family:Arial,sans-serif;color:#667085;margin:0 0 18px;">Generated ${esc(new Date().toLocaleDateString("en-ZA"))}</p>`,
+    ];
+    for (const s of SECTIONS) {
+      const inSec = shown.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
+      if (!inSec.length) continue;
+      p.push(`<h2 style="font-family:Arial,sans-serif;color:${s.accent};border-bottom:2px solid ${s.accent};padding-bottom:4px;margin:22px 0 8px;">${esc(s.label)} (${inSec.length})</h2>`);
+      for (const i of inSec) {
+        p.push(`<h3 style="font-family:Arial,sans-serif;color:#0b1220;margin:14px 0 2px;">${esc(i.headline)}</h3>`);
+        const meta = [i.published_at ? `Published ${i.published_at}` : "", i.confidence ? `Confidence ${i.confidence}` : "", i.request ? `Focus: ${i.request}` : ""].filter(Boolean).join(" · ");
+        if (meta) p.push(`<p style="font-family:Arial,sans-serif;color:#98a2b3;font-size:12px;margin:0 0 6px;">${esc(meta)}</p>`);
+        if (i.why_it_matters) p.push(`<p style="font-family:Arial,sans-serif;margin:0 0 6px;"><b>Why it matters:</b> ${esc(i.why_it_matters)}</p>`);
+        if (i.detail) p.push(`<p style="font-family:Arial,sans-serif;margin:0 0 6px;">${esc(i.detail).replace(/\n/g, "<br/>")}</p>`);
+        if (i.impact_risk) p.push(`<p style="font-family:Arial,sans-serif;color:#475467;margin:0 0 2px;"><b>Internal - impact:</b> ${esc(i.impact_risk)}</p>`);
+        if (i.campaign_response) p.push(`<p style="font-family:Arial,sans-serif;color:#475467;margin:0 0 6px;"><b>Internal - response:</b> ${esc(i.campaign_response)}</p>`);
+        const srcs = sourcesOf(i);
+        if (srcs.length) p.push(`<p style="font-family:Arial,sans-serif;font-size:12px;margin:0 0 4px;">Sources: ${srcs.map((x) => `<a href="${esc(x.url)}">${esc(x.name)}</a>`).join(" · ")}</p>`);
+      }
+    }
+    return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(clientName)} Research</title></head><body>${p.join("\n")}</body></html>`;
+  }
+  async function copyResearch() {
+    try { await navigator.clipboard?.writeText(researchMarkdown()); setExported("copied"); }
     catch { setExported("failed"); }
     setTimeout(() => setExported(""), 1800);
   }
-  function downloadDossier() {
-    const blob = new Blob([dossierMarkdown()], { type: "text/markdown" });
+  function downloadResearch() {
+    const slug = clientName.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "research";
+    const blob = new Blob(["﻿" + researchHtml()], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${clientName.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "dossier"}-dossier.md`;
+    a.download = `${slug}-research.doc`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -363,21 +416,39 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
         // THE DOSSIER, in its five fixed sections so two dossiers read the same way. A section with nothing is
         // simply not shown - the Researcher is told padding a section is a failure, so an empty one is honest.
         <>
-          {/* EXPORT. The whole dossier as Markdown, straight into a deck, a brief or an email. */}
+          {/* FILTERS + EXPORT. Section and date dropdowns narrow the runs; Copy = Markdown, Download = Word. */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[15px] text-ink-faint">{items.length} finding{items.length === 1 ? "" : "s"} in this dossier</span>
+            <span className="text-[15px] text-ink-faint">{shown.length} finding{shown.length === 1 ? "" : "s"} in these research runs</span>
+            <select value={secFilter} onChange={(e) => setSecFilter(e.target.value)}
+              className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-[15px] text-ink-dim outline-none focus:border-[#a855f7]">
+              <option value="all">All sections</option>
+              {SECTIONS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
+              className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-[15px] text-ink-dim outline-none focus:border-[#a855f7]">
+              <option value="all">All time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="7d">Last 7 days</option>
+              <option value="14d">Last 14 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="lastmonth">Last month</option>
+            </select>
             <span className="flex-1" />
-            <button onClick={copyDossier}
+            <button onClick={copyResearch}
               className="rounded-lg border border-line px-3 py-1 text-[16px] font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink">
-              {exported === "copied" ? "Copied ✓" : exported === "failed" ? "Copy failed" : "⧉ Copy dossier"}
+              {exported === "copied" ? "Copied ✓" : exported === "failed" ? "Copy failed" : "⧉ Copy research"}
             </button>
-            <button onClick={downloadDossier}
+            <button onClick={downloadResearch}
               className="rounded-lg border border-line px-3 py-1 text-[16px] font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink">
-              ⭳ Download .md
+              ⭳ Download Word
             </button>
           </div>
+          {shown.length === 0 && (
+            <p className="rounded-xl border border-line bg-surface-1 p-4 text-center text-lg text-ink-dim">Nothing matches these filters. Widen the section or the date range.</p>
+          )}
           {SECTIONS.map((s) => {
-            const inSec = items.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
+            const inSec = shown.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
             if (!inSec.length) return null;
             return (
               <div key={s.id}>

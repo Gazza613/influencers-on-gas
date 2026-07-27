@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "./connections";
 import { db } from "./db";
 import { listAssets } from "./studio";
-import { recordUsage } from "./usage";
+import { meterClaude } from "./usage";
 import { INGEST } from "./vendors/anthropic";
 import type { Deal } from "./studio-producer";
 
@@ -88,6 +88,7 @@ export async function extractDeals(clientId: string): Promise<{ found: number; a
           ],
         }],
       });
+      await meterClaude(res, { clientId, model: INGEST, action: "deal-extract" }).catch(() => {});
       const b = res.content.find((x) => x.type === "tool_use");
       if (!b || b.type !== "tool_use") return { card, deal: null };
       const d = b.input as { readable: boolean } & Deal;
@@ -97,11 +98,6 @@ export async function extractDeals(clientId: string): Promise<{ found: number; a
       return { card, deal: null };
     }
   }));
-
-  await recordUsage({
-    clientId, provider: "anthropic", model: INGEST, unit: "request",
-    action: "deal-extract", count: cards.length,
-  }).catch(() => {});
 
   for (const { card, deal: raw } of results) {
     const deal = raw ? normalise(raw) : null;

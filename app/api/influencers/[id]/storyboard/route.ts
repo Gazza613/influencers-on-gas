@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
-import { generateStoryboard, PREMIUM } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
+import { generateStoryboard } from "@/lib/vendors/anthropic";
 import { isSafePublicUrl } from "@/lib/safe-url";
 import { bibleProfile } from "@/lib/bible";
 
@@ -85,8 +84,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!brief.storyline && (!brief.brand || !brief.offer)) return NextResponse.json({ error: "Write your story in the box above, or add at least a brand/product and the core offer." }, { status: 400 });
 
   try {
-    const storyboard = await generateStoryboard(brief);
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: PREMIUM, unit: "request", action: "storyboard", count: 1 }).catch(() => {});
+    const storyboard = await generateStoryboard(brief, { influencerId: id, userEmail: session.user.email ?? null });
     const production = { brief, storyboard, status: "storyboard", at: Date.now() };
     await updateInfluencer(id, { persona: { ...persona, production } });
     return NextResponse.json({ production });

@@ -35,8 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Step 1: design previews from a description.
     const description = typeof body.description === "string" ? body.description.trim().slice(0, 800) : "";
     if (description.length < 4) return NextResponse.json({ error: "Describe the voice you want." }, { status: 400 });
-    const brief = await designVoiceBrief(description);
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "voice_design", count: 1 }).catch(() => {});
+    const brief = await designVoiceBrief(description, { influencerId: id, userEmail: session.user.email ?? null });
     const previews = await designVoicePreviews(brief.voice_description, brief.sample_text);
     await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "elevenlabs", model: "eleven_multilingual_v2", unit: "tts", action: "voice", count: 1 }).catch(() => {});
     const hosted = await Promise.all(previews.map(async (p) => ({ generatedVoiceId: p.generatedVoiceId, url: await putBytes(p.audio, "voice-design", "mp3", "audio/mpeg").catch(() => null) })));

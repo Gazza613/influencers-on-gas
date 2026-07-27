@@ -219,7 +219,7 @@ export const buildIdentity = inngest.createFunction(
         if (QA_ON && collected.length) {
           try {
             const filtered = await step.run("identity-qa", () => Promise.all(collected.map(async (u) => {
-              const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0]).catch(() => true), qaCreative(u).catch(() => ({ pass: true }))]);
+              const [idOk, qa] = await Promise.all([matchesIdentity(u, valid[0], { influencerId }).catch(() => true), qaCreative(u, { influencerId }).catch(() => ({ pass: true }))]);
               return { u, ok: idOk && qa.pass };
             }))).then((rs) => rs.filter((r) => r.ok).map((r) => r.u));
             if (filtered.length) collected = filtered;
@@ -709,13 +709,12 @@ export const generateCreatives = inngest.createFunction(
       const multiScene = segments.length >= 2;
       let richScenes: string[] = [];
       if (multiScene) {
-        richScenes = await step.run("compose-multi", () => Promise.all(segments.map((seg) => composeCreativeScene({ bible: bibleObj, scene: seg, cinematic, extras: extrasOn, gender, role }).then((c) => c || seg))));
-        await step.run("usage-compose-multi", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "compose", count: segments.length }).catch(() => {}));
+        richScenes = await step.run("compose-multi", () => Promise.all(segments.map((seg) => composeCreativeScene({ bible: bibleObj, scene: seg, cinematic, extras: extrasOn, gender, role }, { influencerId }).then((c) => c || seg))));
       } else {
         let rs = sceneText;
         if (scene) {
-          const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: bibleObj, scene: sceneText, cinematic, extras: extrasOn, gender, role }));
-          if (composed) { rs = composed; await step.run("usage-compose", () => recordUsage({ influencerId, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "compose", count: 1 }).catch(() => {})); }
+          const composed = await step.run("compose-scene", () => composeCreativeScene({ bible: bibleObj, scene: sceneText, cinematic, extras: extrasOn, gender, role }, { influencerId }));
+          if (composed) { rs = composed; }
         }
         richScenes = [rs];
       }
@@ -770,8 +769,7 @@ export const generateCreatives = inngest.createFunction(
         for (const [mdl, n] of Object.entries(byModel)) {
           await step.run(`usage-gen-${rid}-${mdl}`, () => recordUsage({ influencerId, provider: "higgsfield", model: mdl, unit: "image", action: "creative", count: n }));
         }
-        // AI Vision QA (Claude Haiku) runs once per loadable shot, meter it so it appears in Cost Control.
-        if (QA_ON && valid.length) await step.run(`usage-qa-${rid}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: valid.length }));
+        // AI Vision QA (Claude Haiku) runs once per loadable shot; qaCreative meters its own tokens (lib/vendors/anthropic).
         // Per attempt: failed generation stays visible, QA gets a score, and only approved
         // shots are upscaled/rehosted.
         const attempts = await Promise.all(rawProduced.map((sourceUrl, k) =>
@@ -785,7 +783,7 @@ export const generateCreatives = inngest.createFunction(
               return { id, url: sourceUrl, ratio, resolution: "n/a", scene: sceneText, at: Date.now(), status: "failed_generation", qa: null, error: "image url failed to load", role } as Creative;
             }
 
-            const verdict = QA_ON ? await qaCreative(sourceUrl).catch(() => ({ pass: true, score10: 7, issues: ["qa-unavailable"] })) : { pass: true, score10: 0, issues: [] as string[] };
+            const verdict = QA_ON ? await qaCreative(sourceUrl, { influencerId }).catch(() => ({ pass: true, score10: 7, issues: ["qa-unavailable"] })) : { pass: true, score10: 0, issues: [] as string[] };
             const qa = { pass: verdict.pass, score10: verdict.score10, issues: verdict.issues || [] };
             if (!verdict.pass) {
               return {
@@ -1049,8 +1047,7 @@ export const generateShots = inngest.createFunction(
     let lockSrcToStore = storedLockSrc;
     if (wardrobeSrcUrl && wardrobeSrcUrl !== storedLockSrc) {
       const d = await step.run("wardrobe-extract", async () => {
-        const out = await describeOutfit(wardrobeSrcUrl).catch(() => "");
-        if (out) await recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "wardrobe", count: 1 }).catch(() => {});
+        const out = await describeOutfit(wardrobeSrcUrl, { influencerId }).catch(() => "");
         return out;
       });
       if (d) { wardrobeLock = d; lockSrcToStore = wardrobeSrcUrl; }
@@ -1271,8 +1268,7 @@ export const generateShots = inngest.createFunction(
       let usable = url && (await step.run(`valid-${i}`, () => filterLoadable([url as string]))).length > 0 ? url : null;
       // QA GATE (opt-in): reject waxy/malformed/drift frames and re-roll once. Off by default for speed.
       if (usable && QA_ON) {
-        const verdict = await step.run(`qa-${i}`, () => qaCreative(usable as string).catch(() => ({ pass: true, score10: 7, issues: [] as string[] })));
-        await step.run(`uqa-${i}`, () => recordUsage({ influencerId, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "qa", count: 1 }).catch(() => {}));
+        const verdict = await step.run(`qa-${i}`, () => qaCreative(usable as string, { influencerId }).catch(() => ({ pass: true, score10: 7, issues: [] as string[] })));
         if (!verdict.pass) {
           const reroll = await step.run(`reroll-${i}`, gen);
           if (reroll && (await step.run(`valid2-${i}`, () => filterLoadable([reroll as string]))).length > 0) { usable = reroll; await step.run(`u2-${i}`, () => recordUsage({ influencerId, provider: "higgsfield", model: shotModel, unit: "image", action: "creative", count: 1 }).catch(() => {})); }
@@ -1509,7 +1505,7 @@ export const generateClips = inngest.createFunction(
           // model the producer previewed (eleven_v3 renders the voice differently; opt in via
           // AROLL_EXPRESSIVE=1). Verbatim line — no <break> tags (v2 speaks them).
           const r = await step.run(`tts-${i}`, async () => {
-            const mod = await moderateText(line);
+            const mod = await moderateText(line, { influencerId });
             if (!mod.allowed) return null;
             const exp = (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1");
             try {
@@ -2317,7 +2313,7 @@ export const assembleVideo = inngest.createFunction(
       if (voiceId && p.vo) {
         try {
           const url = await step.run(`vo-${p.i}`, async () => {
-            const mod = await moderateText(p.vo); // screen before any ElevenLabs TTS call
+            const mod = await moderateText(p.vo, { influencerId }); // screen before any ElevenLabs TTS call
             if (!mod.allowed) return null;
             return putBytes(await tts(voiceId, p.vo, { expressive: (persona.voice_model === "v3" || process.env.AROLL_EXPRESSIVE === "1"), speed: Number(persona.voice_speed) || undefined }), "vo", "mp3", "audio/mpeg");
           });

@@ -3,7 +3,6 @@ import { auth } from "@/auth";
 import { researchHiggsfieldTips } from "@/lib/vendors/anthropic";
 import { buildTipsEmail } from "@/lib/tips-email";
 import { sendEmail, emailConfigured } from "@/lib/email";
-import { recordUsage } from "@/lib/usage";
 import { cronAuthed } from "@/lib/cron";
 
 // Daily "Higgsfield expert" research email to Gary: latest Higgsfield + AI-influencer
@@ -18,9 +17,8 @@ export async function GET(req: Request) {
   try {
     const to = process.env.TIPS_EMAIL_TO || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
     const today = new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
+    // researchHiggsfieldTips meters its own Claude + web-search cost token-accurately (lib/vendors/anthropic).
     const ideasHtml = await researchHiggsfieldTips(today);
-    // Meter the research call (Claude + web search) so it shows in Cost Control.
-    await recordUsage({ provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "research", count: 1 }).catch(() => {});
 
     // High-signal only: stay silent unless the research cleared the strict bar (a real
     // optimisation or a cost-control win). No noise on quiet days.

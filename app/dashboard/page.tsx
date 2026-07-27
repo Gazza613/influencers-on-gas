@@ -176,7 +176,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The Researcher</>,
         href: "/researcher",
         mark: <ResearcherMark />,
-        blurb: "A commissioned deep dive on the selected client: threats, opportunities, gaps, positioning, and global campaigns worth stealing. Any finding can become the CEO's article.",
+        blurb: "A commissioned deep dive on a client: threats, opportunities, gaps, positioning, and campaigns worth stealing.",
         action: "Open the desk",
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",

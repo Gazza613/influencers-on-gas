@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { reflowContinuity } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
 
 // CONTINUITY pass: after the producer keeps/rejects references, re-flow the VO across the KEPT
 // talking scenes so they read as one seamless script (no gaps from dropped scenes). Saves the
@@ -29,12 +28,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       tone: production?.storyboard?.tone || production?.brief?.tone || "",
       cta: production?.brief?.cta || "",
       scenes: kept,
-    });
+    }, { influencerId: id, userEmail: session.user.email ?? null });
     if (!lines.length) return NextResponse.json({ error: "Nothing to re-flow (no kept talking scenes)." }, { status: 400 });
     const byScene = new Map(lines.map((l) => [Number(l.scene), l]));
     const nextScenes = scenes.map((s, i) => { const l = byScene.get(i); return l ? { ...s, vo_line: l.vo_line, caption: l.caption } : s; });
     await updateInfluencer(id, { persona: { ...persona, production: { ...production, storyboard: { ...production!.storyboard, scenes: nextScenes } } } });
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "reflow", count: lines.length }).catch(() => {});
     return NextResponse.json({ ok: true, reflowed: lines.length });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

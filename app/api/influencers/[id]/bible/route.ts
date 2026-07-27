@@ -2,7 +2,6 @@ import { NextResponse, after } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateInfluencer } from "@/lib/influencers";
 import { generateBible, generateTagline, friendlyAnthropicError } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
 
 // Claude expands a short brief into the full Character Bible (one-off, ~20-40s).
 export const maxDuration = 120;
@@ -41,20 +40,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const refImgs = Array.isArray(p.reference_images) ? (p.reference_images as unknown[]).filter((s): s is string => typeof s === "string") : [];
     const refUrl = typeof p.reference_url === "string" && p.reference_url ? [p.reference_url] : [];
     const referenceImages = refImgs.length ? refImgs : refUrl;
-    const bible = await generateBible(inf.name, brief, gender, look, inf.mode === "twin", referenceImages);
+    const bible = await generateBible(inf.name, brief, gender, look, inf.mode === "twin", referenceImages, { influencerId: id, userEmail: session.user.email ?? null });
     // Save the bible and return it IMMEDIATELY - the producer can proceed to the photoshoot now.
     await updateInfluencer(id, { persona: { ...inf.persona, brief, bible } });
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "bible", action: "bible", count: 1 }).catch(() => {});
     // The marketing tagline is catalogue copy, not needed to proceed - generate + save it AFTER
     // the response so it never adds to the casting wait. (Metered like any paid call.)
     const userEmail = session.user.email ?? null;
     after(async () => {
       try {
-        const tagline = await generateTagline(inf.name, bible as unknown as Record<string, unknown>);
+        const tagline = await generateTagline(inf.name, bible as unknown as Record<string, unknown>, { influencerId: id, userEmail });
         if (tagline) {
           const fresh = await getInfluencer(id);
           if (fresh) await updateInfluencer(id, { persona: { ...(fresh.persona ?? {}), tagline } });
-          await recordUsage({ influencerId: id, userEmail, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "tagline", count: 1 }).catch(() => {});
         }
       } catch { /* tagline is best-effort */ }
     });

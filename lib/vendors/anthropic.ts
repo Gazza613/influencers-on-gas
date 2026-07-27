@@ -2,6 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "../connections";
 import { PLATFORM_STATE } from "../platform-state";
 import { isSafePublicUrl } from "../safe-url";
+import { meterClaude } from "../usage";
+
+// Attribution context for token-accurate metering. Every exported helper that calls Claude takes this as an
+// optional last arg and meters its own message(s) via meterClaude, so cost is token-accurate even when a
+// caller passes nothing (metered without attribution). No circular import: usage.ts does not import this file.
+type MeterMeta = { clientId?: string | null; influencerId?: string | null; userEmail?: string | null };
 
 // Claude (Anthropic), the producer co-pilot brain. Vendor-neutral in the UI.
 // Sonnet 4.6 designs the Character Casting + refines prompts: near-Opus quality for a
@@ -28,7 +34,7 @@ async function client(): Promise<Anthropic> {
 // predatory or abusive" classifier flags scam-pattern copy). We run a fast Haiku safety check and
 // skip any genuinely-prohibited line so it never reaches ElevenLabs. Fail-open so a moderation
 // hiccup never blocks legitimate production.
-export async function moderateText(text: string): Promise<{ allowed: boolean; category: string; reason: string }> {
+export async function moderateText(text: string, meter?: MeterMeta): Promise<{ allowed: boolean; category: string; reason: string }> {
   const t = (text || "").trim();
   if (!t) return { allowed: true, category: "", reason: "" };
   try {
@@ -41,6 +47,7 @@ export async function moderateText(text: string): Promise<{ allowed: boolean; ca
       tool_choice: { type: "tool", name: "verdict" },
       messages: [{ role: "user", content: `Classify this advertising voiceover text:\n\n${t.slice(0, 4000)}` }],
     });
+    await meterClaude(r, { ...meter, model: "claude-haiku-4-5", action: "moderate" }).catch(() => {});
     const block = r.content.find((b) => b.type === "tool_use") as { input?: { allowed?: boolean; category?: string; reason?: string } } | undefined;
     const v = block?.input || {};
     return { allowed: v.allowed !== false, category: String(v.category || ""), reason: String(v.reason || "") };
@@ -145,7 +152,7 @@ Look / finish (adapt to the requested look):
 - "photoshoot" look: professionally styled hair and, for women, tasteful natural makeup; clean, well-prepped, camera-ready skin so visible blemishes are minimal and softened. Still photoreal, never plastic.`;
 
 // Expand a brief into a full Character Bible.
-export async function generateBible(name: string, brief: string, gender?: string, look?: string, twin = false, referenceImageUrls: string[] = []): Promise<CharacterBible> {
+export async function generateBible(name: string, brief: string, gender?: string, look?: string, twin = false, referenceImageUrls: string[] = [], meter?: MeterMeta): Promise<CharacterBible> {
   const c = await client();
   const refUrls = referenceImageUrls.filter((u) => typeof u === "string" && /^https?:\/\//.test(u)).slice(0, 4);
   const hasRefs = refUrls.length > 0;
@@ -171,13 +178,14 @@ export async function generateBible(name: string, brief: string, gender?: string
     tool_choice: { type: "tool", name: "character_bible" },
     messages: [{ role: "user", content }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "bible" }).catch(() => {});
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("No character bible returned");
   return block.input as CharacterBible;
 }
 
 // A short, baity marketing hook for the influencer showcase (rent-me-later catalogue).
-export async function generateTagline(name: string, bible: Record<string, unknown>): Promise<string> {
+export async function generateTagline(name: string, bible: Record<string, unknown>, meter?: MeterMeta): Promise<string> {
   const c = await client();
   const res = await c.messages.create({
     model: "claude-haiku-4-5",
@@ -188,6 +196,7 @@ export async function generateTagline(name: string, bible: Record<string, unknow
       "UK spelling, no em dashes, no surrounding quotes, no hashtags. Return ONLY the hook line.",
     messages: [{ role: "user", content: `Influencer: ${name}\nCharacter (JSON): ${JSON.stringify(bible).slice(0, 2500)}\n\nWrite the hook.` }],
   });
+  await meterClaude(res, { ...meter, model: "claude-haiku-4-5", action: "tagline" }).catch(() => {});
   const block = res.content.find((b) => b.type === "text");
   const t = block && block.type === "text" ? block.text.trim().replace(/^["'\s]+|["'\s]+$/g, "") : "";
   return t.slice(0, 160);
@@ -213,7 +222,7 @@ const QA_SCHEMA = {
 
 const QA_MEDIA = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
-export async function qaCreative(url: string): Promise<{ pass: boolean; score10: number; issues: string[] }> {
+export async function qaCreative(url: string, meter?: MeterMeta): Promise<{ pass: boolean; score10: number; issues: string[] }> {
   // Fetch + inspect as base64 (works on any SDK version; also validates the image loads).
   let b64: string, mt: string;
   try {
@@ -240,6 +249,7 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; score10:
         ],
       }],
     });
+    await meterClaude(res, { ...meter, model: QA_MODEL, action: "qa" }).catch(() => {});
     const block = res.content.find((b) => b.type === "tool_use");
     const out = block && block.type === "tool_use" ? (block.input as { pass?: boolean; score_10?: number; issues?: string[] }) : null;
     const raw = Number(out?.score_10);
@@ -254,7 +264,7 @@ export async function qaCreative(url: string): Promise<{ pass: boolean; score10:
 // WARDROBE EXTRACTION: describe ONLY the outfit of the main person in a guide creative, head to toe, as a
 // concise sentence. Used to LOCK the influencer's clothing as consistent TEXT across every scene (the image
 // anchor alone drifts when a scene's anchor frame is a tight head-shot that hides the bottoms/shoes).
-export async function describeOutfit(url: string): Promise<string> {
+export async function describeOutfit(url: string, meter?: MeterMeta): Promise<string> {
   if (!isSafePublicUrl(url)) return ""; // SSRF: never fetch a private/internal/metadata URL
   let b64: string, mt: string;
   try {
@@ -277,6 +287,7 @@ export async function describeOutfit(url: string): Promise<string> {
         ],
       }],
     });
+    await meterClaude(res, { ...meter, model: QA_MODEL, action: "wardrobe" }).catch(() => {});
     const block = res.content.find((b) => b.type === "text");
     return block && block.type === "text" ? block.text.trim().replace(/\s+/g, " ").slice(0, 320) : "";
   } catch { return ""; }
@@ -286,7 +297,7 @@ export async function describeOutfit(url: string): Promise<string> {
 // drop drifted photoshoot frames (a wide/full-body shot sometimes renders a different model). Fails
 // OPEN (returns true) on any error so a QA hiccup can never empty the set.
 const QA_MEDIA2 = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-export async function matchesIdentity(frameUrl: string, refUrl: string): Promise<boolean> {
+export async function matchesIdentity(frameUrl: string, refUrl: string, meter?: MeterMeta): Promise<boolean> {
   if (!isSafePublicUrl(frameUrl) || !isSafePublicUrl(refUrl)) return true; // SSRF: don't fetch internal URLs (fail open, as this QA does on any error)
   const grab = async (u: string): Promise<{ mt: "image/jpeg"; data: string } | null> => {
     try {
@@ -316,6 +327,7 @@ export async function matchesIdentity(frameUrl: string, refUrl: string): Promise
         ],
       }],
     });
+    await meterClaude(res, { ...meter, model: QA_MODEL, action: "identity-qa" }).catch(() => {});
     const block = res.content.find((b) => b.type === "tool_use");
     const out = block && block.type === "tool_use" ? (block.input as { same_person?: boolean }) : null;
     return out?.same_person !== false; // default true (fail open)
@@ -324,7 +336,7 @@ export async function matchesIdentity(frameUrl: string, refUrl: string): Promise
 
 // Polish a producer's rough idea into a single vivid, art-directed image prompt for a
 // social creative of this influencer. Always clothed; diverse, in-focus backgrounds.
-export async function refineCreativePrompt(name: string, bible: Record<string, unknown>, scene: string): Promise<string> {
+export async function refineCreativePrompt(name: string, bible: Record<string, unknown>, scene: string, meter?: MeterMeta): Promise<string> {
   const c = await client();
   const res = await c.messages.create({
     model: MODEL,
@@ -342,13 +354,14 @@ export async function refineCreativePrompt(name: string, bible: Record<string, u
       "- UK spelling, no em dashes. Return ONLY the brief text, no preamble.",
     messages: [{ role: "user", content: `Influencer: ${name}\n\nProducer's rough idea:\n${scene || "an on-brand lifestyle shot for this influencer"}\n\nWrite the polished brief.` }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "creative" }).catch(() => {});
   const block = res.content.find((b) => b.type === "text");
   return block && block.type === "text" ? block.text.trim() : scene;
 }
 
 // Reimagine ONE section of an existing bible, kept consistent with the rest.
 export async function generateBibleSection(
-  name: string, brief: string, bible: Record<string, unknown>, section: string,
+  name: string, brief: string, bible: Record<string, unknown>, section: string, meter?: MeterMeta,
 ): Promise<unknown> {
   const sub = (BIBLE_SCHEMA.properties as Record<string, unknown>)[section] as { type?: string } | undefined;
   if (!sub) throw new Error(`Unknown section: ${section}`);
@@ -370,6 +383,7 @@ export async function generateBibleSection(
       content: `Influencer: ${name}\n\nBrief:\n${brief || "(no brief provided)"}\n\nHere is the current character bible as JSON. Reimagine ONLY the "${section}" section with a fresh, distinct take, while keeping it fully consistent with the rest of this character. Return just that section.\n\n${JSON.stringify(bible).slice(0, 6000)}`,
     }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "bible" }).catch(() => {});
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("No section returned");
   return isString ? (block.input as { value: unknown }).value : block.input;
@@ -403,7 +417,7 @@ Source rules: every idea MUST carry a real source line. Prefer sources from the 
 Style: UK British spelling. NO em dashes (use commas or full stops). Output only the HTML blocks above (or the NO_SIGNIFICANT_FINDINGS token), no preamble, no closing remarks, no markdown fences.`;
 }
 
-export async function researchHiggsfieldTips(today: string): Promise<string> {
+export async function researchHiggsfieldTips(today: string, meter?: MeterMeta): Promise<string> {
   const c = await client();
   const res = await c.messages.create({
     model: MODEL,
@@ -412,6 +426,7 @@ export async function researchHiggsfieldTips(today: string): Promise<string> {
     system: tipsSystem(today),
     messages: [{ role: "user", content: "Research today's best Higgsfield and AI-influencer practices and give me concrete, build-aware, dated and sourced ideas to implement in Studio on GAS. Skip anything we already do or rejected." }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "research" }).catch(() => {});
   const html = res.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   return html || "NO_SIGNIFICANT_FINDINGS";
 }
@@ -421,7 +436,7 @@ export async function researchHiggsfieldTips(today: string): Promise<string> {
 // comes from a reference image (@image1), so this never describes facial features. The
 // caller wraps the returned paragraph in the structured iPhone-realism prompt + identity
 // lock + constraints. Returns null on failure (caller falls back to the raw brief).
-export async function composeCreativeScene(opts: { bible: Record<string, unknown>; scene: string; cinematic: boolean; extras: boolean; gender?: string; role?: "a-roll" | "b-roll" }): Promise<string | null> {
+export async function composeCreativeScene(opts: { bible: Record<string, unknown>; scene: string; cinematic: boolean; extras: boolean; gender?: string; role?: "a-roll" | "b-roll" }, meter?: MeterMeta): Promise<string | null> {
   try {
     const c = await client();
     const id = (opts.bible?.identity ?? {}) as Record<string, string>;
@@ -446,6 +461,7 @@ export async function composeCreativeScene(opts: { bible: Record<string, unknown
         "Keep poses fresh and natural with hands relaxed; do NOT use the clichéd pose of a hand raised to shield or shade the eyes from the sun, and never describe squinting into the sun. Under 120 words. UK spelling, no em dashes. Output ONLY the paragraph, no preamble.",
       messages: [{ role: "user", content: `Influencer persona: ${persona || "not specified"}\n\nProducer brief: ${opts.scene}\n\nWrite the scene paragraph.` }],
     });
+    await meterClaude(res, { ...meter, model: MODEL, action: "compose-scene" }).catch(() => {});
     const block = res.content.find((b) => b.type === "text");
     const text = block && block.type === "text" ? block.text.trim() : "";
     return text || null;
@@ -467,7 +483,7 @@ export function friendlyAnthropicError(e: unknown): string {
 
 // Voice-direct a line for ElevenLabs v3 TTS: insert audio tags + emphasis so the read sounds
 // like a real, believable human influencer (not flat TTS). Keeps the original words/meaning.
-export async function expressifyScript(line: string, voiceDescriptor = "", tone = "natural and warm", accent = ""): Promise<string> {
+export async function expressifyScript(line: string, voiceDescriptor = "", tone = "natural and warm", accent = "", meter?: MeterMeta): Promise<string> {
   try {
     const c = await client();
     const accentRule = accent
@@ -485,6 +501,7 @@ export async function expressifyScript(line: string, voiceDescriptor = "", tone 
         "Output ONLY the directed line, no preamble, no quotes.",
       messages: [{ role: "user", content: line }],
     });
+    await meterClaude(res, { ...meter, model: MODEL, action: "voice_script" }).catch(() => {});
     const out = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     return out || line;
   } catch {
@@ -496,7 +513,7 @@ export async function expressifyScript(line: string, voiceDescriptor = "", tone 
 // twang, mild lisp") into a rich ElevenLabs Voice Design prompt + a natural 100+ char sample
 // line. Returns { voice_description, sample_text }. Best-practice: cover age, gender, accent,
 // timbre, pacing, character and audio quality.
-export async function designVoiceBrief(description: string): Promise<{ voice_description: string; sample_text: string }> {
+export async function designVoiceBrief(description: string, meter?: MeterMeta): Promise<{ voice_description: string; sample_text: string }> {
   const fallback = { voice_description: description, sample_text: "Hey, so I just had to share this with you, honestly it has completely changed how I think about my day to day routine." };
   try {
     const c = await client();
@@ -510,6 +527,7 @@ export async function designVoiceBrief(description: string): Promise<{ voice_des
         'Return ONLY strict JSON: {"voice_description": "...", "sample_text": "..."}',
       messages: [{ role: "user", content: description }],
     });
+    await meterClaude(res, { ...meter, model: MODEL, action: "voice_design" }).catch(() => {});
     const txt = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const m = txt.match(/\{[\s\S]*\}/);
     if (!m) return fallback;
@@ -661,7 +679,7 @@ export async function generateScript(brief: {
   influencerName: string; brand: string; goal: string; offer: string; benefits: string;
   cta: string; ctaCode?: string; durationSeconds: number; tone: string; setting?: string; influencerProfile?: string; expressive?: boolean;
   storyline?: string; brainFacts?: string;
-}): Promise<string> {
+}, meter?: MeterMeta): Promise<string> {
   const c = await client();
   const words = Math.round(brief.durationSeconds * 2.5);
   // The producer's own vision is the BRIEF, not a hint - same rule as shapeStory. Without this the script
@@ -709,6 +727,7 @@ VERIFIED FACTS: you are also given facts from the client's own knowledge base. D
     + `Influencer: ${brief.influencerName}. ${brief.influencerProfile || ""}\nBrand / product: ${brief.brand || "(take it from the vision above)"}\nGoal: ${brief.goal}\nCore offer / hook: ${brief.offer || "(take it from the vision above)"}\nKey benefits: ${brief.benefits}\nCTA: ${brief.cta}${brief.ctaCode ? ` (code: ${brief.ctaCode})` : ""}\nTone: ${brief.tone}\nSetting: ${brief.setting || "(her natural world)"}\n\n`
     + (story ? `Write the ${brief.durationSeconds}-second voiceover script now, honouring my vision above and keeping every specific in it.` : `Write the ${brief.durationSeconds}-second voiceover script now.`);
   const res = await c.messages.create({ model: MODEL, max_tokens: 1200, system, messages: [{ role: "user", content: input }] });
+  await meterClaude(res, { ...meter, model: MODEL, action: "script" }).catch(() => {});
   const b = res.content.find((x) => x.type === "text");
   return (b && b.type === "text" ? b.text : "").trim();
 }
@@ -718,7 +737,7 @@ export async function generateStoryboard(brief: {
   cta: string; ctaCode?: string; durationSeconds: number; format: string; talent: string;
   setting: string; tone: string; logo?: string; legal?: string; influencerProfile?: string; script?: string;
   arollRefImage?: string; brollRefImage?: string; storyline?: string;
-}): Promise<Storyboard> {
+}, meter?: MeterMeta): Promise<Storyboard> {
   const c = await client();
   // STORYLINE-FIRST: when the producer wrote the ad's story/idea in their own words, that is the HEART of the
   // brief - honour its intent, characters, beats and feeling, and infer any blank fields from it. You are their
@@ -756,6 +775,7 @@ export async function generateStoryboard(brief: {
       tool_choice: { type: "tool", name: "storyboard" },
       messages: [{ role: "user", content: content as unknown as Anthropic.MessageParam["content"] }],
     });
+    await meterClaude(res, { ...meter, model: PREMIUM, action: "storyboard" }).catch(() => {});
     const block = res.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") throw new Error("No storyboard returned");
     return block.input as Storyboard;
@@ -786,7 +806,7 @@ export async function generateStoryboard(brief: {
 
 // THE PRODUCER's script helper: rewrite ONE scene's voiceover line + matching caption, in the
 // single-continuous-VO house style, optionally following a quick instruction from the producer.
-export async function rewriteSceneScript(o: { brand: string; tone: string; beat: string; role: string; blocking: string; currentVo: string; currentCaption: string; instruction?: string; fullVo?: string }): Promise<{ vo_line: string; caption: string }> {
+export async function rewriteSceneScript(o: { brand: string; tone: string; beat: string; role: string; blocking: string; currentVo: string; currentCaption: string; instruction?: string; fullVo?: string }, meter?: MeterMeta): Promise<{ vo_line: string; caption: string }> {
   const c = await client();
   const res = await c.messages.create({
     model: MODEL,
@@ -797,6 +817,7 @@ export async function rewriteSceneScript(o: { brand: string; tone: string; beat:
     tool_choice: { type: "tool", name: "scene_script" },
     messages: [{ role: "user", content: `Brand: ${o.brand || "the brand"}. Tone: ${o.tone || "warm, confident"}. Scene beat: ${o.beat} (${o.role}). On screen: ${o.blocking}. Current VO: "${o.currentVo}". Current caption: "${o.currentCaption}".${o.instruction ? ` Producer instruction: ${o.instruction}.` : ""}${o.fullVo ? `\nFull-ad VO for flow/context: ${o.fullVo}` : ""}${o.role === "b-roll" ? ` This is a B-ROLL (scene shot): keep the VO line LIGHT and measured - a single clear thought, MAX ~9.5 seconds of speech (about 24 words, ideally 6-9s), never longer than 9.5s and never copy-heavy. The scene shot renders on a 10-second clip, so a longer line leaves the video frozen under the tail (a visible pause) - keep it inside 9.5s. The denser copy belongs on a-roll (which takes up to 15s).` : ""}\n\nRewrite the VO line and its caption for THIS scene only.` }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "script" }).catch(() => {});
   const block = res.content.find((b) => b.type === "tool_use");
   if (block && block.type === "tool_use") return block.input as { vo_line: string; caption: string };
   return { vo_line: o.currentVo, caption: o.currentCaption };
@@ -809,7 +830,7 @@ export async function draftBrief(o: {
   influencerName: string; influencerProfile?: string; brand: string;
   offer?: string; benefits?: string; cta?: string; tone?: string; durationSeconds: number;
   audience?: string; keyMessage?: string; proof?: string; brainFacts?: string;
-}): Promise<{ offer: string; benefits: string; cta: string; tone: string }> {
+}, meter?: MeterMeta): Promise<{ offer: string; benefits: string; cta: string; tone: string }> {
   const c = await client();
   const res = await c.messages.create({
     model: MODEL,
@@ -829,6 +850,7 @@ export async function draftBrief(o: {
       (o.brainFacts ? `\nVERIFIED BRAND FACTS from the client's knowledge base - use these as ground truth, do NOT contradict or invent around them:\n${o.brainFacts}\n` : "") +
       `Current draft - offer: "${o.offer || ""}"; benefits: "${o.benefits || ""}"; CTA: "${o.cta || ""}"; tone: "${o.tone || ""}".\n\nWrite the sharpened, world-class brief for this ${o.durationSeconds}s ad.` }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "brief" }).catch(() => {});
   const block = res.content.find((b) => b.type === "tool_use");
   if (block && block.type === "tool_use") return block.input as { offer: string; benefits: string; cta: string; tone: string };
   return { offer: o.offer || "", benefits: o.benefits || "", cta: o.cta || "", tone: o.tone || "" };
@@ -861,7 +883,7 @@ const STORY_BANNED = `"in today's fast-paced world", "imagine a world where", "p
 export async function shapeStory(o: {
   influencerName: string; influencerProfile?: string; storyline?: string; brand?: string; offer?: string;
   benefits?: string; cta?: string; tone?: string; setting?: string; durationSeconds: number; brainFacts?: string;
-}): Promise<{ storyline: string }> {
+}, meter?: MeterMeta): Promise<{ storyline: string }> {
   const c = await client();
   const dur = Math.max(10, Math.min(90, Math.round(o.durationSeconds || 45)));
   const spokenWords = Math.round(dur * 2.4); // NCVS-backed ad-read pace, the same constant PRODUCER_SYSTEM uses
@@ -938,6 +960,7 @@ ${given
   : `I gave no story, so write me a strong one from the brief.${facts ? " Build it on the verified facts above and invent nothing beyond them." : ""}`}` }],
   });
 
+  await meterClaude(res, { ...meter, model: PREMIUM, action: "story" }).catch(() => {});
   const block = res.content.find((b) => b.type === "text");
   const raw = block && block.type === "text" ? block.text : "";
   // Return ONLY the narrative: the angles + beat plan are the model's scaffolding (plan-then-write), not the
@@ -952,7 +975,7 @@ ${given
 // Continuity pass: after the producer curates (keeps/rejects) the reference shots, re-flow the VO so
 // the KEPT scenes read as ONE coherent narrative (no gaps from dropped scenes). Returns one rewritten
 // vo_line + caption per kept scene (keyed by its scene index). Fails open (callers keep originals).
-export async function reflowContinuity(o: { brand: string; tone: string; cta?: string; scenes: { scene: number; role: string; beat: string; vo_line: string }[] }): Promise<{ scene: number; vo_line: string; caption: string }[]> {
+export async function reflowContinuity(o: { brand: string; tone: string; cta?: string; scenes: { scene: number; role: string; beat: string; vo_line: string }[] }, meter?: MeterMeta): Promise<{ scene: number; vo_line: string; caption: string }[]> {
   const talking = o.scenes.filter((s) => s.role === "a-roll");
   if (!talking.length) return [];
   const c = await client();
@@ -965,6 +988,7 @@ export async function reflowContinuity(o: { brand: string; tone: string; cta?: s
     tool_choice: { type: "tool", name: "reflow" },
     messages: [{ role: "user", content: `Brand: ${o.brand || "the brand"}. Tone: ${o.tone || "warm, confident"}.${o.cta ? ` CTA to land last: ${o.cta}.` : ""}\n\nKept talking scenes, IN ORDER:\n${talking.map((s) => `Scene ${s.scene} - beat "${s.beat}". Current VO: "${s.vo_line}"`).join("\n")}\n\nRewrite the VO + caption for each so they read as one continuous, gap-free script.` }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "reflow" }).catch(() => {});
   const block = res.content.find((b) => b.type === "tool_use");
   if (block && block.type === "tool_use") { const out = (block.input as { lines?: { scene: number; vo_line: string; caption: string }[] }).lines; if (Array.isArray(out)) return out; }
   return [];
@@ -973,7 +997,7 @@ export async function reflowContinuity(o: { brand: string; tone: string; cta?: s
 // "Perfect with AI": take the user's rough one-line character idea and rewrite it into a single rich,
 // castable casting brief (age, heritage, profession/world, personality, a visual signature). Returns
 // improved prose the user can edit before casting. Fails open (returns the original on any problem).
-export async function perfectCharacterBrief(brief: string, gender?: string): Promise<string> {
+export async function perfectCharacterBrief(brief: string, gender?: string, meter?: MeterMeta): Promise<string> {
   const c = await client();
   const res = await c.messages.create({
     model: MODEL,
@@ -984,6 +1008,7 @@ export async function perfectCharacterBrief(brief: string, gender?: string): Pro
     tool_choice: { type: "tool", name: "brief" },
     messages: [{ role: "user", content: `${gender ? `Gender: ${gender}. ` : ""}Rough idea: ${brief}\n\nReturn a richer, castable character brief that keeps this idea but makes it vivid and specific.` }],
   });
+  await meterClaude(res, { ...meter, model: MODEL, action: "perfect-brief" }).catch(() => {});
   const block = res.content.find((b) => b.type === "tool_use");
   if (block && block.type === "tool_use") { const out = (block.input as { brief?: string }).brief; if (out && out.trim()) return out.trim(); }
   return brief;

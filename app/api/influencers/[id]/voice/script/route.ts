@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer } from "@/lib/influencers";
 import { expressifyScript } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
 
 // Voice producer: enhance a plain line into an expressively-tagged read (ElevenLabs audio
 // tags + emphasis + pacing), matched to the influencer's voice descriptor + chosen tone.
@@ -23,7 +22,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (line.length < 2) return NextResponse.json({ error: "Add a line first." }, { status: 400 });
 
   const descriptor = ((persona.bible as { voice_descriptor?: string })?.voice_descriptor) || "";
-  const tagged = await expressifyScript(line, descriptor, tone, accent);
-  await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "voice_script", count: 1 }).catch(() => {});
+  const tagged = await expressifyScript(line, descriptor, tone, accent, { influencerId: id, userEmail: session.user.email ?? null });
   return NextResponse.json({ tagged });
 }

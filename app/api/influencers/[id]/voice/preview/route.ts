@@ -34,8 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // v3 reads audio tags; add expressive delivery + (optional) an accent cue to counter v3's drift.
       const descriptor = String((persona.voice_description as string) || "");
       const tone = String((persona.production as { storyboard?: { tone?: string } } | undefined)?.storyboard?.tone || "natural and warm");
-      readText = await expressifyScript(text, descriptor, tone, accent).catch(() => text);
-      await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "voice_script", count: 1 }).catch(() => {});
+      readText = await expressifyScript(text, descriptor, tone, accent, { influencerId: id, userEmail: session.user.email ?? null }).catch(() => text);
     }
     const buf = await tts(voiceId, readText, { expressive: model === "v3", speed });
     const url = await putBytes(buf, "voice-preview", "mp3", "audio/mpeg");

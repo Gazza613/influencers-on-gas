@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer } from "@/lib/influencers";
 import { rewriteSceneScript } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
 
 // THE PRODUCER's script helper: AI-rewrite ONE scene's VO line + caption. Returns the suggestion
 // (the producer reviews + Saves it). Does NOT regenerate the image.
@@ -33,8 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       currentCaption: String(sc.caption || ""),
       instruction: typeof b.instruction === "string" ? b.instruction.slice(0, 300) : "",
       fullVo: production?.storyboard?.full_vo || "",
-    });
-    await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-sonnet-4-6", unit: "scene", action: "script", count: 1 }).catch(() => {});
+    }, { influencerId: id, userEmail: session.user.email ?? null });
     return NextResponse.json(out);
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInfluencer, updateProductionFields } from "@/lib/influencers";
 import { describeOutfit } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
 import { isSafePublicUrl } from "@/lib/safe-url";
 
 // WARDROBE LOCK: when the producer picks a guide creative, read its outfit head-to-toe RIGHT THEN and store
@@ -35,9 +34,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   if (!isSafePublicUrl(src)) return NextResponse.json({ error: "That image URL could not be read." }, { status: 400 });
 
-  const wardrobe = await describeOutfit(src).catch(() => "");
+  const wardrobe = await describeOutfit(src, { influencerId: id, userEmail: session.user.email ?? null }).catch(() => "");
   if (!wardrobe) return NextResponse.json({ error: "Could not read the outfit from that image - try another guide." }, { status: 502 });
-  await recordUsage({ influencerId: id, userEmail: session.user.email ?? null, provider: "anthropic", model: "claude-haiku-4-5", unit: "image", action: "wardrobe", count: 1 }).catch(() => {});
   await updateProductionFields(id, { wardrobe_lock: wardrobe, wardrobe_ref_url: src });
   return NextResponse.json({ wardrobe });
 }

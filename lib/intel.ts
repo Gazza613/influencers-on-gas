@@ -62,6 +62,25 @@ const STYLE = `HOW TO WRITE THIS (it is read by busy marketers and by the client
 - Lead with the point. The first sentence says what happened or what to do, not the build-up.
 - UK British spelling, ALWAYS. NEVER use an em dash or an en dash: use a comma, a full stop, or a plain hyphen.`;
 
+// THE MARKETING LENS (Gary: "we are a marketing agency"). Both intelligence desks - the weekly Strategist and
+// the on-demand Researcher - must think like the best marketing mind in the room, not a generic analyst. Every
+// fact is read for what it means for how this brand is POSITIONED, what it SAYS, what it MAKES and where it
+// SPENDS. Shared by both engines so the standard is identical.
+export const MARKETING_LENS = `YOUR LENS - you are a top 1% MARKETING strategist and researcher, the calibre a leading agency puts in the room. Read EVERYTHING through a marketing lens first: brand positioning and perception, category and competitor share of voice, messaging and narrative, creative and campaign craft, the media and channel mix, the funnel from awareness to conversion, price and value perception, and the consumer psychology and behaviour underneath it all. Regulation, product and market facts matter for what they mean for the MARKETING - how the brand should be positioned, what it should say, what it should make, and where it should spend. Every finding must ultimately answer: what does this change about our marketing, and what is the move?`;
+
+// AGENTS WORKING TOGETHER (Gary). Recent findings a HUMAN accepted into the brain from the OTHER desk, so the
+// Strategist watches what the Researcher established and the Researcher builds on what the Strategist has seen.
+// Accepted only - the validated signal - and recent, capped, headline + why so it stays cheap to carry.
+export async function loadDeskContext(clientId: string, ofRole: "researcher" | "strategist", limit = 20): Promise<{ headline: string; why: string }[]> {
+  const rows = (await db().query(
+    `select headline, why_it_matters from studio_intel
+     where client_id = $1 and role = $2 and status = 'accepted' and found_at > now() - interval '120 days'
+     order by found_at desc limit $3`,
+    [clientId, ofRole, limit],
+  )) as { headline: string; why_it_matters: string }[];
+  return rows.map((r) => ({ headline: String(r.headline || ""), why: String(r.why_it_matters || "") }));
+}
+
 const HONESTY = (windowDays: number) => `HONESTY RULES:
 - Every finding must carry a REAL source URL you actually read. If you cannot source it, do not report it.
 - Grade confidence honestly: high (primary source - regulator, company results, statute), medium (credible secondary - law firm, trade press, fact-checker), low (single source, thin, or inferred).
@@ -224,6 +243,13 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const kit = await getBrandKit(clientId).catch(() => null);
   const windowDays = cfg.windowDays;
 
+  // WORK WITH THE RESEARCHER (Gary). The Strategist watches for what CHANGES the positions the Researcher's deep
+  // dives have established, so it reads them first and reports movement against them rather than in a vacuum.
+  const priorResearch = role === "strategist" ? await loadDeskContext(clientId, "researcher").catch(() => []) : [];
+  const researchContext = priorResearch.length
+    ? `\n\nSTANDING RESEARCH ON FILE (deep dives the Researcher desk established for ${cfg.clientName}) - report what has CHANGED, been CONFIRMED or been CHALLENGED against these, and build on them; do not restate them:\n${priorResearch.map((r) => `- ${r.headline}${r.why ? `: ${r.why}` : ""}`).join("\n").slice(0, 4000)}\n`
+    : "";
+
   // TWO STEPS, deliberately.
   //
   // Step 1 researches with web search. Step 2 files the report with the schema FORCED.
@@ -233,13 +259,13 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   // its own call makes a missing report impossible rather than merely unlikely.
   const brief = `Today is ${today}. Research what has changed that matters to ${cfg.clientName}, strictly inside your scope lock.\n\n` +
     `WHAT WE ALREADY KNOW (do NOT report these back as new - only report what ADDS to or CONTRADICTS this):\n` +
-    `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n\n` +
+    `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}${researchContext}\n\n` +
     `Search the web now. Then set out what is genuinely new and worth our attention, with the real source for each.`;
 
   const research = await client.messages.create({
     model: STANDARD,
     max_tokens: 6000,
-    system: `${cfg.scope}\n\n${roleBrief}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays)}\n\n${STYLE}`,
+    system: `${cfg.scope}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays)}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -263,7 +289,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     max_tokens: 6000,
     // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
     // never carried the UK-spelling / no-em-dash rule at all, which is how em dashes kept reaching the inbox.
-    system: `${cfg.scope}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${cfg.scope}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
