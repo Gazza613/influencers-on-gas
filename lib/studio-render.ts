@@ -104,6 +104,33 @@ export async function closeRenderer(): Promise<void> {
   _browser = null;
 }
 
+// MULTI-PAGE DOCUMENT -> PDF. Same Chromium as the static renderer, but printToPDF instead of a screenshot, so
+// a long document (the Researcher's fact base) paginates properly with real, selectable text rather than being
+// one giant image. printBackground keeps the brand tints and rules; A4 portrait is the internal-document format
+// (the client-facing Proposal's A4 PPTX is a separate, later build). We wait for fonts before printing, for the
+// same reason renderPng does: an undecoded licensed font prints the fallback and the document is quietly wrong.
+export async function renderPdf(html: string, opts: { marginMm?: number } = {}): Promise<Buffer> {
+  const b = await browser();
+  const page = await b.newPage();
+  try {
+    await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
+    await page.evaluate(async () => {
+      const d = document as unknown as { fonts: { ready: Promise<unknown> } };
+      await d.fonts.ready;
+      await Promise.all([...document.images].map((img) => img.complete ? null : new Promise((res) => { img.onload = res; img.onerror = res; })));
+    });
+    await new Promise((r) => setTimeout(r, 150));
+    const m = `${opts.marginMm ?? 14}mm`;
+    const pdf = await page.pdf({
+      format: "A4", printBackground: true, preferCSSPageSize: true,
+      margin: { top: m, bottom: m, left: m, right: m },
+    });
+    return Buffer.from(pdf);
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
 // The @font-face block for a brand kit's licensed fonts. Weights are read off the FILE NAMES the client
 // uploaded (MTNBrighterSans-ExtraBoldItalic -> 800 italic), so a new weight works the moment it is uploaded.
 export function fontFaceCss(fonts: { family: string; url: string }[]): string {

@@ -126,6 +126,7 @@ export type CollectEvent =
 export type ResearchRun = {
   id: string; client_id: string; version: number; status: string; website: string | null;
   notes: string | null; user_email: string | null; created_at: string;
+  pdf_url?: string | null; drive_url?: string | null; notified_at?: string | null;
 };
 export type ResearchClaim = {
   id: string; run_id: string; client_id: string; section: string; subject: string | null; claim: string;
@@ -333,7 +334,7 @@ export async function listResearchClaims(runId: string): Promise<ResearchClaim[]
 /** The latest research run for a client (any status), or null. */
 export async function latestResearchRun(clientId: string): Promise<ResearchRun | null> {
   const rows = (await db().query(
-    `select id, client_id, version, status, website, notes, user_email, created_at
+    `select id, client_id, version, status, website, notes, user_email, created_at, pdf_url, drive_url, notified_at
      from research_runs where client_id = $1 order by version desc limit 1`, [clientId],
   )) as ResearchRun[];
   return rows[0] || null;

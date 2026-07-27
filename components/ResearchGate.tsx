@@ -12,7 +12,7 @@ import { askConfirm } from "@/lib/confirm";
 // overwrite), or Reject. The competitor set is editable right here.
 
 type Client = { id: string; name: string };
-type Run = { id: string; version: number; status: string; website: string | null; notes: string | null; created_at: string };
+type Run = { id: string; version: number; status: string; website: string | null; notes: string | null; created_at: string; pdf_url?: string | null; drive_url?: string | null; notified_at?: string | null };
 type Claim = {
   id: string; section: string; subject: string | null; claim: string;
   source_name: string | null; source_url: string | null; source_date: string | null;
@@ -76,6 +76,11 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const [newComp, setNewComp] = useState({ name: "", website: "" });
   const [progress, setProgress] = useState<null | { label: string; searches: string[]; sources: number; filed: number }>(null);
   const [elapsed, setElapsed] = useState(0);
+  // THE RESEARCH DOCUMENT (spec 3.8, 3.9): built after a run completes - a GAS-CI PDF, filed to Drive when
+  // configured, with an email notice to Gary. delivery says which channels are actually live, so the UI never
+  // implies a Drive/email that is not switched on.
+  const [docBusy, setDocBusy] = useState(false);
+  const [delivery, setDelivery] = useState<{ drive: boolean; email: boolean } | null>(null);
   // Ground-truth website (Gary, material): the team offers up the client's real site so the collect can never
   // research a same-named but different business. Reuses the existing client-website endpoint.
   const [website, setWebsite] = useState("");
@@ -93,6 +98,23 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   }, []);
 
   useEffect(() => { load(clientId); }, [clientId, load]);
+
+  useEffect(() => {
+    fetch(`/api/studio/researcher/document`, { cache: "no-store" }).then((r) => r.json()).then((d) => setDelivery(d?.delivery || null)).catch(() => {});
+  }, []);
+
+  // Build (or rebuild) the Research Document: render PDF, store, file to Drive, email Gary. Called automatically
+  // once a fresh collect finishes, and on demand via "Regenerate".
+  const buildDoc = useCallback(async (runId: string, silent = false) => {
+    setDocBusy(true);
+    const r = await fetch(`/api/studio/researcher/document`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, runId }),
+    }).then((x) => x.json()).catch(() => null);
+    setDocBusy(false);
+    if (r?.ok) { if (!silent) flex(`Research Document ready${r.emailed ? ", and Gary was notified" : ""}.`); await load(clientId); }
+    else if (!silent) flex(r?.error || "Couldn't build the document.");
+  }, [clientId, load]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -123,7 +145,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   async function runCollect(withNotes?: string) {
     setRunning(true); setNote(""); setShowNotes(false);
     setProgress({ label: `Collecting facts on ${clientName}`, searches: [], sources: 0, filed: 0 });
-    let version = 0, count = 0, errored = "";
+    let version = 0, count = 0, errored = "", runId = "";
     try {
       const resp = await fetch(`/api/studio/researcher/collect`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -142,13 +164,13 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         for (const part of parts) {
           const line = part.split("\n").find((l) => l.startsWith("data:"));
           if (!line) continue;
-          let e: { t: string; label?: string; q?: string; n?: number; version?: number; count?: number; message?: string };
+          let e: { t: string; label?: string; q?: string; n?: number; version?: number; runId?: string; count?: number; message?: string };
           try { e = JSON.parse(line.slice(5).trim()); } catch { continue; }
           if (e.t === "phase") setProgress((p) => p ? { ...p, label: e.label || p.label } : p);
           else if (e.t === "search") setProgress((p) => p ? { ...p, searches: [...p.searches, e.q || ""].slice(-6) } : p);
           else if (e.t === "sources") setProgress((p) => p ? { ...p, sources: e.n || p.sources } : p);
           else if (e.t === "claim") setProgress((p) => p ? { ...p, filed: p.filed + 1 } : p);
-          else if (e.t === "run") { version = e.version || 0; count = e.count || 0; }
+          else if (e.t === "run") { version = e.version || 0; count = e.count || 0; runId = e.runId || ""; }
           else if (e.t === "error") errored = e.message || "The Researcher failed.";
         }
       }
@@ -159,6 +181,8 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     if (errored) { setNote(errored); flex(errored); await load(clientId); return; }
     flex(`Research v${version} filed ${count} claim${count === 1 ? "" : "s"}, ready for your review.`);
     await load(clientId);
+    // Auto-build the Research Document (PDF + Drive + notify) once a run has claims.
+    if (runId && count > 0) buildDoc(runId, true);
   }
 
   async function gate(action: "approve" | "reject") {
@@ -235,6 +259,32 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       </div>
       {!isConfigured && <p className="mt-2 text-base text-[#fca5a5]">This brain has nothing to research yet. Add the client and crawl their site into the brain first.</p>}
       {note && <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-base text-[#fca5a5]">{note}</p>}
+
+      {/* THE RESEARCH DOCUMENT */}
+      {run && !running && (
+        <div className="mt-4 rounded-xl border border-line bg-surface-1 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-lg font-bold text-ink">Research Document</div>
+              <div className="mt-0.5 text-sm text-ink-faint">
+                {docBusy ? "Preparing the PDF, filing and notifying…" : run.pdf_url ? "A GAS-CI PDF of the fact base, facts only." : "Not built for this version yet."}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {run.pdf_url && <a href={run.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg bg-accent px-4 py-2 text-base font-bold text-black">Download PDF</a>}
+              {run.drive_url && <a href={run.drive_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink">Open in Drive</a>}
+              <button onClick={() => buildDoc(run.id)} disabled={docBusy}
+                className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink disabled:opacity-50">
+                {docBusy ? "…" : run.pdf_url ? "Regenerate" : "Generate document"}
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-faint">
+            {run.notified_at ? <span className="text-[#86efac]">✓ Gary notified by email</span> : delivery && !delivery.email ? <span>Email notice off, set Gmail credentials to enable.</span> : null}
+            {run.drive_url ? <span className="text-[#86efac]">✓ Filed to Google Drive</span> : delivery && !delivery.drive ? <span>Drive filing not switched on yet, share a folder with the service account to enable.</span> : null}
+          </div>
+        </div>
+      )}
 
       {/* LIVE PROGRESS */}
       {progress && (

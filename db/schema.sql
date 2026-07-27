@@ -722,3 +722,56 @@ alter table studio_intel add constraint studio_intel_role_check
 -- when it was commissioned, or "Standing remit" when the full remit was run - so the desk can tag each finding
 -- with the research it came from and you can refer back to the subject.
 alter table studio_intel add column if not exists request text;
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+-- THE RESEARCHER V3 - A FACTS-ONLY COLLECTOR (build spec V3, section 3). Corrects the earlier build where the
+-- Researcher analysed: threats/opportunities/gaps/positioning/trends now belong to the Strategist. Gate 1 can
+-- only work if what Gary approves is falsifiable FACT, not opinion, so this engine COLLECTS and VERIFIES facts,
+-- tags each with a source and a tier, and never interprets. Research is now typed DATA (a claim store), and the
+-- PDF, the Gate 1 review screen and the Strategist hand-off are all renders of it.
+
+-- A versioned research run per client. Gate 1 approves a specific version; a rerun never overwrites.
+create table if not exists research_runs (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  version int not null default 1,
+  status text not null default 'collecting',   -- collecting | ready | gate1_approved | gate1_rerun | gate1_rejected
+  website text,                                 -- the ground-truth anchor used
+  notes text,                                   -- the rerun-with-notes that produced this version, or a reject reason
+  user_email text,
+  pdf_url text,                                 -- the rendered Research Document (Vercel Blob)
+  drive_url text,                               -- the copy filed to Google Drive under /Research (when configured)
+  notified_at timestamptz,                      -- when Gary was emailed the completion notice
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_research_runs_client on research_runs(client_id, version desc);
+
+-- A single FACT (or signal). No analysis ever lives here. Renders to the Research Document; feeds the Strategist.
+create table if not exists research_claims (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references research_runs(id) on delete cascade,
+  client_id uuid not null references clients(id) on delete cascade,
+  section text not null,        -- snapshot|foundations|products|market|digital|competitor|competitor_set|activity|customer_voice|unverified
+  subject text,                 -- the client, or a named competitor
+  claim text not null,
+  source_name text,
+  source_url text,
+  source_date text,             -- YYYY-MM-DD published/accessed
+  tier int,                     -- 1 load-bearing | 2 reliable | 3 directional
+  verified boolean not null default false,
+  unverified_reason text,       -- why it is signal-only (Unverified section)
+  conflict text,                -- note when sources disagree (both are still recorded)
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_research_claims_run on research_claims(run_id);
+
+-- The competitor set for a client - auto-detected, editable at Gate 1.
+create table if not exists research_competitors (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  name text not null,
+  website text,
+  added_by text,                -- 'auto' or a user email
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_research_competitors_client on research_competitors(client_id);
