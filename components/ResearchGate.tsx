@@ -27,11 +27,13 @@ const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: "foundations", label: "Company foundations", blurb: "History, ownership, leadership, structure" },
   { id: "products", label: "Products and services", blurb: "Range, pricing where public, propositions" },
   { id: "market", label: "Market and category", blurb: "Size where sourced, dynamics, regulation" },
-  { id: "digital", label: "Digital footprint", blurb: "Website, SEO basics, social presence" },
+  { id: "digital", label: "Digital footprint", blurb: "Website, SEO basics, social posting" },
+  { id: "contact", label: "Contact and social channels", blurb: "Phone, email, address, hours, WhatsApp, social profiles" },
   { id: "competitor", label: "Competitor intelligence", blurb: "Observable public activity, client and each competitor" },
   { id: "competitor_set", label: "Competitor set", blurb: "A factual profile per competitor" },
   { id: "activity", label: "90-day activity log", blurb: "Dated, sourced developments" },
   { id: "customer_voice", label: "Customer voice", blurb: "Reviews, ratings, public sentiment" },
+  { id: "faqs", label: "Published FAQs", blurb: "The brand's own frequently-asked questions and answers" },
   { id: "unverified", label: "Unverified, treat as signal only", blurb: "Could not be verified; never cited as fact" },
 ];
 

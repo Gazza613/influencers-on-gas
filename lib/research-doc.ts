@@ -16,19 +16,21 @@ import { listResearchClaims, listCompetitors, type ResearchClaim, type ResearchR
 const STUDIO_URL = (process.env.APP_URL || "https://studio.gasmarketing.co.za").replace(/\/+$/, "");
 const NOTIFY_TO = process.env.SUPER_ADMIN_EMAIL || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
 
-// The eleven sections in document order (spec 3.8). Section 11, the source register, is derived from every
-// claim's source, not a stored section.
+// The claim sections in document order (spec 3.8, extended with contact/social and published FAQs at Gary's
+// request). The final section 13, the source register, is derived from every claim's source, not stored.
 const DOC_SECTIONS: { id: string; n: number; label: string }[] = [
   { id: "snapshot", n: 1, label: "Client snapshot" },
   { id: "foundations", n: 2, label: "Company foundations" },
   { id: "products", n: 3, label: "Products and services" },
   { id: "market", n: 4, label: "Market and category" },
   { id: "digital", n: 5, label: "Digital footprint audit" },
-  { id: "competitor", n: 6, label: "Competitor intelligence" },
-  { id: "competitor_set", n: 7, label: "Competitor set" },
-  { id: "activity", n: 8, label: "90-day activity log" },
-  { id: "customer_voice", n: 9, label: "Customer voice" },
-  { id: "unverified", n: 10, label: "Unverified, treat as signal only" },
+  { id: "contact", n: 6, label: "Contact and social channels" },
+  { id: "competitor", n: 7, label: "Competitor intelligence" },
+  { id: "competitor_set", n: 8, label: "Competitor set" },
+  { id: "activity", n: 9, label: "90-day activity log" },
+  { id: "customer_voice", n: 10, label: "Customer voice" },
+  { id: "faqs", n: 11, label: "Published FAQs" },
+  { id: "unverified", n: 12, label: "Unverified, treat as signal only" },
 ];
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -167,7 +169,7 @@ export function researchDocHtml(clientName: string, website: string | null, run:
     <div class="foot">Prepared by The Researcher · GAS Marketing · Internal · ${esc(ukDate(run.created_at))}</div>
   </div>
   ${sections}
-  <section class="sec"><h2><span class="n">11</span>Source register<span class="count">${sources}</span></h2>${sourceRegister(claims)}</section>
+  <section class="sec"><h2><span class="n">13</span>Source register<span class="count">${sources}</span></h2>${sourceRegister(claims)}</section>
   </body></html>`;
 }
 
