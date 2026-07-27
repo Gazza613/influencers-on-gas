@@ -213,17 +213,30 @@ export async function collectResearch(
     webSearches: gu?.server_tool_use?.web_search_requests ?? searchCount,
   }).catch(() => {});
 
-  const notesText = gathered.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
-
   // FILE THE FACTS as structured claims (forced tool, so a fact base always comes back).
+  //
+  // FILE FROM THE REAL RESULTS, NOT A SUMMARY (Gary hit 0 claims on Amber Room). The gather step does NOT always
+  // end by writing a text summary - sometimes the model stops on the search results themselves. Feeding the file
+  // step only that (often empty) summary left it with nothing, and because we correctly forbid inventing facts,
+  // it filed zero. So we CONTINUE the same conversation: the gather's assistant turn carries every web_search
+  // result block, so the model files from the actual sources it read. web_search stays declared (to keep those
+  // result blocks valid) but tool_choice forces file_facts, so it files rather than searching again. max_tokens
+  // is generous because a full fact base is many claims and a truncated tool call is invalid JSON.
   emit({ t: "phase", label: "Filing the facts, with sources and tiers" });
   const filed = await client.messages.create({
     model: STANDARD,
-    max_tokens: 8000,
-    system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the research below as structured claims. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
-    tools: [{ name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA }],
+    max_tokens: 16000,
+    system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY fact you found in your search as structured claims via file_facts. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
+    tools: [
+      { type: "web_search_20250305", name: "web_search", max_uses: 16 } as unknown as Anthropic.Tool,
+      { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
+    ],
     tool_choice: { type: "tool", name: "file_facts" },
-    messages: [{ role: "user", content: `Research notes:\n\n${notesText.slice(0, 24000) || "(no notes captured, use your searches)"}` }],
+    messages: [
+      { role: "user", content: brief },
+      { role: "assistant", content: gathered.content },
+      { role: "user", content: "Now file every fact you found via file_facts, with its real source URL, date and tier. Do not search again." },
+    ],
   });
   const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
   await recordTokens({
