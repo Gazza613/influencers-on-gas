@@ -73,11 +73,15 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   // router.refresh() re-runs the server component and updates the props in place, with no page load and so no
   // re-gate.
   const router = useRouter();
-  // Land on the client that actually HAS work, not whichever happens to be first in the list. The first live
-  // run filed everything under MTN MoMo while the picker defaulted to GAS Marketing (alphabetically earlier),
-  // so the queue looked empty when it was full. The server hands us the clients already ordered with the ones
-  // that have a Studio brand kit first.
-  const [clientId, setClientId] = useState(clients[0]?.id || "");
+  // Land on MTN MoMo by default (Gary), then let the dropdown reach the rest. MoMo is the flagship brain and
+  // the one with the fullest doctrine, so it is the sane thing to open on - the same default the funnel
+  // builder already lands on. Fall back to the first briefed brain if MoMo is not in the list, and to the
+  // first of any if none is briefed, so the picker is never empty.
+  const [clientId, setClientId] = useState(() => {
+    const momo = clients.find((c) => /mo\s*mo|mtn/i.test(c.name));
+    const briefed = clients.find((c) => configured.includes(c.id));
+    return (momo || briefed || clients[0])?.id || "";
+  });
   const [items, setItems] = useState<Intel[]>([]);
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
@@ -145,6 +149,15 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   // just-commissioned dossier is what you want to read, not the oldest source in the pile (Gary).
   const byFound = (a: Intel, b: Intel) => new Date(b.found_at).getTime() - new Date(a.found_at).getTime();
   const clientName = clients.find((c) => c.id === clientId)?.name || "us";
+
+  // The example prompt has to belong to the SELECTED brain, or it misleads: a MoMo "gaps vs Capitec" line under
+  // BrightRock points the researcher at the wrong category (Gary caught exactly this). We only put a named rival
+  // on a brain we are sure of - anything else gets a brand-neutral prompt rather than a wrong one.
+  const focusExample = /mo\s*mo|mtn/i.test(clientName)
+    ? "e.g. gaps vs Capitec Pay on trust, or a bank wallet's new move worth answering. Leave blank for the full standing remit."
+    : /brightrock/i.test(clientName)
+    ? "e.g. how Discovery or Sanlam are framing income protection, or a life-stage moment the category ignores. Leave blank for the full standing remit."
+    : `e.g. a specific competitor's recent move, or an angle on ${clientName} you want dug into. Leave blank for the full standing remit.`;
   // A brain with no brief for THIS desk can never produce a finding. Saying "nothing in the queue" for one
   // describes a run that did not happen as though it had run and found nothing - two very different things.
   const isConfigured = configured.length === 0 || configured.includes(clientId);
@@ -180,7 +193,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
         <div className="rounded-xl border border-line bg-surface-1 p-4">
           <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Focus for this deep research (optional)</label>
           <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2}
-            placeholder="e.g. gaps vs Capitec Pay on trust, or a specific competitor's new move. Leave blank for the full standing remit."
+            placeholder={focusExample}
             className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
           <p className="mt-1.5 text-[15px] text-ink-faint">Deep, on-demand web research across five sections: threats, opportunities, gaps, positioning, and trends to steal. Each run is metered and appears in Cost Control.</p>
         </div>
