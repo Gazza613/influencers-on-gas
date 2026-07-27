@@ -191,23 +191,22 @@ export async function GET(req: Request) {
   const out: Record<string, unknown>[] = [];
   for (const c of clients) {
     try {
-      // Do NOT swallow a role's failure. On the first live run the Journalist returned nothing and said
-      // nothing about why - which is the worst possible outcome, because "no findings" and "it broke" look
-      // identical from the outside. Capture the error and report it.
+      // STRATEGIST ONLY on the daily cron (Gary). The Journalist role was retired with its tile, but the cron
+      // kept running it too - a second Opus 4.8 + web-search pass PER BRAIN, EVERY DAY, filing to a queue no
+      // screen shows and no email sends. That was the bulk of the "~$30/day Anthropic on light usage" (July
+      // 2026): pure automated spend for output nobody read. CEO articles are now drafted on demand from the
+      // Researcher desk, so nothing needs the daily Journalist. If it is ever wanted back, gate it behind a flag
+      // rather than running it unconditionally.
       const errors: string[] = [];
-      const [journalist, strategist] = await Promise.all([
-        runIntel(c.id, "journalist", today).catch((e) => { errors.push(`journalist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; }),
-        runIntel(c.id, "strategist", today).catch((e) => { errors.push(`strategist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; }),
-      ]);
-      await recordUsage({ clientId: c.id, provider: "anthropic", model: PREMIUM, unit: "request", action: "daily-intel", count: 2 }).catch(() => {});
+      const strategist = await runIntel(c.id, "strategist", today)
+        .catch((e) => { errors.push(`strategist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; });
+      await recordUsage({ clientId: c.id, provider: "anthropic", model: PREMIUM, unit: "request", action: "daily-intel", count: 1 }).catch(() => {});
 
       // Only MATERIAL findings are worth an inbox. The rest wait in the queue.
-      const jm = journalist.filter((i) => i.material);
       const sm = strategist.filter((i) => i.material);
 
-      // THE EMAIL IS THE STRATEGIST ONLY (Gary). The Journalist still runs and still files to the queue - it is
-      // the tool for drafting the CEO's LinkedIn voice, picked up when someone sits down to write, not a daily
-      // bulletin. So a Journalist-only day sends nothing rather than mailing the team something to ignore.
+      // THE EMAIL IS THE STRATEGIST ONLY (Gary). A day with no material strategist finding sends nothing rather
+      // than mailing the team something to ignore.
       // The intro belongs to the brain: MoMo's briefing is about the SA fintech market, GAS's is about our own
       // agency growth, and one description cannot honestly cover both.
       const cfg = await loadIntelBrief(c.id).catch(() => null);
@@ -224,7 +223,7 @@ export async function GET(req: Request) {
         }).catch(() => {});
         emailed = true;
       }
-      out.push({ client: c.name, journalist: journalist.length, strategist: strategist.length, material: jm.length + sm.length, emailed, errors: errors.length ? errors : undefined });
+      out.push({ client: c.name, strategist: strategist.length, material: sm.length, emailed, errors: errors.length ? errors : undefined });
     } catch (e) {
       out.push({ client: c.name, error: String((e as Error)?.message || e).slice(0, 160) });
     }
