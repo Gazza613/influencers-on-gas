@@ -87,6 +87,17 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   const [running, setRunning] = useState(false);
   const [note, setNote] = useState("");
   const [focus, setFocus] = useState("");
+  // LIVE PROGRESS while a deep dive runs (Researcher only). The run streams its real searches and findings, so
+  // the desk narrates the work instead of showing a dead spinner. Null when nothing is running.
+  const [progress, setProgress] = useState<null | { label: string; searches: string[]; sources: number; filed: { section: string; headline: string }[] }>(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!progress) { setElapsed(0); return; }
+    const started = Date.now();
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [progress]);
 
   const refresh = useCallback(async (id: string) => {
     if (!id) return;
@@ -114,14 +125,44 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   async function runNow() {
     setRunning(true); setNote("");
     if (isResearcher) {
-      const r = await fetch(`/api/studio/research`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, focus }),
-      }).then((x) => x.json()).catch(() => null);
-      setRunning(false);
-      if (!r?.ok) { setNote(r?.error || "Couldn't run the deep research."); flex(r?.error || "Couldn't run the deep research."); await refresh(clientId); return; }
-      setNote(r.count ? "" : "The deep research ran clean and found nothing worth filing. That is a real answer, not a gap.");
-      flex(`Deep research done. Filed ${r.count} finding${r.count === 1 ? "" : "s"} across the five sections.`);
+      // Read the run as a live stream (SSE). Each event narrates real work; a done event carries the count.
+      setProgress({ label: "Commissioning the deep research", searches: [], sources: 0, filed: [] });
+      let count = 0, errored = "";
+      try {
+        const resp = await fetch(`/api/studio/research`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId, focus }),
+        });
+        if (!resp.ok || !resp.body) throw new Error(`The deep research could not start (${resp.status}).`);
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const parts = buf.split("\n\n");
+          buf = parts.pop() || "";
+          for (const part of parts) {
+            const line = part.split("\n").find((l) => l.startsWith("data:"));
+            if (!line) continue;
+            let e: { t: string; label?: string; q?: string; n?: number; section?: string; headline?: string; count?: number; message?: string };
+            try { e = JSON.parse(line.slice(5).trim()); } catch { continue; }
+            if (e.t === "phase") setProgress((p) => p ? { ...p, label: e.label || p.label } : p);
+            else if (e.t === "search") setProgress((p) => p ? { ...p, searches: [...p.searches, e.q || ""].slice(-6) } : p);
+            else if (e.t === "sources") setProgress((p) => p ? { ...p, sources: e.n || p.sources } : p);
+            else if (e.t === "finding") setProgress((p) => p ? { ...p, filed: [...p.filed, { section: e.section || "positioning", headline: e.headline || "" }] } : p);
+            else if (e.t === "done") count = e.count || 0;
+            else if (e.t === "error") errored = e.message || "The deep research failed.";
+          }
+        }
+      } catch (err) {
+        errored = (err as Error)?.message || "Couldn't run the deep research.";
+      }
+      setRunning(false); setProgress(null);
+      if (errored) { setNote(errored); flex(errored); await refresh(clientId); return; }
+      setNote(count ? "" : "The deep research ran clean and found nothing worth filing. That is a real answer, not a gap.");
+      flex(`Deep research done. Filed ${count} finding${count === 1 ? "" : "s"} across the five sections.`);
       await refresh(clientId);
       return;
     }
@@ -196,6 +237,45 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
             placeholder={focusExample}
             className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
           <p className="mt-1.5 text-[15px] text-ink-faint">Deep, on-demand web research across five sections: threats, opportunities, gaps, positioning, and trends to steal. Each run is metered and appears in Cost Control.</p>
+        </div>
+      )}
+
+      {/* LIVE PROGRESS. The run narrates itself: the current phase, the real searches as they fire, sources
+          read, and each finding the moment it is filed. This is the difference between "world-class deep dive"
+          as copy and as an actual experience. */}
+      {progress && (
+        <div className="rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/[0.06] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-[#c79bff]" />
+              <span className="text-lg font-semibold text-ink">{progress.label}</span>
+            </div>
+            <span className="tabular text-lg text-ink-dim">
+              {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
+              {progress.sources ? ` · ${progress.sources} source${progress.sources === 1 ? "" : "s"} read` : ""}
+            </span>
+          </div>
+          {progress.searches.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {progress.searches.map((q, i) => (
+                <p key={i} className="truncate text-[15px] text-ink-dim"><span className="text-ink-faint">↳ searching</span> {q}</p>
+              ))}
+            </div>
+          )}
+          {progress.filed.length > 0 && (
+            <div className="mt-3 space-y-1.5 border-t border-line pt-3">
+              {progress.filed.map((f, i) => {
+                const sec = SECTIONS.find((s) => s.id === f.section);
+                return (
+                  <p key={i} className="flex items-start gap-2 text-[15px] text-ink">
+                    <span className="tabular mt-0.5 shrink-0 text-xs uppercase tracking-wider" style={{ color: sec?.accent || "#c79bff" }}>{sec?.label || f.section}</span>
+                    <span className="truncate">{f.headline}</span>
+                  </p>
+                );
+              })}
+            </div>
+          )}
+          <p className="mt-3 text-[13px] text-ink-faint">Deep web research runs live and takes a few minutes. Findings appear here as they are filed, then settle into the sections below.</p>
         </div>
       )}
 

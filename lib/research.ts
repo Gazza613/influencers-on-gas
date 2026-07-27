@@ -139,12 +139,24 @@ const SCHEMA = {
   required: ["findings", "thin_sections"],
 } as unknown as Anthropic.Tool["input_schema"];
 
+// LIVE PROGRESS. A deep run takes minutes; a static "Researching..." makes a world-class engine feel broken.
+// runResearch emits these as it works, so the desk can narrate the actual searches and findings as they land.
+// Progress is best-effort: a listener that throws never breaks the research.
+export type ResearchEvent =
+  | { t: "phase"; label: string }
+  | { t: "search"; q: string }
+  | { t: "sources"; n: number }
+  | { t: "finding"; section: string; headline: string }
+  | { t: "done"; count: number }
+  | { t: "error"; message: string };
+
 /**
  * Commission a research dossier for one brain. On demand only - there is no cron (Gary): deep research on every
  * brain daily is real web-search spend for little gain. Returns the findings it PROPOSES, already stored at
- * status 'new' for a human to accept or bin.
+ * status 'new' for a human to accept or bin. onEvent streams live progress for the desk to narrate.
  */
-export async function runResearch(clientId: string, today: string, focus?: string): Promise<Intel[]> {
+export async function runResearch(clientId: string, today: string, focus?: string, onEvent?: (e: ResearchEvent) => void): Promise<Intel[]> {
+  const emit = (e: ResearchEvent) => { try { onEvent?.(e); } catch { /* progress is best-effort, never fatal */ } };
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
 
@@ -189,18 +201,34 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     `and the best global marketing work in adjacent categories. Then set out what you actually found, with the ` +
     `real source and its date for each. Go deep on the few current things that would change a decision.`;
 
-  const research = await client.messages.create({
+  // STREAMED so the desk can show the actual searches as they run, not a dead spinner. We watch completed
+  // content blocks: a web_search server-tool call carries its query, and each web_search result block carries
+  // the sources it pulled - both are real progress, not a simulated bar.
+  emit({ t: "phase", label: `Searching the web on ${cfg.clientName}, last ${RECENCY_DAYS} days` });
+  let sourcesRead = 0;
+  const stream = client.messages.stream({
     model: PREMIUM,
     max_tokens: 8000,
     system: `${cfg.scope}\n\n${remit}\n\n${ASSESSMENT}\n\n${HONESTY}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 18 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
+  stream.on("contentBlock", (blk) => {
+    const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
+    if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) {
+      emit({ t: "search", q: String(b.input.query).slice(0, 160) });
+    } else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      sourcesRead += b.content.length;
+      emit({ t: "sources", n: sourcesRead });
+    }
+  });
+  const research = await stream.finalMessage();
   await recordUsage({ clientId, provider: "anthropic", model: PREMIUM, unit: "request", action: "deep-research", count: 1 }).catch(() => {});
 
   const notes = research.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   if (!notes) return [];
 
+  emit({ t: "phase", label: "Reading the sources and filing the findings" });
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 8000,
@@ -258,6 +286,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
        noDash(f.campaign_response).slice(0, 3000) || null],
     )) as Intel[];
     saved.push(rows[0]);
+    emit({ t: "finding", section, headline: noDash(f.headline).slice(0, 120) });
   }
   return saved;
 }
