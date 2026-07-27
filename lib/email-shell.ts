@@ -40,8 +40,11 @@ export function emailHeader(strapline: string, dateLabel: string, wordmark = "ST
 }
 
 // Sami signature + GAS-marked footer. `cadence` is the small line under the footer brand
-// (e.g. "ON-DEMAND RESEARCH" or "DAILY COST CONTROL, 07:30 SAST"). Sami wears a different hat per email.
-export function emailSignature(cadence: string, role = "AI Influencer Expert", department = "Creative Department", wordmark = "STUDIO"): string {
+// (e.g. "ON-DEMAND RESEARCH" or "DAILY COST CONTROL, 07:30 SAST"). Sami wears a different hat per email, but
+// the DEFAULT is STUDIO ON GAS, never Influencers (Gary: "we communicate as Studio on GAS, not Influencers on
+// GAS"). A hat is only put on when an email overrides it (the Strategist signs as Research Strategist); left
+// alone, every email speaks for the platform, which is Studio.
+export function emailSignature(cadence: string, role = "AI Studio Lead", department = "Studio on GAS", wordmark = "STUDIO"): string {
   return `
   <div class="pad" style="padding:26px 20px 30px;">
     <div style="height:1px;background:linear-gradient(90deg,${RULE},transparent);margin:0 0 16px;"></div>
