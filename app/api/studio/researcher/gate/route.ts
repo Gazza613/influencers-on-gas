@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { inngest } from "@/lib/inngest";
 
 // GATE 1 (spec 4). Gary approves or rejects a specific research VERSION in Studio - never by email. Approve locks
 // it as the fact base and lets the Strategist start; reject archives it with a reason. "Rerun with notes" is not
@@ -29,5 +30,8 @@ export async function POST(req: Request) {
     [status, reason || null, runId, clientId],
   )) as { id: string; version: number; status: string }[];
   if (!rows[0]) return NextResponse.json({ error: "That research is not awaiting review (already approved, rejected, or superseded)." }, { status: 409 });
+  // Drive the pipeline through an event (spec 4.4). research/approved is the ONLY seam the Strategist can start
+  // from, so approval is enforced at the workflow level, not just in the UI.
+  if (action === "approve") await inngest.send({ name: "research/approved", data: { clientId, runId } }).catch(() => {});
   return NextResponse.json({ ok: true, run: rows[0] });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { collectResearch, latestResearchRun, listResearchClaims, listCompetitors } from "@/lib/researcher-v3";
+import { inngest } from "@/lib/inngest";
 
 // THE RESEARCHER (V3), FACTS-ONLY COLLECTOR. Commissioned on demand, like the old dossier. GET returns the
 // latest run with its claims and the editable competitor set (what Gate 1 reviews). POST commissions a new
@@ -43,6 +44,10 @@ export async function POST(req: Request) {
           notes: notes || null,
           onEvent: (e) => send(e),
         });
+        // DURABLE DOCUMENT (Inngest): render the PDF, file to Drive and email Gary in a retryable background job,
+        // so the fragile parts heal themselves and the SSE request returns as soon as the facts are filed. The UI
+        // polls for the PDF; a manual "Generate document" is the fallback if the background job is unavailable.
+        if (claims.length > 0) await inngest.send({ name: "research/collected", data: { clientId, runId: run.id } }).catch(() => {});
         send({ t: "run", version: run.version, runId: run.id, count: claims.length });
       } catch (e) {
         send({ t: "error", message: String((e as Error)?.message || e).slice(0, 300) });

@@ -119,6 +119,19 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     else if (!silent) flex(r?.error || "Couldn't build the document.");
   }, [clientId, load]);
 
+  // After a collect, the document builds in a DURABLE Inngest job (retryable render/Drive/email). Poll for it,
+  // and if it does not land in ~24s (or Inngest is unavailable), fall back to a synchronous build so a PDF is
+  // never missing.
+  const pollDocument = useCallback(async (runId: string) => {
+    setDocBusy(true);
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (d?.run) { setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []); if (d.run.pdf_url) { setDocBusy(false); return; } }
+    }
+    await buildDoc(runId, true);
+  }, [clientId, buildDoc]);
+
   useEffect(() => {
     if (!clientId) return;
     let live = true;
@@ -184,8 +197,8 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     if (errored) { setNote(errored); flex(errored); await load(clientId); return; }
     flex(`Research v${version} filed ${count} claim${count === 1 ? "" : "s"}, ready for your review.`);
     await load(clientId);
-    // Auto-build the Research Document (PDF + Drive + notify) once a run has claims.
-    if (runId && count > 0) buildDoc(runId, true);
+    // The Research Document builds in a durable background job now; poll for it (synchronous fallback inside).
+    if (runId && count > 0) pollDocument(runId);
   }
 
   async function gate(action: "approve" | "reject") {
