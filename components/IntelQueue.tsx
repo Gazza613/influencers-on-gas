@@ -91,6 +91,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   // the desk narrates the work instead of showing a dead spinner. Null when nothing is running.
   const [progress, setProgress] = useState<null | { label: string; searches: string[]; sources: number; filed: { section: string; headline: string }[] }>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [exported, setExported] = useState("");
 
   useEffect(() => {
     if (!progress) { setElapsed(0); return; }
@@ -122,7 +123,10 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   // Manual trigger. The Researcher COMMISSIONS a fresh dossier on demand (metered, deep); the daily desks run
   // the shared cron pass. Either way, report honestly - a run that found nothing and a run that broke must
   // never look the same from the outside.
-  async function runNow() {
+  async function runNow(focusArg?: string) {
+    // focusArg lets "Go deeper" commission a run seeded from a finding without waiting on the focus state to
+    // settle. A click event is not a string, so the guard keeps onClick={runNow} working too.
+    const useFocus = typeof focusArg === "string" ? focusArg : focus;
     setRunning(true); setNote("");
     if (isResearcher) {
       // Read the run as a live stream (SSE). Each event narrates real work; a done event carries the count.
@@ -131,7 +135,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
       try {
         const resp = await fetch(`/api/studio/research`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientId, focus }),
+          body: JSON.stringify({ clientId, focus: useFocus }),
         });
         if (!resp.ok || !resp.body) throw new Error(`The deep research could not start (${resp.status}).`);
         const reader = resp.body.getReader();
@@ -205,6 +209,56 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   const material = items.filter((i) => i.material).sort(byRecency);
   const rest = items.filter((i) => !i.material).sort(byRecency);
 
+  // GO DEEPER. Commission a fresh run pointed straight at one finding - "what more is there, and what do we do
+  // about it". It seeds the focus box (so you see what was asked) and runs immediately, without waiting on state.
+  function deepen(i: Intel) {
+    if (running) return;
+    const seed = `Go deeper on this finding and what we should do about it: "${i.headline}". Context: ${i.why_it_matters}`.slice(0, 580);
+    setFocus(seed);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    runNow(seed);
+  }
+
+  // EXPORT THE DOSSIER. The whole run as clean Markdown, so it drops straight into a deck, a brief or an email.
+  // Grouped exactly as the desk reads it, sources kept as links, and the internal impact/response lines labelled
+  // so a copy-paste never leaks them into a client-facing document by accident.
+  function dossierMarkdown(): string {
+    const out: string[] = [`# ${clientName} - Researcher dossier`, ""];
+    for (const s of SECTIONS) {
+      const inSec = items.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
+      if (!inSec.length) continue;
+      out.push(`## ${s.label}`, "");
+      for (const i of inSec) {
+        out.push(`### ${i.headline}`);
+        const meta = [i.published_at ? `Published ${i.published_at}` : "", i.confidence ? `Confidence ${i.confidence}` : "", i.request ? `Focus: ${i.request}` : ""].filter(Boolean).join(" · ");
+        if (meta) out.push(`_${meta}_`);
+        out.push("");
+        if (i.why_it_matters) out.push(`**Why it matters:** ${i.why_it_matters}`, "");
+        if (i.detail) out.push(i.detail, "");
+        if (i.impact_risk) out.push(`**Internal - impact:** ${i.impact_risk}`);
+        if (i.campaign_response) out.push(`**Internal - response:** ${i.campaign_response}`);
+        const srcs = sourcesOf(i);
+        if (srcs.length) { out.push("", "Sources:"); srcs.forEach((x) => out.push(`- [${x.name}](${x.url})`)); }
+        out.push("");
+      }
+    }
+    return out.join("\n").trim() + "\n";
+  }
+  async function copyDossier() {
+    try { await navigator.clipboard?.writeText(dossierMarkdown()); setExported("copied"); }
+    catch { setExported("failed"); }
+    setTimeout(() => setExported(""), 1800);
+  }
+  function downloadDossier() {
+    const blob = new Blob([dossierMarkdown()], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${clientName.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "dossier"}-dossier.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="mt-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-1 p-4">
@@ -221,9 +275,9 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
             ↻ Refresh
           </button>
         </div>
-        <button onClick={runNow} disabled={running || !clientId}
+        <button onClick={() => runNow()} disabled={running || !clientId}
           className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-lg font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
-          {running ? (isResearcher ? "Researching…" : "Researching…") : (isResearcher ? "✦ Deep Dive Research" : "↻ Run research now")}
+          {running ? "Researching…" : (isResearcher ? "✦ Deep Dive Research" : "↻ Run research now")}
         </button>
       </div>
 
@@ -305,13 +359,26 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
         // THE DOSSIER, in its five fixed sections so two dossiers read the same way. A section with nothing is
         // simply not shown - the Researcher is told padding a section is a failure, so an empty one is honest.
         <>
+          {/* EXPORT. The whole dossier as Markdown, straight into a deck, a brief or an email. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] text-ink-faint">{items.length} finding{items.length === 1 ? "" : "s"} in this dossier</span>
+            <span className="flex-1" />
+            <button onClick={copyDossier}
+              className="rounded-lg border border-line px-3 py-1 text-[16px] font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink">
+              {exported === "copied" ? "Copied ✓" : exported === "failed" ? "Copy failed" : "⧉ Copy dossier"}
+            </button>
+            <button onClick={downloadDossier}
+              className="rounded-lg border border-line px-3 py-1 text-[16px] font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink">
+              ⭳ Download .md
+            </button>
+          </div>
           {SECTIONS.map((s) => {
             const inSec = items.filter((i) => (i.section || "positioning") === s.id).sort(byFound);
             if (!inSec.length) return null;
             return (
               <div key={s.id}>
                 <p className="tabular mb-2 mt-6 text-lg uppercase tracking-[0.2em]" style={{ color: s.accent }}>{s.label} — {inSec.length}</p>
-                <div className="space-y-3">{inSec.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} clientName={clientName} />)}</div>
+                <div className="space-y-3">{inSec.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} clientName={clientName} deepen={deepen} running={running} />)}</div>
               </div>
             );
           })}
@@ -336,7 +403,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   );
 }
 
-function Card({ i, busy, decide, clientId, clientName }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string; clientName: string }) {
+function Card({ i, busy, decide, clientId, clientName, deepen, running }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string; clientName: string; deepen?: (i: Intel) => void; running?: boolean }) {
   // THE CEO'S NEWSLETTER (Gary). Only on Journalist findings - a Strategist finding is internal, blunt and names
   // competitors, so it is exactly what must never reach the CEO's public voice.
   // Seeded from the SAVED draft (Gary): the piece and its creative used to live only in React state, so logging
@@ -589,6 +656,12 @@ function Card({ i, busy, decide, clientId, clientName }: { i: Intel; busy: boole
               </svg>
             )}
             {writing ? "Writing…" : letter ? "Rewrite the article" : "✎ Publish as a CEO article"}
+          </button>
+        )}
+        {deepen && (
+          <button onClick={() => deepen(i)} disabled={busy || running} title="Commission a fresh run pointed straight at this finding"
+            className="rounded-lg border border-[#a855f7]/40 px-3 py-1 text-[18px] font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
+            ✦ Go deeper
           </button>
         )}
         <button onClick={() => decide(i.id, "accepted")} disabled={busy}
