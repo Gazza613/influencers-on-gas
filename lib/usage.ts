@@ -91,6 +91,24 @@ export async function recordTokens(o: {
   );
 }
 
+// Thin wrapper: meter an Anthropic message from its own usage block. Every Claude call site can swap its flat
+// recordUsage for `meterClaude(res, {...})` and get real-token cost with no per-site token plumbing. Pass
+// `calls` when one metered line covers several messages (e.g. a batch). Never throws into the caller.
+export async function meterClaude(
+  res: { usage?: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null; server_tool_use?: { web_search_requests?: number | null } | null } | null } | null | undefined,
+  meta: { clientId?: string | null; userEmail?: string | null; influencerId?: string | null; model: string; action: string; calls?: number },
+): Promise<void> {
+  const u = res?.usage;
+  await recordTokens({
+    ...meta,
+    inputTokens: u?.input_tokens || 0,
+    outputTokens: u?.output_tokens || 0,
+    cacheReadTokens: u?.cache_read_input_tokens || 0,
+    cacheCreationTokens: u?.cache_creation_input_tokens || 0,
+    webSearches: u?.server_tool_use?.web_search_requests || 0,
+  }).catch(() => {});
+}
+
 // Seed / recalibrate an Anthropic token rate from its USD price (per million tokens, or per web search),
 // converted to ZAR cents at the live FX rate - the same basis every other rate on the card uses.
 export async function setTokenRate(model: string, unit: string, usdPerUnit: number): Promise<void> {

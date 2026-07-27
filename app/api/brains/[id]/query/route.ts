@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
 import { retrieve } from "@/lib/rag";
 import { getSecret } from "@/lib/connections";
-import { recordUsage } from "@/lib/usage";
+import { meterClaude } from "@/lib/usage";
 
 // ASK THE BRAIN A QUESTION AND GET AN ANSWER (Gary: "i do not think your brain is working?").
 //
@@ -140,7 +140,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         model: "claude-sonnet-4-6", max_tokens: 900, system: CLAUDE_RULES,
         messages: [{ role: "user", content: query }],
       });
-      await recordUsage({ clientId: id, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "brain-answer", count: 1 }).catch(() => {});
+      await meterClaude(res, { clientId: id, model: "claude-sonnet-4-6", action: "brain-answer" }).catch(() => {});
       const answer = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n")
         .replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ").trim();
       return NextResponse.json({ hits: [], answer, mode });
@@ -172,7 +172,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         : {}),
       messages: [{ role: "user", content: `PASSAGES FROM THIS BRAIN:\n\n${passages}\n\nQUESTION: ${query}` }],
     });
-    await recordUsage({ clientId: id, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: mode === "live" ? "brain-answer-live" : "brain-answer", count: 1 }).catch(() => {});
+    await meterClaude(res, { clientId: id, model: "claude-sonnet-4-6", action: mode === "live" ? "brain-answer-live" : "brain-answer" }).catch(() => {});
 
     const answer = res.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")

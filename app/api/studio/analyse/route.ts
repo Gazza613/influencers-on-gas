@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { getSecret } from "@/lib/connections";
 import { PREMIUM } from "@/lib/vendors/anthropic";
 import { listTemplates, saveTemplateAnalysis, getBrandKit } from "@/lib/studio";
-import { recordUsage } from "@/lib/usage";
+import { meterClaude } from "@/lib/usage";
 import { isSafePublicUrl } from "@/lib/safe-url";
 
 // READ THE REFERENCE SET AND DERIVE THE TEMPLATE.
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
     const slotSchema = { slots: analysis.slots ?? [] } as Record<string, unknown>;
     await Promise.all(refs.map((t) => saveTemplateAnalysis(t.id, clientId, analysis, slotSchema).catch(() => {})));
 
-    await recordUsage({ clientId, userEmail: session.user.email ?? null, provider: "anthropic", model: PREMIUM, unit: "request", action: "studio-analyse", count: 1 }).catch(() => {});
+    await meterClaude(res, { clientId, userEmail: session.user.email ?? null, model: PREMIUM, action: "studio-analyse" }).catch(() => {});
     return NextResponse.json({ ok: true, analysed: refs.length, analysis });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });

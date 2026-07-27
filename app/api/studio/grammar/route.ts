@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { getSecret } from "@/lib/connections";
 import { PREMIUM } from "@/lib/vendors/anthropic";
 import { listTemplates, listAssets, getBrandKit, upsertBrandKit } from "@/lib/studio";
-import { recordUsage } from "@/lib/usage";
+import { meterClaude } from "@/lib/usage";
 import { isSafePublicUrl } from "@/lib/safe-url";
 
 // LEARN THE BRAND. Reverse-engineer the client's DESIGN SYSTEM from their best-performing creatives.
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     if (!grammar) return NextResponse.json({ error: "The read came back empty." }, { status: 502 });
 
     await upsertBrandKit(clientId, kit?.name || "Brand kit", { design_system: grammar });
-    await recordUsage({ clientId, userEmail: session.user.email ?? null, provider: "anthropic", model: PREMIUM, unit: "request", action: "studio-grammar", count: 1 }).catch(() => {});
+    await meterClaude(res, { clientId, userEmail: session.user.email ?? null, model: PREMIUM, action: "studio-grammar" }).catch(() => {});
 
     return NextResponse.json({ ok: true, read: refs.length + cards.length, design_system: grammar });
   } catch (e) {

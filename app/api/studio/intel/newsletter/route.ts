@@ -6,7 +6,7 @@ import { getSecret } from "@/lib/connections";
 import { getBrandKit } from "@/lib/studio";
 import { loadIntelBrief } from "@/lib/intel";
 import { PREMIUM } from "@/lib/vendors/anthropic";
-import { recordUsage } from "@/lib/usage";
+import { meterClaude } from "@/lib/usage";
 
 // The writer also art-directs. A creative chosen by a separate step would illustrate a different article than
 // the one it sits next to - so the same call that writes the piece decides the image, and is bound by the same
@@ -140,7 +140,7 @@ ${REGISTER}`,
         content: `Write the CEO's newsletter piece from the material below, and art-direct the LinkedIn image that runs with it.\n\n${material}`,
       }],
     });
-    await recordUsage({ clientId, userEmail: session.user?.email ?? null, provider: "anthropic", model: PREMIUM, unit: "request", action: "ceo-newsletter", count: 1 }).catch(() => {});
+    await meterClaude(res, { clientId, userEmail: session.user?.email ?? null, model: PREMIUM, action: "ceo-newsletter" }).catch(() => {});
 
     const block = res.content.find((x) => x.type === "tool_use");
     if (!block || block.type !== "tool_use") return NextResponse.json({ error: "Nothing came back. Try again." }, { status: 500 });

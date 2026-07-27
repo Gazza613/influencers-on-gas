@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
 import { getBrain } from "@/lib/brains";
 import { getSecret } from "@/lib/connections";
-import { recordUsage } from "@/lib/usage";
+import { meterClaude } from "@/lib/usage";
 
 // SHARPEN A QUESTION BEFORE IT IS ASKED.
 //
@@ -77,7 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // subject matter the asker did not raise.
       messages: [{ role: "user", content: `The knowledge base is about: ${brain.name}\n\nQuestion: ${question}` }],
     });
-    await recordUsage({ clientId: id, provider: "anthropic", model: "claude-sonnet-4-6", unit: "request", action: "sharpen-question", count: 1 }).catch(() => {});
+    await meterClaude(res, { clientId: id, model: "claude-sonnet-4-6", action: "sharpen-question" }).catch(() => {});
 
     const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
     const parsed = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as { sharpened?: string; changed?: boolean; why?: string };
