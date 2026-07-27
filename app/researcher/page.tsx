@@ -1,42 +1,32 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
-import IntelQueue from "@/components/IntelQueue";
+import ResearchGate from "@/components/ResearchGate";
 import { listStudioClients } from "@/lib/studio";
-import { brainsWithIntel, researchableClientIds } from "@/lib/intel";
+import { researchableClientIds } from "@/lib/intel";
 
-// THE RESEARCHER. A commissioned, world-class deep dive on where a selected client actually stands - the
-// analyst to the Strategist's newswire. Where the Strategist runs daily and reports what CHANGED, the
-// Researcher is pressed on demand and answers "where do we stand and what should we do", across five fixed
-// sections: threats, opportunities, gaps, positioning, and global trends and campaigns worth stealing.
-//
-// It reuses the same review-and-approve queue as the daily desks (nothing reaches the brain unread), and an
-// accepted finding can be turned into the CEO's LinkedIn article with its three-image creative - the same
-// pipeline the Journalist used. The specifics live on the BRAIN (its scope lock and Researcher remit), never
-// on this page, so a shared screen never carries one client's scope as though it were everyone's.
+// THE RESEARCHER (V3) - A COLLECTOR, NOT AN ANALYST (build spec V3, section 3). It turns a client website into a
+// verified, source-tiered fact base: facts only, no threats/opportunities/gaps/positioning/trends (those are the
+// Strategist's job now). Every claim carries a source and a Tier 1/2/3, so Gate 1 approval is a check of
+// falsifiable FACT, not opinion. Gary approves, reruns with notes, or rejects right on this screen.
 
 export default async function ResearcherPage() {
   const clients = await listStudioClients().catch(() => []);
-  const briefed = await brainsWithIntel().catch(() => []);
-  // Researchable = an explicit Researcher remit OR any crawled knowledge. A freshly-crawled brain (like Amber
-  // Room) is immediately researchable; runResearch derives its scope from its own material. See lib/intel.ts.
-  const configured = await researchableClientIds().catch(() => briefed.filter((b) => b.researcher).map((b) => b.clientId));
-  // A finding can only become a CEO article on a brain that HAS a CEO voice to write in. Brains without CEO
-  // rules never show the publish button (it errored on click before), and are told what is missing instead.
-  const canPublish = briefed.filter((b) => b.ceoRules).map((b) => b.clientId);
+  // Researchable = an explicit Researcher remit OR any crawled knowledge. A freshly-crawled brain is immediately
+  // researchable; the collector derives its scope from its own material and the ground-truth website.
+  const configured = await researchableClientIds().catch(() => []);
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <Link href="/dashboard" className="text-lg font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Researcher</h1>
-        <p className="mt-2 max-w-3xl text-[24px] leading-relaxed text-ink-dim">
-          A world-class deep dive on the selected brain, commissioned when you need it. It works five sections -
-          <b className="text-ink"> threats, opportunities, gaps, positioning</b>, and <b className="text-ink">global
-          trends and campaigns worth stealing</b> - every finding sourced and read through that client&apos;s own
-          doctrine. You accept or bin each one, and any finding can become the CEO&apos;s LinkedIn article. Each
-          brain is researched under its own scope alone.
+        <p className="mt-2 max-w-3xl text-[22px] leading-relaxed text-ink-dim">
+          It collects a <b className="text-ink">verified fact base</b> on the selected client, their market and
+          their competitors. Facts only, never analysis: every claim carries a <b className="text-ink">source and a
+          tier</b>, so what you approve at Gate 1 is checkable at a glance. The analysis comes next, from the
+          Strategist. Approve the facts, rerun with notes, or reject, right here.
         </p>
-        <IntelQueue clients={clients} configured={configured} canPublish={canPublish} role="researcher" />
+        <ResearchGate clients={clients} configured={configured} />
       </main>
     </div>
   );
