@@ -13,9 +13,9 @@ type MeterMeta = { clientId?: string | null; influencerId?: string | null; userE
 // Sonnet 4.6 designs the Character Casting + refines prompts: near-Opus quality for a
 // structured creative sheet, but markedly faster (Opus was noticeably slow here).
 const MODEL = "claude-sonnet-4-6";
-// STANDARD tier (Sonnet): near-Opus quality at ~40% of the cost. The daily Strategist WATCHER runs here (Gary):
-// it hunts what changed every week, which does not need the premium model, and it was a top automated spender.
-// The on-demand Researcher stays on PREMIUM - that is the world-class deep dive.
+// STANDARD tier (Sonnet): near-Opus quality at ~40% of the cost, for anything that does not need the premium
+// model. (The weekly Strategist tried this to cut the old daily spend, but moved back to Opus once it became a
+// once-a-week run - the quality is worth it at that cadence. Kept available for future cheaper-tier use.)
 export const STANDARD = "claude-sonnet-4-6";
 // The DIRECTOR runs on the premium model: the storyboard is the highest-leverage reasoning step
 // (it must stay context-aware about who does what, and read the reference creatives), so it's worth it.

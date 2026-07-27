@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { STANDARD } from "./vendors/anthropic";
+import { PREMIUM } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
 import { recordTokens } from "./usage";
 
@@ -263,18 +263,19 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     `Search the web now. Then set out what is genuinely new and worth our attention, with the real source for each.`;
 
   const research = await client.messages.create({
-    model: STANDARD,
+    model: PREMIUM,
     max_tokens: 6000,
     system: `${cfg.scope}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays)}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
-  // TOKEN-ACCURATE metering (Gary): the daily Strategist runs on Sonnet + web search (moved off Opus to cut the
-  // automated spend). The search step's cost is dominated by the search RESULTS fed back as input tokens, so a
-  // flat per-request proxy badly understated it. Meter the real usage of both steps here, tagged 'daily-intel'.
+  // TOKEN-ACCURATE metering (Gary): the WEEKLY Strategist runs on Opus 4.8 + web search - now that it is once a
+  // week (not daily), the premium model is worth it for the analysis quality, and the cost is contained. The
+  // search step's cost is dominated by the search RESULTS fed back as input tokens, so a flat per-request proxy
+  // badly understated it. Meter the real usage of both steps here, tagged 'daily-intel'.
   const su = research.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
   await recordTokens({
-    clientId, userEmail, model: STANDARD, action: "daily-intel",
+    clientId, userEmail, model: PREMIUM, action: "daily-intel",
     inputTokens: su?.input_tokens || 0, outputTokens: su?.output_tokens || 0,
     cacheReadTokens: su?.cache_read_input_tokens || 0, cacheCreationTokens: su?.cache_creation_input_tokens || 0,
     webSearches: su?.server_tool_use?.web_search_requests || 0,
@@ -284,7 +285,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   if (!notes) return [];
 
   const res = await client.messages.create({
-    model: STANDARD,
+    model: PREMIUM,
     // The assessment adds two reasoned fields per finding, so the filing step needs the room to think.
     max_tokens: 6000,
     // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
@@ -297,7 +298,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
   const fu = res.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
   await recordTokens({
-    clientId, userEmail, model: STANDARD, action: "daily-intel",
+    clientId, userEmail, model: PREMIUM, action: "daily-intel",
     inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0,
     cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0,
   }).catch(() => {});
