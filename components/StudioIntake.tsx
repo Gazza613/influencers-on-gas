@@ -35,6 +35,7 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
   const [compliance, setCompliance] = useState("");
   const [savedCompliance, setSavedCompliance] = useState(false);
   const [funnelUrls, setFunnelUrls] = useState("");
+  const [ingestMsg, setIngestMsg] = useState("");
 
   const clientName = clients.find((c) => c.id === clientId)?.name || "this client";
   const isMoMo = /mo\s*mo|mtn/i.test(clientName);
@@ -529,21 +530,37 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
         <button
           onClick={async () => {
             const urls = funnelUrls.split(/\n+/).map((u) => u.trim()).filter(Boolean).map((u) => ({ url: u }));
-            setBusy("ingest"); setProgress(`Ingesting funnels into ${clientName}'s brain…`);
+            setBusy("ingest"); setIngestMsg("");
             try {
               const d = await fetch("/api/studio/ingest-funnels", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ clientId, urls }),
               }).then((r) => r.json());
-              setProgress(d.ok ? `Trained ${d.brain}: ${d.totalChunks} chunks from ${(d.funnels || []).filter((f: { chunks: number }) => f.chunks > 0).length} pages.` : `Failed: ${d.error || "unknown"}`);
-              if (d.ok) setFunnelUrls("");
-            } catch (e) { setProgress(`Failed: ${String((e as Error)?.message || e).slice(0, 100)}`); }
+              if (d.ok) {
+                const pages = (d.funnels || []).filter((f: { chunks: number }) => f.chunks > 0).length;
+                setIngestMsg(`ok:Trained ${d.brain}: ${d.totalChunks} passages from ${pages} page${pages === 1 ? "" : "s"}.`);
+                setFunnelUrls("");
+              } else setIngestMsg(`err:${d.error || "unknown error"}`);
+            } catch (e) { setIngestMsg(`err:${String((e as Error)?.message || e).slice(0, 120)}`); }
             finally { setBusy(""); }
           }}
-          disabled={!!busy || !clientId || (!isMoMo && !funnelUrls.trim())}
-          className="mt-3 rounded-lg border border-[#818cf8]/50 bg-[#818cf8]/10 px-4 py-2 text-sm font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
-          {busy === "ingest" ? "Training…" : `Train ${clientName}'s brain`}
+          disabled={busy === "ingest" || !clientId || (!isMoMo && !funnelUrls.trim())}
+          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#818cf8]/50 bg-[#818cf8]/10 px-4 py-2 text-sm font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
+          {busy === "ingest" && (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+              <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          )}
+          {busy === "ingest" ? "Training the brain…" : `Train ${clientName}'s brain`}
         </button>
+        {/* Clear result RIGHT HERE at the button (Gary: the old confirmation showed far away, so it looked like
+            nothing happened). */}
+        {ingestMsg && (
+          <p className={`mt-2 text-[15px] font-semibold ${ingestMsg.startsWith("ok:") ? "text-[#86efac]" : "text-[#fca5a5]"}`}>
+            {ingestMsg.startsWith("ok:") ? "✓ " + ingestMsg.slice(3) : "⚠ " + ingestMsg.slice(4)}
+          </p>
+        )}
         <p className="mt-1 text-[14px] text-ink-faint">Takes about a minute. Safe to re-run - it refreshes this brain&apos;s funnel knowledge.</p>
       </div>
 
