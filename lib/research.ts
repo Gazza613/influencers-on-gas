@@ -16,8 +16,9 @@ import { recordUsage } from "./usage";
 // RECENCY, 90 DAYS (Gary). A finding has to rest on a development, publication or move from the last
 // RECENCY_DAYS. Year-old news dressed up as a finding is exactly what makes research feel stale, so a dated
 // finding older than the window is dropped. Older material may still inform the READ - "Mukuru has operated
-// since 2004" is background, not a finding. The ONE carve-out is the trends-and-campaigns-to-steal section,
-// where a proven older campaign is legitimately a craft reference; everywhere else, current or it does not run.
+// since 2004" is background, not a finding. The trends-and-campaigns-to-steal section runs a wider 12-month
+// window (TREND_RECENCY_DAYS), because a globally effective campaign stays a valid craft reference far longer
+// than a news item does; everywhere else, current or it does not run.
 //
 // WHAT IT KEEPS FROM THE DAILY ENGINE, because these are the parts that make research trustworthy:
 //   - THE BRAIN IS THE RINGFENCE. Scope lock and remit come from THIS brain's row; no brief means we refuse to
@@ -33,7 +34,10 @@ export type ResearchSection = "threat" | "opportunity" | "gap" | "positioning" |
 
 // The recency window for a finding. Structural context can be older, but the FINDING itself must be current -
 // year-old news dressed as research is the thing Gary called out. Tune here; everything downstream reads it.
+// The trends-and-campaigns-to-steal section runs a wider window: a globally effective campaign stays a valid
+// reference for up to 12 months (Gary), where a news finding does not.
 export const RECENCY_DAYS = 90;
+export const TREND_RECENCY_DAYS = 365;
 
 export const SECTIONS: { id: ResearchSection; label: string; blurb: string }[] = [
   { id: "threat", label: "Threats", blurb: "What could damage this client's position" },
@@ -69,9 +73,9 @@ const HONESTY = `HONESTY RULES:
 - RECENCY, 90 DAYS. A finding must rest on a development, publication or move from the last 90 days (you are
   told the cutoff date below). Older structural context may inform your READ, but it cannot BE the finding:
   "Mukuru has operated since 2004" is background, not a finding, and last year's partnership is not this
-  quarter's news. If you cannot date a claim to within the window, do not present it as current. The ONE
-  exception is the trends-and-campaigns-to-steal section, where a proven older campaign may be cited as a craft
-  reference - and even there, lead with why it is worth acting on now.
+  quarter's news. If you cannot date a claim to within the window, do not present it as current. The ONE wider
+  window is the trends-and-campaigns-to-steal section: a globally effective campaign stays a valid craft
+  reference for up to 12 MONTHS - and even there, lead with why it is worth acting on now.
 - SAY WHEN SOMETHING IS CURRENT. If a fact could have moved since publication, say so rather than implying it
   still holds.
 - DO NOT REPORT THE BRAIN'S OWN DOCTRINE BACK. You are given what we already know. A finding must ADD to it,
@@ -116,7 +120,7 @@ const SCHEMA = {
               required: ["name", "url"],
             },
           },
-          published_at: { type: "string", description: "Date the SOURCE was published as YYYY-MM-DD. Findings must be current, so date every one you can. A dated finding older than the 90-day window is DROPPED (except in the trend / campaigns-to-steal section). Empty string only if genuinely undateable - accepted but weaker." },
+          published_at: { type: "string", description: "Date the SOURCE was published as YYYY-MM-DD. Findings must be current, so date every one you can. A dated finding older than the 90-day window is DROPPED; the trend / campaigns-to-steal section allows up to 12 months. Empty string only if genuinely undateable - accepted but weaker." },
           period: { type: "string", description: "What the DATA covers if different from publication (e.g. 'FY2025'). Empty if not applicable." },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           material: { type: "boolean", description: "Would this actually change what we say, make or spend? Be ruthless." },
@@ -159,6 +163,11 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const cutoff = new Date(`${today}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - RECENCY_DAYS);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // The trends-to-steal section gets the wider 12-month window - a globally effective campaign stays a valid
+  // craft reference far longer than a news item does.
+  const trendCutoff = new Date(`${today}T00:00:00Z`);
+  trendCutoff.setUTCDate(trendCutoff.getUTCDate() - TREND_RECENCY_DAYS);
+  const trendCutoffStr = trendCutoff.toISOString().slice(0, 10);
 
   const sectionList = SECTIONS.map((s) => `- ${s.label} (${s.id}): ${s.blurb}`).join("\n");
   const askedFor = focus?.trim()
@@ -174,8 +183,8 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n\n` +
     `RECENCY: every finding must rest on something from the LAST ${RECENCY_DAYS} DAYS, i.e. on or after ` +
     `${cutoffStr}. Prioritise your searches to that window. Older material may inform your understanding, but do ` +
-    `not present it as a finding - the one exception is a landmark campaign cited as a craft reference in the ` +
-    `trends-to-steal section.\n\n` +
+    `not present it as a finding. The one wider window is the trends-to-steal section: a globally effective ` +
+    `campaign may be cited as a craft reference if it ran within the last 12 months (on or after ${trendCutoffStr}).\n\n` +
     `Search the web now, properly and widely: the client, their competitors, their category, their regulators, ` +
     `and the best global marketing work in adjacent categories. Then set out what you actually found, with the ` +
     `real source and its date for each. Go deep on the few current things that would change a decision.`;
@@ -195,7 +204,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const res = await client.messages.create({
     model: PREMIUM,
     max_tokens: 8000,
-    system: `${cfg.scope}\n\n${HONESTY}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings under the five sections. Carry the REAL source URLs and their dates through - never invent one. Every finding must be dated on or after ${cutoffStr} (last ${RECENCY_DAYS} days); drop anything older unless it is a craft reference in the trends-to-steal section. Name any section you genuinely found nothing for in thin_sections rather than padding it.`,
+    system: `${cfg.scope}\n\n${HONESTY}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings under the five sections. Carry the REAL source URLs and their dates through - never invent one. Every finding must be dated on or after ${cutoffStr} (last ${RECENCY_DAYS} days); the trends-to-steal section may go back to ${trendCutoffStr} (12 months) for a globally effective campaign. Drop anything older. Name any section you genuinely found nothing for in thin_sections rather than padding it.`,
     tools: [{ name: "dossier", description: "The research dossier, every finding sourced.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "dossier" },   // FORCED - a dossier always comes back
     messages: [{ role: "user", content: `Research notes:\n\n${notes.slice(0, 24000)}` }],
@@ -233,7 +242,8 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     // dropped - EXCEPT in the trends-to-steal section, where a landmark older campaign is a legitimate craft
     // reference. Undated findings pass (we cannot prove them stale), but the prompt pushes hard to date them.
     const pub = /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? String(f.published_at) : null;
-    if (pub && pub < cutoffStr && section !== "trend") continue;
+    const limit = section === "trend" ? trendCutoffStr : cutoffStr;
+    if (pub && pub < limit) continue;
     const rows = (await db().query(
       `insert into studio_intel (client_id, role, section, request, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
        values ($1,'researcher',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
