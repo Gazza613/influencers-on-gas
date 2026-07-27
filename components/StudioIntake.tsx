@@ -34,6 +34,10 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
   const [progress, setProgress] = useState("");
   const [compliance, setCompliance] = useState("");
   const [savedCompliance, setSavedCompliance] = useState(false);
+  const [funnelUrls, setFunnelUrls] = useState("");
+
+  const clientName = clients.find((c) => c.id === clientId)?.name || "this client";
+  const isMoMo = /mo\s*mo|mtn/i.test(clientName);
 
   const refresh = useCallback(async (id: string) => {
     if (!id) return;
@@ -126,6 +130,31 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
     await refresh(clientId);
   }
 
+  // FONTS FROM A DOCUMENT. The client's font list arrives as a .txt or .pdf, not as font files. We read it and
+  // record the font families on the brand kit (named, file-still-needed). TXT is read in the browser; a PDF is
+  // uploaded to storage and the model reads it directly. Client-scoped, so it only ever writes this brain.
+  async function fontsFromDoc(files: FileList | null) {
+    const f = files?.[0];
+    if (!f || !clientId) return;
+    setBusy("fonts_doc"); setProgress(`Reading ${f.name}…`);
+    try {
+      let body: Record<string, unknown>;
+      if (/pdf$/i.test(f.name) || f.type === "application/pdf") {
+        const blob = await upload(`studio/font-doc/${f.name}`, f, { access: "public", handleUploadUrl: "/api/studio/blob-upload" });
+        body = { clientId, blobUrl: blob.url, mediaType: "application/pdf" };
+      } else {
+        body = { clientId, text: await f.text() };
+      }
+      const r = await fetch("/api/studio/brand-kit/fonts-from-doc", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) flex(r?.error || "Couldn't read the fonts from that document.");
+      else flex(r.added ? `Recorded ${r.added} font${r.added === 1 ? "" : "s"} from ${f.name}.` : (r.note || "No new fonts named in that document."));
+      await refresh(clientId);
+    } catch (e) { flex(String((e as Error)?.message || e).slice(0, 100)); }
+    finally { setBusy(""); setProgress(""); }
+  }
+
   const fonts = brandKit?.fonts ?? [];
   const logos = brandKit?.logos ?? [];
   const refsFor = (p: string) => templates.filter((t) => t.placement === p);
@@ -133,13 +162,16 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
   // 48 font files listed one per line is a wall. Group them by FAMILY (the bit before the weight suffix,
   // e.g. MTNBrighterSans-BoldItalic -> MTNBrighterSans) and show the weight count, so you can see at a
   // glance that we hold the whole family rather than scrolling a list.
-  const fontFamilies = Object.entries(
-    fonts.reduce<Record<string, number>>((acc, f) => {
+  const fontFamilies = Object.values(
+    fonts.reduce<Record<string, { family: string; count: number; hasFile: boolean }>>((acc, f) => {
       const family = String(f.family || "").split("-")[0] || "Unknown";
-      acc[family] = (acc[family] ?? 0) + 1;
+      const cur = acc[family] ?? { family, count: 0, hasFile: false };
+      cur.count += 1;
+      if (f.url) cur.hasFile = true; // a file we can render with, vs a name from a document
+      acc[family] = cur;
       return acc;
     }, {}),
-  ).sort((a, b) => b[1] - a[1]);
+  ).sort((a, b) => b.count - a.count);
 
   return (
     <div className="mt-6 space-y-6">
@@ -196,16 +228,24 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
               The real font files we render with (.woff2 / .otf / .ttf). Without these the rendered text
               cannot match the design, and no CSS fixes it. Upload every weight you use.
             </p>
-            <label className="mt-2 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
-              {busy === "font" ? "Uploading…" : "＋ Add font files"}
-              <input type="file" multiple accept=".woff2,.woff,.otf,.ttf" className="hidden"
-                onChange={(e) => send(e.target.files, "font")} />
-            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <label className="inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
+                {busy === "font" ? "Uploading…" : "＋ Add font files"}
+                <input type="file" multiple accept=".woff2,.woff,.otf,.ttf" className="hidden"
+                  onChange={(e) => send(e.target.files, "font")} />
+              </label>
+              {/* Only a LIST of fonts (a .txt or .pdf from the client), not the files: we read the names off it. */}
+              <label className="inline-block cursor-pointer rounded-lg border border-line px-3 py-1.5 text-sm font-bold text-ink-dim hover:border-line-strong hover:text-ink">
+                {busy === "fonts_doc" ? "Reading…" : "＋ Fonts from a doc (.txt/.pdf)"}
+                <input type="file" accept=".txt,.pdf,text/plain,application/pdf" className="hidden"
+                  onChange={(e) => fontsFromDoc(e.target.files)} />
+              </label>
+            </div>
             {fontFamilies.length > 0 && (
               <ul className="mt-2 space-y-1">
-                {fontFamilies.map(([family, count]) => (
-                  <li key={family} className="tabular text-[14px] text-[#86efac]">
-                    ✓ {family} <span className="text-ink-faint">· {count} weight{count === 1 ? "" : "s"}</span>
+                {fontFamilies.map((ff) => (
+                  <li key={ff.family} className={`tabular text-[14px] ${ff.hasFile ? "text-[#86efac]" : "text-[#fcd34d]"}`}>
+                    {ff.hasFile ? "✓" : "◦"} {ff.family} <span className="text-ink-faint">· {ff.hasFile ? `${ff.count} weight${ff.count === 1 ? "" : "s"}` : "named, file needed"}</span>
                   </li>
                 ))}
               </ul>
@@ -382,13 +422,13 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
           or offer screenshot - never AI-invented UI. These are the approved screens to pick from. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex items-center justify-between">
-          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">MoMo phone screenshots</div>
+          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Phone screenshots</div>
           <span className="tabular text-[14px] text-ink-faint">{assets.filter((a) => a.kind === "phone_screen").length} uploaded</span>
         </div>
         <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
-          Approved MoMo app and offer screenshots. When a creative shows someone holding up a phone, the screen
-          must be one of these real screenshots - the system never invents app UI. Upload the ones your team
-          approves and we reference them at build time.
+          Approved app and offer screenshots for {clientName}. When a creative shows someone holding up a phone,
+          the screen must be one of these real screenshots - the system never invents app UI. Upload the ones your
+          team approves and we reference them at build time.
         </p>
         <label className="mt-3 inline-block cursor-pointer rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10">
           {busy === "phone_screen" ? "Uploading…" : "＋ Add phone screenshots"}
@@ -473,29 +513,38 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
         )}
       </div>
 
-      {/* TRAIN THE BRAIN ON LIVE FUNNELS. Keep the brain current as new campaigns ship - ingest the live
-          funnels so the Producer, brief coach, Strategist and Journalist all learn from the newest work. */}
+      {/* TRAIN THE BRAIN ON FUNNELS - CLIENT-SCOPED. Ingest THIS client's funnels/reference pages into ITS
+          brain so the Producer, brief coach, Strategist and Researcher learn from its real work. Paste the
+          URLs for the selected client; MoMo has a built-in quick-set of its 20 best funnels. */}
       <div className="rounded-xl border border-line bg-surface-1 p-5">
-        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Train the brain on live funnels</div>
+        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Train the brain on {clientName}&apos;s funnels</div>
         <p className="mt-2 text-[15px] leading-relaxed text-ink-dim">
-          Ingest the live MTN MoMo funnels into the brain so every output learns from the real, current work.
-          Run this whenever new campaigns ship - it refreshes what the Producer, brief coach, Strategist and
-          Journalist draw on.
+          Ingest <b className="text-ink-dim">{clientName}</b>&apos;s own funnels or reference pages into its brain, so every
+          output learns from its real work. Paste one URL per line{isMoMo ? ", or leave blank to use MoMo's built-in 20-funnel set" : ""}.
+          It writes only to <b className="text-ink-dim">{clientName}</b> - never another brain.
         </p>
+        <textarea value={funnelUrls} onChange={(e) => setFunnelUrls(e.target.value)} rows={3}
+          placeholder={isMoMo ? "Leave blank to use the 20 MoMo funnels, or paste your own URLs (one per line)" : "https://the-amber-room.co.za/a-campaign\nhttps://the-amber-room.co.za/another"}
+          className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-[14px] leading-relaxed text-ink outline-none focus:border-[#818cf8]" />
         <button
           onClick={async () => {
-            setBusy("ingest"); setProgress("Ingesting funnels into the brain…");
+            const urls = funnelUrls.split(/\n+/).map((u) => u.trim()).filter(Boolean).map((u) => ({ url: u }));
+            setBusy("ingest"); setProgress(`Ingesting funnels into ${clientName}'s brain…`);
             try {
-              const d = await fetch("/api/studio/ingest-funnels").then((r) => r.json());
-              setProgress(d.ok ? `Trained the brain: ${d.totalChunks} chunks from ${(d.funnels || []).filter((f: { chunks: number }) => f.chunks > 0).length} funnels.` : `Failed: ${d.error || "unknown"}`);
+              const d = await fetch("/api/studio/ingest-funnels", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ clientId, urls }),
+              }).then((r) => r.json());
+              setProgress(d.ok ? `Trained ${d.brain}: ${d.totalChunks} chunks from ${(d.funnels || []).filter((f: { chunks: number }) => f.chunks > 0).length} pages.` : `Failed: ${d.error || "unknown"}`);
+              if (d.ok) setFunnelUrls("");
             } catch (e) { setProgress(`Failed: ${String((e as Error)?.message || e).slice(0, 100)}`); }
             finally { setBusy(""); }
           }}
-          disabled={!!busy}
+          disabled={!!busy || !clientId || (!isMoMo && !funnelUrls.trim())}
           className="mt-3 rounded-lg border border-[#818cf8]/50 bg-[#818cf8]/10 px-4 py-2 text-sm font-bold text-ink hover:bg-[#818cf8]/20 disabled:opacity-40">
-          {busy === "ingest" ? "Training…" : "Train the brain on the funnels"}
+          {busy === "ingest" ? "Training…" : `Train ${clientName}'s brain`}
         </button>
-        <p className="mt-1 text-[14px] text-ink-faint">Takes about a minute. Safe to re-run - it refreshes the funnel knowledge.</p>
+        <p className="mt-1 text-[14px] text-ink-faint">Takes about a minute. Safe to re-run - it refreshes this brain&apos;s funnel knowledge.</p>
       </div>
 
       {/* CI DOCUMENT */}

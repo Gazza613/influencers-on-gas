@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { ingestChunks } from "@/lib/rag";
 import { listStudioClients } from "@/lib/studio";
+import { isSafePublicUrl } from "@/lib/safe-url";
 import { db } from "@/lib/db";
 
-// ONE-SHOT: ingest the 20 best-performing MoMo funnels into the client brain, so the Producer, brief coach,
-// Strategist and Journalist all draw on the real funnel patterns via RAG. Runs on prod because Voyage
-// embeddings only decrypt here. Super-admin only (it spends + writes the brain). Idempotent: clears the prior
-// funnel ingest first, so re-running just refreshes.
+// Ingest a brain's own funnels/reference pages into ITS brain (RAG), so the Producer, brief coach, Strategist
+// and Researcher draw on that client's real work. CLIENT-SCOPED (Gary): it writes to the clientId you pass,
+// never a hardcoded brain - a fix for the old version that always wrote to MoMo regardless of selection. Pass
+// your own URLs for any client; MoMo has a built-in quick-set of its 20 best funnels. Super-admin only (spends +
+// writes the brain). Idempotent: clears the prior funnel ingest for that client first, so re-running refreshes.
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
@@ -46,19 +48,32 @@ function chunk(t: string): string[] {
   return out.filter((c) => c.length > 60);
 }
 
-export async function GET() {
+export async function POST(req: Request) {
   const session = await auth();
   if (session?.user?.role !== "super_admin") return NextResponse.json({ error: "super-admin only" }, { status: 401 });
 
+  const body = (await req.json().catch(() => ({}))) as { clientId?: string; urls?: { name?: string; url?: string }[] };
+  const clientId = String(body.clientId || "").trim();
+  if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });
+
   const clients = await listStudioClients().catch(() => []);
-  const client = clients.find((c) => /momo/i.test(c.name)) || clients[0];
-  if (!client) return NextResponse.json({ error: "no client" }, { status: 400 });
+  const client = clients.find((c) => c.id === clientId);
+  if (!client) return NextResponse.json({ error: "That client does not exist." }, { status: 400 });
+
+  // The funnel set: the URLs pasted for THIS client, or - only for MoMo - its built-in 20-funnel quick-set.
+  // A brain never inherits another brain's funnels; a non-MoMo client with no URLs is told to paste its own.
+  let set: [string, string][];
+  const pasted = (body.urls || [])
+    .map((u) => [String(u.name || u.url || "").slice(0, 80), String(u.url || "").trim()] as [string, string])
+    .filter(([, url]) => isSafePublicUrl(url));
+  if (pasted.length) set = pasted.slice(0, 40);
+  else if (/mo\s*mo|mtn/i.test(client.name)) set = FUNNELS;
+  else return NextResponse.json({ error: `Paste ${client.name}'s funnel or reference URLs to train its brain (one per line).` }, { status: 400 });
 
   await db().query("delete from knowledge_chunks where client_id=$1 and metadata->>'kind'='funnel'", [client.id]);
 
-  // Fetch all 20 IN PARALLEL (10s each), not one-after-another - the sequential version took minutes and just
-  // spun the browser. Then chunk everything and embed in one pass.
-  const fetched = await Promise.all(FUNNELS.map(async ([name, url]) => {
+  // Fetch all IN PARALLEL (10s each), then chunk and embed in one pass.
+  const fetched = await Promise.all(set.map(async ([name, url]) => {
     try {
       const html = await (await fetch(url, { signal: AbortSignal.timeout(10000) })).text();
       const text = toText(html);
