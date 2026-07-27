@@ -33,6 +33,7 @@ const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: "competitor", label: "Competitor intelligence", blurb: "Observable public activity, client and each competitor" },
   { id: "competitor_set", label: "Competitor set", blurb: "A factual profile per competitor" },
   { id: "activity", label: "90-day activity log", blurb: "Dated, sourced developments" },
+  { id: "press", label: "Press and media", blurb: "Media releases, news, interviews, awards, mentions, any date" },
   { id: "customer_voice", label: "Customer voice", blurb: "Reviews, ratings, public sentiment" },
   { id: "faqs", label: "Published FAQs", blurb: "The brand's own frequently-asked questions and answers" },
   { id: "unverified", label: "Unverified, treat as signal only", blurb: "Could not be verified; never cited as fact" },

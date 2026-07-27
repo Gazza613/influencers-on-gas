@@ -37,6 +37,7 @@ export const RESEARCH_SECTIONS = [
   { id: "competitor", label: "Competitor intelligence" },
   { id: "competitor_set", label: "Competitor set" },
   { id: "activity", label: "90-day activity log" },
+  { id: "press", label: "Press and media" },
   { id: "customer_voice", label: "Customer voice" },
   { id: "faqs", label: "Published FAQs" },
   { id: "unverified", label: "Unverified, treat as signal only" },
@@ -89,7 +90,7 @@ const SCHEMA = {
           section: {
             type: "string",
             enum: RESEARCH_SECTIONS.map((s) => s.id),
-            description: "snapshot=who they are/what they sell/where they play. foundations=history, ownership, leadership, structure. products=range, pricing where public, propositions. market=size where sourced, dynamics, regulation. digital=website observations, SEO basics, social posting cadence and content. contact=a contact or channel fact: a phone number, email, physical address, operating hours, WhatsApp number, or an official social profile (platform + full URL/handle). competitor=an observable public-channel fact about the CLIENT or a named competitor (see the competitor brief). competitor_set=a one-line factual profile of a competitor. activity=a dated development in the last 90 days. customer_voice=reviews, ratings, public sentiment (SA platforms included). faqs=one of the brand's OWN published frequently-asked questions, captured as the question and its answer, sourced to their FAQ/help page. unverified=a claim you could not verify but which may carry signal.",
+            description: "snapshot=who they are/what they sell/where they play. foundations=history, ownership, leadership, structure. products=range, pricing where public, propositions. market=size where sourced, dynamics, regulation. digital=website observations, SEO basics, social posting cadence and content. contact=a contact or channel fact: a phone number, email, physical address, operating hours, WhatsApp number, or an official social profile (platform + full URL/handle). competitor=an observable public-channel fact about the CLIENT or a named competitor (see the competitor brief). competitor_set=a one-line factual profile of a competitor. activity=a dated development in the last 90 days. press=a media release, news article, interview, podcast, award or notable third-party mention of the client, at ANY date, sourced to the original. customer_voice=reviews, ratings, public sentiment (SA platforms included). faqs=one of the brand's OWN published frequently-asked questions, captured as the question and its answer, sourced to their FAQ/help page. unverified=a claim you could not verify but which may carry signal.",
           },
           subject: { type: "string", description: "The brand this fact is about: the client's name, or a named competitor." },
           claim: { type: "string", description: "The fact itself, plainly stated. No interpretation." },
@@ -190,10 +191,11 @@ export async function collectResearch(
     `ALWAYS COLLECT, EVERY RUN, WITHOUT EXCEPTION (check the site footer, and the contact, about and help pages):\n` +
     `- CONTACT DETAILS (section=contact): every phone number, email address, physical address, operating hours and WhatsApp number ${name} publishes.\n` +
     `- SOCIAL CHANNELS (section=contact): every official social profile ${name} runs, each as the platform plus its full URL or @handle (Facebook, Instagram, LinkedIn, X/Twitter, TikTok, YouTube).\n` +
+    `- PRESS AND MEDIA (section=press): media releases, news coverage, interviews, podcasts, awards, and notable third-party mentions of ${name}, at ANY date, each sourced to the original. Search beyond their own site for these.\n` +
     `- PUBLISHED FAQs (section=faqs): ${name}'s OWN frequently-asked questions, each as a claim carrying the question and its answer, sourced to their FAQ or help page.\n` +
-    `If the site genuinely publishes none of one of these, record that absence as a single section=unverified note rather than leaving it out silently.\n\n` +
+    `If the site or the wider record genuinely has none of one of these, record that absence as a single section=unverified note rather than leaving it out silently.\n\n` +
     `${COMPETITOR_BRIEF}\n\n` +
-    `Search the web now, properly and widely: ${name}'s own site${website ? ` (${website})` : ""} and channels, its competitors, its category, its regulators, review platforms, and recent news. Then record what you actually found, every claim with its real source URL, the source date, and a tier. Facts only.`;
+    `Search the web now, properly and widely, and do NOT lean only on their own website: ${name}'s own site${website ? ` (${website})` : ""} and channels, PLUS Google News and newsrooms for press and media releases, trade and industry publications, the relevant regulator's register (for a financial services provider, the FSCA FSP register), LinkedIn, business directories, partner and award announcements, and review platforms. Their site establishes who they are; the independent record is where much of the fact base lives. Then record what you actually found, every claim with its real source URL, the source date, and a tier. Facts only.`;
 
   emit({ t: "phase", label: `Collecting facts on ${name}` });
   let sourcesRead = 0, searchCount = 0;

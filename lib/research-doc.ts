@@ -28,9 +28,10 @@ const DOC_SECTIONS: { id: string; n: number; label: string }[] = [
   { id: "competitor", n: 7, label: "Competitor intelligence" },
   { id: "competitor_set", n: 8, label: "Competitor set" },
   { id: "activity", n: 9, label: "90-day activity log" },
-  { id: "customer_voice", n: 10, label: "Customer voice" },
-  { id: "faqs", n: 11, label: "Published FAQs" },
-  { id: "unverified", n: 12, label: "Unverified, treat as signal only" },
+  { id: "press", n: 10, label: "Press and media" },
+  { id: "customer_voice", n: 11, label: "Customer voice" },
+  { id: "faqs", n: 12, label: "Published FAQs" },
+  { id: "unverified", n: 13, label: "Unverified, treat as signal only" },
 ];
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -169,7 +170,7 @@ export function researchDocHtml(clientName: string, website: string | null, run:
     <div class="foot">Prepared by The Researcher · GAS Marketing · Internal · ${esc(ukDate(run.created_at))}</div>
   </div>
   ${sections}
-  <section class="sec"><h2><span class="n">13</span>Source register<span class="count">${sources}</span></h2>${sourceRegister(claims)}</section>
+  <section class="sec"><h2><span class="n">14</span>Source register<span class="count">${sources}</span></h2>${sourceRegister(claims)}</section>
   </body></html>`;
 }
 
