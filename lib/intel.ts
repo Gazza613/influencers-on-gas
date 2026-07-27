@@ -126,11 +126,12 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
 
 // Which brains have research configured at all. The daily run iterates THESE, so adding a brain's brief is what
 // switches its research on - there is no hardcoded client list to keep in step.
-export async function brainsWithIntel(): Promise<{ clientId: string; clientName: string; journalist: boolean; strategist: boolean; researcher: boolean }[]> {
+export async function brainsWithIntel(): Promise<{ clientId: string; clientName: string; journalist: boolean; strategist: boolean; researcher: boolean; ceoRules: boolean }[]> {
   const rows = (await db().query(
     `select b.client_id, c.name as client_name,
             (b.journalist is not null) as journalist, (b.strategist is not null) as strategist,
-            (b.researcher is not null) as researcher
+            (b.researcher is not null) as researcher,
+            (b.ceo_rules is not null and length(trim(b.ceo_rules)) > 0) as ceo_rules
      from intel_briefs b join clients c on c.id = b.client_id
      order by c.name`,
     [],
@@ -141,6 +142,9 @@ export async function brainsWithIntel(): Promise<{ clientId: string; clientName:
     journalist: r.journalist === true,
     strategist: r.strategist === true,
     researcher: r.researcher === true,
+    // Whether this brain can publish a CEO article at all - it needs a CEO voice to write in. Used to gate the
+    // "Publish as CEO article" button so a brain without rules never shows it, rather than erroring on click.
+    ceoRules: r.ceo_rules === true,
   }));
 }
 

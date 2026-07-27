@@ -19,8 +19,8 @@
 export type Desk =
   | "Influencers on GAS"
   | "Creatives on GAS"
+  | "The Researcher"
   | "The Strategist"
-  | "The Journalist"
   | "Brains"
   | "Platform"
   | "Unattributed";
@@ -28,8 +28,8 @@ export type Desk =
 export const DESK_ORDER: Desk[] = [
   "Influencers on GAS",
   "Creatives on GAS",
+  "The Researcher",
   "The Strategist",
-  "The Journalist",
   "Brains",
   "Platform",
   "Unattributed",
@@ -39,8 +39,8 @@ export const DESK_ORDER: Desk[] = [
 export const DESK_TINT: Record<Desk, string> = {
   "Influencers on GAS": "#c084fc",
   "Creatives on GAS": "#60a5fa",
+  "The Researcher": "#a855f7",
   "The Strategist": "#34d399",
-  "The Journalist": "#fbbf24",
   Brains: "#f472b6",
   Platform: "#94a3b8",
   Unattributed: "#64748b",
@@ -63,9 +63,11 @@ const CREATIVES = new Set([
   "forensic-swap-test", "strip-person-test",
 ]);
 
-// The two research desks.
+// The two intelligence desks. The Researcher is the commissioned deep-dive engine (it replaced the retired
+// Journalist tile), so the CEO-article actions - which now publish from the Researcher desk - live here too,
+// alongside the deep-research run and its source-verification pass. The Strategist is the daily newswire.
+const RESEARCHER = new Set(["deep-research", "research-file", "research-verify", "ceo-newsletter", "ceo-backdrop", "ceo-linkedin-creative"]);
 const STRATEGIST = new Set(["daily-intel"]);
-const JOURNALIST = new Set(["ceo-newsletter", "ceo-backdrop", "ceo-linkedin-creative"]);
 
 // Shared client knowledge, and platform housekeeping that belongs to no single desk.
 const BRAINS = new Set(["ingest", "brain-reindex"]);
@@ -77,8 +79,8 @@ export function deskOf(action: string | null | undefined): Desk {
 
   if (INFLUENCERS.has(a)) return "Influencers on GAS";
   if (CREATIVES.has(a)) return "Creatives on GAS";
+  if (RESEARCHER.has(a)) return "The Researcher";
   if (STRATEGIST.has(a)) return "The Strategist";
-  if (JOURNALIST.has(a)) return "The Journalist";
   if (BRAINS.has(a)) return "Brains";
   if (PLATFORM.has(a)) return "Platform";
 
@@ -86,7 +88,7 @@ export function deskOf(action: string | null | undefined): Desk {
   // These must be tested AFTER the exact sets above: bare "edit" is an influencer creative edit, while
   // "edit-slider" and "edit-section1" are the funnel builder. Prefix-first would swallow both.
   if (a.startsWith("retheme-") || a.startsWith("edit-") || a.startsWith("studio-")) return "Creatives on GAS";
-  if (a.startsWith("ceo-")) return "The Journalist";
+  if (a.startsWith("ceo-") || a.startsWith("research-")) return "The Researcher";
   if (a.startsWith("intel-")) return "The Strategist";
 
   return "Unattributed";

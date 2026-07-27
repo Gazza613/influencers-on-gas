@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)); } catch { /* client gone */ }
       };
       try {
-        const findings = await runResearch(clientId, today, focus || undefined, (e) => send(e));
+        const findings = await runResearch(clientId, today, focus || undefined, (e) => send(e), session.user?.email ?? null);
         send({ t: "done", count: findings.length });
       } catch (e) {
         send({ t: "error", message: String((e as Error)?.message || e).slice(0, 300) });

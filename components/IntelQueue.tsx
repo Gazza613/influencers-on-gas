@@ -60,7 +60,7 @@ const CONF: Record<string, string> = {
   low: "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]",
 };
 
-export default function IntelQueue({ clients, configured = [], role }: { clients: Client[]; configured?: string[]; role: "journalist" | "strategist" | "researcher" }) {
+export default function IntelQueue({ clients, configured = [], canPublish, role }: { clients: Client[]; configured?: string[]; canPublish?: string[]; role: "journalist" | "strategist" | "researcher" }) {
   // The Researcher is COMMISSIONED, not watched: an on-demand focus line lets you point a dossier at a
   // question ("their new bank partnership", "gaps vs Capitec"). Empty = the full standing remit.
   const isResearcher = role === "researcher";
@@ -194,6 +194,10 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   // just-commissioned dossier is what you want to read, not the oldest source in the pile (Gary).
   const byFound = (a: Intel, b: Intel) => new Date(b.found_at).getTime() - new Date(a.found_at).getTime();
   const clientName = clients.find((c) => c.id === clientId)?.name || "us";
+  // Whether THIS brain has a CEO voice to publish an article in. When false, the publish button is replaced by
+  // a plain line saying what to add, rather than letting the click fail with a small toast (Gary). If the prop
+  // is not supplied at all (legacy desks), we leave the button as it was.
+  const canPublishHere = canPublish === undefined ? true : canPublish.includes(clientId);
 
   // The example prompt has to belong to the SELECTED brain, or it misleads: a MoMo "gaps vs Capitec" line under
   // BrightRock points the researcher at the wrong category (Gary caught exactly this). We only put a named rival
@@ -378,7 +382,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
             return (
               <div key={s.id}>
                 <p className="tabular mb-2 mt-6 text-lg uppercase tracking-[0.2em]" style={{ color: s.accent }}>{s.label} — {inSec.length}</p>
-                <div className="space-y-3">{inSec.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} clientName={clientName} deepen={deepen} running={running} />)}</div>
+                <div className="space-y-3">{inSec.map((i) => <Card key={i.id} i={i} busy={busy} decide={decide} clientId={clientId} clientName={clientName} deepen={deepen} running={running} canPublish={canPublishHere} />)}</div>
               </div>
             );
           })}
@@ -403,7 +407,7 @@ export default function IntelQueue({ clients, configured = [], role }: { clients
   );
 }
 
-function Card({ i, busy, decide, clientId, clientName, deepen, running }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string; clientName: string; deepen?: (i: Intel) => void; running?: boolean }) {
+function Card({ i, busy, decide, clientId, clientName, deepen, running, canPublish = true }: { i: Intel; busy: boolean; decide: (id: string, s: "accepted" | "binned") => void; clientId: string; clientName: string; deepen?: (i: Intel) => void; running?: boolean; canPublish?: boolean }) {
   // THE CEO'S NEWSLETTER (Gary). Only on Journalist findings - a Strategist finding is internal, blunt and names
   // competitors, so it is exactly what must never reach the CEO's public voice.
   // Seeded from the SAVED draft (Gary): the piece and its creative used to live only in React state, so logging
@@ -414,6 +418,9 @@ function Card({ i, busy, decide, clientId, clientName, deepen, running }: { i: I
   const [art, setArt] = useState<string>(i.newsletter_art || "");   // the SELECTED creative
   const [options, setOptions] = useState<string[]>(i.newsletter_options || []); // the CEO build returns three
   const [drawing, setDrawing] = useState(false);
+  // A prominent, in-card error for the CEO article (Gary: the toast was too small to read). It sits right by
+  // the button, not in the corner of the screen.
+  const [nlError, setNlError] = useState("");
   // Kept so the image can be RERUN without rewriting the article (Gary) - the piece is fine, it is the render
   // you did not like.
   const [artBrief, setArtBrief] = useState<{ subject: string; callout: string } | null>(null);
@@ -437,13 +444,13 @@ function Card({ i, busy, decide, clientId, clientName, deepen, running }: { i: I
   }
 
   async function writeNewsletter() {
-    setWriting(true); setArt(""); setOptions([]);
+    setWriting(true); setArt(""); setOptions([]); setNlError("");
     const d = await fetch("/api/studio/intel/newsletter", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, id: i.id }),
     }).then((r) => r.json()).catch(() => null);
     setWriting(false);
-    if (!d?.newsletter) { flex(d?.error || "Could not write the newsletter."); return; }
+    if (!d?.newsletter) { const msg = d?.error || "Could not write the article."; setNlError(msg); flex(msg); return; }
     setLetter(d.newsletter);
     await keepDraft({ newsletter: d.newsletter });
 
@@ -655,20 +662,33 @@ function Card({ i, busy, decide, clientId, clientName, deepen, running }: { i: I
         </div>
       )}
 
+      {nlError && (
+        <div className="mt-3 flex items-start justify-between gap-3 rounded-lg border border-[#f87171]/45 bg-[#f87171]/10 px-3 py-2.5">
+          <p className="text-[19px] leading-snug text-[#fca5a5]">{nlError}</p>
+          <button onClick={() => setNlError("")} className="shrink-0 text-[17px] font-semibold text-ink-faint underline hover:text-ink">Dismiss</button>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
         {/* Publish as a CEO article - from a Journalist finding, or now a Researcher one (its primary home).
-            A Strategist finding is internal and names competitors, so it is deliberately never eligible. */}
+            A Strategist finding is internal and names competitors, so it is deliberately never eligible. The
+            button only shows when the brain HAS a CEO voice; without one, a plain line says what to add rather
+            than letting the click fail with a tiny toast (Gary). */}
         {(i.role === "journalist" || i.role === "researcher") && (
-          <button onClick={writeNewsletter} disabled={writing}
-            className="mr-auto inline-flex items-center gap-2 rounded-lg border border-[#818cf8]/40 px-3 py-1 text-[18px] font-bold text-[#a5b4fc] hover:bg-[#818cf8]/10 disabled:opacity-40">
-            {writing && (
-              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-            )}
-            {writing ? "Writing…" : letter ? "Rewrite the article" : "✎ Publish as a CEO article"}
-          </button>
+          canPublish ? (
+            <button onClick={writeNewsletter} disabled={writing}
+              className="mr-auto inline-flex items-center gap-2 rounded-lg border border-[#818cf8]/40 px-3 py-1 text-[18px] font-bold text-[#a5b4fc] hover:bg-[#818cf8]/10 disabled:opacity-40">
+              {writing && (
+                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                  <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              )}
+              {writing ? "Writing…" : letter ? "Rewrite the article" : "✎ Publish as a CEO article"}
+            </button>
+          ) : (
+            <span className="mr-auto text-[16px] text-ink-faint">Add CEO writing rules to <b className="text-ink-dim">{clientName}</b>&apos;s brain to publish articles.</span>
+          )
         )}
         {deepen && (
           <button onClick={() => deepen(i)} disabled={busy || running} title="Commission a fresh run pointed straight at this finding"

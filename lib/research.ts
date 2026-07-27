@@ -156,7 +156,7 @@ export type ResearchEvent =
  * brain daily is real web-search spend for little gain. Returns the findings it PROPOSES, already stored at
  * status 'new' for a human to accept or bin. onEvent streams live progress for the desk to narrate.
  */
-export async function runResearch(clientId: string, today: string, focus?: string, onEvent?: (e: ResearchEvent) => void): Promise<Intel[]> {
+export async function runResearch(clientId: string, today: string, focus?: string, onEvent?: (e: ResearchEvent) => void, userEmail?: string | null): Promise<Intel[]> {
   const emit = (e: ResearchEvent) => { try { onEvent?.(e); } catch { /* progress is best-effort, never fatal */ } };
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
@@ -224,7 +224,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     }
   });
   const research = await stream.finalMessage();
-  await recordUsage({ clientId, provider: "anthropic", model: PREMIUM, unit: "request", action: "deep-research", count: 1 }).catch(() => {});
+  await recordUsage({ clientId, userEmail, provider: "anthropic", model: PREMIUM, unit: "request", action: "deep-research", count: 1 }).catch(() => {});
 
   const notes = research.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   if (!notes) return [];
@@ -238,7 +238,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
     tool_choice: { type: "tool", name: "dossier" },   // FORCED - a dossier always comes back
     messages: [{ role: "user", content: `Research notes:\n\n${notes.slice(0, 24000)}` }],
   });
-  await recordUsage({ clientId, provider: "anthropic", model: PREMIUM, unit: "request", action: "research-file", count: 1 }).catch(() => {});
+  await recordUsage({ clientId, userEmail, provider: "anthropic", model: PREMIUM, unit: "request", action: "research-file", count: 1 }).catch(() => {});
 
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") return [];
@@ -282,16 +282,18 @@ export async function runResearch(clientId: string, today: string, focus?: strin
       c.srcs, client, () => { verifyCalls += 1; },
     ).catch(() => ({ status: "unverified" as const, supported: null, date: toISODate(c.f.published_at), checkedUrl: c.srcs[0]?.url || null, note: "" })),
   ));
-  if (verifyCalls) await recordUsage({ clientId, provider: "anthropic", model: INGEST, unit: "request", action: "research-verify", count: verifyCalls }).catch(() => {});
+  if (verifyCalls) await recordUsage({ clientId, userEmail, provider: "anthropic", model: INGEST, unit: "request", action: "research-verify", count: verifyCalls }).catch(() => {});
 
   const saved: Intel[] = [];
   for (let k = 0; k < candidates.length; k++) {
     const { f, section, srcs } = candidates[k];
     const v = verdicts[k];
 
-    // DROP A FABRICATION. The page was reachable and it does NOT support the claim - exactly the failure that
-    // makes research untrustworthy. Refuted only ever means "we read the page and it isn't there".
-    if (v.status === "refuted") continue;
+    // DROP A FABRICATION. Two ways a source fails the trust test: "refuted" (we read the page and the claim
+    // is not there) and "dead" (the cited URL 404s - the page does not exist, e.g. the invented
+    // facebook.com/business/help/click-to-whatsapp-ads link Gary caught). Neither is citable, so neither is
+    // stored. A bot-blocked source ("unverified") is NOT dropped - blocking robots is not lying.
+    if (v.status === "refuted" || v.status === "dead") continue;
 
     // THE RECENCY GATE, now on the VERIFIED date. A finding dated before the cutoff is stale and dropped - except
     // the trends-to-steal section, which runs the 12-month window. Undated findings pass (we cannot prove them

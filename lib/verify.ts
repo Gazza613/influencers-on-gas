@@ -14,12 +14,17 @@ import { INGEST } from "./vendors/anthropic";
 // blocks robots. Only a page we DID read and that does not support the claim is refuted.
 
 export type Verdict = {
-  status: "verified" | "refuted" | "partial" | "unverified";
+  status: "verified" | "refuted" | "partial" | "unverified" | "dead";
   supported: boolean | null;
   date: string | null;      // the REAL publish date we established, YYYY-MM-DD, or null
   checkedUrl: string | null;
   note: string;
 };
+
+// A DEAD link is one the server explicitly says does not exist. This is the facebook.com/business/help/
+// click-to-whatsapp-ads case Gary hit: a plausible-looking URL the model invented, that 404s. We treat only
+// these explicit codes as dead (drop the finding); a 403/429/timeout is a bot-block, not a fabrication (keep).
+const DEAD_STATUS = new Set([404, 410, 451]);
 
 /** Normalise any date-ish string to YYYY-MM-DD, or null. */
 export function toISODate(s: unknown): string | null {
@@ -109,11 +114,18 @@ export async function verifyFinding(
   anthropic: Anthropic,
   meter: () => void,
 ): Promise<Verdict> {
-  const candidates = srcs.slice(0, 2);
+  const candidates = srcs.slice(0, 3);
   const pages = await Promise.all(candidates.map((s) => fetchSourcePage(s.url)));
   const idx = pages.findIndex((p) => p.ok && p.text.length > 200);
   if (idx === -1) {
-    // Reached nothing readable. Do NOT refute - a bot-block is not a fabrication. Keep the model's own date.
+    // Reached nothing readable. Split two very different cases. If the server EXPLICITLY says the page does
+    // not exist (404/410) and nothing softer failed, the cited link is dead - a fabricated or broken URL, and
+    // the finding is dropped. A 403 / timeout / 5xx is a bot-block, not a fabrication, so we keep it, flagged.
+    const hardDead = pages.some((p) => DEAD_STATUS.has(p.status));
+    const softFail = pages.some((p) => !p.ok && !DEAD_STATUS.has(p.status));
+    if (hardDead && !softFail) {
+      return { status: "dead", supported: false, date: null, checkedUrl: candidates[0]?.url || null, note: "The cited source returned 404 - the page does not exist. Link is fabricated or broken." };
+    }
     return { status: "unverified", supported: null, date: toISODate(claim.published_at), checkedUrl: candidates[0]?.url || null, note: "Source could not be fetched for verification (may be bot-blocked)." };
   }
   const pg = pages[idx];

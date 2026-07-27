@@ -18,6 +18,9 @@ export default async function ResearcherPage() {
   const clients = await listStudioClients().catch(() => []);
   const briefed = await brainsWithIntel().catch(() => []);
   const configured = briefed.filter((b) => b.researcher).map((b) => b.clientId);
+  // A finding can only become a CEO article on a brain that HAS a CEO voice to write in. Brains without CEO
+  // rules never show the publish button (it errored on click before), and are told what is missing instead.
+  const canPublish = briefed.filter((b) => b.ceoRules).map((b) => b.clientId);
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
@@ -31,7 +34,7 @@ export default async function ResearcherPage() {
           doctrine. You accept or bin each one, and any finding can become the CEO&apos;s LinkedIn article. Each
           brain is researched under its own scope alone; none is ever borrowed.
         </p>
-        <IntelQueue clients={clients} configured={configured} role="researcher" />
+        <IntelQueue clients={clients} configured={configured} canPublish={canPublish} role="researcher" />
       </main>
     </div>
   );

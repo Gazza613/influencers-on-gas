@@ -140,7 +140,7 @@ ${REGISTER}`,
         content: `Write the CEO's newsletter piece from the material below, and art-direct the LinkedIn image that runs with it.\n\n${material}`,
       }],
     });
-    await recordUsage({ clientId, provider: "anthropic", model: PREMIUM, unit: "request", action: "ceo-newsletter", count: 1 }).catch(() => {});
+    await recordUsage({ clientId, userEmail: session.user?.email ?? null, provider: "anthropic", model: PREMIUM, unit: "request", action: "ceo-newsletter", count: 1 }).catch(() => {});
 
     const block = res.content.find((x) => x.type === "tool_use");
     if (!block || block.type !== "tool_use") return NextResponse.json({ error: "Nothing came back. Try again." }, { status: 500 });
