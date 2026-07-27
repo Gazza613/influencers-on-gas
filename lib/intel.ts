@@ -3,6 +3,7 @@ import { db } from "./db";
 import { getSecret } from "./connections";
 import { PREMIUM } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
+import { recordTokens } from "./usage";
 
 // THE DAILY INTELLIGENCE RUN — shared engine for The Journalist and The Strategist.
 //
@@ -207,7 +208,7 @@ const SCHEMA = {
 // not of the engine, and two sources of truth for the same setting is how they drift apart.
 
 // Run one role's daily research. Returns the findings it PROPOSES (already stored, status 'new').
-export async function runIntel(clientId: string, role: "journalist" | "strategist", today: string): Promise<Intel[]> {
+export async function runIntel(clientId: string, role: "journalist" | "strategist", today: string, userEmail?: string | null): Promise<Intel[]> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
 
@@ -242,6 +243,17 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
+  // TOKEN-ACCURATE metering (Gary): the daily Strategist is Opus 4.8 + web search, the biggest automated
+  // Anthropic spender. The search step's cost is dominated by the search RESULTS fed back as input tokens, so a
+  // flat per-request proxy badly understated it. Meter the real usage of both steps here, tagged 'daily-intel'.
+  const su = research.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
+  await recordTokens({
+    clientId, userEmail, model: PREMIUM, action: "daily-intel",
+    inputTokens: su?.input_tokens || 0, outputTokens: su?.output_tokens || 0,
+    cacheReadTokens: su?.cache_read_input_tokens || 0, cacheCreationTokens: su?.cache_creation_input_tokens || 0,
+    webSearches: su?.server_tool_use?.web_search_requests || 0,
+  }).catch(() => {});
+
   const notes = research.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
   if (!notes) return [];
 
@@ -256,6 +268,13 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
   });
+
+  const fu = res.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+  await recordTokens({
+    clientId, userEmail, model: PREMIUM, action: "daily-intel",
+    inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0,
+    cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0,
+  }).catch(() => {});
 
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") return [];

@@ -3,8 +3,6 @@ import { auth } from "@/auth";
 import { cronAuthed } from "@/lib/cron";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { runIntel, loadIntelBrief, brainsWithIntel, type Intel } from "@/lib/intel";
-import { recordUsage } from "@/lib/usage";
-import { PREMIUM } from "@/lib/vendors/anthropic";
 import { emailShell } from "@/lib/email-shell";
 import { APP_URL } from "@/lib/app-url";
 
@@ -197,10 +195,12 @@ export async function GET(req: Request) {
       // 2026): pure automated spend for output nobody read. CEO articles are now drafted on demand from the
       // Researcher desk, so nothing needs the daily Journalist. If it is ever wanted back, gate it behind a flag
       // rather than running it unconditionally.
+      // runIntel now meters its own real token cost (tagged 'daily-intel'), so there is no flat proxy here. A
+      // manual run (a super-admin pressing "Run research now") is attributed to that user; the true cron passes
+      // no session, so its spend lands under Super Admin.
       const errors: string[] = [];
-      const strategist = await runIntel(c.id, "strategist", today)
+      const strategist = await runIntel(c.id, "strategist", today, session?.user?.email ?? null)
         .catch((e) => { errors.push(`strategist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; });
-      await recordUsage({ clientId: c.id, provider: "anthropic", model: PREMIUM, unit: "request", action: "daily-intel", count: 1 }).catch(() => {});
 
       // Only MATERIAL findings are worth an inbox. The rest wait in the queue.
       const sm = strategist.filter((i) => i.material);
