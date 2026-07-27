@@ -164,10 +164,36 @@ function EyeMark() {
   );
 }
 
-// GARY'S ORDER: Influencers, Studio, Media, PSI, Strategist, Journalist. It maps cleanly onto the three pairs,
-// so the grouping survives - Run simply moves ahead of Know, and the Strategist leads its pair (it is the daily
-// working tool; the Journalist is picked up when someone sits down to write).
+// GARY'S ORDER (July 2026): the two intelligence desks LEAD the whole page - The Researcher first, The
+// Strategist second - then Make, Run, and the rest of Know. Gary drew arrows putting them at the very top: the
+// market read is what he wants the eye to hit first, ahead of the production tools.
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
+  {
+    label: "Intelligence",
+    note: "The market, and what to do about it",
+    doors: [
+      {
+        name: <>The Researcher</>,
+        href: "/researcher",
+        mark: <ResearcherMark />,
+        blurb: "A commissioned deep dive on the selected client: threats, opportunities, gaps, positioning, and global campaigns worth stealing. Any finding can become the CEO's article.",
+        action: "Open the desk",
+        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
+        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
+        accent: "text-[#67e8f9]",
+      },
+      {
+        name: <>The Strategist</>,
+        href: "/strategist",
+        mark: <StrategistMark />,
+        blurb: "Weekly market and competitor intelligence. It hunts for what makes a current assumption wrong, then says what to do about it.",
+        action: "Open the desk",
+        ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
+        wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
+        accent: "text-[#a5b4fc]",
+      },
+    ],
+  },
   {
     label: "Make",
     note: "The work itself",
@@ -240,26 +266,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         ring: "border-[#f472b6]/30 hover:border-[#f472b6]/70 hover:shadow-[0_0_50px_-12px_rgba(244,114,182,0.45)]",
         wash: "from-[#f472b6]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#f9a8d4]",
-      },
-      {
-        name: <>The Researcher</>,
-        href: "/researcher",
-        mark: <ResearcherMark />,
-        blurb: "A commissioned deep dive on the selected client: threats, opportunities, gaps, positioning, and global campaigns worth stealing. Any finding can become the CEO's article.",
-        action: "Open the desk",
-        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
-        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
-        accent: "text-[#67e8f9]",
-      },
-      {
-        name: <>The Strategist</>,
-        href: "/strategist",
-        mark: <StrategistMark />,
-        blurb: "Weekly market and competitor intelligence. It hunts for what makes a current assumption wrong, then says what to do about it.",
-        action: "Open the desk",
-        ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
-        wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
-        accent: "text-[#a5b4fc]",
       },
       {
         name: <>Audience <span className="brand-grad">on</span> GAS</>,
