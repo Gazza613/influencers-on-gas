@@ -151,6 +151,33 @@ export type ResearchEvent =
   | { t: "done"; count: number }
   | { t: "error"; message: string };
 
+// MEMORY - so a re-run does not refile what it already surfaced (Gary). Normalise a headline to a comparable
+// key (lowercase, alphanumerics only) and a URL to host+path (no scheme, query or trailing slash), so trivial
+// differences do not defeat the match.
+const normKey = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const normUrl = (u: unknown) => String(u ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/[#?].*$/, "").replace(/\/+$/, "");
+
+/** What this brain's Researcher has ALREADY surfaced recently - so a fresh run adds to it rather than repeating. */
+async function loadSeenResearch(clientId: string): Promise<{ headlines: string[]; keys: Set<string>; urls: Set<string> }> {
+  // Look back further than the recency window (findings stay relevant past their own publish date), and across
+  // every status: an accepted finding is in the brain, a queued one is waiting, and even a binned one was
+  // rejected on purpose - none should come back around.
+  const rows = (await db().query(
+    `select headline, source_url, sources from studio_intel
+     where client_id = $1 and role = 'researcher' and found_at > now() - interval '180 days'`,
+    [clientId],
+  )) as { headline: string; source_url: string | null; sources: { url?: string }[] | null }[];
+  const headlines: string[] = [];
+  const keys = new Set<string>();
+  const urls = new Set<string>();
+  for (const r of rows) {
+    if (r.headline) { headlines.push(r.headline); keys.add(normKey(r.headline)); }
+    if (r.source_url) urls.add(normUrl(r.source_url));
+    for (const s of Array.isArray(r.sources) ? r.sources : []) if (s?.url) urls.add(normUrl(s.url));
+  }
+  return { headlines, keys, urls };
+}
+
 /**
  * Commission a research dossier for one brain. On demand only - there is no cron (Gary): deep research on every
  * brain daily is real web-search spend for little gain. Returns the findings it PROPOSES, already stored at
@@ -169,6 +196,7 @@ export async function runResearch(clientId: string, today: string, focus?: strin
 
   const client = new Anthropic({ apiKey: key });
   const kit = await getBrandKit(clientId).catch(() => null);
+  const seen = await loadSeenResearch(clientId).catch(() => ({ headlines: [] as string[], keys: new Set<string>(), urls: new Set<string>() }));
 
   // THE 90-DAY WINDOW (Gary). Research must be current: a finding older than this reads as stale, not
   // structural. Computed from the run date so it always tracks "today", and passed to the model AND enforced in
@@ -186,6 +214,11 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const askedFor = focus?.trim()
     ? `\n\nTHE COMMISSION - what this particular dossier is for, which should bias what you dig into:\n${focus.trim()}`
     : "";
+  // MEMORY into the prompt: the model should build ON the desk, not repeat it. We show it the headlines already
+  // on file and tell it to only report genuinely NEW developments. A hard code-level dedup below is the backstop.
+  const alreadyFiled = seen.headlines.length
+    ? `\n\nALREADY ON FILE for ${cfg.clientName} - do NOT report any of these again, only genuinely NEW developments or a materially sharper angle:\n${seen.headlines.slice(0, 50).map((h) => `- ${h}`).join("\n")}\n`
+    : "";
 
   // TWO STEPS, for the same reason the daily run does it: given web_search AND the report tool under
   // tool_choice:auto, the model can search and then simply stop without ever filing. Forcing the report in its
@@ -193,7 +226,8 @@ export async function runResearch(clientId: string, today: string, focus?: strin
   const brief = `Today is ${today}. Research ${cfg.clientName} in depth, strictly inside your scope lock.\n\n` +
     `Work the five sections:\n${sectionList}${askedFor}\n\n` +
     `WHAT WE ALREADY KNOW (do NOT report this back - only what ADDS to, sharpens or CONTRADICTS it):\n` +
-    `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n\n` +
+    `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}\n` +
+    `${alreadyFiled}\n` +
     `RECENCY: every finding must rest on something from the LAST ${RECENCY_DAYS} DAYS, i.e. on or after ` +
     `${cutoffStr}. Prioritise your searches to that window. Older material may inform your understanding, but do ` +
     `not present it as a finding. The one wider window is the trends-to-steal section: a globally effective ` +
@@ -280,7 +314,11 @@ export async function runResearch(clientId: string, today: string, focus?: strin
       .filter((s): s is { name: string; url: string } => !!s && typeof (s as { url?: string }).url === "string" && /^https?:\/\//i.test((s as { url: string }).url))
       .slice(0, 8);
     return { f, section, srcs };
-  }).filter((c) => c.srcs.length > 0);
+  }).filter((c) => c.srcs.length > 0)
+    // NO-REPEAT BACKSTOP (Gary): the prompt already asks the model not to repeat what is on file, but a model
+    // drifts, so we also drop a candidate whose headline OR primary source matches something already surfaced
+    // for this brain in the last 180 days. Done BEFORE verification, so a repeat costs nothing to check.
+    .filter((c) => !seen.keys.has(normKey(c.f.headline)) && !c.srcs.some((s) => seen.urls.has(normUrl(s.url))));
   if (!candidates.length) return [];
 
   // VERIFIED RETRIEVAL - the trust layer (Gary's #1). We do not take the model's word that a source exists, says
