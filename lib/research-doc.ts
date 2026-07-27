@@ -187,8 +187,10 @@ export async function buildResearchDocument(clientId: string, runId: string): Pr
   const run = rows[0];
   if (!run) throw new Error("Research run not found.");
   const clientName = run.client_name;
-  const [claims, competitors] = await Promise.all([listResearchClaims(runId), listCompetitors(clientId)]);
-  if (!claims.length) throw new Error("This run has no claims to document.");
+  const [allClaims, competitors] = await Promise.all([listResearchClaims(runId), listCompetitors(clientId)]);
+  // Rejected facts (dropped by Gary at Gate 1) never reach the document, the source register, or the Strategist.
+  const claims = allClaims.filter((c) => !c.rejected);
+  if (!claims.length) throw new Error("This run has no claims to document (all were rejected, or none filed).");
 
   const html = researchDocHtml(clientName, run.website, run, claims, competitors);
   const pdf = await renderPdf(html);

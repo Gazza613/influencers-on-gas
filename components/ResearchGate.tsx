@@ -17,6 +17,7 @@ type Claim = {
   id: string; section: string; subject: string | null; claim: string;
   source_name: string | null; source_url: string | null; source_date: string | null;
   tier: number | null; verified: boolean; unverified_reason: string | null; conflict: string | null;
+  rejected?: boolean;
 };
 type Competitor = { id: string; name: string; website: string | null; added_by: string | null };
 
@@ -218,9 +219,21 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     if (r?.ok) setCompetitors(r.competitors || []);
   }
 
+  // Drop (or restore) a SINGLE fact, surgically, keeping the rest of the fact base. Optimistic - the row updates
+  // at once; rejected facts are excluded from the document and the Strategist hand-off. Regenerate to refresh the PDF.
+  async function rejectClaim(c: Claim, reject: boolean) {
+    setClaims((cs) => cs.map((x) => x.id === c.id ? { ...x, rejected: reject } : x));
+    const r = await fetch(`/api/studio/researcher/claim`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, claimId: c.id, action: reject ? "reject" : "restore" }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { setClaims((cs) => cs.map((x) => x.id === c.id ? { ...x, rejected: !reject } : x)); flex("Couldn't update that fact."); }
+  }
+
   const status = run ? (STATUS[run.status] || STATUS.collecting) : null;
   const canGate = run?.status === "ready";
   const bySection = (id: string) => claims.filter((c) => c.section === id);
+  const rejectedCount = claims.filter((c) => c.rejected).length;
 
   return (
     <div className="mt-8">
@@ -360,37 +373,49 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
 
       {/* THE FACT BASE, BY SECTION */}
       {run && claims.length > 0 && (
-        <div className="mt-8 space-y-8">
-          <h2 className="text-xl font-bold text-ink">The fact base</h2>
+        <div className="mt-8 space-y-9">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-2xl font-bold text-ink">The fact base</h2>
+            {rejectedCount > 0 && (
+              <span className="text-base text-[#fca5a5]">{rejectedCount} fact{rejectedCount === 1 ? "" : "s"} rejected and excluded. <button onClick={() => run && buildDoc(run.id)} className="underline hover:text-accent">Regenerate the document</button> to update the PDF.</span>
+            )}
+          </div>
           {SECTIONS.map((sec) => {
             const rows = bySection(sec.id);
             if (rows.length === 0) return null;
             const isUnverified = sec.id === "unverified";
+            const active = rows.filter((c) => !c.rejected).length;
             return (
               <section key={sec.id}>
-                <div className="flex items-baseline justify-between border-b border-line pb-2">
-                  <h3 className={`text-lg font-bold ${isUnverified ? "text-[#fca5a5]" : "text-ink"}`}>{sec.label}</h3>
-                  <span className="text-sm text-ink-faint">{rows.length}</span>
+                <div className="flex items-baseline justify-between border-b-2 border-line pb-2">
+                  <h3 className={`text-2xl font-bold ${isUnverified ? "text-[#fca5a5]" : "text-ink"}`}>{sec.label}</h3>
+                  <span className="text-base text-ink-faint">{active}{active !== rows.length ? ` of ${rows.length}` : ""}</span>
                 </div>
-                <p className="mt-1 text-sm text-ink-faint">{sec.blurb}</p>
-                <ul className="mt-3 divide-y divide-line/50">
+                <p className="mt-1.5 text-base text-ink-faint">{sec.blurb}</p>
+                <ul className="mt-4 space-y-3">
                   {rows.map((c) => (
-                    <li key={c.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-                      <div className="min-w-0 flex-1">
-                        {c.subject && !new RegExp(clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(c.subject) && (
-                          <span className="mr-2 rounded bg-surface-2 px-1.5 py-0.5 text-xs font-semibold text-ink-dim">{c.subject}</span>
-                        )}
-                        <span className="text-base leading-relaxed text-ink">{c.claim}</span>
-                        {c.conflict && <div className="mt-1 text-sm text-[#fcd34d]">⚠ Sources conflict: {c.conflict}</div>}
-                        {isUnverified && c.unverified_reason && <div className="mt-1 text-sm text-ink-faint">Why unverified: {c.unverified_reason}</div>}
+                    <li key={c.id} className={`rounded-xl border p-4 ${c.rejected ? "border-line/50 bg-surface-1/40 opacity-60" : "border-line/70 bg-surface-1"}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <p className={`flex-1 text-xl leading-relaxed ${c.rejected ? "text-ink-faint line-through" : "text-ink"}`}>
+                          {c.subject && !new RegExp(clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(c.subject) && (
+                            <span className="mr-2 rounded bg-surface-2 px-2 py-0.5 align-middle text-sm font-semibold text-ink-dim">{c.subject}</span>
+                          )}
+                          {c.claim}
+                        </p>
+                        {c.rejected
+                          ? <button onClick={() => rejectClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:text-ink">Undo</button>
+                          : <button onClick={() => rejectClaim(c, true)} className="shrink-0 rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this one fact, keep the rest">Reject</button>}
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                        {c.tier && TIER[c.tier] && <span title={TIER[c.tier].title} className={`rounded border px-1.5 py-0.5 text-xs font-semibold ${TIER[c.tier].cls}`}>{TIER[c.tier].label}</span>}
-                        {c.verified ? <span title="Source fetched and confirmed" className="text-xs font-semibold text-[#86efac]">✓ verified</span> : <span className="text-xs text-ink-faint">unconfirmed</span>}
-                        {c.source_date && <span className="tabular text-xs text-ink-faint">{ukDate(c.source_date)}</span>}
+                      {c.conflict && <div className="mt-2 text-base text-[#fcd34d]">⚠ Sources conflict: {c.conflict}</div>}
+                      {isUnverified && c.unverified_reason && <div className="mt-2 text-base text-ink-faint">Why unverified: {c.unverified_reason}</div>}
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+                        {c.tier && TIER[c.tier] && <span title={TIER[c.tier].title} className={`rounded border px-2 py-0.5 font-semibold ${TIER[c.tier].cls}`}>{TIER[c.tier].label}</span>}
+                        {c.verified ? <span title="Source fetched and confirmed" className="font-semibold text-[#86efac]">✓ verified</span> : <span className="text-ink-faint">unconfirmed</span>}
+                        {c.source_date && <span className="tabular text-ink-faint">{ukDate(c.source_date)}</span>}
                         {c.source_url
-                          ? <a href={c.source_url} target="_blank" rel="noreferrer" className="max-w-[12rem] truncate text-sm text-accent hover:underline">{c.source_name || "source"}</a>
-                          : <span className="text-sm text-ink-faint">{c.source_name || "no source"}</span>}
+                          ? <a href={c.source_url} target="_blank" rel="noreferrer" className="max-w-[20rem] truncate text-accent hover:underline">{c.source_name || "source"}</a>
+                          : <span className="text-ink-faint">{c.source_name || "no source"}</span>}
+                        {c.rejected && <span className="font-semibold text-[#fca5a5]">rejected</span>}
                       </div>
                     </li>
                   ))}

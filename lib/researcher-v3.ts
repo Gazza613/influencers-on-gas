@@ -134,6 +134,7 @@ export type ResearchClaim = {
   id: string; run_id: string; client_id: string; section: string; subject: string | null; claim: string;
   source_name: string | null; source_url: string | null; source_date: string | null; tier: number | null;
   verified: boolean; unverified_reason: string | null; conflict: string | null;
+  rejected?: boolean; rejected_by?: string | null;
 };
 
 const noDash = (s: unknown) => String(s ?? "")
@@ -346,7 +347,7 @@ export async function collectResearch(
 /** The claims for a run, ordered for rendering (section order, then verified before unverified, Tier 1 first). */
 export async function listResearchClaims(runId: string): Promise<ResearchClaim[]> {
   return (await db().query(
-    `select id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict
+    `select id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, rejected, rejected_by
      from research_claims where run_id = $1 order by created_at asc`, [runId],
   )) as ResearchClaim[];
 }

@@ -761,6 +761,8 @@ create table if not exists research_claims (
   verified boolean not null default false,
   unverified_reason text,       -- why it is signal-only (Unverified section)
   conflict text,                -- note when sources disagree (both are still recorded)
+  rejected boolean not null default false,  -- a single fact Gary dropped at Gate 1 (surgical, keeps the rest)
+  rejected_by text,             -- who rejected it (audit trail; a soft flag, never a hard delete)
   created_at timestamptz not null default now()
 );
 create index if not exists idx_research_claims_run on research_claims(run_id);
@@ -775,3 +777,10 @@ create table if not exists research_competitors (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_research_competitors_client on research_competitors(client_id);
+
+-- Columns added after the tables first shipped (create-if-not-exists above skips existing tables, so evolve here).
+alter table research_runs add column if not exists pdf_url text;
+alter table research_runs add column if not exists drive_url text;
+alter table research_runs add column if not exists notified_at timestamptz;
+alter table research_claims add column if not exists rejected boolean not null default false;
+alter table research_claims add column if not exists rejected_by text;
