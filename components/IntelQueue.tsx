@@ -345,7 +345,7 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
             <p className="text-lg text-ink-dim">
               {isResearcher
                 ? <>No research yet. Add a focus if you like, then hit <b className="text-ink">Deep Dive Research</b>.</>
-                : <>Nothing in the queue. The daily run is at 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</>}
+                : <>Nothing in the queue. The weekly run is Friday 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</>}
             </p>
           ) : (
             <>

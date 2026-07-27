@@ -390,6 +390,8 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   -- stay for sections not yet moved to token metering.
   ('anthropic','claude-opus-4-8','mtok_in', 0, 9250, true),
   ('anthropic','claude-opus-4-8','mtok_out', 0, 46250, true),
+  ('anthropic','claude-sonnet-4-6','mtok_in', 0, 5550, true),   -- daily Strategist watcher runs here ($3/1M)
+  ('anthropic','claude-sonnet-4-6','mtok_out', 0, 27750, true), -- ($15/1M)
   ('anthropic','claude-haiku-4-5','mtok_in', 0, 1850, true),
   ('anthropic','claude-haiku-4-5','mtok_out', 0, 9250, true),
   ('anthropic','web_search','search', 0, 18.5, true)

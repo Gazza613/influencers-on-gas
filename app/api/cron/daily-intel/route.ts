@@ -159,10 +159,10 @@ export function buildEmail(client: string, strategist: Intel[], today: string, i
     </div>`;
 
   return emailShell({
-    strapline: "DAILY INTELLIGENCE",
+    strapline: "WEEKLY INTELLIGENCE",
     dateLabel: `${client} · ${ukDate(today)}`,
     body,
-    cadence: "DAILY INTELLIGENCE, 08:30 SAST",
+    cadence: "WEEKLY INTELLIGENCE, FRIDAY 08:30 SAST",
     wordmark: "STRATEGIST",
     role: "AI Research Strategist",
     department: "GAS Marketing Automation",
@@ -211,7 +211,7 @@ export async function GET(req: Request) {
       // agency growth, and one description cannot honestly cover both.
       const cfg = await loadIntelBrief(c.id).catch(() => null);
       const intro = cfg?.emailIntro
-        || `Daily intelligence for ${c.name}. Only findings that should change something reach this email, and each one carries what it could do and what I think we should do about it. Every claim is sourced, so please check the links before repeating anything.`;
+        || `Weekly intelligence for ${c.name}. Only findings that should change something reach this email, and each one carries what it could do and what I think we should do about it. Every claim is sourced, so please check the links before repeating anything.`;
 
       let emailed = false;
       if (sm.length && emailConfigured()) {
