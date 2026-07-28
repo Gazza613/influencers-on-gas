@@ -144,17 +144,31 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // After a collect, the document builds in a DURABLE Inngest job (retryable render/Drive/email). Poll for it,
   // and if it does not land in ~24s (or Inngest is unavailable), fall back to a synchronous build so a PDF is
   // never missing.
+  const polledRef = useRef<string | null>(null);   // which run we're already polling for a PDF (avoids duplicates)
   const pollDocument = useCallback(async (runId: string) => {
+    polledRef.current = runId;
     setDocBusy(true);
-    // The brief now writes prose (Opus) then renders + files, so a document takes ~30-60s. Poll for ~90s before
-    // the synchronous fallback, so a finished PDF from the durable job is shown rather than being rebuilt.
-    for (let i = 0; i < 22; i++) {
-      await new Promise((r) => setTimeout(r, 4000));
+    // The brief writes prose (Opus) then renders + files, which can take a minute or two. Poll patiently (~4 min)
+    // for the durable job to land the PDF - the moment run.pdf_url appears we show Download and stop. Only if it
+    // truly never lands do we fall back to a synchronous build. Poll the exact run, so a newer run can't confuse it.
+    for (let i = 0; i < 48; i++) {
+      await new Promise((r) => setTimeout(r, 5000));
       const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-      if (d?.run) { setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []); if (d.run.pdf_url) { setDocBusy(false); return; } }
+      if (d?.run?.id === runId) {
+        setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []);
+        if (d.run.pdf_url) { setDocBusy(false); return; }
+      }
     }
     await buildDoc(runId, true);
   }, [clientId, buildDoc]);
+
+  // If a run is READY but its PDF is not built yet (e.g. the page was reloaded while the document was still
+  // rendering), resume polling automatically, so the Download button always turns up without any action.
+  useEffect(() => {
+    if (run && run.status === "ready" && !run.pdf_url && !running && !docBusy && polledRef.current !== run.id) {
+      pollDocument(run.id);
+    }
+  }, [run, running, docBusy, pollDocument]);
 
   const loadSpend = useCallback(async () => {
     const d = await fetch(`/api/studio/researcher/spend`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
@@ -400,7 +414,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             <div>
               <div className="text-lg font-bold text-ink">Research Brief</div>
               <div className="mt-0.5 text-sm text-ink-faint">
-                {docBusy ? "Preparing the brief, filing and notifying…" : run.pdf_url ? "A GAS-branded research brief, written for your strategist." : "Not built for this version yet."}
+                {docBusy ? "Writing and rendering the brief, this takes a minute or two. The Download button appears here when it is ready, and it is also emailed to you." : run.pdf_url ? "A GAS-branded research brief, written for your strategist." : "Not built for this version yet, use Generate."}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
