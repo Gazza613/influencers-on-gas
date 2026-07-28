@@ -473,7 +473,11 @@ export async function collectResearch(
     // and half Fable's price. The quality Gary benchmarked lives in the FILE, QA and PROSE steps below, which
     // stay on Fable. This is the single biggest line on the desk, so it is where the split pays off.
     const g = client.messages.stream({
-      model: PREMIUM, max_tokens: 8000,
+      // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large). At 8k
+      // with up to 40 searches it truncated mid-search every run - discarding paid searches and, worse, leaving a
+      // dangling tool_use that 400'd the file step. 16k lets the searches we pay for actually land. You only pay
+      // for tokens produced, so this captures value rather than adding cost.
+      model: PREMIUM, max_tokens: 16000,
       system: `${scope}\n\n${FACTS_ONLY}`,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: passBrief }],
@@ -487,6 +491,22 @@ export async function collectResearch(
     const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
     await recordTokens({ clientId, userEmail, model: PREMIUM, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
 
+    // SANITISE THE GATHER TURN before replaying it into the file step. If the gather hit max_tokens WHILE a
+    // web_search was in flight, its assistant content ends with a `server_tool_use` that has no matching
+    // `web_search_tool_result` - and replaying that turn is a hard 400 ("web_search tool use ... without a
+    // corresponding web_search_tool_result block"). We drop any search request that never got a result, so the
+    // continuation is always valid. (We only lose the one truncated search's results, which never arrived anyway.)
+    const rawContent = Array.isArray(gathered.content) ? gathered.content : [];
+    const resultFor = new Set(rawContent.filter((b) => (b as { type: string }).type === "web_search_tool_result").map((b) => (b as { tool_use_id?: string }).tool_use_id));
+    let gatheredContent = rawContent.filter((b) => {
+      const bb = b as { type: string; name?: string; id?: string };
+      if (bb.type === "server_tool_use" && bb.name === "web_search") return resultFor.has(bb.id);
+      return true;
+    });
+    // An assistant turn must not be empty (the API rejects it). If sanitising removed everything, replay a
+    // minimal text turn so the file step still runs (it will file from the user brief and site block).
+    if (!gatheredContent.length) gatheredContent = [{ type: "text", text: "Search complete." } as unknown as (typeof rawContent)[number]];
+
     const filed = await client.messages.stream({
       model: FABLE, max_tokens: 32000,
       system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact you actually found as a structured claim via file_facts, up to about 120 claims. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines, and give each well-covered section the depth it has real sourced material for. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
@@ -497,7 +517,7 @@ export async function collectResearch(
       tool_choice: { type: "tool", name: "file_facts" },
       messages: [
         { role: "user", content: passBrief },
-        { role: "assistant", content: gathered.content },
+        { role: "assistant", content: gatheredContent },
         { role: "user", content: "Now file the material facts you found via file_facts, each with its real source URL, date and tier. Do not search again." },
       ],
     }).finalMessage();
