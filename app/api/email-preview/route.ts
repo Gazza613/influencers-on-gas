@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { inviteEmail, resetEmail } from "@/lib/invite-email";
 import { buildEmail } from "@/app/api/cron/daily-intel/route";
+import { researchEmailHtml } from "@/lib/research-doc";
+import { renderDoneEmailHtml } from "@/lib/notify";
+import { brandedHtml } from "@/lib/alerts";
 import { APP_URL } from "@/lib/app-url";
 
 // SEE AN EMAIL WITHOUT SENDING ONE.
@@ -32,6 +35,9 @@ export async function GET(req: Request) {
 
   if (type === "invite") html = inviteEmail({ inviterName: "Gary Berman", inviteeName: "Sam", link: `${APP_URL}/invite/sample-token` }).html;
   else if (type === "reset") html = resetEmail({ name: "Sam", link: `${APP_URL}/reset/sample-token` }).html;
+  else if (type === "research") html = researchEmailHtml({ clientName: "The Amber Room", version: 2, claimCount: 54, studioLink: `${APP_URL}/researcher`, pdfUrl: `${APP_URL}/sample.pdf`, driveUrl: "https://drive.google.com/sample", dateLabel: "28 July 2026" });
+  else if (type === "producer") html = renderDoneEmailHtml("Your final cut is ready 🎉", "The final cut for <b>Kiara</b> has finished rendering and stitching. It is ready to review and download.", `${APP_URL}/studio`, "Watch the final cut →");
+  else if (type === "alert") html = brandedHtml("Higgsfield API wallet out of credits", "403 not enough credits (developer-API wallet)", { tag: "OUT OF CREDITS", cause: "The fast REST lane's developer-API wallet ran dry mid-render.", fix: "Top up the API wallet at platform.higgsfield.ai, then re-run the step." }, { influencer: "Kiara", step: "b-roll clip 3", provider: "higgsfield" });
   else html = buildEmail("MTN MoMo", SAMPLE_INTEL, "19 July 2026", "Two findings worth your attention this morning.");
 
   return new NextResponse(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0">${html}</body></html>`, {

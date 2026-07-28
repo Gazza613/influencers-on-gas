@@ -2,6 +2,7 @@ import { sendEmail, emailConfigured } from "@/lib/email";
 import { db } from "@/lib/db";
 import { getInfluencer, updateProductionFields } from "@/lib/influencers";
 import { APP_URL } from "./app-url";
+import { emailShell } from "./email-shell";
 
 // Ops alerting: when the platform hits a real problem (a vendor out of credits, a rejected/expired API
 // key, a vendor down/timing out, or a build step that failed outright), email the admin a branded,
@@ -41,37 +42,29 @@ async function throttleOk(tag: string, minutes: number): Promise<boolean> {
 }
 
 const esc = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const ukDate = () => new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
 
-function brandedHtml(title: string, detail: string, c: { tag: string; cause: string; fix: string }, context: Record<string, string | number | undefined>): string {
+// Built on the shared MOBILE-FIRST shell (Gary: raw fixed-width emails were oversized on a phone). The old 560px
+// fixed table forced a phone to zoom; the shell is fluid and scales type up only on desktop.
+export function brandedHtml(title: string, detail: string, c: { tag: string; cause: string; fix: string }, context: Record<string, string | number | undefined>): string {
   const rows = Object.entries(context).filter(([, v]) => v !== undefined && v !== "" && v !== null)
-    .map(([k, v]) => `<tr><td style="padding:6px 12px;color:#8b8b9e;font-size:12px;white-space:nowrap;vertical-align:top">${esc(k)}</td><td style="padding:6px 12px;color:#e8e8f0;font-size:13px">${esc(String(v))}</td></tr>`)
+    .map(([k, v]) => `<tr><td style="padding:5px 10px;color:#8b8b9e;font-size:12px;white-space:nowrap;vertical-align:top">${esc(k)}</td><td style="padding:5px 10px;color:#e8e8f0;font-size:12px;word-break:break-word">${esc(String(v))}</td></tr>`)
     .join("");
-  return `<!doctype html><html><body style="margin:0;background:#0b0b12;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b12;padding:28px 0">
-    <tr><td align="center">
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:92%;background:#14141f;border:1px solid #262636;border-radius:16px;overflow:hidden">
-        <tr><td style="background:linear-gradient(90deg,#ec4899,#a855f7,#60a5fa);height:5px;line-height:5px;font-size:0">&nbsp;</td></tr>
-        <tr><td style="padding:24px 28px 8px">
-          <div style="color:#8b8b9e;font-size:11px;letter-spacing:2px;text-transform:uppercase">Studio on GAS · Platform alert</div>
-          <div style="display:inline-block;margin-top:12px;padding:4px 12px;border-radius:999px;background:rgba(236,72,153,0.15);border:1px solid rgba(236,72,153,0.4);color:#f9a8d4;font-size:12px;font-weight:700;letter-spacing:1px">⚠️ ${esc(c.tag)}</div>
-          <h1 style="margin:14px 0 0;color:#ffffff;font-size:19px;line-height:1.35">${esc(title)}</h1>
-        </td></tr>
-        <tr><td style="padding:8px 28px">
-          <p style="margin:8px 0;color:#c7c7d6;font-size:14px;line-height:1.55"><b style="color:#fff">What happened:</b> ${esc(c.cause)}</p>
-          <p style="margin:8px 0;color:#c7c7d6;font-size:14px;line-height:1.55"><b style="color:#86efac">What to do:</b> ${esc(c.fix)}</p>
-        </td></tr>
-        ${rows ? `<tr><td style="padding:8px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f0f18;border:1px solid #262636;border-radius:10px">${rows}</table></td></tr>` : ""}
-        <tr><td style="padding:8px 28px 4px">
-          <div style="color:#8b8b9e;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Technical detail</div>
-          <pre style="margin:0;padding:12px 14px;background:#0f0f18;border:1px solid #262636;border-radius:10px;color:#9aa0b4;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(detail).slice(0, 1200)}</pre>
-        </td></tr>
-        <tr><td style="padding:18px 28px 26px">
-          <a href="${APP_URL}/cost-control" style="display:inline-block;padding:10px 18px;border-radius:10px;background:linear-gradient(90deg,#a855f7,#60a5fa);color:#fff;font-size:13px;font-weight:700;text-decoration:none">Open Cost Control →</a>
-          <p style="margin:16px 0 0;color:#5b5b6e;font-size:11px;line-height:1.5">You're getting this because you're the platform admin. Alerts are grouped so a single outage won't flood your inbox.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table></body></html>`;
+  const body = `
+    <div style="display:inline-block;padding:4px 12px;border-radius:999px;background:rgba(249,98,3,0.14);border:1px solid rgba(249,98,3,0.4);color:#fca55f;font-size:11px;font-weight:800;letter-spacing:1px;">&#9888; ${esc(c.tag)}</div>
+    <p class="h2" style="font-size:16px;line-height:1.35;font-weight:800;color:#ffffff;margin:12px 0 0;">${esc(title)}</p>
+    <p class="p" style="font-size:14px;line-height:1.6;color:#c7c7d6;margin:12px 0 6px;"><b style="color:#fff;">What happened:</b> ${esc(c.cause)}</p>
+    <p class="p" style="font-size:14px;line-height:1.6;color:#c7c7d6;margin:0 0 6px;"><b style="color:#86efac;">What to do:</b> ${esc(c.fix)}</p>
+    ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0 0;background:#0f0f18;border:1px solid #262636;border-radius:10px;">${rows}</table>` : ""}
+    <div class="small" style="color:#8b8b9e;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:16px 0 6px;">Technical detail</div>
+    <pre style="margin:0;padding:12px 14px;background:#0f0f18;border:1px solid #262636;border-radius:10px;color:#9aa0b4;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;">${esc(detail).slice(0, 1200)}</pre>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px auto 6px;">
+      <tr><td align="center" bgcolor="#f96203" style="border-radius:999px;">
+        <a href="${APP_URL}/cost-control" style="display:inline-block;padding:14px 30px;font-size:15px;font-weight:800;color:#0b0d12;text-decoration:none;border-radius:999px;">Open Cost Control &rarr;</a>
+      </td></tr>
+    </table>
+    <p class="small" style="font-size:12px;line-height:1.5;color:#5b5b6e;margin:14px 0 0;text-align:center;">You are getting this because you are the platform admin. Alerts are grouped so a single outage will not flood your inbox.</p>`;
+  return emailShell({ strapline: "Platform alert", dateLabel: ukDate(), body, cadence: "PLATFORM ALERTS", role: "AI Studio Lead", department: "Studio on GAS" });
 }
 
 // Send a branded ops alert (best-effort). throttleMinutes groups repeats of the same kind+title.

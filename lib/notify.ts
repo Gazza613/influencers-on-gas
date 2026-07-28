@@ -5,19 +5,26 @@ import { sendEmail, emailConfigured } from "@/lib/email";
 // they can walk away and get pulled back only when there's something to do. Fully guarded: a no-op unless email
 // is configured, and every send is wrapped so a mail hiccup can NEVER fail the render job.
 import { APP_URL } from "./app-url";
+import { emailShell } from "./email-shell";
 // Gary is always BCC'd on every render notification (team oversight), whoever built it.
 const gary = () => process.env.SUPER_ADMIN_EMAIL || process.env.ALERT_EMAIL_TO || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
 const recipient = () => process.env.ALERT_EMAIL_TO || process.env.SUPER_ADMIN_EMAIL || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
 const esc = (s: string) => String(s).replace(/[<>&]/g, (c) => (({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] as string));
+const ukDate = () => new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
 
-function shell(heading: string, body: string, ctaHref: string, ctaLabel: string): string {
-  return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0a0b0f;padding:28px;border-radius:16px;color:#eef1f6;max-width:520px">
-    <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#c07cff;font-weight:700">Studio on GAS · Producer</div>
-    <div style="font-size:22px;font-weight:800;margin:8px 0 10px">${heading}</div>
-    <p style="color:#aab2c2;font-size:14px;line-height:1.6;margin:0 0 18px">${body}</p>
-    <a href="${ctaHref}" style="display:inline-block;padding:11px 20px;border-radius:10px;background:linear-gradient(90deg,#ec4899,#a855f7,#60a5fa);color:#fff;font-size:13px;font-weight:700;text-decoration:none">${ctaLabel}</a>
-    <p style="color:#6f7788;font-size:11px;margin:18px 0 0">You're getting this because a long render finished while you were away.</p>
-  </div>`;
+// Built on the shared MOBILE-FIRST shell (Gary: raw emails were oversized on a phone). Inline sizes are the
+// mobile sizes; the shell scales them up on desktop and survives Gmail stripping the <style> block.
+export function renderDoneEmailHtml(heading: string, body: string, ctaHref: string, ctaLabel: string): string {
+  const inner = `
+    <p class="h2" style="font-size:16px;line-height:1.35;font-weight:800;color:#ffffff;margin:0 0 8px;">${heading}</p>
+    <p class="p" style="font-size:14px;line-height:1.7;color:#9aa0a8;margin:0 0 4px;">${body}</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px auto 6px;">
+      <tr><td align="center" bgcolor="#f96203" style="border-radius:999px;">
+        <a href="${ctaHref}" style="display:inline-block;padding:14px 30px;font-size:15px;font-weight:800;color:#0b0d12;text-decoration:none;border-radius:999px;">${ctaLabel}</a>
+      </td></tr>
+    </table>
+    <p class="small" style="font-size:12px;line-height:1.6;color:#6f757e;margin:16px 0 0;text-align:center;">You are getting this because a long render finished while you were away.</p>`;
+  return emailShell({ strapline: "Producer", dateLabel: ukDate(), body: inner, cadence: "STUDIO PRODUCER", role: "AI Studio Lead", department: "Studio on GAS", wordmark: "PRODUCER" });
 }
 
 // kind "final-render" = the ~40-min full-quality render finished (ready to stitch).
@@ -38,7 +45,7 @@ export async function notifyRenderDone(opts: { name: string; kind: "final-render
   const to = (opts.to && opts.to.includes("@")) ? opts.to.trim() : recipient();
   const bcc = to.toLowerCase() === gary().toLowerCase() ? undefined : gary();
   try {
-    await sendEmail({ to, bcc, subject, html: shell(heading, body, href, label) });
+    await sendEmail({ to, bcc, subject, html: renderDoneEmailHtml(heading, body, href, label) });
     return { sent: true };
   } catch {
     return { sent: false }; // never let a mail failure break the render

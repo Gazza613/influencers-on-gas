@@ -3,6 +3,7 @@ import { renderPdf } from "./studio-render";
 import { putBytes } from "./blob";
 import { fileToClientDrive, driveConfigured } from "./drive";
 import { sendEmail, emailConfigured } from "./email";
+import { emailShell } from "./email-shell";
 import { listResearchClaims, listCompetitors, type ResearchClaim, type ResearchRun } from "./researcher-v3";
 
 // THE RESEARCH DOCUMENT (build spec 3.8, 3.9). A concise, internal, GAS-CI PDF render of the claim store: the
@@ -211,18 +212,10 @@ export async function buildResearchDocument(clientId: string, runId: string): Pr
   // Notify Gary - a Studio link, never an approval mechanism (spec 3.9, 4).
   let emailed = false;
   if (emailConfigured()) {
-    const studioLink = `${STUDIO_URL}/researcher`;
-    const driveLine = driveUrl ? `<p style="margin:6px 0"><a href="${esc(driveUrl)}" style="color:#6d28d9">Open in Google Drive</a></p>` : "";
-    const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px">
-      <div style="font-weight:800;letter-spacing:.5px">GAS · THE RESEARCHER</div>
-      <div style="height:5px;border-radius:3px;margin:8px 0 16px;background:linear-gradient(90deg,#ff4d8d,#a855f7,#3b82f6)"></div>
-      <p style="font-size:16px;margin:0 0 4px"><b>${esc(clientName)}</b> research is ready for your review.</p>
-      <p style="color:#555;margin:0 0 14px">Version ${run.version} · ${claims.length} claim${claims.length === 1 ? "" : "s"} collected, every one sourced and tiered. It is awaiting Gate 1, approve, rerun with notes, or reject in Studio.</p>
-      <p style="margin:0 0 14px"><a href="${esc(studioLink)}" style="display:inline-block;background:#a855f7;color:#fff;font-weight:700;padding:10px 18px;border-radius:8px;text-decoration:none">Review in Studio</a></p>
-      <p style="margin:6px 0"><a href="${esc(pdfUrl)}" style="color:#6d28d9">Download the Research Document (PDF)</a></p>
-      ${driveLine}
-      <p style="color:#999;font-size:12px;margin-top:16px">Approval always happens in Studio, never from this email.</p>
-    </div>`;
+    const html = researchEmailHtml({
+      clientName, version: run.version, claimCount: claims.length,
+      studioLink: `${STUDIO_URL}/researcher`, pdfUrl, driveUrl, dateLabel: ukDate(run.created_at),
+    });
     const r = await sendEmail({ to: NOTIFY_TO, subject: `Research ready · ${clientName} (v${run.version})`, html, fromName: "The Researcher · GAS" }).catch(() => ({ sent: false }));
     emailed = !!r.sent;
     if (emailed) await db().query(`update research_runs set notified_at = now() where id = $1`, [runId]).catch(() => {});
@@ -233,4 +226,25 @@ export async function buildResearchDocument(clientId: string, runId: string): Pr
 
 export function documentDeliveryStatus() {
   return { drive: driveConfigured(), email: emailConfigured() };
+}
+
+// The "research ready" notification, on the shared MOBILE-FIRST shell (Gary: the old raw email was oversized on
+// a phone, where these are opened). Inline sizes are the mobile sizes; the shell scales them up on desktop and
+// survives Gmail stripping the <style>. Exported so /api/email-preview can render it at any width.
+export function researchEmailHtml(o: { clientName: string; version: number; claimCount: number; studioLink: string; pdfUrl: string; driveUrl?: string | null; dateLabel: string }): string {
+  const links = `<p class="small" style="font-size:12px;line-height:1.9;color:#9aa0a8;margin:16px 0 0;text-align:center;">`
+    + `<a href="${esc(o.pdfUrl)}" style="color:#7dd3fc;text-decoration:underline;">Download the Research Document (PDF)</a>`
+    + (o.driveUrl ? `<br /><a href="${esc(o.driveUrl)}" style="color:#7dd3fc;text-decoration:underline;">Open in Google Drive</a>` : "")
+    + `</p>`;
+  const body = `
+    <p class="p" style="font-size:14px;line-height:1.65;color:#e6e8eb;margin:0 0 10px;"><b style="color:#ffffff;">${esc(o.clientName)}</b> research is ready for your review.</p>
+    <p class="p" style="font-size:14px;line-height:1.7;color:#9aa0a8;margin:0 0 4px;">Version ${o.version} &middot; ${o.claimCount} claim${o.claimCount === 1 ? "" : "s"} collected, every one sourced and tiered. It is awaiting Gate 1: approve, rerun with notes, or reject in Studio.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px auto 6px;">
+      <tr><td align="center" bgcolor="#f96203" style="border-radius:999px;">
+        <a href="${esc(o.studioLink)}" style="display:inline-block;padding:14px 30px;font-size:15px;font-weight:800;color:#0b0d12;text-decoration:none;border-radius:999px;">Review in Studio &rarr;</a>
+      </td></tr>
+    </table>
+    ${links}
+    <p class="small" style="font-size:12px;line-height:1.6;color:#6f757e;margin:16px 0 0;text-align:center;">Approval always happens in Studio, never from this email.</p>`;
+  return emailShell({ strapline: "Research ready", dateLabel: o.dateLabel, body, cadence: "ON-DEMAND RESEARCH", role: "Research Lead", department: "Studio on GAS", wordmark: "RESEARCHER" });
 }
