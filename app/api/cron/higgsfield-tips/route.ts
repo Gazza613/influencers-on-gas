@@ -5,12 +5,16 @@ import { buildTipsEmail } from "@/lib/tips-email";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { cronAuthed } from "@/lib/cron";
 
-// Daily "Higgsfield expert" research email to Gary: latest Higgsfield + AI-influencer
-// best practice turned into concrete ideas for the platform. Scheduled in vercel.json
-// (06:00 UTC ~ 08:00 SAST). Also triggerable manually by a signed-in user (for testing).
+// RETIRED (Gary, July 2026): the daily "Higgsfield ideas" research email is no longer wanted - it cost money
+// (a metered Claude + web-search run every morning) for diminishing value. The cron is removed from vercel.json
+// AND the route is disabled here, so neither the schedule nor a stray manual trigger can spend on it again. Kept
+// as a no-op (not deleted) so the history and the metering wiring stay legible if we ever want it back.
 export const maxDuration = 120;
+const RETIRED = true;
 
 export async function GET(req: Request) {
+  if (RETIRED) return NextResponse.json({ sent: false, retired: true, reason: "Daily Higgsfield-tips email was retired (Gary): no schedule, no spend." });
+
   const session = await auth();
   if (!cronAuthed(req) && session?.user?.role !== "super_admin") return NextResponse.json({ error: "forbidden" }, { status: 401 }); // manual trigger: super-admin only (these can spend money)
 
