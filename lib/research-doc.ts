@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { FABLE } from "./vendors/anthropic";
+import { OPUS5 } from "./vendors/anthropic";
 import { recordTokens } from "./usage";
 import { renderPdf } from "./studio-render";
 import { putBytes } from "./blob";
@@ -104,14 +104,14 @@ async function writeBriefProse(clientId: string, clientName: string, vertical: s
   const input = sections.map((s) => `## ${s.id} - ${s.label}\n${s.facts.map((f) => `- ${f}`).join("\n")}`).join("\n\n");
   try {
     const res = await client.messages.stream({
-      model: FABLE, max_tokens: 12000,
+      model: OPUS5, max_tokens: 12000,
       system: `You write internal research BRIEFS for GAS Marketing's strategy team - the read a marketing strategist does to understand a client before building strategy. Rewrite each section's facts as FLOWING PROFESSIONAL PARAGRAPHS, never bullet points.\n\nRULES:\n- Use ONLY the facts given. Add nothing, infer nothing, ANALYSE nothing - analysis is the strategist's job, not yours. No opinions, no recommendations, no SWOT.\n- Keep every specific: names, roles, numbers, dates, product names, addresses, quotes and prices. Detail is the point of this brief, do not summarise the specifics away into generalities.\n- Where the facts note something was not found, not disclosed, or that sources conflict, say so plainly in a sentence - do not hide gaps.\n- Write in UK British English. Never use an em dash or en dash, use a comma or full stop. Direct, confident, no fluff, no AI-sounding filler.\n- LEAD WITH RECENCY: in the positioning, current marketing and recent-activity sections, OPEN with the most recent developments and the current strategic thrust (the newest dated facts define where the business is now). Frame older products or campaigns as the established base, not the headline.\n- 1 to 4 paragraphs per section, separated by a blank line, scaled to how much real detail the facts hold. Do not repeat the section title inside the prose.`,
       tools: [{ name: "write_brief", description: "The brief prose, one entry per section id.", input_schema: SCHEMA }],
       tool_choice: { type: "tool", name: "write_brief" },
       messages: [{ role: "user", content: `Client: ${clientName}${vertical ? ` (${vertical})` : ""}\n\nThe verified fact base, grouped by section id. Write the brief prose for each:\n\n${input}` }],
     }).finalMessage();
     const u = res.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-    await recordTokens({ clientId, userEmail, model: FABLE, action: "research-brief", inputTokens: u?.input_tokens || 0, outputTokens: u?.output_tokens || 0, cacheReadTokens: u?.cache_read_input_tokens || 0, cacheCreationTokens: u?.cache_creation_input_tokens || 0 }).catch(() => {});
+    await recordTokens({ clientId, userEmail, model: OPUS5, action: "research-brief", inputTokens: u?.input_tokens || 0, outputTokens: u?.output_tokens || 0, cacheReadTokens: u?.cache_read_input_tokens || 0, cacheCreationTokens: u?.cache_creation_input_tokens || 0 }).catch(() => {});
     const block = res.content.find((b) => b.type === "tool_use");
     const out = (block && block.type === "tool_use" ? (block.input as { sections?: { id?: string; prose?: string }[] }).sections : []) || [];
     const map: Record<string, string> = {};

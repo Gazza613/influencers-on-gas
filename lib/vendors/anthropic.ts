@@ -20,10 +20,13 @@ export const STANDARD = "claude-sonnet-4-6";
 // The DIRECTOR runs on the premium model: the storyboard is the highest-leverage reasoning step
 // (it must stay context-aware about who does what, and read the reference creatives), so it's worth it.
 export const PREMIUM = "claude-opus-4-8";
-// FABLE 5 - Anthropic's most capable model. The Researcher's brain runs on this: its extraction and synthesis
-// are materially deeper than Opus (Gary benchmarked a Fable 5 brief and it was dramatically richer). Priced in
-// rate_card (mtok_in 10 / mtok_out 50), so runs stay accurately metered.
+// FABLE 5 - Anthropic's most capable model (mtok_in 10 / mtok_out 50). Kept available, but the Researcher no
+// longer defaults to it: Opus 5 matches most of Fable's capability at HALF the price, which matters after we hit
+// the account usage limit. Reach for FABLE only where a step genuinely needs the very top model.
 export const FABLE = "claude-fable-5";
+// OPUS 5 - the new default (mtok_in 5 / mtok_out 25, half Fable's price). The Researcher's brain runs on this
+// now: near-Fable extraction and synthesis, at the Opus price we already pay for the gather. Verify stays Haiku.
+export const OPUS5 = "claude-opus-5";
 // Ingestion: reading printed text off a card is not a judgement call. Running 68 of those on a premium model
 // is paying Opus prices to do OCR.
 export const INGEST = "claude-haiku-4-5";
