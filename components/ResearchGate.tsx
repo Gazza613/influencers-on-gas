@@ -91,6 +91,12 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // implies a Drive/email that is not switched on.
   const [docBusy, setDocBusy] = useState(false);
   const [delivery, setDelivery] = useState<{ drive: boolean; email: boolean } | null>(null);
+  // COST METER (Gary): the Researcher's spend, so the team sees it as they run. Refreshed after every run.
+  const [spend, setSpend] = useState<{ monthCents: number; todayCents: number; runsThisMonth: number } | null>(null);
+  // NEW BRAIN (Gary): create a client from the dropdown - name + one or more websites.
+  const [showCreate, setShowCreate] = useState(false);
+  const [nb, setNb] = useState<{ name: string; sites: string[] }>({ name: "", sites: [""] });
+  const [creating, setCreating] = useState(false);
   // Ground-truth website (Gary, material): the team offers up the client's real site so the collect can never
   // research a same-named but different business. Reuses the existing client-website endpoint.
   const [website, setWebsite] = useState("");
@@ -140,6 +146,30 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     }
     await buildDoc(runId, true);
   }, [clientId, buildDoc]);
+
+  const loadSpend = useCallback(async () => {
+    const d = await fetch(`/api/studio/researcher/spend`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+    if (d && typeof d.monthCents === "number") setSpend(d);
+  }, []);
+  useEffect(() => { loadSpend(); }, [loadSpend]);
+
+  async function createBrain() {
+    const name = nb.name.trim();
+    const sites = nb.sites.map((s) => s.trim()).filter(Boolean);
+    if (!name) { flex("A client name is needed."); return; }
+    if (!sites.length) { flex("At least one website is needed, it is the ground-truth anchor."); return; }
+    setCreating(true);
+    const r = await fetch(`/api/studio/researcher/brain`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, websites: sites }),
+    }).then((x) => x.json()).catch(() => null);
+    setCreating(false);
+    if (!r?.ok) { flex(r?.error || "Couldn't create the brain."); return; }
+    setShowCreate(false); setNb({ name: "", sites: [""] });
+    flex(`Brain created: ${r.name}. Run the Researcher on it.`);
+    setClientId(r.id);   // select the new one; it appears once the server list refreshes
+    router.refresh();
+  }
 
   useEffect(() => {
     if (!clientId) return;
@@ -207,6 +237,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     flex(`Research v${version} filed ${count} claim${count === 1 ? "" : "s"}, ready for your review.`);
     await load(clientId);
     if (count > 0) { setJustDone(true); setTimeout(() => setJustDone(false), 9000); }   // green "complete" flash
+    loadSpend();   // refresh the cost meter with what this run spent
     // The Research Document builds in a durable background job now; poll for it (synchronous fallback inside).
     if (runId && count > 0) pollDocument(runId);
   }
@@ -258,15 +289,27 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const bySection = (id: string) => claims.filter((c) => c.section === id);
   const rejectedCount = claims.filter((c) => c.rejected).length;
 
+  const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
     <div className="mt-8">
+      {/* COST METER */}
+      {spend && (
+        <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-line bg-surface-1 px-4 py-2.5">
+          <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Researcher spend</span>
+          <span className="tabular"><b className="text-xl font-bold text-ink">{rand(spend.monthCents)}</b> <span className="text-sm text-ink-faint">this month</span></span>
+          <span className="tabular text-base text-ink-dim">{rand(spend.todayCents)} <span className="text-sm text-ink-faint">today</span></span>
+          <span className="text-sm text-ink-faint">{spend.runsThisMonth} run{spend.runsThisMonth === 1 ? "" : "s"} this month</span>
+        </div>
+      )}
       {/* CLIENT + GROUND TRUTH */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <label className="block">
           <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Client</span>
-          <select value={clientId} onChange={(e) => setClientId(e.target.value)}
+          <select value={clientId} onChange={(e) => { if (e.target.value === "__new__") setShowCreate(true); else setClientId(e.target.value); }}
             className="mt-1 block w-72 rounded-lg border border-line bg-surface-1 px-3 py-2 text-lg outline-none focus:border-accent">
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{configured.includes(c.id) ? "" : " (not researchable yet)"}</option>)}
+            <option value="__new__">+ New brain…</option>
           </select>
         </label>
         <div className="flex items-end gap-2">
@@ -281,6 +324,31 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         </div>
       </div>
       <p className="mt-2 text-sm text-ink-faint">The website is the anchor: the Researcher only reports the organisation at this address, never a same-named business.</p>
+
+      {/* NEW BRAIN */}
+      {showCreate && (
+        <div className="mt-4 rounded-xl border border-accent/40 bg-surface-1 p-5">
+          <div className="text-lg font-bold text-ink">New brain</div>
+          <p className="mt-0.5 text-sm text-ink-faint">Create a client. Add every official website they run, the first is the primary ground-truth anchor.</p>
+          <input value={nb.name} onChange={(e) => setNb({ ...nb, name: e.target.value })} placeholder="Client name"
+            className="mt-3 block w-full max-w-md rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg outline-none focus:border-accent" />
+          <div className="mt-3 space-y-2">
+            {nb.sites.map((s, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input value={s} onChange={(e) => { const sites = [...nb.sites]; sites[i] = e.target.value; setNb({ ...nb, sites }); }}
+                  placeholder={i === 0 ? "https://primary-website.co.za" : "https://another-site.co.za"}
+                  className="block w-full max-w-md rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-accent" />
+                {nb.sites.length > 1 && <button onClick={() => setNb({ ...nb, sites: nb.sites.filter((_, j) => j !== i) })} aria-label="Remove website" className="text-ink-faint hover:text-alert">✕</button>}
+              </div>
+            ))}
+            <button onClick={() => setNb({ ...nb, sites: [...nb.sites, ""] })} className="text-sm font-semibold text-accent hover:underline">+ Add another website</button>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button onClick={createBrain} disabled={creating} className="rounded-lg bg-accent px-5 py-2.5 text-base font-bold text-black disabled:opacity-50">{creating ? "Creating…" : "Create brain"}</button>
+            <button onClick={() => { setShowCreate(false); setNb({ name: "", sites: [""] }); }} className="rounded-lg border border-line px-4 py-2.5 text-base font-semibold text-ink-dim hover:text-ink">Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* RUN BAR - obvious visual feedback for the team (Gary): glow + spinner while running, green when done. */}
       <div className="mt-5 flex flex-wrap items-center gap-3">

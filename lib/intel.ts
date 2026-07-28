@@ -98,7 +98,8 @@ export async function deriveResearchBrief(clientId: string): Promise<{ clientNam
 export async function researchableClientIds(): Promise<string[]> {
   const rows = (await db().query(
     `select distinct c.id from clients c
-     where exists (select 1 from intel_briefs b where b.client_id = c.id and b.researcher is not null)
+     where c.website is not null and c.website <> ''
+        or exists (select 1 from intel_briefs b where b.client_id = c.id and b.researcher is not null)
         or exists (select 1 from knowledge_chunks k where k.client_id = c.id)`,
   )) as { id: string }[];
   return rows.map((r) => String(r.id));
@@ -202,6 +203,18 @@ export async function clientWebsite(clientId: string): Promise<string | null> {
      group by 1 order by n desc limit 1`, [clientId],
   )) as { host: string | null; n: number }[];
   return dom[0]?.host ? `${dom[0].host}/` : null;
+}
+
+// ALL of a client's official sites (Gary: some clients have several). The primary `website` first, then any
+// extras from `websites`, deduped. Falls back to the crawl domain if none is set.
+export async function clientWebsites(clientId: string): Promise<string[]> {
+  const c = (await db().query(`select website, websites from clients where id = $1`, [clientId])) as { website: string | null; websites: string[] | null }[];
+  const extra = Array.isArray(c[0]?.websites) ? c[0]!.websites! : [];
+  const all = [...(c[0]?.website ? [c[0].website] : []), ...extra].map((u) => String(u || "").trim()).filter(Boolean);
+  const dedup = [...new Set(all.map((u) => u.replace(/\/+$/, "").toLowerCase()))].map((low) => all.find((u) => u.replace(/\/+$/, "").toLowerCase() === low)!);
+  if (dedup.length) return dedup;
+  const w = await clientWebsite(clientId);
+  return w ? [w] : [];
 }
 
 // Which brains have research configured at all. The daily run iterates THESE, so adding a brain's brief is what

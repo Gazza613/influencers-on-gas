@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
 import { PREMIUM, INGEST } from "./vendors/anthropic";
-import { clientWebsite, siteAnchor, deriveResearchBrief, loadIntelBrief } from "./intel";
+import { clientWebsites, siteAnchor, deriveResearchBrief, loadIntelBrief } from "./intel";
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
 import { ingestChunks } from "./rag";
@@ -203,14 +203,17 @@ function pageScore(u: string): number {
 // LIVE-FETCH THE CORE PAGES (Gary). A crawl can be incomplete - GAS's brain was blog-only, missing home/about/
 // products/contact. So at run time we fetch the client's foundational pages DIRECTLY from their live site, so the
 // brief is never hostage to a partial crawl. fetchSourcePage returns clean text (HTML stripped) and is SSRF-safe.
-async function loadCorePages(website: string | null): Promise<string> {
-  if (!website) return "";
-  const base = website.replace(/\/+$/, "");
+async function loadCorePages(websites: string[]): Promise<string> {
+  if (!websites.length) return "";
   const paths = ["", "/about", "/about-us", "/who-we-are", "/company", "/our-story", "/products", "/services",
     "/solutions", "/what-we-do", "/offering", "/pricing", "/plans", "/contact", "/contact-us", "/get-in-touch",
     "/team", "/our-team", "/leadership", "/people", "/faq", "/faqs"];
   const seen = new Set<string>();
-  const urls = paths.map((p) => base + p).filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
+  const urls: string[] = [];
+  for (const w of websites) {
+    const base = String(w).replace(/\/+$/, "");
+    for (const p of paths) { const u = base + p; if (!seen.has(u)) { seen.add(u); urls.push(u); } }
+  }
   const fetched = await Promise.all(urls.map(async (u) => {
     const r = await fetchSourcePage(u).catch(() => null);
     return r && r.ok && r.text.trim().length > 200 ? { url: u, text: r.text.trim() } : null;
@@ -270,8 +273,11 @@ export async function collectResearch(
   const derived = await deriveResearchBrief(clientId);
   if (!derived) throw new Error("This brain has nothing to research yet. Add the client and crawl their site into the brain first.");
   const name = derived.clientName;
-  const website = await clientWebsite(clientId).catch(() => null);
-  const anchor = siteAnchor(name, website);
+  const websites = await clientWebsites(clientId).catch(() => [] as string[]);
+  const website = websites[0] || null;    // primary, for the anchor and the run record
+  const anchor = siteAnchor(name, website) + (websites.length > 1
+    ? `\n\n${name} also operates these official sites, all the SAME organisation - research them as ${name}'s own too: ${websites.slice(1).join(", ")}.`
+    : "");
 
   // LOCKED GROUND TRUTH the GAS team supplied (Gary): the CEO / senior leadership. This OVERRIDES anything the
   // web says - the team knows their client. It was being ignored (the collector rediscovered leadership from
@@ -333,7 +339,7 @@ export async function collectResearch(
   // current, competitors, press, the team on LinkedIn). No scrimping here (Gary): this runs periodically and the
   // aim is the best possible research, so we read widely.
   const [corePages, crawled] = await Promise.all([
-    loadCorePages(website).catch(() => ""),
+    loadCorePages(websites).catch(() => ""),
     loadSiteContent(clientId, 22000).catch(() => ""),
   ]);
   const siteRaw = [corePages, crawled].filter(Boolean).join("\n\n").slice(0, 36000);

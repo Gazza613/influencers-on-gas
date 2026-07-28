@@ -36,6 +36,7 @@ create table if not exists clients (
   created_at         timestamptz not null default now()
 );
 alter table clients add column if not exists website text;
+alter table clients add column if not exists websites jsonb;   -- additional official sites (some clients run several)
 
 create table if not exists client_profiles (
   id                  uuid primary key default gen_random_uuid(),
