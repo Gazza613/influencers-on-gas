@@ -343,7 +343,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           </div>
         </div>
       </div>
-      <p className="mt-2 text-sm text-ink-faint">The website(s) are the anchor: the Researcher reports only the organisation at these addresses, and reads every one of them. Add each official site a client runs.</p>
+      <p className="mt-2 text-sm text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them.</p>
 
       {/* NEW BRAIN */}
       {showCreate && (
