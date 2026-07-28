@@ -782,5 +782,8 @@ create index if not exists idx_research_competitors_client on research_competito
 alter table research_runs add column if not exists pdf_url text;
 alter table research_runs add column if not exists drive_url text;
 alter table research_runs add column if not exists notified_at timestamptz;
+alter table research_runs add column if not exists vertical text;       -- benchmark-keying category (insurance, fintech, agency...)
+alter table research_runs add column if not exists word_url text;       -- editable Word (.doc) export alongside the PDF
+alter table research_runs add column if not exists identity jsonb;      -- {legal_name, licence, address, markets, contact_person, contact_details} for the brief cover
 alter table research_claims add column if not exists rejected boolean not null default false;
 alter table research_claims add column if not exists rejected_by text;

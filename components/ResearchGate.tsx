@@ -12,7 +12,7 @@ import { askConfirm } from "@/lib/confirm";
 // overwrite), or Reject. The competitor set is editable right here.
 
 type Client = { id: string; name: string };
-type Run = { id: string; version: number; status: string; website: string | null; notes: string | null; created_at: string; pdf_url?: string | null; drive_url?: string | null; notified_at?: string | null };
+type Run = { id: string; version: number; status: string; website: string | null; notes: string | null; created_at: string; vertical?: string | null; pdf_url?: string | null; drive_url?: string | null; word_url?: string | null; notified_at?: string | null };
 type Claim = {
   id: string; section: string; subject: string | null; claim: string;
   source_name: string | null; source_url: string | null; source_date: string | null;
@@ -24,18 +24,23 @@ type Competitor = { id: string; name: string; website: string | null; added_by: 
 // The ten sections of the Research Document, in render order (spec 3.8). Kept here so this client component does
 // not import the server engine. Unverified is last and visually set apart - nothing in it is a fact.
 const SECTIONS: { id: string; label: string; blurb: string }[] = [
-  { id: "snapshot", label: "Client snapshot", blurb: "Who they are, what they sell, where they play" },
-  { id: "foundations", label: "Company foundations", blurb: "History, ownership, leadership, structure" },
-  { id: "products", label: "Products and services", blurb: "Range, pricing where public, propositions" },
-  { id: "market", label: "Market and category", blurb: "Size where sourced, dynamics, regulation" },
-  { id: "digital", label: "Digital footprint", blurb: "Website, SEO basics, social posting" },
-  { id: "contact", label: "Contact and social channels", blurb: "Phone, email, address, hours, WhatsApp, social profiles" },
-  { id: "competitor", label: "Competitor intelligence", blurb: "Observable public activity, client and each competitor" },
+  { id: "snapshot", label: "Who they are", blurb: "What they sell, and where they play" },
+  { id: "foundations", label: "Company foundations", blurb: "History, ownership, structure" },
+  { id: "leadership", label: "Leadership and management team", blurb: "The people who run it, and their backgrounds" },
+  { id: "products", label: "Products, services and commercial model", blurb: "Range, pricing, how they make money and sell" },
+  { id: "market", label: "Market and category", blurb: "The market and category they compete in" },
+  { id: "positioning", label: "How they position themselves", blurb: "Their stated promise, USPs and tone" },
+  { id: "audience", label: "Audience and customers", blurb: "Who they serve, and their segments" },
+  { id: "digital", label: "Digital footprint", blurb: "Website, SEO basics, social activity" },
+  { id: "contact", label: "Contact and channels", blurb: "Phone, email, address, hours, WhatsApp, socials" },
+  { id: "marketing", label: "Current marketing and advertising", blurb: "The client's own channels, campaigns, promos, paid" },
+  { id: "competitor", label: "Competitor intelligence", blurb: "Observable public activity, client and competitors" },
   { id: "competitor_set", label: "Competitor set", blurb: "A factual profile per competitor" },
-  { id: "activity", label: "90-day activity log", blurb: "Dated, sourced developments" },
-  { id: "press", label: "Press and media", blurb: "Media releases, news, interviews, awards, mentions, any date" },
+  { id: "activity", label: "Recent activity (90 days)", blurb: "Dated, sourced developments" },
+  { id: "press", label: "Press and media", blurb: "Releases, news, interviews, awards, mentions, any date" },
   { id: "customer_voice", label: "Customer voice", blurb: "Reviews, ratings, public sentiment" },
-  { id: "faqs", label: "Published FAQs", blurb: "The brand's own frequently-asked questions and answers" },
+  { id: "faqs", label: "Published FAQs", blurb: "The brand's own questions and answers" },
+  { id: "regulatory", label: "Regulatory, compliance and advertising rules", blurb: "Licence + advertising rules (regulated clients only)" },
   { id: "unverified", label: "Unverified, treat as signal only", blurb: "Could not be verified; never cited as fact" },
 ];
 
@@ -294,13 +299,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         <div className="mt-4 rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-lg font-bold text-ink">Research Document</div>
+              <div className="text-lg font-bold text-ink">Research Brief</div>
               <div className="mt-0.5 text-sm text-ink-faint">
-                {docBusy ? "Preparing the PDF, filing and notifying…" : run.pdf_url ? "A GAS-CI PDF of the fact base, facts only." : "Not built for this version yet."}
+                {docBusy ? "Preparing the brief, filing and notifying…" : run.pdf_url ? "A GAS-branded research brief, facts only. PDF to present, Word to edit." : "Not built for this version yet."}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {run.pdf_url && <a href={run.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg bg-accent px-4 py-2 text-base font-bold text-black">Download PDF</a>}
+              {run.word_url && <a href={run.word_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink">Download Word</a>}
               {run.drive_url && <a href={run.drive_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink">Open in Drive</a>}
               <button onClick={() => buildDoc(run.id)} disabled={docBusy}
                 className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink disabled:opacity-50">
