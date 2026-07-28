@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { FABLE, INGEST } from "./vendors/anthropic";
+import { FABLE, PREMIUM, INGEST } from "./vendors/anthropic";
 import { clientWebsites, siteAnchor, deriveResearchBrief, loadIntelBrief } from "./intel";
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
@@ -451,8 +451,11 @@ export async function collectResearch(
   // Streamed (the SDK refuses a 32k non-streaming call), and max_tokens is generous so the forced tool call is
   // never truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
   const runPass = async (passBrief: string): Promise<FileOut> => {
+    // GATHER on Opus 4.8, not Fable (Gary's cost call): the gather is search ORCHESTRATION - Opus is elite at it
+    // and half Fable's price. The quality Gary benchmarked lives in the FILE, QA and PROSE steps below, which
+    // stay on Fable. This is the single biggest line on the desk, so it is where the split pays off.
     const g = client.messages.stream({
-      model: FABLE, max_tokens: 8000,
+      model: PREMIUM, max_tokens: 8000,
       system: `${scope}\n\n${FACTS_ONLY}`,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: passBrief }],
@@ -464,7 +467,7 @@ export async function collectResearch(
     });
     const gathered = await g.finalMessage();
     const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
-    await recordTokens({ clientId, userEmail, model: FABLE, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
+    await recordTokens({ clientId, userEmail, model: PREMIUM, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
 
     const filed = await client.messages.stream({
       model: FABLE, max_tokens: 32000,
