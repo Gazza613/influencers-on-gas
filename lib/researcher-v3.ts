@@ -3,8 +3,9 @@ import { db } from "./db";
 import { getSecret } from "./connections";
 import { STANDARD, INGEST } from "./vendors/anthropic";
 import { clientWebsite, siteAnchor, deriveResearchBrief } from "./intel";
-import { recordTokens } from "./usage";
-import { verifyFinding, toISODate } from "./verify";
+import { recordTokens, recordUsage } from "./usage";
+import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
+import { ingestChunks } from "./rag";
 
 // THE RESEARCHER, V3 - A COLLECTOR, NEVER AN ANALYST (build spec V3, section 3).
 //
@@ -190,6 +191,26 @@ function pageScore(u: string): number {
   return s;
 }
 
+// LIVE-FETCH THE CORE PAGES (Gary). A crawl can be incomplete - GAS's brain was blog-only, missing home/about/
+// products/contact. So at run time we fetch the client's foundational pages DIRECTLY from their live site, so the
+// brief is never hostage to a partial crawl. fetchSourcePage returns clean text (HTML stripped) and is SSRF-safe.
+async function loadCorePages(website: string | null): Promise<string> {
+  if (!website) return "";
+  const base = website.replace(/\/+$/, "");
+  const paths = ["", "/about", "/about-us", "/who-we-are", "/company", "/our-story", "/products", "/services",
+    "/solutions", "/what-we-do", "/offering", "/pricing", "/plans", "/contact", "/contact-us", "/get-in-touch",
+    "/team", "/our-team", "/leadership", "/people", "/faq", "/faqs"];
+  const seen = new Set<string>();
+  const urls = paths.map((p) => base + p).filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
+  const fetched = await Promise.all(urls.map(async (u) => {
+    const r = await fetchSourcePage(u).catch(() => null);
+    return r && r.ok && r.text.trim().length > 200 ? { url: u, text: r.text.trim() } : null;
+  }));
+  let acc = "";
+  for (const f of fetched) { if (f) acc += `[${f.url}] (live)\n${f.text.slice(0, 3000)}\n\n`; }
+  return acc.trim();
+}
+
 async function loadSiteContent(clientId: string, maxChars: number): Promise<string> {
   // 1) Get EVERY crawled URL (cheap - no content), so the pick is over the whole site, not an alphabetical slice.
   const urlRows = (await db().query(
@@ -277,11 +298,18 @@ export async function collectResearch(
     `${COMPETITOR_BRIEF}\n\n` +
     `Search the web now, properly and widely, and do NOT lean only on their own website: ${name}'s own site${website ? ` (${website})` : ""} and channels, PLUS Google News and newsrooms, trade and industry publications, LinkedIn (for the team), business directories, partner and award announcements, review platforms, and - for a regulated client only - the relevant regulator's register. Their site establishes who they are; the independent record is where much of the fact base lives. Record every claim with its real source URL, the source date, and a tier. Facts only.`;
 
-  // READ THE CLIENT'S OWN CRAWLED SITE (Tier 1) so the client's facts come from real page content, not two-line
-  // search snippets, and web search is freed for what the site cannot give (external, current, competitors, press).
-  const siteContent = await loadSiteContent(clientId, 18000).catch(() => "");
-  const siteBlock = siteContent
-    ? `\n\nTHE CLIENT'S OWN WEBSITE, ALREADY CRAWLED FOR YOU (Tier 1, their own channel). Take the client's own facts from THIS real content and cite the page URL shown in [brackets] for each. Do not waste searches re-reading their own site, use this. Then web-search for what is NOT here (external, current, competitors, press, reviews, the team on LinkedIn):\n\n${siteContent}\n`
+  // READ THE CLIENT'S OWN SITE FOR REAL (Tier 1) so the client's facts come from actual page content, not two-line
+  // search snippets. We LIVE-FETCH the foundational pages (bullet-proof against a partial crawl) AND mine whatever
+  // is in the crawled brain, core pages first. Web search is then freed for what the site cannot give (external,
+  // current, competitors, press, the team on LinkedIn). No scrimping here (Gary): this runs periodically and the
+  // aim is the best possible research, so we read widely.
+  const [corePages, crawled] = await Promise.all([
+    loadCorePages(website).catch(() => ""),
+    loadSiteContent(clientId, 22000).catch(() => ""),
+  ]);
+  const siteRaw = [corePages, crawled].filter(Boolean).join("\n\n").slice(0, 36000);
+  const siteBlock = siteRaw
+    ? `\n\nTHE CLIENT'S OWN WEBSITE, READ FOR YOU (Tier 1, their own channel - "(live)" pages were fetched just now, the rest are from our crawl). Take the client's own facts from THIS real content and cite the page URL shown in [brackets] for each. Do not waste searches re-reading their own site, use this. Then web-search for what is NOT here (external, current, competitors, press, reviews, the team on LinkedIn):\n\n${siteRaw}\n`
     : "";
 
   // Shape the file tool output into claims (used by the first pass and the gap pass).
@@ -310,7 +338,7 @@ export async function collectResearch(
     const g = client.messages.stream({
       model: STANDARD, max_tokens: 8000,
       system: `${scope}\n\n${FACTS_ONLY}`,
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: passBrief }],
     });
     g.on("contentBlock", (blk) => {
@@ -326,7 +354,7 @@ export async function collectResearch(
       model: STANDARD, max_tokens: 32000,
       system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing, do NOT pad, but never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
       tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool,
+        { type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool,
         { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
       ],
       tool_choice: { type: "tool", name: "file_facts" },
@@ -471,6 +499,29 @@ export async function latestResearchRun(clientId: string): Promise<ResearchRun |
      from research_runs where client_id = $1 order by version desc limit 1`, [clientId],
   )) as ResearchRun[];
   return rows[0] || null;
+}
+
+/**
+ * Ingest the APPROVED research into the client's BRAIN (RAG) so the platform can retrieve it later (the Strategist,
+ * the Producer, Ask the Brain). The brain IS the client - client_id is the isolation key - so it always exists and
+ * there is nothing to create. NO DUPLICATION (Gary): every research chunk is tagged kind='research', and we DELETE
+ * the prior research chunks before re-ingesting, so the brain holds exactly the latest approved fact base, never
+ * stacked copies. Unverified signals are not ingested (they are not fact). Returns the number of facts ingested.
+ */
+export async function ingestApprovedResearch(clientId: string, runId: string, userEmail?: string | null): Promise<number> {
+  const claims = (await listResearchClaims(runId)).filter((c) => !c.rejected && c.section !== "unverified" && c.claim.trim().length > 0);
+  // Replace any previous approved research in this brain first - no duplication across approvals.
+  await db().query(`delete from knowledge_chunks where client_id = $1 and metadata->>'kind' = 'research'`, [clientId]).catch(() => {});
+  if (!claims.length) return 0;
+  const label = Object.fromEntries(RESEARCH_SECTIONS.map((s) => [s.id, s.label]));
+  const items = claims.map((c) => ({
+    content: `[${label[c.section] || c.section}] ${c.subject ? c.subject + " - " : ""}${c.claim}`
+      + (c.source_name || c.source_url ? ` (source: ${c.source_name || c.source_url}${c.source_date ? ", " + c.source_date : ""}${c.tier ? ", Tier " + c.tier : ""})` : ""),
+    metadata: { kind: "research", section: c.section, run_id: runId, tier: c.tier, url: c.source_url },
+  }));
+  const stored = await ingestChunks(clientId, null, items);
+  if (stored) await recordUsage({ clientId, userEmail: userEmail ?? null, provider: "voyage", model: "voyage-4-lite", unit: "embedding", action: "research-ingest", count: stored }).catch(() => {});
+  return stored;
 }
 
 /** The editable competitor set for a client. */

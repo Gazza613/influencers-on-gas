@@ -1,6 +1,7 @@
 import { inngest } from "@/lib/inngest";
 import { db } from "@/lib/db";
 import { buildResearchDocument } from "@/lib/research-doc";
+import { ingestApprovedResearch } from "@/lib/researcher-v3";
 
 // THE RESEARCHER PIPELINE, DURABLE (build spec V3, sections 2 + 4.4 + 9).
 //
@@ -24,8 +25,9 @@ export const buildResearchDocumentJob = inngest.createFunction(
 );
 
 // research/approved -> Gate 1 passed. This is the seam the Strategist hangs off (Phase 2): reachable ONLY from an
-// approved run. For now it guarantees the approved version has its document (in case approval beat the render),
-// so the fact base Gary signed off is always downloadable and filed.
+// approved run. On approval we (1) guarantee the approved version has its document, and (2) INGEST the approved
+// fact base into the client's brain (RAG) so the rest of the platform can retrieve it - deduped, so re-approvals
+// replace rather than stack (Gary). The brain IS the client, so it always exists; nothing to create.
 export const onResearchApproved = inngest.createFunction(
   { id: "research-approved", name: "Gate 1 approved", retries: 2, triggers: [{ event: "research/approved" }] },
   async ({ event, step }) => {
@@ -36,7 +38,9 @@ export const onResearchApproved = inngest.createFunction(
       return !!rows[0]?.pdf_url;
     });
     if (!has) await step.run("ensure-document", () => buildResearchDocument(clientId, runId).catch(() => null));
+    // Ingest the approved fact base into the brain (durable, retryable, deduped).
+    const ingested = await step.run("ingest-to-brain", () => ingestApprovedResearch(clientId, runId).catch(() => 0));
     // SEAM (Phase 2): trigger the Strategist here. It is only ever reachable from an approved fact base.
-    return { approved: runId };
+    return { approved: runId, ingestedFacts: ingested };
   },
 );
