@@ -253,13 +253,15 @@ async function loadRecentArticles(websites: string[], maxChars: number): Promise
       }
     });
   }));
-  const picked = [...links].slice(0, 14);
-  const fetched = await Promise.all(picked.map(async (u) => {
+  const picked = [...links].slice(0, 26);
+  const fetched = (await Promise.all(picked.map(async (u) => {
     const r = await fetchSourcePage(u).catch(() => null);
     return r && r.ok && r.text.trim().length > 300 ? { url: u, text: r.text.trim(), date: r.date } : null;
-  }));
-  let acc = "";
-  for (const f of fetched) { if (!f) continue; if (acc.length > maxChars) break; acc += `[${f.url}]${f.date ? ` (article, ${f.date})` : " (article)"}\n${f.text.slice(0, 2500)}\n\n`; }
+  }))).filter((x): x is { url: string; text: string; date: string | null } => !!x);
+  // NEWEST FIRST - recency defines positioning (Gary). Dated articles lead, newest to oldest; undated sink.
+  fetched.sort((a, b) => (b.date || "0").localeCompare(a.date || "0"));
+  let acc = "MOST RECENT ARTICLES FIRST (the newest define the client's CURRENT positioning):\n\n";
+  for (const f of fetched) { if (acc.length > maxChars) break; acc += `[${f.url}]${f.date ? ` (article, dated ${f.date})` : " (article, undated)"}\n${f.text.slice(0, 2600)}\n\n`; }
   return acc.trim();
 }
 
@@ -369,7 +371,8 @@ export async function collectResearch(
     `- PUBLISHED FAQs (section=faqs): ${name}'s OWN frequently-asked questions, each as the question and its answer, sourced to their FAQ/help page.\n` +
     `- REGULATORY, ONLY IF THE CLIENT IS IN A REGULATED SECTOR (section=regulatory): if and ONLY if ${name} is in financial services or another licensed/regulated field, capture its licence identifier (e.g. an FSP number, usually in the footer), verify it on the regulator's OWN register (for an FSP, the FSCA register) and record licence status and authorised categories, AND the advertising rules that constrain its campaigns (e.g. FAIS: no guarantees, no urgency devices, mandatory disclaimers). If the client is NOT regulated (an agency, retailer, restaurant, and the like), SKIP this entirely - do not hunt for a licence that does not exist.\n` +
     `If the site or the wider record genuinely has none of an APPLICABLE item, record that absence as a single section=unverified note rather than leaving it out silently.\n\n` +
-    `TWO MORE RULES:\n` +
+    `THREE RULES:\n` +
+    `- RECENCY DEFINES POSITIONING (the most important rule for this brief): the client's CURRENT positioning is defined by their MOST RECENT content - recent articles, LinkedIn posts and launches - NOT by older product pages. A product page can be years old; an article from last week is the truth about where the business is NOW. In POSITIONING, CURRENT MARKETING and ACTIVITY, LEAD with the newest strategic thrust: name the current flagship product/service the recent content centres on, and frame older products as the established portfolio, not the current story. If the recent articles or posts centre on a new service (for example a "PSI / Pre-Sales Intelligence" launch, or a "Media on GAS" performance-marketing push), THAT is the current positioning - make it the headline, never a footnote. Date the recent items.\n` +
     `- DATA RECENCY: for market and industry statistics, actively find and use the MOST RECENT figures available and DATE every statistic with its year. If the newest published figure is more than about a year old, say it is the latest available and flag its age. Never present a two-year-old statistic as if it were current.\n` +
     `- AFFILIATES, KEEP THEM SEPARATE: if ${name} is affiliated with, distributes for, or operates under a larger brand (e.g. a BrightRock / Sanlam / Momentum network), keep ${name}'s OWN facts strictly separate from the parent or partner's. Do NOT attribute the PARENT'S executives, CEO, size or numbers to ${name}. Record the affiliation as a fact, but ${name}'s leadership means ${name}'s OWN people, never the partner's CEO.\n\n` +
     `${COMPETITOR_BRIEF}\n\n` +
