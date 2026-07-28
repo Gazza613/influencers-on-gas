@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flex } from "@/lib/flex";
 import { askConfirm } from "@/lib/confirm";
@@ -67,6 +67,15 @@ function ukDate(s: string | null): string {
   return `${day}${th} ${dt.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })} ${dt.getUTCFullYear()}`;
 }
 
+// Readable elapsed: 45 -> "45s", 80 -> "1m 20s", 3720 -> "1h 2m" (Gary: 80 seconds should read 1 minute 20 seconds).
+function fmtElapsed(s: number): string {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), sec = s % 60;
+  if (m < 60) return sec ? `${m}m ${sec}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
 export default function ResearchGate({ clients, configured = [] }: { clients: Client[]; configured?: string[] }) {
   const router = useRouter();
   const [clientId, setClientId] = useState(() => {
@@ -99,7 +108,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const [creating, setCreating] = useState(false);
   // Ground-truth website (Gary, material): the team offers up the client's real site so the collect can never
   // research a same-named but different business. Reuses the existing client-website endpoint.
-  const [website, setWebsite] = useState("");
+  const [sites, setSites] = useState<string[]>([""]);   // the client's ground-truth websites (some run several)
   const [siteSaved, setSiteSaved] = useState(false);
 
   const clientName = clients.find((c) => c.id === clientId)?.name || "the client";
@@ -175,30 +184,34 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     if (!clientId) return;
     let live = true;
     fetch(`/api/studio/client-website?clientId=${clientId}`, { cache: "no-store" })
-      .then((r) => r.json()).then((d) => { if (live) { setWebsite(d?.website || ""); setSiteSaved(false); } }).catch(() => {});
+      .then((r) => r.json()).then((d) => { if (live) { const w = Array.isArray(d?.websites) && d.websites.length ? d.websites : (d?.website ? [d.website] : [""]); setSites(w.length ? w : [""]); setSiteSaved(false); } }).catch(() => {});
     return () => { live = false; };
   }, [clientId]);
 
+  // ONE continuous timer per run. It must key on `running`, NOT `progress` - progress changes on every search and
+  // phase, and keying on it restarted the clock from zero each time (Gary). startedRef is stamped once, in runCollect.
+  const startedRef = useRef(0);
   useEffect(() => {
-    if (!progress) { setElapsed(0); return; }
-    const started = Date.now();
-    const t = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    if (!running) return;
+    const t = setInterval(() => setElapsed(Math.max(0, Math.floor((Date.now() - startedRef.current) / 1000))), 1000);
     return () => clearInterval(t);
-  }, [progress]);
+  }, [running]);
 
-  async function saveWebsite() {
+  async function saveSites() {
+    const list = sites.map((s) => s.trim()).filter(Boolean);
     const r = await fetch("/api/studio/client-website", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, website }),
+      body: JSON.stringify({ clientId, websites: list }),
     }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) { setWebsite(r.website || ""); setSiteSaved(true); setTimeout(() => setSiteSaved(false), 1800); }
-    else flex(r?.error || "Couldn't save the website.");
+    if (r?.ok) { setSites(r.websites?.length ? r.websites : [""]); setSiteSaved(true); setTimeout(() => setSiteSaved(false), 1800); }
+    else flex(r?.error || "Couldn't save the websites.");
   }
 
   // Commission a collect. withNotes runs a "Rerun with notes" - a fresh VERSION addressing corrections, never an
   // overwrite. Streams the real searches, sources and claims as they land, so the run never feels like a dead bar.
   async function runCollect(withNotes?: string) {
     setRunning(true); setNote(""); setShowNotes(false); setJustDone(false);
+    startedRef.current = Date.now(); setElapsed(0);
     setProgress({ label: `Collecting facts on ${clientName}`, searches: [], sources: 0, filed: 0 });
     let version = 0, count = 0, errored = "", runId = "";
     try {
@@ -312,18 +325,25 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             <option value="__new__">+ New brain…</option>
           </select>
         </label>
-        <div className="flex items-end gap-2">
-          <label className="block">
-            <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Ground-truth website</span>
-            <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://www.the-amber-room.co.za/"
-              className="mt-1 block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-base outline-none focus:border-accent" />
-          </label>
-          <button onClick={saveWebsite} className="rounded-lg border border-line px-3 py-2 text-base font-semibold text-ink-dim hover:text-ink">
-            {siteSaved ? "✓ Saved" : "Save"}
-          </button>
+        <div>
+          <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Ground-truth website(s)</span>
+          <div className="mt-1 space-y-2">
+            {sites.map((s, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input value={s} onChange={(e) => { const next = [...sites]; next[i] = e.target.value; setSites(next); }}
+                  placeholder={i === 0 ? "https://www.the-amber-room.co.za/" : "https://another-official-site.co.za"}
+                  className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-base outline-none focus:border-accent" />
+                {sites.length > 1 && <button onClick={() => setSites(sites.filter((_, j) => j !== i))} aria-label="Remove website" className="text-ink-faint hover:text-alert">✕</button>}
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-3">
+            <button onClick={() => setSites([...sites, ""])} className="text-sm font-semibold text-accent hover:underline">+ Add another website</button>
+            <button onClick={saveSites} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:text-ink">{siteSaved ? "✓ Saved" : "Save"}</button>
+          </div>
         </div>
       </div>
-      <p className="mt-2 text-sm text-ink-faint">The website is the anchor: the Researcher only reports the organisation at this address, never a same-named business.</p>
+      <p className="mt-2 text-sm text-ink-faint">The website(s) are the anchor: the Researcher reports only the organisation at these addresses, and reads every one of them. Add each official site a client runs.</p>
 
       {/* NEW BRAIN */}
       {showCreate && (
@@ -404,7 +424,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         <div className="mt-4 rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex items-center justify-between">
             <div className="text-lg font-semibold text-ink">{progress.label}</div>
-            <div className="tabular text-sm text-ink-faint">{elapsed}s · {progress.sources} sources · {progress.filed} filed</div>
+            <div className="tabular text-sm text-ink-faint">{fmtElapsed(elapsed)} · {progress.sources} sources · {progress.filed} filed</div>
           </div>
           {progress.searches.length > 0 && (
             <ul className="mt-3 space-y-1">
