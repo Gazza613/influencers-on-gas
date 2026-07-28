@@ -10,6 +10,7 @@ type Report = {
   byUser: { user_email: string; credits: number; cents: number; events: number }[];
   byUserDesk: { user_email: string; total_cents: number; desks: { desk: string; cents: number; tint: string }[] }[];
   byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
+  byClient: { id: string | null; name: string; cents: number; events: number; research_cents: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
   byAction: { action: string; credits: number; cents: number; events: number }[];
   byDesk: { desk: string; credits: number; cents: number; events: number; tint: string }[];
@@ -213,6 +214,9 @@ export default function CostControlPage() {
         {/* TEAM MEMBERS - the number that matters most to Gary */}
         <TeamMembers rows={members} />
 
+        {/* BY CLIENT / BRAIN - total spend and research-only cost per client (Gary: "this is key") */}
+        {report && report.byClient.some((c) => c.id) && <ClientCosts rows={report.byClient} />}
+
         {/* BY SECTION */}
         {report && report.byDesk.length > 0 && <SectionSplit desks={report.byDesk} fixedByDesk={fixedByDesk} />}
 
@@ -282,6 +286,45 @@ export default function CostControlPage() {
         )}
       </main>
     </div>
+  );
+}
+
+// BY CLIENT / BRAIN (Gary: "research by client cost - this is key"). Research, strategy and brain work are all
+// keyed by client_id, so this is where "what has each client cost us, research included" gets answered. The
+// Research column pulls out the Researcher-desk slice; combined with the Team members view above (who ran it),
+// this closes the loop: which client, what it cost, and who commissioned it.
+type ClientRow = { id: string | null; name: string; cents: number; events: number; research_cents: number; last_at: string };
+function ClientCosts({ rows }: { rows: ClientRow[] }) {
+  const clients = rows.filter((c) => c.id);   // drop the "(no client)" platform/cron bucket
+  if (!clients.length) return null;
+  const researchTint = "#a855f7";   // matches "The Researcher" desk tint
+  return (
+    <section className="mt-8">
+      <h2 className="text-xl font-bold">By client / brain</h2>
+      <p className="mt-0.5 text-lg text-ink-dim">What each client has cost this period, with the research spend pulled out. Pair with Team members above to see who ran it.</p>
+      <div className="mt-3 overflow-hidden rounded-xl border border-line bg-surface-1">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-line text-sm uppercase tracking-wide text-ink-faint">
+              <th className="px-5 py-3 font-semibold">Client</th>
+              <th className="px-5 py-3 text-right font-semibold"><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: researchTint }} />Research</span></th>
+              <th className="px-5 py-3 text-right font-semibold">Total spend</th>
+              <th className="hidden px-5 py-3 text-right font-semibold sm:table-cell">Last activity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clients.map((c) => (
+              <tr key={c.id} className="border-b border-line/50 last:border-0">
+                <td className="px-5 py-3 text-lg font-semibold text-ink">{c.name}</td>
+                <td className="tabular px-5 py-3 text-right text-lg font-bold" style={{ color: c.research_cents > 0 ? researchTint : undefined }}>{c.research_cents > 0 ? rand(c.research_cents) : "—"}</td>
+                <td className="tabular px-5 py-3 text-right text-lg font-bold text-ink">{rand(c.cents)}</td>
+                <td className="hidden px-5 py-3 text-right text-base text-ink-faint sm:table-cell">{c.last_at}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

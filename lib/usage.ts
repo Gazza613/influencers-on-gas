@@ -159,6 +159,10 @@ export type CostReport = {
   // view answers "what did each person cost, and on which section". Empty desks are dropped per member.
   byUserDesk: { user_email: string; total_cents: number; desks: { desk: string; cents: number; tint: string }[] }[];
   byInfluencer: { id: string | null; name: string; credits: number; cents: number; images: number; videos: number; last_at: string }[];
+  // Per CLIENT / brain (Gary: "research by client cost - this is key"). The Researcher, Strategist and brain work
+  // are all keyed by client_id, so this answers "what has each client cost us", research included. Researcher-only
+  // cost per client is `research_cents`.
+  byClient: { id: string | null; name: string; cents: number; events: number; research_cents: number; last_at: string }[];
   byProvider: { provider: string; credits: number; cents: number }[];
   byAction: { action: string; credits: number; cents: number; events: number }[];
   byDesk: DeskSpend[];
@@ -216,6 +220,27 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
     from usage_events u left join influencers i on i.id = u.influencer_id ${where}
     group by i.id, i.name order by max(u.created_at) desc limit 200`)) as CostReport["byInfluencer"];
 
+  // PER CLIENT / BRAIN. Grouped by client_id + action so the Researcher slice can be split out in TS (deskOf),
+  // giving both the client's TOTAL spend and its research-only cost in one table.
+  const clientRows = (await q(`
+    select u.client_id as id, coalesce(c.name,'(no client)') as name, coalesce(u.action,'(other)') as action,
+           sum(u.cents)::int as cents, count(*)::int as events, max(u.created_at) as last_at
+    from usage_events u left join clients c on c.id = u.client_id ${where}
+    group by u.client_id, c.name, u.action`)) as { id: string | null; name: string; action: string; cents: number; events: number; last_at: string }[];
+  const perClient = new Map<string, { id: string | null; name: string; cents: number; events: number; research_cents: number; last_at: string }>();
+  for (const r of clientRows) {
+    const k = r.id || "none";
+    const cur = perClient.get(k) ?? { id: r.id, name: r.name, cents: 0, events: 0, research_cents: 0, last_at: r.last_at };
+    cur.cents += Number(r.cents) || 0;
+    cur.events += Number(r.events) || 0;
+    if (deskOf(r.action) === "The Researcher") cur.research_cents += Number(r.cents) || 0;
+    if (r.last_at > cur.last_at) cur.last_at = r.last_at;
+    perClient.set(k, cur);
+  }
+  const byClient: CostReport["byClient"] = [...perClient.values()]
+    .map((c) => ({ ...c, last_at: c.last_at ? new Date(c.last_at).toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "" }))
+    .sort((a, b) => b.cents - a.cents);
+
   // TEAM MEMBER x SECTION cross-tab. Grouped by the same normalized user + action, then rolled to desks in TS
   // (one mapping, next to the call sites). Gives "each section by team member" and the per-member total in one.
   const userDeskRows = (await db().query(
@@ -246,7 +271,7 @@ export async function getReport(f: CostFilters = {}): Promise<CostReport> {
   const influencers = (await db().query(`select id, name from influencers order by created_at desc limit 500`)) as { id: string; name: string }[];
   const providers = (await db().query(`select distinct provider from usage_events order by provider`) as { provider: string }[]).map((r) => r.provider);
 
-  return { total, split, byUser, byUserDesk, byInfluencer, byProvider, byAction, byDesk, byDay, influencers, providers };
+  return { total, split, byUser, byUserDesk, byInfluencer, byClient, byProvider, byAction, byDesk, byDay, influencers, providers };
 }
 
 // Total ledger credits/cents recorded since a date (for cycle reconciliation).
