@@ -237,8 +237,11 @@ export async function collectResearch(
   // claims (Gary hit exactly this on a content-rich client: a wide search found so many facts the file call blew
   // the 16k ceiling and filed nothing). So max_tokens is large AND the model is asked to bound the fact base to
   // the material facts - a fact base is not "everything on the internet", it is the ~70 facts that matter.
+  // STREAMED, not create(). At max_tokens this large the SDK REFUSES a non-streaming request ("Streaming is
+  // required for operations that may take longer than 10 minutes") and throws before it ever calls the API - so
+  // a non-streaming create here would fail outright. Streaming lifts that cap and is how the gather already runs.
   emit({ t: "phase", label: "Filing the facts, with sources and tiers" });
-  const filed = await client.messages.create({
+  const filed = await client.messages.stream({
     model: STANDARD,
     max_tokens: 32000,
     system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found in your search as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing facts and do NOT pad, but never omit the always-collect items (regulatory identity, contact details, social channels, press and FAQs). Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
@@ -252,7 +255,7 @@ export async function collectResearch(
       { role: "assistant", content: gathered.content },
       { role: "user", content: "Now file the material facts you found via file_facts (up to ~70), each with its real source URL, date and tier. Do not search again." },
     ],
-  });
+  }).finalMessage();
   // If the tool call still hit the ceiling, the JSON is truncated and unparseable - surface it rather than
   // silently filing zero (the failure mode we are fixing).
   if (filed.stop_reason === "max_tokens") emit({ t: "phase", label: "The fact base was very large; filing what was captured" });
