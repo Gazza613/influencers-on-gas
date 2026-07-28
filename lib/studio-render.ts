@@ -113,13 +113,17 @@ export async function renderPdf(html: string, opts: { marginMm?: number } = {}):
   const b = await browser();
   const page = await b.newPage();
   try {
-    await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
+    // domcontentloaded, NOT "load": a document that @imports a web font (Poppins) must never HANG the render if
+    // the font host is slow or blocked. We give fonts + images a bounded window below, then print regardless - a
+    // brief that renders in a fallback font beats a brief that never renders (Gary: missing PDF).
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30_000 });
     await page.evaluate(async () => {
       const d = document as unknown as { fonts: { ready: Promise<unknown> } };
-      await d.fonts.ready;
-      await Promise.all([...document.images].map((img) => img.complete ? null : new Promise((res) => { img.onload = res; img.onerror = res; })));
+      const cap = (p: Promise<unknown>, ms: number) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
+      await cap(d.fonts.ready, 5000);   // wait up to 5s for the web font, then proceed with the fallback
+      await cap(Promise.all([...document.images].map((img) => img.complete ? null : new Promise((res) => { img.onload = res; img.onerror = res; }))), 6000);
     });
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 200));
     const m = `${opts.marginMm ?? 14}mm`;
     const pdf = await page.pdf({
       format: "A4", printBackground: true, preferCSSPageSize: true,

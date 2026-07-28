@@ -223,6 +223,46 @@ async function loadCorePages(websites: string[]): Promise<string> {
   return acc.trim();
 }
 
+// DEEP-READ THE ARTICLES/BLOG (Gary): the client's own recent articles are where product launches, positioning
+// and thought leadership live, and a fixed core-page list misses them. We fetch each site's article/blog listing,
+// pull the individual article links, and read the most recent ones in full. This surfaces things like a "PSI /
+// Pre-Sales Intelligence" launch that a homepage never mentions.
+async function fetchRawHtml(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(8000), headers: { "User-Agent": "Mozilla/5.0 (compatible; GAS-Studio-Researcher/1.0; +https://gasmarketing.co.za)", Accept: "text/html" } });
+    if (!res.ok) return "";
+    if (!/html|text/i.test(res.headers.get("content-type") || "")) return "";
+    return (await res.text()).slice(0, 400_000);
+  } catch { return ""; }
+}
+async function loadRecentArticles(websites: string[], maxChars: number): Promise<string> {
+  if (!websites.length) return "";
+  const listingPaths = ["/articles", "/blog", "/news", "/insights", "/resources", "/thinking", "/perspectives", "/learn"];
+  const links = new Set<string>();
+  await Promise.all(websites.flatMap((w) => {
+    const base = String(w).replace(/\/+$/, "");
+    const origin = base.match(/^https?:\/\/[^/]+/)?.[0] || base;
+    return listingPaths.map(async (lp) => {
+      const raw = await fetchRawHtml(base + lp);
+      if (!raw) return;
+      for (const m of raw.matchAll(/href=["']([^"'#?]+)["']/gi)) {
+        let h = m[1];
+        if (h.startsWith("/")) h = origin + h;
+        if (!h.startsWith(origin)) continue;                                             // same site only (SSRF-safe)
+        if (/\/(article|articles|blog|news|insight|insights|post|posts)\/[a-z0-9]/i.test(h)) links.add(h);
+      }
+    });
+  }));
+  const picked = [...links].slice(0, 14);
+  const fetched = await Promise.all(picked.map(async (u) => {
+    const r = await fetchSourcePage(u).catch(() => null);
+    return r && r.ok && r.text.trim().length > 300 ? { url: u, text: r.text.trim(), date: r.date } : null;
+  }));
+  let acc = "";
+  for (const f of fetched) { if (!f) continue; if (acc.length > maxChars) break; acc += `[${f.url}]${f.date ? ` (article, ${f.date})` : " (article)"}\n${f.text.slice(0, 2500)}\n\n`; }
+  return acc.trim();
+}
+
 async function loadSiteContent(clientId: string, maxChars: number): Promise<string> {
   // 1) Get EVERY crawled URL (cheap - no content), so the pick is over the whole site, not an alphabetical slice.
   const urlRows = (await db().query(
@@ -321,6 +361,8 @@ export async function collectResearch(
     `- LEADERSHIP (section=leadership): the EXECUTIVE and MANAGEMENT team ONLY - the CEO/MD, founders, directors, principals and practice managers - NOT the full roster of advisers or staff (a list of advisers is NOT the leadership). Names, roles and a short background each. Dig BEYOND the website: LinkedIn company page, news, and for a licensed FSP the regulator's register, which lists the KEY INDIVIDUALS (the legally responsible officers) - treat those as the authoritative leadership. Note any FORMER holders of a senior role if that is on record. If the company genuinely does not publish an executive team anywhere you can find, record that explicitly as a section=unverified note - do NOT pad the leadership section with advisers to make it look complete. You MAY capture the team's SIZE and make-up as a SINGLE snapshot fact (e.g. "the site lists roughly 14 advisers and 5 practice coordinators"), but never file each individual adviser as leadership.\n` +
     `- AUDIENCE (section=audience): who the client serves today, their customer base and segments, and any stated target audience.\n` +
     `- CURRENT MARKETING (section=marketing): the client's OWN observable marketing and advertising - which channels they post on, cadence, campaign themes, promotions, and whether they run paid ads.\n` +
+    `- RECENT ARTICLES (sections=marketing/activity/positioning/products): read the client's OWN recent articles/blog (last 3 months, provided above where fetched) and mine them for PRODUCT LAUNCHES (e.g. a new product like PSI / Pre-Sales Intelligence), positioning shifts and thought-leadership themes. These are a primary source for what the business is pushing now.\n` +
+    `- FOUNDERS' AND EXECUTIVES' LINKEDIN (sections=activity/leadership/positioning): search the named founders and executives BY NAME on LinkedIn for their recent posts, announcements, product launches and positioning statements in the last 90 days. LinkedIn is where leaders announce what is new before it hits the website.\n` +
     `- CONTACT DETAILS (section=contact): every phone number, email address, physical address, operating hours and WhatsApp number ${name} publishes.\n` +
     `- SOCIAL CHANNELS (section=contact): every official social profile ${name} runs, each as the platform plus its full URL or @handle (Facebook, Instagram, LinkedIn, X/Twitter, TikTok, YouTube).\n` +
     `- PRESS AND MEDIA (section=press): media releases, news, interviews, podcasts, awards and notable third-party mentions, at ANY date, each sourced. Search beyond their own site.\n` +
@@ -338,13 +380,14 @@ export async function collectResearch(
   // is in the crawled brain, core pages first. Web search is then freed for what the site cannot give (external,
   // current, competitors, press, the team on LinkedIn). No scrimping here (Gary): this runs periodically and the
   // aim is the best possible research, so we read widely.
-  const [corePages, crawled] = await Promise.all([
+  const [corePages, articles, crawled] = await Promise.all([
     loadCorePages(websites).catch(() => ""),
-    loadSiteContent(clientId, 22000).catch(() => ""),
+    loadRecentArticles(websites, 20000).catch(() => ""),
+    loadSiteContent(clientId, 16000).catch(() => ""),
   ]);
-  const siteRaw = [corePages, crawled].filter(Boolean).join("\n\n").slice(0, 36000);
+  const siteRaw = [corePages, articles, crawled].filter(Boolean).join("\n\n").slice(0, 50000);
   const siteBlock = siteRaw
-    ? `\n\nTHE CLIENT'S OWN WEBSITE, READ FOR YOU (Tier 1, their own channel - "(live)" pages were fetched just now, the rest are from our crawl). Take the client's own facts from THIS real content and cite the page URL shown in [brackets] for each. Do not waste searches re-reading their own site, use this. Then web-search for what is NOT here (external, current, competitors, press, reviews, the team on LinkedIn):\n\n${siteRaw}\n`
+    ? `\n\nTHE CLIENT'S OWN WEBSITE, READ FOR YOU (Tier 1, their own channel - "(live)" pages and "(article)" pages were fetched just now, the rest are from our crawl). Take the client's own facts from THIS real content and cite the page URL shown in [brackets] for each. The "(article)" pages are the client's RECENT ARTICLES/BLOG - mine them hard for product launches, positioning and thought leadership (they reveal far more than a homepage). Do not waste searches re-reading their own site, use this. Then web-search for what is NOT here:\n\n${siteRaw}\n`
     : "";
 
   // Shape the file tool output into claims (used by the first pass and the gap pass).
