@@ -520,7 +520,9 @@ export async function ingestApprovedResearch(clientId: string, runId: string, us
     metadata: { kind: "research", section: c.section, run_id: runId, tier: c.tier, url: c.source_url },
   }));
   const stored = await ingestChunks(clientId, null, items);
-  if (stored) await recordUsage({ clientId, userEmail: userEmail ?? null, provider: "voyage", model: "voyage-4-lite", unit: "embedding", action: "research-ingest", count: stored }).catch(() => {});
+  // Meter the Voyage embedding. unit 'embed' matches the rate_card row (voyage-4-lite is a fraction of a cent for
+  // a research ingest, so it prices ~R0, but the event is recorded and attributed to The Researcher desk).
+  if (stored) await recordUsage({ clientId, userEmail: userEmail ?? null, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "research-ingest", count: stored }).catch(() => {});
   return stored;
 }
 
