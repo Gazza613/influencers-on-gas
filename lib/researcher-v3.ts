@@ -334,13 +334,15 @@ async function loadSiteContent(clientId: string, maxChars: number): Promise<stri
  * analysis ever. Returns the run and its stored claims. onEvent streams live progress for the desk to narrate.
  *
  * @param notes optional Gate-1 "rerun with notes" corrections, folded into this version's brief.
+ * @param focus optional up-front steer for THIS run (e.g. specific suburbs, a product line, a region). It adds
+ *   emphasis and dedicated depth, but never overrides facts-only, the no-fabrication lock, or the always-collect items.
  */
 export async function collectResearch(
   clientId: string,
   today: string,
-  opts: { userEmail?: string | null; notes?: string | null; onEvent?: (e: CollectEvent) => void } = {},
+  opts: { userEmail?: string | null; notes?: string | null; focus?: string | null; onEvent?: (e: CollectEvent) => void } = {},
 ): Promise<{ run: ResearchRun; claims: ResearchClaim[] }> {
-  const { userEmail, notes } = opts;
+  const { userEmail, notes, focus } = opts;
   const emit = (e: CollectEvent) => { try { opts.onEvent?.(e); } catch { /* progress is best-effort */ } };
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
@@ -382,6 +384,13 @@ export async function collectResearch(
     ? `\n\nCORRECTION NOTES from the last review (address these precisely in this version):\n${notes.trim().slice(0, 2000)}`
     : "";
 
+  // FOCUS (Gary): an optional up-front steer for THIS run - e.g. specific suburbs for an estate agency, a product
+  // line, a region, a competitor to profile. It PRIORITISES and DEEPENS that angle, but it does not narrow the
+  // brief: the always-collect items and every section are still gathered, and the no-fabrication lock still holds.
+  const focusBlock = focus?.trim()
+    ? `\n\nFOCUS FOR THIS RUN (the team's steer - treat as a PRIORITY): ${focus.trim().slice(0, 1000)}\nGive this extra depth and dedicated, sourced facts, and weave it through the relevant sections. This is an emphasis, NOT a restriction: still collect the always-collect items and cover every section. And it never loosens the rules, only real, sourced facts, never anything invented to satisfy the focus.`
+    : "";
+
   // DO NOT REFERENCE (Gary): facts the team REJECTED in any past review are a permanent block-list for this
   // client. We tell the model never to surface them again AND filter them out in code below, so a rejected fact
   // can never come back on a rerun.
@@ -400,7 +409,7 @@ export async function collectResearch(
 
   const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}${ceoLock}${deprecatedLock}${rejectBlock}`;
 
-  const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${knownList}${notesBlock}\n\n` +
+  const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${focusBlock}${knownList}${notesBlock}\n\n` +
     `Cover every angle a marketing strategist needs: who they are and what they sell (snapshot), history/ownership/structure (foundations), the leadership and management team (leadership), products/pricing and the commercial model - how they make money and how they sell (products), the market and category (market), how THEY position themselves - promise, USPs, tone (positioning), who they serve and their audience (audience), website/SEO/social (digital), their OWN current marketing and advertising (marketing), the competitor intelligence below, a one-line profile of each competitor (competitor_set), dated developments in the last 90 days on/after ${cutoffStr} (activity), press and media (press), and reviews/sentiment incl. SA platforms like HelloPeter and Google (customer_voice).\n\n` +
     `Also set the tool fields 'vertical' (the client's marketing category) and 'regulated' (whether they are in a licensed/regulated sector).\n\n` +
     `ALWAYS COLLECT, EVERY RUN, WITHOUT EXCEPTION (check the site footer, and the contact, about, team and help pages):\n` +

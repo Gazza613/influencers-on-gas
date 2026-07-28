@@ -26,9 +26,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; notes?: string };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; notes?: string; focus?: string };
   const clientId = String(b.clientId || "").trim();
   const notes = String(b.notes || "").trim().slice(0, 2000);
+  const focus = String(b.focus || "").trim().slice(0, 1000);
   if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
         const { run, claims } = await collectResearch(clientId, today, {
           userEmail: session.user?.email ?? null,
           notes: notes || null,
+          focus: focus || null,
           onEvent: (e) => send(e),
         });
         // DURABLE DOCUMENT (Inngest): render the PDF, file to Drive and email Gary in a retryable background job,

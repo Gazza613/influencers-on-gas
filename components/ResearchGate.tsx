@@ -92,6 +92,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const [note, setNote] = useState("");
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState("");
+  const [focus, setFocus] = useState("");   // optional up-front steer for this run (e.g. specific suburbs)
   const [newComp, setNewComp] = useState({ name: "", website: "" });
   const [progress, setProgress] = useState<null | { label: string; searches: string[]; sources: number; filed: number }>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -231,7 +232,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     try {
       const resp = await fetch(`/api/studio/researcher/collect`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, notes: withNotes || "" }),
+        body: JSON.stringify({ clientId, notes: withNotes || "", focus: focus.trim() }),
       });
       if (!resp.ok || !resp.body) throw new Error(`The Researcher could not start (${resp.status}).`);
       const reader = resp.body.getReader();
@@ -397,8 +398,20 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         </div>
       )}
 
+      {/* FOCUS (Gary): an optional steer before the run - e.g. specific suburbs for an estate agency, a product
+          line, a region. Prioritises that angle without narrowing the brief. Hidden once a run is in flight. */}
+      {!running && (
+        <div className="mt-5">
+          <label className="block text-sm font-semibold uppercase tracking-wide text-ink-faint">Focus for this run (optional)</label>
+          <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2}
+            placeholder="Steer the research. e.g. 'Focus on the Southern Suburbs: Constantia, Claremont, Newlands, Bishopscourt.' Leave blank for a full run."
+            className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-1 px-3.5 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
+          <p className="mt-1 text-sm text-ink-faint">An emphasis, not a filter: every section is still collected, and nothing is ever made up to fit the focus.</p>
+        </div>
+      )}
+
       {/* RUN BAR - obvious visual feedback for the team (Gary): glow + spinner while running, green when done. */}
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <button onClick={() => runCollect()} disabled={running || !isConfigured}
           className={`rounded-lg px-5 py-2.5 text-lg font-bold transition ${
             running ? "bg-accent text-black glow-accent"
