@@ -212,6 +212,13 @@ body {
   border: 2px solid rgba(168, 85, 247, 0.25); border-top-color: #c79bff;
   animation: spinRing 0.7s linear infinite; vertical-align: -0.15em;
 }
+/* High-contrast variant for use ON a solid accent button (light-purple-on-purple
+   vanished — Gary couldn't see it). Dark track + dark head reads against the
+   button's black text; thicker and a touch bigger so the motion is unmissable. */
+.spinner-ring--solid {
+  width: 1.25em; height: 1.25em; border-width: 3px;
+  border-color: rgba(0, 0, 0, 0.28); border-top-color: #12082e;
+}
 @keyframes spinRing { to { transform: rotate(360deg); } }
 
 /* Thin top progress bar shown during route navigation. */

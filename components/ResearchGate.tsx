@@ -406,7 +406,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             : `bg-accent text-black ${!isConfigured ? "opacity-50" : ""}`
           }`}>
           {running
-            ? <span className="inline-flex items-center gap-2"><span className="spinner-ring" style={{ fontSize: "1.05em" }} /> Collecting…</span>
+            ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Collecting… <span className="tabular font-semibold opacity-80">{fmtElapsed(elapsed)}</span></span>
             : justDone ? "✓ Research complete"
             : run ? "Collect again (new version)" : "Run the Researcher"}
         </button>
