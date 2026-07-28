@@ -131,7 +131,9 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // never missing.
   const pollDocument = useCallback(async (runId: string) => {
     setDocBusy(true);
-    for (let i = 0; i < 6; i++) {
+    // The brief now writes prose (Opus) then renders + files, so a document takes ~30-60s. Poll for ~90s before
+    // the synchronous fallback, so a finished PDF from the durable job is shown rather than being rebuilt.
+    for (let i = 0; i < 22; i++) {
       await new Promise((r) => setTimeout(r, 4000));
       const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
       if (d?.run) { setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []); if (d.run.pdf_url) { setDocBusy(false); return; } }

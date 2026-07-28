@@ -268,8 +268,9 @@ export async function collectResearch(
   // web says - the team knows their client. It was being ignored (the collector rediscovered leadership from
   // scratch), which is why a locked CEO did not appear. Injected into the scope so both passes treat it as fact.
   const briefLock = await loadIntelBrief(clientId).catch(() => null);
+  const ceoTitleLock = briefLock?.ceoTitle || "Chief Executive Officer";
   const ceoLock = briefLock?.ceoName
-    ? `\n\nCONFIRMED LEADERSHIP (ground truth from the GAS team - Tier 1, and it OVERRIDES anything you find online that conflicts): ${briefLock.ceoName} is the ${briefLock.ceoTitle || "Chief Executive Officer"} of ${name}. File this in the leadership section as a verified fact, research their professional background, and never contradict or omit it.`
+    ? `\n\nCONFIRMED LEADERSHIP - GROUND TRUTH from the GAS team, this is FACT and it OVERRIDES the web. You MUST file this exact leadership fact, tier 1, verified: "${briefLock.ceoName} is the ${ceoTitleLock} of ${name}." Write it plainly as ${name}'s ${ceoTitleLock}. If the web associates ${briefLock.ceoName} mainly with a PARENT or PARTNER organisation (for example a BrightRock), that is BACKGROUND about the SAME person - you may record it as their prior/related role or affiliation, but you must NOT present ${briefLock.ceoName} as primarily another company's executive, must NOT contradict that they lead ${name}, and must NEVER omit that they are ${name}'s ${ceoTitleLock}.`
     : "";
 
   // Existing competitor set - so a targeted re-pass can be scoped, and so we build on the set, not replace it.
@@ -418,6 +419,40 @@ export async function collectResearch(
       if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
     }
     if (Array.isArray(out2.competitors)) out.competitors = [...(out.competitors || []), ...out2.competitors];
+  }
+
+  // ADVERSARIAL QA PASS (Gary). Before Gate 1, a ruthless senior-editor pass red-teams the fact base and catches
+  // what a human reviewer would: facts MIS-ATTRIBUTED to the client (a parent/partner's CEO or numbers shown as
+  // the client's own), advisers filed as leadership, tangential trivia, and load-bearing claims on a single weak
+  // source. It DROPS / MOVES / DEMOTES bad claims so the base is clean BEFORE it reaches you. This is what turns
+  // "you catch the misses" into "it catches its own". Best-effort - it never blocks the run.
+  if (rawClaims.length) {
+    emit({ t: "phase", label: "Reviewing the fact base for accuracy and attribution" });
+    const QA_SCHEMA = { type: "object", additionalProperties: false, properties: { reviews: { type: "array", items: { type: "object", additionalProperties: false, properties: { index: { type: "integer" }, action: { type: "string", enum: ["keep", "drop", "move", "demote"] }, section: { type: "string" }, reason: { type: "string" } }, required: ["index", "action", "section", "reason"] } } }, required: ["reviews"] } as unknown as Anthropic.Tool["input_schema"];
+    const list = rawClaims.map((c, i) => `${i}. [section=${c.section} | about: ${c.subject}] ${c.claim}${c.source_url ? ` (src: ${c.source_url})` : " (no source)"}`).join("\n");
+    try {
+      const qa = await client.messages.stream({
+        model: PREMIUM, max_tokens: 16000,
+        system: `You are a ruthless senior research editor. Review a fact base about ${name} before it reaches a marketing strategist and rule on EVERY numbered claim:\n- keep: a correct, relevant fact, correctly placed and correctly attributed (${name}'s OWN fact, or a clearly-labelled competitor fact in a competitor section).\n- drop: WRONG, tangential trivia that will not inform strategy, or MIS-ATTRIBUTED - a fact about a parent, partner or other company presented as ${name}'s own (for example a partner's CEO, size or numbers shown as ${name}'s).\n- move: a real fact in the WRONG section - give the correct section id. Advisers/staff filed under leadership belong in snapshot; a competitor fact outside a competitor section moves to competitor.\n- demote: a load-bearing claim on a single weak or uncorroborated source, or stale data shown as current - give section "unverified".\nValid section ids: ${RESEARCH_SECTIONS.map((s) => s.id).join(", ")}.\nRULES: ${name}'s LEADERSHIP means ${name}'s OWN executives, never a parent or partner's. Be strict about noise, a strategist wants signal not filler.${ceoLock ? ` GROUND TRUTH: ${briefLock?.ceoName} IS ${name}'s ${ceoTitleLock} - always keep that, never drop or demote it, and drop or fix anything that reframes them as only a parent company's executive.` : ""}\nReturn a verdict for EVERY claim index, using the exact index shown.`,
+        tools: [{ name: "review", description: "A verdict for every claim.", input_schema: QA_SCHEMA }],
+        tool_choice: { type: "tool", name: "review" },
+        messages: [{ role: "user", content: `Fact base to review (${rawClaims.length} claims):\n\n${list}` }],
+      }).finalMessage();
+      const qu = qa.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+      await recordTokens({ clientId, userEmail, model: PREMIUM, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
+      const qblock = qa.content.find((b) => b.type === "tool_use");
+      const reviews = (qblock && qblock.type === "tool_use" ? (qblock.input as { reviews?: { index: number; action: string; section: string; reason: string }[] }).reviews : []) || [];
+      const drop = new Set<number>();
+      for (const r of reviews) {
+        const i = Number(r.index);
+        if (!Number.isInteger(i) || i < 0 || i >= rawClaims.length) continue;
+        if (r.action === "drop") drop.add(i);
+        else if (r.action === "move" && SECTION_IDS.has(String(r.section) as ResearchSectionId)) rawClaims[i].section = String(r.section);
+        else if (r.action === "demote") { rawClaims[i].section = "unverified"; rawClaims[i].unverified_reason = noDash(r.reason).slice(0, 500) || rawClaims[i].unverified_reason || "Flagged in review: single or uncorroborated source."; }
+      }
+      for (let i = rawClaims.length - 1; i >= 0; i--) if (drop.has(i)) rawClaims.splice(i, 1);
+      emit({ t: "phase", label: `Review complete: cleaned ${drop.size} weak or mis-attributed claim${drop.size === 1 ? "" : "s"}` });
+    } catch { /* QA is best-effort, never block the run */ }
   }
 
   // VERIFIED RETRIEVAL (spec 3.7). We do not take the model's word that a source exists, says what it claims, or
