@@ -788,3 +788,5 @@ alter table research_runs add column if not exists word_url text;       -- edita
 alter table research_runs add column if not exists identity jsonb;      -- {legal_name, licence, address, markets, contact_person, contact_details} for the brief cover
 alter table research_claims add column if not exists rejected boolean not null default false;
 alter table research_claims add column if not exists rejected_by text;
+alter table research_claims add column if not exists in_brain boolean not null default false;  -- a fact Gary kept at Gate 1 (moves to the "In the Brain" tray; carried forward so reruns show only what is new)
+alter table research_claims add column if not exists in_brain_by text;

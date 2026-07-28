@@ -17,7 +17,7 @@ type Claim = {
   id: string; section: string; subject: string | null; claim: string;
   source_name: string | null; source_url: string | null; source_date: string | null;
   tier: number | null; verified: boolean; unverified_reason: string | null; conflict: string | null;
-  rejected?: boolean;
+  rejected?: boolean; in_brain?: boolean;
 };
 type Competitor = { id: string; name: string; website: string | null; added_by: string | null };
 
@@ -303,7 +303,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // Drop (or restore) a SINGLE fact, surgically, keeping the rest of the fact base. Optimistic - the row updates
   // at once; rejected facts are excluded from the document and the Strategist hand-off. Regenerate to refresh the PDF.
   async function rejectClaim(c: Claim, reject: boolean) {
-    setClaims((cs) => cs.map((x) => x.id === c.id ? { ...x, rejected: reject } : x));
+    setClaims((cs) => cs.map((x) => x.id === c.id ? { ...x, rejected: reject, in_brain: reject ? false : x.in_brain } : x));
     const r = await fetch(`/api/studio/researcher/claim`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, claimId: c.id, action: reject ? "reject" : "restore" }),
@@ -311,10 +311,23 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     if (!r?.ok) { setClaims((cs) => cs.map((x) => x.id === c.id ? { ...x, rejected: !reject } : x)); flex("Couldn't update that fact."); }
   }
 
+  // Tag a SINGLE fact "in the brain" (or take it back out). Like a reject, it clears the fact out of the live
+  // review list into its own "In the Brain" tray, so on the NEXT run only the untagged, genuinely-new facts show.
+  // A fact can be in-brain OR rejected, never both - tagging one clears the other.
+  async function brainClaim(c: Claim, add: boolean) {
+    setClaims((cs) => cs.map((x) => x.id === c.id ? { ...x, in_brain: add, rejected: add ? false : x.rejected } : x));
+    const r = await fetch(`/api/studio/researcher/claim`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, claimId: c.id, action: add ? "add_brain" : "remove_brain" }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { setClaims((cs) => cs.map((x) => x.id === c.id ? { ...x, in_brain: !add } : x)); flex("Couldn't update that fact."); }
+  }
+
   const status = run ? (STATUS[run.status] || STATUS.collecting) : null;
   const canGate = run?.status === "ready";
   const bySection = (id: string) => claims.filter((c) => c.section === id);
-  const rejectedCount = claims.filter((c) => c.rejected).length;
+  const rejectedCount = claims.filter((c) => c.rejected && !c.in_brain).length;
+  const inBrainCount = claims.filter((c) => c.in_brain).length;
 
   const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -508,12 +521,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         <div className="mt-8 space-y-9">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-2xl font-bold text-ink">The fact base</h2>
-            {rejectedCount > 0 && (
-              <span className="text-base text-[#fca5a5]">{rejectedCount} rejected, excluded and never referenced again. <button onClick={() => run && buildDoc(run.id)} className="underline hover:text-accent">Regenerate the document</button> to update the PDF.</span>
-            )}
+            <span className="text-base text-ink-faint">
+              {inBrainCount > 0 && <span className="text-[#86efac]">{inBrainCount} in the brain. </span>}
+              {rejectedCount > 0 && <span className="text-[#fca5a5]">{rejectedCount} rejected. </span>}
+              {(inBrainCount > 0 || rejectedCount > 0) && <><button onClick={() => run && buildDoc(run.id)} className="underline hover:text-accent">Regenerate the document</button> to update the PDF.</>}
+            </span>
           </div>
           {SECTIONS.map((sec) => {
-            const rows = bySection(sec.id).filter((c) => !c.rejected);   // rejected facts disappear from view
+            const rows = bySection(sec.id).filter((c) => !c.rejected && !c.in_brain);   // tagged facts leave the live list
             if (rows.length === 0) return null;
             const isUnverified = sec.id === "unverified";
             return (
@@ -533,7 +548,10 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                           )}
                           {c.claim}
                         </p>
-                        <button onClick={() => rejectClaim(c, true)} className="shrink-0 rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this fact - it disappears and is never referenced again">Reject</button>
+                        <div className="flex shrink-0 gap-2">
+                          <button onClick={() => brainClaim(c, true)} className="rounded-lg border border-[#86efac]/40 px-3 py-1.5 text-sm font-semibold text-[#86efac] hover:bg-[#86efac]/10" title="Keep this fact - it moves to In the Brain and drops out of the next run's new list">Add to Brain</button>
+                          <button onClick={() => rejectClaim(c, true)} className="rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this fact - it disappears and is never referenced again">Reject</button>
+                        </div>
                       </div>
                       {c.conflict && <div className="mt-2 text-base text-[#fcd34d]">⚠ Sources conflict: {c.conflict}</div>}
                       {isUnverified && c.unverified_reason && <div className="mt-2 text-base text-ink-faint">Why unverified: {c.unverified_reason}</div>}
@@ -551,6 +569,24 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               </section>
             );
           })}
+          {/* IN THE BRAIN - facts Gary has kept. Out of the live list so the next run's genuinely-new facts stand
+              out, recoverable with Restore. */}
+          {inBrainCount > 0 && (
+            <section>
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-[#86efac]/30 pb-2">
+                <h3 className="text-xl font-bold text-[#86efac]">In the Brain · {inBrainCount}</h3>
+                <span className="text-sm text-ink-faint">Kept. These drop out of the live list so the next run only shows what is new.</span>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {claims.filter((c) => c.in_brain).map((c) => (
+                  <li key={c.id} className="flex items-start justify-between gap-4 rounded-lg border border-[#86efac]/20 bg-surface-1/30 px-4 py-2.5">
+                    <p className="flex-1 text-base leading-relaxed text-ink-dim">{c.claim}</p>
+                    <button onClick={() => brainClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink-dim hover:text-ink">Restore</button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {/* REJECTED - out of the way, recoverable, and a permanent do-not-reference memory. */}
           {rejectedCount > 0 && (
             <section>
@@ -559,7 +595,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                 <span className="text-sm text-ink-faint">Stored. The Researcher will never surface these again, on any future run.</span>
               </div>
               <ul className="mt-3 space-y-2">
-                {claims.filter((c) => c.rejected).map((c) => (
+                {claims.filter((c) => c.rejected && !c.in_brain).map((c) => (
                   <li key={c.id} className="flex items-start justify-between gap-4 rounded-lg border border-line/40 bg-surface-1/30 px-4 py-2.5">
                     <p className="flex-1 text-base leading-relaxed text-ink-faint line-through">{c.claim}</p>
                     <button onClick={() => rejectClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink-dim hover:text-ink">Undo</button>

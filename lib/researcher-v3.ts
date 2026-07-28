@@ -160,7 +160,7 @@ export type ResearchClaim = {
   id: string; run_id: string; client_id: string; section: string; subject: string | null; claim: string;
   source_name: string | null; source_url: string | null; source_date: string | null; tier: number | null;
   verified: boolean; unverified_reason: string | null; conflict: string | null;
-  rejected?: boolean; rejected_by?: string | null;
+  rejected?: boolean; rejected_by?: string | null; in_brain?: boolean; in_brain_by?: string | null;
 };
 
 const noDash = (s: unknown) => String(s ?? "")
@@ -177,6 +177,17 @@ async function loadRejectedFacts(clientId: string): Promise<string[]> {
     `select distinct claim from research_claims where client_id = $1 and rejected = true and claim is not null`, [clientId],
   ).catch(() => [])) as { claim: string }[];
   return rows.map((r) => r.claim).filter((c) => c && c.trim().length > 0);
+}
+
+// Facts Gary has already tagged "in the brain" on a past run. On a fresh run we pre-tag any claim that matches
+// one of these (by normalised text), so it lands in the "In the Brain" tray, not the live list - which is the
+// whole point of the tag: the next run shows only what is genuinely NEW. (Rejected facts are blocked outright
+// above; kept facts are not blocked, just pre-sorted.)
+async function loadInBrainFacts(clientId: string): Promise<Set<string>> {
+  const rows = (await db().query(
+    `select distinct claim from research_claims where client_id = $1 and in_brain = true and claim is not null`, [clientId],
+  ).catch(() => [])) as { claim: string }[];
+  return new Set(rows.map((r) => normKey(r.claim)).filter(Boolean));
 }
 
 // MINE THE CRAWLED SITE. The client's own website is already crawled into the brain - the richest, most reliable
@@ -627,13 +638,16 @@ export async function collectResearch(
   )) as ResearchRun[];
   const run = runRows[0];
 
+  // Pre-tag facts Gary already kept on a past run, so this run's list shows only what is genuinely new.
+  const inBrainPrev = await loadInBrainFacts(clientId).catch(() => new Set<string>());
   const saved: ResearchClaim[] = [];
   for (const c of claims) {
+    const kept = inBrainPrev.has(normKey(c.claim));
     const rows = (await db().query(
-      `insert into research_claims (run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-       returning id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict`,
-      [run.id, clientId, c.section, c.subject, c.claim, c.source_name, c.source_url, c.source_date, c.tier, c.verified, c.unverified_reason, c.conflict],
+      `insert into research_claims (run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, in_brain, in_brain_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       returning id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, rejected, rejected_by, in_brain, in_brain_by`,
+      [run.id, clientId, c.section, c.subject, c.claim, c.source_name, c.source_url, c.source_date, c.tier, c.verified, c.unverified_reason, c.conflict, kept, kept ? "carried-forward" : null],
     )) as ResearchClaim[];
     saved.push(rows[0]);
     emit({ t: "claim", section: c.section, claim: c.claim.slice(0, 120) });
@@ -659,7 +673,7 @@ export async function collectResearch(
 /** The claims for a run, ordered for rendering (section order, then verified before unverified, Tier 1 first). */
 export async function listResearchClaims(runId: string): Promise<ResearchClaim[]> {
   return (await db().query(
-    `select id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, rejected, rejected_by
+    `select id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, rejected, rejected_by, in_brain, in_brain_by
      from research_claims where run_id = $1 order by created_at asc`, [runId],
   )) as ResearchClaim[];
 }
