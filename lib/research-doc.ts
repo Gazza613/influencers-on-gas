@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { PREMIUM } from "./vendors/anthropic";
+import { FABLE } from "./vendors/anthropic";
 import { recordTokens } from "./usage";
 import { renderPdf } from "./studio-render";
 import { putBytes } from "./blob";
@@ -37,14 +37,15 @@ const DOC_SECTIONS: { id: string; n: number; label: string; lead: string }[] = [
   { id: "digital", n: 8, label: "Digital footprint", lead: "Their website, search presence and social activity." },
   { id: "contact", n: 9, label: "Contact and channels", lead: "How to reach them, and every channel they run." },
   { id: "marketing", n: 10, label: "Current marketing and advertising", lead: "The marketing and advertising the client is running now." },
-  { id: "competitor", n: 11, label: "Competitor intelligence", lead: "What the competitive set is doing, observed from public channels." },
+  { id: "competitor", n: 11, label: "Competitor landscape", lead: "The competitors in play and what they are doing, observed from public channels." },
   { id: "competitor_set", n: 12, label: "Competitor set", lead: "The competitors in play, a factual profile each." },
   { id: "activity", n: 13, label: "Recent activity (90 days)", lead: "What has moved in the last 90 days." },
   { id: "press", n: 14, label: "Press and media", lead: "Coverage, releases and mentions across the wider media." },
   { id: "customer_voice", n: 15, label: "Customer voice", lead: "What customers say, in reviews and public sentiment." },
   { id: "faqs", n: 16, label: "Published FAQs", lead: "The questions the client answers for its own customers." },
   { id: "regulatory", n: 17, label: "Regulatory, compliance and advertising rules", lead: "The licences the client holds and the advertising rules its campaigns must follow." },
-  { id: "unverified", n: 18, label: "Unverified signals", lead: "Signals we could not verify. Treat as leads, never as fact." },
+  { id: "gaps", n: 18, label: "Gaps to verify with the client", lead: "Where the public record is thin. Confirm these directly with the client before the strategy leans on them." },
+  { id: "unverified", n: 19, label: "Unverified signals", lead: "Signals we could not verify. Treat as leads, never as fact." },
 ];
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -103,14 +104,14 @@ async function writeBriefProse(clientId: string, clientName: string, vertical: s
   const input = sections.map((s) => `## ${s.id} - ${s.label}\n${s.facts.map((f) => `- ${f}`).join("\n")}`).join("\n\n");
   try {
     const res = await client.messages.stream({
-      model: PREMIUM, max_tokens: 12000,
+      model: FABLE, max_tokens: 12000,
       system: `You write internal research BRIEFS for GAS Marketing's strategy team - the read a marketing strategist does to understand a client before building strategy. Rewrite each section's facts as FLOWING PROFESSIONAL PARAGRAPHS, never bullet points.\n\nRULES:\n- Use ONLY the facts given. Add nothing, infer nothing, ANALYSE nothing - analysis is the strategist's job, not yours. No opinions, no recommendations, no SWOT.\n- Keep every specific: names, roles, numbers, dates, product names, addresses.\n- Where the facts note something was not found, not disclosed, or that sources conflict, say so plainly in a sentence - do not hide gaps.\n- Write in UK British English. Never use an em dash or en dash, use a comma or full stop. Direct, confident, no fluff, no AI-sounding filler.\n- LEAD WITH RECENCY: in the positioning, current marketing and recent-activity sections, OPEN with the most recent developments and the current strategic thrust (the newest dated facts define where the business is now). Frame older products or campaigns as the established base, not the headline.\n- 1 to 3 short paragraphs per section, separated by a blank line. Do not repeat the section title inside the prose.`,
       tools: [{ name: "write_brief", description: "The brief prose, one entry per section id.", input_schema: SCHEMA }],
       tool_choice: { type: "tool", name: "write_brief" },
       messages: [{ role: "user", content: `Client: ${clientName}${vertical ? ` (${vertical})` : ""}\n\nThe verified fact base, grouped by section id. Write the brief prose for each:\n\n${input}` }],
     }).finalMessage();
     const u = res.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-    await recordTokens({ clientId, userEmail, model: PREMIUM, action: "research-brief", inputTokens: u?.input_tokens || 0, outputTokens: u?.output_tokens || 0, cacheReadTokens: u?.cache_read_input_tokens || 0, cacheCreationTokens: u?.cache_creation_input_tokens || 0 }).catch(() => {});
+    await recordTokens({ clientId, userEmail, model: FABLE, action: "research-brief", inputTokens: u?.input_tokens || 0, outputTokens: u?.output_tokens || 0, cacheReadTokens: u?.cache_read_input_tokens || 0, cacheCreationTokens: u?.cache_creation_input_tokens || 0 }).catch(() => {});
     const block = res.content.find((b) => b.type === "tool_use");
     const out = (block && block.type === "tool_use" ? (block.input as { sections?: { id?: string; prose?: string }[] }).sections : []) || [];
     const map: Record<string, string> = {};
@@ -126,21 +127,30 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
   const sources = new Set(claims.filter((c) => c.source_url).map((c) => c.source_url!.toLowerCase())).size;
   const id = (identity || {}) as ResearchIdentity;
 
+  // NUMBER ONLY THE SECTIONS THAT RENDER, contiguously - an empty section (no facts) is skipped, and the numbers
+  // must not leave a gap (external review flagged 11/15/17 vanishing). The "competitor" section absorbs the
+  // competitor-set profiles too, so competitor intel is one section, never split with one half empty.
+  let n = 0;
   const sections = DOC_SECTIONS.map((sec) => {
-    const rows = claims.filter((c) => c.section === sec.id);
-    if (!rows.length) return "";   // conditional sections (e.g. regulatory) simply do not render when empty
+    if (sec.id === "competitor_set") return "";   // folded into "competitor" below
+    const rows = sec.id === "competitor"
+      ? claims.filter((c) => c.section === "competitor" || c.section === "competitor_set")
+      : claims.filter((c) => c.section === sec.id);
+    if (!rows.length) return "";   // conditional/empty sections simply do not render
+    n += 1;
     const unver = sec.id === "unverified";
     // Prefer the written prose; fall back to the raw facts as sentences so the section is never empty.
     const text = (prose[sec.id] || rows.map((r) => r.claim).join(" ")).trim();
     const paras = text.split(/\n\n+/).map((p) => `<p class="pp">${esc(p.trim())}</p>`).join("");
     return `<section class="sec ${unver ? "warn-sec" : ""}">
-      <h2><span class="n">${sec.n}</span> ${esc(sec.label)}</h2>
+      <h2><span class="n">${n}</span> ${esc(sec.label)}</h2>
       <p class="lead">${esc(sec.lead)}</p>
       ${unver ? `<p class="warn">Nothing here is a fact. The Strategist may treat these as flagged hypotheses only, never cite them as fact.</p>` : ""}
       ${paras}
       ${sectionSources(rows)}
     </section>`;
   }).join("");
+  const registerN = n + 1;   // the source register follows the last rendered section, contiguously
 
   const idrow = (k: string, v: string) => v ? `<tr><td class="ik">${esc(k)}</td><td class="iv">${v}</td></tr>` : "";
   const idTable = `<table class="idt">
@@ -219,7 +229,7 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
     <div class="foot">Prepared by The Researcher &middot; GAS Marketing &middot; Internal &middot; ${esc(ukDate(run.created_at))}</div>
   </div>
   ${sections}
-  <section class="sec"><h2><span class="n">19</span> Source register</h2><p class="lead">Every source behind this brief, with its tier and the date accessed.</p>${sourceRegister(claims)}</section>
+  <section class="sec"><h2><span class="n">${registerN}</span> Source register</h2><p class="lead">Every source behind this brief, with its tier and the date accessed.</p>${sourceRegister(claims)}</section>
   </body></html>`;
 }
 
@@ -243,7 +253,12 @@ export async function buildResearchDocument(clientId: string, runId: string): Pr
   if (!claims.length) throw new Error("This run has no claims to document (all were rejected, or none filed).");
 
   // Write the brief prose from the fact base (facts only), then render.
-  const sectionsForProse = DOC_SECTIONS.map((sec) => ({ id: sec.id, label: sec.label, facts: claims.filter((c) => c.section === sec.id).map((c) => c.claim) })).filter((s) => s.facts.length);
+  const sectionsForProse = DOC_SECTIONS
+    .filter((sec) => sec.id !== "competitor_set")   // folded into "competitor"
+    .map((sec) => ({
+      id: sec.id, label: sec.label,
+      facts: claims.filter((c) => sec.id === "competitor" ? (c.section === "competitor" || c.section === "competitor_set") : c.section === sec.id).map((c) => c.claim),
+    })).filter((s) => s.facts.length);
   const prose = await writeBriefProse(clientId, clientName, run.vertical || null, sectionsForProse, run.user_email);
 
   const html = briefHtml(clientName, run.website, run, claims, run.identity || null, prose);

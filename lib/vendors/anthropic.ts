@@ -20,6 +20,10 @@ export const STANDARD = "claude-sonnet-4-6";
 // The DIRECTOR runs on the premium model: the storyboard is the highest-leverage reasoning step
 // (it must stay context-aware about who does what, and read the reference creatives), so it's worth it.
 export const PREMIUM = "claude-opus-4-8";
+// FABLE 5 - Anthropic's most capable model. The Researcher's brain runs on this: its extraction and synthesis
+// are materially deeper than Opus (Gary benchmarked a Fable 5 brief and it was dramatically richer). Priced in
+// rate_card (mtok_in 10 / mtok_out 50), so runs stay accurately metered.
+export const FABLE = "claude-fable-5";
 // Ingestion: reading printed text off a card is not a judgement call. Running 68 of those on a premium model
 // is paying Opus prices to do OCR.
 export const INGEST = "claude-haiku-4-5";

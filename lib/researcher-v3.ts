@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { PREMIUM, INGEST } from "./vendors/anthropic";
+import { FABLE, INGEST } from "./vendors/anthropic";
 import { clientWebsites, siteAnchor, deriveResearchBrief, loadIntelBrief } from "./intel";
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
@@ -46,6 +46,7 @@ export const RESEARCH_SECTIONS = [
   { id: "customer_voice", label: "Customer voice" },
   { id: "faqs", label: "Published FAQs" },
   { id: "regulatory", label: "Regulatory, compliance and advertising rules" },
+  { id: "gaps", label: "Gaps to verify with the client" },
   { id: "unverified", label: "Unverified, treat as signal only" },
 ] as const;
 export type ResearchSectionId = (typeof RESEARCH_SECTIONS)[number]["id"];
@@ -75,6 +76,7 @@ TIME-BOXING:
 
 // COMPETITOR INTELLIGENCE from observable public channels only (spec 3.5). No ad libraries - explicitly deferred.
 const COMPETITOR_BRIEF = `COMPETITOR INTELLIGENCE (for the client AND every competitor), from PUBLIC, OWNED channels only - record what is factually observable, never whether it is good:
+- WHO COUNTS AS A COMPETITOR (be precise, do NOT leak): a DIRECT competitor sells the SAME core service to the SAME buyer in the SAME market. Match on the client's ACTUAL business, not a loose theme. A performance-marketing agency competes with other performance-marketing / growth / media-buying agencies for the same clients, NOT with every company that mentions "AI", nor with the martech tools or platforms it USES, nor with its own clients or partners. Pick 3-6 genuine like-for-like rivals and, for each, capture in competitor_set one line on WHY it is a true competitor (same service, same buyer). If a candidate only shares a buzzword, leave it out and, where useful, note adjacent players separately as market context rather than filing them as competitors.
 - Websites: propositions, offers, pricing where public, calls to action, landing approaches.
 - Social presence: which platforms are in use, posting cadence, content formats, visible campaign themes and promotions within the activity window.
 - Search visibility: whether the brand is visibly present for the category's core terms, and with what visible message. Do NOT claim rankings or SEO metrics you cannot observe directly, state presence and visible messaging only.
@@ -206,15 +208,37 @@ function pageScore(u: string): number {
 async function loadCorePages(websites: string[]): Promise<string> {
   if (!websites.length) return "";
   const paths = ["", "/about", "/about-us", "/who-we-are", "/company", "/our-story", "/products", "/services",
-    "/solutions", "/what-we-do", "/offering", "/pricing", "/plans", "/contact", "/contact-us", "/get-in-touch",
-    "/team", "/our-team", "/leadership", "/people", "/faq", "/faqs"];
+    "/solutions", "/our-solution", "/what-we-do", "/offering", "/pricing", "/plans", "/contact", "/contact-us",
+    "/get-in-touch", "/team", "/our-team", "/leadership", "/people", "/faq", "/faqs", "/case-studies", "/work",
+    "/clients", "/results", "/foundation"];
   const seen = new Set<string>();
   const urls: string[] = [];
-  for (const w of websites) {
+  const add = (u: string) => { const k = u.replace(/\/+$/, ""); if (!seen.has(k)) { seen.add(k); urls.push(u); } };
+  await Promise.all(websites.map(async (w) => {
     const base = String(w).replace(/\/+$/, "");
-    for (const p of paths) { const u = base + p; if (!seen.has(u)) { seen.add(u); urls.push(u); } }
-  }
-  const fetched = await Promise.all(urls.map(async (u) => {
+    const origin = base.match(/^https?:\/\/[^/]+/)?.[0] || base;
+    const rootDomain = origin.replace(/^https?:\/\//, "").replace(/^www\./, "");
+    // 1) the fixed core paths
+    for (const p of paths) add(base + p);
+    // 2) common product/AI SUBDOMAINS (GAS runs ai.gasmarketing.co.za - a fixed path list never finds these)
+    for (const sub of ["ai", "app", "go", "get", "grow", "hello", "start"]) add(`https://${sub}.${rootDomain}/`);
+    // 3) DISCOVER from the homepage nav: follow the client's OWN internal links (same registrable domain, incl.
+    //    subdomains), so pages the fixed list does not know about (a Foundation, an Our-Solution page) are read too.
+    const home = await fetchRawHtml(base).catch(() => "");
+    if (home) {
+      const domRe = new RegExp(`^https?://([a-z0-9-]+\\.)?${rootDomain.replace(/\./g, "\\.")}(/|$)`, "i");
+      for (const m of home.matchAll(/href=["']([^"'#?]+)["']/gi)) {
+        let h = m[1];
+        if (h.startsWith("/")) h = origin + h;
+        if (!/^https?:\/\//i.test(h) || !domRe.test(h)) continue;
+        if (/\.(png|jpe?g|svg|gif|webp|avif|pdf|css|js|ico|woff2?|mp4|zip)(\?|$)/i.test(h)) continue;
+        add(h.replace(/[#?].*$/, ""));
+      }
+    }
+  }));
+  // Score, read the top pages in full (foundational pages first, blog sinks - it has its own reader).
+  const top = urls.sort((a, b) => pageScore(b.replace(/^https?:\/\/[^/]+/, "") || "/") - pageScore(a.replace(/^https?:\/\/[^/]+/, "") || "/")).slice(0, 30);
+  const fetched = await Promise.all(top.map(async (u) => {
     const r = await fetchSourcePage(u).catch(() => null);
     return r && r.ok && r.text.trim().length > 200 ? { url: u, text: r.text.trim() } : null;
   }));
@@ -417,7 +441,7 @@ export async function collectResearch(
   // never truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
   const runPass = async (passBrief: string): Promise<FileOut> => {
     const g = client.messages.stream({
-      model: PREMIUM, max_tokens: 8000,
+      model: FABLE, max_tokens: 8000,
       system: `${scope}\n\n${FACTS_ONLY}`,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: passBrief }],
@@ -429,10 +453,10 @@ export async function collectResearch(
     });
     const gathered = await g.finalMessage();
     const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
-    await recordTokens({ clientId, userEmail, model: PREMIUM, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
+    await recordTokens({ clientId, userEmail, model: FABLE, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
 
     const filed = await client.messages.stream({
-      model: PREMIUM, max_tokens: 32000,
+      model: FABLE, max_tokens: 32000,
       system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing, do NOT pad, but never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
       tools: [
         { type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool,
@@ -446,7 +470,7 @@ export async function collectResearch(
       ],
     }).finalMessage();
     const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-    await recordTokens({ clientId, userEmail, model: PREMIUM, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+    await recordTokens({ clientId, userEmail, model: FABLE, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
     const block = filed.content.find((b) => b.type === "tool_use");
     return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
   };
@@ -508,14 +532,14 @@ export async function collectResearch(
     const list = rawClaims.map((c, i) => `${i}. [section=${c.section} | about: ${c.subject}] ${c.claim}${c.source_url ? ` (src: ${c.source_url})` : " (no source)"}`).join("\n");
     try {
       const qa = await client.messages.stream({
-        model: PREMIUM, max_tokens: 16000,
+        model: FABLE, max_tokens: 16000,
         system: `You are a ruthless senior research editor. Review a fact base about ${name} before it reaches a marketing strategist and rule on EVERY numbered claim:\n- keep: a correct, relevant fact, correctly placed and correctly attributed (${name}'s OWN fact, or a clearly-labelled competitor fact in a competitor section).\n- drop: WRONG, tangential trivia that will not inform strategy, or MIS-ATTRIBUTED - a fact about a parent, partner or other company presented as ${name}'s own (for example a partner's CEO, size or numbers shown as ${name}'s).\n- move: a real fact in the WRONG section - give the correct section id. Advisers/staff filed under leadership belong in snapshot; a competitor fact outside a competitor section moves to competitor.\n- demote: a load-bearing claim on a single weak or uncorroborated source, or stale data shown as current - give section "unverified".\nValid section ids: ${RESEARCH_SECTIONS.map((s) => s.id).join(", ")}.\nRULES: ${name}'s LEADERSHIP means ${name}'s OWN executives, never a parent or partner's. Be strict about noise, a strategist wants signal not filler.${ceoLock ? ` GROUND TRUTH: ${briefLock?.ceoName} IS ${name}'s ${ceoTitleLock} - always keep that, never drop or demote it, and drop or fix anything that reframes them as only a parent company's executive.` : ""}\nReturn a verdict for EVERY claim index, using the exact index shown.`,
         tools: [{ name: "review", description: "A verdict for every claim.", input_schema: QA_SCHEMA }],
         tool_choice: { type: "tool", name: "review" },
         messages: [{ role: "user", content: `Fact base to review (${rawClaims.length} claims):\n\n${list}` }],
       }).finalMessage();
       const qu = qa.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-      await recordTokens({ clientId, userEmail, model: PREMIUM, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
+      await recordTokens({ clientId, userEmail, model: FABLE, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
       const qblock = qa.content.find((b) => b.type === "tool_use");
       const reviews = (qblock && qblock.type === "tool_use" ? (qblock.input as { reviews?: { index: number; action: string; section: string; reason: string }[] }).reviews : []) || [];
       const drop = new Set<number>();
@@ -529,6 +553,32 @@ export async function collectResearch(
       for (let i = rawClaims.length - 1; i >= 0; i--) if (drop.has(i)) rawClaims.splice(i, 1);
       emit({ t: "phase", label: `Review complete: cleaned ${drop.size} weak or mis-attributed claim${drop.size === 1 ? "" : "s"}` });
     } catch { /* QA is best-effort, never block the run */ }
+  }
+
+  // GAP REGISTER (Gary's Fable-5 benchmark had one). After the fact base is cleaned, flag - deterministically, in
+  // code - the areas a marketing strategist needs but the PUBLIC record came back thin on, so the Strategist knows
+  // exactly what to confirm with the client rather than assuming silence means nothing exists. This is honest
+  // scoping, not padding: it names the hole instead of filling it with a guess.
+  const GAP_CHECK: { id: string; label: string; min: number }[] = [
+    { id: "leadership", label: "the named executive/management team", min: 1 },
+    { id: "products", label: "products, pricing and how they make money", min: 2 },
+    { id: "positioning", label: "their stated positioning and USPs", min: 1 },
+    { id: "audience", label: "who they serve and their target audience", min: 1 },
+    { id: "marketing", label: "their own current marketing and advertising", min: 1 },
+    { id: "competitor_set", label: "a set of genuine like-for-like competitors", min: 2 },
+    { id: "activity", label: "dated developments in the last 90 days", min: 1 },
+    { id: "customer_voice", label: "public reviews and sentiment", min: 1 },
+  ];
+  for (const g of GAP_CHECK) {
+    const n = rawClaims.filter((c) => c.section === g.id).length;
+    if (n < g.min) {
+      rawClaims.push({
+        section: "gaps", subject: name,
+        claim: `Thin in the public record: ${g.label}. The research found ${n === 0 ? "nothing" : "little"} that is verifiable here, so confirm this directly with the client before the strategy relies on it.`,
+        source_name: null, source_url: null, source_date: null, tier: 1,
+        unverified_reason: null, conflict: null,
+      });
+    }
   }
 
   // VERIFIED RETRIEVAL (spec 3.7). We do not take the model's word that a source exists, says what it claims, or
