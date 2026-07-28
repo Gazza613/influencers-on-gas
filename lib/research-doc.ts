@@ -122,58 +122,63 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
   </table>`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-  @page { size: A4 portrait; margin: 16mm 14mm; }
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+  @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: Manrope, "Segoe UI", Helvetica, Arial, sans-serif; color: #14131a; font-size: 11px; line-height: 1.55; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  a { color: #b8500a; text-decoration: none; word-break: break-word; }
-  .cover { page-break-after: always; }
-  .brandrow img { height: 42px; }
-  .eyebrow { margin-top: 14px; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #F96203; font-weight: 800; }
-  h1.client { font-size: 34px; line-height: 1.08; margin: 4px 0; letter-spacing: -0.4px; color: #14131a; }
-  .descriptor { font-size: 13px; color: #5b5966; text-transform: capitalize; }
-  .bar { height: 5px; background: #F96203; border-radius: 2px; margin: 16px 0 18px; width: 64px; }
+  body { margin: 0; font-family: Poppins, "Segoe UI", Helvetica, Arial, sans-serif; color: #1A1526; background: #FFF9F3; font-size: 11px; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  a { color: #C42A6B; text-decoration: none; word-break: break-word; }
+  /* COVER - the Deep-Space gradient hero, full bleed (Word takes the solid fallback). */
+  .cover { color: #FFFBF8; background: #1A1043; background: linear-gradient(160deg, #1A1043 0%, #3A1580 50%, #0E2A6B 100%); padding: 24mm 16mm 20mm; min-height: 297mm; page-break-after: always; }
+  .cover .logo { height: 44px; }
+  .eyebrow { margin-top: 22px; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; color: #FF7A2F; background: linear-gradient(90deg,#FF7A2F,#F80D5B); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  h1.client { font-size: 46px; line-height: 1.02; margin: 10px 0 8px; letter-spacing: -0.5px; text-transform: uppercase; font-weight: 800; color: #FFFBF8; }
+  .descriptor { font-size: 14px; color: rgba(255,251,248,0.7); text-transform: capitalize; font-weight: 500; }
+  .bar { height: 6px; width: 88px; border-radius: 3px; margin: 20px 0 22px; background: #FF6B00; background: linear-gradient(90deg,#FF7A2F,#F80D5B); }
   .idt { width: 100%; border-collapse: collapse; margin: 6px 0 0; }
-  .idt td { padding: 6px 0; border-bottom: 1px solid #ece9f0; vertical-align: top; font-size: 11.5px; }
-  .idt .ik { color: #8a8992; text-transform: uppercase; letter-spacing: .5px; font-size: 9px; width: 32%; padding-right: 12px; font-weight: 700; }
-  .idt .iv { color: #14131a; font-weight: 600; }
-  .counts { margin-top: 20px; }
-  .counts .c { display: inline-block; margin-right: 24px; }
-  .counts .k { color: #8a8992; text-transform: uppercase; letter-spacing: .5px; font-size: 8.5px; font-weight: 700; }
-  .counts .v { font-size: 17px; font-weight: 800; color: #14131a; }
-  .chips { margin-top: 14px; }
-  .chips a, .chips span { display: inline-block; border: 1px solid #e6e3ee; border-radius: 20px; padding: 2px 10px; margin: 0 6px 6px 0; font-size: 10px; font-weight: 600; color: #14131a; }
-  .notice { margin-top: 18px; border: 1px solid #f7d9c4; background: #fff6ef; border-radius: 8px; padding: 11px 13px; font-size: 10.5px; color: #6b5544; }
-  .notice b { color: #14131a; }
-  .legend { margin-top: 12px; font-size: 9.5px; color: #6b6a75; }
-  .tier { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 8.5px; font-weight: 800; border: 1px solid; }
+  .idt td { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.12); vertical-align: top; font-size: 12px; }
+  .idt .ik { color: rgba(255,251,248,0.55); text-transform: uppercase; letter-spacing: .6px; font-size: 9px; width: 30%; padding-right: 12px; font-weight: 600; }
+  .idt .iv { color: #FFFBF8; font-weight: 500; }
+  .idt .iv a { color: #FF9A5A; }
+  .counts { margin-top: 24px; }
+  .counts .c { display: inline-block; margin-right: 26px; }
+  .counts .k { color: rgba(255,251,248,0.5); text-transform: uppercase; letter-spacing: .6px; font-size: 8.5px; font-weight: 600; }
+  .counts .v { font-size: 20px; font-weight: 800; color: #FFFBF8; }
+  .chips { margin-top: 16px; }
+  .chips a, .chips span { display: inline-block; border: 1px solid rgba(255,255,255,0.22); border-radius: 20px; padding: 3px 11px; margin: 0 6px 6px 0; font-size: 10px; font-weight: 600; color: #FFFBF8; }
+  .cover .notice { margin-top: 20px; border: 1px solid rgba(255,122,47,0.4); background: rgba(255,122,47,0.12); border-radius: 10px; padding: 12px 14px; font-size: 10.5px; color: rgba(255,251,248,0.82); }
+  .cover .notice b { color: #FFFBF8; }
+  .cover .legend { margin-top: 12px; font-size: 9.5px; color: rgba(255,251,248,0.6); }
+  .cover .foot { margin-top: 18px; font-size: 9px; color: rgba(255,251,248,0.45); }
+  /* BODY - cream sections. */
+  .content { padding: 16mm 14mm; }
+  .tier { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 8.5px; font-weight: 700; border: 1px solid; }
   .t1 { color: #15803d; border-color: #86efac; background: #f0fdf4; }
-  .t2 { color: #1d4ed8; border-color: #93c5fd; background: #eff6ff; }
+  .t2 { color: #2540D6; border-color: #b6c1f6; background: #eef1ff; }
   .t3 { color: #b45309; border-color: #fcd34d; background: #fffbeb; }
-  .foot { margin-top: 16px; font-size: 9px; color: #a3a2ab; }
-  .sec { margin: 0 0 4px; }
-  .sec h2 { font-size: 15px; margin: 18px 0 2px; color: #14131a; page-break-after: avoid; }
+  .sec { margin: 0 0 6px; }
+  .sec h2 { font-size: 15px; margin: 20px 0 2px; color: #1A1526; text-transform: uppercase; font-weight: 800; letter-spacing: 0.2px; page-break-after: avoid; }
   .sec h2 .n { color: #F96203; font-weight: 800; }
-  .lead { margin: 0 0 8px; color: #6b6a75; font-size: 10.5px; border-bottom: 2px solid #F96203; padding-bottom: 8px; font-style: italic; }
+  .lead { margin: 0 0 10px; color: #6b6478; font-size: 10.5px; border-bottom: 2px solid #F96203; padding-bottom: 8px; font-style: italic; }
   .warn-sec .lead { border-bottom-color: #f59e0b; }
   .warn { color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 10px; margin: 0 0 8px; font-size: 10px; }
-  .fact { padding: 7px 0; border-bottom: 1px solid #f3f1f6; page-break-inside: avoid; }
-  .ftext { color: #14131a; font-size: 11.5px; }
-  .subj { color: #b8500a; }
+  .fact { padding: 7px 0; border-bottom: 1px solid #efe9e2; page-break-inside: avoid; }
+  .ftext { color: #1A1526; font-size: 11.5px; }
+  .subj { color: #C42A6B; }
   .conflict { color: #b45309; font-size: 9.5px; margin-top: 2px; }
   .reason { color: #8a8992; font-size: 9.5px; margin-top: 2px; }
   .trail { margin-top: 3px; font-size: 9px; color: #a3a2ab; }
   .trail .ok { color: #15803d; font-weight: 700; }
-  .trail .unc { color: #bfbec6; }
+  .trail .unc { color: #c8c2bb; }
   .trail .tdate { color: #8a8992; }
-  .trail .src { color: #b8500a; }
-  .trail .src.none { color: #bfbec6; }
+  .trail .src { color: #C42A6B; }
+  .trail .src.none { color: #c8c2bb; }
   .reg { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-top: 4px; }
-  .reg th { text-align: left; color: #8a8992; text-transform: uppercase; letter-spacing: .5px; font-size: 8.5px; border-bottom: 1px solid #e6e3ee; padding: 4px 6px; }
-  .reg td { padding: 5px 6px; border-bottom: 1px solid #f3f1f6; vertical-align: top; }
+  .reg th { text-align: left; color: #8a8992; text-transform: uppercase; letter-spacing: .5px; font-size: 8.5px; border-bottom: 1px solid #e6ded5; padding: 4px 6px; }
+  .reg td { padding: 5px 6px; border-bottom: 1px solid #efe9e2; vertical-align: top; }
   .empty { color: #a3a2ab; }
   </style></head><body>
   <div class="cover">
-    <div class="brandrow"><img src="${STUDIO_URL}/gas-logo.png" alt="GAS Marketing" /></div>
+    <img class="logo" src="${STUDIO_URL}/gas-logo.png" alt="GAS Marketing" />
     <div class="eyebrow">GAS Marketing &middot; Research Brief</div>
     <h1 class="client">${esc(clientName)}</h1>
     <div class="descriptor">${esc(run.vertical || "")}</div>
@@ -191,8 +196,10 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
     <div class="legend"><span class="tier t1">Tier 1</span> load-bearing &nbsp; <span class="tier t2">Tier 2</span> reliable &nbsp; <span class="tier t3">Tier 3</span> directional</div>
     <div class="foot">Prepared by The Researcher &middot; GAS Marketing &middot; Internal &middot; ${esc(ukDate(run.created_at))}</div>
   </div>
-  ${sections}
-  <section class="sec"><h2><span class="n">19</span> Source register</h2><p class="lead">Every source behind this brief, with its tier and the date accessed.</p>${sourceRegister(claims)}</section>
+  <div class="content">
+    ${sections}
+    <section class="sec"><h2><span class="n">19</span> Source register</h2><p class="lead">Every source behind this brief, with its tier and the date accessed.</p>${sourceRegister(claims)}</section>
+  </div>
   </body></html>`;
 }
 
