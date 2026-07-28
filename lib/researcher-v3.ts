@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { STANDARD, INGEST } from "./vendors/anthropic";
+import { PREMIUM, INGEST } from "./vendors/anthropic";
 import { clientWebsite, siteAnchor, deriveResearchBrief } from "./intel";
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
@@ -336,7 +336,7 @@ export async function collectResearch(
   // never truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
   const runPass = async (passBrief: string): Promise<FileOut> => {
     const g = client.messages.stream({
-      model: STANDARD, max_tokens: 8000,
+      model: PREMIUM, max_tokens: 8000,
       system: `${scope}\n\n${FACTS_ONLY}`,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: passBrief }],
@@ -348,10 +348,10 @@ export async function collectResearch(
     });
     const gathered = await g.finalMessage();
     const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
-    await recordTokens({ clientId, userEmail, model: STANDARD, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
+    await recordTokens({ clientId, userEmail, model: PREMIUM, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
 
     const filed = await client.messages.stream({
-      model: STANDARD, max_tokens: 32000,
+      model: PREMIUM, max_tokens: 32000,
       system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing, do NOT pad, but never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
       tools: [
         { type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool,
@@ -365,7 +365,7 @@ export async function collectResearch(
       ],
     }).finalMessage();
     const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-    await recordTokens({ clientId, userEmail, model: STANDARD, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+    await recordTokens({ clientId, userEmail, model: PREMIUM, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
     const block = filed.content.find((b) => b.type === "tool_use");
     return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
   };
