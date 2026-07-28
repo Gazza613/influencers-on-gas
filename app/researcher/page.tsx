@@ -9,6 +9,10 @@ import { researchableClientIds } from "@/lib/intel";
 // Strategist's job now). Every claim carries a source and a Tier 1/2/3, so Gate 1 approval is a check of
 // falsifiable FACT, not opinion. Gary approves, reruns with notes, or rejects right on this screen.
 
+// Always read the live client list: a brain created just now (the "New Brain" flow) must appear in the dropdown
+// on the next load, not after a deploy. Without this the route can be cached and a new client never shows.
+export const dynamic = "force-dynamic";
+
 export default async function ResearcherPage() {
   const clients = await listStudioClients().catch(() => []);
   // Researchable = an explicit Researcher remit OR any crawled knowledge. A freshly-crawled brain is immediately
