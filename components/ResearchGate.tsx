@@ -407,34 +407,31 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-2xl font-bold text-ink">The fact base</h2>
             {rejectedCount > 0 && (
-              <span className="text-base text-[#fca5a5]">{rejectedCount} fact{rejectedCount === 1 ? "" : "s"} rejected and excluded. <button onClick={() => run && buildDoc(run.id)} className="underline hover:text-accent">Regenerate the document</button> to update the PDF.</span>
+              <span className="text-base text-[#fca5a5]">{rejectedCount} rejected, excluded and never referenced again. <button onClick={() => run && buildDoc(run.id)} className="underline hover:text-accent">Regenerate the document</button> to update the PDF.</span>
             )}
           </div>
           {SECTIONS.map((sec) => {
-            const rows = bySection(sec.id);
+            const rows = bySection(sec.id).filter((c) => !c.rejected);   // rejected facts disappear from view
             if (rows.length === 0) return null;
             const isUnverified = sec.id === "unverified";
-            const active = rows.filter((c) => !c.rejected).length;
             return (
               <section key={sec.id}>
                 <div className="flex items-baseline justify-between border-b-2 border-line pb-2">
                   <h3 className={`text-2xl font-bold ${isUnverified ? "text-[#fca5a5]" : "text-ink"}`}>{sec.label}</h3>
-                  <span className="text-base text-ink-faint">{active}{active !== rows.length ? ` of ${rows.length}` : ""}</span>
+                  <span className="text-base text-ink-faint">{rows.length}</span>
                 </div>
                 <p className="mt-1.5 text-base text-ink-faint">{sec.blurb}</p>
                 <ul className="mt-4 space-y-3">
                   {rows.map((c) => (
-                    <li key={c.id} className={`rounded-xl border p-4 ${c.rejected ? "border-line/50 bg-surface-1/40 opacity-60" : "border-line/70 bg-surface-1"}`}>
+                    <li key={c.id} className="rounded-xl border border-line/70 bg-surface-1 p-4">
                       <div className="flex items-start justify-between gap-4">
-                        <p className={`flex-1 text-xl leading-relaxed ${c.rejected ? "text-ink-faint line-through" : "text-ink"}`}>
+                        <p className="flex-1 text-xl leading-relaxed text-ink">
                           {c.subject && !new RegExp(clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(c.subject) && (
                             <span className="mr-2 rounded bg-surface-2 px-2 py-0.5 align-middle text-sm font-semibold text-ink-dim">{c.subject}</span>
                           )}
                           {c.claim}
                         </p>
-                        {c.rejected
-                          ? <button onClick={() => rejectClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:text-ink">Undo</button>
-                          : <button onClick={() => rejectClaim(c, true)} className="shrink-0 rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this one fact, keep the rest">Reject</button>}
+                        <button onClick={() => rejectClaim(c, true)} className="shrink-0 rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this fact - it disappears and is never referenced again">Reject</button>
                       </div>
                       {c.conflict && <div className="mt-2 text-base text-[#fcd34d]">⚠ Sources conflict: {c.conflict}</div>}
                       {isUnverified && c.unverified_reason && <div className="mt-2 text-base text-ink-faint">Why unverified: {c.unverified_reason}</div>}
@@ -445,7 +442,6 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                         {c.source_url
                           ? <a href={c.source_url} target="_blank" rel="noreferrer" className="max-w-[20rem] truncate text-accent hover:underline">{c.source_name || "source"}</a>
                           : <span className="text-ink-faint">{c.source_name || "no source"}</span>}
-                        {c.rejected && <span className="font-semibold text-[#fca5a5]">rejected</span>}
                       </div>
                     </li>
                   ))}
@@ -453,6 +449,23 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               </section>
             );
           })}
+          {/* REJECTED - out of the way, recoverable, and a permanent do-not-reference memory. */}
+          {rejectedCount > 0 && (
+            <section>
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-[#f87171]/30 pb-2">
+                <h3 className="text-xl font-bold text-[#fca5a5]">Rejected · {rejectedCount}</h3>
+                <span className="text-sm text-ink-faint">Stored. The Researcher will never surface these again, on any future run.</span>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {claims.filter((c) => c.rejected).map((c) => (
+                  <li key={c.id} className="flex items-start justify-between gap-4 rounded-lg border border-line/40 bg-surface-1/30 px-4 py-2.5">
+                    <p className="flex-1 text-base leading-relaxed text-ink-faint line-through">{c.claim}</p>
+                    <button onClick={() => rejectClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink-dim hover:text-ink">Undo</button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       )}
       {run && claims.length === 0 && !running && (

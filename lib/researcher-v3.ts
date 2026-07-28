@@ -168,6 +168,15 @@ const noDash = (s: unknown) => String(s ?? "")
 
 const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 120);
 
+// The permanent "do not reference" list for a client: every fact the team has ever REJECTED at Gate 1, across
+// all runs. Fed to the collector and enforced in code, so a rejected fact can never resurface on a rerun (Gary).
+async function loadRejectedFacts(clientId: string): Promise<string[]> {
+  const rows = (await db().query(
+    `select distinct claim from research_claims where client_id = $1 and rejected = true and claim is not null`, [clientId],
+  ).catch(() => [])) as { claim: string }[];
+  return rows.map((r) => r.claim).filter((c) => c && c.trim().length > 0);
+}
+
 // MINE THE CRAWLED SITE. The client's own website is already crawled into the brain - the richest, most reliable
 // source there is. Reading it directly means facts come from real page CONTENT, not two-line search snippets, and
 // web search is freed to cover only what the site cannot (external, current, competitors, press, the team). We
@@ -289,7 +298,15 @@ export async function collectResearch(
     ? `\n\nCORRECTION NOTES from the last review (address these precisely in this version):\n${notes.trim().slice(0, 2000)}`
     : "";
 
-  const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}${ceoLock}`;
+  // DO NOT REFERENCE (Gary): facts the team REJECTED in any past review are a permanent block-list for this
+  // client. We tell the model never to surface them again AND filter them out in code below, so a rejected fact
+  // can never come back on a rerun.
+  const rejectedFacts = await loadRejectedFacts(clientId).catch(() => [] as string[]);
+  const rejectBlock = rejectedFacts.length
+    ? `\n\nDO NOT REFERENCE - the GAS team REJECTED these facts in a previous review. Never surface them again, and drop anything that means the same thing:\n${rejectedFacts.slice(0, 50).map((r) => `- ${r.slice(0, 200)}`).join("\n")}`
+    : "";
+
+  const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}${ceoLock}${rejectBlock}`;
 
   const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${knownList}${notesBlock}\n\n` +
     `Cover every angle a marketing strategist needs: who they are and what they sell (snapshot), history/ownership/structure (foundations), the leadership and management team (leadership), products/pricing and the commercial model - how they make money and how they sell (products), the market and category (market), how THEY position themselves - promise, USPs, tone (positioning), who they serve and their audience (audience), website/SEO/social (digital), their OWN current marketing and advertising (marketing), the competitor intelligence below, a one-line profile of each competitor (competitor_set), dated developments in the last 90 days on/after ${cutoffStr} (activity), press and media (press), and reviews/sentiment incl. SA platforms like HelloPeter and Google (customer_voice).\n\n` +
@@ -419,6 +436,13 @@ export async function collectResearch(
       if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
     }
     if (Array.isArray(out2.competitors)) out.competitors = [...(out.competitors || []), ...out2.competitors];
+  }
+
+  // Enforce the do-not-reference block-list in code (the prompt asks, this guarantees): a rerun can never bring
+  // back a fact the team rejected.
+  if (rejectedFacts.length) {
+    const rejSet = new Set(rejectedFacts.map(normKey));
+    for (let i = rawClaims.length - 1; i >= 0; i--) if (rejSet.has(normKey(rawClaims[i].claim))) rawClaims.splice(i, 1);
   }
 
   // ADVERSARIAL QA PASS (Gary). Before Gate 1, a ruthless senior-editor pass red-teams the fact base and catches
