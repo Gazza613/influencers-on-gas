@@ -165,6 +165,59 @@ const noDash = (s: unknown) => String(s ?? "")
   .replace(/\s*[—–]\s*/g, " - ")
   .trim();
 
+const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 120);
+
+// MINE THE CRAWLED SITE. The client's own website is already crawled into the brain - the richest, most reliable
+// source there is. Reading it directly means facts come from real page CONTENT, not two-line search snippets, and
+// web search is freed to cover only what the site cannot (external, current, competitors, press, the team). We
+// sample broadly across pages (one chunk per distinct URL) and carry each page's URL so the model can cite it.
+// PRIORITISE THE FOUNDATIONAL PAGES. A content-heavy site has hundreds of /blog URLs that, ordered alphabetically,
+// crowd out the pages that actually matter (home, about, team, products, contact). Score every page and read the
+// core ones first, letting blog/news fill any remaining space.
+function pageScore(u: string): number {
+  const path = String(u || "").toLowerCase().replace(/^https?:\/\/[^/]+/, "").replace(/[?#].*$/, "");
+  let s = 0;
+  if (path === "" || path === "/") s += 14;                                                // homepage
+  if (/\/(about|about-us|who-we-are|company|our-story)/.test(path)) s += 11;
+  if (/\/(team|our-team|leadership|people|management)/.test(path)) s += 11;
+  if (/\/(product|products|service|services|solution|solutions|what-we-do|offering)/.test(path)) s += 10;
+  if (/\/(pricing|plans|packages)/.test(path)) s += 9;
+  if (/\/(contact|contact-us|get-in-touch)/.test(path)) s += 9;
+  if (/\/(faq|faqs|help|support)/.test(path)) s += 6;
+  if (/\/(case-stud|clients|work|portfolio|results)/.test(path)) s += 4;
+  if (/\/(blog|news|article|post|insight|resource)/.test(path)) s -= 6;                    // useful, but not foundational
+  s -= Math.min(4, (path.match(/\//g) || []).length);                                      // shallower pages first
+  return s;
+}
+
+async function loadSiteContent(clientId: string, maxChars: number): Promise<string> {
+  // 1) Get EVERY crawled URL (cheap - no content), so the pick is over the whole site, not an alphabetical slice.
+  const urlRows = (await db().query(
+    `select distinct metadata->>'url' as url from knowledge_chunks where client_id = $1 and content is not null and metadata->>'url' is not null`, [clientId],
+  ).catch(() => [])) as { url: string }[];
+  if (!urlRows.length) {
+    const any = (await db().query(`select content from knowledge_chunks where client_id = $1 and content is not null order by created_at asc limit 30`, [clientId]).catch(() => [])) as { content: string }[];
+    let acc = "";
+    for (const r of any) { if (acc.length > maxChars) break; acc += `${r.content.trim().slice(0, 1200)}\n\n`; }
+    return acc.trim();
+  }
+  // 2) Score, take the top ~45 pages, and fetch just those pages' content.
+  const topUrls = urlRows.map((r) => r.url).sort((a, b) => pageScore(b) - pageScore(a)).slice(0, 45);
+  const rows = (await db().query(
+    `select distinct on (metadata->>'url') content, metadata->>'url' as url
+     from knowledge_chunks
+     where client_id = $1 and metadata->>'url' = any($2) and content is not null
+     order by metadata->>'url', created_at asc`, [clientId, topUrls],
+  ).catch(() => [])) as { content: string; url: string }[];
+  rows.sort((a, b) => pageScore(b.url) - pageScore(a.url));   // any() loses order; restore priority
+  let acc = "";
+  for (const r of rows) {
+    if (acc.length > maxChars) break;
+    acc += `[${r.url}]\n${r.content.trim().slice(0, 1500)}\n\n`;
+  }
+  return acc.trim();
+}
+
 /**
  * Collect a verified, source-tiered fact base for one client, as a new versioned research_run. Facts only - no
  * analysis ever. Returns the run and its stored claims. onEvent streams live progress for the desk to narrate.
@@ -224,87 +277,15 @@ export async function collectResearch(
     `${COMPETITOR_BRIEF}\n\n` +
     `Search the web now, properly and widely, and do NOT lean only on their own website: ${name}'s own site${website ? ` (${website})` : ""} and channels, PLUS Google News and newsrooms, trade and industry publications, LinkedIn (for the team), business directories, partner and award announcements, review platforms, and - for a regulated client only - the relevant regulator's register. Their site establishes who they are; the independent record is where much of the fact base lives. Record every claim with its real source URL, the source date, and a tier. Facts only.`;
 
-  emit({ t: "phase", label: `Collecting facts on ${name}` });
-  let sourcesRead = 0, searchCount = 0;
-  const stream = client.messages.stream({
-    model: STANDARD,
-    max_tokens: 8000,
-    system: `${scope}\n\n${FACTS_ONLY}`,
-    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
-    messages: [{ role: "user", content: brief }],
-  });
-  stream.on("contentBlock", (blk) => {
-    const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
-    if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) {
-      searchCount += 1; emit({ t: "search", q: String(b.input.query).slice(0, 160) });
-    } else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
-      sourcesRead += b.content.length; emit({ t: "sources", n: sourcesRead });
-    }
-  });
-  const gathered = await stream.finalMessage();
-  const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
-  await recordTokens({
-    clientId, userEmail, model: STANDARD, action: "deep-research",
-    inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0,
-    cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0,
-    webSearches: gu?.server_tool_use?.web_search_requests ?? searchCount,
-  }).catch(() => {});
+  // READ THE CLIENT'S OWN CRAWLED SITE (Tier 1) so the client's facts come from real page content, not two-line
+  // search snippets, and web search is freed for what the site cannot give (external, current, competitors, press).
+  const siteContent = await loadSiteContent(clientId, 18000).catch(() => "");
+  const siteBlock = siteContent
+    ? `\n\nTHE CLIENT'S OWN WEBSITE, ALREADY CRAWLED FOR YOU (Tier 1, their own channel). Take the client's own facts from THIS real content and cite the page URL shown in [brackets] for each. Do not waste searches re-reading their own site, use this. Then web-search for what is NOT here (external, current, competitors, press, reviews, the team on LinkedIn):\n\n${siteContent}\n`
+    : "";
 
-  // FILE THE FACTS as structured claims (forced tool, so a fact base always comes back).
-  //
-  // FILE FROM THE REAL RESULTS, NOT A SUMMARY (Gary hit 0 claims on Amber Room). The gather step does NOT always
-  // end by writing a text summary - sometimes the model stops on the search results themselves. Feeding the file
-  // step only that (often empty) summary left it with nothing, and because we correctly forbid inventing facts,
-  // it filed zero. So we CONTINUE the same conversation: the gather's assistant turn carries every web_search
-  // result block, so the model files from the actual sources it read. web_search stays declared (to keep those
-  // result blocks valid) but tool_choice forces file_facts, so it files rather than searching again. max_tokens
-  // is generous because a full fact base is many claims and a truncated tool call is invalid JSON.
-  // OUTPUT MUST NOT TRUNCATE. A forced tool call that runs past max_tokens is invalid JSON, which parses to ZERO
-  // claims (Gary hit exactly this on a content-rich client: a wide search found so many facts the file call blew
-  // the 16k ceiling and filed nothing). So max_tokens is large AND the model is asked to bound the fact base to
-  // the material facts - a fact base is not "everything on the internet", it is the ~70 facts that matter.
-  // STREAMED, not create(). At max_tokens this large the SDK REFUSES a non-streaming request ("Streaming is
-  // required for operations that may take longer than 10 minutes") and throws before it ever calls the API - so
-  // a non-streaming create here would fail outright. Streaming lifts that cap and is how the gather already runs.
-  emit({ t: "phase", label: "Filing the facts, with sources and tiers" });
-  const filed = await client.messages.stream({
-    model: STANDARD,
-    max_tokens: 32000,
-    system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found in your search as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing facts and do NOT pad, but never omit the always-collect items (regulatory identity, contact details, social channels, press and FAQs). Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
-    tools: [
-      { type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool,
-      { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
-    ],
-    tool_choice: { type: "tool", name: "file_facts" },
-    messages: [
-      { role: "user", content: brief },
-      { role: "assistant", content: gathered.content },
-      { role: "user", content: "Now file the material facts you found via file_facts (up to ~70), each with its real source URL, date and tier. Do not search again." },
-    ],
-  }).finalMessage();
-  // If the tool call still hit the ceiling, the JSON is truncated and unparseable - surface it rather than
-  // silently filing zero (the failure mode we are fixing).
-  if (filed.stop_reason === "max_tokens") emit({ t: "phase", label: "The fact base was very large; filing what was captured" });
-  const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-  await recordTokens({
-    clientId, userEmail, model: STANDARD, action: "research-file",
-    inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0,
-    cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0,
-  }).catch(() => {});
-
-  const block = filed.content.find((b) => b.type === "tool_use");
-  const out = (block && block.type === "tool_use" ? block.input : {}) as { claims?: Record<string, unknown>[]; competitors?: { name?: string; website?: string }[]; vertical?: string; regulated?: boolean; identity?: Record<string, unknown> };
-  const vertical = noDash(out.vertical).slice(0, 80) || null;
-  const idIn = (out.identity || {}) as Record<string, unknown>;
-  const identity = {
-    legal_name: noDash(idIn.legal_name).slice(0, 200) || null,
-    licence: noDash(idIn.licence).slice(0, 120) || null,
-    address: noDash(idIn.address).slice(0, 300) || null,
-    markets: noDash(idIn.markets).slice(0, 200) || null,
-    contact_person: noDash(idIn.contact_person).slice(0, 200) || null,
-    contact_details: noDash(idIn.contact_details).slice(0, 200) || null,
-  };
-  const rawClaims = (Array.isArray(out.claims) ? out.claims : [])
+  // Shape the file tool output into claims (used by the first pass and the gap pass).
+  const parseClaims = (o: { claims?: Record<string, unknown>[] }) => (Array.isArray(o.claims) ? o.claims : [])
     .map((c) => ({
       section: SECTION_IDS.has(String(c.section) as ResearchSectionId) ? String(c.section) : "snapshot",
       subject: noDash(c.subject).slice(0, 200) || name,
@@ -317,6 +298,88 @@ export async function collectResearch(
       conflict: noDash(c.conflict).slice(0, 500) || null,
     }))
     .filter((c) => c.claim.length > 0);
+
+  let sourcesRead = 0, searchCount = 0;
+  type FileOut = { claims?: Record<string, unknown>[]; competitors?: { name?: string; website?: string }[]; vertical?: string; regulated?: boolean; identity?: Record<string, unknown> };
+  // ONE gather+file cycle. Gathers wide (web_search) with the crawled site in context, then files from the REAL
+  // results by CONTINUING the conversation - the gather's assistant turn carries every web_search result block, so
+  // the model files from the actual sources rather than a text summary it does not always write (the 0-claims bug).
+  // Streamed (the SDK refuses a 32k non-streaming call), and max_tokens is generous so the forced tool call is
+  // never truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
+  const runPass = async (passBrief: string): Promise<FileOut> => {
+    const g = client.messages.stream({
+      model: STANDARD, max_tokens: 8000,
+      system: `${scope}\n\n${FACTS_ONLY}`,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
+      messages: [{ role: "user", content: passBrief }],
+    });
+    g.on("contentBlock", (blk) => {
+      const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
+      if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) { searchCount += 1; emit({ t: "search", q: String(b.input.query).slice(0, 160) }); }
+      else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) { sourcesRead += b.content.length; emit({ t: "sources", n: sourcesRead }); }
+    });
+    const gathered = await g.finalMessage();
+    const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
+    await recordTokens({ clientId, userEmail, model: STANDARD, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
+
+    const filed = await client.messages.stream({
+      model: STANDARD, max_tokens: 32000,
+      system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing, do NOT pad, but never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
+      tools: [
+        { type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool,
+        { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
+      ],
+      tool_choice: { type: "tool", name: "file_facts" },
+      messages: [
+        { role: "user", content: passBrief },
+        { role: "assistant", content: gathered.content },
+        { role: "user", content: "Now file the material facts you found via file_facts, each with its real source URL, date and tier. Do not search again." },
+      ],
+    }).finalMessage();
+    const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+    await recordTokens({ clientId, userEmail, model: STANDARD, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+    const block = filed.content.find((b) => b.type === "tool_use");
+    return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
+  };
+
+  emit({ t: "phase", label: `Collecting facts on ${name}` });
+  const out = await runPass(brief + siteBlock);
+  const vertical = noDash(out.vertical).slice(0, 80) || null;
+  const idIn = (out.identity || {}) as Record<string, unknown>;
+  const identity = {
+    legal_name: noDash(idIn.legal_name).slice(0, 200) || null,
+    licence: noDash(idIn.licence).slice(0, 120) || null,
+    address: noDash(idIn.address).slice(0, 300) || null,
+    markets: noDash(idIn.markets).slice(0, 200) || null,
+    contact_person: noDash(idIn.contact_person).slice(0, 200) || null,
+    contact_details: noDash(idIn.contact_details).slice(0, 200) || null,
+  };
+  const rawClaims = parseClaims(out);
+
+  // COMPLETENESS PASS (Gary: never hand the Strategist a half-complete brief). Audit the mandatory sections; if
+  // any came back thin, do ONE targeted follow-up that digs only on the gaps, then merge (deduped). Capped at one
+  // extra pass to keep cost bounded.
+  const MANDATORY: { id: string; need: string; min: number }[] = [
+    { id: "leadership", need: "the management and executive team - names, roles and short backgrounds (use LinkedIn)", min: 2 },
+    { id: "products", need: "products/services, pricing where public, and the commercial model", min: 2 },
+    { id: "positioning", need: "how they position themselves - promise, USPs, tone", min: 1 },
+    { id: "audience", need: "who they serve and their audience segments", min: 1 },
+    { id: "contact", need: "phone, email, address and every official social profile URL", min: 2 },
+    { id: "marketing", need: "their own current marketing and advertising activity", min: 1 },
+    { id: "competitor_set", need: "a factual profile of each competitor", min: 2 },
+  ];
+  const gaps = MANDATORY.filter((m) => rawClaims.filter((c) => c.section === m.id).length < m.min);
+  if (gaps.length) {
+    emit({ t: "phase", label: `Filling gaps: ${gaps.map((g) => g.id).join(", ")}` });
+    const gapBrief = `Targeted follow-up for the ${name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}`).join("\n")}\n\nSearch specifically for these: LinkedIn for the team, their pricing and product pages, their social profiles, their current campaigns.${siteBlock}`;
+    const out2 = await runPass(gapBrief);
+    const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
+    for (const c of parseClaims(out2)) {
+      const k = `${c.section}::${normKey(c.claim)}`;
+      if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
+    }
+    if (Array.isArray(out2.competitors)) out.competitors = [...(out.competitors || []), ...out2.competitors];
+  }
 
   // VERIFIED RETRIEVAL (spec 3.7). We do not take the model's word that a source exists, says what it claims, or
   // carries the date it claims. For each sourced claim we FETCH the page, read its real date, and check support.
