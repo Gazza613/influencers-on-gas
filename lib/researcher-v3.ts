@@ -204,7 +204,7 @@ export async function collectResearch(
     model: STANDARD,
     max_tokens: 8000,
     system: `${scope}\n\n${FACTS_ONLY}`,
-    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 16 } as unknown as Anthropic.Tool],
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
   stream.on("contentBlock", (blk) => {
@@ -233,22 +233,29 @@ export async function collectResearch(
   // result block, so the model files from the actual sources it read. web_search stays declared (to keep those
   // result blocks valid) but tool_choice forces file_facts, so it files rather than searching again. max_tokens
   // is generous because a full fact base is many claims and a truncated tool call is invalid JSON.
+  // OUTPUT MUST NOT TRUNCATE. A forced tool call that runs past max_tokens is invalid JSON, which parses to ZERO
+  // claims (Gary hit exactly this on a content-rich client: a wide search found so many facts the file call blew
+  // the 16k ceiling and filed nothing). So max_tokens is large AND the model is asked to bound the fact base to
+  // the material facts - a fact base is not "everything on the internet", it is the ~70 facts that matter.
   emit({ t: "phase", label: "Filing the facts, with sources and tiers" });
   const filed = await client.messages.create({
     model: STANDARD,
-    max_tokens: 16000,
-    system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY fact you found in your search as structured claims via file_facts. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
+    max_tokens: 32000,
+    system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found in your search as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing facts and do NOT pad, but never omit the always-collect items (regulatory identity, contact details, social channels, press and FAQs). Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
     tools: [
-      { type: "web_search_20250305", name: "web_search", max_uses: 16 } as unknown as Anthropic.Tool,
+      { type: "web_search_20250305", name: "web_search", max_uses: 12 } as unknown as Anthropic.Tool,
       { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
     ],
     tool_choice: { type: "tool", name: "file_facts" },
     messages: [
       { role: "user", content: brief },
       { role: "assistant", content: gathered.content },
-      { role: "user", content: "Now file every fact you found via file_facts, with its real source URL, date and tier. Do not search again." },
+      { role: "user", content: "Now file the material facts you found via file_facts (up to ~70), each with its real source URL, date and tier. Do not search again." },
     ],
   });
+  // If the tool call still hit the ceiling, the JSON is truncated and unparseable - surface it rather than
+  // silently filing zero (the failure mode we are fixing).
+  if (filed.stop_reason === "max_tokens") emit({ t: "phase", label: "The fact base was very large; filing what was captured" });
   const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
   await recordTokens({
     clientId, userEmail, model: STANDARD, action: "research-file",

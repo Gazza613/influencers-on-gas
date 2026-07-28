@@ -1,0 +1,18 @@
+import Anthropic from "@anthropic-ai/sdk";
+import fs from "node:fs";
+const src=fs.readFileSync("lib/researcher-v3.ts","utf8");
+const grab=(n)=>{const m=src.match(new RegExp("const "+n+" = `([\\s\\S]*?)`;"));return m?m[1]:"";};
+const FACTS_ONLY=grab("FACTS_ONLY"),COMPETITOR_BRIEF=grab("COMPETITOR_BRIEF"),NO_DASH_NOTE=grab("NO_DASH_NOTE");
+const name="GAS Marketing",website="https://www.gasmarketing.co.za";
+const anchor=`\n\nGROUND-TRUTH ANCHOR. The client is ${name} at ${website}. Fixes WHICH organisation, not the source. Range widely: news, press releases, trade press, regulator records, LinkedIn, directories, reviews. The rule is about the ENTITY not the source.`;
+const scope=`SCOPE LOCK. Collecting facts about ${name} ONLY.${anchor}`;
+const brief=`Collect a verified fact base on ${name}. ALWAYS collect regulatory ID, contact, social, press/media, FAQs. Search widely, do NOT lean only on their site: their site, Google News, trade press, regulator register, LinkedIn, directories, reviews.`;
+const P=(...e)=>({type:"string",enum:e});const SECS=["snapshot","foundations","products","market","digital","contact","competitor","competitor_set","activity","press","customer_voice","faqs","unverified"];
+const SCHEMA={type:"object",additionalProperties:false,properties:{claims:{type:"array",items:{type:"object",additionalProperties:false,properties:{section:P(...SECS),subject:{type:"string"},claim:{type:"string"},source_name:{type:"string"},source_url:{type:"string"},source_date:{type:"string"},tier:{type:"integer",enum:[1,2,3]},evergreen:{type:"boolean"},unverified_reason:{type:"string"},conflict:{type:"string"}},required:["section","subject","claim","source_name","source_url","source_date","tier","evergreen","unverified_reason","conflict"]}},competitors:{type:"array",items:{type:"object",additionalProperties:false,properties:{name:{type:"string"},website:{type:"string"}},required:["name","website"]}}},required:["claims","competitors"]};
+const client=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
+const stream=client.messages.stream({model:"claude-sonnet-4-6",max_tokens:8000,system:`${scope}\n\n${FACTS_ONLY}`,tools:[{type:"web_search_20250305",name:"web_search",max_uses:12}],messages:[{role:"user",content:brief}]});
+const g=await stream.finalMessage();
+console.log("GATHER stop:",g.stop_reason,"out_tokens:",g.usage?.output_tokens);
+const filed=await client.messages.create({model:"claude-sonnet-4-6",max_tokens:32000,system:`${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts (up to ~70) via file_facts. Unverifiable -> section=unverified.`,tools:[{type:"web_search_20250305",name:"web_search",max_uses:12},{name:"file_facts",description:"fact base",input_schema:SCHEMA}],tool_choice:{type:"tool",name:"file_facts"},messages:[{role:"user",content:brief},{role:"assistant",content:g.content},{role:"user",content:"Now file the material facts (up to ~70) via file_facts. Do not search again."}]});
+const blk=filed.content.find(b=>b.type==="tool_use");
+console.log("FILE stop:",filed.stop_reason,"out_tokens:",filed.usage?.output_tokens,"CLAIMS:",blk&&Array.isArray(blk.input?.claims)?blk.input.claims.length:"NONE");
