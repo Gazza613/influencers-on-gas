@@ -78,6 +78,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const [claims, setClaims] = useState<Claim[]>([]);
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [running, setRunning] = useState(false);
+  const [justDone, setJustDone] = useState(false);   // green "complete" flash on the button when a run finishes
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [showNotes, setShowNotes] = useState(false);
@@ -165,7 +166,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // Commission a collect. withNotes runs a "Rerun with notes" - a fresh VERSION addressing corrections, never an
   // overwrite. Streams the real searches, sources and claims as they land, so the run never feels like a dead bar.
   async function runCollect(withNotes?: string) {
-    setRunning(true); setNote(""); setShowNotes(false);
+    setRunning(true); setNote(""); setShowNotes(false); setJustDone(false);
     setProgress({ label: `Collecting facts on ${clientName}`, searches: [], sources: 0, filed: 0 });
     let version = 0, count = 0, errored = "", runId = "";
     try {
@@ -203,6 +204,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     if (errored) { setNote(errored); flex(errored); await load(clientId); return; }
     flex(`Research v${version} filed ${count} claim${count === 1 ? "" : "s"}, ready for your review.`);
     await load(clientId);
+    if (count > 0) { setJustDone(true); setTimeout(() => setJustDone(false), 9000); }   // green "complete" flash
     // The Research Document builds in a durable background job now; poll for it (synchronous fallback inside).
     if (runId && count > 0) pollDocument(runId);
   }
@@ -278,11 +280,18 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       </div>
       <p className="mt-2 text-sm text-ink-faint">The website is the anchor: the Researcher only reports the organisation at this address, never a same-named business.</p>
 
-      {/* RUN BAR */}
+      {/* RUN BAR - obvious visual feedback for the team (Gary): glow + spinner while running, green when done. */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <button onClick={() => runCollect()} disabled={running || !isConfigured}
-          className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
-          {running ? "Collecting…" : run ? "Collect again (new version)" : "Run the Researcher"}
+          className={`rounded-lg px-5 py-2.5 text-lg font-bold transition ${
+            running ? "bg-accent text-black glow-accent"
+            : justDone ? "next-pulse"
+            : `bg-accent text-black ${!isConfigured ? "opacity-50" : ""}`
+          }`}>
+          {running
+            ? <span className="inline-flex items-center gap-2"><span className="spinner-ring" style={{ fontSize: "1.05em" }} /> Collecting…</span>
+            : justDone ? "✓ Research complete"
+            : run ? "Collect again (new version)" : "Run the Researcher"}
         </button>
         {run && status && (
           <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${status.cls}`}>
@@ -301,12 +310,11 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             <div>
               <div className="text-lg font-bold text-ink">Research Brief</div>
               <div className="mt-0.5 text-sm text-ink-faint">
-                {docBusy ? "Preparing the brief, filing and notifying…" : run.pdf_url ? "A GAS-branded research brief, facts only. PDF to present, Word to edit." : "Not built for this version yet."}
+                {docBusy ? "Preparing the brief, filing and notifying…" : run.pdf_url ? "A GAS-branded research brief, written for your strategist." : "Not built for this version yet."}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {run.pdf_url && <a href={run.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg bg-accent px-4 py-2 text-base font-bold text-black">Download PDF</a>}
-              {run.word_url && <a href={run.word_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink">Download Word</a>}
               {run.drive_url && <a href={run.drive_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink">Open in Drive</a>}
               <button onClick={() => buildDoc(run.id)} disabled={docBusy}
                 className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink disabled:opacity-50">

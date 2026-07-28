@@ -1,4 +1,8 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
+import { getSecret } from "./connections";
+import { PREMIUM } from "./vendors/anthropic";
+import { recordTokens } from "./usage";
 import { renderPdf } from "./studio-render";
 import { putBytes } from "./blob";
 import { fileToClientDrive, driveConfigured } from "./drive";
@@ -6,17 +10,18 @@ import { sendEmail, emailConfigured } from "./email";
 import { emailShell } from "./email-shell";
 import { listResearchClaims, listCompetitors, type ResearchClaim, type ResearchRun, type ResearchIdentity } from "./researcher-v3";
 
-// THE RESEARCH BRIEF (build spec 3.8, 3.9, extended with Gary's brief construct). An internal, GAS-CI document
-// that turns the claim store into a client research brief a marketing strategist can build a pitch from: a cover
-// identity block, then each section as a readable lead-in followed by the sourced facts (a light tier/source
-// trail on each), with a conditional regulatory section and a full source register. Rendered to a PDF (final) and
-// an editable Word .doc, stored (Blob), filed to Drive when configured, and Gary is emailed a Studio link.
+// THE RESEARCH BRIEF (build spec 3.8, 3.9, + Gary's brief construct). An internal, GAS-CI document that turns the
+// claim store into a READ-FRIENDLY client research brief a marketing strategist can build a pitch from: a cover
+// identity block, then each section written as flowing PROSE paragraphs (not tagged bullets), with the sources
+// for that section listed at the foot of the section, plus a full source register. Conditional sections (e.g.
+// regulatory) render only when they have facts.
 //
-// FACTS ONLY. No analysis, no SWOT, no recommendations - that is what makes Gate 1 a check of fact, not opinion.
-// The lead-ins are neutral framings of what a section covers, never a synthesis (synthesis is the Strategist's).
+// FACTS ONLY. The prose is written STRICTLY from the collected facts - it adds nothing, infers nothing and
+// analyses nothing (analysis is the Strategist's job). The atomic claim store remains the checkable truth behind
+// Gate 1; this document is the readable render of it.
 //
-// WORD-SAFE HTML. The same template renders in Chromium (PDF) and in Word (.doc): block/table layout, no flexbox
-// or gradients, so the editable copy opens cleanly and on-brand.
+// PROFESSIONAL LAYOUT. @page carries a real margin so every page gets clean margins and content never overlaps a
+// page edge; the cover is a dark GAS-CI panel on page one.
 
 const STUDIO_URL = (process.env.APP_URL || "https://studio.gasmarketing.co.za").replace(/\/+$/, "");
 const NOTIFY_TO = process.env.SUPER_ADMIN_EMAIL || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
@@ -54,23 +59,17 @@ function ukDate(s: string | null): string {
 const TIER_LABEL: Record<number, string> = { 1: "Tier 1", 2: "Tier 2", 3: "Tier 3" };
 const TIER_CLASS: Record<number, string> = { 1: "t1", 2: "t2", 3: "t3" };
 
-// One fact, block layout (Word-safe - no flexbox). The claim reads as a sentence; a light muted trail underneath
-// carries the tier, whether we verified it, the date, and the clickable source, so it stays checkable at a glance.
-function factHtml(c: ResearchClaim, clientName: string): string {
-  const showSubject = c.subject && !new RegExp(clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(c.subject);
-  const tier = c.tier && TIER_LABEL[c.tier] ? `<span class="tier ${TIER_CLASS[c.tier]}">${TIER_LABEL[c.tier]}</span>` : "";
-  const verified = c.verified ? `<span class="ok">verified</span>` : `<span class="unc">unconfirmed</span>`;
-  const date = c.source_date ? `<span class="tdate">${esc(ukDate(c.source_date))}</span>` : "";
-  const src = c.source_url
-    ? `<a class="src" href="${esc(c.source_url)}">${esc(c.source_name || "source")}</a>`
-    : `<span class="src none">${esc(c.source_name || "no source")}</span>`;
-  const conflict = c.conflict ? `<div class="conflict">Sources conflict: ${esc(c.conflict)}</div>` : "";
-  const reason = c.section === "unverified" && c.unverified_reason ? `<div class="reason">Why unverified: ${esc(c.unverified_reason)}</div>` : "";
-  return `<div class="fact">
-    <div class="ftext">${showSubject ? `<b class="subj">${esc(c.subject)}:</b> ` : ""}${esc(c.claim)}</div>
-    ${conflict}${reason}
-    <div class="trail">${tier} ${verified} ${date} ${src}</div>
-  </div>`;
+// The sources cited across a section, deduped, rendered at the foot of the section (Gary: source links per section).
+function sectionSources(rows: ResearchClaim[]): string {
+  const seen = new Map<string, { name: string; url: string }>();
+  for (const c of rows) {
+    if (!c.source_url) continue;
+    const k = c.source_url.toLowerCase();
+    if (!seen.has(k)) seen.set(k, { name: c.source_name || c.source_url, url: c.source_url });
+  }
+  const list = [...seen.values()];
+  if (!list.length) return "";
+  return `<div class="srcs"><span class="srcs-l">Sources</span> ${list.map((s) => `<a href="${esc(s.url)}">${esc(s.name)}</a>`).join(" &middot; ")}</div>`;
 }
 
 function sourceRegister(claims: ResearchClaim[]): string {
@@ -88,7 +87,41 @@ function sourceRegister(claims: ResearchClaim[]): string {
     <td>${esc(ukDate(r.date))}</td></tr>`).join("")}</tbody></table>`;
 }
 
-export function briefHtml(clientName: string, website: string | null, run: ResearchRun, claims: ResearchClaim[], competitors: { name: string; website: string | null }[], identity: ResearchIdentity | null): string {
+// THE BRIEF WRITER. Turns the section-grouped fact base into flowing prose a strategist can read, using ONLY the
+// facts given. Runs on the strongest model; falls back to the raw facts if it is unavailable, so a document is
+// never blank. Metered to The Researcher desk.
+async function writeBriefProse(clientId: string, clientName: string, vertical: string | null, sections: { id: string; label: string; facts: string[] }[], userEmail?: string | null): Promise<Record<string, string>> {
+  if (!sections.length) return {};
+  const key = await getSecret("anthropic");
+  if (!key) return {};
+  const client = new Anthropic({ apiKey: key });
+  const SCHEMA = {
+    type: "object", additionalProperties: false,
+    properties: { sections: { type: "array", items: { type: "object", additionalProperties: false, properties: { id: { type: "string" }, prose: { type: "string", description: "1 to 3 flowing paragraphs, plain prose, no bullet points or headings. Separate paragraphs with a blank line." } }, required: ["id", "prose"] } } },
+    required: ["sections"],
+  } as unknown as Anthropic.Tool["input_schema"];
+  const input = sections.map((s) => `## ${s.id} - ${s.label}\n${s.facts.map((f) => `- ${f}`).join("\n")}`).join("\n\n");
+  try {
+    const res = await client.messages.stream({
+      model: PREMIUM, max_tokens: 12000,
+      system: `You write internal research BRIEFS for GAS Marketing's strategy team - the read a marketing strategist does to understand a client before building strategy. Rewrite each section's facts as FLOWING PROFESSIONAL PARAGRAPHS, never bullet points.\n\nRULES:\n- Use ONLY the facts given. Add nothing, infer nothing, ANALYSE nothing - analysis is the strategist's job, not yours. No opinions, no recommendations, no SWOT.\n- Keep every specific: names, roles, numbers, dates, product names, addresses.\n- Where the facts note something was not found, not disclosed, or that sources conflict, say so plainly in a sentence - do not hide gaps.\n- Write in UK British English. Never use an em dash or en dash, use a comma or full stop. Direct, confident, no fluff, no AI-sounding filler.\n- 1 to 3 short paragraphs per section, separated by a blank line. Do not repeat the section title inside the prose.`,
+      tools: [{ name: "write_brief", description: "The brief prose, one entry per section id.", input_schema: SCHEMA }],
+      tool_choice: { type: "tool", name: "write_brief" },
+      messages: [{ role: "user", content: `Client: ${clientName}${vertical ? ` (${vertical})` : ""}\n\nThe verified fact base, grouped by section id. Write the brief prose for each:\n\n${input}` }],
+    }).finalMessage();
+    const u = res.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+    await recordTokens({ clientId, userEmail, model: PREMIUM, action: "research-brief", inputTokens: u?.input_tokens || 0, outputTokens: u?.output_tokens || 0, cacheReadTokens: u?.cache_read_input_tokens || 0, cacheCreationTokens: u?.cache_creation_input_tokens || 0 }).catch(() => {});
+    const block = res.content.find((b) => b.type === "tool_use");
+    const out = (block && block.type === "tool_use" ? (block.input as { sections?: { id?: string; prose?: string }[] }).sections : []) || [];
+    const map: Record<string, string> = {};
+    for (const s of out) if (s.id && s.prose) map[s.id] = String(s.prose).trim();
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export function briefHtml(clientName: string, website: string | null, run: ResearchRun, claims: ResearchClaim[], identity: ResearchIdentity | null, prose: Record<string, string>): string {
   const verified = claims.filter((c) => c.verified).length;
   const sources = new Set(claims.filter((c) => c.source_url).map((c) => c.source_url!.toLowerCase())).size;
   const id = (identity || {}) as ResearchIdentity;
@@ -97,17 +130,17 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
     const rows = claims.filter((c) => c.section === sec.id);
     if (!rows.length) return "";   // conditional sections (e.g. regulatory) simply do not render when empty
     const unver = sec.id === "unverified";
+    // Prefer the written prose; fall back to the raw facts as sentences so the section is never empty.
+    const text = (prose[sec.id] || rows.map((r) => r.claim).join(" ")).trim();
+    const paras = text.split(/\n\n+/).map((p) => `<p class="pp">${esc(p.trim())}</p>`).join("");
     return `<section class="sec ${unver ? "warn-sec" : ""}">
       <h2><span class="n">${sec.n}</span> ${esc(sec.label)}</h2>
       <p class="lead">${esc(sec.lead)}</p>
       ${unver ? `<p class="warn">Nothing here is a fact. The Strategist may treat these as flagged hypotheses only, never cite them as fact.</p>` : ""}
-      ${rows.map((c) => factHtml(c, clientName)).join("")}
+      ${paras}
+      ${sectionSources(rows)}
     </section>`;
   }).join("");
-
-  const compChips = competitors.length
-    ? `<div class="chips">${competitors.map((c) => c.website ? `<a href="${esc(c.website)}">${esc(c.name)}</a>` : `<span>${esc(c.name)}</span>`).join("")}</div>`
-    : "";
 
   const idrow = (k: string, v: string) => v ? `<tr><td class="ik">${esc(k)}</td><td class="iv">${v}</td></tr>` : "";
   const idTable = `<table class="idt">
@@ -123,55 +156,45 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
-  @page { size: A4 portrait; margin: 0; }
+  @page { size: A4 portrait; margin: 16mm 15mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: Poppins, "Segoe UI", Helvetica, Arial, sans-serif; color: #1A1526; background: #FFF9F3; font-size: 11px; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: Poppins, "Segoe UI", Helvetica, Arial, sans-serif; color: #1A1526; background: #FFF9F3; font-size: 11px; line-height: 1.62; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   a { color: #C42A6B; text-decoration: none; word-break: break-word; }
-  /* COVER - the Deep-Space gradient hero, full bleed (Word takes the solid fallback). */
-  .cover { color: #FFFBF8; background: #1A1043; background: linear-gradient(160deg, #1A1043 0%, #3A1580 50%, #0E2A6B 100%); padding: 24mm 16mm 20mm; min-height: 297mm; page-break-after: always; }
-  .cover .logo { height: 44px; }
-  .eyebrow { margin-top: 22px; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; color: #FF7A2F; background: linear-gradient(90deg,#FF7A2F,#F80D5B); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-  h1.client { font-size: 46px; line-height: 1.02; margin: 10px 0 8px; letter-spacing: -0.5px; text-transform: uppercase; font-weight: 800; color: #FFFBF8; }
-  .descriptor { font-size: 14px; color: rgba(255,251,248,0.7); text-transform: capitalize; font-weight: 500; }
-  .bar { height: 6px; width: 88px; border-radius: 3px; margin: 20px 0 22px; background: #FF6B00; background: linear-gradient(90deg,#FF7A2F,#F80D5B); }
-  .idt { width: 100%; border-collapse: collapse; margin: 6px 0 0; }
-  .idt td { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.12); vertical-align: top; font-size: 12px; }
+  /* COVER - a dark GAS-CI panel on page one (within the page margins, so it never bleeds into content). */
+  .cover { color: #FFFBF8; background: #1A1043; background: linear-gradient(160deg, #1A1043 0%, #3A1580 52%, #0E2A6B 100%); border-radius: 16px; padding: 20mm 15mm; min-height: 246mm; page-break-after: always; }
+  .cover .logo { height: 42px; }
+  .eyebrow { margin-top: 20px; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; color: #FF7A2F; background: linear-gradient(90deg,#FF7A2F,#F80D5B); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  h1.client { font-size: 42px; line-height: 1.03; margin: 10px 0 8px; letter-spacing: -0.5px; text-transform: uppercase; font-weight: 800; color: #FFFBF8; }
+  .descriptor { font-size: 14px; color: rgba(255,251,248,0.72); text-transform: capitalize; font-weight: 500; }
+  .bar { height: 6px; width: 84px; border-radius: 3px; margin: 18px 0 20px; background: #FF6B00; background: linear-gradient(90deg,#FF7A2F,#F80D5B); }
+  .idt { width: 100%; border-collapse: collapse; }
+  .idt td { padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.12); vertical-align: top; font-size: 12px; }
   .idt .ik { color: rgba(255,251,248,0.55); text-transform: uppercase; letter-spacing: .6px; font-size: 9px; width: 30%; padding-right: 12px; font-weight: 600; }
   .idt .iv { color: #FFFBF8; font-weight: 500; }
   .idt .iv a { color: #FF9A5A; }
-  .counts { margin-top: 24px; }
-  .counts .c { display: inline-block; margin-right: 26px; }
+  .counts { margin-top: 26px; }
+  .counts .c { display: inline-block; margin-right: 28px; }
   .counts .k { color: rgba(255,251,248,0.5); text-transform: uppercase; letter-spacing: .6px; font-size: 8.5px; font-weight: 600; }
-  .counts .v { font-size: 20px; font-weight: 800; color: #FFFBF8; }
-  .chips { margin-top: 16px; }
-  .chips a, .chips span { display: inline-block; border: 1px solid rgba(255,255,255,0.22); border-radius: 20px; padding: 3px 11px; margin: 0 6px 6px 0; font-size: 10px; font-weight: 600; color: #FFFBF8; }
-  .cover .notice { margin-top: 20px; border: 1px solid rgba(255,122,47,0.4); background: rgba(255,122,47,0.12); border-radius: 10px; padding: 12px 14px; font-size: 10.5px; color: rgba(255,251,248,0.82); }
+  .counts .v { font-size: 21px; font-weight: 800; color: #FFFBF8; }
+  .cover .notice { margin-top: 24px; border: 1px solid rgba(255,122,47,0.4); background: rgba(255,122,47,0.12); border-radius: 10px; padding: 12px 15px; font-size: 10.5px; color: rgba(255,251,248,0.82); }
   .cover .notice b { color: #FFFBF8; }
-  .cover .legend { margin-top: 12px; font-size: 9.5px; color: rgba(255,251,248,0.6); }
-  .cover .foot { margin-top: 18px; font-size: 9px; color: rgba(255,251,248,0.45); }
-  /* BODY - cream sections. */
-  .content { padding: 16mm 14mm; }
+  .cover .legend { margin-top: 14px; font-size: 9.5px; color: rgba(255,251,248,0.6); }
+  .cover .foot { margin-top: 20px; font-size: 9px; color: rgba(255,251,248,0.45); }
   .tier { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 8.5px; font-weight: 700; border: 1px solid; }
   .t1 { color: #15803d; border-color: #86efac; background: #f0fdf4; }
   .t2 { color: #2540D6; border-color: #b6c1f6; background: #eef1ff; }
   .t3 { color: #b45309; border-color: #fcd34d; background: #fffbeb; }
-  .sec { margin: 0 0 6px; }
-  .sec h2 { font-size: 15px; margin: 20px 0 2px; color: #1A1526; text-transform: uppercase; font-weight: 800; letter-spacing: 0.2px; page-break-after: avoid; }
+  /* BODY sections - cream, prose. */
+  .sec { margin: 0 0 14px; }
+  .sec h2 { font-size: 15px; margin: 18px 0 2px; color: #1A1526; text-transform: uppercase; font-weight: 800; letter-spacing: 0.2px; page-break-after: avoid; }
   .sec h2 .n { color: #F96203; font-weight: 800; }
-  .lead { margin: 0 0 10px; color: #6b6478; font-size: 10.5px; border-bottom: 2px solid #F96203; padding-bottom: 8px; font-style: italic; }
+  .lead { margin: 0 0 9px; color: #6b6478; font-size: 10px; border-bottom: 2px solid #F96203; padding-bottom: 7px; font-style: italic; page-break-after: avoid; }
   .warn-sec .lead { border-bottom-color: #f59e0b; }
   .warn { color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 10px; margin: 0 0 8px; font-size: 10px; }
-  .fact { padding: 7px 0; border-bottom: 1px solid #efe9e2; page-break-inside: avoid; }
-  .ftext { color: #1A1526; font-size: 11.5px; }
-  .subj { color: #C42A6B; }
-  .conflict { color: #b45309; font-size: 9.5px; margin-top: 2px; }
-  .reason { color: #8a8992; font-size: 9.5px; margin-top: 2px; }
-  .trail { margin-top: 3px; font-size: 9px; color: #a3a2ab; }
-  .trail .ok { color: #15803d; font-weight: 700; }
-  .trail .unc { color: #c8c2bb; }
-  .trail .tdate { color: #8a8992; }
-  .trail .src { color: #C42A6B; }
-  .trail .src.none { color: #c8c2bb; }
+  .pp { margin: 0 0 8px; color: #262130; font-size: 11.5px; line-height: 1.68; orphans: 3; widows: 3; }
+  .srcs { margin: 8px 0 2px; padding-top: 7px; border-top: 1px solid #efe4d8; font-size: 9px; color: #9a92a4; }
+  .srcs-l { text-transform: uppercase; letter-spacing: .6px; font-weight: 700; color: #b6adbf; margin-right: 6px; }
+  .srcs a { color: #C42A6B; }
   .reg { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-top: 4px; }
   .reg th { text-align: left; color: #8a8992; text-transform: uppercase; letter-spacing: .5px; font-size: 8.5px; border-bottom: 1px solid #e6ded5; padding: 4px 6px; }
   .reg td { padding: 5px 6px; border-bottom: 1px solid #efe9e2; vertical-align: top; }
@@ -191,15 +214,12 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
       <span class="c"><div class="k">Verified</div><div class="v">${verified}</div></span>
       <span class="c"><div class="k">Sources</div><div class="v">${sources}</div></span>
     </div>
-    ${compChips}
     <div class="notice"><b>Facts only.</b> This brief is a collected, source-tiered fact base with no analysis or recommendations, by design, so what is approved at Gate 1 is falsifiable fact. The strategy comes next, from the Strategist.</div>
     <div class="legend"><span class="tier t1">Tier 1</span> load-bearing &nbsp; <span class="tier t2">Tier 2</span> reliable &nbsp; <span class="tier t3">Tier 3</span> directional</div>
     <div class="foot">Prepared by The Researcher &middot; GAS Marketing &middot; Internal &middot; ${esc(ukDate(run.created_at))}</div>
   </div>
-  <div class="content">
-    ${sections}
-    <section class="sec"><h2><span class="n">19</span> Source register</h2><p class="lead">Every source behind this brief, with its tier and the date accessed.</p>${sourceRegister(claims)}</section>
-  </div>
+  ${sections}
+  <section class="sec"><h2><span class="n">19</span> Source register</h2><p class="lead">Every source behind this brief, with its tier and the date accessed.</p>${sourceRegister(claims)}</section>
   </body></html>`;
 }
 
@@ -217,26 +237,31 @@ export async function buildResearchDocument(clientId: string, runId: string): Pr
   const run = rows[0];
   if (!run) throw new Error("Research run not found.");
   const clientName = run.client_name;
-  const [allClaims, competitors] = await Promise.all([listResearchClaims(runId), listCompetitors(clientId)]);
+  const allClaims = await listResearchClaims(runId);
   // Rejected facts (dropped by Gary at Gate 1) never reach the document, the source register, or the Strategist.
   const claims = allClaims.filter((c) => !c.rejected);
   if (!claims.length) throw new Error("This run has no claims to document (all were rejected, or none filed).");
 
-  const html = briefHtml(clientName, run.website, run, claims, competitors, run.identity || null);
+  // Write the brief prose from the fact base (facts only), then render.
+  const sectionsForProse = DOC_SECTIONS.map((sec) => ({ id: sec.id, label: sec.label, facts: claims.filter((c) => c.section === sec.id).map((c) => c.claim) })).filter((s) => s.facts.length);
+  const prose = await writeBriefProse(clientId, clientName, run.vertical || null, sectionsForProse, run.user_email);
+
+  const html = briefHtml(clientName, run.website, run, claims, run.identity || null, prose);
   const safeName = clientName.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "client";
 
-  // PDF (final) via Chromium; Word (.doc) is the SAME HTML, which Word opens and lets the team edit.
+  // PDF via Chromium. WORD DROPPED FOR NOW (Gary): the HTML-based .doc rendered poorly in Word, so PDF is the
+  // deliverable; a native .docx export can be added later if the team needs to edit in Word.
   const pdf = await renderPdf(html);
   const pdfUrl = await putBytes(pdf, `research/${clientId}`, "pdf", "application/pdf");
-  const wordUrl = await putBytes(Buffer.from(html, "utf8"), `research/${clientId}`, "doc", "application/msword");
+  const wordUrl = "";
 
   // File the PDF to Drive under <client>/Research (gated - skips cleanly if not configured).
   const drive = await fileToClientDrive({ clientName, subfolder: "Research", filename: `${safeName}-research-brief-v${run.version}.pdf`, bytes: pdf, contentType: "application/pdf" });
   const driveUrl = drive.filed ? drive.url! : null;
 
   await db().query(
-    `update research_runs set pdf_url = $1, word_url = $2, drive_url = coalesce($3, drive_url) where id = $4`,
-    [pdfUrl, wordUrl, driveUrl, runId],
+    `update research_runs set pdf_url = $1, word_url = null, drive_url = coalesce($2, drive_url) where id = $3`,
+    [pdfUrl, driveUrl, runId],
   );
 
   // Notify Gary - a Studio link, never an approval mechanism (spec 3.9, 4).
@@ -244,7 +269,7 @@ export async function buildResearchDocument(clientId: string, runId: string): Pr
   if (emailConfigured()) {
     const emailHtml = researchEmailHtml({
       clientName, version: run.version, claimCount: claims.length,
-      studioLink: `${STUDIO_URL}/researcher`, pdfUrl, wordUrl, driveUrl, dateLabel: ukDate(run.created_at),
+      studioLink: `${STUDIO_URL}/researcher`, pdfUrl, driveUrl, dateLabel: ukDate(run.created_at),
     });
     const r = await sendEmail({ to: NOTIFY_TO, subject: `Research brief ready · ${clientName} (v${run.version})`, html: emailHtml, fromName: "The Researcher · GAS" }).catch(() => ({ sent: false }));
     emailed = !!r.sent;

@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
 import { PREMIUM, INGEST } from "./vendors/anthropic";
-import { clientWebsite, siteAnchor, deriveResearchBrief } from "./intel";
+import { clientWebsite, siteAnchor, deriveResearchBrief, loadIntelBrief } from "./intel";
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
 import { ingestChunks } from "./rag";
@@ -264,6 +264,14 @@ export async function collectResearch(
   const website = await clientWebsite(clientId).catch(() => null);
   const anchor = siteAnchor(name, website);
 
+  // LOCKED GROUND TRUTH the GAS team supplied (Gary): the CEO / senior leadership. This OVERRIDES anything the
+  // web says - the team knows their client. It was being ignored (the collector rediscovered leadership from
+  // scratch), which is why a locked CEO did not appear. Injected into the scope so both passes treat it as fact.
+  const briefLock = await loadIntelBrief(clientId).catch(() => null);
+  const ceoLock = briefLock?.ceoName
+    ? `\n\nCONFIRMED LEADERSHIP (ground truth from the GAS team - Tier 1, and it OVERRIDES anything you find online that conflicts): ${briefLock.ceoName} is the ${briefLock.ceoTitle || "Chief Executive Officer"} of ${name}. File this in the leadership section as a verified fact, research their professional background, and never contradict or omit it.`
+    : "";
+
   // Existing competitor set - so a targeted re-pass can be scoped, and so we build on the set, not replace it.
   const knownCompetitors = (await db().query(
     `select name, website from research_competitors where client_id = $1 order by created_at asc`, [clientId],
@@ -280,7 +288,7 @@ export async function collectResearch(
     ? `\n\nCORRECTION NOTES from the last review (address these precisely in this version):\n${notes.trim().slice(0, 2000)}`
     : "";
 
-  const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}`;
+  const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}${ceoLock}`;
 
   const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${knownList}${notesBlock}\n\n` +
     `Cover every angle a marketing strategist needs: who they are and what they sell (snapshot), history/ownership/structure (foundations), the leadership and management team (leadership), products/pricing and the commercial model - how they make money and how they sell (products), the market and category (market), how THEY position themselves - promise, USPs, tone (positioning), who they serve and their audience (audience), website/SEO/social (digital), their OWN current marketing and advertising (marketing), the competitor intelligence below, a one-line profile of each competitor (competitor_set), dated developments in the last 90 days on/after ${cutoffStr} (activity), press and media (press), and reviews/sentiment incl. SA platforms like HelloPeter and Google (customer_voice).\n\n` +
