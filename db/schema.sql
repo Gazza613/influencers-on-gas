@@ -694,6 +694,7 @@ create index if not exists idx_users_reset_token on users(reset_token);
 alter table intel_briefs add column if not exists ceo_rules text;
 alter table intel_briefs add column if not exists ceo_name  text;
 alter table intel_briefs add column if not exists ceo_title text;
+alter table intel_briefs add column if not exists deprecated_products jsonb not null default '[]'::jsonb;  -- retired products the client has not yet scrubbed off its site; the Researcher never surfaces these (Gary: GAS Appitude/ROC/INGAiGE)
 
 -- Why an ingest failed. Status alone said "failed" and nothing else, so a broken source could only be
 -- diagnosed by guessing - which is exactly what happened to the first site crawl.

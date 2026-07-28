@@ -157,12 +157,15 @@ export type IntelBrief = {
   // The client's OWN official website - the ground truth the desks must stay inside (Gary). Both desks anchor
   // to it so they can never research a same-named but different business.
   website: string | null;
+  // RETIRED PRODUCTS the client no longer sells but has not yet scrubbed from its own site (Gary: GAS still lists
+  // Appitude / ROC / INGAiGE). Ground truth from the team: NEVER present these as current, never reference them.
+  deprecatedProducts: string[];
 };
 
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const rows = (await db().query(
     `select b.client_id, c.name as client_name, c.website, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
-            b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title
+            b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title, b.deprecated_products
      from intel_briefs b join clients c on c.id = b.client_id
      where b.client_id = $1`,
     [clientId],
@@ -182,6 +185,7 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
     ceoName: (r.ceo_name as string) || null,
     ceoTitle: (r.ceo_title as string) || null,
     website: (r.website as string) || null,
+    deprecatedProducts: Array.isArray(r.deprecated_products) ? (r.deprecated_products as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
   };
 }
 

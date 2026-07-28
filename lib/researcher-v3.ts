@@ -58,10 +58,11 @@ export const ACTIVITY_WINDOW_DAYS = 90;
 const FACTS_ONLY = `You are The Researcher at GAS Marketing, a top 1% marketing researcher. You COLLECT and VERIFY facts about a client, their market, and their competitors. You never analyse, interpret, recommend, or editorialise.
 
 HARD RULES:
+- NEVER FABRICATE, this is the one unbreakable rule. Every fact must come from a real source you actually read. You never invent, infer, estimate, round, extrapolate or "reasonably assume" a figure, date, name, quote, statistic or detail. If you did not read it in a real source, it does not exist. A missing fact is recorded as a gap, never filled with a plausible guess. Better a short, certain brief than a full, doubtful one.
+- GO DEEP, but only on what is real. Thin, generic summaries are not good enough. For every fact, capture the SPECIFICS you actually found: exact figures, dates, named people and their exact titles, direct quotes (in quotation marks), prices, plan names, product mechanics, channel names, follower/review counts, licence numbers. A detailed brief is one dense with sourced specifics, NOT one padded with generalities or invented detail. Prefer three concrete sourced facts over one vague sentence. Where a section has more real, sourced detail to give, give it.
 - You never use the words opportunity, threat, gap, weakness, strength, should, could, suggests, or recommend in relation to the client. No SWOT. No conclusions. Facts only.
 - Every factual claim you record carries a SOURCE (the real URL you read) and the DATE the source was published or accessed.
 - You distinguish VERIFIED FACT from UNVERIFIED SIGNAL and never blend the two. If you cannot verify a claim, you place it in the Unverified section with the reason, you do not drop it.
-- You would rather return less that is certain than more that is doubtful. You never fill gaps with plausible-sounding assumptions.
 - When two sources conflict, you record BOTH and flag the conflict rather than choosing.
 - You write in UK British English, use commas rather than em dashes (never an em or en dash), and write concisely and plainly.
 
@@ -389,7 +390,15 @@ export async function collectResearch(
     ? `\n\nDO NOT REFERENCE - the GAS team REJECTED these facts in a previous review. Never surface them again, and drop anything that means the same thing:\n${rejectedFacts.slice(0, 50).map((r) => `- ${r.slice(0, 200)}`).join("\n")}`
     : "";
 
-  const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}${ceoLock}${rejectBlock}`;
+  // RETIRED PRODUCTS (Gary, ground truth): products the client has DISCONTINUED but not yet scrubbed from its own
+  // site. They will still appear on the live site and in old articles - the model must treat them as legacy and
+  // NEVER present them as current or reference them. We tell it here AND hard-drop any claim naming one below.
+  const deadProducts = briefLock?.deprecatedProducts?.length ? briefLock.deprecatedProducts : [];
+  const deprecatedLock = deadProducts.length
+    ? `\n\nRETIRED PRODUCTS - GROUND TRUTH from the ${name} team, this OVERRIDES the website. These products are DISCONTINUED and are only still on the site by oversight: ${deadProducts.join(", ")}. NEVER present them as current, NEVER list them as ${name}'s products or services, and do NOT reference them at all - not even as "formerly" or "legacy". If a page or article mentions them, ignore that part. ${name}'s current, primary system is what the RECENT content promotes - lead with that.`
+    : "";
+
+  const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}${ceoLock}${deprecatedLock}${rejectBlock}`;
 
   const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${knownList}${notesBlock}\n\n` +
     `Cover every angle a marketing strategist needs: who they are and what they sell (snapshot), history/ownership/structure (foundations), the leadership and management team (leadership), products/pricing and the commercial model - how they make money and how they sell (products), the market and category (market), how THEY position themselves - promise, USPs, tone (positioning), who they serve and their audience (audience), website/SEO/social (digital), their OWN current marketing and advertising (marketing), the competitor intelligence below, a one-line profile of each competitor (competitor_set), dated developments in the last 90 days on/after ${cutoffStr} (activity), press and media (press), and reviews/sentiment incl. SA platforms like HelloPeter and Google (customer_voice).\n\n` +
@@ -457,7 +466,7 @@ export async function collectResearch(
     const g = client.messages.stream({
       model: PREMIUM, max_tokens: 8000,
       system: `${scope}\n\n${FACTS_ONLY}`,
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool],
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: passBrief }],
     });
     g.on("contentBlock", (blk) => {
@@ -471,9 +480,9 @@ export async function collectResearch(
 
     const filed = await client.messages.stream({
       model: FABLE, max_tokens: 32000,
-      system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the MATERIAL facts you found as structured claims via file_facts, up to about 70 claims. Prioritise the most useful and load-bearing, do NOT pad, but never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
+      system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact you actually found as a structured claim via file_facts, up to about 120 claims. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines, and give each well-covered section the depth it has real sourced material for. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
       tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: 25 } as unknown as Anthropic.Tool,
+        { type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool,
         { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
       ],
       tool_choice: { type: "tool", name: "file_facts" },
@@ -533,6 +542,16 @@ export async function collectResearch(
   if (rejectedFacts.length) {
     const rejSet = new Set(rejectedFacts.map(normKey));
     for (let i = rawClaims.length - 1; i >= 0; i--) if (rejSet.has(normKey(rawClaims[i].claim))) rawClaims.splice(i, 1);
+  }
+
+  // Enforce the RETIRED-PRODUCTS lock in code (guarantee, not just a prompt ask): drop any claim that names a
+  // discontinued product, so a stale site page or old article can never resurface it. Word-boundary + collapsed
+  // punctuation so "INGAiGE", "INGAIGE" and "IN-GAiGE" all match. Subject-only mentions go too.
+  if (deadProducts.length) {
+    const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const dead = deadProducts.map(clean).filter(Boolean);
+    const hit = (s: string | null) => { const t = clean(s || ""); return dead.some((d) => t.includes(d)); };
+    for (let i = rawClaims.length - 1; i >= 0; i--) if (hit(rawClaims[i].claim) || hit(rawClaims[i].subject)) rawClaims.splice(i, 1);
   }
 
   // ADVERSARIAL QA PASS (Gary). Before Gate 1, a ruthless senior-editor pass red-teams the fact base and catches
