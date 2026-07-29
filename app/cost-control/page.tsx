@@ -68,7 +68,12 @@ export default function CostControlPage() {
   const [userEmail, setUserEmail] = useState("");
 
   const [report, setReport] = useState<Report | null>(null);
-  const [fixedByDesk, setFixedByDesk] = useState<Record<string, number>>({});
+  // The FULL subscription allocation from the SAME fetch as the report, so the hero total and the By-section
+  // tallies reconcile off ONE consistent set of numbers (fixing the "totals don't add up" - the hero was
+  // usage-only while By-section added subscription shares). byDesk = used-plan share per desk; idleCents = plans
+  // nobody used this period; totalCents = every active subscription.
+  const [fixed, setFixed] = useState<{ totalCents: number; byDesk: { desk: string; cents: number; tint: string }[]; idleCents: number } | null>(null);
+  const fixedByDesk = fixed ? Object.fromEntries(fixed.byDesk.map((d) => [d.desk, d.cents])) : {};
   const [audit, setAudit] = useState<Audit>([]);
   const [prev, setPrev] = useState<{ cents: number; credits: number } | null>(null);
   const [cycle, setCycle] = useState<{ start: string; trackedCredits: number; trackedCents: number } | null>(null);
@@ -93,7 +98,11 @@ export default function CostControlPage() {
     const cmp = prevWindow(from, to);
     if (cmp) { qs.set("cmpFrom", cmp.cmpFrom); qs.set("cmpTo", cmp.cmpTo); }
     const r = await fetch(`/api/cost-control?${qs}`).then((x) => x.json()).catch(() => null);
-    if (r?.report) { setReport(r.report); setAudit(r.audit || []); setPrev(r.previous ?? null); setCycle(r.cycle ?? null); setRate(r.zarPerUsd || 0); }
+    if (r?.report) {
+      setReport(r.report); setAudit(r.audit || []); setPrev(r.previous ?? null); setCycle(r.cycle ?? null); setRate(r.zarPerUsd || 0);
+      const f = r.fixed;
+      setFixed(f ? { totalCents: f.totalCents || 0, byDesk: f.byDesk || [], idleCents: (f.idle || []).reduce((s: number, x: { cents: number }) => s + (x.cents || 0), 0) } : null);
+    }
     setLoading(false);
   }, [from, to, influencerId, provider, userEmail]);
 
@@ -196,19 +205,24 @@ export default function CostControlPage() {
           )}
         </div>
 
-        {/* HERO: total */}
+        {/* HERO: the TRUE total = pay-per-use + every active subscription. This is what the platform costs the
+            agency, and it is the number the By-section tallies reconcile to (usage + used plans + idle plans). */}
         <div className="mt-6 rounded-2xl border border-line bg-surface-1 p-7">
           <div className="text-base uppercase tracking-[0.15em] text-ink-faint">Total spend · {periodLabel}</div>
           <div className="mt-2 flex flex-wrap items-end gap-4">
-            <div className="tabular text-6xl font-extrabold leading-none">{report ? rand(report.total.cents) : "…"}</div>
-            {rate > 0 && report && <div className="tabular pb-1 text-2xl text-ink-dim">{usd(report.total.cents, rate)}</div>}
+            <div className="tabular text-6xl font-extrabold leading-none">{report ? rand((report.total.cents) + (fixed?.totalCents ?? 0)) : "…"}</div>
+            {rate > 0 && report && <div className="tabular pb-1 text-2xl text-ink-dim">{usd((report.total.cents) + (fixed?.totalCents ?? 0), rate)}</div>}
             {delta != null && (
               <div className={`tabular pb-2 text-xl font-bold ${delta > 0 ? "text-active" : "text-ready"}`}>
-                {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}% vs previous
+                {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}% usage vs previous
               </div>
             )}
           </div>
-          <div className="mt-2 text-lg text-ink-faint">{report ? `${report.total.events.toLocaleString()} paid actions in this period` : ""}</div>
+          <div className="mt-2 text-lg text-ink-faint">
+            {report ? (fixed && fixed.totalCents > 0
+              ? <>{rand(report.total.cents)} usage ({report.total.events.toLocaleString()} paid actions) + {rand(fixed.totalCents)} monthly subscriptions</>
+              : `${report.total.events.toLocaleString()} paid actions in this period`) : ""}
+          </div>
         </div>
 
         {/* TEAM MEMBERS - the number that matters most to Gary */}
@@ -218,11 +232,10 @@ export default function CostControlPage() {
         {report && report.byClient.some((c) => c.id) && <ClientCosts rows={report.byClient} />}
 
         {/* BY SECTION */}
-        {report && report.byDesk.length > 0 && <SectionSplit desks={report.byDesk} fixedByDesk={fixedByDesk} />}
+        {report && report.byDesk.length > 0 && <SectionSplit desks={report.byDesk} fixedByDesk={fixedByDesk} idleCents={fixed?.idleCents ?? 0} />}
 
         {/* MONTHLY SUBSCRIPTIONS */}
-        <FixedCosts isSuperAdmin={isSuper}
-          onLoaded={(a) => setFixedByDesk(Object.fromEntries(a.byDesk.map((d) => [d.desk, d.cents])))} />
+        <FixedCosts isSuperAdmin={isSuper} />
 
         {/* DAILY TREND */}
         {report && report.byDay.length > 1 && (
@@ -371,18 +384,21 @@ function TeamMembers({ rows }: { rows: MemberRow[] }) {
 
 // BY SECTION - each section's true cost: pay-per-use plus its share of the subscriptions its work runs on.
 type DeskRow = { desk: string; credits: number; cents: number; events: number; tint: string };
-function SectionSplit({ desks, fixedByDesk }: { desks: DeskRow[]; fixedByDesk: Record<string, number> }) {
+function SectionSplit({ desks, fixedByDesk, idleCents }: { desks: DeskRow[]; fixedByDesk: Record<string, number>; idleCents: number }) {
   const trueOf = (d: DeskRow) => d.cents + (fixedByDesk[d.desk] ?? 0);
-  const total = desks.reduce((s, d) => s + trueOf(d), 0);
+  // Include idle plans (paid for, used by nobody) as their own row, so the rows SUM to the hero total exactly:
+  // usage + used-plan shares + idle plans = every rand the platform spent this period. No more mismatch.
+  const total = desks.reduce((s, d) => s + trueOf(d), 0) + idleCents;
   const pct = (c: number) => (total > 0 ? (c / total) * 100 : 0);
-  const anyFixed = Object.values(fixedByDesk).some((v) => v > 0);
+  const anyFixed = Object.values(fixedByDesk).some((v) => v > 0) || idleCents > 0;
   return (
     <section className="mt-8">
       <h2 className="text-xl font-bold">By section</h2>
-      {anyFixed && <p className="mt-0.5 text-lg text-ink-dim">Pay-per-use plus each section&apos;s share of the subscriptions.</p>}
+      {anyFixed && <p className="mt-0.5 text-lg text-ink-dim">Pay-per-use plus each section&apos;s share of the subscriptions. These rows sum to the total above.</p>}
       <div className="mt-3 rounded-xl border border-line bg-surface-1 p-5">
         <div className="flex h-4 w-full overflow-hidden rounded-full bg-surface-2">
           {desks.map((d) => <div key={d.desk} title={`${d.desk} · ${rand(trueOf(d))}`} style={{ width: `${Math.max(pct(trueOf(d)), trueOf(d) > 0 ? 0.8 : 0)}%`, background: d.tint }} />)}
+          {idleCents > 0 && <div title={`Unused plans · ${rand(idleCents)}`} style={{ width: `${Math.max(pct(idleCents), 0.8)}%`, background: "#475569" }} />}
         </div>
         <div className="mt-4 space-y-3">
           {desks.map((d) => {
@@ -401,6 +417,19 @@ function SectionSplit({ desks, fixedByDesk }: { desks: DeskRow[]; fixedByDesk: R
               </div>
             );
           })}
+          {idleCents > 0 && (
+            <div className="flex items-center justify-between gap-3 border-b border-line/60 pb-3 last:border-0">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: "#475569" }} />
+                <span className="truncate text-lg font-semibold text-ink-dim">Unused plans</span>
+                <span className="tabular shrink-0 text-base text-ink-faint">idle capacity</span>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="tabular text-xl font-bold text-ink-dim">{rand(idleCents)}</div>
+                <div className="tabular text-base text-ink-faint">paid for, used by nobody</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
