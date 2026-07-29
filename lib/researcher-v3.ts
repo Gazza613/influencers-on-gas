@@ -432,7 +432,11 @@ export async function collectResearch(
   // line, a region, a competitor to profile. It PRIORITISES and DEEPENS that angle, but it does not narrow the
   // brief: the always-collect items and every section are still gathered, and the no-fabrication lock still holds.
   const focusBlock = focus?.trim()
-    ? `\n\nFOCUS FOR THIS RUN (the team's steer - treat as a PRIORITY): ${focus.trim().slice(0, 1000)}\nGive this extra depth and dedicated, sourced facts, and weave it through the relevant sections. This is an emphasis, NOT a restriction: still collect the always-collect items and cover every section. And it never loosens the rules, only real, sourced facts, never anything invented to satisfy the focus.`
+    ? `\n\nFOCUS FOR THIS RUN (the team's steer - treat as a PRIORITY): ${focus.trim().slice(0, 1000)}\nGive this extra depth and dedicated, sourced facts, and weave it through the relevant sections.\n` +
+      `TWO KINDS of focus, handle each correctly:\n` +
+      `1) A TOPIC/ANGLE focus (a product line, a theme) is an EMPHASIS, not a restriction: still collect the always-collect items and cover every section, just with extra depth on the focus.\n` +
+      `2) A MARKET/GEOGRAPHY/ENTITY focus (e.g. "South Africa only", a specific country, region or legal entity) is a hard SCOPE BOUNDARY: research ONLY that market/entity. Every search query should be scoped to it (e.g. add "South Africa" to your searches), and facts about the brand's operations in OTHER countries/markets are OUT OF SCOPE, appearing only as a brief line of parent-group context, never as the subject. If a source is about a different market, do not file it as this client's fact. When the same global brand operates in many markets, the focus market is THE subject and the others are background.\n` +
+      `Either way it never loosens the rules: only real, sourced facts, never anything invented to satisfy the focus.`
     : "";
 
   // DO NOT REFERENCE (Gary): facts the team REJECTED in any past review are a permanent block-list for this
