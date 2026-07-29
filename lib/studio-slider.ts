@@ -286,7 +286,7 @@ export async function finishSlider(clientId: string, referenceUrl: string, swapU
   // FORENSIC placement (Gary): "change only the people and the callouts, keep everything else as the reference."
   // The swap returns a clean photograph, so we lay OUR real logo, deal and legal at the REFERENCE'S own
   // positions (no doubling risk, because the plate is clean). One layout read gives us those boxes.
-  const layout = await detectLayout(referenceUrl).catch(() => null);
+  const layout = await detectLayout(referenceUrl, clientId).catch(() => null);
 
   // Headline + legal: the Producer's campaign headline over a soft gradient, and the exact reference disclaimer
   // in the thin navy footer.
@@ -334,7 +334,7 @@ export async function stampTypesetDeal(
     const kit = await getBrandKit(clientId).catch(() => null);
     const fonts = (kit?.fonts || []) as { family: string; url: string }[];
     const buf: Buffer = Buffer.from(new Uint8Array(await (await fetch(imageUrl)).arrayBuffer()));
-    const layout = referenceUrl ? await detectLayout(referenceUrl).catch(() => null) : null;
+    const layout = referenceUrl ? await detectLayout(referenceUrl, clientId).catch(() => null) : null;
     const out = await overlayDeal(buf, deal, fonts, layout?.callout, orientation);
     return await putBytes(out, `studio/${clientId}/deal-typeset`, "png", "image/png");
   } catch (e) {
@@ -375,7 +375,7 @@ export async function stampDealCard(
     const W = meta.width || 1080, H = meta.height || 1080;
 
     // Prefer the reference's own deal box; else a sensible top-right placement.
-    const layout = referenceUrl ? await detectLayout(referenceUrl).catch(() => null) : null;
+    const layout = referenceUrl ? await detectLayout(referenceUrl, clientId).catch(() => null) : null;
     const box = layout?.callout || null;
     const wFrac = box
       ? Math.min(0.34, Math.max(0.16, (box.wPct > 1 ? box.wPct / 100 : box.wPct)))
@@ -450,7 +450,7 @@ export async function stampRealLogo(clientId: string, referenceUrl: string, imag
     let out: Buffer = Buffer.from(new Uint8Array(await (await fetch(imageUrl)).arrayBuffer()));
     // The reference tells us where ITS logo sits; the retheme keeps the logo in that same spot, so stamping at
     // the same box lands right on top of the garbled one.
-    const layout = await detectLayout(referenceUrl).catch(() => null);
+    const layout = await detectLayout(referenceUrl, clientId).catch(() => null);
     const logoBox = layout?.logo || { xPct: 4, yPct: 4, wPct: 28 };
     // ONE consistent lockup for every slider in the carousel, kept legible by the halo - not a per-slide colour
     // pick that could leave the set mismatched.

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "./connections";
 import { PREMIUM } from "./vendors/anthropic";
+import { meterClaude } from "./usage";
 
 // DERIVE THE LAYOUT FROM A REFERENCE. The core of "composite it ourselves".
 //
@@ -80,7 +81,7 @@ const SCHEMA = {
   required: ["aspect", "logo", "swish", "callout", "headline"],
 } as unknown as Anthropic.Tool["input_schema"];
 
-export async function detectLayout(referenceUrl: string): Promise<Layout> {
+export async function detectLayout(referenceUrl: string, clientId?: string): Promise<Layout> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
   const client = new Anthropic({ apiKey: key });
@@ -107,6 +108,7 @@ export async function detectLayout(referenceUrl: string): Promise<Layout> {
     }],
   });
 
+  await meterClaude(res, { clientId: clientId ?? null, model: PREMIUM, action: "studio-layout" }).catch(() => {});
   const b = res.content.find((x) => x.type === "tool_use");
   if (!b || b.type !== "tool_use") throw new Error("The layout detector returned nothing.");
   return b.input as Layout;

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "./connections";
 import { PREMIUM } from "./vendors/anthropic";
+import { meterClaude } from "./usage";
 import { getBrandKit, listAssets } from "./studio";
 
 // THE STUDIO PRODUCER — a brief in plain English, a whole funnel campaign out.
@@ -297,6 +298,7 @@ export async function planCampaign(clientId: string, brief: string): Promise<Cam
       tool_choice: { type: "tool", name: "plan" },
       messages: [{ role: "user", content }],
     });
+    await meterClaude(res, { clientId, model: PREMIUM, action: "studio-campaign-plan" }).catch(() => {});   // every attempt spends
     const block = res.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") { lastFaults = ["the Producer returned no plan at all"]; continue; }
     const candidate = coercePlan(block.input);
@@ -306,7 +308,7 @@ export async function planCampaign(clientId: string, brief: string): Promise<Cam
   }
   if (!plan) throw new Error(`The Producer could not produce a usable plan after 3 attempts: ${lastFaults.join(" ")} Try again.`);
 
-  plan.sms = await fitSms(client, plan.sms, plan.theme);
+  plan.sms = await fitSms(client, plan.sms, plan.theme, clientId);
   return plan;
 }
 
@@ -410,7 +412,7 @@ export function assembleSms(copy: string, slug: string): string {
   return `${clean} https://bit.ly/${s} ${SMS_TAIL}`.trim();
 }
 
-async function fitSms(client: Anthropic, first: { copy?: string; slug?: string } | undefined, theme: string) {
+async function fitSms(client: Anthropic, first: { copy?: string; slug?: string } | undefined, theme: string, clientId?: string) {
   let copy = (first?.copy || "").trim();
   let slug = (first?.slug || "").replace(/[^A-Za-z0-9]/g, "");
 
@@ -436,6 +438,7 @@ async function fitSms(client: Anthropic, first: { copy?: string; slug?: string }
         content: `Campaign: ${theme}\n\nThis SMS is not usable:\nCOPY: ${copy || "(empty)"}\nSLUG: ${slug || "(empty)"}\nAssembled it reads: "${assembled}"\n\n${faults}\n\nRewrite it. Assembled it must land at or under ${SMS_MAX} characters. Keep the offer and the price intact.`,
       }],
     });
+    await meterClaude(fix, { clientId: clientId ?? null, model: PREMIUM, action: "studio-sms-fix" }).catch(() => {});
     const block = fix.content.find((b) => b.type === "text");
     const text = block && block.type === "text" ? block.text : "";
     const mCopy = text.match(/COPY:\s*(.+)/i);
@@ -557,6 +560,7 @@ export async function sharpenBrief(clientId: string, rough: string, dealList: st
     messages: [{ role: "user", content }],
   });
 
+  await meterClaude(res, { clientId, model: PREMIUM, action: "studio-brief-sharpen" }).catch(() => {});
   const b = res.content.find((x) => x.type === "tool_use");
   if (!b || b.type !== "tool_use") throw new Error("The brief coach returned nothing.");
   const raw = b.input as Record<string, unknown>;

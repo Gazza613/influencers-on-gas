@@ -65,7 +65,7 @@ export async function buildDiscCreative(clientId: string, kind: string, refUrl: 
       const fonts = (kit?.fonts || []) as { family: string; url: string }[];
       // Detect where the reference's pill sits so OUR pill fully covers it (the swap does not reliably remove
       // the old pill - Gary saw it sitting behind the new one).
-      const layout = await detectLayout(refUrl).catch(() => null);
+      const layout = await detectLayout(refUrl, clientId).catch(() => null);
       try { out = (await overlayPill(out, callout, fonts, { box: layout?.callout || null, widthFrac: bgKind === "section1" ? 0.6 : 0.66 })) as Buffer; }
       catch (e) { console.error(`[buildDiscCreative] pill overlay failed (${kind}):`, e); }
     }
