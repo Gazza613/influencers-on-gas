@@ -791,3 +791,5 @@ alter table research_claims add column if not exists rejected boolean not null d
 alter table research_claims add column if not exists rejected_by text;
 alter table research_claims add column if not exists in_brain boolean not null default false;  -- a fact Gary kept at Gate 1 (moves to the "In the Brain" tray; carried forward so reruns show only what is new)
 alter table research_claims add column if not exists in_brain_by text;
+alter table research_runs add column if not exists progress jsonb;  -- live {label, sources, filed} while status='collecting', so a returning user sees progress (durable run survives navigation)
+alter table research_runs add column if not exists error text;      -- failure reason if a run ends in status='failed'

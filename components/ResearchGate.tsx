@@ -12,7 +12,7 @@ import { askConfirm } from "@/lib/confirm";
 // overwrite), or Reject. The competitor set is editable right here.
 
 type Client = { id: string; name: string };
-type Run = { id: string; version: number; status: string; website: string | null; notes: string | null; created_at: string; vertical?: string | null; pdf_url?: string | null; drive_url?: string | null; word_url?: string | null; notified_at?: string | null };
+type Run = { id: string; version: number; status: string; website: string | null; notes: string | null; created_at: string; vertical?: string | null; pdf_url?: string | null; drive_url?: string | null; word_url?: string | null; notified_at?: string | null; progress?: { label?: string; sources?: number; filed?: number } | null; error?: string | null };
 type Claim = {
   id: string; section: string; subject: string | null; claim: string;
   source_name: string | null; source_url: string | null; source_date: string | null;
@@ -56,6 +56,7 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   gate1_approved: { label: "Approved · fact base locked", cls: "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" },
   gate1_rejected: { label: "Rejected", cls: "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]" },
   gate1_rerun: { label: "Superseded by a newer version", cls: "border-line bg-surface-2 text-ink-faint" },
+  failed: { label: "Run did not finish", cls: "border-[#f87171]/40 bg-[#f87171]/10 text-[#fca5a5]" },
 };
 
 function ukDate(s: string | null): string {
@@ -171,6 +172,33 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     }
   }, [run, running, docBusy, pollDocument]);
 
+  // DURABLE RUN RESUME (Gary: navigating away must not lose the run). If we land on a run that is still
+  // 'collecting' (started in another tab/session and kept alive by waitUntil), poll until it finishes, then load
+  // its claims - so returning to the page picks the run back up instead of showing an error or a dead spinner.
+  const collectPollRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!run || run.status !== "collecting" || running || collectPollRef.current === run.id) return;
+    collectPollRef.current = run.id;
+    let live = true;
+    (async () => {
+      for (let i = 0; i < 180 && live; i++) {   // ~15 min ceiling (the run's own guard expires at 20)
+        await new Promise((r) => setTimeout(r, 5000));
+        if (!live) return;
+        const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+        if (!live || !d?.run) continue;
+        setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []);
+        if (d.run.status !== "collecting") {
+          collectPollRef.current = null;
+          if (d.run.status === "ready") { loadSpend(); if (!d.run.pdf_url) pollDocument(d.run.id); }
+          return;
+        }
+      }
+    })();
+    return () => { live = false; collectPollRef.current = null; };
+    // loadSpend intentionally omitted from deps (declared just below; stable useCallback) to avoid a TDZ at render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, running, clientId, pollDocument]);
+
   const loadSpend = useCallback(async () => {
     const d = await fetch(`/api/studio/researcher/spend`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
     if (d && typeof d.monthCents === "number") setSpend(d);
@@ -249,7 +277,8 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           if (!line) continue;
           let e: { t: string; label?: string; q?: string; n?: number; version?: number; runId?: string; count?: number; message?: string };
           try { e = JSON.parse(line.slice(5).trim()); } catch { continue; }
-          if (e.t === "phase") setProgress((p) => p ? { ...p, label: e.label || p.label } : p);
+          if (e.t === "start") runId = e.runId || "";   // the durable run exists now; capture its id early
+          else if (e.t === "phase") setProgress((p) => p ? { ...p, label: e.label || p.label } : p);
           else if (e.t === "search") setProgress((p) => p ? { ...p, searches: [...p.searches, e.q || ""].slice(-6) } : p);
           else if (e.t === "sources") setProgress((p) => p ? { ...p, sources: e.n || p.sources } : p);
           else if (e.t === "claim") setProgress((p) => p ? { ...p, filed: p.filed + 1 } : p);
@@ -326,6 +355,8 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
 
   const status = run ? (STATUS[run.status] || STATUS.collecting) : null;
   const canGate = run?.status === "ready";
+  // A durable run still collecting server-side (this session's SSE, or one resumed after navigating away).
+  const collecting = run?.status === "collecting";
   const bySection = (id: string) => claims.filter((c) => c.section === id);
   const rejectedCount = claims.filter((c) => c.rejected && !c.in_brain).length;
   const inBrainCount = claims.filter((c) => c.in_brain).length;
@@ -412,14 +443,15 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
 
       {/* RUN BAR - obvious visual feedback for the team (Gary): glow + spinner while running, green when done. */}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button onClick={() => runCollect()} disabled={running || !isConfigured}
+        <button onClick={() => runCollect()} disabled={running || collecting || !isConfigured}
           className={`rounded-lg px-5 py-2.5 text-lg font-bold transition ${
-            running ? "bg-accent text-black glow-accent"
+            running || collecting ? "bg-accent text-black glow-accent"
             : justDone ? "next-pulse"
             : `bg-accent text-black ${!isConfigured ? "opacity-50" : ""}`
           }`}>
           {running
             ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Collecting… <span className="tabular font-semibold opacity-80">{fmtElapsed(elapsed)}</span></span>
+            : collecting ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Researching…</span>
             : justDone ? "✓ Research complete"
             : run ? "Collect again (new version)" : "Run the Researcher"}
         </button>
@@ -428,13 +460,25 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             v{run.version} · {status.label}
           </span>
         )}
-        {run && <span className="text-sm text-ink-faint">{claims.length} claim{claims.length === 1 ? "" : "s"} · collected {ukDate(run.created_at)}</span>}
+        {run && !collecting && <span className="text-sm text-ink-faint">{claims.length} claim{claims.length === 1 ? "" : "s"} · collected {ukDate(run.created_at)}</span>}
       </div>
       {!isConfigured && <p className="mt-2 text-base text-[#fca5a5]">This brain has nothing to research yet. Add the client and crawl their site into the brain first.</p>}
+
+      {/* DURABLE RUN IN PROGRESS (resumed after navigating away, or running in another tab). Safe to leave. */}
+      {collecting && !running && (
+        <div className="mt-4 rounded-xl border border-accent/40 bg-surface-1 p-5 glow-accent">
+          <div className="flex items-center gap-2 text-lg font-bold text-ink"><span className="spinner-ring spinner-ring--solid" /> Researching {clientName}…</div>
+          <p className="mt-1 text-base text-ink-dim">{run?.progress?.label || "Collecting facts"}{typeof run?.progress?.sources === "number" ? ` · ${run.progress.sources} sources` : ""}{typeof run?.progress?.filed === "number" && run.progress.filed > 0 ? ` · ${run.progress.filed} filed` : ""}</p>
+          <p className="mt-2 text-sm text-ink-faint">This runs in the background, so you can safely navigate away, the research is saved when it finishes. This view updates on its own.</p>
+        </div>
+      )}
+      {run?.status === "failed" && !running && (
+        <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-base text-[#fca5a5]">The last run did not finish{run.error ? `: ${run.error}` : "."} Nothing was charged for an unsaved result. You can run it again.</p>
+      )}
       {note && <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-base text-[#fca5a5]">{note}</p>}
 
       {/* THE RESEARCH DOCUMENT */}
-      {run && !running && (
+      {run && !running && !collecting && (
         <div className="mt-4 rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -619,7 +663,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           )}
         </div>
       )}
-      {run && claims.length === 0 && !running && (
+      {run && claims.length === 0 && !running && !collecting && run.status !== "failed" && (
         <p className="mt-8 text-base text-ink-dim">This version filed no claims. Run again, or check the client has crawled material and a website set.</p>
       )}
     </div>

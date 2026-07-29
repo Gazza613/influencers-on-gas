@@ -143,6 +143,7 @@ const SCHEMA = {
 } as unknown as Anthropic.Tool["input_schema"];
 
 export type CollectEvent =
+  | { t: "start"; runId: string; version: number }
   | { t: "phase"; label: string }
   | { t: "search"; q: string }
   | { t: "sources"; n: number }
@@ -156,6 +157,7 @@ export type ResearchRun = {
   notes: string | null; user_email: string | null; created_at: string; vertical?: string | null;
   identity?: ResearchIdentity | null;
   pdf_url?: string | null; drive_url?: string | null; word_url?: string | null; notified_at?: string | null;
+  progress?: { label?: string; sources?: number; filed?: number } | null; error?: string | null;
 };
 export type ResearchClaim = {
   id: string; run_id: string; client_id: string; section: string; subject: string | null; claim: string;
@@ -343,7 +345,13 @@ export async function collectResearch(
   opts: { userEmail?: string | null; notes?: string | null; focus?: string | null; onEvent?: (e: CollectEvent) => void } = {},
 ): Promise<{ run: ResearchRun; claims: ResearchClaim[] }> {
   const { userEmail, notes, focus } = opts;
-  const emit = (e: CollectEvent) => { try { opts.onEvent?.(e); } catch { /* progress is best-effort */ } };
+  // emit fans out to the live SSE (onEvent) AND, once the run row exists, mirrors progress into the DB (sink) so a
+  // user who navigates away and returns still sees where the durable run is.
+  let progressSink: ((e: CollectEvent) => void) | null = null;
+  const emit = (e: CollectEvent) => {
+    try { opts.onEvent?.(e); } catch { /* progress is best-effort */ }
+    try { progressSink?.(e); } catch { /* mirror is best-effort */ }
+  };
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
   const client = new Anthropic({ apiKey: key });
@@ -358,6 +366,42 @@ export async function collectResearch(
   const anchor = siteAnchor(name, website) + (websites.length > 1
     ? `\n\n${name} also operates these official sites, all the SAME organisation - research them as ${name}'s own too: ${websites.slice(1).join(", ")}.`
     : "");
+
+  // DURABLE RUN (Gary: navigating away lost the run and wasted the spend). We create the run row NOW, status
+  // 'collecting', and the route keeps the work alive past a browser disconnect (waitUntil). Two payoffs: the work
+  // reaches the store step even if the tab is closed (no wasted cost), and a returning user sees a run in
+  // progress. CONCURRENCY GUARD: if a collect for this client is already in flight (a 'collecting' run younger
+  // than 20 min), refuse to start a second - that is what double-charges when the team "restarts" a run they
+  // think died. The in-flight run is finishing on its own.
+  const active = (await db().query(
+    `select id, version from research_runs where client_id = $1 and status = 'collecting' and created_at > now() - interval '20 minutes' order by created_at desc limit 1`,
+    [clientId],
+  )) as { id: string; version: number }[];
+  if (active[0]) throw new Error(`A research run (v${active[0].version}) is already in progress for this client and will finish on its own, even if you navigate away. Please wait for it rather than starting another.`);
+
+  const verRow0 = (await db().query(`select coalesce(max(version),0)+1 as v from research_runs where client_id = $1`, [clientId])) as { v: number }[];
+  const version = Number(verRow0[0]?.v) || 1;
+  const startRows = (await db().query(
+    `insert into research_runs (client_id, version, status, website, notes, user_email)
+     values ($1,$2,'collecting',$3,$4,$5) returning id`,
+    [clientId, version, website, notes?.trim()?.slice(0, 2000) || null, userEmail || null],
+  )) as { id: string }[];
+  const runId = startRows[0].id;
+  emit({ t: "start", runId, version });
+  // Throttled progress mirror to the DB, so a user who navigates away and back sees where the run is.
+  let lastProg = 0, progSources = 0, progFiled = 0, progLabel = "Starting";
+  const saveProgress = async (label?: string) => {
+    if (label) progLabel = label;
+    const now = Date.now();
+    if (now - lastProg < 1500 && !label) return;
+    lastProg = now;
+    await db().query(`update research_runs set progress = $2 where id = $1`, [runId, JSON.stringify({ label: progLabel, sources: progSources, filed: progFiled })]).catch(() => {});
+  };
+  progressSink = (e) => {
+    if (e.t === "sources") progSources = e.n;
+    else if (e.t === "claim") progFiled += 1;
+    void saveProgress(e.t === "phase" ? e.label : undefined);
+  };
 
   // LOCKED GROUND TRUTH the GAS team supplied (Gary): the CEO / senior leadership. This OVERRIDES anything the
   // web says - the team knows their client. It was being ignored (the collector rediscovered leadership from
@@ -678,14 +722,13 @@ export async function collectResearch(
     return { ...c, source_date: realDate, verified: false, unverified_reason: c.unverified_reason || (c.section === "unverified" ? "Single or unverifiable source." : "Source could not be reached to verify.") };
   });
 
-  // STORE as a new versioned run. Version = last + 1 (Gate 1 approves a specific version; reruns never overwrite).
-  const verRow = (await db().query(`select coalesce(max(version),0)+1 as v from research_runs where client_id = $1`, [clientId])) as { v: number }[];
-  const version = Number(verRow[0]?.v) || 1;
+  // STORE: finalise the run we created up front (status 'collecting' -> 'ready'), filling in what we now know.
+  // (The version was fixed and the row inserted at the start so the run is durable and single-flighted.)
   const runRows = (await db().query(
-    `insert into research_runs (client_id, version, status, website, notes, user_email, vertical, identity)
-     values ($1,$2,'ready',$3,$4,$5,$6,$7)
+    `update research_runs set status = 'ready', vertical = $2, identity = $3, progress = null, error = null
+     where id = $1
      returning id, client_id, version, status, website, notes, user_email, vertical, identity, created_at`,
-    [clientId, version, website, notes?.trim()?.slice(0, 2000) || null, userEmail || null, vertical, JSON.stringify(identity)],
+    [runId, vertical, JSON.stringify(identity)],
   )) as ResearchRun[];
   const run = runRows[0];
 
@@ -721,6 +764,14 @@ export async function collectResearch(
   return { run, claims: saved };
 }
 
+/** Mark a durable run failed (only if still 'collecting'), so a returning user is not stuck on a dead spinner. */
+export async function markResearchFailed(runId: string, message: string): Promise<void> {
+  await db().query(
+    `update research_runs set status = 'failed', error = $2, progress = null where id = $1 and status = 'collecting'`,
+    [runId, String(message || "").slice(0, 500)],
+  ).catch(() => {});
+}
+
 /** The claims for a run, ordered for rendering (section order, then verified before unverified, Tier 1 first). */
 export async function listResearchClaims(runId: string): Promise<ResearchClaim[]> {
   return (await db().query(
@@ -732,7 +783,7 @@ export async function listResearchClaims(runId: string): Promise<ResearchClaim[]
 /** The latest research run for a client (any status), or null. */
 export async function latestResearchRun(clientId: string): Promise<ResearchRun | null> {
   const rows = (await db().query(
-    `select id, client_id, version, status, website, notes, user_email, created_at, vertical, identity, pdf_url, drive_url, word_url, notified_at
+    `select id, client_id, version, status, website, notes, user_email, created_at, vertical, identity, pdf_url, drive_url, word_url, notified_at, progress, error
      from research_runs where client_id = $1 order by version desc limit 1`, [clientId],
   )) as ResearchRun[];
   return rows[0] || null;

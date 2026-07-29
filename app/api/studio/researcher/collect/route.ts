@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { auth } from "@/auth";
-import { collectResearch, latestResearchRun, listResearchClaims, listCompetitors } from "@/lib/researcher-v3";
+import { collectResearch, latestResearchRun, listResearchClaims, listCompetitors, markResearchFailed } from "@/lib/researcher-v3";
 import { inngest } from "@/lib/inngest";
 
 // THE RESEARCHER (V3), FACTS-ONLY COLLECTOR. Commissioned on demand, like the old dossier. GET returns the
@@ -34,28 +35,46 @@ export async function POST(req: Request) {
 
   const today = new Date().toISOString().slice(0, 10);
   const encoder = new TextEncoder();
+
+  // DURABLE RUN (Gary: navigating away errored AND lost the acquired research, wasting the spend). The collection
+  // now runs DECOUPLED from the response stream and is kept alive by waitUntil, so it reaches the store step even
+  // if the browser disconnects. The SSE stream just tails a queue of progress events while the tab is open; if it
+  // closes, the work carries on server-side and the run lands in the DB regardless. On failure the run is marked
+  // 'failed' (never left as a dead 'collecting' spinner).
+  const queue: unknown[] = [];
+  let finished = false, capturedRunId = "";
+  const work = (async () => {
+    try {
+      const { run, claims } = await collectResearch(clientId, today, {
+        userEmail: session.user?.email ?? null,
+        notes: notes || null,
+        focus: focus || null,
+        onEvent: (e) => { if (e.t === "start") capturedRunId = e.runId; queue.push(e); },
+      });
+      if (claims.length > 0) await inngest.send({ name: "research/collected", data: { clientId, runId: run.id } }).catch(() => {});
+      queue.push({ t: "run", version: run.version, runId: run.id, count: claims.length });
+    } catch (e) {
+      const msg = String((e as Error)?.message || e).slice(0, 300);
+      if (capturedRunId) await markResearchFailed(capturedRunId, msg);   // don't leave a dead 'collecting' run
+      queue.push({ t: "error", message: msg });
+    } finally {
+      finished = true;
+    }
+  })();
+  waitUntil(work);   // keeps the function (and the run) alive past a client disconnect
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (obj: unknown) => {
-        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)); } catch { /* client gone */ }
+        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)); } catch { /* client gone: work continues via waitUntil */ }
       };
-      try {
-        const { run, claims } = await collectResearch(clientId, today, {
-          userEmail: session.user?.email ?? null,
-          notes: notes || null,
-          focus: focus || null,
-          onEvent: (e) => send(e),
-        });
-        // DURABLE DOCUMENT (Inngest): render the PDF, file to Drive and email Gary in a retryable background job,
-        // so the fragile parts heal themselves and the SSE request returns as soon as the facts are filed. The UI
-        // polls for the PDF; a manual "Generate document" is the fallback if the background job is unavailable.
-        if (claims.length > 0) await inngest.send({ name: "research/collected", data: { clientId, runId: run.id } }).catch(() => {});
-        send({ t: "run", version: run.version, runId: run.id, count: claims.length });
-      } catch (e) {
-        send({ t: "error", message: String((e as Error)?.message || e).slice(0, 300) });
-      } finally {
-        controller.close();
+      // Drain the queue until the work finishes. If the client disconnects, enqueue no-ops and this loop simply
+      // ends when the work does, but the work itself is not tied to this stream.
+      while (!finished || queue.length) {
+        if (queue.length) send(queue.shift());
+        else await new Promise((r) => setTimeout(r, 250));
       }
+      try { controller.close(); } catch { /* already closed */ }
     },
   });
   return new Response(stream, {
