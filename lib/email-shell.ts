@@ -32,8 +32,10 @@ export function emailHeader(strapline: string, dateLabel: string, wordmark = "ST
     <div class="orbwrap" style="width:84px;height:84px;margin:0 auto 16px;border-radius:50%;background:radial-gradient(circle at 50% 50%, rgba(249,98,3,0.42) 0%, rgba(249,98,3,0.16) 42%, rgba(249,98,3,0) 68%);">
       <img src="${BASE}/gas-logo.png" width="56" height="56" class="orb" style="display:block;margin:0 auto;padding-top:14px;border:0;outline:none;" alt="GAS" />
     </div>
-    <div class="strap" style="font-size:10px;letter-spacing:4px;text-transform:uppercase;color:${EMBER};font-weight:800;">${strapline}</div>
-    <div class="wordmark" style="margin-top:6px;font-size:22px;font-weight:900;letter-spacing:3px;color:${TXT};white-space:nowrap;">${wordmark} <span style="color:${EMBER};">ON</span> <span style="color:${LAVA};">GAS</span></div>
+    <div class="strap" style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${EMBER};font-weight:800;">${strapline}</div>
+    <!-- Wordmark must NEVER be nowrap on a phone: "STRATEGIST ON GAS" is wider than a phone and was clipping
+         ("STRATEGI ST ..."). Smaller base + a wrap that keeps "ON GAS" together. Desktop bumps it back up. -->
+    <div class="wordmark" style="margin-top:6px;font-size:17px;font-weight:900;letter-spacing:2px;color:${TXT};line-height:1.2;">${wordmark} <span style="white-space:nowrap;"><span style="color:${EMBER};">ON</span> <span style="color:${LAVA};">GAS</span></span></div>
     <div class="datelabel" style="margin-top:8px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${CAPTION};font-weight:700;">${dateLabel}</div>
   </div>
   <div class="pad" style="padding:0 20px;"><div style="height:1px;background:linear-gradient(90deg,transparent,${EMBER},transparent);"></div></div>`;
@@ -90,7 +92,7 @@ export function emailShell(opts: {
       .tag        { font-size:11px !important; }
     }
   </style>
-  <div style="background:${BG};padding:32px 12px;font-family:${FONT};-webkit-font-smoothing:antialiased;">
+  <div style="background:${BG};padding:24px 10px;font-family:${FONT};-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
     <div class="container" style="max-width:100%;margin:0 auto;background:linear-gradient(170deg,#0F1820 0%,#13202C 100%);border:1px solid ${RULE};border-radius:16px;overflow:hidden;">
       ${emailHeader(opts.strapline, opts.dateLabel, opts.wordmark)}
       <div class="pad" style="padding:4px 20px 4px;">${opts.body}</div>

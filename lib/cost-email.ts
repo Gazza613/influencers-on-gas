@@ -46,19 +46,26 @@ export function buildCostEmail(opts: {
   const usedPct = remaining != null ? Math.max(0, Math.min(100, Math.round(((monthly - remaining) / monthly) * 100))) : null;
 
   const body = `
-      <!-- Hero numbers -->
-      <div style="display:flex;gap:10px;">
-        <div style="flex:1;border:1px solid rgba(168,85,247,0.3);border-radius:14px;padding:14px;background:rgba(168,85,247,0.06);">
-          <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a8f98;">Spent ${periodLabel.toLowerCase()}</div>
-          <div style="font-size:26px;font-weight:800;color:#fff;margin-top:4px;">${rand(report.total.cents)}</div>
-          <div style="font-size:12px;color:#9aa0a8;">${Math.round(report.total.credits).toLocaleString()} credits · ${report.total.events} jobs</div>
-        </div>
-        <div style="flex:1;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;background:#0c1117;">
-          <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a8f98;">This cycle (from the 10th)</div>
-          <div style="font-size:26px;font-weight:800;color:#fff;margin-top:4px;">${rand(monthReport.total.cents)}</div>
-          <div style="font-size:12px;color:#9aa0a8;">${remaining != null ? `${remaining.toLocaleString()} / ${monthly.toLocaleString()} credits left` : "balance n/a"}</div>
-        </div>
-      </div>
+      <!-- Hero numbers. TABLE, not flexbox (Gmail mobile ignores flex and overflowed, clipping the values).
+           Two 50% cells stay side by side on every client; the values are sized to fit a phone column. -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;">
+        <tr>
+          <td width="50%" style="vertical-align:top;padding-right:5px;">
+            <div style="border:1px solid rgba(168,85,247,0.3);border-radius:14px;padding:13px;background:rgba(168,85,247,0.06);">
+              <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#8a8f98;">Spent ${esc(periodLabel.toLowerCase())}</div>
+              <div style="font-size:22px;font-weight:800;color:#fff;margin-top:4px;white-space:nowrap;">${rand(report.total.cents)}</div>
+              <div style="font-size:11px;color:#9aa0a8;">${Math.round(report.total.credits).toLocaleString()} cr · ${report.total.events} jobs</div>
+            </div>
+          </td>
+          <td width="50%" style="vertical-align:top;padding-left:5px;">
+            <div style="border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:13px;background:#0c1117;">
+              <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#8a8f98;">This cycle (from 10th)</div>
+              <div style="font-size:22px;font-weight:800;color:#fff;margin-top:4px;white-space:nowrap;">${rand(monthReport.total.cents)}</div>
+              <div style="font-size:11px;color:#9aa0a8;">${remaining != null ? `${remaining.toLocaleString()} / ${monthly.toLocaleString()} left` : "balance n/a"}</div>
+            </div>
+          </td>
+        </tr>
+      </table>
       ${usedPct != null ? `<div style="height:8px;border-radius:99px;background:#141b24;margin-top:10px;overflow:hidden;"><div style="height:100%;width:${usedPct}%;background:${usedPct > 88 ? "#ff453a" : "#34c759"};"></div></div>` : ""}
 
       ${card("By team member", rows(monthReport.byUser.map((u) => ({ label: u.user_email === "(system)" ? "Super Admin" : u.user_email, sub: `${u.events} jobs`, cents: u.cents }))))}
