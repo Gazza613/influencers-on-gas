@@ -904,3 +904,22 @@ alter table research_runs add column if not exists cycle_id uuid;        -- the 
 alter table research_runs add column if not exists campaign_id uuid;     -- the campaign in focus (plain ref)
 alter table research_runs add column if not exists run_mode text not null default 'foundation';  -- foundation | delta
 alter table research_claims add column if not exists pillar_tags jsonb not null default '[]'::jsonb;  -- which downstream pillars each fact serves (strategist/audience/creative/psi/channels)
+
+-- THE PROPOSAL (lives in the Strategist POD). The client-facing growth proposal built on the approved strategy for
+-- sign-off. Written on Fable 5, human-edited, then rendered to a client-branded PDF. objective = the Meta outcome
+-- objective; tier = launch|dominate (rate card). content = the structured proposal (see lib/proposal.ts).
+create table if not exists proposals (
+  id uuid primary key default gen_random_uuid(),
+  engagement_id uuid not null references engagements(id) on delete cascade,
+  campaign_id uuid references campaigns(id) on delete set null,
+  strategy_id uuid references strategies(id) on delete set null,
+  objective text not null,
+  tier text not null default 'dominate',
+  status text not null default 'draft',              -- draft | awaiting_approval | approved
+  content jsonb,
+  pdf_url text,
+  approved_by text, approved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_proposals_strategy on proposals(strategy_id, created_at desc);
+create index if not exists idx_proposals_engagement on proposals(engagement_id, created_at desc);

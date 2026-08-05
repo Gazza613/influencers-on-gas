@@ -1,0 +1,186 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { getSecret } from "./connections";
+import { db } from "./db";
+import { FABLE, withAnthropicRetry } from "./vendors/anthropic";
+import { meterClaude } from "./usage";
+import type { Strategy, StrategyContent } from "./cycle";
+import { OBJECTIVES, TIERS, PLATFORMS, type ObjectiveId, type TierId } from "./proposal-config";
+export { OBJECTIVES, TIERS, PLATFORMS };
+export type { ObjectiveId, TierId };
+
+// THE PROPOSAL (lives in the Strategist POD). A world-class, client-facing growth proposal for sign-off, built on
+// the GAS Agency of NOW system: the approved research + strategy applied to every pod, specific to the client's
+// objective. This is the highest-stakes, lowest-volume output in the whole system, so it runs on FABLE 5 (the most
+// capable model) - no space for average. Human Command, AI Execution: Fable drafts, a senior human edits and
+// approves, then it renders to a client-branded PDF (next increment). NEVER commits to an outcome; figures are
+// illustrative only. The word "manifesto" is internal and never appears.
+
+// ── THE PROPOSAL CONTENT (the structured document Fable produces) ─────────────────────────────────────────────
+export type ProposalContent = {
+  headline: string;                                          // "The Integrated Growth Engine for {Client}"
+  subhead: string;                                           // one-sentence promise, tied to the objective
+  exec_summary: { intro: string; cards: { title: string; body: string }[] };
+  opportunity: { intro: string; definition_of_success: string };
+  audience: {
+    overview: string;
+    personas: {
+      label: string; trigger: string; need: string; who: string; propensity: string; angle: string;
+      platforms: { platform: string; selections: string[]; approach: string }[];  // ACTUAL targeting per platform
+    }[];
+  };
+  strategy: { proposition: string; angle: string; why_it_wins: string[] };
+  channels: { rationale: string; plan: { platform: string; priority: string; role: string; why: string }[] };   // intelligent selection
+  pods: { name: string; for_client: string; benefit: string }[];                  // the 8 pods mapped to the client
+  funnel: { disclaimer: string; stages: { stage: string; note: string }[] };      // ILLUSTRATIVE only
+  kpis: { metric: string; why: string; baseline: string }[];
+  rollout: { week: string; title: string; pods: string; points: string[]; gate: string }[];
+  compliance: { intro: string; points: string[] };
+  investment: { tier_name: string; rate: string; engine_includes: string[]; notes: string[] };
+};
+
+const P = (arr: readonly string[]) => arr.join(", ");
+
+const CONTENT_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    headline: { type: "string" },
+    subhead: { type: "string", description: "One sentence, tied to the objective. Confident, specific, no hype." },
+    exec_summary: { type: "object", additionalProperties: false, properties: { intro: { type: "string" }, cards: { type: "array", items: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, body: { type: "string" } }, required: ["title", "body"] }, description: "4 value cards." } }, required: ["intro", "cards"] },
+    opportunity: { type: "object", additionalProperties: false, properties: { intro: { type: "string" }, definition_of_success: { type: "string", description: "A single, sharp definition of what success looks like for THIS objective." } }, required: ["intro", "definition_of_success"] },
+    audience: {
+      type: "object", additionalProperties: false,
+      description: "THE PROOF OF OUR TARGETING. Personas with ACTUAL platform-level selections.",
+      properties: {
+        overview: { type: "string" },
+        personas: {
+          type: "array", description: "3 to 5 personas.",
+          items: {
+            type: "object", additionalProperties: false,
+            properties: {
+              label: { type: "string" }, trigger: { type: "string" }, need: { type: "string" }, who: { type: "string" }, propensity: { type: "string" }, angle: { type: "string" },
+              platforms: {
+                type: "array",
+                description: `The real targeting per platform (only the platforms that fit this persona, from: ${P(PLATFORMS)}).`,
+                items: { type: "object", additionalProperties: false, properties: {
+                  platform: { type: "string", enum: PLATFORMS as unknown as string[] },
+                  selections: { type: "array", items: { type: "string" }, description: "Concrete, credible targeting selections. Facebook/Instagram: interests, behaviours, demographics, custom/lookalike. TikTok: interests, hashtags, creator adjacencies. Google Display: in-market segments, custom-intent keywords, topics. LinkedIn: job titles, seniority, function, industry, company size." },
+                  approach: { type: "string", description: "How we use it, e.g. prospecting via lookalikes then retargeting." },
+                }, required: ["platform", "selections", "approach"] },
+              },
+            },
+            required: ["label", "trigger", "need", "who", "propensity", "angle", "platforms"],
+          },
+        },
+      },
+      required: ["overview", "personas"],
+    },
+    strategy: { type: "object", additionalProperties: false, properties: { proposition: { type: "string" }, angle: { type: "string" }, why_it_wins: { type: "array", items: { type: "string" } } }, required: ["proposition", "angle", "why_it_wins"] },
+    channels: {
+      type: "object", additionalProperties: false,
+      description: "INTELLIGENT channel selection for THIS objective + audience. Do not list every platform; select and justify.",
+      properties: {
+        rationale: { type: "string" },
+        plan: { type: "array", items: { type: "object", additionalProperties: false, properties: {
+          platform: { type: "string", enum: PLATFORMS as unknown as string[] },
+          priority: { type: "string", enum: ["lead", "support", "test"], description: "lead = primary budget; support = secondary; test = probe." },
+          role: { type: "string" }, why: { type: "string", description: "why this platform fits the objective and audience" },
+        }, required: ["platform", "priority", "role", "why"] } },
+      },
+      required: ["rationale", "plan"],
+    },
+    pods: { type: "array", description: "The 8 pods mapped to the client, in order.", items: { type: "object", additionalProperties: false, properties: { name: { type: "string" }, for_client: { type: "string", description: "what this pod does FOR this client, specific to the objective" }, benefit: { type: "string" } }, required: ["name", "for_client", "benefit"] } },
+    funnel: {
+      type: "object", additionalProperties: false,
+      description: "ILLUSTRATIVE funnel economics only. Clearly labelled as illustrative, benchmark ranges, NEVER a guaranteed number.",
+      properties: { disclaimer: { type: "string", description: "State plainly that these are illustrative benchmarks, not a guarantee." }, stages: { type: "array", items: { type: "object", additionalProperties: false, properties: { stage: { type: "string" }, note: { type: "string" } }, required: ["stage", "note"] } } },
+      required: ["disclaimer", "stages"],
+    },
+    kpis: { type: "array", items: { type: "object", additionalProperties: false, properties: { metric: { type: "string" }, why: { type: "string" }, baseline: { type: "string" } }, required: ["metric", "why", "baseline"] } },
+    rollout: { type: "array", description: "The 31-day rollout, 4 weeks.", items: { type: "object", additionalProperties: false, properties: { week: { type: "string" }, title: { type: "string" }, pods: { type: "string" }, points: { type: "array", items: { type: "string" } }, gate: { type: "string" } }, required: ["week", "title", "pods", "points", "gate"] } },
+    compliance: { type: "object", additionalProperties: false, properties: { intro: { type: "string" }, points: { type: "array", items: { type: "string" } } }, required: ["intro", "points"] },
+    investment: { type: "object", additionalProperties: false, properties: { tier_name: { type: "string" }, rate: { type: "string" }, engine_includes: { type: "array", items: { type: "string" } }, notes: { type: "array", items: { type: "string" } } }, required: ["tier_name", "rate", "engine_includes", "notes"] },
+  },
+  required: ["headline", "subhead", "exec_summary", "opportunity", "audience", "strategy", "channels", "pods", "funnel", "kpis", "rollout", "compliance", "investment"],
+} as unknown as Anthropic.Tool["input_schema"];
+
+function extract(msg: Anthropic.Message): ProposalContent | null {
+  const b = msg.content.find((x) => x.type === "tool_use");
+  return b && b.type === "tool_use" ? (b.input as ProposalContent) : null;
+}
+
+const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)[TierId]) =>
+  `You are the lead growth strategist and media planner at GAS Marketing Automation, the Agency of NOW, writing a WORLD-CLASS, award-winning growth proposal for ${clientName} to sign off. Discipline: Human Command, AI Execution. This is a professional client-facing document; it must be specific, confident and demonstrably expert on every pod.\n\n` +
+  `THE ENGINE (use these exact pod names, mapped to ${clientName}): Researcher, Strategist, Audience, Creative, Channels, PSI, PSI Conversion Dashboard, Media on GAS. It is one closed-loop engine: each pod feeds sharper intelligence to the next, and Media on GAS feeds every result back upstream so the system compounds and gets more intelligent over time.\n\n` +
+  `THE OBJECTIVE for this proposal is ${objectiveLabel}. Make the WHOLE document specific to this objective, the audience, the channels, the KPIs, the rollout and the definition of success all flow from it.\n\n` +
+  `THE TIER is ${tier.name} at ${tier.rate}. Investment scope: ${tier.scope} Governance: ${tier.cadence}\n\n` +
+  `HARD RULES:\n` +
+  `- GROUND IN THE FACTS. Use only the approved strategy and research facts provided. Never invent a fact, a name, a number or a market detail.\n` +
+  `- NEVER COMMIT TO AN OUTCOME. No guaranteed conversion rates, lead volumes or returns anywhere. The funnel economics and any figure are ILLUSTRATIVE benchmarks, clearly labelled, never a promise.\n` +
+  `- AUDIENCE IS THE PROOF OF OUR ABILITY, and it is the most important section. For each persona give ACTUAL, credible platform-level targeting selections on the platforms that genuinely fit them (from Facebook, Instagram, TikTok, Google Display, LinkedIn). Facebook/Instagram: interests, behaviours, demographics, custom + lookalike. TikTok: interests, hashtags, creator adjacencies. Google Display: in-market segments, custom-intent keywords, topics. LinkedIn: job titles, seniority, function, industry, company size. Be specific enough that a media buyer could build these audiences.\n` +
+  `- CHANNELS: intelligently SELECT the platforms for this objective and audience and justify each, with a lead/support/test priority. Do not reflexively include every platform, choose where the value is.\n` +
+  `- Map all EIGHT pods to ${clientName}, each specific to the objective.\n` +
+  `- Write in UK British English. Never use an em dash or en dash. Never use the word "manifesto". Confident, premium, concrete, no filler.`;
+
+// Build the proposal content for an approved strategy, on the chosen objective + tier. Fable 5, retried on overload.
+export async function buildProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null }): Promise<{ content: ProposalContent; clientId: string; engagementId: string; campaignId: string | null }> {
+  const key = await getSecret("anthropic");
+  if (!key) throw new Error("Claude isn't connected.");
+  const srows = (await db().query(`select * from strategies where id = $1`, [strategyId])) as Strategy[];
+  const strategy = srows[0];
+  if (!strategy) throw new Error("That strategy was not found.");
+  if (strategy.status !== "approved") throw new Error("Approve the strategy at Gate 2 before building the proposal.");
+  const eng = (await db().query(`select client_id from engagements where id = $1`, [strategy.engagement_id])) as { client_id: string }[];
+  const clientId = eng[0]?.client_id;
+  const clientName = ((await db().query(`select name from clients where id = $1`, [clientId])) as { name: string }[])[0]?.name || "the client";
+  const run = (await db().query(`select id from research_runs where client_id = $1 and status = 'gate1_approved' order by version desc limit 1`, [clientId])) as { id: string }[];
+  const facts = run[0]
+    ? (await db().query(`select section, subject, claim from research_claims where run_id = $1 and rejected = false and section <> 'unverified' and claim <> '' order by (tier is null), tier asc`, [run[0].id])) as { section: string; subject: string | null; claim: string }[]
+    : [];
+
+  const objective = OBJECTIVES.find((o) => o.id === input.objective) || OBJECTIVES[0];
+  const tier = TIERS[input.tier] || TIERS.dominate;
+  const client = new Anthropic({ apiKey: key });
+
+  const factBlock = facts.slice(0, 160).map((f) => `- [${f.section}${f.subject ? `/${f.subject}` : ""}] ${f.claim}`).join("\n");
+  const strat = strategy.content as StrategyContent | null;
+  const user =
+    `CLIENT: ${clientName}\nOBJECTIVE: ${objective.label} (${objective.note})\nTIER: ${tier.name} at ${tier.rate}\n\n` +
+    `THE APPROVED STRATEGY (the spine of this proposal):\n${JSON.stringify(strat)}\n\n` +
+    `THE VERIFIED RESEARCH FACTS (ground the opportunity, audience and pods in these):\n${factBlock}\n\n` +
+    `Write the full proposal via write_proposal. Make the audience and channels world-class and specific.`;
+
+  const tool: Anthropic.Tool = { name: "write_proposal", description: "The complete, structured growth proposal.", input_schema: CONTENT_SCHEMA };
+  const msg = await withAnthropicRetry(() => client.messages.stream({
+    model: FABLE, max_tokens: 16000, system: SYSTEM(clientName, objective.label, tier),
+    tools: [tool], tool_choice: { type: "tool", name: "write_proposal" },
+    messages: [{ role: "user", content: user }],
+  }).finalMessage());
+  await meterClaude(msg, { clientId, userEmail: input.userEmail ?? null, model: FABLE, action: "proposal-build" }).catch(() => {});
+  const content = extract(msg);
+  if (!content) throw new Error("The proposal draft came back empty. Try again.");
+  return { content, clientId, engagementId: strategy.engagement_id, campaignId: strategy.campaign_id };
+}
+
+// ── Persistence ──────────────────────────────────────────────────────────────────────────────────────────────
+export type Proposal = {
+  id: string; engagement_id: string; campaign_id: string | null; strategy_id: string | null;
+  objective: string; tier: string; status: string; content: ProposalContent | null;
+  pdf_url: string | null; approved_by: string | null; approved_at: string | null; created_at: string;
+};
+
+// Build + save a fresh proposal draft for an approved strategy.
+export async function buildAndSaveProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null }): Promise<Proposal> {
+  const { content, engagementId, campaignId } = await buildProposal(strategyId, input);
+  const rows = (await db().query(
+    `insert into proposals (engagement_id, campaign_id, strategy_id, objective, tier, status, content)
+     values ($1,$2,$3,$4,$5,'awaiting_approval',$6) returning *`,
+    [engagementId, campaignId, strategyId, input.objective, input.tier, JSON.stringify(content)],
+  )) as Proposal[];
+  return rows[0];
+}
+
+// The latest proposal for a strategy (any status), for the builder surface.
+export async function latestProposalForStrategy(strategyId: string): Promise<Proposal | null> {
+  const rows = (await db().query(`select * from proposals where strategy_id = $1 order by created_at desc limit 1`, [strategyId])) as Proposal[];
+  return rows[0] || null;
+}

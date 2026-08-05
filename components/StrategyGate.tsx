@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { Strategy, StrategyContent } from "@/lib/cycle";
+import ProposalBuilder from "@/components/ProposalBuilder";
 
 // GATE 2 surface. Build a strategy from the approved fact base, review it, refine with notes if needed, then
 // approve. The Proposal (next step, same POD) will run from the approved strategy - shown here as the next move.
@@ -231,14 +232,8 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
             </div>
           )}
 
-          {/* APPROVED -> Proposal is next (same POD) */}
-          {strategy.status === "approved" && (
-            <section className="rounded-xl border border-[#4ade80]/30 bg-surface-1 p-5">
-              <div className="text-lg font-bold text-[#86efac]">Direction locked ✓</div>
-              <p className="mt-1 text-base text-ink-dim">The strategy is approved. <b className="text-ink">The Proposal runs from here</b>, turning this direction into the client-facing plan. Coming next in this same step.</p>
-              <button disabled className="mt-3 rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink-faint opacity-60" title="Coming next">Run the Proposal →</button>
-            </section>
-          )}
+          {/* APPROVED -> the Proposal runs from here (same POD) */}
+          {strategy.status === "approved" && <ProposalBuilder strategyId={strategy.id} />}
         </div>
       )}
     </div>

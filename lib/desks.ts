@@ -89,7 +89,7 @@ export function deskOf(action: string | null | undefined): Desk {
   // "edit-slider" and "edit-section1" are the funnel builder. Prefix-first would swallow both.
   if (a.startsWith("retheme-") || a.startsWith("edit-") || a.startsWith("studio-")) return "Creatives on GAS";
   if (a.startsWith("ceo-") || a.startsWith("research-")) return "The Researcher";
-  if (a.startsWith("intel-") || a.startsWith("strategy-")) return "The Strategist";
+  if (a.startsWith("intel-") || a.startsWith("strategy-") || a.startsWith("proposal-")) return "The Strategist";
 
   return "Unattributed";
 }
