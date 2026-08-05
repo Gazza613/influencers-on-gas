@@ -37,6 +37,7 @@ create table if not exists clients (
 );
 alter table clients add column if not exists website text;
 alter table clients add column if not exists websites jsonb;   -- additional official sites (some clients run several)
+alter table clients add column if not exists socials jsonb not null default '[]'::jsonb;   -- the client's official social accounts (FB/IG/TikTok/LinkedIn/YouTube/X), mined by the Researcher
 
 create table if not exists client_profiles (
   id                  uuid primary key default gen_random_uuid(),

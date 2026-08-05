@@ -367,6 +367,14 @@ export async function collectResearch(
     ? `\n\n${name} also operates these official sites, all the SAME organisation - research them as ${name}'s own too: ${websites.slice(1).join(", ")}.`
     : "");
 
+  // KNOWN SOCIAL ACCOUNTS (Gary): the team supplies the client's own social profiles, so the Researcher mines each
+  // rather than hoping to find them. These are ground truth for the client's social presence.
+  const socialRows = (await db().query(`select socials from clients where id = $1`, [clientId]).catch(() => [])) as { socials: string[] | null }[];
+  const socials = (Array.isArray(socialRows[0]?.socials) ? socialRows[0]!.socials! : []).filter((s) => typeof s === "string" && s.trim());
+  const socialBlock = socials.length
+    ? `\n\nKNOWN SOCIAL ACCOUNTS (the GAS team supplied these - they ARE ${name}'s, mine EACH one): ${socials.join(", ")}.\nFor each, capture the platform + handle (section=contact), and mine it for posting CADENCE, the CONTENT themes and campaigns they run, engagement signals, and who their AUDIENCE appears to be (sections=marketing/audience/activity). The most RECENT posts define their current positioning and marketing, so lead with those.`
+    : "";
+
   // DURABLE RUN (Gary: navigating away lost the run and wasted the spend). We create the run row NOW, status
   // 'collecting', and the route keeps the work alive past a browser disconnect (waitUntil). Two payoffs: the work
   // reaches the store step even if the tab is closed (no wasted cost), and a returning user sees a run in
@@ -457,7 +465,7 @@ export async function collectResearch(
 
   const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor or market context.${anchor}${ceoLock}${deprecatedLock}${rejectBlock}`;
 
-  const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${focusBlock}${knownList}${notesBlock}\n\n` +
+  const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${focusBlock}${socialBlock}${knownList}${notesBlock}\n\n` +
     `Cover every angle a marketing strategist needs: who they are and what they sell (snapshot), history/ownership/structure (foundations), the leadership and management team (leadership), products/pricing and the commercial model - how they make money and how they sell (products), the market and category (market), how THEY position themselves - promise, USPs, tone (positioning), who they serve and their audience (audience), website/SEO/social (digital), their OWN current marketing and advertising (marketing), the competitor intelligence below, a one-line profile of each competitor (competitor_set), dated developments in the last 90 days on/after ${cutoffStr} (activity), press and media (press), and reviews/sentiment incl. SA platforms like HelloPeter and Google (customer_voice).\n\n` +
     `Also set the tool fields 'vertical' (the client's marketing category) and 'regulated' (whether they are in a licensed/regulated sector).\n\n` +
     `ALWAYS COLLECT, EVERY RUN, WITHOUT EXCEPTION (check the site footer, and the contact, about, team and help pages):\n` +
@@ -468,6 +476,7 @@ export async function collectResearch(
     `- FOUNDERS' AND EXECUTIVES' LINKEDIN (sections=activity/leadership/positioning): search the named founders and executives BY NAME on LinkedIn for their recent posts, announcements, product launches and positioning statements in the last 90 days. LinkedIn is where leaders announce what is new before it hits the website.\n` +
     `- CONTACT DETAILS (section=contact): every phone number, email address, physical address, operating hours and WhatsApp number ${name} publishes.\n` +
     `- SOCIAL CHANNELS (section=contact): every official social profile ${name} runs, each as the platform plus its full URL or @handle (Facebook, Instagram, LinkedIn, X/Twitter, TikTok, YouTube).\n` +
+    `- MARKET AND CATEGORY STATS (section=market): actively find the MOST RECENT, credible statistics for ${name}'s category and geography - market size, growth rate, number of players/outlets, category and demand trends, consumer behaviour shifts. DATE every figure with its year and source. These feed the client proposal, so they must be CURRENT (strongly prefer the last 12 to 18 months) and directly relevant to this business, not generic. If the newest figure is older, say so and flag its age. A dated, relevant stat is worth far more than a vague or stale one.\n` +
     `- PRESS AND MEDIA (section=press): media releases, news, interviews, podcasts, awards and notable third-party mentions, at ANY date, each sourced. Search beyond their own site.\n` +
     `- PUBLISHED FAQs (section=faqs): ${name}'s OWN frequently-asked questions, each as the question and its answer, sourced to their FAQ/help page.\n` +
     `- REGULATORY, ONLY IF THE CLIENT IS IN A REGULATED SECTOR (section=regulatory): if and ONLY if ${name} is in financial services or another licensed/regulated field, capture its licence identifier (e.g. an FSP number, usually in the footer), verify it on the regulator's OWN register (for an FSP, the FSCA register) and record licence status and authorised categories, AND the advertising rules that constrain its campaigns (e.g. FAIS: no guarantees, no urgency devices, mandatory disclaimers). If the client is NOT regulated (an agency, retailer, restaurant, and the like), SKIP this entirely - do not hunt for a licence that does not exist.\n` +

@@ -112,6 +112,8 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // research a same-named but different business. Reuses the existing client-website endpoint.
   const [sites, setSites] = useState<string[]>([""]);   // the client's ground-truth websites (some run several)
   const [siteSaved, setSiteSaved] = useState(false);
+  const [socials, setSocials] = useState<string[]>([""]);   // the client's official social accounts (Gary: mine these too)
+  const [socSaved, setSocSaved] = useState(false);
 
   const clientName = clients.find((c) => c.id === clientId)?.name || "the client";
   const isConfigured = configured.length === 0 || configured.includes(clientId);
@@ -227,7 +229,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     if (!clientId) return;
     let live = true;
     fetch(`/api/studio/client-website?clientId=${clientId}`, { cache: "no-store" })
-      .then((r) => r.json()).then((d) => { if (live) { const w = Array.isArray(d?.websites) && d.websites.length ? d.websites : (d?.website ? [d.website] : [""]); setSites(w.length ? w : [""]); setSiteSaved(false); } }).catch(() => {});
+      .then((r) => r.json()).then((d) => { if (live) { const w = Array.isArray(d?.websites) && d.websites.length ? d.websites : (d?.website ? [d.website] : [""]); setSites(w.length ? w : [""]); setSiteSaved(false); const s = Array.isArray(d?.socials) && d.socials.length ? d.socials : [""]; setSocials(s.length ? s : [""]); setSocSaved(false); } }).catch(() => {});
     return () => { live = false; };
   }, [clientId]);
 
@@ -248,6 +250,16 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     }).then((x) => x.json()).catch(() => null);
     if (r?.ok) { setSites(r.websites?.length ? r.websites : [""]); setSiteSaved(true); setTimeout(() => setSiteSaved(false), 1800); }
     else flex(r?.error || "Couldn't save the websites.");
+  }
+
+  async function saveSocials() {
+    const list = socials.map((s) => s.trim()).filter(Boolean);
+    const r = await fetch("/api/studio/client-website", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, socials: list }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) { setSocials(r.socials?.length ? r.socials : [""]); setSocSaved(true); setTimeout(() => setSocSaved(false), 1800); }
+    else flex(r?.error || "Couldn't save the social accounts.");
   }
 
   // Commission a collect. withNotes runs a "Rerun with notes" - a fresh VERSION addressing corrections, never an
@@ -400,9 +412,27 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             <button onClick={() => setSites([...sites, ""])} className="text-sm font-semibold text-accent hover:underline">+ Add another website</button>
             <button onClick={saveSites} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:text-ink">{siteSaved ? "✓ Saved" : "Save"}</button>
           </div>
+          {/* SOCIAL ACCOUNTS (Gary): the client's own social profiles, mined for cadence, content themes and audience. */}
+          <div className="mt-4">
+            <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Social media accounts</span>
+            <div className="mt-1 space-y-2">
+              {socials.map((s, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input value={s} onChange={(e) => { const next = [...socials]; next[i] = e.target.value; setSocials(next); }}
+                    placeholder={i === 0 ? "https://www.instagram.com/theclient" : "https://www.linkedin.com/company/theclient"}
+                    className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-base outline-none focus:border-accent" />
+                  {socials.length > 1 && <button onClick={() => setSocials(socials.filter((_, j) => j !== i))} aria-label="Remove social account" className="text-ink-faint hover:text-alert">✕</button>}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center gap-3">
+              <button onClick={() => setSocials([...socials, ""])} className="text-sm font-semibold text-accent hover:underline">+ Add a social account</button>
+              <button onClick={saveSocials} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:text-ink">{socSaved ? "✓ Saved" : "Save"}</button>
+            </div>
+          </div>
         </div>
       </div>
-      <p className="mt-2 text-sm text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them.</p>
+      <p className="mt-2 text-sm text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them. Social accounts are mined for cadence, content themes and audience signals.</p>
 
       {/* NEW BRAIN */}
       {showCreate && (
