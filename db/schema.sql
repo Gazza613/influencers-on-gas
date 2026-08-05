@@ -793,3 +793,114 @@ alter table research_claims add column if not exists in_brain boolean not null d
 alter table research_claims add column if not exists in_brain_by text;
 alter table research_runs add column if not exists progress jsonb;  -- live {label, sources, filed} while status='collecting', so a returning user sees progress (durable run survives navigation)
 alter table research_runs add column if not exists error text;      -- failure reason if a run ends in status='failed'
+
+-- ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+-- THE INTELLIGENCE LAYER CYCLE (Agency of NOW · Pillars I + II). Phase A: the spine + contracts.
+--
+-- The ecosystem is a CLOSED LOOP, so the value is in the hand-offs, not any one pillar. These objects are the
+-- ecosystem's internal API: the Researcher (I) fills the brain, the Strategist (II) emits a structured strategy
+-- that Pillars III-VIII execute against, and the optimisation layer feeds performance_signals back in. This phase
+-- creates the tables ONLY - no behaviour change - so every later phase (Delta research, the Strategist engine,
+-- Gate 2, the Optimise/Pivot cycles) has a spine to hang off, and Pillars III-VIII are cheap to add later.
+--
+-- PERSISTENCE HIERARCHY (what carries forward vs resets):
+--   engagement/brain  persists forever, compounds, serves all 8 pillars
+--     campaign         one product/range/objective push (a PIVOT = a new campaign)
+--       cycle          one round through the loop (an OPTIMISE = a new cycle on the same campaign)
+
+-- One per active client relationship. Holds the DURABLE strategy artefacts a Foundation cycle produces and a
+-- quarterly refresh re-forecasts (positioning, jointly-owned KPIs, the baseline, the roadmap, sales-ready def).
+create table if not exists engagements (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  status text not null default 'active',            -- active | paused | ended
+  positioning jsonb,                                -- durable strategic direction (from the engagement-level strategy)
+  kpis jsonb,                                        -- jointly-owned success metrics (the measurement contract)
+  baseline jsonb,                                    -- documented starting position every metric is measured against
+  roadmap jsonb,                                     -- sequenced acquisition/scaling plan across the horizon
+  sales_ready_def text,                              -- what "sales-ready" means for this client (feeds PSI/Lead Mgmt)
+  current_eng_strategy_id uuid,                      -- latest APPROVED level=engagement strategy (plain ref, no FK: created later)
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_engagements_client on engagements(client_id);
+
+-- One per product/range/objective. A client changing product is a NEW campaign under the same engagement, so the
+-- brain and positioning are inherited, never re-onboarded.
+create table if not exists campaigns (
+  id uuid primary key default gen_random_uuid(),
+  engagement_id uuid not null references engagements(id) on delete cascade,
+  name text not null,
+  product text,                                      -- the product/range/offer this campaign pushes
+  objective text,                                    -- the commercial objective for this push
+  status text not null default 'active',             -- active | paused | archived
+  current_strategy_id uuid,                          -- latest APPROVED level=campaign strategy (plain ref)
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_campaigns_engagement on campaigns(engagement_id);
+
+-- One round through the loop. ONE machine, three modes - foundation (new client / quarterly refresh), optimise
+-- (recurring, same campaign, driven by performance_signals) and pivot (new product). Differs only in trigger,
+-- depth, and which inputs it pulls.
+create table if not exists cycles (
+  id uuid primary key default gen_random_uuid(),
+  engagement_id uuid not null references engagements(id) on delete cascade,
+  campaign_id uuid references campaigns(id) on delete set null,   -- null for engagement-level foundation
+  mode text not null,                                -- foundation | optimise | pivot | refresh
+  trigger text not null default 'manual',            -- manual | scheduled | signal
+  status text not null default 'open',               -- open | researching | strategising | awaiting_gate | approved | closed
+  research_run_id uuid,                              -- the run (full or delta) this cycle commissioned (plain ref)
+  strategy_id uuid,                                  -- the strategy this cycle produced (plain ref)
+  opened_by text,
+  opened_at timestamptz not null default now(),
+  closed_at timestamptz
+);
+create index if not exists idx_cycles_engagement on cycles(engagement_id, opened_at desc);
+create index if not exists idx_cycles_campaign on cycles(campaign_id);
+
+-- The Strategist's output: versioned, gradeable, every point traceable to a fact. content(jsonb) carries the
+-- structured brief every downstream pillar inherits (proposition, target, angle, message hierarchy, channel logic,
+-- KPIs, sales-ready def, rationale->fact_id, risks, and changes_from_last for optimise mode). See lib/cycle.ts.
+create table if not exists strategies (
+  id uuid primary key default gen_random_uuid(),
+  engagement_id uuid not null references engagements(id) on delete cascade,
+  campaign_id uuid references campaigns(id) on delete cascade,    -- null for level=engagement
+  cycle_id uuid references cycles(id) on delete set null,
+  level text not null default 'campaign',            -- engagement | campaign
+  mode text not null default 'foundation',           -- foundation | optimise | pivot
+  version int not null default 1,
+  status text not null default 'draft',              -- draft | awaiting_approval | approved | superseded
+  content jsonb,                                     -- the structured strategy (the inter-pillar contract)
+  approved_by text,                                  -- Gate 2 (direction) - the human command point
+  approved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_strategies_engagement on strategies(engagement_id, version desc);
+create index if not exists idx_strategies_campaign on strategies(campaign_id);
+
+-- Normalised feedback from the downstream pillars (PSI VI, Optimisation VIII, Lead Mgmt VII) - or entered by hand
+-- now, before those pillars exist. The Strategist reads unconsumed signals at the start of an OPTIMISE cycle to
+-- recommend the next month's approach. Shape is fixed now so the real pillars later auto-write the same object.
+create table if not exists performance_signals (
+  id uuid primary key default gen_random_uuid(),
+  engagement_id uuid not null references engagements(id) on delete cascade,
+  campaign_id uuid references campaigns(id) on delete cascade,
+  source text not null default 'manual',             -- psi | media | lead_mgmt | manual
+  metric text not null,                              -- what was measured (e.g. CPL, conversion rate, lead quality)
+  direction text,                                    -- up | down | flat
+  magnitude text,                                    -- free-form for now (e.g. "-32%", "R48 -> R31")
+  confidence text,                                   -- high | med | low
+  lever text,                                        -- audience | creative | channel | offer | message
+  note text,                                         -- the human-readable observation
+  observed_at timestamptz,                           -- when it happened (may differ from logged-at)
+  consumed_by_cycle_id uuid references cycles(id) on delete set null,   -- which optimise cycle acted on it
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_signals_campaign on performance_signals(campaign_id, created_at desc);
+create index if not exists idx_signals_unconsumed on performance_signals(engagement_id) where consumed_by_cycle_id is null;
+
+-- Extend the Researcher's existing tables so a run belongs to a cycle and facts are tagged for their consumers.
+alter table research_runs add column if not exists cycle_id uuid;        -- the cycle this run belongs to (plain ref)
+alter table research_runs add column if not exists campaign_id uuid;     -- the campaign in focus (plain ref)
+alter table research_runs add column if not exists run_mode text not null default 'foundation';  -- foundation | delta
+alter table research_claims add column if not exists pillar_tags jsonb not null default '[]'::jsonb;  -- which downstream pillars each fact serves (strategist/audience/creative/psi/channels)
