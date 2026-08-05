@@ -20,6 +20,8 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
   const [msg, setMsg] = useState("");
   const [accent, setAccent] = useState("");   // optional client-colour override (auto-detected from their site if blank)
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [comments, setComments] = useState("");
+  const [gateBusy, setGateBusy] = useState(false);
 
   const load = useCallback(async () => {
     const d = await fetch(`/api/studio/proposal/latest?strategyId=${strategyId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
@@ -50,7 +52,23 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     setMsg(""); setProposal((p) => (p ? { ...p, pdf_url: r.url } : p));
   }
 
+  async function gate(action: "refine" | "approve" | "reopen") {
+    if (!proposal) return;
+    if (action === "refine" && !comments.trim()) { setMsg("Add your comments to send it back."); return; }
+    setGateBusy(true);
+    if (action === "refine") setMsg("Reworking the proposal against your comments on Fable 5…");
+    const r = await fetch(`/api/studio/proposal/gate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposalId: proposal.id, action, comments: comments.trim() }),
+    }).then((x) => x.json()).catch(() => null);
+    setGateBusy(false);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't complete that."); return; }
+    setMsg(""); setComments("");
+    if (r.proposal) setProposal(r.proposal); else await load();
+  }
+
   const c = (proposal?.content || null) as ProposalContent | null;
+  const approved = proposal?.status === "approved";
 
   return (
     <section className="rounded-xl border border-[#4ade80]/30 bg-surface-1 p-5">
@@ -235,23 +253,42 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
             {(c.investment?.notes || []).map((n, i) => <p key={i} className="mt-2 text-sm text-ink-faint">{n}</p>)}
           </section>
 
-          {/* BRANDED PDF - client colours (auto-detected from their site, or override) + GAS as Agency of NOW */}
-          <div className="rounded-xl border border-accent/40 bg-surface-1 p-5">
-            <div className="text-lg font-bold text-ink">The branded document</div>
-            <p className="mt-1 text-base text-ink-dim">Render this as a client-branded PDF for sign-off. The client&apos;s accent colour is detected from their website; override it here if needed.</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-ink-dim">
-                Client colour
-                <input type="color" value={accent || "#3a5bd9"} onChange={(e) => setAccent(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-line bg-surface-2" />
-                {accent && <button onClick={() => setAccent("")} className="text-xs text-ink-faint hover:text-ink">auto-detect</button>}
-              </label>
-              <button onClick={makePdf} disabled={pdfBusy} className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
-                {pdfBusy ? "Rendering…" : proposal?.pdf_url ? "Re-render PDF" : "Generate the PDF"}
-              </button>
-              {proposal?.pdf_url && <a href={proposal.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink-dim hover:text-ink">Download PDF ↓</a>}
+          {/* STRATEGIST GATE (Human Command). Review the draft: send it back with comments, or approve for the
+              final cut. The PDF only cuts after a human approves. */}
+          {!approved ? (
+            <div className="rounded-xl border border-[#fbbf24]/40 bg-surface-1 p-5">
+              <div className="text-lg font-bold text-[#fcd34d]">Strategist review · your gate</div>
+              <p className="mt-1 text-base text-ink-dim">You have read the full proposal above. Add any comments to rework it, or approve it as is for the final cut. Nothing is client-ready until you approve.</p>
+              <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={4}
+                placeholder="Comments to rework (leave blank to accept as is). e.g. 'Lead the audience on the LinkedIn segment for the business-owner persona. Test TikTok, do not lead with it. Tighten the funnel note.'"
+                className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button onClick={() => gate("refine")} disabled={gateBusy || !comments.trim()} className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">Rework with my comments</button>
+                <button onClick={() => gate("approve")} disabled={gateBusy} className="rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">Approve as is →</button>
+              </div>
             </div>
-            <p className="mt-2 text-sm text-ink-faint">Reproduces GAS&apos;s standard terms and sign-off. Figures are illustrative, never a guarantee.</p>
-          </div>
+          ) : (
+            /* APPROVED -> the branded PDF (final cut). Client colours auto-detected, override if needed. */
+            <div className="rounded-xl border border-accent/40 bg-surface-1 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-lg font-bold text-[#86efac]">Approved ✓ · the final cut</div>
+                <button onClick={() => gate("reopen")} disabled={gateBusy} className="text-sm font-semibold text-ink-faint hover:text-ink">Reopen to edit</button>
+              </div>
+              <p className="mt-1 text-base text-ink-dim">Render the client-branded PDF for sign-off. The client&apos;s accent colour is detected from their website; override it if needed.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-ink-dim">
+                  Client colour
+                  <input type="color" value={accent || "#3a5bd9"} onChange={(e) => setAccent(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-line bg-surface-2" />
+                  {accent && <button onClick={() => setAccent("")} className="text-xs text-ink-faint hover:text-ink">auto-detect</button>}
+                </label>
+                <button onClick={makePdf} disabled={pdfBusy} className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                  {pdfBusy ? "Rendering…" : proposal?.pdf_url ? "Re-render PDF" : "Cut the final PDF"}
+                </button>
+                {proposal?.pdf_url && <a href={proposal.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink-dim hover:text-ink">Download PDF ↓</a>}
+              </div>
+              <p className="mt-2 text-sm text-ink-faint">Reproduces GAS&apos;s standard terms and sign-off. Figures are illustrative, never a guarantee.</p>
+            </div>
+          )}
         </div>
       )}
     </section>

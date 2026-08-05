@@ -65,51 +65,51 @@ function proposalHtml(c: ProposalContent, x: Ctx): string {
     <p class="lede">One closed-loop engine that carries a stranger from first impression to a booked, qualified outcome, and then compounds. Each pod feeds sharper intelligence to the next, and Media on GAS feeds every result back upstream so the system gets more intelligent over time.</p>
     ${pods8(A)}`);
 
-  const audience = sec(`${head("05", "The target audience", A)}
-    <p class="lede">${esc(c.audience?.overview)}</p>
-    ${(c.audience?.personas || []).map((p) => `<div class="persona">
-      <div class="pname">${esc(p.label)}</div>
-      <div class="pmeta"><b>Trigger</b> ${esc(p.trigger)} &nbsp;&middot;&nbsp; <b>Need</b> ${esc(p.need)}</div>
-      <div class="pmeta">${esc(p.who)}</div>
-      <div class="pangle" style="color:${A}">${esc(p.angle)}</div>
-      ${(p.platforms || []).map((pl) => `<div class="plat"><span class="platname" style="background:${A}">${esc(pl.platform)}</span> <span class="platapp">${esc(pl.approach)}</span><div class="chips">${(pl.selections || []).map((s) => `<span class="chip">${esc(s)}</span>`).join("")}</div></div>`).join("")}
-    </div>`).join("")}`);
-
-  const strat = sec(`${head("06", "Our strategic recommendation", A)}
-    <div class="panel" style="border-color:${A}"><p class="pbig">${esc(c.strategy?.proposition)}</p><p class="lede" style="margin-top:8px">${esc(c.strategy?.angle)}</p></div>
-    <ul class="ticks">${(c.strategy?.why_it_wins || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>`);
-
+  // The showcase content that belongs to specific pods: Strategist (recommendation + market intel), Audience
+  // (platform targeting) and Channels (the plan). These are rendered INSIDE their pod, not as separate sections,
+  // because Audience and Channels ARE pods (III and V) - never duplicated.
+  const stratInner = `<div class="panel" style="border-color:${A}"><p class="pbig">${esc(c.strategy?.proposition)}</p><p class="lede" style="margin-top:8px">${esc(c.strategy?.angle)}</p></div><ul class="ticks">${(c.strategy?.why_it_wins || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>`;
   const mi = c.market_intel;
-  const market = mi ? sec(`${head("07", "Market intelligence & opportunities", A)}
-    <p class="lede">${esc(mi.overview)}</p>
-    <div class="grid2">${(mi.stats || []).map((s) => `<div class="card"><div class="stat" style="color:${A}">${esc(s.stat)}</div><div class="statsrc">${esc(s.source)}</div></div>`).join("")}</div>
-    <div class="opps">${(mi.opportunities || []).map((o) => `<div class="opp"><span class="otag" style="background:${o.digital ? A : "#64748b"}">${o.digital ? "Our pods" : "Beyond digital"}</span><b>${esc(o.insight)}</b> <span class="owhy">${esc(o.why)}</span></div>`).join("")}</div>` ) : "";
+  const marketInner = mi ? `<div class="subhead" style="color:${A}">Market intelligence &amp; opportunities</div><p class="lede">${esc(mi.overview)}</p><div class="grid2">${(mi.stats || []).map((s) => `<div class="card"><div class="stat" style="color:${A}">${esc(s.stat)}</div><div class="statsrc">${esc(s.source)}</div></div>`).join("")}</div><div class="opps">${(mi.opportunities || []).map((o) => `<div class="opp"><span class="otag" style="background:${o.digital ? A : "#64748b"}">${o.digital ? "Our pods" : "Beyond digital"}</span><b>${esc(o.insight)}</b> <span class="owhy">${esc(o.why)}</span></div>`).join("")}</div>` : "";
+  const audienceInner = `<p class="lede">${esc(c.audience?.overview)}</p>${(c.audience?.personas || []).map((p) => `<div class="persona"><div class="pname">${esc(p.label)}</div><div class="pmeta"><b>Trigger</b> ${esc(p.trigger)} &nbsp;&middot;&nbsp; <b>Need</b> ${esc(p.need)}</div><div class="pmeta">${esc(p.who)}</div><div class="pangle" style="color:${A}">${esc(p.angle)}</div>${(p.platforms || []).map((pl) => `<div class="plat"><span class="platname" style="background:${A}">${esc(pl.platform)}</span> <span class="platapp">${esc(pl.approach)}</span><div class="chips">${(pl.selections || []).map((s) => `<span class="chip">${esc(s)}</span>`).join("")}</div></div>`).join("")}</div>`).join("")}`;
+  const channelsInner = `<p class="lede">${esc(c.channels?.rationale)}</p>${(c.channels?.plan || []).map((ch) => `<div class="chan"><span class="chname" style="background:${A}">${esc(ch.platform)}</span><span class="chpri">${esc(PRIORITY[ch.priority] || "Support")}</span><b>${esc(ch.role)}</b><div class="chwhy">${esc(ch.why)}</div></div>`).join("")}`;
 
-  const channels = sec(`${head("08", "Channel plan, intelligently selected", A)}
-    <p class="lede">${esc(c.channels?.rationale)}</p>
-    ${(c.channels?.plan || []).map((ch) => `<div class="chan"><span class="chname" style="background:${A}">${esc(ch.platform)}</span><span class="chpri">${esc(PRIORITY[ch.priority] || "Support")}</span><b>${esc(ch.role)}</b><div class="chwhy">${esc(ch.why)}</div></div>`).join("")}`);
+  // Match a generated pod card to its slot by normalised name, so the eight render IN ORDER, each with its brief.
+  const findPod = (norm: string) => (c.pods || []).find((p) => p.name.toLowerCase().replace(/[^a-z]/g, "") === norm);
+  const podBlock = (num: string, name: string, norm: string, extra = "") => {
+    const b = findPod(norm);
+    return `<div class="podblock"><div class="podeyebrow" style="color:${A}">Pod ${num} &middot; ${esc(name)}</div>${b ? `<div class="podfor">${esc(b.for_client)}</div><div class="podben">${esc(b.benefit)}</div>` : ""}${extra}</div>`;
+  };
 
-  const pods = sec(`${head("09", "The eight pods, mapped to you", A)}
-    <div class="grid2">${(c.pods || []).map((p) => `<div class="card"><div class="podname">${esc(p.name)}</div><div class="cbody">${esc(p.for_client)}</div><div class="poddesc">${esc(p.benefit)}</div></div>`).join("")}</div>`);
+  const pods = sec(`${head("05", "The eight pods, applied to you", A)}
+    <p class="lede">One engine, eight pods, each mapped to you. Audience and Channels are two of these pods; the platform-level detail inside them shows the depth we bring.</p>
+    ${podBlock("I", "Researcher", "researcher")}
+    ${podBlock("II", "Strategist", "strategist", stratInner + marketInner)}
+    ${podBlock("III", "Audience", "audience", audienceInner)}
+    ${podBlock("IV", "Creative", "creative")}
+    ${podBlock("V", "Channels", "channels", channelsInner)}
+    ${podBlock("VI", "PSI", "psi")}
+    ${podBlock("VII", "PSI Conversion Dashboard", "psiconversiondashboard")}
+    ${podBlock("VIII", "Media on GAS", "mediaongas")}`);
 
-  const rollout = sec(`${head("10", "Your 31-day rollout", A)}
+  const rollout = sec(`${head("06", "Your 31-day rollout", A)}
     <p class="lede">The rollout mirrors the engine. Each week ends at a sign-off gate: nothing proceeds until the previous stage is proven.</p>
     ${(c.rollout || []).map((w) => `<div class="week"><div class="wtop"><span class="wname" style="color:${A}">${esc(w.week)} &middot; ${esc(w.title)}</span><span class="wpods">${esc(w.pods)}</span></div><ul class="dots">${(w.points || []).map((pt) => `<li>${esc(pt)}</li>`).join("")}</ul><div class="wgate" style="border-color:${A}"><b style="color:${A}">Gate</b> ${esc(w.gate)}</div></div>`).join("")}`);
 
-  const funnel = sec(`${head("11", "Illustrative funnel economics", A)}
+  const funnel = sec(`${head("07", "Illustrative funnel economics", A)}
     <p class="disc">${esc(c.funnel?.disclaimer)}</p>
     <div class="funnel">${(c.funnel?.stages || []).map((s, i) => `<div class="fstage"><span class="fnum" style="background:${A}">${i + 1}</span><b>${esc(s.stage)}</b> <span>${esc(s.note)}</span></div>`).join("")}</div>`);
 
-  const kpis = sec(`${head("12", "KPIs, agreed up front", A)}
+  const kpis = sec(`${head("08", "KPIs, agreed up front", A)}
     <table class="kt"><thead><tr><th>Metric</th><th>Why it matters</th><th>Baseline</th></tr></thead><tbody>${(c.kpis || []).map((k) => `<tr><td><b>${esc(k.metric)}</b></td><td>${esc(k.why)}</td><td>${esc(k.baseline)}</td></tr>`).join("")}</tbody></table>`);
 
-  const compliance = sec(`${head("13", "Trusted with data, by design", A)}
+  const compliance = sec(`${head("09", "Trusted with data, by design", A)}
     <p class="lede">${esc(c.compliance?.intro)}</p>
     <ul class="ticks">${(c.compliance?.points || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul>
     <div class="panel" style="border-color:${A}"><div class="plabel" style="color:${A}">POPIA + GDPR</div><p>Aligned across every funnel and integration, so your brand's trust is protected at every touchpoint.</p></div>`);
 
   const inv = c.investment;
-  const investment = sec(`${head("14", "The investment", A)}
+  const investment = sec(`${head("10", "The investment", A)}
     <div class="invhead" style="border-color:${A}"><div class="invtier">${esc(inv?.tier_name)} <span class="invtag" style="color:${A}">${esc(x.tier.tagline)}</span></div><div class="invrate">${esc(inv?.rate)}</div></div>
     <div class="grid2">${(inv?.engine_includes || []).map((e) => `<div class="inc">&#10003; ${esc(e)}</div>`).join("")}</div>
     ${(inv?.notes || []).map((n) => `<p class="note">${esc(n)}</p>`).join("")}`);
@@ -123,11 +123,11 @@ function proposalHtml(c: ProposalContent, x: Ctx): string {
     ["5 · Confidentiality and data", `Both parties keep each other's commercial information strictly confidential. All consumer personal information is collected with consent and processed under POPIA in line with the compliance section of this proposal, and consumer-facing scripts and creative are submitted for your compliance approval before launch.`],
     ["6 · Exit", `After the six-month proof of concept, the engagement continues month to month, with no lock-in. Either party may exit on 30 days' written notice. On exit, GAS provides a full, orderly handover of accounts, assets, data and documentation at no additional cost.`],
   ];
-  const terms = sec(`${head("15", "Simple terms, in plain language", A)}
+  const terms = sec(`${head("11", "Simple terms, in plain language", A)}
     <p class="lede">This page, together with the rate above, is the working agreement between ${GAS.name} (Pty) Ltd and ${esc(x.legalName)}. Signature of this proposal constitutes acceptance of these terms.</p>
     <div class="grid2">${T.map(([h, b]) => `<div class="card"><div class="ctitle" style="color:${A}">${esc(h)}</div><div class="cbody">${b}</div></div>`).join("")}</div>`);
 
-  const sign = sec(`${head("16", "Agreement and sign-off", A)}
+  const sign = sec(`${head("12", "Agreement and sign-off", A)}
     <p class="lede">By signing below, the parties accept this proposal and commence a six-month proof-of-concept agreement on the ${esc(x.tier.name)} tier. This proposal is valid for 14 days from ${ukDate(x.today)}.</p>
     <div class="grid2">
       <div class="card"><div class="slabel">For the client</div><div class="sname">${esc(x.legalName)}</div>${x.ceo ? `<div class="sperson">${esc(x.ceo)}${x.ceoTitle ? " &middot; " + esc(x.ceoTitle) : ""}</div>` : ""}<div class="sline">Signature</div><div class="sdate">Date</div></div>
@@ -137,6 +137,7 @@ function proposalHtml(c: ProposalContent, x: Ctx): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
     @page { size: A4 portrait; margin: 15mm 14mm; }
+    @page cover { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
     body { margin:0; font-family: Poppins, "Segoe UI", Helvetica, Arial, sans-serif; color:#15131c; font-size:10.5px; line-height:1.6; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     h1 { font-size:34px; line-height:1.05; font-weight:900; letter-spacing:-0.5px; margin:0; text-transform:uppercase; }
@@ -146,7 +147,12 @@ function proposalHtml(c: ProposalContent, x: Ctx): string {
     .pg { padding:2mm 0 6mm; page-break-inside:avoid; }
     section + section { page-break-before:always; }
     /* cover */
-    .cover { color:#fff; min-height:262mm; padding:14mm 12mm; display:flex; flex-direction:column; page-break-after:always; border-radius:0; }
+    /* EDGE-TO-EDGE cover (Gary): its own zero-margin page so the dark panel bleeds to the paper edge. */
+    .cover { page: cover; width:210mm; min-height:297mm; color:#fff; padding:18mm 15mm; display:flex; flex-direction:column; page-break-after:always; }
+    .podblock { border:1px solid #e6e2ee; border-radius:12px; padding:12px 15px; margin:10px 0; background:#faf9fc; page-break-inside:avoid; }
+    .podeyebrow { font-size:9px; letter-spacing:2px; font-weight:800; text-transform:uppercase; }
+    .podfor { font-size:11px; color:#403b4d; margin-top:3px; font-weight:500; } .podben { font-size:10px; color:#5a5568; margin-top:2px; }
+    .subhead { font-size:10px; letter-spacing:1.5px; font-weight:800; text-transform:uppercase; margin:14px 0 6px; }
     .cov-top { display:flex; justify-content:space-between; align-items:flex-start; }
     .gasmark { font-size:15px; font-weight:800; letter-spacing:1px; } .gassub { font-size:8px; letter-spacing:4px; color:#FF7A2F; font-weight:700; margin-top:2px; }
     .cov-client { font-size:11px; font-weight:700; color:rgba(255,255,255,0.7); text-align:right; max-width:45%; }
@@ -195,7 +201,7 @@ function proposalHtml(c: ProposalContent, x: Ctx): string {
     .slabel { font-size:8px; letter-spacing:2px; font-weight:800; color:#8a8496; text-transform:uppercase; } .sname { font-size:14px; font-weight:800; margin-top:3px; } .sperson { font-size:10px; color:#403b4d; margin-top:2px; } .sperson2 { font-size:9px; color:#8a8496; }
     .sline { border-top:1px solid #bbb; margin-top:34px; padding-top:3px; font-size:8px; letter-spacing:1px; color:#8a8496; text-transform:uppercase; } .sdate { font-size:8px; color:#8a8496; }
   </style></head><body>
-    ${cover}${exec}${opp}${philosophy}${eco}${audience}${strat}${market}${channels}${pods}${rollout}${funnel}${kpis}${compliance}${investment}${terms}${sign}
+    ${cover}${exec}${opp}${philosophy}${eco}${pods}${rollout}${funnel}${kpis}${compliance}${investment}${terms}${sign}
   </body></html>`;
 }
 
@@ -204,6 +210,7 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
   const prows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
   const p = prows[0];
   if (!p || !p.content) throw new Error("That proposal was not found, or has no content.");
+  if (p.status !== "approved") throw new Error("Approve the proposal at the strategist gate before cutting the final PDF.");
   const eng = (await db().query(`select client_id from engagements where id = $1`, [p.engagement_id])) as { client_id: string }[];
   const clientId = eng[0]?.client_id;
   const crow = (await db().query(`select name, website from clients where id = $1`, [clientId])) as { name: string; website: string | null }[];

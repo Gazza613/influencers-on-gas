@@ -137,7 +137,8 @@ const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)
   `- Write in UK British English. Never use an em dash or en dash. Never use the word "manifesto". Confident, premium, concrete, no filler.`;
 
 // Build the proposal content for an approved strategy, on the chosen objective + tier. Fable 5, retried on overload.
-export async function buildProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null }): Promise<{ content: ProposalContent; clientId: string; engagementId: string; campaignId: string | null }> {
+// notes/prior fold in a strategist's review comments so a rework improves the draft rather than starting cold.
+export async function buildProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null; notes?: string; prior?: ProposalContent | null }): Promise<{ content: ProposalContent; clientId: string; engagementId: string; campaignId: string | null }> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected.");
   const srows = (await db().query(`select * from strategies where id = $1`, [strategyId])) as Strategy[];
@@ -158,10 +159,12 @@ export async function buildProposal(strategyId: string, input: { objective: Obje
 
   const factBlock = facts.slice(0, 160).map((f) => `- [${f.section}${f.subject ? `/${f.subject}` : ""}] ${f.claim}`).join("\n");
   const strat = strategy.content as StrategyContent | null;
+  const priorBlock = input.prior ? `\n\nCURRENT DRAFT (improve this, do not start from scratch):\n${JSON.stringify(input.prior)}` : "";
+  const notesBlock = input.notes?.trim() ? `\n\nSTRATEGIST REVIEW COMMENTS (a senior human, apply each precisely - this is the human gate):\n${input.notes.trim().slice(0, 3000)}` : "";
   const user =
     `CLIENT: ${clientName}\nOBJECTIVE: ${objective.label} (${objective.note})\nTIER: ${tier.name} at ${tier.rate}\n\n` +
     `THE APPROVED STRATEGY (the spine of this proposal):\n${JSON.stringify(strat)}\n\n` +
-    `THE VERIFIED RESEARCH FACTS (ground the opportunity, audience and pods in these):\n${factBlock}\n\n` +
+    `THE VERIFIED RESEARCH FACTS (ground the opportunity, audience and pods in these):\n${factBlock}${priorBlock}${notesBlock}\n\n` +
     `Write the full proposal via write_proposal. Make the audience and channels world-class and specific.`;
 
   const tool: Anthropic.Tool = { name: "write_proposal", description: "The complete, structured growth proposal.", input_schema: CONTENT_SCHEMA };
@@ -198,4 +201,37 @@ export async function buildAndSaveProposal(strategyId: string, input: { objectiv
 export async function latestProposalForStrategy(strategyId: string): Promise<Proposal | null> {
   const rows = (await db().query(`select * from proposals where strategy_id = $1 order by created_at desc limit 1`, [strategyId])) as Proposal[];
   return rows[0] || null;
+}
+
+// THE COMMENT GATE (Human Command). The senior strategist reviews the draft and sends it back with comments; the
+// proposal is regenerated in place, folding the comments in, still awaiting approval. A new PDF must be re-cut after.
+export async function refineProposal(proposalId: string, comments: string, userEmail?: string | null): Promise<Proposal> {
+  const rows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
+  const cur = rows[0];
+  if (!cur) throw new Error("That proposal was not found.");
+  if (cur.status === "approved") throw new Error("That proposal is approved. Reopen it to make changes.");
+  if (!cur.strategy_id) throw new Error("This proposal has no strategy to rebuild from.");
+  const { content } = await buildProposal(cur.strategy_id, {
+    objective: cur.objective as ObjectiveId, tier: cur.tier as TierId,
+    userEmail, notes: comments, prior: cur.content,
+  });
+  const upd = (await db().query(
+    `update proposals set content = $2, status = 'awaiting_approval', pdf_url = null where id = $1 returning *`,
+    [proposalId, JSON.stringify(content)],
+  )) as Proposal[];
+  return upd[0];
+}
+
+// APPROVE the proposal (the gate before the final cut). Only an approved proposal can render the final PDF.
+export async function approveProposal(proposalId: string, approvedBy: string): Promise<Proposal | null> {
+  const rows = (await db().query(
+    `update proposals set status = 'approved', approved_by = $2, approved_at = now() where id = $1 and status = 'awaiting_approval' returning *`,
+    [proposalId, approvedBy],
+  )) as Proposal[];
+  return rows[0] || null;
+}
+
+// Reopen an approved proposal for further edits.
+export async function reopenProposal(proposalId: string): Promise<void> {
+  await db().query(`update proposals set status = 'awaiting_approval', approved_by = null, approved_at = null where id = $1`, [proposalId]);
 }
