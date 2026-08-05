@@ -18,6 +18,8 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
   const [tier, setTier] = useState<TierId>("dominate");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [accent, setAccent] = useState("");   // optional client-colour override (auto-detected from their site if blank)
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
     const d = await fetch(`/api/studio/proposal/latest?strategyId=${strategyId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
@@ -34,6 +36,18 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     setBusy(false);
     if (!r?.ok) { setMsg(r?.error || "Couldn't build the proposal."); return; }
     setMsg(""); setProposal(r.proposal);
+  }
+
+  async function makePdf() {
+    if (!proposal) return;
+    setPdfBusy(true); setMsg("Rendering the branded PDF, this takes a moment…");
+    const r = await fetch(`/api/studio/proposal/pdf`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposalId: proposal.id, accent: accent.trim() || undefined }),
+    }).then((x) => x.json()).catch(() => null);
+    setPdfBusy(false);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't render the PDF."); return; }
+    setMsg(""); setProposal((p) => (p ? { ...p, pdf_url: r.url } : p));
   }
 
   const c = (proposal?.content || null) as ProposalContent | null;
@@ -221,8 +235,22 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
             {(c.investment?.notes || []).map((n, i) => <p key={i} className="mt-2 text-sm text-ink-faint">{n}</p>)}
           </section>
 
-          <div className="rounded-xl border border-line bg-surface-1 p-4 text-sm text-ink-faint">
-            This is the proposal draft for your review. The client-branded PDF (their colours, professional iconography, GAS as Agency of NOW) is the next step, coming shortly.
+          {/* BRANDED PDF - client colours (auto-detected from their site, or override) + GAS as Agency of NOW */}
+          <div className="rounded-xl border border-accent/40 bg-surface-1 p-5">
+            <div className="text-lg font-bold text-ink">The branded document</div>
+            <p className="mt-1 text-base text-ink-dim">Render this as a client-branded PDF for sign-off. The client&apos;s accent colour is detected from their website; override it here if needed.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-ink-dim">
+                Client colour
+                <input type="color" value={accent || "#3a5bd9"} onChange={(e) => setAccent(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-line bg-surface-2" />
+                {accent && <button onClick={() => setAccent("")} className="text-xs text-ink-faint hover:text-ink">auto-detect</button>}
+              </label>
+              <button onClick={makePdf} disabled={pdfBusy} className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                {pdfBusy ? "Rendering…" : proposal?.pdf_url ? "Re-render PDF" : "Generate the PDF"}
+              </button>
+              {proposal?.pdf_url && <a href={proposal.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink-dim hover:text-ink">Download PDF ↓</a>}
+            </div>
+            <p className="mt-2 text-sm text-ink-faint">Reproduces GAS&apos;s standard terms and sign-off. Figures are illustrative, never a guarantee.</p>
           </div>
         </div>
       )}
