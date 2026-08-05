@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { OPUS5, INGEST } from "./vendors/anthropic";
+import { OPUS5, INGEST, withAnthropicRetry } from "./vendors/anthropic";
 import { clientWebsites, siteAnchor, deriveResearchBrief, loadIntelBrief } from "./intel";
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
@@ -520,22 +520,25 @@ export async function collectResearch(
     // GATHER on Opus 4.8, not Fable (Gary's cost call): the gather is search ORCHESTRATION - Opus is elite at it
     // and half Fable's price. The quality Gary benchmarked lives in the FILE, QA and PROSE steps below, which
     // stay on Fable. This is the single biggest line on the desk, so it is where the split pays off.
-    const g = client.messages.stream({
-      // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large). At 8k
-      // with up to 40 searches it truncated mid-search every run - discarding paid searches and, worse, leaving a
-      // dangling tool_use that 400'd the file step. 16k lets the searches we pay for actually land. You only pay
-      // for tokens produced, so this captures value rather than adding cost.
-      model: OPUS5, max_tokens: 16000,
-      system: `${scope}\n\n${FACTS_ONLY}`,
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool],
-      messages: [{ role: "user", content: passBrief }],
+    // Retried on a transient overload (529) / rate limit, so a single Anthropic blip does not kill the whole run.
+    const gathered = await withAnthropicRetry(async () => {
+      const g = client.messages.stream({
+        // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large). At 8k
+        // with up to 40 searches it truncated mid-search every run - discarding paid searches and, worse, leaving a
+        // dangling tool_use that 400'd the file step. 16k lets the searches we pay for actually land. You only pay
+        // for tokens produced, so this captures value rather than adding cost.
+        model: OPUS5, max_tokens: 16000,
+        system: `${scope}\n\n${FACTS_ONLY}`,
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool],
+        messages: [{ role: "user", content: passBrief }],
+      });
+      g.on("contentBlock", (blk) => {
+        const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
+        if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) { searchCount += 1; emit({ t: "search", q: String(b.input.query).slice(0, 160) }); }
+        else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) { sourcesRead += b.content.length; emit({ t: "sources", n: sourcesRead }); }
+      });
+      return await g.finalMessage();
     });
-    g.on("contentBlock", (blk) => {
-      const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
-      if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) { searchCount += 1; emit({ t: "search", q: String(b.input.query).slice(0, 160) }); }
-      else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) { sourcesRead += b.content.length; emit({ t: "sources", n: sourcesRead }); }
-    });
-    const gathered = await g.finalMessage();
     const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
     await recordTokens({ clientId, userEmail, model: OPUS5, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
 
@@ -555,7 +558,7 @@ export async function collectResearch(
     // minimal text turn so the file step still runs (it will file from the user brief and site block).
     if (!gatheredContent.length) gatheredContent = [{ type: "text", text: "Search complete." } as unknown as (typeof rawContent)[number]];
 
-    const filed = await client.messages.stream({
+    const filed = await withAnthropicRetry(() => client.messages.stream({
       model: OPUS5, max_tokens: 32000,
       system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact you actually found as a structured claim via file_facts, up to about 120 claims. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines, and give each well-covered section the depth it has real sourced material for. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
       tools: [
@@ -568,7 +571,7 @@ export async function collectResearch(
         { role: "assistant", content: gatheredContent },
         { role: "user", content: "Now file the material facts you found via file_facts, each with its real source URL, date and tier. Do not search again." },
       ],
-    }).finalMessage();
+    }).finalMessage());
     const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
     await recordTokens({ clientId, userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
     const block = filed.content.find((b) => b.type === "tool_use");
@@ -641,13 +644,13 @@ export async function collectResearch(
     const QA_SCHEMA = { type: "object", additionalProperties: false, properties: { reviews: { type: "array", items: { type: "object", additionalProperties: false, properties: { index: { type: "integer" }, action: { type: "string", enum: ["keep", "drop", "move", "demote"] }, section: { type: "string" }, reason: { type: "string" } }, required: ["index", "action", "section", "reason"] } } }, required: ["reviews"] } as unknown as Anthropic.Tool["input_schema"];
     const list = rawClaims.map((c, i) => `${i}. [section=${c.section} | about: ${c.subject}] ${c.claim}${c.source_url ? ` (src: ${c.source_url})` : " (no source)"}`).join("\n");
     try {
-      const qa = await client.messages.stream({
+      const qa = await withAnthropicRetry(() => client.messages.stream({
         model: OPUS5, max_tokens: 16000,
         system: `You are a ruthless senior research editor. Review a fact base about ${name} before it reaches a marketing strategist and rule on EVERY numbered claim:\n- keep: a correct, relevant fact, correctly placed and correctly attributed (${name}'s OWN fact, or a clearly-labelled competitor fact in a competitor section).\n- drop: WRONG, tangential trivia that will not inform strategy, or MIS-ATTRIBUTED - a fact about a parent, partner or other company presented as ${name}'s own (for example a partner's CEO, size or numbers shown as ${name}'s).\n- move: a real fact in the WRONG section - give the correct section id. Advisers/staff filed under leadership belong in snapshot; a competitor fact outside a competitor section moves to competitor.\n- demote: a load-bearing claim on a single weak or uncorroborated source, or stale data shown as current - give section "unverified".\nValid section ids: ${RESEARCH_SECTIONS.map((s) => s.id).join(", ")}.\nRULES: ${name}'s LEADERSHIP means ${name}'s OWN executives, never a parent or partner's. Be strict about noise, a strategist wants signal not filler.${ceoLock ? ` GROUND TRUTH: ${briefLock?.ceoName} IS ${name}'s ${ceoTitleLock} - always keep that, never drop or demote it, and drop or fix anything that reframes them as only a parent company's executive.` : ""}\nReturn a verdict for EVERY claim index, using the exact index shown.`,
         tools: [{ name: "review", description: "A verdict for every claim.", input_schema: QA_SCHEMA }],
         tool_choice: { type: "tool", name: "review" },
         messages: [{ role: "user", content: `Fact base to review (${rawClaims.length} claims):\n\n${list}` }],
-      }).finalMessage();
+      }).finalMessage());
       const qu = qa.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
       await recordTokens({ clientId, userEmail, model: OPUS5, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
       const qblock = qa.content.find((b) => b.type === "tool_use");

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecret } from "./connections";
 import { db } from "./db";
-import { OPUS5 } from "./vendors/anthropic";
+import { OPUS5, withAnthropicRetry } from "./vendors/anthropic";
 import { meterClaude } from "./usage";
 import {
   ensureEngagement, createCampaign, openCycle, setCycleStatus, createStrategyDraft,
@@ -100,12 +100,12 @@ async function generateStrategyContent(
   const SCHEMA = STRATEGY_CONTENT_SCHEMA as unknown as Anthropic.Tool["input_schema"];
   const tool: Anthropic.Tool = { name: "write_strategy", description: "The single, structured commercial strategy.", input_schema: SCHEMA };
 
-  // 1) DRAFT.
-  const draftMsg = await client.messages.stream({
+  // 1) DRAFT. Retried on a transient Anthropic overload (529) / rate limit.
+  const draftMsg = await withAnthropicRetry(() => client.messages.stream({
     model: OPUS5, max_tokens: 12000, system: STRATEGIST_SYSTEM(clientName),
     tools: [tool], tool_choice: { type: "tool", name: "write_strategy" },
     messages: [{ role: "user", content: user }],
-  }).finalMessage();
+  }).finalMessage());
   await meterClaude(draftMsg, { clientId, userEmail: opts.userEmail ?? null, model: OPUS5, action: "strategy-build" }).catch(() => {});
   let content = extractContent(draftMsg);
   if (!content) throw new Error("The Strategist returned nothing. Try again.");
@@ -113,7 +113,7 @@ async function generateStrategyContent(
   // 2) ADVERSARIAL RED-TEAM. A ruthless strategy director kills any point not grounded in a cited fact, forces a
   //    single proposition, and hardens the KPIs and pre-mortem. This is what turns "plausible" into "defensible".
   try {
-    const advMsg = await client.messages.stream({
+    const advMsg = await withAnthropicRetry(() => client.messages.stream({
       model: OPUS5, max_tokens: 12000,
       system: `You are a ruthless strategy director red-teaming a draft strategy for ${clientName} before it reaches the board. ` +
         `Kill any claim not grounded in a cited Fn fact. Force it to ONE single-minded proposition. Make it decision-forcing, ` +
@@ -121,7 +121,7 @@ async function generateStrategyContent(
         `Return the IMPROVED strategy via write_strategy. UK English, no em dashes.`,
       tools: [tool], tool_choice: { type: "tool", name: "write_strategy" },
       messages: [{ role: "user", content: `Fact base:\n${legend}\n\nDraft strategy to red-team and improve:\n${JSON.stringify(content)}` }],
-    }).finalMessage();
+    }).finalMessage());
     await meterClaude(advMsg, { clientId, userEmail: opts.userEmail ?? null, model: OPUS5, action: "strategy-refine" }).catch(() => {});
     content = extractContent(advMsg) || content;
   } catch { /* red-team is best-effort; the draft still stands */ }

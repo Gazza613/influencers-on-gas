@@ -31,6 +31,34 @@ export const OPUS5 = "claude-opus-5";
 // is paying Opus prices to do OCR.
 export const INGEST = "claude-haiku-4-5";
 
+// TRANSIENT-ERROR RETRY. Anthropic occasionally returns `overloaded_error` (HTTP 529) or a rate limit (429),
+// especially right after a model launch. On a streamed call the SDK does NOT auto-retry a mid-stream error, so a
+// single blip would kill a whole research or strategy run (Gary saw exactly this). This wraps a call and retries
+// the WHOLE thing with exponential backoff + jitter, only for genuinely transient failures - never for a real
+// error like a bad request or an auth/usage-limit problem, which would just waste time and money.
+function isTransientAnthropic(e: unknown): boolean {
+  const status = (e as { status?: number })?.status;
+  if (status && [408, 409, 429, 500, 502, 503, 504, 529].includes(status)) return true;
+  const s = String((e as Error)?.message || e).toLowerCase();
+  return s.includes("overloaded") || s.includes("rate_limit") || s.includes("rate limit") || s.includes("529") || s.includes("503") || s.includes("timeout") || s.includes("econnreset");
+}
+
+export async function withAnthropicRetry<T>(fn: () => Promise<T>, opts: { tries?: number; baseMs?: number } = {}): Promise<T> {
+  const tries = opts.tries ?? 5;
+  const base = opts.baseMs ?? 1500;
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      lastErr = e;
+      if (i === tries - 1 || !isTransientAnthropic(e)) throw e;      // give up after the last try, or on a real error
+      const wait = Math.min(24000, base * 2 ** i) + Math.floor(Math.random() * 600);   // 1.5s, 3s, 6s, 12s, 24s (+jitter)
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+  throw lastErr;
+}
+
 async function client(): Promise<Anthropic> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Co-pilot (Anthropic) is not connected");
