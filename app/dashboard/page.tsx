@@ -184,9 +184,9 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
       },
       {
         name: <>The Strategist</>,
-        href: "/strategist",
+        href: "/strategist/plan",
         mark: <StrategistMark />,
-        blurb: "Weekly market and competitor intelligence. It hunts for what makes a current assumption wrong, then says what to do about it.",
+        blurb: "Turns the Researcher's approved fact base into one single-minded, defensible strategy, every point traced to a fact. You refine and approve at Gate 2.",
         action: "Open the desk",
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
         wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
