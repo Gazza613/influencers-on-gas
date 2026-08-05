@@ -139,6 +139,33 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
             </Block>
           </div>
 
+          {/* AUDIENCE BLUEPRINT - the proof of targeting ability (goes into the proposal). Who + how we reach, never a promised outcome. */}
+          {content.audience && (
+            <section className="rounded-xl border border-accent/40 bg-surface-1 p-5">
+              <div className="text-sm font-semibold uppercase tracking-wide text-accent">The target audience</div>
+              {content.audience.overview && <p className="mt-2 text-base text-ink-dim">{content.audience.overview}</p>}
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {(content.audience.personas || []).map((p, i) => (
+                  <div key={i} className="rounded-lg border border-line bg-surface-2 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-lg font-bold text-ink">{p.label}</span>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${p.fact_id ? "bg-[#4ade80]/15 text-[#86efac]" : "bg-[#fbbf24]/15 text-[#fcd34d]"}`}>{p.fact_id ? "grounded" : "assumption"}</span>
+                    </div>
+                    <p className="mt-1.5 text-sm text-ink-faint"><b className="text-ink-dim">Trigger</b> · {p.trigger}</p>
+                    <p className="mt-0.5 text-sm text-ink-faint"><b className="text-ink-dim">Need</b> · {p.need}</p>
+                    <p className="mt-0.5 text-sm text-ink-faint"><b className="text-ink-dim">Who</b> · {p.who}</p>
+                    {(p.signals || []).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">{p.signals.map((s, j) => <span key={j} className="rounded-full border border-line px-2 py-0.5 text-xs text-ink-dim">{s}</span>)}</div>
+                    )}
+                    <p className="mt-2 text-sm text-ink-dim"><b className="text-ink">Why they convert</b> · {p.propensity}</p>
+                    <p className="mt-1 text-sm text-ink-dim"><b className="text-ink">Angle</b> · {p.angle}</p>
+                    <p className="mt-1.5 text-xs text-ink-faint">Indicative reach · {p.scale}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <Block title="Channel logic">
             <ul className="space-y-1.5">{(content.channel_logic || []).map((c, i) => (
               <li key={i} className="text-base text-ink-dim"><b className="text-ink">{c.channel}</b> · {c.role}</li>

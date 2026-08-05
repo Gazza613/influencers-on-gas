@@ -47,6 +47,15 @@ const STRATEGIST_SYSTEM = (clientName: string) =>
   `confirm, never a confident guess.\n` +
   `- MEASURABLE. Give KPIs with a baseline each (use the fact base where it gives one; else say 'to baseline'), and a ` +
   `real pre-mortem in 'risks' (what would make this fail).\n` +
+  `- AUDIENCE BLUEPRINT (this is the proof of our targeting ability, and it goes into the client proposal). Define 3 ` +
+  `to 5 sharp target personas. For each: the life-moment or buying TRIGGER that puts them in-market, the client ` +
+  `product/NEED it maps to, WHO they are (South African demographics + geography), the intent/interest SIGNALS we ` +
+  `target on (behavioural, contextual, life-event, search), WHY they convert (propensity), the message ANGLE for ` +
+  `them, and an INDICATIVE scale. Ground each persona in the customer/audience/market facts and cite the Fn in ` +
+  `its fact_id. Make these specific and evidenced, not generic, this is what shows the client our data ability.\n` +
+  `- NEVER COMMIT TO AN OUTCOME. Do not promise conversion rates, lead volumes, a return, or a guaranteed result, ` +
+  `anywhere. 'scale' and any figure are INDICATIVE only and must read as illustrative. We define who and how we ` +
+  `reach and how we measure, never what we guarantee.\n` +
   `- Fill 'changes_from_last' ONLY when refining an existing strategy; otherwise return an empty array.\n` +
   `- UK British English. Never use an em dash or en dash: use a comma, a full stop or a plain hyphen.`;
 
@@ -55,14 +64,19 @@ function extractContent(msg: Anthropic.Message): StrategyContent | null {
   return b && b.type === "tool_use" ? (b.input as StrategyContent) : null;
 }
 
-// Map the model's "Fn" citations back to real research_claim ids, so rationale is traceable to the fact store.
+// Map the model's "Fn" citations back to real research_claim ids, so rationale and personas are traceable to the
+// fact store.
 function resolveFactIds(content: StrategyContent, claims: ClaimLite[]): StrategyContent {
-  const rationale = (Array.isArray(content.rationale) ? content.rationale : []).map((r) => {
-    const m = String(r.fact_id ?? "").match(/F?(\d+)/i);
+  const toId = (fid: string | null | undefined): string | null => {
+    const m = String(fid ?? "").match(/F?(\d+)/i);
     const idx = m ? Number(m[1]) - 1 : -1;
-    return { point: String(r.point || ""), fact_id: idx >= 0 && idx < claims.length ? claims[idx].id : null };
-  });
-  return { ...content, rationale };
+    return idx >= 0 && idx < claims.length ? claims[idx].id : null;
+  };
+  const rationale = (Array.isArray(content.rationale) ? content.rationale : []).map((r) => ({ point: String(r.point || ""), fact_id: toId(r.fact_id) }));
+  const audience = content.audience
+    ? { overview: String(content.audience.overview || ""), personas: (Array.isArray(content.audience.personas) ? content.audience.personas : []).map((p) => ({ ...p, fact_id: toId(p.fact_id) })) }
+    : content.audience;
+  return { ...content, rationale, audience };
 }
 
 // Generate (or refine) strategy content from the approved fact base. `notes` folds in the team's edit direction;
@@ -88,7 +102,7 @@ async function generateStrategyContent(
 
   // 1) DRAFT.
   const draftMsg = await client.messages.stream({
-    model: OPUS5, max_tokens: 8000, system: STRATEGIST_SYSTEM(clientName),
+    model: OPUS5, max_tokens: 12000, system: STRATEGIST_SYSTEM(clientName),
     tools: [tool], tool_choice: { type: "tool", name: "write_strategy" },
     messages: [{ role: "user", content: user }],
   }).finalMessage();
@@ -100,7 +114,7 @@ async function generateStrategyContent(
   //    single proposition, and hardens the KPIs and pre-mortem. This is what turns "plausible" into "defensible".
   try {
     const advMsg = await client.messages.stream({
-      model: OPUS5, max_tokens: 8000,
+      model: OPUS5, max_tokens: 12000,
       system: `You are a ruthless strategy director red-teaming a draft strategy for ${clientName} before it reaches the board. ` +
         `Kill any claim not grounded in a cited Fn fact. Force it to ONE single-minded proposition. Make it decision-forcing, ` +
         `not a survey. Ensure every KPI has a baseline and the pre-mortem names the real ways it could fail. Do NOT invent facts. ` +

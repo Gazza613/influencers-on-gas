@@ -29,9 +29,25 @@ export type PillarTag = (typeof PILLAR_TAGS)[number];
 // This is the single most important shape in the ecosystem: each downstream pillar reads the field that is theirs
 // (target -> Audience III, angle/message -> Creative IV, channel_logic -> Channels V, kpis -> Optimisation VIII,
 // sales_ready_def -> PSI VI / Lead Mgmt VII). Every strategic point traces to a fact_id, so it is defensible.
+// One target persona in the Audience Blueprint. This is the PROOF of GAS's targeting ability that goes into the
+// proposal - it defines WHO to reach and HOW, never a promised outcome. `scale` is indicative only (Gary: no
+// commitment on actual outcomes). When Pillar III (Audience Intelligence) is built, it inherits this shape.
+export type AudiencePersona = {
+  label: string;          // e.g. "New-parent protectors"
+  trigger: string;        // the life-moment / buying trigger that puts them in-market
+  need: string;           // the client product/need this persona maps to
+  who: string;            // demographics + geography (SA-specific)
+  signals: string[];      // the intent/interest signals we target on (behavioural, contextual, life-event, search)
+  propensity: string;     // why they convert (the rationale)
+  angle: string;          // the message hook for this persona
+  scale: string;          // INDICATIVE reach only - qualitative or clearly illustrative, never a guaranteed number
+  fact_id: string | null; // traced to a research fact where grounded
+};
+
 export type StrategyContent = {
   proposition: string;                                        // the single-minded core idea
   target: { segment: string; insight: string };              // -> Audience (III)
+  audience: { overview: string; personas: AudiencePersona[] };// the Audience Blueprint (proof of targeting) -> proposal + Audience (III)
   positioning: { promise: string; usps: string[] };          // durable, engagement-level
   angle: string;                                             // the strategic wedge -> Creative (IV)
   message_hierarchy: string[];                               // primary / support / proof -> Creative (IV)
@@ -51,6 +67,32 @@ export const STRATEGY_CONTENT_SCHEMA = {
   properties: {
     proposition: { type: "string", description: "The single-minded core idea. One proposition, never a menu." },
     target: { type: "object", additionalProperties: false, properties: { segment: { type: "string" }, insight: { type: "string" } }, required: ["segment", "insight"] },
+    audience: {
+      type: "object", additionalProperties: false,
+      description: "The Audience Blueprint: proof of our targeting ability. Defines WHO and HOW we reach, never a promised outcome.",
+      properties: {
+        overview: { type: "string", description: "The targeting thesis in one short paragraph: who to reach and why." },
+        personas: {
+          type: "array", description: "3 to 5 sharp target personas.",
+          items: {
+            type: "object", additionalProperties: false,
+            properties: {
+              label: { type: "string" },
+              trigger: { type: "string", description: "the life-moment or buying trigger that puts them in-market" },
+              need: { type: "string", description: "the client product/need this persona maps to" },
+              who: { type: "string", description: "demographics + geography, South Africa-specific" },
+              signals: { type: "array", items: { type: "string" }, description: "the intent/interest signals we target on" },
+              propensity: { type: "string", description: "why they convert" },
+              angle: { type: "string", description: "the message hook for this persona" },
+              scale: { type: "string", description: "INDICATIVE reach only, qualitative or clearly illustrative. Never a guaranteed number." },
+              fact_id: { type: ["string", "null"], description: "the Fn fact grounding this persona, or null." },
+            },
+            required: ["label", "trigger", "need", "who", "signals", "propensity", "angle", "scale", "fact_id"],
+          },
+        },
+      },
+      required: ["overview", "personas"],
+    },
     positioning: { type: "object", additionalProperties: false, properties: { promise: { type: "string" }, usps: { type: "array", items: { type: "string" } } }, required: ["promise", "usps"] },
     angle: { type: "string", description: "The strategic wedge the creative is built from." },
     message_hierarchy: { type: "array", items: { type: "string" }, description: "Primary, support, proof - in order." },
@@ -62,7 +104,7 @@ export const STRATEGY_CONTENT_SCHEMA = {
     risks: { type: "array", items: { type: "string" }, description: "The pre-mortem: what could make this fail." },
     changes_from_last: { type: "array", items: { type: "object", additionalProperties: false, properties: { change: { type: "string" }, because: { type: "string" } }, required: ["change", "because"] }, description: "OPTIMISE mode only: each change and the signal/fact behind it." },
   },
-  required: ["proposition", "target", "positioning", "angle", "message_hierarchy", "channel_logic", "objective", "kpis", "sales_ready_def", "rationale", "risks", "changes_from_last"],
+  required: ["proposition", "target", "audience", "positioning", "angle", "message_hierarchy", "channel_logic", "objective", "kpis", "sales_ready_def", "rationale", "risks", "changes_from_last"],
 } as const;
 
 // ── Row types ────────────────────────────────────────────────────────────────────────────────────────────────
