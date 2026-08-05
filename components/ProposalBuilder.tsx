@@ -127,6 +127,35 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
             <ul className="mt-2 list-disc pl-5 text-base text-ink-dim">{(c.strategy?.why_it_wins || []).map((w, i) => <li key={i}>{w}</li>)}</ul>
           </Blk>
 
+          {/* MARKET INTELLIGENCE - proves industry expertise, incl. non-digital opportunities */}
+          {c.market_intel && (
+            <section className="rounded-xl border border-[#60a5fa]/40 bg-surface-1 p-5">
+              <div className="text-sm font-semibold uppercase tracking-wide text-[#93c5fd]">Market intelligence & opportunities</div>
+              {c.market_intel.overview && <p className="mt-2 text-base text-ink-dim">{c.market_intel.overview}</p>}
+              {(c.market_intel.stats || []).length > 0 && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {c.market_intel.stats.map((s, i) => (
+                    <div key={i} className="rounded-lg border border-line bg-surface-2 p-3">
+                      <div className="text-base font-bold text-ink">{s.stat}</div>
+                      <div className="mt-0.5 text-xs text-ink-faint">{s.source}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(c.market_intel.opportunities || []).length > 0 && (
+                <ul className="mt-3 space-y-2">{c.market_intel.opportunities.map((o, i) => (
+                  <li key={i} className="rounded-lg border border-line bg-surface-2 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-base font-semibold text-ink">{o.insight}</span>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${o.digital ? "bg-[#4ade80]/15 text-[#86efac]" : "bg-[#60a5fa]/15 text-[#93c5fd]"}`}>{o.digital ? "our pods" : "beyond digital"}</span>
+                    </div>
+                    <div className="mt-0.5 text-sm text-ink-dim">{o.why}</div>
+                  </li>
+                ))}</ul>
+              )}
+            </section>
+          )}
+
           {/* CHANNELS - intelligent selection */}
           <Blk title="Channel plan · intelligently selected">
             <p className="text-base text-ink-dim">{c.channels?.rationale}</p>

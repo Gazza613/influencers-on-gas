@@ -53,6 +53,7 @@ const STRATEGIST_SYSTEM = (clientName: string) =>
   `target on (behavioural, contextual, life-event, search), WHY they convert (propensity), the message ANGLE for ` +
   `them, and an INDICATIVE scale. Ground each persona in the customer/audience/market facts and cite the Fn in ` +
   `its fact_id. Make these specific and evidenced, not generic, this is what shows the client our data ability.\n` +
+  `- MARKET OPPORTUNITIES (the deep industry-knowledge layer). Surface 3 to 6 real market opportunities and insights ${clientName} should consider, grounded in the market/activity facts (cite the Fn). INCLUDE opportunities BEYOND digital marketing (set digital:false), a category event, a partnership, a retail or product angle, a gap a competitor has left. This shows we see the whole board and understand the industry, not just the ad account. Never invent one; only real, sourced opportunities.\n` +
   `- NEVER COMMIT TO AN OUTCOME. Do not promise conversion rates, lead volumes, a return, or a guaranteed result, ` +
   `anywhere. 'scale' and any figure are INDICATIVE only and must read as illustrative. We define who and how we ` +
   `reach and how we measure, never what we guarantee.\n` +
@@ -73,10 +74,11 @@ function resolveFactIds(content: StrategyContent, claims: ClaimLite[]): Strategy
     return idx >= 0 && idx < claims.length ? claims[idx].id : null;
   };
   const rationale = (Array.isArray(content.rationale) ? content.rationale : []).map((r) => ({ point: String(r.point || ""), fact_id: toId(r.fact_id) }));
+  const market_opportunities = (Array.isArray(content.market_opportunities) ? content.market_opportunities : []).map((m) => ({ ...m, fact_id: toId(m.fact_id) }));
   const audience = content.audience
     ? { overview: String(content.audience.overview || ""), personas: (Array.isArray(content.audience.personas) ? content.audience.personas : []).map((p) => ({ ...p, fact_id: toId(p.fact_id) })) }
     : content.audience;
-  return { ...content, rationale, audience };
+  return { ...content, rationale, market_opportunities, audience };
 }
 
 // Generate (or refine) strategy content from the approved fact base. `notes` folds in the team's edit direction;

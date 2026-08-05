@@ -56,6 +56,9 @@ export type StrategyContent = {
   kpis: { metric: string; target: string; baseline: string }[];   // the measurement contract -> Optimisation (VIII)
   sales_ready_def: string;                                   // -> PSI (VI) / Lead Mgmt (VII)
   rationale: { point: string; fact_id: string | null }[];    // every claim traced to a fact
+  // Market opportunities the client should consider, INCLUDING ones beyond digital (digital:false) - the deep
+  // industry-knowledge layer that shows GAS sees the whole board. Flows into the proposal's market intelligence.
+  market_opportunities: { insight: string; why_it_matters: string; digital: boolean; fact_id: string | null }[];
   risks: string[];                                           // the pre-mortem
   changes_from_last: { change: string; because: string }[];  // OPTIMISE mode only: what we are changing and why
 };
@@ -101,10 +104,19 @@ export const STRATEGY_CONTENT_SCHEMA = {
     kpis: { type: "array", items: { type: "object", additionalProperties: false, properties: { metric: { type: "string" }, target: { type: "string" }, baseline: { type: "string" } }, required: ["metric", "target", "baseline"] } },
     sales_ready_def: { type: "string", description: "What 'sales-ready' means for this client." },
     rationale: { type: "array", items: { type: "object", additionalProperties: false, properties: { point: { type: "string" }, fact_id: { type: ["string", "null"] } }, required: ["point", "fact_id"] }, description: "Every strategic point traced to a research fact id." },
+    market_opportunities: {
+      type: "array",
+      description: "Market opportunities and industry insights the client should consider, INCLUDING ones beyond digital (set digital:false). The deep industry-knowledge layer. Grounded in the facts, never invented.",
+      items: { type: "object", additionalProperties: false, properties: {
+        insight: { type: "string" }, why_it_matters: { type: "string" },
+        digital: { type: "boolean", description: "true if this is something GAS's pods deliver; false if it is a broader strategic consideration beyond our digital scope." },
+        fact_id: { type: ["string", "null"] },
+      }, required: ["insight", "why_it_matters", "digital", "fact_id"] },
+    },
     risks: { type: "array", items: { type: "string" }, description: "The pre-mortem: what could make this fail." },
     changes_from_last: { type: "array", items: { type: "object", additionalProperties: false, properties: { change: { type: "string" }, because: { type: "string" } }, required: ["change", "because"] }, description: "OPTIMISE mode only: each change and the signal/fact behind it." },
   },
-  required: ["proposition", "target", "audience", "positioning", "angle", "message_hierarchy", "channel_logic", "objective", "kpis", "sales_ready_def", "rationale", "risks", "changes_from_last"],
+  required: ["proposition", "target", "audience", "positioning", "angle", "message_hierarchy", "channel_logic", "objective", "kpis", "sales_ready_def", "rationale", "market_opportunities", "risks", "changes_from_last"],
 } as const;
 
 // ── Row types ────────────────────────────────────────────────────────────────────────────────────────────────

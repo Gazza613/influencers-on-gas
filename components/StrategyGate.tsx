@@ -207,6 +207,22 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
             </Block>
           )}
 
+          {content.market_opportunities?.length > 0 && (
+            <section className="rounded-xl border border-[#60a5fa]/30 bg-surface-1 p-5">
+              <div className="text-sm font-semibold uppercase tracking-wide text-[#93c5fd]">Market opportunities · the whole board</div>
+              <p className="mt-1 text-sm text-ink-faint">Industry insights the client should consider, including beyond our digital scope. These carry into the proposal.</p>
+              <ul className="mt-3 space-y-2">{content.market_opportunities.map((m, i) => (
+                <li key={i} className="rounded-lg border border-line bg-surface-2 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-base font-semibold text-ink">{m.insight}</span>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${m.digital ? "bg-[#4ade80]/15 text-[#86efac]" : "bg-[#60a5fa]/15 text-[#93c5fd]"}`}>{m.digital ? "our pods" : "beyond digital"}</span>
+                  </div>
+                  <div className="mt-0.5 text-sm text-ink-dim">{m.why_it_matters}</div>
+                </li>
+              ))}</ul>
+            </section>
+          )}
+
           <section className="rounded-xl border border-[#f87171]/30 bg-surface-1 p-5">
             <div className="text-sm font-semibold uppercase tracking-wide text-[#fca5a5]">Pre-mortem · risks</div>
             <ul className="mt-2 list-disc pl-5 text-base text-ink-dim">{(content.risks || []).map((r, i) => <li key={i}>{r}</li>)}</ul>

@@ -29,6 +29,9 @@ export type ProposalContent = {
     }[];
   };
   strategy: { proposition: string; angle: string; why_it_wins: string[] };
+  // A market deep-dive that proves industry expertise: recent dated stats + opportunities the client should
+  // consider, INCLUDING non-digital ones (flagged as strategic considerations beyond our pods, not deliverables).
+  market_intel: { overview: string; stats: { stat: string; source: string }[]; opportunities: { insight: string; why: string; digital: boolean }[] };
   channels: { rationale: string; plan: { platform: string; priority: string; role: string; why: string }[] };   // intelligent selection
   pods: { name: string; for_client: string; benefit: string }[];                  // the 8 pods mapped to the client
   funnel: { disclaimer: string; stages: { stage: string; note: string }[] };      // ILLUSTRATIVE only
@@ -75,6 +78,16 @@ const CONTENT_SCHEMA = {
       required: ["overview", "personas"],
     },
     strategy: { type: "object", additionalProperties: false, properties: { proposition: { type: "string" }, angle: { type: "string" }, why_it_wins: { type: "array", items: { type: "string" } } }, required: ["proposition", "angle", "why_it_wins"] },
+    market_intel: {
+      type: "object", additionalProperties: false,
+      description: "A market deep-dive that proves our industry expertise. Recent DATED stats + opportunities, including non-digital ones. Grounded in the research; never fabricate a figure.",
+      properties: {
+        overview: { type: "string", description: "The current state of the client's market, in a short paragraph, using recent facts." },
+        stats: { type: "array", items: { type: "object", additionalProperties: false, properties: { stat: { type: "string", description: "the figure or finding" }, source: { type: "string", description: "source and date/year" } }, required: ["stat", "source"] }, description: "3 to 6 recent, dated, relevant market statistics." },
+        opportunities: { type: "array", items: { type: "object", additionalProperties: false, properties: { insight: { type: "string" }, why: { type: "string" }, digital: { type: "boolean", description: "true if within our pods; false if a broader strategic consideration for the client, beyond our digital scope." } }, required: ["insight", "why", "digital"] }, description: "Opportunities the client should consider, including non-digital ones flagged digital:false as strategic considerations, not deliverables." },
+      },
+      required: ["overview", "stats", "opportunities"],
+    },
     channels: {
       type: "object", additionalProperties: false,
       description: "INTELLIGENT channel selection for THIS objective + audience. Do not list every platform; select and justify.",
@@ -100,7 +113,7 @@ const CONTENT_SCHEMA = {
     compliance: { type: "object", additionalProperties: false, properties: { intro: { type: "string" }, points: { type: "array", items: { type: "string" } } }, required: ["intro", "points"] },
     investment: { type: "object", additionalProperties: false, properties: { tier_name: { type: "string" }, rate: { type: "string" }, engine_includes: { type: "array", items: { type: "string" } }, notes: { type: "array", items: { type: "string" } } }, required: ["tier_name", "rate", "engine_includes", "notes"] },
   },
-  required: ["headline", "subhead", "exec_summary", "opportunity", "audience", "strategy", "channels", "pods", "funnel", "kpis", "rollout", "compliance", "investment"],
+  required: ["headline", "subhead", "exec_summary", "opportunity", "audience", "strategy", "market_intel", "channels", "pods", "funnel", "kpis", "rollout", "compliance", "investment"],
 } as unknown as Anthropic.Tool["input_schema"];
 
 function extract(msg: Anthropic.Message): ProposalContent | null {
@@ -116,6 +129,7 @@ const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)
   `HARD RULES:\n` +
   `- GROUND IN THE FACTS. Use only the approved strategy and research facts provided. Never invent a fact, a name, a number or a market detail.\n` +
   `- USE RECENT MARKET DATA. Where the research gives current, relevant market or category statistics (size, growth, trends, consumer behaviour), weave them into the opportunity and executive summary to show we understand this market NOW, each with its date. Never use a stale or generic stat, and never fabricate one.\n` +
+  `- MARKET INTELLIGENCE SECTION. Include a genuine market deep-dive: recent, dated, relevant stats and the opportunities the client should consider. INCLUDE non-digital opportunities (a category event like a major expo, a partnership, a retail or product angle) flagged as broader strategic considerations for them, not things we are committing to deliver. This proves deep industry knowledge and gives value beyond the digital pods. Draw it from the strategy's market opportunities and the research facts. Only real, sourced insights.\n` +
   `- NEVER COMMIT TO AN OUTCOME. No guaranteed conversion rates, lead volumes or returns anywhere. The funnel economics and any figure are ILLUSTRATIVE benchmarks, clearly labelled, never a promise.\n` +
   `- AUDIENCE IS THE PROOF OF OUR ABILITY, and it is the most important section. For each persona give ACTUAL, credible platform-level targeting selections on the platforms that genuinely fit them (from Facebook, Instagram, TikTok, Google Display, LinkedIn). Facebook/Instagram: interests, behaviours, demographics, custom + lookalike. TikTok: interests, hashtags, creator adjacencies. Google Display: in-market segments, custom-intent keywords, topics. LinkedIn: job titles, seniority, function, industry, company size. Be specific enough that a media buyer could build these audiences.\n` +
   `- CHANNELS: intelligently SELECT the platforms for this objective and audience and justify each, with a lead/support/test priority. Do not reflexively include every platform, choose where the value is.\n` +
