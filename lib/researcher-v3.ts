@@ -382,10 +382,15 @@ export async function collectResearch(
   // than 20 min), refuse to start a second - that is what double-charges when the team "restarts" a run they
   // think died. The in-flight run is finishing on its own.
   const active = (await db().query(
-    `select id, version from research_runs where client_id = $1 and status = 'collecting' and created_at > now() - interval '20 minutes' order by created_at desc limit 1`,
+    `select id, version, extract(epoch from (now()-created_at))::int as age from research_runs where client_id = $1 and status = 'collecting' order by created_at desc limit 1`,
     [clientId],
-  )) as { id: string; version: number }[];
-  if (active[0]) throw new Error(`A research run (v${active[0].version}) is already in progress for this client and will finish on its own, even if you navigate away. Please wait for it rather than starting another.`);
+  )) as { id: string; version: number; age: number }[];
+  // A run still 'collecting' past ~13 min is DEAD (the function's hard time limit), so reclaim it - mark it failed
+  // and let this run proceed. Only a genuinely-in-flight run (younger than that) blocks a second start.
+  if (active[0]) {
+    if (active[0].age < 13 * 60) throw new Error(`A research run (v${active[0].version}) is already in progress for this client and will finish on its own, even if you navigate away. Please wait for it rather than starting another.`);
+    await db().query(`update research_runs set status = 'failed', error = 'Run exceeded the time limit and was stopped.', progress = null where id = $1 and status = 'collecting'`, [active[0].id]).catch(() => {});
+  }
 
   const verRow0 = (await db().query(`select coalesce(max(version),0)+1 as v from research_runs where client_id = $1`, [clientId])) as { v: number }[];
   const version = Number(verRow0[0]?.v) || 1;
@@ -526,7 +531,7 @@ export async function collectResearch(
   // the model files from the actual sources rather than a text summary it does not always write (the 0-claims bug).
   // Streamed (the SDK refuses a 32k non-streaming call), and max_tokens is generous so the forced tool call is
   // never truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
-  const runPass = async (passBrief: string): Promise<FileOut> => {
+  const runPass = async (passBrief: string, maxSearches = 26): Promise<FileOut> => {
     // GATHER on Opus 4.8, not Fable (Gary's cost call): the gather is search ORCHESTRATION - Opus is elite at it
     // and half Fable's price. The quality Gary benchmarked lives in the FILE, QA and PROSE steps below, which
     // stay on Fable. This is the single biggest line on the desk, so it is where the split pays off.
@@ -539,7 +544,7 @@ export async function collectResearch(
         // for tokens produced, so this captures value rather than adding cost.
         model: OPUS5, max_tokens: 16000,
         system: `${scope}\n\n${FACTS_ONLY}`,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool],
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool],
         messages: [{ role: "user", content: passBrief }],
       });
       g.on("contentBlock", (blk) => {
@@ -618,7 +623,7 @@ export async function collectResearch(
   if (gaps.length) {
     emit({ t: "phase", label: `Filling gaps: ${gaps.map((g) => g.id).join(", ")}` });
     const gapBrief = `Targeted follow-up for the ${name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}`).join("\n")}\n\nSearch specifically for these: LinkedIn for the team, their pricing and product pages, their social profiles, their current campaigns.${siteBlock}`;
-    const out2 = await runPass(gapBrief);
+    const out2 = await runPass(gapBrief, 12);   // targeted top-up, not a second full sweep (keeps the run inside the time limit)
     const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
     for (const c of parseClaims(out2)) {
       const k = `${c.section}::${normKey(c.claim)}`;

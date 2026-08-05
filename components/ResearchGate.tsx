@@ -194,6 +194,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           if (d.run.status === "ready") { loadSpend(); if (!d.run.pdf_url) pollDocument(d.run.id); }
           return;
         }
+        // A run still 'collecting' past ~14 min is dead (the function's hard time limit). Stop waiting and say so,
+        // rather than showing "Researching..." forever.
+        const ageMin = (Date.now() - new Date(d.run.created_at).getTime()) / 60000;
+        if (ageMin > 14) {
+          collectPollRef.current = null;
+          setRun({ ...d.run, status: "failed", error: "This run exceeded the time limit and stopped. Nothing was charged for an unsaved result. Run it again." });
+          return;
+        }
       }
     })();
     return () => { live = false; collectPollRef.current = null; };
