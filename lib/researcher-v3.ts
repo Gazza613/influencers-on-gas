@@ -504,7 +504,7 @@ export async function collectResearch(
     loadRecentArticles(websites, 20000).catch(() => ""),
     loadSiteContent(clientId, 16000).catch(() => ""),
   ]);
-  const siteRaw = [corePages, articles, crawled].filter(Boolean).join("\n\n").slice(0, 50000);
+  const siteRaw = [corePages, articles, crawled].filter(Boolean).join("\n\n").slice(0, 34000);
   const siteBlock = siteRaw
     ? `\n\nTHE CLIENT'S OWN WEBSITE, READ FOR YOU (Tier 1, their own channel - "(live)" pages and "(article)" pages were fetched just now, the rest are from our crawl). Take the client's own facts from THIS real content and cite the page URL shown in [brackets] for each. The "(article)" pages are the client's RECENT ARTICLES/BLOG - mine them hard for product launches, positioning and thought leadership (they reveal far more than a homepage). Do not waste searches re-reading their own site, use this. Then web-search for what is NOT here:\n\n${siteRaw}\n`
     : "";
@@ -531,7 +531,7 @@ export async function collectResearch(
   // the model files from the actual sources rather than a text summary it does not always write (the 0-claims bug).
   // Streamed (the SDK refuses a 32k non-streaming call), and max_tokens is generous so the forced tool call is
   // never truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
-  const runPass = async (passBrief: string, maxSearches = 26): Promise<FileOut> => {
+  const runPass = async (passBrief: string, maxSearches = 18): Promise<FileOut> => {
     // GATHER on Opus 4.8, not Fable (Gary's cost call): the gather is search ORCHESTRATION - Opus is elite at it
     // and half Fable's price. The quality Gary benchmarked lives in the FILE, QA and PROSE steps below, which
     // stay on Fable. This is the single biggest line on the desk, so it is where the split pays off.
@@ -574,7 +574,7 @@ export async function collectResearch(
     if (!gatheredContent.length) gatheredContent = [{ type: "text", text: "Search complete." } as unknown as (typeof rawContent)[number]];
 
     const filed = await withAnthropicRetry(() => client.messages.stream({
-      model: OPUS5, max_tokens: 32000,
+      model: OPUS5, max_tokens: 22000,
       system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact you actually found as a structured claim via file_facts, up to about 120 claims. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines, and give each well-covered section the depth it has real sourced material for. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
       tools: [
         { type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool,
@@ -623,7 +623,7 @@ export async function collectResearch(
   if (gaps.length) {
     emit({ t: "phase", label: `Filling gaps: ${gaps.map((g) => g.id).join(", ")}` });
     const gapBrief = `Targeted follow-up for the ${name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}`).join("\n")}\n\nSearch specifically for these: LinkedIn for the team, their pricing and product pages, their social profiles, their current campaigns.${siteBlock}`;
-    const out2 = await runPass(gapBrief, 12);   // targeted top-up, not a second full sweep (keeps the run inside the time limit)
+    const out2 = await runPass(gapBrief, 8);   // targeted top-up, not a second full sweep (keeps the run inside the time limit)
     const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
     for (const c of parseClaims(out2)) {
       const k = `${c.section}::${normKey(c.claim)}`;
@@ -713,12 +713,19 @@ export async function collectResearch(
   // carries the date it claims. For each sourced claim we FETCH the page, read its real date, and check support.
   // A claim whose page 404s or does not support it is NOT dropped (a collector keeps signal) - it is MOVED to the
   // Unverified section with the reason, and the date we store is the one we read off the page.
-  const sourced = rawClaims.filter((c) => c.source_url);
-  if (sourced.length) emit({ t: "phase", label: `Verifying ${sourced.length} source${sourced.length === 1 ? "" : "s"}` });
+  // Verify the load-bearing claims, capped so a big run stays inside the function time limit. Every claim has a
+  // fetch (up to 9s) plus a Haiku call, so verifying 120 is minutes we do not have. We verify the highest-tier
+  // sourced claims first (Tier 1, then 2, then 3), up to a cap; the rest keep their source but stay 'unconfirmed'.
+  const VERIFY_CAP = 55;
+  const toVerify = rawClaims
+    .map((c, i) => ({ c, i }))
+    .filter((x) => x.c.source_url)
+    .sort((a, b) => (a.c.tier ?? 9) - (b.c.tier ?? 9))
+    .slice(0, VERIFY_CAP);
+  if (toVerify.length) emit({ t: "phase", label: `Verifying ${toVerify.length} key source${toVerify.length === 1 ? "" : "s"}` });
   let verifyCalls = 0, vin = 0, vout = 0, vcr = 0, vcc = 0;
   const verdicts = new Map<number, Awaited<ReturnType<typeof verifyFinding>>>();
-  await Promise.all(rawClaims.map(async (c, i) => {
-    if (!c.source_url) return;
+  await Promise.all(toVerify.map(async ({ c, i }) => {
     const v = await verifyFinding(
       { headline: c.claim, detail: c.conflict || "", published_at: c.source_date || "" },
       [{ name: c.source_name || c.source_url!, url: c.source_url! }], client, () => { verifyCalls += 1; },
