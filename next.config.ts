@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
     // Renders the client's deal card as code so a typed (dynamic) deal can be previewed and composited with
     // exact type. Without the browser traced in, the render throws and the deal silently never lands.
     "/api/studio/deal-preview": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
+    // The Research Document and the client-branded Proposal both render to PDF via Chromium (studio-render). Each
+    // route needs the browser binary traced in or the render throws at runtime and the button silently does
+    // nothing (Gary: "final cut not doing anything").
+    "/api/studio/researcher/document": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
+    "/api/studio/proposal/pdf": ["./node_modules/@sparticuz/chromium/bin/**", "./node_modules/puppeteer-core/**"],
   },
   images: {
     // Let the image optimiser fetch + downsize hero images from our two known hosts so the
