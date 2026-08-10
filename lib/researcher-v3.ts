@@ -335,29 +335,192 @@ async function loadSiteContent(clientId: string, maxChars: number): Promise<stri
  * Collect a verified, source-tiered fact base for one client, as a new versioned research_run. Facts only - no
  * analysis ever. Returns the run and its stored claims. onEvent streams live progress for the desk to narrate.
  *
+ * THE COLLECT IS A DURABLE, MULTI-PHASE JOB. Vercel caps a single function invocation at ~13 minutes, and a deep
+ * run on a big client used to hit that ceiling and die mid-flight. So the work is decomposed into PHASES - prepare,
+ * gather, gap-fill, review, verify, store - each its OWN invocation with its own time budget, orchestrated by
+ * Inngest with retries (inngest/research.ts). No single 13-minute ceiling, and each phase can go deeper. The phases
+ * are exported as standalone functions so there is ONE implementation, driven two ways: the durable Inngest
+ * orchestrator, and the inline collectResearch below (single-process, kept as a fallback and for tests).
+ *
  * @param notes optional Gate-1 "rerun with notes" corrections, folded into this version's brief.
  * @param focus optional up-front steer for THIS run (e.g. specific suburbs, a product line, a region). It adds
  *   emphasis and dedicated depth, but never overrides facts-only, the no-fabrication lock, or the always-collect items.
  */
-export async function collectResearch(
-  clientId: string,
-  today: string,
-  opts: { userEmail?: string | null; notes?: string | null; focus?: string | null; onEvent?: (e: CollectEvent) => void } = {},
-): Promise<{ run: ResearchRun; claims: ResearchClaim[] }> {
-  const { userEmail, notes, focus } = opts;
-  // emit fans out to the live SSE (onEvent) AND, once the run row exists, mirrors progress into the DB (sink) so a
-  // user who navigates away and returns still sees where the durable run is.
-  let progressSink: ((e: CollectEvent) => void) | null = null;
-  const emit = (e: CollectEvent) => {
-    try { opts.onEvent?.(e); } catch { /* progress is best-effort */ }
-    try { progressSink?.(e); } catch { /* mirror is best-effort */ }
+
+// The serializable context every phase needs. It crosses Inngest step boundaries (JSON only - no Anthropic client,
+// no closures), so each phase rebuilds the Anthropic client from the secret and opens its own DB handle.
+export type ResearchCtx = {
+  clientId: string; today: string; userEmail: string | null;
+  runId: string; version: number;
+  name: string; website: string | null;
+  scope: string; brief: string; siteBlock: string;
+  ceoName: string | null; ceoTitle: string; hasCeoLock: boolean;
+  rejectedFacts: string[]; deadProducts: string[];
+  knownCompetitors: { name: string; website: string | null }[];
+};
+
+type FileOut = { claims?: Record<string, unknown>[]; competitors?: { name?: string; website?: string }[]; vertical?: string; regulated?: boolean; identity?: Record<string, unknown> };
+export type RawClaim = {
+  section: string; subject: string; claim: string;
+  source_name: string | null; source_url: string | null; source_date: string | null;
+  tier: number; unverified_reason: string | null; conflict: string | null;
+};
+type VerifiedClaim = RawClaim & { verified: boolean };
+
+// A collecting run older than this is treated as dead (the durable job hung, or a deploy died mid-run), so a fresh
+// start reclaims it and the UI stops waiting. Runs span many invocations now, so this is generous - far longer than
+// any healthy run - and Inngest's own onFailure marks a truly failed run 'failed' long before this backstop bites.
+const RUN_STALL_SECONDS = 45 * 60;
+
+// PROGRESS MIRROR. With the collect decoupled from any open request, the UI learns where a run is by polling the
+// run's `progress` column. Every phase writes its label (and running counts) through this sink, throttled so a burst
+// of search events is not a write storm. onEvent (the inline path) also fans out to a live SSE if one is open.
+export function makeResearchProgress(runId: string, onEvent?: (e: CollectEvent) => void): (e: CollectEvent) => void {
+  let lastProg = 0, sources = 0, filed = 0, label = "Starting";
+  return (e: CollectEvent) => {
+    try { onEvent?.(e); } catch { /* progress is best-effort */ }
+    if (e.t === "sources") sources = e.n;
+    else if (e.t === "claim") filed += 1;
+    else if (e.t === "phase") label = e.label;
+    const now = Date.now();
+    if (now - lastProg < 1500 && e.t !== "phase") return;   // throttle, but a phase change always writes through
+    lastProg = now;
+    void db().query(`update research_runs set progress = $2 where id = $1`, [runId, JSON.stringify({ label, sources, filed })]).catch(() => {});
   };
+}
+
+// Shape the file tool output into claims (used by the broad pass and the gap pass).
+function parseClaims(name: string, o: { claims?: Record<string, unknown>[] }): RawClaim[] {
+  return (Array.isArray(o.claims) ? o.claims : [])
+    .map((c) => ({
+      section: SECTION_IDS.has(String(c.section) as ResearchSectionId) ? String(c.section) : "snapshot",
+      subject: noDash(c.subject).slice(0, 200) || name,
+      claim: noDash(c.claim).slice(0, 2000),
+      source_name: noDash(c.source_name).slice(0, 200) || null,
+      source_url: typeof c.source_url === "string" && /^https?:\/\//i.test(c.source_url) ? c.source_url : null,
+      source_date: toISODate(c.source_date),
+      tier: [1, 2, 3].includes(Number(c.tier)) ? Number(c.tier) : 3,
+      unverified_reason: noDash(c.unverified_reason).slice(0, 500) || null,
+      conflict: noDash(c.conflict).slice(0, 500) || null,
+    }))
+    .filter((c) => c.claim.length > 0);
+}
+
+// A small concurrency pool. Verify fetches many pages, and firing all of them at once would hammer the network.
+async function pooledForEach<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let idx = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    while (idx < items.length) { const i = idx++; await fn(items[i]); }
+  });
+  await Promise.all(workers);
+}
+
+async function anthropicClient(): Promise<Anthropic> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
-  const client = new Anthropic({ apiKey: key });
+  return new Anthropic({ apiKey: key });
+}
 
-  // Identity + ground-truth anchor. A name is the minimum; the website is what stops us researching a same-named
-  // but different business (Gary, material). deriveResearchBrief gives us the client's own crawled material too.
+// ONE gather+file cycle. Gathers wide (web_search) with the crawled site in context, then files from the REAL
+// results by CONTINUING the conversation - the gather's assistant turn carries every web_search result block, so the
+// model files from the actual sources rather than a text summary it does not always write (the 0-claims bug).
+// Streamed (the SDK refuses a large non-streaming call), and max_tokens is generous so the forced tool call is never
+// truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
+async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: string, maxSearches: number, emit: (e: CollectEvent) => void): Promise<FileOut> {
+  let sourcesRead = 0;
+  // GATHER on Opus 5 (Gary's cost call): the gather is search ORCHESTRATION - Opus is elite at it and half Fable's
+  // price. Retried on a transient overload (529) / rate limit, so a single Anthropic blip does not kill the run.
+  const gathered = await withAnthropicRetry(async () => {
+    const g = client.messages.stream({
+      // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large). At 8k it
+      // truncated mid-search - discarding paid searches and leaving a dangling tool_use that 400'd the file step.
+      model: OPUS5, max_tokens: 16000,
+      system: `${ctx.scope}\n\n${FACTS_ONLY}`,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool],
+      messages: [{ role: "user", content: passBrief }],
+    });
+    g.on("contentBlock", (blk) => {
+      const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
+      if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) { emit({ t: "search", q: String(b.input.query).slice(0, 160) }); }
+      else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) { sourcesRead += b.content.length; emit({ t: "sources", n: sourcesRead }); }
+    });
+    return await g.finalMessage();
+  });
+  const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
+
+  // SANITISE THE GATHER TURN before replaying it into the file step. If the gather hit max_tokens WHILE a web_search
+  // was in flight, its assistant content ends with a `server_tool_use` that has no matching `web_search_tool_result`
+  // - and replaying that turn is a hard 400. We drop any search request that never got a result.
+  const rawContent = Array.isArray(gathered.content) ? gathered.content : [];
+  const resultFor = new Set(rawContent.filter((b) => (b as { type: string }).type === "web_search_tool_result").map((b) => (b as { tool_use_id?: string }).tool_use_id));
+  let gatheredContent = rawContent.filter((b) => {
+    const bb = b as { type: string; name?: string; id?: string };
+    if (bb.type === "server_tool_use" && bb.name === "web_search") return resultFor.has(bb.id);
+    return true;
+  });
+  // An assistant turn must not be empty (the API rejects it). If sanitising removed everything, replay a minimal
+  // text turn so the file step still runs (it files from the user brief and site block).
+  if (!gatheredContent.length) gatheredContent = [{ type: "text", text: "Search complete." } as unknown as (typeof rawContent)[number]];
+
+  const filed = await withAnthropicRetry(() => client.messages.stream({
+    model: OPUS5, max_tokens: 22000,
+    system: `${ctx.scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact you actually found as a structured claim via file_facts, up to about 120 claims. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines, and give each well-covered section the depth it has real sourced material for. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
+    tools: [
+      { type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool,
+      { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
+    ],
+    tool_choice: { type: "tool", name: "file_facts" },
+    messages: [
+      { role: "user", content: passBrief },
+      { role: "assistant", content: gatheredContent },
+      { role: "user", content: "Now file the material facts you found via file_facts, each with its real source URL, date and tier. Do not search again." },
+    ],
+  }).finalMessage());
+  const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+  const block = filed.content.find((b) => b.type === "tool_use");
+  return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
+}
+
+// ==== THE PHASES (each its own Inngest step / invocation) ======================================================
+
+/**
+ * GUARD + CREATE. Called synchronously by the collect route so the user gets an immediate answer: a friendly refusal
+ * if a run is already in flight, or a new run row to poll. Returns the runId + version; the heavy work then runs as a
+ * durable Inngest job. Kept fast - only the concurrency check, the version, and the row insert.
+ */
+export async function startResearchRun(clientId: string, opts: { userEmail?: string | null; notes?: string | null } = {}): Promise<{ runId: string; version: number }> {
+  const derived = await deriveResearchBrief(clientId);
+  if (!derived) throw new Error("This brain has nothing to research yet. Add the client and crawl their site into the brain first.");
+  // CONCURRENCY GUARD: refuse a second start if a collect for this client is genuinely in flight. A run spans many
+  // invocations now, so "in flight" is a generous window; only a run older than that is treated as dead and reclaimed.
+  const active = (await db().query(
+    `select id, version, extract(epoch from (now()-created_at))::int as age from research_runs where client_id = $1 and status = 'collecting' order by created_at desc limit 1`,
+    [clientId],
+  )) as { id: string; version: number; age: number }[];
+  if (active[0]) {
+    if (active[0].age < RUN_STALL_SECONDS) throw new Error(`A research run (v${active[0].version}) is already in progress for this client and will finish on its own, even if you navigate away. Please wait for it rather than starting another.`);
+    await db().query(`update research_runs set status = 'failed', error = 'Run exceeded the time limit and was stopped.', progress = null where id = $1 and status = 'collecting'`, [active[0].id]).catch(() => {});
+  }
+  const websites = await clientWebsites(clientId).catch(() => [] as string[]);
+  const website = websites[0] || null;
+  const verRow0 = (await db().query(`select coalesce(max(version),0)+1 as v from research_runs where client_id = $1`, [clientId])) as { v: number }[];
+  const version = Number(verRow0[0]?.v) || 1;
+  const startRows = (await db().query(
+    `insert into research_runs (client_id, version, status, website, notes, user_email)
+     values ($1,$2,'collecting',$3,$4,$5) returning id`,
+    [clientId, version, website, opts.notes?.trim()?.slice(0, 2000) || null, opts.userEmail || null],
+  )) as { id: string }[];
+  return { runId: startRows[0].id, version };
+}
+
+/** PHASE: prepare. Build the full research context (locks, prompts, the client's own site read for real). */
+export async function prepareResearch(clientId: string, runId: string, version: number, today: string, opts: { userEmail?: string | null; notes?: string | null; focus?: string | null } = {}): Promise<ResearchCtx> {
+  const { userEmail, notes, focus } = opts;
+
+  // Identity + ground-truth anchor. A name is the minimum; the website is what stops us researching a same-named but
+  // different business (Gary, material). deriveResearchBrief gives us the client's own crawled material too.
   const derived = await deriveResearchBrief(clientId);
   if (!derived) throw new Error("This brain has nothing to research yet. Add the client and crawl their site into the brain first.");
   const name = derived.clientName;
@@ -375,50 +538,8 @@ export async function collectResearch(
     ? `\n\nKNOWN SOCIAL ACCOUNTS (the GAS team supplied these - they ARE ${name}'s, mine EACH one): ${socials.join(", ")}.\nFor each, capture the platform + handle (section=contact), and mine it for posting CADENCE, the CONTENT themes and campaigns they run, engagement signals, and who their AUDIENCE appears to be (sections=marketing/audience/activity). The most RECENT posts define their current positioning and marketing, so lead with those.`
     : "";
 
-  // DURABLE RUN (Gary: navigating away lost the run and wasted the spend). We create the run row NOW, status
-  // 'collecting', and the route keeps the work alive past a browser disconnect (waitUntil). Two payoffs: the work
-  // reaches the store step even if the tab is closed (no wasted cost), and a returning user sees a run in
-  // progress. CONCURRENCY GUARD: if a collect for this client is already in flight (a 'collecting' run younger
-  // than 20 min), refuse to start a second - that is what double-charges when the team "restarts" a run they
-  // think died. The in-flight run is finishing on its own.
-  const active = (await db().query(
-    `select id, version, extract(epoch from (now()-created_at))::int as age from research_runs where client_id = $1 and status = 'collecting' order by created_at desc limit 1`,
-    [clientId],
-  )) as { id: string; version: number; age: number }[];
-  // A run still 'collecting' past ~13 min is DEAD (the function's hard time limit), so reclaim it - mark it failed
-  // and let this run proceed. Only a genuinely-in-flight run (younger than that) blocks a second start.
-  if (active[0]) {
-    if (active[0].age < 13 * 60) throw new Error(`A research run (v${active[0].version}) is already in progress for this client and will finish on its own, even if you navigate away. Please wait for it rather than starting another.`);
-    await db().query(`update research_runs set status = 'failed', error = 'Run exceeded the time limit and was stopped.', progress = null where id = $1 and status = 'collecting'`, [active[0].id]).catch(() => {});
-  }
-
-  const verRow0 = (await db().query(`select coalesce(max(version),0)+1 as v from research_runs where client_id = $1`, [clientId])) as { v: number }[];
-  const version = Number(verRow0[0]?.v) || 1;
-  const startRows = (await db().query(
-    `insert into research_runs (client_id, version, status, website, notes, user_email)
-     values ($1,$2,'collecting',$3,$4,$5) returning id`,
-    [clientId, version, website, notes?.trim()?.slice(0, 2000) || null, userEmail || null],
-  )) as { id: string }[];
-  const runId = startRows[0].id;
-  emit({ t: "start", runId, version });
-  // Throttled progress mirror to the DB, so a user who navigates away and back sees where the run is.
-  let lastProg = 0, progSources = 0, progFiled = 0, progLabel = "Starting";
-  const saveProgress = async (label?: string) => {
-    if (label) progLabel = label;
-    const now = Date.now();
-    if (now - lastProg < 1500 && !label) return;
-    lastProg = now;
-    await db().query(`update research_runs set progress = $2 where id = $1`, [runId, JSON.stringify({ label: progLabel, sources: progSources, filed: progFiled })]).catch(() => {});
-  };
-  progressSink = (e) => {
-    if (e.t === "sources") progSources = e.n;
-    else if (e.t === "claim") progFiled += 1;
-    void saveProgress(e.t === "phase" ? e.label : undefined);
-  };
-
-  // LOCKED GROUND TRUTH the GAS team supplied (Gary): the CEO / senior leadership. This OVERRIDES anything the
-  // web says - the team knows their client. It was being ignored (the collector rediscovered leadership from
-  // scratch), which is why a locked CEO did not appear. Injected into the scope so both passes treat it as fact.
+  // LOCKED GROUND TRUTH the GAS team supplied (Gary): the CEO / senior leadership. This OVERRIDES anything the web
+  // says - the team knows their client. Injected into the scope so every pass treats it as fact.
   const briefLock = await loadIntelBrief(clientId).catch(() => null);
   const ceoTitleLock = briefLock?.ceoTitle || "Chief Executive Officer";
   const ceoLock = briefLock?.ceoName
@@ -452,9 +573,9 @@ export async function collectResearch(
       `Either way it never loosens the rules: only real, sourced facts, never anything invented to satisfy the focus.`
     : "";
 
-  // DO NOT REFERENCE (Gary): facts the team REJECTED in any past review are a permanent block-list for this
-  // client. We tell the model never to surface them again AND filter them out in code below, so a rejected fact
-  // can never come back on a rerun.
+  // DO NOT REFERENCE (Gary): facts the team REJECTED in any past review are a permanent block-list for this client.
+  // We tell the model never to surface them again AND filter them out in code (the review phase), so a rejected
+  // fact can never come back on a rerun.
   const rejectedFacts = await loadRejectedFacts(clientId).catch(() => [] as string[]);
   const rejectBlock = rejectedFacts.length
     ? `\n\nDO NOT REFERENCE - the GAS team REJECTED these facts in a previous review. Never surface them again, and drop anything that means the same thing:\n${rejectedFacts.slice(0, 50).map((r) => `- ${r.slice(0, 200)}`).join("\n")}`
@@ -462,7 +583,7 @@ export async function collectResearch(
 
   // RETIRED PRODUCTS (Gary, ground truth): products the client has DISCONTINUED but not yet scrubbed from its own
   // site. They will still appear on the live site and in old articles - the model must treat them as legacy and
-  // NEVER present them as current or reference them. We tell it here AND hard-drop any claim naming one below.
+  // NEVER present them as current. We tell it here AND hard-drop any claim naming one (the review phase).
   const deadProducts = briefLock?.deprecatedProducts?.length ? briefLock.deprecatedProducts : [];
   const deprecatedLock = deadProducts.length
     ? `\n\nRETIRED PRODUCTS - GROUND TRUTH from the ${name} team, this OVERRIDES the website. These products are DISCONTINUED and are only still on the site by oversight: ${deadProducts.join(", ")}. NEVER present them as current, NEVER list them as ${name}'s products or services, and do NOT reference them at all - not even as "formerly" or "legacy". If a page or article mentions them, ignore that part. ${name}'s current, primary system is what the RECENT content promotes - lead with that.`
@@ -509,95 +630,23 @@ export async function collectResearch(
     ? `\n\nTHE CLIENT'S OWN WEBSITE, READ FOR YOU (Tier 1, their own channel - "(live)" pages and "(article)" pages were fetched just now, the rest are from our crawl). Take the client's own facts from THIS real content and cite the page URL shown in [brackets] for each. The "(article)" pages are the client's RECENT ARTICLES/BLOG - mine them hard for product launches, positioning and thought leadership (they reveal far more than a homepage). Do not waste searches re-reading their own site, use this. Then web-search for what is NOT here:\n\n${siteRaw}\n`
     : "";
 
-  // Shape the file tool output into claims (used by the first pass and the gap pass).
-  const parseClaims = (o: { claims?: Record<string, unknown>[] }) => (Array.isArray(o.claims) ? o.claims : [])
-    .map((c) => ({
-      section: SECTION_IDS.has(String(c.section) as ResearchSectionId) ? String(c.section) : "snapshot",
-      subject: noDash(c.subject).slice(0, 200) || name,
-      claim: noDash(c.claim).slice(0, 2000),
-      source_name: noDash(c.source_name).slice(0, 200) || null,
-      source_url: typeof c.source_url === "string" && /^https?:\/\//i.test(c.source_url) ? c.source_url : null,
-      source_date: toISODate(c.source_date),
-      tier: [1, 2, 3].includes(Number(c.tier)) ? Number(c.tier) : 3,
-      unverified_reason: noDash(c.unverified_reason).slice(0, 500) || null,
-      conflict: noDash(c.conflict).slice(0, 500) || null,
-    }))
-    .filter((c) => c.claim.length > 0);
-
-  let sourcesRead = 0, searchCount = 0;
-  type FileOut = { claims?: Record<string, unknown>[]; competitors?: { name?: string; website?: string }[]; vertical?: string; regulated?: boolean; identity?: Record<string, unknown> };
-  // ONE gather+file cycle. Gathers wide (web_search) with the crawled site in context, then files from the REAL
-  // results by CONTINUING the conversation - the gather's assistant turn carries every web_search result block, so
-  // the model files from the actual sources rather than a text summary it does not always write (the 0-claims bug).
-  // Streamed (the SDK refuses a 32k non-streaming call), and max_tokens is generous so the forced tool call is
-  // never truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
-  const runPass = async (passBrief: string, maxSearches = 18): Promise<FileOut> => {
-    // GATHER on Opus 4.8, not Fable (Gary's cost call): the gather is search ORCHESTRATION - Opus is elite at it
-    // and half Fable's price. The quality Gary benchmarked lives in the FILE, QA and PROSE steps below, which
-    // stay on Fable. This is the single biggest line on the desk, so it is where the split pays off.
-    // Retried on a transient overload (529) / rate limit, so a single Anthropic blip does not kill the whole run.
-    const gathered = await withAnthropicRetry(async () => {
-      const g = client.messages.stream({
-        // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large). At 8k
-        // with up to 40 searches it truncated mid-search every run - discarding paid searches and, worse, leaving a
-        // dangling tool_use that 400'd the file step. 16k lets the searches we pay for actually land. You only pay
-        // for tokens produced, so this captures value rather than adding cost.
-        model: OPUS5, max_tokens: 16000,
-        system: `${scope}\n\n${FACTS_ONLY}`,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool],
-        messages: [{ role: "user", content: passBrief }],
-      });
-      g.on("contentBlock", (blk) => {
-        const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
-        if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) { searchCount += 1; emit({ t: "search", q: String(b.input.query).slice(0, 160) }); }
-        else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) { sourcesRead += b.content.length; emit({ t: "sources", n: sourcesRead }); }
-      });
-      return await g.finalMessage();
-    });
-    const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
-    await recordTokens({ clientId, userEmail, model: OPUS5, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
-
-    // SANITISE THE GATHER TURN before replaying it into the file step. If the gather hit max_tokens WHILE a
-    // web_search was in flight, its assistant content ends with a `server_tool_use` that has no matching
-    // `web_search_tool_result` - and replaying that turn is a hard 400 ("web_search tool use ... without a
-    // corresponding web_search_tool_result block"). We drop any search request that never got a result, so the
-    // continuation is always valid. (We only lose the one truncated search's results, which never arrived anyway.)
-    const rawContent = Array.isArray(gathered.content) ? gathered.content : [];
-    const resultFor = new Set(rawContent.filter((b) => (b as { type: string }).type === "web_search_tool_result").map((b) => (b as { tool_use_id?: string }).tool_use_id));
-    let gatheredContent = rawContent.filter((b) => {
-      const bb = b as { type: string; name?: string; id?: string };
-      if (bb.type === "server_tool_use" && bb.name === "web_search") return resultFor.has(bb.id);
-      return true;
-    });
-    // An assistant turn must not be empty (the API rejects it). If sanitising removed everything, replay a
-    // minimal text turn so the file step still runs (it will file from the user brief and site block).
-    if (!gatheredContent.length) gatheredContent = [{ type: "text", text: "Search complete." } as unknown as (typeof rawContent)[number]];
-
-    const filed = await withAnthropicRetry(() => client.messages.stream({
-      model: OPUS5, max_tokens: 22000,
-      system: `${scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact you actually found as a structured claim via file_facts, up to about 120 claims. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines, and give each well-covered section the depth it has real sourced material for. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Where two sources disagree, record both and note the conflict.`,
-      tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool,
-        { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
-      ],
-      tool_choice: { type: "tool", name: "file_facts" },
-      messages: [
-        { role: "user", content: passBrief },
-        { role: "assistant", content: gatheredContent },
-        { role: "user", content: "Now file the material facts you found via file_facts, each with its real source URL, date and tier. Do not search again." },
-      ],
-    }).finalMessage());
-    const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-    await recordTokens({ clientId, userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
-    const block = filed.content.find((b) => b.type === "tool_use");
-    return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
+  return {
+    clientId, today, userEmail: userEmail ?? null, runId, version,
+    name, website, scope, brief, siteBlock,
+    ceoName: briefLock?.ceoName ?? null, ceoTitle: ceoTitleLock, hasCeoLock: !!briefLock?.ceoName,
+    rejectedFacts, deadProducts, knownCompetitors,
   };
+}
 
-  emit({ t: "phase", label: `Collecting facts on ${name}` });
-  const out = await runPass(brief + siteBlock);
+/** PHASE: gather (pass 1). The broad sweep - gather wide, then file from the real results. Restored to 26 searches
+ *  (was trimmed to 18 to fit the old single-invocation limit; each phase has its own budget now, so it goes deep). */
+export async function researchGatherPass1(ctx: ResearchCtx, emit: (e: CollectEvent) => void): Promise<{ rawClaims: RawClaim[]; competitors: { name?: string; website?: string }[]; vertical: string | null; identity: ResearchIdentity }> {
+  const client = await anthropicClient();
+  emit({ t: "phase", label: `Collecting facts on ${ctx.name}` });
+  const out = await gatherAndFile(client, ctx, ctx.brief + ctx.siteBlock, 26, emit);
   const vertical = noDash(out.vertical).slice(0, 80) || null;
   const idIn = (out.identity || {}) as Record<string, unknown>;
-  const identity = {
+  const identity: ResearchIdentity = {
     legal_name: noDash(idIn.legal_name).slice(0, 200) || null,
     licence: noDash(idIn.licence).slice(0, 120) || null,
     address: noDash(idIn.address).slice(0, 300) || null,
@@ -605,11 +654,13 @@ export async function collectResearch(
     contact_person: noDash(idIn.contact_person).slice(0, 200) || null,
     contact_details: noDash(idIn.contact_details).slice(0, 200) || null,
   };
-  const rawClaims = parseClaims(out);
+  const rawClaims = parseClaims(ctx.name, out);
+  return { rawClaims, competitors: Array.isArray(out.competitors) ? out.competitors : [], vertical, identity };
+}
 
-  // COMPLETENESS PASS (Gary: never hand the Strategist a half-complete brief). Audit the mandatory sections; if
-  // any came back thin, do ONE targeted follow-up that digs only on the gaps, then merge (deduped). Capped at one
-  // extra pass to keep cost bounded.
+/** PHASE: gap-fill. Audit the mandatory sections; if any came back thin, ONE targeted top-up, then merge (deduped). */
+export async function researchGapFill(ctx: ResearchCtx, rawClaimsIn: RawClaim[], competitorsIn: { name?: string; website?: string }[], emit: (e: CollectEvent) => void): Promise<{ rawClaims: RawClaim[]; competitors: { name?: string; website?: string }[] }> {
+  // Never hand the Strategist a half-complete brief (Gary): the mandatory sections must have real depth.
   const MANDATORY: { id: string; need: string; min: number }[] = [
     { id: "leadership", need: "the management and executive team - names, roles and short backgrounds (use LinkedIn)", min: 2 },
     { id: "products", need: "products/services, pricing where public, and the commercial model", min: 2 },
@@ -619,55 +670,62 @@ export async function collectResearch(
     { id: "marketing", need: "their own current marketing and advertising activity", min: 1 },
     { id: "competitor_set", need: "a factual profile of each competitor", min: 2 },
   ];
-  const gaps = MANDATORY.filter((m) => rawClaims.filter((c) => c.section === m.id).length < m.min);
-  if (gaps.length) {
-    emit({ t: "phase", label: `Filling gaps: ${gaps.map((g) => g.id).join(", ")}` });
-    const gapBrief = `Targeted follow-up for the ${name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}`).join("\n")}\n\nSearch specifically for these: LinkedIn for the team, their pricing and product pages, their social profiles, their current campaigns.${siteBlock}`;
-    const out2 = await runPass(gapBrief, 8);   // targeted top-up, not a second full sweep (keeps the run inside the time limit)
-    const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
-    for (const c of parseClaims(out2)) {
-      const k = `${c.section}::${normKey(c.claim)}`;
-      if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
-    }
-    if (Array.isArray(out2.competitors)) out.competitors = [...(out.competitors || []), ...out2.competitors];
+  const gaps = MANDATORY.filter((m) => rawClaimsIn.filter((c) => c.section === m.id).length < m.min);
+  if (!gaps.length) return { rawClaims: rawClaimsIn, competitors: competitorsIn };
+  const client = await anthropicClient();
+  emit({ t: "phase", label: `Filling gaps: ${gaps.map((g) => g.id).join(", ")}` });
+  const gapBrief = `Targeted follow-up for the ${ctx.name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}`).join("\n")}\n\nSearch specifically for these: LinkedIn for the team, their pricing and product pages, their social profiles, their current campaigns.${ctx.siteBlock}`;
+  const out2 = await gatherAndFile(client, ctx, gapBrief, 12, emit);   // targeted top-up; its own step budget, so a touch deeper than before
+  const rawClaims = [...rawClaimsIn];
+  const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
+  for (const c of parseClaims(ctx.name, out2)) {
+    const k = `${c.section}::${normKey(c.claim)}`;
+    if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
   }
+  const competitors = Array.isArray(out2.competitors) ? [...competitorsIn, ...out2.competitors] : competitorsIn;
+  return { rawClaims, competitors };
+}
 
-  // Enforce the do-not-reference block-list in code (the prompt asks, this guarantees): a rerun can never bring
-  // back a fact the team rejected.
-  if (rejectedFacts.length) {
-    const rejSet = new Set(rejectedFacts.map(normKey));
+/** PHASE: review. Enforce the block-lists (rejected facts + retired products), red-team the base (QA), register gaps. */
+export async function researchReview(ctx: ResearchCtx, rawClaimsIn: RawClaim[], emit: (e: CollectEvent) => void): Promise<RawClaim[]> {
+  const rawClaims = [...rawClaimsIn];
+
+  // Enforce the do-not-reference block-list in code (the prompt asks, this guarantees): a rerun can never bring back
+  // a fact the team rejected.
+  if (ctx.rejectedFacts.length) {
+    const rejSet = new Set(ctx.rejectedFacts.map(normKey));
     for (let i = rawClaims.length - 1; i >= 0; i--) if (rejSet.has(normKey(rawClaims[i].claim))) rawClaims.splice(i, 1);
   }
 
   // Enforce the RETIRED-PRODUCTS lock in code (guarantee, not just a prompt ask): drop any claim that names a
-  // discontinued product, so a stale site page or old article can never resurface it. Word-boundary + collapsed
-  // punctuation so "INGAiGE", "INGAIGE" and "IN-GAiGE" all match. Subject-only mentions go too.
-  if (deadProducts.length) {
+  // discontinued product, so a stale site page or old article can never resurface it. Collapsed punctuation so
+  // "INGAiGE", "INGAIGE" and "IN-GAiGE" all match. Subject-only mentions go too.
+  if (ctx.deadProducts.length) {
     const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-    const dead = deadProducts.map(clean).filter(Boolean);
+    const dead = ctx.deadProducts.map(clean).filter(Boolean);
     const hit = (s: string | null) => { const t = clean(s || ""); return dead.some((d) => t.includes(d)); };
     for (let i = rawClaims.length - 1; i >= 0; i--) if (hit(rawClaims[i].claim) || hit(rawClaims[i].subject)) rawClaims.splice(i, 1);
   }
 
   // ADVERSARIAL QA PASS (Gary). Before Gate 1, a ruthless senior-editor pass red-teams the fact base and catches
-  // what a human reviewer would: facts MIS-ATTRIBUTED to the client (a parent/partner's CEO or numbers shown as
-  // the client's own), advisers filed as leadership, tangential trivia, and load-bearing claims on a single weak
-  // source. It DROPS / MOVES / DEMOTES bad claims so the base is clean BEFORE it reaches you. This is what turns
-  // "you catch the misses" into "it catches its own". Best-effort - it never blocks the run.
+  // what a human reviewer would: facts MIS-ATTRIBUTED to the client (a parent/partner's CEO or numbers shown as the
+  // client's own), advisers filed as leadership, tangential trivia, and load-bearing claims on a single weak source.
+  // It DROPS / MOVES / DEMOTES bad claims so the base is clean BEFORE it reaches you. Best-effort - never blocks.
   if (rawClaims.length) {
+    const client = await anthropicClient();
     emit({ t: "phase", label: "Reviewing the fact base for accuracy and attribution" });
     const QA_SCHEMA = { type: "object", additionalProperties: false, properties: { reviews: { type: "array", items: { type: "object", additionalProperties: false, properties: { index: { type: "integer" }, action: { type: "string", enum: ["keep", "drop", "move", "demote"] }, section: { type: "string" }, reason: { type: "string" } }, required: ["index", "action", "section", "reason"] } } }, required: ["reviews"] } as unknown as Anthropic.Tool["input_schema"];
     const list = rawClaims.map((c, i) => `${i}. [section=${c.section} | about: ${c.subject}] ${c.claim}${c.source_url ? ` (src: ${c.source_url})` : " (no source)"}`).join("\n");
     try {
       const qa = await withAnthropicRetry(() => client.messages.stream({
         model: OPUS5, max_tokens: 16000,
-        system: `You are a ruthless senior research editor. Review a fact base about ${name} before it reaches a marketing strategist and rule on EVERY numbered claim:\n- keep: a correct, relevant fact, correctly placed and correctly attributed (${name}'s OWN fact, or a clearly-labelled competitor fact in a competitor section).\n- drop: WRONG, tangential trivia that will not inform strategy, or MIS-ATTRIBUTED - a fact about a parent, partner or other company presented as ${name}'s own (for example a partner's CEO, size or numbers shown as ${name}'s).\n- move: a real fact in the WRONG section - give the correct section id. Advisers/staff filed under leadership belong in snapshot; a competitor fact outside a competitor section moves to competitor.\n- demote: a load-bearing claim on a single weak or uncorroborated source, or stale data shown as current - give section "unverified".\nValid section ids: ${RESEARCH_SECTIONS.map((s) => s.id).join(", ")}.\nRULES: ${name}'s LEADERSHIP means ${name}'s OWN executives, never a parent or partner's. Be strict about noise, a strategist wants signal not filler.${ceoLock ? ` GROUND TRUTH: ${briefLock?.ceoName} IS ${name}'s ${ceoTitleLock} - always keep that, never drop or demote it, and drop or fix anything that reframes them as only a parent company's executive.` : ""}\nReturn a verdict for EVERY claim index, using the exact index shown.`,
+        system: `You are a ruthless senior research editor. Review a fact base about ${ctx.name} before it reaches a marketing strategist and rule on EVERY numbered claim:\n- keep: a correct, relevant fact, correctly placed and correctly attributed (${ctx.name}'s OWN fact, or a clearly-labelled competitor fact in a competitor section).\n- drop: WRONG, tangential trivia that will not inform strategy, or MIS-ATTRIBUTED - a fact about a parent, partner or other company presented as ${ctx.name}'s own (for example a partner's CEO, size or numbers shown as ${ctx.name}'s).\n- move: a real fact in the WRONG section - give the correct section id. Advisers/staff filed under leadership belong in snapshot; a competitor fact outside a competitor section moves to competitor.\n- demote: a load-bearing claim on a single weak or uncorroborated source, or stale data shown as current - give section "unverified".\nValid section ids: ${RESEARCH_SECTIONS.map((s) => s.id).join(", ")}.\nRULES: ${ctx.name}'s LEADERSHIP means ${ctx.name}'s OWN executives, never a parent or partner's. Be strict about noise, a strategist wants signal not filler.${ctx.hasCeoLock ? ` GROUND TRUTH: ${ctx.ceoName} IS ${ctx.name}'s ${ctx.ceoTitle} - always keep that, never drop or demote it, and drop or fix anything that reframes them as only a parent company's executive.` : ""}\nReturn a verdict for EVERY claim index, using the exact index shown.`,
         tools: [{ name: "review", description: "A verdict for every claim.", input_schema: QA_SCHEMA }],
         tool_choice: { type: "tool", name: "review" },
         messages: [{ role: "user", content: `Fact base to review (${rawClaims.length} claims):\n\n${list}` }],
       }).finalMessage());
       const qu = qa.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-      await recordTokens({ clientId, userEmail, model: OPUS5, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
+      await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
       const qblock = qa.content.find((b) => b.type === "tool_use");
       const reviews = (qblock && qblock.type === "tool_use" ? (qblock.input as { reviews?: { index: number; action: string; section: string; reason: string }[] }).reviews : []) || [];
       const drop = new Set<number>();
@@ -685,8 +743,8 @@ export async function collectResearch(
 
   // GAP REGISTER (Gary's Fable-5 benchmark had one). After the fact base is cleaned, flag - deterministically, in
   // code - the areas a marketing strategist needs but the PUBLIC record came back thin on, so the Strategist knows
-  // exactly what to confirm with the client rather than assuming silence means nothing exists. This is honest
-  // scoping, not padding: it names the hole instead of filling it with a guess.
+  // exactly what to confirm with the client rather than assuming silence means nothing exists. Honest scoping, not
+  // padding: it names the hole instead of filling it with a guess.
   const GAP_CHECK: { id: string; label: string; min: number }[] = [
     { id: "leadership", label: "the named executive/management team", min: 1 },
     { id: "products", label: "products, pricing and how they make money", min: 2 },
@@ -701,22 +759,25 @@ export async function collectResearch(
     const n = rawClaims.filter((c) => c.section === g.id).length;
     if (n < g.min) {
       rawClaims.push({
-        section: "gaps", subject: name,
+        section: "gaps", subject: ctx.name,
         claim: `Thin in the public record: ${g.label}. The research found ${n === 0 ? "nothing" : "little"} that is verifiable here, so confirm this directly with the client before the strategy relies on it.`,
         source_name: null, source_url: null, source_date: null, tier: 1,
         unverified_reason: null, conflict: null,
       });
     }
   }
+  return rawClaims;
+}
 
-  // VERIFIED RETRIEVAL (spec 3.7). We do not take the model's word that a source exists, says what it claims, or
-  // carries the date it claims. For each sourced claim we FETCH the page, read its real date, and check support.
-  // A claim whose page 404s or does not support it is NOT dropped (a collector keeps signal) - it is MOVED to the
-  // Unverified section with the reason, and the date we store is the one we read off the page.
-  // Verify the load-bearing claims, capped so a big run stays inside the function time limit. Every claim has a
-  // fetch (up to 9s) plus a Haiku call, so verifying 120 is minutes we do not have. We verify the highest-tier
-  // sourced claims first (Tier 1, then 2, then 3), up to a cap; the rest keep their source but stay 'unconfirmed'.
-  const VERIFY_CAP = 55;
+/** PHASE: verify (spec 3.7). We do not take the model's word that a source exists, says what it claims, or carries
+ *  the date it claims. For each sourced claim we FETCH the page, read its real date, and check support. A claim
+ *  whose page 404s or does not support it is NOT dropped (a collector keeps signal) - it is MOVED to Unverified with
+ *  the reason, and the date we store is the one we read off the page. */
+export async function researchVerify(ctx: ResearchCtx, rawClaims: RawClaim[], emit: (e: CollectEvent) => void): Promise<VerifiedClaim[]> {
+  const client = await anthropicClient();
+  // Each phase has its OWN time budget now, so the cap is generous enough to cover the whole sourced set on a normal
+  // run (the file step tops out near 120 claims), not the old 55. Fetches are pooled so we do not hammer the network.
+  const VERIFY_CAP = 140;
   const toVerify = rawClaims
     .map((c, i) => ({ c, i }))
     .filter((x) => x.c.source_url)
@@ -725,7 +786,7 @@ export async function collectResearch(
   if (toVerify.length) emit({ t: "phase", label: `Verifying ${toVerify.length} key source${toVerify.length === 1 ? "" : "s"}` });
   let verifyCalls = 0, vin = 0, vout = 0, vcr = 0, vcc = 0;
   const verdicts = new Map<number, Awaited<ReturnType<typeof verifyFinding>>>();
-  await Promise.all(toVerify.map(async ({ c, i }) => {
+  await pooledForEach(toVerify, 10, async ({ c, i }) => {
     const v = await verifyFinding(
       { headline: c.claim, detail: c.conflict || "", published_at: c.source_date || "" },
       [{ name: c.source_name || c.source_url!, url: c.source_url! }], client, () => { verifyCalls += 1; },
@@ -734,12 +795,12 @@ export async function collectResearch(
       verdicts.set(i, v);
       if (v.usage) { vin += v.usage.inputTokens; vout += v.usage.outputTokens; vcr += v.usage.cacheReadTokens; vcc += v.usage.cacheCreationTokens; }
     }
-  }));
+  });
   if (verifyCalls) {
-    await recordTokens({ clientId, userEmail, model: INGEST, action: "research-verify", calls: verifyCalls, inputTokens: vin, outputTokens: vout, cacheReadTokens: vcr, cacheCreationTokens: vcc }).catch(() => {});
+    await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: INGEST, action: "research-verify", calls: verifyCalls, inputTokens: vin, outputTokens: vout, cacheReadTokens: vcr, cacheCreationTokens: vcc }).catch(() => {});
   }
 
-  const claims = rawClaims.map((c, i) => {
+  return rawClaims.map((c, i) => {
     const v = verdicts.get(i);
     if (!v) return { ...c, verified: false };
     // Trust outcome: verified page -> keep in section, mark verified, use the real date. Dead/refuted -> move to
@@ -750,19 +811,20 @@ export async function collectResearch(
     if (v.status === "refuted") return { ...c, section: "unverified", verified: false, unverified_reason: c.unverified_reason || "The cited page did not support this claim." };
     return { ...c, source_date: realDate, verified: false, unverified_reason: c.unverified_reason || (c.section === "unverified" ? "Single or unverifiable source." : "Source could not be reached to verify.") };
   });
+}
 
-  // STORE: finalise the run we created up front (status 'collecting' -> 'ready'), filling in what we now know.
-  // (The version was fixed and the row inserted at the start so the run is durable and single-flighted.)
+/** PHASE: store. Finalise the run row (collecting -> ready), insert the claims, merge any newly detected competitors. */
+export async function researchStore(ctx: ResearchCtx, claims: VerifiedClaim[], competitors: { name?: string; website?: string }[], vertical: string | null, identity: ResearchIdentity, emit: (e: CollectEvent) => void): Promise<{ run: ResearchRun; claims: ResearchClaim[] }> {
   const runRows = (await db().query(
     `update research_runs set status = 'ready', vertical = $2, identity = $3, progress = null, error = null
      where id = $1
      returning id, client_id, version, status, website, notes, user_email, vertical, identity, created_at`,
-    [runId, vertical, JSON.stringify(identity)],
+    [ctx.runId, vertical, JSON.stringify(identity)],
   )) as ResearchRun[];
   const run = runRows[0];
 
   // Pre-tag facts Gary already kept on a past run, so this run's list shows only what is genuinely new.
-  const inBrainPrev = await loadInBrainFacts(clientId).catch(() => new Set<string>());
+  const inBrainPrev = await loadInBrainFacts(ctx.clientId).catch(() => new Set<string>());
   const saved: ResearchClaim[] = [];
   for (const c of claims) {
     const kept = inBrainPrev.has(normKey(c.claim));
@@ -770,27 +832,52 @@ export async function collectResearch(
       `insert into research_claims (run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, in_brain, in_brain_by)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        returning id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, rejected, rejected_by, in_brain, in_brain_by`,
-      [run.id, clientId, c.section, c.subject, c.claim, c.source_name, c.source_url, c.source_date, c.tier, c.verified, c.unverified_reason, c.conflict, kept, kept ? "carried-forward" : null],
+      [run.id, ctx.clientId, c.section, c.subject, c.claim, c.source_name, c.source_url, c.source_date, c.tier, c.verified, c.unverified_reason, c.conflict, kept, kept ? "carried-forward" : null],
     )) as ResearchClaim[];
     saved.push(rows[0]);
     emit({ t: "claim", section: c.section, claim: c.claim.slice(0, 120) });
   }
 
   // Merge any newly detected competitors into the editable set (auto-added; Gary edits at Gate 1).
-  const have = new Set(knownCompetitors.map((c) => c.name.toLowerCase().trim()));
-  for (const comp of Array.isArray(out.competitors) ? out.competitors : []) {
+  const have = new Set(ctx.knownCompetitors.map((c) => c.name.toLowerCase().trim()));
+  for (const comp of Array.isArray(competitors) ? competitors : []) {
     const cname = noDash(comp?.name).slice(0, 200);
     if (!cname || have.has(cname.toLowerCase().trim())) continue;
     have.add(cname.toLowerCase().trim());
     const cweb = typeof comp?.website === "string" && /^https?:\/\//i.test(comp.website) ? comp.website.slice(0, 300) : null;
     await db().query(
       `insert into research_competitors (client_id, name, website, added_by) values ($1,$2,$3,'auto')`,
-      [clientId, cname, cweb],
+      [ctx.clientId, cname, cweb],
     ).catch(() => {});
   }
 
   emit({ t: "done", count: saved.length });
   return { run, claims: saved };
+}
+
+/**
+ * INLINE single-process driver over the phases - a fallback and the test path. The durable Inngest orchestrator in
+ * inngest/research.ts drives the SAME phases across separate invocations, so there is no single 13-minute ceiling.
+ */
+export async function collectResearch(
+  clientId: string,
+  today: string,
+  opts: { userEmail?: string | null; notes?: string | null; focus?: string | null; onEvent?: (e: CollectEvent) => void } = {},
+): Promise<{ run: ResearchRun; claims: ResearchClaim[] }> {
+  const { runId, version } = await startResearchRun(clientId, opts);
+  const emit = makeResearchProgress(runId, opts.onEvent);
+  emit({ t: "start", runId, version });
+  try {
+    const ctx = await prepareResearch(clientId, runId, version, today, opts);
+    const p1 = await researchGatherPass1(ctx, emit);
+    const gapd = await researchGapFill(ctx, p1.rawClaims, p1.competitors, emit);
+    const reviewed = await researchReview(ctx, gapd.rawClaims, emit);
+    const verified = await researchVerify(ctx, reviewed, emit);
+    return await researchStore(ctx, verified, gapd.competitors, p1.vertical, p1.identity, emit);
+  } catch (e) {
+    await markResearchFailed(runId, String((e as Error)?.message || e));
+    throw e;
+  }
 }
 
 /** Mark a durable run failed (only if still 'collecting'), so a returning user is not stuck on a dead spinner. */

@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
 import { auth } from "@/auth";
-import { collectResearch, latestResearchRun, listResearchClaims, listCompetitors, markResearchFailed } from "@/lib/researcher-v3";
+import { startResearchRun, latestResearchRun, listResearchClaims, listCompetitors } from "@/lib/researcher-v3";
 import { inngest } from "@/lib/inngest";
 
-// THE RESEARCHER (V3), FACTS-ONLY COLLECTOR. Commissioned on demand, like the old dossier. GET returns the
-// latest run with its claims and the editable competitor set (what Gate 1 reviews). POST commissions a new
-// versioned run and STREAMS progress (Server-Sent Events) - a full collect does many web searches then files
-// and verifies, so a static spinner would make it feel broken.
-export const maxDuration = 800;
+// THE RESEARCHER (V3), FACTS-ONLY COLLECTOR. Commissioned on demand. GET returns the latest run with its claims and
+// the editable competitor set (what Gate 1 reviews). POST commissions a new versioned run: it creates the run row,
+// fires the DURABLE, phase-stepped Inngest job (inngest/research.ts) and returns immediately. The run is no longer
+// tied to this request, so it can take as long as it needs - a deep run used to hit Vercel's ~13-minute per-request
+// ceiling and die. The UI polls this route's GET for the run's status + progress until it lands.
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
@@ -34,55 +33,19 @@ export async function POST(req: Request) {
   if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });
 
   const today = new Date().toISOString().slice(0, 10);
-  const encoder = new TextEncoder();
 
-  // DURABLE RUN (Gary: navigating away errored AND lost the acquired research, wasting the spend). The collection
-  // now runs DECOUPLED from the response stream and is kept alive by waitUntil, so it reaches the store step even
-  // if the browser disconnects. The SSE stream just tails a queue of progress events while the tab is open; if it
-  // closes, the work carries on server-side and the run lands in the DB regardless. On failure the run is marked
-  // 'failed' (never left as a dead 'collecting' spinner).
-  const queue: unknown[] = [];
-  let finished = false, capturedRunId = "";
-  const work = (async () => {
-    try {
-      const { run, claims } = await collectResearch(clientId, today, {
-        userEmail: session.user?.email ?? null,
-        notes: notes || null,
-        focus: focus || null,
-        onEvent: (e) => { if (e.t === "start") capturedRunId = e.runId; queue.push(e); },
-      });
-      if (claims.length > 0) await inngest.send({ name: "research/collected", data: { clientId, runId: run.id } }).catch(() => {});
-      queue.push({ t: "run", version: run.version, runId: run.id, count: claims.length });
-    } catch (e) {
-      const msg = String((e as Error)?.message || e).slice(0, 300);
-      if (capturedRunId) await markResearchFailed(capturedRunId, msg);   // don't leave a dead 'collecting' run
-      queue.push({ t: "error", message: msg });
-    } finally {
-      finished = true;
-    }
-  })();
-  waitUntil(work);   // keeps the function (and the run) alive past a client disconnect
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (obj: unknown) => {
-        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)); } catch { /* client gone: work continues via waitUntil */ }
-      };
-      // Drain the queue until the work finishes. If the client disconnects, enqueue no-ops and this loop simply
-      // ends when the work does, but the work itself is not tied to this stream.
-      while (!finished || queue.length) {
-        if (queue.length) send(queue.shift());
-        else await new Promise((r) => setTimeout(r, 250));
-      }
-      try { controller.close(); } catch { /* already closed */ }
-    },
-  });
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
-  });
+  // Create the run row synchronously (so the user gets an immediate answer - a friendly refusal if a collect is
+  // already in flight, or a run id to poll), then fire the durable phase-stepped job and return. The heavy work runs
+  // in Inngest, decoupled from this request, so it can take as long as it needs.
+  try {
+    const { runId, version } = await startResearchRun(clientId, { userEmail: session.user?.email ?? null, notes: notes || null });
+    await inngest.send({
+      name: "research/collect",
+      data: { clientId, runId, version, today, userEmail: session.user?.email ?? null, notes: notes || null, focus: focus || null },
+    });
+    return NextResponse.json({ ok: true, runId, version, status: "collecting" });
+  } catch (e) {
+    // A concurrency refusal ("already in progress") or a setup error - surface it as a 409 so the UI shows the message.
+    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 409 });
+  }
 }

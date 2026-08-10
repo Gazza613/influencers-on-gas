@@ -166,6 +166,21 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     await buildDoc(runId, true);
   }, [clientId, buildDoc]);
 
+  // Poll a 'collecting' run until it lands (or fails). The collect is a DURABLE, phase-stepped Inngest job now,
+  // decoupled from any request, so it can run well past the old ~13-minute ceiling. We reflect the run's progress
+  // column into the live panel as we go (no SSE any more). Returns the final run, or null if it never settles.
+  const pollCollectingRun = useCallback(async (runId: string): Promise<Run | null> => {
+    for (let i = 0; i < 400; i++) {   // ~33 min at 5s; the run's own backstop reclaims a genuinely hung job at 45
+      await new Promise((r) => setTimeout(r, 5000));
+      const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (!d?.run || d.run.id !== runId) continue;
+      setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []);
+      if (d.run.progress) setProgress({ label: d.run.progress.label || "Working", searches: [], sources: d.run.progress.sources || 0, filed: d.run.progress.filed || 0 });
+      if (d.run.status !== "collecting") return d.run;
+    }
+    return null;
+  }, [clientId]);
+
   // If a run is READY but its PDF is not built yet (e.g. the page was reloaded while the document was still
   // rendering), resume polling automatically, so the Download button always turns up without any action.
   useEffect(() => {
@@ -175,39 +190,23 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   }, [run, running, docBusy, pollDocument]);
 
   // DURABLE RUN RESUME (Gary: navigating away must not lose the run). If we land on a run that is still
-  // 'collecting' (started in another tab/session and kept alive by waitUntil), poll until it finishes, then load
-  // its claims - so returning to the page picks the run back up instead of showing an error or a dead spinner.
+  // 'collecting' (the durable Inngest job is still working, started in this or another tab/session), poll until it
+  // finishes, then load its claims - so returning to the page picks the run back up, not an error or a dead spinner.
   const collectPollRef = useRef<string | null>(null);
   useEffect(() => {
     if (!run || run.status !== "collecting" || running || collectPollRef.current === run.id) return;
     collectPollRef.current = run.id;
     let live = true;
     (async () => {
-      for (let i = 0; i < 180 && live; i++) {   // ~15 min ceiling (the run's own guard expires at 20)
-        await new Promise((r) => setTimeout(r, 5000));
-        if (!live) return;
-        const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-        if (!live || !d?.run) continue;
-        setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []);
-        if (d.run.status !== "collecting") {
-          collectPollRef.current = null;
-          if (d.run.status === "ready") { loadSpend(); if (!d.run.pdf_url) pollDocument(d.run.id); }
-          return;
-        }
-        // A run still 'collecting' past ~14 min is dead (the function's hard time limit). Stop waiting and say so,
-        // rather than showing "Researching..." forever.
-        const ageMin = (Date.now() - new Date(d.run.created_at).getTime()) / 60000;
-        if (ageMin > 14) {
-          collectPollRef.current = null;
-          setRun({ ...d.run, status: "failed", error: "This run exceeded the time limit and stopped. Nothing was charged for an unsaved result. Run it again." });
-          return;
-        }
-      }
+      const final = await pollCollectingRun(run.id);
+      if (!live) return;
+      collectPollRef.current = null;
+      if (final && final.status === "ready") { loadSpend(); if (!final.pdf_url) pollDocument(final.id); }
     })();
     return () => { live = false; collectPollRef.current = null; };
     // loadSpend intentionally omitted from deps (declared just below; stable useCallback) to avoid a TDZ at render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run, running, clientId, pollDocument]);
+  }, [run, running, pollCollectingRun, pollDocument]);
 
   const loadSpend = useCallback(async () => {
     const d = await fetch(`/api/studio/researcher/spend`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
@@ -271,52 +270,42 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   }
 
   // Commission a collect. withNotes runs a "Rerun with notes" - a fresh VERSION addressing corrections, never an
-  // overwrite. Streams the real searches, sources and claims as they land, so the run never feels like a dead bar.
+  // overwrite. The collect fires a DURABLE, phase-stepped Inngest job and returns immediately; we then POLL the run
+  // to completion (it runs server-side regardless of this tab, so closing it no longer loses the work or the spend).
   async function runCollect(withNotes?: string) {
     setRunning(true); setNote(""); setShowNotes(false); setJustDone(false);
     startedRef.current = Date.now(); setElapsed(0);
     setProgress({ label: `Collecting facts on ${clientName}`, searches: [], sources: 0, filed: 0 });
-    let version = 0, count = 0, errored = "", runId = "";
+    let runId = "";
     try {
       const resp = await fetch(`/api/studio/researcher/collect`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, notes: withNotes || "", focus: focus.trim() }),
       });
-      if (!resp.ok || !resp.body) throw new Error(`The Researcher could not start (${resp.status}).`);
-      const reader = resp.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() || "";
-        for (const part of parts) {
-          const line = part.split("\n").find((l) => l.startsWith("data:"));
-          if (!line) continue;
-          let e: { t: string; label?: string; q?: string; n?: number; version?: number; runId?: string; count?: number; message?: string };
-          try { e = JSON.parse(line.slice(5).trim()); } catch { continue; }
-          if (e.t === "start") runId = e.runId || "";   // the durable run exists now; capture its id early
-          else if (e.t === "phase") setProgress((p) => p ? { ...p, label: e.label || p.label } : p);
-          else if (e.t === "search") setProgress((p) => p ? { ...p, searches: [...p.searches, e.q || ""].slice(-6) } : p);
-          else if (e.t === "sources") setProgress((p) => p ? { ...p, sources: e.n || p.sources } : p);
-          else if (e.t === "claim") setProgress((p) => p ? { ...p, filed: p.filed + 1 } : p);
-          else if (e.t === "run") { version = e.version || 0; count = e.count || 0; runId = e.runId || ""; }
-          else if (e.t === "error") errored = e.message || "The Researcher failed.";
-        }
-      }
+      const d = await resp.json().catch(() => null);
+      if (!resp.ok) throw new Error(d?.error || `The Researcher could not start (${resp.status}).`);
+      runId = d?.runId || "";
+      await load(clientId);   // reflect the new 'collecting' run at once
     } catch (err) {
-      errored = (err as Error)?.message || "Couldn't run the Researcher.";
+      setRunning(false); setProgress(null);
+      const msg = (err as Error)?.message || "Couldn't run the Researcher.";
+      setNote(msg); flex(msg); await load(clientId);
+      return;
     }
+    // Poll the durable job to completion. It keeps running on the server even if this tab closes.
+    const final = runId ? await pollCollectingRun(runId) : null;
     setRunning(false); setProgress(null);
-    if (errored) { setNote(errored); flex(errored); await load(clientId); return; }
-    flex(`Research v${version} filed ${count} claim${count === 1 ? "" : "s"}, ready for your review.`);
+    if (!final) {
+      const msg = "This run is taking longer than usual. It keeps running in the background, so check back shortly.";
+      setNote(msg); flex(msg); await load(clientId); return;
+    }
+    if (final.status === "failed") { const msg = final.error || "The Researcher failed."; setNote(msg); flex(msg); await load(clientId); return; }
+    flex(`Research v${final.version} is ready for your review.`);
     await load(clientId);
-    if (count > 0) { setJustDone(true); setTimeout(() => setJustDone(false), 9000); }   // green "complete" flash
+    setJustDone(true); setTimeout(() => setJustDone(false), 9000);   // green "complete" flash
     loadSpend();   // refresh the cost meter with what this run spent
-    // The Research Document builds in a durable background job now; poll for it (synchronous fallback inside).
-    if (runId && count > 0) pollDocument(runId);
+    // The Research Document builds in a durable background job; poll for it (synchronous fallback inside).
+    if (!final.pdf_url) pollDocument(final.id);
   }
 
   async function gate(action: "approve" | "reject") {

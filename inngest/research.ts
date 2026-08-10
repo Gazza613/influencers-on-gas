@@ -1,7 +1,10 @@
 import { inngest } from "@/lib/inngest";
 import { db } from "@/lib/db";
 import { buildResearchDocument } from "@/lib/research-doc";
-import { ingestApprovedResearch } from "@/lib/researcher-v3";
+import {
+  ingestApprovedResearch, markResearchFailed, makeResearchProgress,
+  prepareResearch, researchGatherPass1, researchGapFill, researchReview, researchVerify, researchStore,
+} from "@/lib/researcher-v3";
 
 // THE RESEARCHER PIPELINE, DURABLE (build spec V3, sections 2 + 4.4 + 9).
 //
@@ -12,6 +15,43 @@ import { ingestApprovedResearch } from "@/lib/researcher-v3";
 //   - The Gate 1 decision drives the pipeline through EVENTS. The next stage (the Strategist) will be an Inngest
 //     function triggered ONLY by research/approved, so it can never start from anything but an APPROVED fact base.
 //     That is the workflow-level enforcement the spec demands (4.4), not merely a UI check.
+
+// research/collect -> RUN THE COLLECT, DECOMPOSED INTO PHASES. Vercel caps a single function invocation at ~13
+// minutes, and a deep run on a big client used to hit that ceiling and die mid-flight. Each phase below is its OWN
+// step (its own invocation, its own time budget), so the whole run has no single time limit and each phase can go
+// deeper (gather restored to 26 searches, verify uncapped from the old 55). The route creates the run row and fires
+// this event; the UI polls the run's progress. Between steps ONLY serializable state crosses (ctx + claim arrays),
+// so each phase rebuilds its own Anthropic client. Concurrency keyed on the client, and the DB guard, both stop a
+// second collect for the same client. onFailure marks the run 'failed' so a returning user is never stuck spinning.
+export const runResearchCollect = inngest.createFunction(
+  {
+    id: "research-collect",
+    name: "Collect the research",
+    retries: 1,
+    concurrency: { key: "event.data.clientId", limit: 1 },
+    triggers: [{ event: "research/collect" }],
+    onFailure: async ({ event }) => {
+      const runId = (event as { data?: { event?: { data?: { runId?: string } } } })?.data?.event?.data?.runId;
+      if (runId) await markResearchFailed(String(runId), "The research job did not finish. Nothing was charged for an unsaved result. Run it again.").catch(() => {});
+    },
+  },
+  async ({ event, step }) => {
+    const d = event.data as { clientId: string; runId: string; version: number; today: string; userEmail: string | null; notes: string | null; focus: string | null };
+    const opts = { userEmail: d.userEmail, notes: d.notes, focus: d.focus };
+    // Each step is memoized on success, so a retry resumes at the failed phase rather than re-spending on the ones
+    // that already landed. Progress is written to the run's `progress` column from inside each phase (best-effort).
+    const ctx = await step.run("prepare", () => prepareResearch(d.clientId, d.runId, d.version, d.today, opts));
+    const p1 = await step.run("gather-pass-1", () => researchGatherPass1(ctx, makeResearchProgress(d.runId)));
+    const gapd = await step.run("gap-fill", () => researchGapFill(ctx, p1.rawClaims, p1.competitors, makeResearchProgress(d.runId)));
+    const reviewed = await step.run("review", () => researchReview(ctx, gapd.rawClaims, makeResearchProgress(d.runId)));
+    const verified = await step.run("verify", () => researchVerify(ctx, reviewed, makeResearchProgress(d.runId)));
+    const stored = await step.run("store", () => researchStore(ctx, verified, gapd.competitors, p1.vertical, p1.identity, makeResearchProgress(d.runId)));
+    const count = stored.claims.length;
+    // Hand off to the Research Document build (and the rest of the pipeline) exactly as the old path did.
+    if (count > 0) await step.sendEvent("collected", { name: "research/collected", data: { clientId: d.clientId, runId: d.runId } });
+    return { runId: d.runId, count };
+  },
+);
 
 // research/collected -> build the Research Document (PDF -> Blob -> Drive -> email). Fired when a collect run
 // finishes with claims. Retried, because a render or an upload can blip.
