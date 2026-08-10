@@ -1,0 +1,48 @@
+/* ==========================================================================
+   GAS — BASE
+   Minimal element defaults + a few brand utility classes. Keep light; most
+   styling lives in component files / product code reading the tokens above.
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-body);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Flame keyword highlight — the signature headline treatment */
+.gas-flame-text {
+  background: var(--grad-flame);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Eyebrow kicker */
+.gas-eyebrow {
+  font-size: var(--type-eyebrow-size);
+  font-weight: var(--type-eyebrow-weight);
+  letter-spacing: var(--type-eyebrow-spacing);
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+/* Uppercase display headline */
+.gas-display {
+  font-family: var(--font-display);
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-lh);
+  font-weight: var(--type-display-weight);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+::selection { background: var(--gas-magenta); color: #fff; }

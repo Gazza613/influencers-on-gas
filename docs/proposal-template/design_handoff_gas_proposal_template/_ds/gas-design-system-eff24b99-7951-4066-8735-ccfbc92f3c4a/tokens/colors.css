@@ -1,0 +1,68 @@
+/* ==========================================================================
+   GAS — COLOUR
+   "The flame carries energy and every call to action; the deep-space blues
+    and purples ground it; magenta adds the pop. Solid tints are for type and
+    fine detail only."
+   ========================================================================== */
+
+:root {
+  /* --- Brand solids ----------------------------------------------------- */
+  --gas-orange:      #FF9A2E;  /* flame start, value coins, accents      */
+  --gas-red:         #ED1C24;  /* flame end                              */
+  --gas-magenta:     #ED219A;  /* the pop — pills, highlights            */
+  --gas-purple:      #5A1B9A;  /* card grounds, gradient end             */
+  --gas-royal:       #1B1C94;  /* royal blue                             */
+  --gas-navy:        #02385C;  /* deep navy — deepest ground             */
+
+  /* --- Neutral / tint ramp (type & fine detail only) -------------------- */
+  --gas-cream:       #FFF8F0;  /* light section background               */
+  --gas-mist:        #B7B2C7;  /* light lavender-grey                    */
+  --gas-slate:       #565470;  /* muted slate — secondary text on light  */
+  --gas-indigo:      #3B3A6E;  /* muted indigo                           */
+  --gas-plum:        #74107F;  /* deep plum accent                       */
+  --gas-ink:         #1A1230;  /* near-black, primary text on light      */
+  --gas-white:       #FFFFFF;
+
+  /* --- Signature gradients ---------------------------------------------- */
+  /* Flame — CTAs & energy */
+  --grad-flame:       linear-gradient(135deg, #FF9A2E 0%, #ED1C24 100%); /* @kind color */
+  --grad-flame-soft:  linear-gradient(135deg, #FFB259 0%, #F2462C 100%); /* @kind color */
+  /* Deep Space — backgrounds */
+  --grad-deep-space:  linear-gradient(135deg, #02385C 0%, #2B1E73 55%, #5A1B9A 100%); /* @kind color */
+  /* Punch — forms & panels */
+  --grad-punch:       linear-gradient(150deg, #ED219A 0%, #8E1C9A 55%, #5A1B9A 100%); /* @kind color */
+  /* Coin — the flame circle motif */
+  --grad-coin:        radial-gradient(120% 120% at 30% 25%, #FFB14E 0%, #FF8A1E 38%, #ED1C24 100%); /* @kind color */
+  /* Card — generic purple product card ground */
+  --grad-card:        linear-gradient(160deg, #4A1C8C 0%, #5A1B9A 45%, #7A1E8E 100%); /* @kind color */
+
+  /* ======================================================================
+     SEMANTIC ALIASES — reach for these in product code
+     ====================================================================== */
+
+  /* Surfaces */
+  --surface-page:        var(--gas-cream);   /* default light page         */
+  --surface-page-dark:   var(--grad-deep-space);
+  --surface-card:        var(--gas-white);   /* card on a light page       */
+  --surface-card-grad:   var(--grad-card);   /* product / feature card     */
+  --surface-form:        var(--grad-punch);  /* form & panel ground        */
+  --surface-inset:       #F3ECF7;            /* subtle inset on light      */
+
+  /* Text */
+  --text-strong:         var(--gas-ink);     /* headlines on light         */
+  --text-body:           #3A3450;            /* body on light              */
+  --text-muted:          var(--gas-slate);   /* captions / labels          */
+  --text-on-dark:        var(--gas-white);
+  --text-on-dark-muted:  rgba(255,255,255,0.62);
+  --text-accent:         var(--gas-orange);  /* flame keyword              */
+
+  /* Actions */
+  --action-primary:      var(--grad-flame);  /* solid flame pill           */
+  --action-on-light:     var(--gas-white);   /* white pill on light/dark   */
+  --action-pop:          var(--gas-magenta); /* magenta label pill         */
+
+  /* Lines */
+  --border-on-light:     rgba(26,18,48,0.12);
+  --border-on-dark:      rgba(255,255,255,0.22);
+  --focus-ring:          var(--gas-magenta);
+}
