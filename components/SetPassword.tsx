@@ -40,7 +40,8 @@ export default function SetPassword({ token, email }: { token: string; email: st
       <input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} placeholder="Confirm password" autoComplete="new-password"
         className="mt-2.5 w-full rounded-lg border border-line bg-surface-2 px-4 py-3 text-sm text-ink outline-none focus:border-[#a855f7]" />
       {err && <p className="mt-3 text-xs text-alert">{err}</p>}
-      <button type="submit" disabled={busy} className="btn-brand mt-4 w-full rounded-full py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-70">
+      <button type="submit" disabled={busy} className="btn-brand mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-70">
+        {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
         {busy ? "Setting…" : "Set password & continue →"}
       </button>
     </form>

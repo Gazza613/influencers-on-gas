@@ -379,8 +379,8 @@ export default function StudioIntake({ initialClients }: { initialClients: Clien
         <button
           onClick={saveCompliance}
           disabled={busy === "compliance" || !clientId}
-          className="mt-2 rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
-        >{busy === "compliance" ? "Saving…" : "Save compliance line"}</button>
+          className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[#60a5fa]/40 px-3 py-1.5 text-sm font-bold text-[#93c5fd] hover:bg-[#60a5fa]/10 disabled:opacity-40"
+        >{busy === "compliance" && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{busy === "compliance" ? "Saving…" : "Save compliance line"}</button>
       </div>
 
       {/* DEAL CARDS (the client's name for them; spec 5b calls them callouts). A designed deal card arrives

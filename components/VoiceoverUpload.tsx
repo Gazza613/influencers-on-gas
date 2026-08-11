@@ -71,7 +71,7 @@ export default function VoiceoverUpload({ influencerId, presetUrl, onDone }: { i
       {url && <p className="mb-2 text-[11px] text-ready">✓ Recording ready{presetUrl && url === presetUrl ? " (from the script step)" : ""}.</p>}
       <Uploader kind="my-vo" accept="audio" label={url ? "Upload a different recording" : "Upload your voiceover recording"} onUploaded={(u) => { setUrl(u); setErr(""); }} />
       {url && (
-        <button onClick={process} disabled={busy} className="btn-brand mt-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? `🎙️ ${status || "Working…"}` : "Use my voice (slice per scene)"}</button>
+        <button onClick={process} disabled={busy} className="btn-brand mt-2 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{busy ? `🎙️ ${status || "Working…"}` : "Use my voice (slice per scene)"}</button>
       )}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
     </div>

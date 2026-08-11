@@ -1086,7 +1086,7 @@ export default function ProducerStudio({ influencerId, name, initialProduction, 
                 )}
                 {usedBrain && <span className="rounded-full border border-[#4ade80]/40 bg-[#4ade80]/10 px-2 py-1 text-[10px] font-semibold text-[#86efac]">grounded on the brain</span>}
                 {/* AI HELPER: shape rough notes into a vivid, producer-grade story you can then Direct. */}
-                <button onClick={polishStory} disabled={storyBusy || busy} title="I'll take your notes (or the brief) and shape them into a vivid, top-1% story you can review, edit, then direct." className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{storyBusy ? "✨ Shaping your story…" : storyline.trim() ? "✨ Sharpen my story" : "✨ Help me write it"}</button>
+                <button onClick={polishStory} disabled={storyBusy || busy} title="I'll take your notes (or the brief) and shape them into a vivid, top-1% story you can review, edit, then direct." className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-xs font-semibold text-[#c79bff] transition hover:bg-[#a855f7]/10 disabled:opacity-50">{storyBusy && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{storyBusy ? "✨ Shaping your story…" : storyline.trim() ? "✨ Sharpen my story" : "✨ Help me write it"}</button>
               </div>
             </div>
             <textarea value={storyline} onChange={(e) => setStoryline(e.target.value)} rows={5} disabled={storyBusy}

@@ -108,7 +108,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
               );
             })}
           </div>
-          <button onClick={() => sel && setVia({ action: "select", voiceId: sel, voiceName: lib.find((v) => v.voice_id === sel)?.name })} disabled={!sel || busy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? "Setting…" : "Use this voice"}</button>
+          <button onClick={() => sel && setVia({ action: "select", voiceId: sel, voiceName: lib.find((v) => v.voice_id === sel)?.name })} disabled={!sel || busy} className="btn-brand inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{busy ? "Setting…" : "Use this voice"}</button>
         </div>
       )}
 
@@ -121,7 +121,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
             ))}
           </div>
           <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="Describe the voice…" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
-          <button onClick={designVoice} disabled={!desc.trim() || designing} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{designing ? "Designing voice options…" : "✨ Design voice options"}</button>
+          <button onClick={designVoice} disabled={!desc.trim() || designing} className="btn-brand inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{designing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{designing ? "Designing voice options…" : "✨ Design voice options"}</button>
           {previews.length > 0 && (
             <div className="mt-1 space-y-2">
               <p className="text-[11px] text-ink-faint">Listen and pick your favourite:</p>
@@ -129,7 +129,7 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
                 <div key={p.generatedVoiceId} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2">
                   <span className="text-xs font-semibold text-ink-dim">Option {i + 1}</span>
                   <audio src={p.url} controls className="h-8" />
-                  <button onClick={() => useDesigned(p.generatedVoiceId, p.url)} disabled={!!savingId} className="rounded-lg border border-[#a855f7]/50 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{savingId === p.generatedVoiceId ? "Saving…" : "Use this voice"}</button>
+                  <button onClick={() => useDesigned(p.generatedVoiceId, p.url)} disabled={!!savingId} className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/50 px-3 py-1.5 text-xs font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{savingId === p.generatedVoiceId && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{savingId === p.generatedVoiceId ? "Saving…" : "Use this voice"}</button>
                 </div>
               ))}
             </div>
@@ -146,14 +146,14 @@ export default function VoicePicker({ influencerId, name, voiceId, voiceName, vo
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#a855f7]" />
             <span>I confirm the person whose voice this is has consented to it being cloned and used in these videos.</span>
           </label>
-          <button onClick={() => setVia({ action: "clone", sampleUrls: samples, consentId: consent ? `consent-${Date.now()}` : "", voiceName: `${name} (my voice)` })} disabled={busy || !samples.length || !consent} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? "Cloning your voice…" : "🎙️ Clone my voice"}</button>
+          <button onClick={() => setVia({ action: "clone", sampleUrls: samples, consentId: consent ? `consent-${Date.now()}` : "", voiceName: `${name} (my voice)` })} disabled={busy || !samples.length || !consent} className="btn-brand inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{busy ? "Cloning your voice…" : "🎙️ Clone my voice"}</button>
           <p className="text-[10px] text-ink-faint">Cloning a real voice requires consent. If this is blocked, ask an admin to enable voice cloning for the account.</p>
         </div>
       )}
 
       {vtab === "auto" && (
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={() => setVia({ action: "auto" })} disabled={busy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? "Setting up…" : "Use a matched voice"}</button>
+          <button onClick={() => setVia({ action: "auto" })} disabled={busy} className="btn-brand inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{busy ? "Setting up…" : "Use a matched voice"}</button>
           <span className="text-[13px] text-ink-faint">We pick a natural voice matched to {name}&apos;s gender.</span>
         </div>
       )}

@@ -38,9 +38,9 @@ export default function DeleteInfluencerButton({ id, name }: { id: string; name:
       disabled={busy}
       title={`Delete ${name}`}
       aria-label={`Delete ${name}`}
-      className="absolute left-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-[12px] text-white backdrop-blur-sm transition hover:bg-alert disabled:opacity-60"
+      className="absolute left-2 top-2 z-20 flex h-7 w-7 items-center justify-center gap-2 rounded-full bg-black/55 text-[12px] text-white backdrop-blur-sm transition hover:bg-alert disabled:opacity-60"
     >
-      {busy ? "…" : "🗑"}
+      {busy ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" /> : "🗑"}
     </button>
   );
 }

@@ -32,7 +32,8 @@ export default function BrainsManager({ initial }: { initial: Brain[] }) {
           placeholder="New brain name (e.g. PSI, Learnalot)"
           className="flex-1 rounded-lg border border-line bg-surface-2 px-4 py-3 text-lg text-ink outline-none focus:border-line-strong"
         />
-        <button onClick={create} disabled={busy || !name.trim()} className="btn-brand rounded-lg px-5 py-3 text-lg font-bold disabled:opacity-50">
+        <button onClick={create} disabled={busy || !name.trim()} className="btn-brand inline-flex items-center gap-2 rounded-lg px-5 py-3 text-lg font-bold disabled:opacity-50">
+          {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
           {busy ? "Creating…" : "New brain"}
         </button>
       </div>

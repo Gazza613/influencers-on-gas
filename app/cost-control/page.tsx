@@ -166,7 +166,8 @@ export default function CostControlPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-4xl font-extrabold tracking-tight">Cost Control</h1>
           <button onClick={() => load()} disabled={loading}
-            className="rounded-lg border border-line px-4 py-2 text-lg font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink disabled:opacity-60">
+            className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-lg font-semibold text-ink-dim transition hover:border-line-strong hover:text-ink disabled:opacity-60">
+            {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
             {loading ? "Refreshing…" : "↻ Refresh"}
           </button>
         </div>
@@ -262,14 +263,15 @@ export default function CostControlPage() {
             <div className="mt-4 space-y-5">
               <div className="flex flex-wrap items-center gap-3">
                 <button onClick={calibrate} disabled={calibrating}
-                  className="rounded-lg border border-[#a855f7]/30 px-4 py-2 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/30 px-4 py-2 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+                  {calibrating && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
                   {calibrating ? "Calibrating…" : "Recalibrate costs"}
                 </button>
                 <div className="flex items-center gap-2">
                   <span className="text-lg text-ink-dim">Per-build target R</span>
                   <input value={buildTarget} onChange={(e) => setBuildTarget(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="1000"
                     className="tabular w-24 rounded border border-line bg-surface-2 px-2 py-1.5 text-lg text-ink outline-none focus:border-[#a855f7]" />
-                  <button onClick={saveBuildTarget} disabled={targetBusy} className="rounded border border-[#a855f7]/30 px-3 py-1.5 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{targetBusy ? "…" : "Save"}</button>
+                  <button onClick={saveBuildTarget} disabled={targetBusy} className="inline-flex items-center gap-2 rounded border border-[#a855f7]/30 px-3 py-1.5 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{targetBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{targetBusy ? "…" : "Save"}</button>
                   {targetMsg && <span className="text-lg text-ink-faint">{targetMsg}</span>}
                 </div>
               </div>

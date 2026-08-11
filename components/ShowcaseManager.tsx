@@ -219,7 +219,7 @@ function Card({ v, busy, onToggle, onRemove, onRename, onRegen, reel = false }: 
           </button>
         )}
         <div className="flex shrink-0 items-center gap-1.5">
-          <button onClick={() => onRegen(v)} disabled={busy} title="Regenerate thumbnail" aria-label="Regenerate thumbnail" className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-ink-dim hover:text-accent disabled:opacity-50">↻🖼</button>
+          <button onClick={() => onRegen(v)} disabled={busy} title="Regenerate thumbnail" aria-label="Regenerate thumbnail" className="inline-flex items-center gap-2 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-ink-dim hover:text-accent disabled:opacity-50">{busy && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}↻🖼</button>
           <button
             onClick={() => (reel ? onRemove(v.id) : onToggle(v.id, true))}
             disabled={busy}

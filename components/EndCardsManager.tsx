@@ -70,7 +70,7 @@ export default function EndCardsManager({ initial }: { initial: EndCard[] }) {
         <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Name it (e.g. MoMo end card - yellow)" className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-[#a855f7]" />
         <Uploader kind="endcard" accept={kind} label={`Upload your ${ratio} end ${kind}`} current={url} onUploaded={setUrl} />
         {err && <p className="text-xs text-alert">{err}</p>}
-        <button onClick={add} disabled={!url || busy} className="btn-brand rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy ? "Saving…" : "＋ Add to library"}</button>
+        <button onClick={add} disabled={!url || busy} className="btn-brand inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{busy ? "Saving…" : "＋ Add to library"}</button>
       </div>
 
       {/* Library - grouped by shape so each shows at its correct size */}

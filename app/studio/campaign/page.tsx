@@ -161,11 +161,13 @@ export default function CampaignPage() {
             {/* THE BRIEF COACH. Free, and it runs first: a thin brief does not produce a bad campaign, it
                 produces a plausible generic one - which is worse, because it looks finished. */}
             <button onClick={() => post("sharpen")} disabled={!!busy || !clientId || brief.trim().length < 4}
-              className="rounded-lg border border-[#818cf8]/60 bg-[#818cf8]/10 px-5 py-2.5 text-[17px] font-bold text-ink transition hover:bg-[#818cf8]/20 disabled:opacity-40">
+              className="inline-flex items-center gap-2 rounded-lg border border-[#818cf8]/60 bg-[#818cf8]/10 px-5 py-2.5 text-[17px] font-bold text-ink transition hover:bg-[#818cf8]/20 disabled:opacity-40">
+              {busy === "sharpen" && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
               {busy === "sharpen" ? `The Producer is reading your brief… ${elapsed}s` : "Sharpen the brief"}
             </button>
             <button onClick={() => post("plan")} disabled={!!busy || !clientId || brief.trim().length < 12}
-              className="rounded-lg bg-accent px-5 py-2.5 text-[17px] font-bold text-black disabled:opacity-40">
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-[17px] font-bold text-black disabled:opacity-40">
+              {busy === "plan" && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
               {busy === "plan" ? `The Producer is thinking… ${elapsed}s` : "Plan the campaign"}
             </button>
             <span className="text-base text-ink-dim">Sharpening is free, and it makes the plan better.</span>
@@ -355,7 +357,8 @@ export default function CampaignPage() {
             </div>
 
             <button onClick={() => post("produce")} disabled={!!busy}
-              className="w-full rounded-xl bg-accent px-4 py-3.5 text-base font-bold text-black disabled:opacity-40">
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-base font-bold text-black disabled:opacity-40">
+              {busy === "produce" && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
               {busy === "produce"
                 ? `Generating and rendering… ${elapsed}s`
                 : "Final production · generate the 5 creatives"}
