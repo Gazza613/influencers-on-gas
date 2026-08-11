@@ -71,6 +71,18 @@ export type ProposalDoc = {
     intro: string;
     rows: { icon: string; name: string; role: string; kind: "lead" | "support" | "test"; what: string; why: string }[];  // up to 5
   };
+  psi: {
+    intro: string; for_client: string;
+    tiles: { level: string; caption: string; kind: "high" | "medium" | "low" }[];   // 3
+    chat: { assistant: string; bubbles: { role: "in" | "out"; text: string }[]; closing: string };
+    side_cards: { title: string; body: string }[];                                  // 3
+    benefit_client: string; benefit_forward: string;
+  };
+  pods78: {
+    headline: Headline;
+    dashboard_para: string; dashboard_chip: string; media_para: string; media_chip: string;
+    tiles: { label: string; spark: "line-down" | "bars" | "line-up" | "gauge"; caption: string }[];   // 4
+  };
 };
 
 // ── primitives ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -484,6 +496,65 @@ function channelsPage(d: ProposalDoc, ci: CiTokens): string {
     + footerLight(ci, d.brand_short, 13));
 }
 
+// 14 POD VI PSI (dark, ghost VI). Header + intro + glass for-client box + HIGH/MEDIUM/LOW tiles + WhatsApp mock +
+// 3 side cards + 2 benefit chips. The WhatsApp bubbles are data; the score scale is fixed.
+const WHATSAPP = `<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>`;
+function psiPage(d: ProposalDoc, ci: CiTokens): string {
+  const p = d.psi;
+  const tileColor = (k: "high" | "medium" | "low") => k === "high" ? ci.accentOnDark : k === "medium" ? "#FFFFFF" : "rgba(255,255,255,0.6)";
+  const tile = (t: { level: string; caption: string; kind: "high" | "medium" | "low" }) =>
+    `<div style="background:rgba(255,255,255,0.10);border-radius:14px;padding:14px 16px;text-align:center;"><div style="font-size:20px;font-weight:800;color:${tileColor(t.kind)};">${esc(t.level)}</div><div style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.75);margin-top:4px;">${esc(t.caption)}</div></div>`;
+  const bubble = (b: { role: "in" | "out"; text: string }) => b.role === "in"
+    ? `<div style="margin-top:8px;background:rgba(255,255,255,0.12);border-radius:12px 12px 12px 3px;padding:8px 12px;font-size:10px;line-height:1.55;max-width:85%;color:rgba(255,255,255,0.92);">${esc(b.text)}</div>`
+    : `<div style="margin-top:8px;background:${ci.accentGrad};border-radius:12px 12px 3px 12px;padding:8px 12px;font-size:10px;line-height:1.55;max-width:72%;margin-left:auto;">${esc(b.text)}</div>`;
+  const sideCard = (c: { title: string; body: string }) =>
+    `<div style="background:rgba(255,255,255,0.08);border-radius:14px;padding:12px 16px;flex:1;"><div style="font-size:11px;font-weight:700;">${esc(c.title)}</div><div style="font-size:10.5px;color:rgba(255,255,255,0.72);line-height:1.55;margin-top:3px;">${esc(c.body)}</div></div>`;
+  const benefit = (eb: string, body: string) => `<div style="flex:1;background:rgba(255,255,255,0.06);border-radius:14px;padding:12px 16px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(eb)}</div><div style="font-size:11px;line-height:1.6;color:rgba(255,255,255,0.8);margin-top:4px;">${esc(body)}</div></div>`;
+  const chatHeader = `<div style="display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.14);"><div style="width:24px;height:24px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${WHATSAPP}</svg></div><div><div style="font-size:10px;font-weight:700;">${esc(p.chat.assistant)}</div><div style="font-size:8px;font-weight:600;color:${ci.success};letter-spacing:0.12em;">ONLINE · WHATSAPP</div></div></div>`;
+  return section(pageDark(ci, "52px 60px 40px", "position:relative;overflow:hidden;"),
+    ghostNumeral(ci, "VI", true)
+    + podHeader(ci, WHATSAPP, "Pod VI of VIII · The Conversion Layer · Proprietary", "PSI · Pre-Sales Intelligence", "Interest into Intent", true)
+    + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.8);margin:16px 0 0;">${esc(p.intro)}</p>`
+    + `<div style="margin-top:16px;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.22);border-radius:16px;padding:18px 22px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">For ${esc(d.client_name)}</div><p style="font-size:12px;line-height:1.7;margin:8px 0 0;color:rgba(255,255,255,0.88);">${esc(p.for_client)}</p></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px;">${p.tiles.slice(0, 3).map(tile).join("")}</div>`
+    + `<div style="display:grid;grid-template-columns:1.15fr 1fr;gap:10px;margin-top:14px;">`
+    +   `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:14px 16px;">${chatHeader}${p.chat.bubbles.map(bubble).join("")}<div style="margin-top:10px;display:flex;justify-content:flex-end;"><div style="background:rgba(124,227,139,0.15);border:1px solid rgba(124,227,139,0.4);color:${ci.success};border-radius:999px;padding:4px 12px;font-size:8.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">${esc(p.chat.closing)}</div></div></div>`
+    +   `<div style="display:flex;flex-direction:column;gap:10px;">${p.side_cards.slice(0, 3).map(sideCard).join("")}</div>`
+    + `</div>`
+    + `<div style="display:flex;gap:10px;margin-top:14px;">${benefit("Client benefit", p.benefit_client)}${benefit("Connects forward", p.benefit_forward)}</div>`
+    + footerDark(d.brand_short, 14));
+}
+
+// 15 PODS VII-VIII (light). Two pod blocks + the illustrative dashboard: 2x2 dark KPI tiles with SVG sparklines.
+function sparkline(ci: CiTokens, kind: "line-down" | "bars" | "line-up" | "gauge"): string {
+  const open = `<svg width="100%" height="40" viewBox="0 0 100 26" preserveAspectRatio="none">`;
+  if (kind === "line-down") return open + `<polyline points="0,5 20,8 40,7 60,13 80,17 100,21" fill="none" stroke="${ci.success}" stroke-width="2.5" stroke-linecap="round"></polyline></svg>`;
+  if (kind === "line-up") return open + `<polyline points="0,21 20,18 40,19 60,12 80,9 100,4" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.5" stroke-linecap="round"></polyline></svg>`;
+  if (kind === "gauge") return open + `<path d="M10 24 A 40 40 0 0 1 90 24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="5" stroke-linecap="round"></path><path d="M10 24 A 40 40 0 0 1 62 6" fill="none" stroke="${ci.success}" stroke-width="5" stroke-linecap="round"></path></svg>`;
+  const bar = (x: number, y: number, h: number, fill: string) => `<rect x="${x}" y="${y}" width="10" height="${h}" rx="2" fill="${fill}"></rect>`;
+  return open + bar(4, 14, 12, `${ci.accentOnDark}55`) + bar(20, 11, 15, `${ci.accentOnDark}88`) + bar(36, 13, 13, `${ci.accentOnDark}66`) + bar(52, 8, 18, `${ci.accentOnDark}bb`) + bar(68, 5, 21, ci.accentOnDark) + bar(84, 2, 24, `${ci.accentOnDark}dd`) + `</svg>`;
+}
+function pods78Page(d: ProposalDoc, ci: CiTokens): string {
+  const p = d.pods78;
+  const podBlock = (roman: string, name: string, subtitle: string, para: string, chip: string) =>
+    `<div style="background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:center;gap:10px;">${podDisc(ci, roman)}<div><div style="font-size:14px;font-weight:800;text-transform:uppercase;">${esc(name)}</div><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accent};">${esc(subtitle)}</div></div></div>`
+    + `<p style="font-size:10px;line-height:1.55;color:${ci.body};margin:8px 0 0;">${esc(para)}</p>${tintChip(ci, chip)}</div>`;
+  const kpiTile = (t: { label: string; spark: "line-down" | "bars" | "line-up" | "gauge"; caption: string }) =>
+    `<div style="background:${ci.darkCard};border-radius:14px;padding:14px 18px;color:#FFFFFF;"><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(t.label)}</div><div style="margin-top:6px;">${sparkline(ci, t.spark)}</div><div style="font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-top:7px;">${esc(t.caption)}</div></div>`;
+  return section(pageLight("48px 60px 36px"),
+    eyebrow(ci, "The Engine · Conversion and Learning Layers") + headline28(ci, p.headline)
+    + `<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">`
+    +   podBlock("VII", "PSI Conversion Dashboard", "The bridge from marketing to your team", p.dashboard_para, p.dashboard_chip)
+    +   podBlock("VIII", "Media on GAS", "Learns, reallocates and scales winners", p.media_para, p.media_chip)
+    + `</div>`
+    + `<div style="margin-top:12px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
+    +   `<div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">The one screen the bi-weekly review argues from</div><div style="font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8496;">Illustrative preview · real baselines from week one</div></div>`
+    +   `<div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:10px;">${p.tiles.slice(0, 4).map(kpiTile).join("")}</div>`
+    + `</div>`
+    + footerLight(ci, d.brand_short, 15));
+}
+
 // ── document shell ────────────────────────────────────────────────────────────────────────────────────────────
 
 // Assemble the full HTML document: Poppins from Google Fonts, one fixed A4 page box per section, print geometry.
@@ -492,7 +563,7 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
     coverPage(d, ci), execPage(d, ci), opportunityPage(d, ci), strategyPage(d, ci), marketPage(d, ci),
     philosophyPage(d, ci), ecosystemPage(d, ci), dividerPage(d, ci),
     pods12Page(d, ci), audiencePage(d, ci), targetingPage(d, ci),
-    creativePage(d, ci), channelsPage(d, ci),
+    creativePage(d, ci), channelsPage(d, ci), psiPage(d, ci), pods78Page(d, ci),
   ].join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`
     + `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`
