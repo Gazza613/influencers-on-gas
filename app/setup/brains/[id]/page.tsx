@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBrain, listSources } from "@/lib/brains";
+import { getBrandKit } from "@/lib/studio";
 import BrainConsole from "@/components/BrainConsole";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,8 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
   const brain = await getBrain(id);
   if (!brain) notFound();
   const sources = await listSources(id);
+  // The brand doctrine (positioning + rules) is now edited on this page, not synced from a separate kit.
+  const kit = await getBrandKit(id).catch(() => null);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -19,7 +22,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
         <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[12px] uppercase tracking-wide text-ink-faint">brain</span>
         <span className="tabular text-base text-ink-faint">{brain.chunk_count ?? 0} passages</span>
       </div>
-      <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} />
+      <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} initialDoctrine={kit?.tone_notes ?? ""} />
     </div>
   );
 }

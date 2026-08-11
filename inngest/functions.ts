@@ -378,6 +378,9 @@ export const ingestSource = inngest.createFunction(
     const uri = String(event.data.uri || "");
     const text = String(event.data.text || "");
     const includePath = event.data.includePath ? String(event.data.includePath) : null;
+    // Optional tag on pasted knowledge (e.g. "compliance"), so the proposal + creative can retrieve that kind
+    // of passage specifically rather than treating it as generic text.
+    const kind = event.data.kind ? String(event.data.kind) : null;
 
     try {
       let items: { content: string; metadata?: Record<string, unknown> }[];
@@ -452,7 +455,7 @@ export const ingestSource = inngest.createFunction(
         if (!doc.content) throw new Error("that file had no readable text in it (a scanned image PDF has no text layer)");
         items = chunkText(doc.content).map((c) => ({ content: c, metadata: { url: uri, title: doc.title } }));
       } else {
-        items = chunkText(text).map((c) => ({ content: c, metadata: { title: uri || "Pasted note" } }));
+        items = chunkText(text).map((c) => ({ content: c, metadata: { title: uri || (kind === "compliance" ? "Compliance copy" : "Pasted note"), ...(kind ? { kind } : {}) } }));
       }
       if (!items.length) throw new Error("nothing to ingest");
 

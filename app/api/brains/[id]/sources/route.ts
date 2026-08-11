@@ -33,9 +33,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const includePath = typeof body.includePath === "string" ? body.includePath.trim() : "";
+  const kind = typeof body.kind === "string" && /^[a-z_]{2,20}$/.test(body.kind) ? body.kind : null;
   const sourceId = await createSource(id, type, uri, includePath || null);
   try {
-    await inngest.send({ name: "brain/ingest.source", data: { sourceId, clientId: id, type, uri, text, includePath: includePath || null } });
+    await inngest.send({ name: "brain/ingest.source", data: { sourceId, clientId: id, type, uri, text, includePath: includePath || null, kind } });
   } catch {
     return NextResponse.json({ error: "Generation engine not connected (Inngest)." }, { status: 503 });
   }

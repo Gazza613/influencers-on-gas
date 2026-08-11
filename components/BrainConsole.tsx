@@ -10,13 +10,31 @@ import BrainLibrary from "@/components/BrainLibrary";
 type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null };
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
-export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }: { brainId: string; initialSources: Source[]; chunkCount?: number }) {
+type Mode = "website" | "documents" | "youtube" | "text" | "compliance" | "positioning";
+
+// A professional 2px-stroke mark per source type, in the brain's violet->cyan family (via currentColor).
+function SourceIcon({ m }: { m: Mode }) {
+  const paths: Record<Mode, string> = {
+    website: `<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 3.5 5.8 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.8-3.5-9s1-6.5 3.5-9Z"/>`,
+    documents: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/>`,
+    youtube: `<rect x="2" y="5" width="20" height="14" rx="4"/><path d="m10 9 5 3-5 3z"/>`,
+    text: `<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/>`,
+    compliance: `<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 .58-.91l7-3.5a1 1 0 0 1 .84 0l7 3.5A1 1 0 0 1 20 6Z"/><path d="m9 12 2 2 4-4"/>`,
+    positioning: `<path d="m12 3 2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 15.9l-4.7 2.47.9-5.23-3.8-3.7 5.25-.76z"/>`,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden dangerouslySetInnerHTML={{ __html: paths[m] }} />;
+}
+
+export default function BrainConsole({ brainId, initialSources, chunkCount = 0, initialDoctrine = "" }: { brainId: string; initialSources: Source[]; chunkCount?: number; initialDoctrine?: string }) {
   const [sources, setSources] = useState<Source[]>(initialSources);
-  const [mode, setMode] = useState<"website" | "crawl" | "text" | "file">("website");
+  const [mode, setMode] = useState<Mode>("website");
   const [progress, setProgress] = useState("");
-  const [uri, setUri] = useState("");
-  const [includePath, setIncludePath] = useState("");
+  const [sites, setSites] = useState<string[]>([""]);      // multi-site website scrape
+  const [fullSite, setFullSite] = useState(true);          // full-site crawl vs a single page
   const [text, setText] = useState("");
+  const [compliance, setCompliance] = useState("");
+  const [doctrine, setDoctrine] = useState(initialDoctrine);
+  const [savingDoc, setSavingDoc] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState("");
 
@@ -39,18 +57,57 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
     }
   }
 
-  async function add() {
+  // WEBSITE(S). Multi-site: each row is scraped. Full-site crawls every page it can reach (no path scope);
+  // single-page reads just that URL. Both keep each page's own title + URL so a passage traces back to source.
+  async function addWebsites() {
+    const list = sites.map((s) => s.trim()).filter((s) => /^https?:\/\//i.test(s));
+    if (!list.length) { setAddErr("Enter at least one website URL (https://…)."); return; }
+    if (adding) return;
+    setAdding(true); setAddErr("");
+    const failed: string[] = [];
+    for (const site of list) {
+      const r = await fetch(`/api/brains/${brainId}/sources`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fullSite ? { type: "crawl", uri: site, includePath: "" } : { type: "website", uri: site }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) failed.push(`${site}: ${d?.error || "could not add"}`);
+    }
+    if (failed.length) setAddErr(failed.join(" · "));
+    else { setSites([""]); flex(fullSite ? "Scraping the site now, every page it can reach." : "Reading the page now."); }
+    await refresh(); setAdding(false);
+  }
+
+  // PASTE / COMPLIANCE. Both are pasted text; compliance is tagged kind:"compliance" so creative and the
+  // proposal's governance page can retrieve that kind of passage specifically.
+  async function addText(kind?: "compliance") {
+    const val = (kind === "compliance" ? compliance : text).trim();
+    if (val.length < 20) { setAddErr("Paste a bit more text to learn from."); return; }
     if (adding) return;
     setAdding(true); setAddErr("");
     const r = await fetch(`/api/brains/${brainId}/sources`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mode === "crawl" ? { type: "crawl", uri, includePath } : mode === "website" ? { type: "website", uri } : { type: "text", text }),
+      body: JSON.stringify({ type: "text", text: val, ...(kind ? { kind } : {}) }),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) { setAddErr(d?.error || "Could not add source"); setAdding(false); return; }
-    setUri(""); setText(""); setIncludePath("");
-    await refresh();
-    setAdding(false);
+    if (!r.ok) { setAddErr(d?.error || "Could not add"); setAdding(false); return; }
+    if (kind === "compliance") setCompliance(""); else setText("");
+    await refresh(); setAdding(false);
+  }
+
+  // POSITIONING & RULES (the brand doctrine, folded in). Saves to the brand kit and embeds it into the brain in
+  // one action, so it is retrievable, no separate "sync" step.
+  async function saveDoctrine() {
+    if (savingDoc) return;
+    if (doctrine.trim().length < 20) { setAddErr("Write a bit more positioning to learn from."); return; }
+    setSavingDoc(true); setAddErr("");
+    const s = await fetch(`/api/studio/brand-kit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: brainId, tone_notes: doctrine }) }).catch(() => null);
+    if (!s?.ok) { setSavingDoc(false); flex("Could not save the positioning."); return; }
+    const e = await fetch(`/api/brains/${brainId}/sync-doctrine`, { method: "POST" }).catch(() => null);
+    const d = await e?.json().catch(() => ({}));
+    setSavingDoc(false);
+    if (e?.ok) { flex("Saved. The brain has learnt the positioning and rules."); await refresh(); }
+    else flex(d?.error || "Saved, but could not embed it.");
   }
 
   // DOCUMENTS (articles, PDFs, decks, notes). Each file goes STRAIGHT to Blob from the browser - a serverless
@@ -139,73 +196,90 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
   return (
     <div className="mt-6 space-y-6">
       {/* Add knowledge */}
-      <div className="rounded-xl border border-line bg-surface-1 p-6">
-        <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Feed the brain</div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {([["file", "Documents"], ["website", "One page"], ["crawl", "Whole section"], ["text", "Paste text"]] as const).map(([m, label]) => (
-            <button key={m} onClick={() => setMode(m)}
-              className={`rounded-lg px-3 py-1.5 text-base font-semibold ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff]" : "border border-line text-ink-dim hover:text-ink"}`}>
-              {label}
+      <div className="overflow-hidden rounded-2xl border border-[#a855f7]/25 bg-surface-1 p-6">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a855f7]/15 text-[#c79bff]">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden><path d="M12 3a4 4 0 0 0-4 4 3.5 3.5 0 0 0-2 6.3A3.5 3.5 0 0 0 8 20a4 4 0 0 0 8 0 3.5 3.5 0 0 0 2-6.7A3.5 3.5 0 0 0 16 7a4 4 0 0 0-4-4Z" /><path d="M12 7v13M8.5 10.5 12 12l3.5-1.5" /></svg>
+          </span>
+          <div>
+            <h2 className="text-xl font-extrabold tracking-tight text-ink">Feed the knowledge</h2>
+            <p className="text-base text-ink-dim">Everything here becomes the brain&apos;s memory: chunked, embedded, and retrievable by every desk.</p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2.5">
+          {([["website", "Website"], ["documents", "Documents"], ["youtube", "YouTube"], ["text", "Paste text"], ["compliance", "Compliance"], ["positioning", "Positioning & rules"]] as const).map(([m, label]) => (
+            <button key={m} onClick={() => setMode(m)} disabled={m === "youtube"}
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : m === "youtube" ? "cursor-not-allowed border border-line/70 text-ink-faint" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+              <SourceIcon m={m} />{label}{m === "youtube" && <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-ink-faint">soon</span>}
             </button>
           ))}
         </div>
 
-        {mode === "file" ? (
+        <div className="mt-5">
+        {mode === "documents" ? (
           <>
-            {/* Articles, PDFs, decks, notes. Uploads straight to Blob and ingests as each one lands. */}
-            <label className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface-2/50 px-4 py-7 text-center hover:border-[#a855f7]/50">
+            {/* PDFs, decks, notes. Uploads straight to Blob and ingests as each one lands. */}
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface-2/50 px-4 py-8 text-center hover:border-[#a855f7]/50">
               <input type="file" multiple accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown,text/csv"
                 onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} disabled={adding} className="hidden" />
               <span className="text-base font-bold text-ink">Choose documents, or drop them here</span>
-              <span className="text-base text-ink-dim">Articles, PDFs, research, notes. Each one ingests as it lands.</span>
+              <span className="text-base text-ink-dim">PDFs, decks, research, notes. Each one ingests as it lands.</span>
               <span className="mt-1 text-base text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
             </label>
             {progress && <p className="mt-2 text-base text-ink-dim">Uploading {progress}…</p>}
           </>
-        ) : mode === "crawl" ? (
-          <>
-            {/* A WHOLE SECTION, not one page. Scraping the index of a blog gets fifty headlines and no
-                arguments; this brings every article in, each keeping its own title and URL so a passage can
-                always be traced back to what it came from. */}
-            <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://a-site.com/articles"
-              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong" />
-            {/* SCOPE. Without it a crawl wanders the whole site - the first real one returned a case study, a
-                solutions page and the sitemap alongside the articles. It also excludes the index page itself,
-                whose summaries are abbreviated restatements of the very articles we want and would compete
-                with them in retrieval. */}
-            <input value={includePath} onChange={(e) => setIncludePath(e.target.value)} placeholder="Only pages under this path, e.g. /blog"
-              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong" />
-            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">
-              {adding ? "Starting the crawl…" : "Crawl and add everything"}
-            </button>
-            <p className="mt-2.5 text-base text-ink-dim">
-              Reads every article it finds, up to 80 pages. Takes a few minutes and keeps running if you close
-              the tab. <b className="text-ink-dim">Set the path</b> when the articles live somewhere other than
-              the address you started from, which is the usual shape of a blog - an index at one path, the
-              articles at another.
-            </p>
-          </>
         ) : mode === "website" ? (
           <>
-            <input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://an-article.com/the-piece"
-              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
-            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-base font-bold disabled:opacity-50">
-              {adding ? "Adding to brain…" : "Add to brain"}
-            </button>
+            {/* Full site crawls every page it can reach (no path scope); single page reads just that URL. Each
+                page keeps its own title + URL so a passage always traces back to its source. */}
+            <div className="inline-flex rounded-lg border border-line p-1 text-[14px]">
+              <button onClick={() => setFullSite(true)} className={`rounded-md px-3 py-1.5 font-semibold ${fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Full site, all pages</button>
+              <button onClick={() => setFullSite(false)} className={`rounded-md px-3 py-1.5 font-semibold ${!fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Single page</button>
+            </div>
+            {sites.map((s, i) => (
+              <div key={i} className="mt-2.5 flex gap-2">
+                <input value={s} onChange={(e) => setSites((list) => list.map((x, j) => (j === i ? e.target.value : x)))} placeholder="https://the-client.com"
+                  className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong" />
+                {sites.length > 1 && <button onClick={() => setSites((list) => list.filter((_, j) => j !== i))} aria-label="Remove this website" className="shrink-0 rounded-lg border border-line px-3 text-ink-faint hover:border-alert/50 hover:text-alert">✕</button>}
+              </div>
+            ))}
+            <button onClick={() => setSites((list) => [...list, ""])} className="mt-2.5 text-[15px] font-semibold text-[#c79bff] hover:underline">+ Add another website</button>
+            <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding ? "Adding…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
+            <p className="mt-2.5 text-base text-ink-dim">{fullSite ? "Reads every page it can reach, up to 80 per site. Takes a few minutes and keeps running if you close the tab." : "Reads just the page at each URL."}</p>
+          </>
+        ) : mode === "youtube" ? (
+          <div className="rounded-xl border border-dashed border-line bg-surface-2/40 px-4 py-8 text-center">
+            <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-ink-faint"><SourceIcon m="youtube" /></span>
+            <p className="text-base font-bold text-ink">YouTube channel ingestion</p>
+            <p className="mt-1 text-base text-ink-dim">We will pull the channel&apos;s video transcripts into the brain, great for brand voice and thought leadership. This backend is being built next.</p>
+          </div>
+        ) : mode === "compliance" ? (
+          <>
+            <textarea value={compliance} onChange={(e) => setCompliance(e.target.value)} rows={5} placeholder="Paste the client's mandatory compliance copy: disclaimers, licence wording, advertising rules…"
+              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
+            <button onClick={() => addText("compliance")} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding ? "Adding…" : "Add compliance copy"}</button>
+            <p className="mt-2.5 text-base text-ink-dim">Tagged as <b className="text-ink-dim">compliance</b> so creative and the proposal&apos;s governance page can pull it specifically.</p>
+          </>
+        ) : mode === "positioning" ? (
+          <>
+            <textarea value={doctrine} onChange={(e) => setDoctrine(e.target.value)} rows={7} placeholder="The client's positioning, brand rules and proof points. What they stand for, how they talk, what is true about them, what must never be said…"
+              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
+            <button onClick={saveDoctrine} disabled={savingDoc} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{savingDoc ? "Saving…" : "Save & teach the brain"}</button>
+            <p className="mt-2.5 text-base text-ink-dim">This is the <b className="text-ink-dim">brand doctrine</b>: positioning, rules and proof points. Saved and embedded automatically, no separate sync step.</p>
           </>
         ) : (
           <>
-            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Paste brand notes, positioning, proof points, a transcript…"
-              className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
-            <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2 text-base font-bold disabled:opacity-50">
-              {adding ? "Adding to brain…" : "Add to brain"}
-            </button>
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="Paste brand notes, proof points, a transcript, a key document…"
+              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
+            <button onClick={() => addText()} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding ? "Adding…" : "Add to brain"}</button>
           </>
         )}
+        </div>
 
-        {addErr && <p className="mt-2 text-base text-alert">{addErr}</p>}
+        {addErr && <p className="mt-3 text-base text-alert">{addErr}</p>}
         {/* The isolation guarantee, said out loud where someone is about to hand us a client's private material. */}
-        <p className="mt-3 text-base text-ink-faint">
+        <p className="mt-4 text-base text-ink-faint">
           Everything added here is chunked and embedded into <b className="text-ink-dim">this brain only</b>. No other brain can read it.
         </p>
       </div>
