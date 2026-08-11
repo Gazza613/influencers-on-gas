@@ -457,7 +457,7 @@ create index if not exists idx_studio_templates_client on studio_templates(clien
 create table if not exists studio_assets (
   id         uuid primary key default gen_random_uuid(),
   client_id  uuid not null references clients(id) on delete cascade,
-  kind       text not null check (kind in ('reference','image','logo','font','video','ci_doc','deal_card')),
+  kind       text not null,
   name       text,
   url        text not null,
   meta       jsonb not null default '{}'::jsonb,     -- width, height, bytes, mime, tags
@@ -465,12 +465,6 @@ create table if not exists studio_assets (
 );
 create index if not exists idx_studio_assets_client on studio_assets(client_id, kind);
 
--- Deal cards (the client's promo callouts) are an asset kind too (spec 5b): the team uploads the designed pill, we recreate
--- it once as a pixel-matched component with the offer text as an editable slot, and the design is locked.
--- Widen the constraint on tables that already exist (no data touched - a CHECK, not a row).
-alter table studio_assets drop constraint if exists studio_assets_kind_check;
-alter table studio_assets add constraint studio_assets_kind_check
-  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card'));
 
 -- Client compliance line (e.g. MTN's "Ts&Cs Apply · Queries? 083135 · MTN JR AUTH FSP 46094"). It is
 -- client-level, not per-template, and must be reproducible VERBATIM on any creative that needs it - a
@@ -631,17 +625,16 @@ create table if not exists studio_campaigns (
 );
 create index if not exists studio_campaigns_client on studio_campaigns (client_id, created_at desc);
 
--- Phone screenshots (MoMo app / offer screens): the approved screen to show when a creative holds up a phone.
--- Never AI-invented UI - the team uploads real screenshots and we reference one at build time.
+-- studio_assets.kind - ONE authoritative constraint (consolidated 2026-08-11). This used to be redefined three
+-- times with growing lists; run top-to-bottom the first, narrow re-add failed on existing ceo_cutout rows, so
+-- migrate died before the full list and the live table ended up with NO constraint. Kinds, for reference:
+--   reference/deal_card/phone_screen - real funnel artwork creatives forensically match to
+--   logo/font/brand_icon              - brand kit assets (the mark, the type, the icon bubbles)
+--   ceo_photo/ceo_cutout/team_photo   - people: source portrait, matted cut-out, team pics
+--   image/video/ci_doc                - general upload, footage, CI document
 alter table studio_assets drop constraint if exists studio_assets_kind_check;
 alter table studio_assets add constraint studio_assets_kind_check
-  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen'));
-
--- Brand icons: the client's icon library (the floating icon bubbles - dice, call, bag, tap-to-pay, wifi - and
--- any other brand icons), so creatives reuse the real icons rather than inventing them.
-alter table studio_assets drop constraint if exists studio_assets_kind_check;
-alter table studio_assets add constraint studio_assets_kind_check
-  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon','ceo_photo','ceo_cutout'));
+  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon','ceo_photo','ceo_cutout','team_photo'));
 
 -- ── Subscriptions: the FIXED monthly exposure ────────────────────────────────
 -- Metered usage only ever answered "what did this job cost us at the margin?". For a platform built on
