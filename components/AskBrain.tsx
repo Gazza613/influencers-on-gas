@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Working, { WORKING_ASK, WORKING_ASK_WEB } from "@/components/Working";
+import { askConfirm } from "@/lib/confirm";
+import { flex } from "@/lib/flex";
 
 // ASK THE BRAIN. The team's everyday way into a client's knowledge, wherever they are working.
 //
@@ -44,13 +46,15 @@ export default function AskBrain({ clients, initialClientId }: { clients: Client
   const [openSources, setOpenSources] = useState(false);
   const [mode, setMode] = useState<Mode>("brain");
   const [answeredMode, setAnsweredMode] = useState<Mode>("brain");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<"" | "added" | "duplicate">("");
 
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
 
   async function ask(question?: string) {
     const text = (question ?? q).trim();
     if (!text || !clientId || busy) return;
-    setBusy(true); setErr(""); setAnswer(""); setHits([]); setAsked(text); setOpenSources(false);
+    setBusy(true); setErr(""); setAnswer(""); setHits([]); setAsked(text); setOpenSources(false); setSaved("");
     const d = await fetch(`/api/brains/${clientId}/query`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: text, mode }),
     }).then((r) => r.json()).catch(() => null);
@@ -61,6 +65,31 @@ export default function AskBrain({ clients, initialClientId }: { clients: Client
     // The mode the ANSWER was produced under, not whatever the control says now - otherwise changing the
     // selector after the fact would silently relabel an answer that is already on screen.
     setAnsweredMode((d.mode as Mode) || mode);
+  }
+
+  // SAVE THIS ANSWER INTO THE BRAIN so it compounds (Gary). A blended/web/Claude answer carries knowledge the
+  // client has not verified, so we make that explicit and store it as an unverified note, never as ground truth.
+  // Dedup on the server means "already there" is a real answer, not a duplicate.
+  async function addToBrain() {
+    if (saving || !answer) return;
+    if (answeredMode !== "brain") {
+      const ok = await askConfirm({
+        title: "Add this answer to the brain?",
+        body: "This answer includes general or web knowledge that is NOT part of the client's verified material. It will be saved as an UNVERIFIED note, tagged with where it came from, so it can never be mistaken for the client's own doctrine. Check it before you rely on it.",
+        confirmLabel: "Save as a note",
+      });
+      if (!ok) return;
+    }
+    setSaving(true);
+    const d = await fetch(`/api/brains/${clientId}/ingest-answer`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: asked, answer, mode: answeredMode }),
+    }).then((r) => r.json()).catch(() => null);
+    setSaving(false);
+    if (!d?.ok) { flex(d?.error || "Couldn't add that to the brain."); return; }
+    if (d.duplicate) { setSaved("duplicate"); flex("Already in the brain, nothing added."); return; }
+    setSaved("added");
+    flex(d.unverified ? "Saved to the brain as an unverified note." : "Saved to the brain.");
   }
 
   // Rewrite the question so it retrieves better, and SHOW what changed - the point is that the team learns to
@@ -180,6 +209,24 @@ export default function AskBrain({ clients, initialClientId }: { clients: Client
             </p>
           )}
           {asked && <p className="mt-4 text-[14px] text-ink-faint">You asked: {asked}</p>}
+          {/* ADD TO BRAIN: compound a useful answer back into the knowledge base. Non-brain answers save as an
+              explicitly unverified note (provenance kept), and the server dedups so "already there" is real. */}
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#a855f7]/20 pt-4">
+            {saved === "added" ? (
+              <span className="text-[15px] font-semibold text-[#86efac]">✓ Saved to the brain{answeredMode !== "brain" ? " as an unverified note" : ""}</span>
+            ) : saved === "duplicate" ? (
+              <span className="text-[15px] text-ink-dim">Already in the brain, nothing added.</span>
+            ) : (
+              <button onClick={addToBrain} disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#86efac]/50 px-4 py-2 text-[15px] font-bold text-[#86efac] hover:bg-[#86efac]/10 disabled:opacity-50">
+                {saving && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
+                {saving ? "Saving…" : "＋ Add this answer to the brain"}
+              </button>
+            )}
+            {answeredMode !== "brain" && saved !== "added" && (
+              <span className="text-[13px] text-[#fcd34d]">Saved as unverified, since it is not the client&apos;s own verified material.</span>
+            )}
+          </div>
         </div>
       )}
 
