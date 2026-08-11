@@ -164,6 +164,7 @@ export type ResearchClaim = {
   source_name: string | null; source_url: string | null; source_date: string | null; tier: number | null;
   verified: boolean; unverified_reason: string | null; conflict: string | null;
   rejected?: boolean; rejected_by?: string | null; in_brain?: boolean; in_brain_by?: string | null;
+  newsletter?: string | null; newsletter_art?: string | null; newsletter_options?: string[];
 };
 
 const noDash = (s: unknown) => String(s ?? "")
@@ -891,7 +892,7 @@ export async function markResearchFailed(runId: string, message: string): Promis
 /** The claims for a run, ordered for rendering (section order, then verified before unverified, Tier 1 first). */
 export async function listResearchClaims(runId: string): Promise<ResearchClaim[]> {
   return (await db().query(
-    `select id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, rejected, rejected_by, in_brain, in_brain_by
+    `select id, run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, rejected, rejected_by, in_brain, in_brain_by, newsletter, newsletter_art, newsletter_options
      from research_claims where run_id = $1 order by created_at asc`, [runId],
   )) as ResearchClaim[];
 }

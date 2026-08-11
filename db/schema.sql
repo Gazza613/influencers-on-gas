@@ -905,6 +905,12 @@ alter table research_runs add column if not exists cycle_id uuid;        -- the 
 alter table research_runs add column if not exists campaign_id uuid;     -- the campaign in focus (plain ref)
 alter table research_runs add column if not exists run_mode text not null default 'foundation';  -- foundation | delta
 alter table research_claims add column if not exists pillar_tags jsonb not null default '[]'::jsonb;  -- which downstream pillars each fact serves (strategist/audience/creative/psi/channels)
+-- The CEO newsletter drafted off a fact, kept so it SURVIVES a logout (Gary: "I clicked approve and it did
+-- nothing and when I went back it was gone"). Mirrors the studio_intel newsletter columns: the piece, the chosen
+-- creative, and the other renders so the choice can be revisited. Approving at the fact writes these; they reload.
+alter table research_claims add column if not exists newsletter text;
+alter table research_claims add column if not exists newsletter_art text;
+alter table research_claims add column if not exists newsletter_options jsonb not null default '[]'::jsonb;
 
 -- THE PROPOSAL (lives in the Strategist POD). The client-facing growth proposal built on the approved strategy for
 -- sign-off. Written on Fable 5, human-edited, then rendered to a client-branded PDF. objective = the Meta outcome

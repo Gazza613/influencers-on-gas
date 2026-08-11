@@ -209,7 +209,7 @@ function EyeMark() {
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
     label: "Intelligence",
-    note: "Know your customer: research → brain → strategy → proposal",
+    note: "Know your customer: research → brain → strategy → proposal.",
     doors: [
       {
         name: <>The Researcher</>,
@@ -261,7 +261,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   },
   {
     label: "Know",
-    note: "What we know, and how to ask it",
+    note: "What we know, and how to ask it.",
     doors: [
       {
         name: <>Ask the <span className="brand-grad">Brain</span></>,
@@ -288,7 +288,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   },
   {
     label: "Make",
-    note: "The work itself",
+    note: "The work itself.",
     doors: [
       {
         name: <>Influencers <span className="brand-grad">on</span> GAS</>,
@@ -318,7 +318,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   },
   {
     label: "Run",
-    note: "Live, in market, right now",
+    note: "Live, in market, right now.",
     doors: [
       {
         name: <>Media <span className="brand-grad">on</span> GAS</>,
@@ -460,9 +460,9 @@ export default function HomePage() {
           {GROUPS.map((g, gi) => (
             <section key={g.label}>
               {/* The group label carries a hairline out to the edge: it reads as a chapter, not a heading. */}
-              <div className="flex items-center gap-4">
-                <h2 className="tabular text-[13px] font-semibold uppercase tracking-[0.3em] text-ink-dim">{g.label}</h2>
-                <span className="text-[15px] text-ink-faint">{g.note}</span>
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <h2 className="tabular text-[20px] font-bold uppercase tracking-[0.18em] text-ink">{g.label}</h2>
+                <span className="text-[17px] text-ink-dim">{g.note}</span>
                 <span aria-hidden className="gas-draw h-px flex-1 bg-gradient-to-r from-line to-transparent" />
               </div>
               <div className="mt-4 grid gap-5 sm:grid-cols-2">

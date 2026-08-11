@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getBrain } from "@/lib/brains";
-import { listAssets } from "@/lib/studio";
+import { isSafePublicUrl } from "@/lib/safe-url";
+import { addAsset, deleteAsset, getBrandKit, listAssets, upsertBrandKit } from "@/lib/studio";
 
 // THE BRAND LIBRARY, SHOWN WHERE IT ALREADY LIVES (Gary: "those intake reference images ... should actually
 // always sit in a well structured brain section").
@@ -23,6 +24,7 @@ const GROUPS: { kind: string; label: string; note: string }[] = [
   { kind: "phone_screen", label: "Phone screens", note: "Real screenshots, never invented" },
   { kind: "brand_icon", label: "Brand icons", note: "" },
   { kind: "ceo_photo", label: "CEO photos", note: "Forensic source for the CEO creative" },
+  { kind: "team_photo", label: "Team photos", note: "Real people, used as the source for team creative" },
   { kind: "font", label: "Fonts", note: "" },
   { kind: "ci_doc", label: "CI documents", note: "" },
 ];
@@ -50,4 +52,49 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   return NextResponse.json({ groups, total: all.length });
+}
+
+// UPLOAD a brand-library file straight into the brain (Gary: the logo, CEO photo and team pics should be added
+// and removed HERE, not only through Intake). The browser uploads the file directly to Blob (the studio signer,
+// which allows images), then posts the finished URL here. Same client_id key, so it lands in the same library
+// the creatives forensically match to. A logo also joins the brand kit so the funnel and social sets see it.
+const UPLOADABLE = new Set(["logo", "ceo_photo", "team_photo", "brand_icon", "image", "phone_screen", "deal_card"]);
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const brain = await getBrain(id);
+  if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
+
+  const b = (await req.json().catch(() => ({}))) as { url?: string; kind?: string; name?: string; bytes?: number };
+  const kind = String(b.kind || "").trim();
+  const url = String(b.url || "").trim();
+  const name = String(b.name || "").trim();
+  if (!UPLOADABLE.has(kind)) return NextResponse.json({ error: `Can't add a "${kind}" here.` }, { status: 400 });
+  // Only ever register a blob from OUR OWN store, never an arbitrary URL (SSRF).
+  if (!url || !/\.blob\.vercel-storage\.com\//i.test(url) || !isSafePublicUrl(url)) {
+    return NextResponse.json({ error: "That file isn't in our storage." }, { status: 400 });
+  }
+
+  const asset = await addAsset(id, kind, url, name || null, { bytes: Number(b.bytes) || 0, original_name: name });
+  // A logo is also a brand-kit asset, so it serves the funnel and the social sets from one place (mirrors Intake).
+  if (kind === "logo") {
+    const kit = (await getBrandKit(id)) ?? (await upsertBrandKit(id, "Brand kit", {}));
+    await upsertBrandKit(id, kit.name, { logos: [...(kit.logos ?? []), { variant: "primary", url, name }] });
+  }
+  return NextResponse.json({ ok: true, id: asset.id, url, kind, name: name || null });
+}
+
+// REMOVE a brand-library file from the brain (Gary: "be able to remove them if necessary").
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const brain = await getBrain(id);
+  if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
+  const assetId = new URL(req.url).searchParams.get("assetId") || "";
+  if (!assetId) return NextResponse.json({ error: "assetId required" }, { status: 400 });
+  await deleteAsset(id, assetId);
+  return NextResponse.json({ ok: true });
 }

@@ -18,6 +18,7 @@ type Claim = {
   source_name: string | null; source_url: string | null; source_date: string | null;
   tier: number | null; verified: boolean; unverified_reason: string | null; conflict: string | null;
   rejected?: boolean; in_brain?: boolean;
+  newsletter?: string | null; newsletter_art?: string | null; newsletter_options?: string[];
 };
 type Competitor = { id: string; name: string; website: string | null; added_by: string | null };
 
@@ -115,7 +116,11 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const [socials, setSocials] = useState<string[]>([""]);   // the client's official social accounts (Gary: mine these too)
   const [socSaved, setSocSaved] = useState(false);
   // CEO NEWSLETTER (Gary): tag a fact -> write the CEO's LinkedIn piece + its creative, then approve/reject/rewrite.
-  const [nl, setNl] = useState<null | { claim: Claim; post: string; art: { subject: string; callout: string } | null; img: string | null; busy: boolean; imgBusy: boolean; err: string; note: string; showNote: boolean }>(null);
+  const [nl, setNl] = useState<null | { claim: Claim; post: string; art: { subject: string; callout: string } | null; img: string | null; imgs: string[]; busy: boolean; imgBusy: boolean; saving: boolean; saved: boolean; err: string; note: string; showNote: boolean }>(null);
+  // The newsletter preview is DRAGGABLE (Gary: "drag the preview box down using the bottom-right dragger") - the
+  // header moves it, and the panel itself resizes from its bottom-right corner (native CSS resize).
+  const [nlBox, setNlBox] = useState({ x: 0, y: 0 });
+  const nlDrag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
 
   const clientName = clients.find((c) => c.id === clientId)?.name || "the client";
   const isConfigured = configured.length === 0 || configured.includes(clientId);
@@ -372,7 +377,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // Write the CEO's LinkedIn newsletter from ONE fact, in the brain's voice, then render its creative. `note` folds
   // in a rewrite instruction. The piece lands first (fast); the image follows as its own short request.
   async function openNewsletter(c: Claim, note?: string) {
-    setNl({ claim: c, post: "", art: null, img: null, busy: true, imgBusy: false, err: "", note: "", showNote: false });
+    // If this fact already has a SAVED draft (survived a logout) and this isn't an explicit rewrite, reopen it as it
+    // was - the piece, the chosen creative and the other renders - rather than spending on a fresh generation.
+    if (!note && c.newsletter) {
+      const opts = Array.isArray(c.newsletter_options) ? c.newsletter_options : [];
+      setNl({ claim: c, post: c.newsletter, art: null, img: c.newsletter_art || opts[0] || null, imgs: opts, busy: false, imgBusy: false, saving: false, saved: true, err: "", note: "", showNote: false });
+      return;
+    }
+    setNl({ claim: c, post: "", art: null, img: null, imgs: [], busy: true, imgBusy: false, saving: false, saved: false, err: "", note: "", showNote: false });
     const r = await fetch(`/api/studio/researcher/newsletter`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, claimId: c.id, notes: note || "" }),
@@ -383,7 +395,33 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, subject: r.art?.subject, callout: r.art?.callout }),
     }).then((x) => x.json()).catch(() => null);
-    setNl((s) => s ? { ...s, imgBusy: false, img: img?.ok ? img.url : null } : s);
+    // The creative returns THREE renders when a CEO photo is on file (buildCeoCreatives); fall back to the single url.
+    const imgs: string[] = img?.ok ? (Array.isArray(img.urls) && img.urls.length ? img.urls : img.url ? [img.url] : []) : [];
+    setNl((s) => s ? { ...s, imgBusy: false, img: imgs[0] || null, imgs } : s);
+  }
+
+  // APPROVE saves the piece + the chosen creative + the other options ONTO the fact, so it survives a logout and
+  // reopens where it was (Gary). REJECT clears any saved draft. Both scoped to this brain's fact.
+  async function approveNewsletter() {
+    if (!nl) return;
+    setNl((s) => s ? { ...s, saving: true } : s);
+    const r = await fetch(`/api/studio/researcher/newsletter/save`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, claimId: nl.claim.id, newsletter: nl.post, art: nl.img || "", options: nl.imgs }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { setNl((s) => s ? { ...s, saving: false, err: r?.error || "Couldn't save the piece." } : s); return; }
+    // Reflect the save on the fact so a reopen loads it and a small marker shows it is kept.
+    setClaims((cs) => cs.map((x) => x.id === nl.claim.id ? { ...x, newsletter: nl.post, newsletter_art: nl.img || null, newsletter_options: nl.imgs } : x));
+    setNl(null);
+    flex("Approved and saved to this fact. It survives logout and is ready for the CEO: copy the post, download the image.");
+  }
+  async function rejectNewsletter() {
+    if (!nl) return;
+    if (nl.saved || nl.claim.newsletter) {
+      await fetch(`/api/studio/researcher/newsletter/save?clientId=${encodeURIComponent(clientId)}&claimId=${encodeURIComponent(nl.claim.id)}`, { method: "DELETE" }).catch(() => {});
+      setClaims((cs) => cs.map((x) => x.id === nl.claim.id ? { ...x, newsletter: null, newsletter_art: null, newsletter_options: [] } : x));
+    }
+    setNl(null);
   }
 
   const bySection = (id: string) => claims.filter((c) => c.section === id);
@@ -678,7 +716,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                           {c.claim}
                         </p>
                         <div className="flex shrink-0 gap-2">
-                          <button onClick={() => openNewsletter(c)} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-sm font-semibold text-[#c79bff] hover:bg-[#a855f7]/10" title="Write the CEO's LinkedIn newsletter from this fact, then approve, reject or rewrite">CEO Newsletter</button>
+                          <button onClick={() => openNewsletter(c)} className={`rounded-lg border px-3 py-1.5 text-sm font-semibold hover:bg-[#a855f7]/10 ${c.newsletter ? "border-[#86efac]/50 text-[#86efac]" : "border-[#a855f7]/40 text-[#c79bff]"}`} title={c.newsletter ? "A CEO newsletter is saved on this fact - open to view, edit or download" : "Write the CEO's LinkedIn newsletter from this fact, then approve, reject or rewrite"}>{c.newsletter ? "CEO Newsletter ✓" : "CEO Newsletter"}</button>
                           <button onClick={() => brainClaim(c, true)} className="rounded-lg border border-[#86efac]/40 px-3 py-1.5 text-sm font-semibold text-[#86efac] hover:bg-[#86efac]/10" title="Keep this fact - it moves to In the Brain and drops out of the next run's new list">Add to Brain</button>
                           <button onClick={() => rejectClaim(c, true)} className="rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this fact - it disappears and is never referenced again">Reject</button>
                         </div>
@@ -743,12 +781,21 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       {/* CEO NEWSLETTER preview: the post + its creative, with approve / reject / rewrite. */}
       {nl && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:p-8" onClick={() => setNl(null)}>
-          <div className="w-full max-w-3xl rounded-2xl border border-[#a855f7]/30 bg-surface-1 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-[#c79bff]">CEO Newsletter</h3>
+          <div
+            className="flex max-h-[92vh] w-full max-w-3xl resize flex-col overflow-auto rounded-2xl border border-[#a855f7]/30 bg-surface-1 shadow-2xl"
+            style={{ transform: `translate(${nlBox.x}px, ${nlBox.y}px)` }}
+            onClick={(e) => e.stopPropagation()}>
+            {/* Drag handle: the header. Grab it to move the box; resize from the bottom-right corner (native). */}
+            <div
+              onPointerDown={(e) => { nlDrag.current = { sx: e.clientX, sy: e.clientY, ox: nlBox.x, oy: nlBox.y }; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
+              onPointerMove={(e) => { const d = nlDrag.current; if (d) setNlBox({ x: d.ox + (e.clientX - d.sx), y: d.oy + (e.clientY - d.sy) }); }}
+              onPointerUp={() => { nlDrag.current = null; }}
+              className="flex cursor-move items-center justify-between border-b border-line px-6 py-4 select-none">
+              <h3 className="text-xl font-bold text-[#c79bff]">CEO Newsletter <span className="ml-1 text-sm font-normal text-ink-faint">⠿ drag to move</span></h3>
               <button onClick={() => setNl(null)} className="rounded px-2 text-lg text-ink-faint hover:text-ink" aria-label="Close">✕</button>
             </div>
-            <p className="mt-1 text-sm text-ink-faint">In the CEO&apos;s voice, from: &ldquo;{nl.claim.claim.slice(0, 90)}{nl.claim.claim.length > 90 ? "…" : ""}&rdquo;</p>
+            <div className="p-6">
+            <p className="mt-0 text-sm text-ink-faint">In the CEO&apos;s voice, from: &ldquo;{nl.claim.claim.slice(0, 90)}{nl.claim.claim.length > 90 ? "…" : ""}&rdquo;</p>
 
             {nl.err ? (
               <div className="mt-4 rounded-lg border border-alert/40 bg-alert/5 p-4 text-base text-alert">{nl.err}</div>
@@ -758,12 +805,27 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
                 <div>
                   {nl.imgBusy ? (
-                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 text-base text-ink-dim">Rendering the image…</div>
+                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 text-base text-ink-dim">Rendering three options…</div>
                   ) : nl.img ? (
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={nl.img} alt="CEO newsletter creative" className="w-full rounded-xl border border-line" />
-                      <a href={nl.img} download target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-semibold text-[#c79bff] hover:underline">Download image</a>
+                      {/* THREE OPTIONS (Gary): the creative returns three renders when a CEO photo is on file. Pick one. */}
+                      {nl.imgs.length > 1 && (
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {nl.imgs.map((u, i) => (
+                            <button key={u} onClick={() => setNl((s) => s ? { ...s, img: u } : s)} title={`Option ${i + 1}`}
+                              className={`overflow-hidden rounded-lg border-2 transition ${nl.img === u ? "border-[#c79bff]" : "border-line hover:border-line-strong"}`}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={u} alt={`Option ${i + 1}`} className="aspect-square w-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-2 flex items-center gap-3">
+                        <a href={nl.img} download target="_blank" rel="noreferrer" className="text-sm font-semibold text-[#c79bff] hover:underline">Download image</a>
+                        {nl.imgs.length > 1 && <span className="text-sm text-ink-faint">Option {nl.imgs.indexOf(nl.img) + 1} of {nl.imgs.length}</span>}
+                      </div>
                     </>
                   ) : (
                     <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 p-4 text-center text-base text-ink-faint">No image. Upload a CEO photo to this brain to composite the real portrait.</div>
@@ -786,13 +848,16 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                     <button onClick={() => openNewsletter(nl.claim, nl.note)} className="btn-brand rounded-lg px-4 py-2 text-base font-bold">Rewrite</button>
                   </div>
                 )}
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button onClick={() => { setNl(null); flex("Approved. Copy the post and download the image to publish on LinkedIn."); }} className="rounded-lg border border-[#86efac]/50 px-4 py-2 text-base font-bold text-[#86efac] hover:bg-[#86efac]/10">Approve</button>
-                  <button onClick={() => setNl(null)} className="rounded-lg border border-[#f87171]/50 px-4 py-2 text-base font-bold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <button onClick={approveNewsletter} disabled={nl.saving} className="rounded-lg border border-[#86efac]/50 px-4 py-2 text-base font-bold text-[#86efac] hover:bg-[#86efac]/10 disabled:opacity-50">{nl.saving ? "Saving…" : nl.saved ? "Save changes" : "Approve"}</button>
+                  <button onClick={rejectNewsletter} className="rounded-lg border border-[#f87171]/50 px-4 py-2 text-base font-bold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
                   <button onClick={() => setNl((s) => s ? { ...s, showNote: !s.showNote } : s)} className="rounded-lg border border-line px-4 py-2 text-base font-bold text-ink hover:border-line-strong">Rewrite</button>
+                  {nl.saved && <span className="text-sm text-[#86efac]">✓ Saved to this fact</span>}
                 </div>
+                <p className="mt-2 text-sm text-ink-faint">Approve keeps the piece and the chosen image on this fact, so it survives a logout and is ready to hand to the CEO.</p>
               </>
             )}
+            </div>
           </div>
         </div>
       )}
