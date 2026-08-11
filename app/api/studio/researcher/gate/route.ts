@@ -32,6 +32,17 @@ export async function POST(req: Request) {
   if (!rows[0]) return NextResponse.json({ error: "That research is not awaiting review (already approved, rejected, or superseded)." }, { status: 409 });
   // Drive the pipeline through an event (spec 4.4). research/approved is the ONLY seam the Strategist can start
   // from, so approval is enforced at the workflow level, not just in the UI.
-  if (action === "approve") await inngest.send({ name: "research/approved", data: { clientId, runId } }).catch(() => {});
-  return NextResponse.json({ ok: true, run: rows[0] });
+  let brainFacts = 0;
+  if (action === "approve") {
+    // Count the facts that WILL be embedded into the brain (same filter as ingestApprovedResearch), so the toast
+    // can confirm "N facts added to the brain". The embed itself runs durably in the onResearchApproved job.
+    const c = (await db().query(
+      `select count(*)::int as n from research_claims
+       where run_id = $1 and client_id = $2 and rejected = false and section <> 'unverified' and claim <> ''`,
+      [runId, clientId],
+    )) as { n: number }[];
+    brainFacts = c[0]?.n || 0;
+    await inngest.send({ name: "research/approved", data: { clientId, runId } }).catch(() => {});
+  }
+  return NextResponse.json({ ok: true, run: rows[0], brainFacts });
 }

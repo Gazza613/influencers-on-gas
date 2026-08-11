@@ -319,7 +319,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   async function gate(action: "approve" | "reject") {
     if (!run) return;
     if (action === "reject" && !(await askConfirm({ title: `Reject research v${run.version}?`, body: "It is archived and the pipeline stops here for this client. You can commission a fresh run any time.", tone: "danger", confirmLabel: "Reject" }))) return;
-    if (action === "approve" && !(await askConfirm({ title: `Approve research v${run.version} as the fact base?`, body: "It locks as the fact base and the Strategist can start from it. Approve facts you have checked.", confirmLabel: "Approve" }))) return;
+    if (action === "approve" && !(await askConfirm({ title: `Approve research v${run.version} as the fact base?`, body: "It locks as the fact base, the Strategist can start from it, and every fact is added to the brain so the whole platform can retrieve it. Approve facts you have checked.", confirmLabel: "Approve" }))) return;
     setBusy(true);
     const r = await fetch(`/api/studio/researcher/gate`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -327,7 +327,10 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (!r?.ok) { flex(r?.error || "Couldn't record that."); return; }
-    flex(action === "approve" ? "Approved. The fact base is locked." : "Rejected and archived.");
+    if (action === "approve") {
+      const n = Number(r.brainFacts) || 0;
+      flex(n > 0 ? `Approved. The fact base is locked and ${n} fact${n === 1 ? "" : "s"} ${n === 1 ? "is" : "are"} being added to the brain.` : "Approved. The fact base is locked.");
+    } else flex("Rejected and archived.");
     await load(clientId);
   }
 
