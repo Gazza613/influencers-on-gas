@@ -639,7 +639,7 @@ function funnelPage(d: ProposalDoc, ci: CiTokens): string {
   const td = (t: string, bold: boolean) => `<div style="padding:7px 12px;border-top:1px solid #EEE8F5;color:${bold ? ci.body : ci.muted};${bold ? "font-weight:700;" : ""}">${esc(t)}</div>`;
   const rows = f.kpis.map((k) => td(k.metric, true) + td(k.why, false) + td(k.baseline, false)).join("");
   return section(pageLight("48px 60px 36px"),
-    eyebrow(ci, "09 · Funnel Economics and KPIs") + headline28(ci, { lead: "A precision funnel,", gradient: "measured against reality" })
+    eyebrow(ci, "09 · Funnel Economics and KPIs") + headline28(ci, { lead: "A precision funnel,", gradient: "measured against reality." })
     + `<p style="font-size:9.5px;line-height:1.55;color:${ci.muted};margin:8px 0 0;font-style:italic;">${esc(f.disclaimer)}</p>`
     + `<div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">${f.bars.slice(0, 6).map(bar).join("")}</div>`
     + miniEyebrow(ci, "KPIs, agreed up front")
@@ -655,7 +655,7 @@ function governancePage(d: ProposalDoc, ci: CiTokens): string {
   const pill = (t: string) =>
     `<div style="display:flex;align-items:center;gap:7px;background:${ci.darkCard};border-radius:999px;padding:6px 11px;color:#FFFFFF;white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${SHIELD}</svg><span style="font-size:7.8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${t}</span></div>`;
   return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "10 · Governance") + headline(ci, { lead: "Trusted with data,", gradient: "by design" })
+    eyebrow(ci, "10 · Governance") + headline(ci, { lead: "Trusted with data,", gradient: "by design." })
     + `<p style="font-size:11.5px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.governance.intro)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">${d.governance.commitments.slice(0, 8).map((c) => card(c.title, c.body)).join("")}</div>`
     + `<div style="margin-top:12px;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:10px;justify-content:space-between;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">Compliance stack</div><div style="display:flex;gap:8px;flex-wrap:nowrap;">${["POPIA", "GDPR-aligned", "Platform policies", "Verified-claims register"].map(pill).join("")}</div></div>`
@@ -727,7 +727,7 @@ function agreementPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accent};">${esc(title)}</div><div style="font-size:11px;line-height:1.6;color:${ci.body};margin-top:6px;">${esc(body)}</div></div>`;
   const cards = d.agreement.clauses.slice(0, 6).map((c, i) => clause(CLAUSE_TITLES[i] || c.title, c.body)).join("");
   return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "13 · Agency Agreement") + headline(ci, { lead: "Simple terms,", gradient: "in plain language" })
+    eyebrow(ci, "13 · Agency Agreement") + headline(ci, { lead: "Simple terms,", gradient: "in plain language." })
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.muted};margin:12px 0 0;">${esc(d.agreement.intro)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;flex:1;">${cards}</div>`
     + `<div style="margin-top:14px;background:${ci.darkPage};border-radius:16px;padding:16px 24px;color:#FFFFFF;display:flex;align-items:center;gap:16px;"><div style="width:34px;height:34px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></div><div style="font-size:11.5px;line-height:1.6;color:rgba(255,255,255,0.85);">That is the whole agreement: six clauses, one page. Deliberately simple, binding on signature, and written so a decision can be made in the room.</div></div>`);
@@ -736,6 +736,11 @@ function agreementPage(d: ProposalDoc, ci: CiTokens): string {
 // 24 SIGN-OFF (light). Two signature cards: client (data) + agency (fixed GAS/Gary Berman).
 function signoffPage(d: ProposalDoc, ci: CiTokens): string {
   const s = d.signoff;
+  // The client mark: their logo when on file, else a clean monogram of the client name (never an empty disc).
+  const clientInitial = (d.client_name.trim()[0] || "•").toUpperCase();
+  const clientMark = d.client_logo
+    ? `<img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" style="width:32px;height:32px;border-radius:50%;object-fit:contain;background:#FFFFFF;">`
+    : `<div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:13px;">${esc(clientInitial)}</div>`;
   const sigRule = `<div style="margin-top:26px;"><div style="border-bottom:1.5px solid rgba(26,16,48,0.35);height:34px;"></div><div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};margin-top:6px;"><span>Signature</span><span>Date</span></div></div>`;
   const clientCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
     + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the client</div>`
@@ -743,7 +748,7 @@ function signoffPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="margin-top:14px;"><div style="font-size:13px;font-weight:700;">Authorised Signatory</div><div style="font-size:11px;color:${ci.muted};margin-top:2px;">${esc(s.client.signatory_label)}</div></div>`
     + `<div style="font-size:10.5px;line-height:1.8;color:${ci.muted};margin-top:10px;">${s.client.contacts.map((c) => `<div>${esc(c)}</div>`).join("")}</div>`
     + sigRule
-    + `<div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;"><div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};"></div><div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};">${esc(s.client.tagline)}</div></div></div>`;
+    + `<div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;">${clientMark}<div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};">${esc(s.client.tagline)}</div></div></div>`;
   const agencyCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;color:#1A1030;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
     + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the agency</div>`
     + `<div style="font-size:16px;font-weight:800;text-transform:uppercase;margin-top:6px;">GAS Marketing Automation</div>`
