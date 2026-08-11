@@ -41,6 +41,8 @@ export type ProposalDoc = {
     quotes: { body: string; source: string }[];                  // 4
     actions: { title: string; body: string }[];                  // 6
   };
+  ecosystem_intro: string;   // 1 client-specific line on the ecosystem page (pods/layers are fixed)
+  divider_line: string;      // 1 client-specific line on the VIII divider ("...the {campaign} specifically")
 };
 
 // ── primitives ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -75,6 +77,11 @@ function headline(ci: CiTokens, h: Headline, size = 30): string {
 const footerLight = (ci: CiTokens, brandShort: string, n: number) =>
   `<div style="margin-top:auto;padding-top:14px;border-top:1px solid rgba(26,16,48,0.12);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};">`
   + `<span>GAS Marketing Automation · The Agency of NOW</span><span>${esc(brandShort)} · ${String(n).padStart(2, "0")}</span></div>`;
+
+// The dark-page footer rule (white on the CI dark ground). n omitted => no page number (dividers).
+const footerDark = (brandShort: string, n: number | null, mt = "14px") =>
+  `<div style="margin-top:${mt};padding-top:14px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);position:relative;">`
+  + `<span>GAS Marketing Automation · The Agency of NOW</span><span>${esc(brandShort)}${n ? ` · ${String(n).padStart(2, "0")}` : ""}</span></div>`;
 
 const pageLight = (padding: string, extra = "") =>
   `background:#FAF8FC;color:#1A1030;font-family:Poppins,sans-serif;display:flex;flex-direction:column;padding:${padding};${extra}`;
@@ -235,11 +242,84 @@ function marketPage(d: ProposalDoc, ci: CiTokens): string {
     + footerLight(ci, d.brand_short, 5));
 }
 
+// 06 CORE PHILOSOPHY (dark). Fixed agency doctrine (Gary: fixed template). AI does / Humans do / Together + chips.
+const PHIL_INTRO = "Technology is the engine; human connection remains the steering wheel. AI is deployed to remove repetitive work, respond instantly and qualify at scale, so your people spend their time where only humans add value. This is the specific combination that outperforms either alone.";
+const PHIL_AI = "Data processing, research at scale, creative volume, real-time intent scoring, WhatsApp qualification, retargeting workflows and continuous budget optimisation.";
+const PHIL_HUMAN = "Strategy, empathy, StorySelling nuance, judgement, compliance sensitivity, the final decision and the client relationship. Your people stay at the heart of every relationship.";
+const PHIL_TOGETHER = "Deeper partnerships built on transparency, accountability and shared success, at a speed and scale neither could reach alone. It is the specific combination that outperforms either alone.";
+function philosophyPage(d: ProposalDoc, ci: CiTokens): string {
+  const chip = (t: string) => `<div style="flex:1;text-align:center;background:rgba(255,255,255,0.10);border-radius:999px;padding:9px 16px;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;white-space:nowrap;">${t}</div>`;
+  const CPU = `<rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path>`;
+  const HEART = `<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>`;
+  const glassCard = (pill: string, body: string) =>
+    `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:18px;padding:20px 22px;">${pill}<p style="font-size:12px;line-height:1.7;color:rgba(255,255,255,0.8);margin:12px 0 0;">${esc(body)}</p></div>`;
+  const aiPill = `<div style="background:${ci.accentGrad};border-radius:999px;padding:5px 14px;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CPU}</svg>AI does</div>`;
+  const humanPill = `<div style="background:#FFFFFF;color:#1A1030;border-radius:999px;padding:5px 14px;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A1030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${HEART}</svg>Humans do</div>`;
+  return section(pageDark(ci, "52px 60px 40px"),
+    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">05 · Core Philosophy</div>`
+    + `<div style="font-size:34px;font-weight:800;text-transform:uppercase;line-height:1.1;margin-top:10px;">Human Command. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">AI Execution.</span></div>`
+    + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(PHIL_INTRO)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px;">${glassCard(aiPill, PHIL_AI)}${glassCard(humanPill, PHIL_HUMAN)}</div>`
+    + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:18px;padding:20px 24px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">Together</div><p style="font-size:13px;font-weight:600;line-height:1.6;margin:8px 0 0;color:rgba(255,255,255,0.9);">${esc(PHIL_TOGETHER)}</p></div>`
+    + `<div style="display:flex;gap:10px;margin-top:auto;padding-top:20px;flex-wrap:nowrap;">${chip("Accountability over activity")}${chip("Truth over comfort")}${chip("Speed with judgement")}</div>`
+    + footerDark(d.brand_short, 6));
+}
+
+// 07 THE ECOSYSTEM (light). Fixed 8 pods in 3 layers + fixed flow strip + fixed feedback pill; only the intro varies.
+const ecoDark = (ci: CiTokens, n: string, name: string, tag: string) =>
+  `<div style="background:${ci.darkCard};border-radius:14px;padding:13px 16px;color:#FFFFFF;"><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;color:${ci.accentOnDark};">${n}</div><div style="font-size:13px;font-weight:700;margin-top:3px;">${esc(name)}</div><div style="font-size:10.5px;color:rgba(255,255,255,0.72);margin-top:3px;line-height:1.5;">${esc(tag)}</div></div>`;
+const ecoLight = (ci: CiTokens, n: string, name: string, tag: string) =>
+  `<div style="background:#FFFFFF;border-radius:14px;padding:13px 16px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;color:${ci.accent};">${n}</div><div style="font-size:13px;font-weight:700;margin-top:3px;">${esc(name)}</div><div style="font-size:10.5px;color:${ci.muted};margin-top:3px;line-height:1.5;">${esc(tag)}</div></div>`;
+const FLOW: { accent: boolean; icon: string; label: string }[] = [
+  { accent: false, icon: `<circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>`, label: "Research" },
+  { accent: false, icon: `<circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>`, label: "Strategy" },
+  { accent: true, icon: `<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>`, label: "Audience" },
+  { accent: true, icon: `<path d="m12 19 7-7 3 3-7 7-3-3z"></path><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="m2 2 7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle>`, label: "Creative" },
+  { accent: true, icon: `<path d="m3 11 18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path>`, label: "Channels" },
+  { accent: false, icon: `<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>`, label: "PSI Qualify" },
+  { accent: false, icon: `<rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path>`, label: "Lead Mgmt" },
+  { accent: false, icon: `<path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path>`, label: "Optimise" },
+];
+function ecosystemPage(d: ProposalDoc, ci: CiTokens): string {
+  const layerLabel = (t: string) => `<div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};margin-bottom:8px;">${t}</div>`;
+  const node = (f: (typeof FLOW)[number]) => `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;width:62px;"><div style="width:30px;height:30px;border-radius:50%;background:${f.accent ? ci.accentGrad : ci.darkCard};display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${f.icon}</svg></div><div style="font-size:7.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${ci.muted};text-align:center;">${f.label}</div></div>`;
+  const arrow = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${ci.arrow}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:9px;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`;
+  const flow = FLOW.map(node).join(arrow);
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "06 · The Ecosystem") + headline(ci, { lead: "Eight integrated pods", gradient: "one engine" })
+    + `<p style="font-size:12.5px;line-height:1.7;color:${ci.body};margin:14px 0 0;">${esc(d.ecosystem_intro)}</p>`
+    + `<div style="margin-top:20px;">${layerLabel("Intelligence Layer")}<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${ecoDark(ci, "POD I", "The Researcher", "Your business brain: market, competitors, customer sentiment")}${ecoDark(ci, "POD II", "The Strategist", "Intelligence converted into a commercial plan and KPIs")}</div></div>`
+    + `<div style="margin-top:16px;">${layerLabel("Execution Layer")}<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">${ecoLight(ci, "POD III", "Audience Intelligence", "The right people, not the most people")}${ecoLight(ci, "POD IV", "Creative Studio", "Emotive StorySelling, tested at volume")}${ecoLight(ci, "POD V", "Channel Management", "Omnichannel media, tuned daily")}</div></div>`
+    + `<div style="margin-top:16px;">${layerLabel("Conversion and Learning Layers")}<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">${ecoDark(ci, "POD VI", "PSI · Pre-Sales Intelligence", "Every enquiry scored for intent, in real time")}${ecoDark(ci, "POD VII", "PSI Conversion Dashboard", "The bridge from marketing to your team")}${ecoDark(ci, "POD VIII", "Media on GAS", "Identifies the metrics that matter. Learns and scales winners.")}</div></div>`
+    + `<div style="margin-top:16px;background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};text-align:center;">How intelligence flows through the engine</div><div style="display:flex;align-items:flex-start;justify-content:center;gap:5px;margin-top:10px;">${flow}</div></div>`
+    + `<div style="margin-top:auto;background:${ci.accentGrad};border-radius:999px;padding:10px 22px;box-shadow:0 6px 18px rgba(46,26,74,0.2);color:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:12px;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;"><span style="width:22px;height:22px;border-radius:50%;background:${ci.iconDisc};display:inline-flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;">&#8635;</span><span>Feedback loop: every outcome flows back to sharpen the whole engine</span></div>`
+    + footerLight(ci, d.brand_short, 7));
+}
+
+// 08 POD DIVIDER (dark). Fixed giant "VIII" + headline + 8 pod chips; one client-specific intro line.
+function dividerPage(d: ProposalDoc, ci: CiTokens): string {
+  const chips = ["I · Researcher", "II · Strategist", "III · Audience", "IV · Creative", "V · Channels", "VI · Pre-Sales Intelligence", "VII · Conversion Dashboard", "VIII · Media on GAS"]
+    .map((t) => `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);border-radius:999px;padding:7px 16px;font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;">${t}</div>`).join("");
+  return section(pageDark(ci, "56px 64px 44px", "position:relative;overflow:hidden;background:" + ci.darkCard + ";"),
+    `<div style="position:absolute;left:-140px;bottom:-140px;width:480px;height:480px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,rgba(199,125,232,0) 70%);"></div>`
+    + `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};position:relative;">The Ecosystem, Pod by Pod</div>`
+    + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
+    +   `<div style="font-size:170px;font-weight:800;line-height:0.9;letter-spacing:-0.02em;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">VIII</div>`
+    +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.12;margin-top:18px;max-width:660px;">Eight AI Marketing Pods.<br>One accountable partner.</div>`
+    +   `<p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.68);margin:16px 0 0;max-width:480px;">${esc(d.divider_line)}</p>`
+    + `</div>`
+    + `<div style="display:flex;flex-wrap:wrap;gap:8px;position:relative;">${chips}</div>`
+    + footerDark(d.brand_short, null, "28px"));
+}
+
 // ── document shell ────────────────────────────────────────────────────────────────────────────────────────────
 
 // Assemble the full HTML document: Poppins from Google Fonts, one fixed A4 page box per section, print geometry.
 export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens()): string {
-  const pages = [coverPage(d, ci), execPage(d, ci), opportunityPage(d, ci), strategyPage(d, ci), marketPage(d, ci)].join("\n");
+  const pages = [
+    coverPage(d, ci), execPage(d, ci), opportunityPage(d, ci), strategyPage(d, ci), marketPage(d, ci),
+    philosophyPage(d, ci), ecosystemPage(d, ci), dividerPage(d, ci),
+  ].join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`
     + `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`
     + `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">`
