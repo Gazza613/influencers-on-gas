@@ -83,11 +83,15 @@ const isHex = (s?: string | null): s is string => !!s && /^#?[0-9a-fA-F]{3}([0-9
 export function deriveCiTokens(accent?: string | null, dark?: string | null): CiTokens {
   if (!isHex(accent)) return CHILLA_CI;
   const A = hexToRgb(accent);
-  // The dark ground: the client's own dark colour if given and valid, else a deep, slightly desaturated accent.
-  const D = isHex(dark) ? hexToRgb(dark) : darken(mix(A, { r: 20, g: 16, b: 40 }, 0.5), 0.55);
+  // THE DARK GROUND IS ITS OWN FAMILY, not a tint of the accent. The reference pairs a navy ground with a crimson
+  // accent (Boston) - the crimson lives ONLY in text, discs, chips and the corner glow, never in the ground. So the
+  // dark page/card gradients derive from D alone. D is the client's dark colour if given, else a deep near-neutral
+  // carrying just a whisper of the accent hue (so a mono-brand still reads on-brand without going garish).
+  const D = isHex(dark) ? hexToRgb(dark) : mix({ r: 14, g: 16, b: 30 }, A, 0.16);
+  const dp2 = mix(D, WHITE, 0.09), dp3 = mix(D, WHITE, 0.20);   // dark-page stops, staying in D's family
+  const dc1 = mix(D, WHITE, 0.05), dc2 = mix(D, WHITE, 0.12), dc3 = mix(D, WHITE, 0.22);   // dark-card stops
 
   const accentDeep = darken(A, 0.28);
-  const accentDeeper = darken(A, 0.5);          // last stop of dark-page/card gradients
   const accentBright = lighten(A, 0.42);        // icon-disc start, on-dark accent
   const accentMid = lighten(A, 0.12);           // icon-disc mid
   const accentSoft = lighten(A, 0.22);          // accent gradient start (chips)
@@ -96,8 +100,8 @@ export function deriveCiTokens(accent?: string | null, dark?: string | null): Ci
 
   return {
     pageBg: "#FAF8FC", ink: "#1A1030", body: "#372F45", muted: "#544A63",
-    darkPage: `linear-gradient(135deg,${H(D)} 0%,${H(mix(D, A, 0.35))} 55%,${H(accentDeeper)} 100%)`,
-    darkCard: `linear-gradient(160deg,${H(mix(D, A, 0.18))} 0%,${H(mix(D, A, 0.45))} 45%,${H(accentDeeper)} 100%)`,
+    darkPage: `linear-gradient(135deg,${H(D)} 0%,${H(dp2)} 55%,${H(dp3)} 100%)`,
+    darkCard: `linear-gradient(160deg,${H(dc1)} 0%,${H(dc2)} 45%,${H(dc3)} 100%)`,
     accentGrad: `linear-gradient(135deg,${H(accentSoft)} 0%,${H(accentDeep)} 100%)`,
     coverTextGrad: `linear-gradient(135deg,${H(coverStart)} 0%,${H(coverEnd)} 100%)`,
     iconDisc: `radial-gradient(120% 120% at 30% 25%,${H(accentBright)} 0%,${H(accentMid)} 38%,${H(accentDeep)} 100%)`,
