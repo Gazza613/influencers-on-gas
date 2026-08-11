@@ -2,9 +2,13 @@ import { inngest } from "@/lib/inngest";
 import { db } from "@/lib/db";
 import { buildResearchDocument } from "@/lib/research-doc";
 import {
-  ingestApprovedResearch, markResearchFailed, makeResearchProgress,
+  ingestApprovedResearch, markResearchFailed, makeResearchProgress, startResearchRun,
   prepareResearch, researchGatherPass1, researchGapFill, researchReview, researchVerify, researchStore,
 } from "@/lib/researcher-v3";
+
+// Where the weekly completion notice is attributed. The email itself is sent by buildResearchDocument to the same
+// address (NOTIFY_TO); this just stamps the run's user_email so the spend is attributed to the right person.
+const WEEKLY_TO = process.env.SUPER_ADMIN_EMAIL || process.env.COST_EMAIL_TO || "gary@gasmarketing.co.za";
 
 // THE RESEARCHER PIPELINE, DURABLE (build spec V3, sections 2 + 4.4 + 9).
 //
@@ -82,5 +86,38 @@ export const onResearchApproved = inngest.createFunction(
     const ingested = await step.run("ingest-to-brain", () => ingestApprovedResearch(clientId, runId).catch(() => 0));
     // SEAM (Phase 2): trigger the Strategist here. It is only ever reachable from an approved fact base.
     return { approved: runId, ingestedFacts: ingested };
+  },
+);
+
+// WEEKLY AUTO-RUN (Gary: "run the Researcher weekly on a Monday morning at 08h30 - a weekly toggle ON/OFF so we do
+// not waste money"). Every Monday 08:30 Africa/Johannesburg, run the Researcher for each brain that has opted in
+// (clients.research_weekly = true). OFF by default, so no brain is ever charged without opting in.
+//
+// Each brain's run goes through the SAME durable collect pipeline as a manual run, so it emails Gary a completion
+// notice and lands at Gate 1 for approve/reject. Existing facts do not resurface: kept facts are pre-tagged and
+// drop out of the live list, so a weekly run only ever surfaces what is genuinely new (a delta). A brain that is
+// already collecting is skipped by startResearchRun's own guard, so one slow run never blocks the batch.
+export const weeklyResearch = inngest.createFunction(
+  { id: "research-weekly", name: "Weekly Researcher auto-run", retries: 1, triggers: [{ cron: "TZ=Africa/Johannesburg 30 8 * * 1" }] },
+  async ({ step }) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const clientIds = await step.run("pick-opted-in", async () => {
+      const rows = (await db().query(`select id from clients where research_weekly = true order by created_at asc`)) as { id: string }[];
+      return rows.map((r) => String(r.id));
+    });
+    let started = 0;
+    for (const clientId of clientIds) {
+      const ok = await step.run(`start-${clientId}`, async () => {
+        try {
+          const { runId, version } = await startResearchRun(clientId, { userEmail: WEEKLY_TO, notes: "Weekly automatic run." });
+          await inngest.send({ name: "research/collect", data: { clientId, runId, version, today, userEmail: WEEKLY_TO, notes: "Weekly automatic run.", focus: null } });
+          return true;
+        } catch {
+          return false;   // concurrency guard or a not-ready brain: skip it, keep the batch going
+        }
+      });
+      if (ok) started++;
+    }
+    return { started, considered: clientIds.length };
   },
 );

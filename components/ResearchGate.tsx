@@ -223,6 +223,28 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   }, []);
   useEffect(() => { loadSpend(run?.id); }, [loadSpend, run?.id]);
 
+  // WEEKLY AUTO-RUN toggle (Gary): per client, Monday 08:30 SAST. Loaded for the selected client, off by default.
+  const [weekly, setWeekly] = useState<{ on: boolean; busy: boolean }>({ on: false, busy: false });
+  useEffect(() => {
+    if (!clientId) return;
+    let live = true;
+    fetch(`/api/studio/researcher/weekly?clientId=${clientId}`, { cache: "no-store" })
+      .then((r) => r.json()).then((d) => { if (live) setWeekly({ on: !!d?.enabled, busy: false }); }).catch(() => {});
+    return () => { live = false; };
+  }, [clientId]);
+  async function toggleWeekly() {
+    if (weekly.busy) return;
+    const next = !weekly.on;
+    setWeekly({ on: next, busy: true });
+    const d = await fetch(`/api/studio/researcher/weekly`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, enabled: next }),
+    }).then((r) => r.json()).catch(() => null);
+    if (!d?.ok) { setWeekly({ on: !next, busy: false }); flex(d?.error || "Couldn't change the weekly run."); return; }
+    setWeekly({ on: d.enabled, busy: false });
+    flex(d.enabled ? "Weekly auto-run ON. This brain runs every Monday 08:30 and emails you to approve." : "Weekly auto-run OFF. No scheduled runs for this brain.");
+  }
+
   async function createBrain() {
     const name = nb.name.trim();
     const sites = nb.sites.map((s) => s.trim()).filter(Boolean);
@@ -571,6 +593,25 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         )}
       </div>
       {!isConfigured && <p className="mt-2 text-base text-[#fca5a5]">This brain has nothing to research yet. Add the client and crawl their site into the brain first.</p>}
+
+      {/* WEEKLY AUTO-RUN (Gary): opt this brain into a Monday 08:30 run, off by default so nothing is charged
+          without opting in. It emails you when it lands, then you approve or reject at Gate 1 as usual. */}
+      {isConfigured && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-1 px-4 py-3">
+          <button role="switch" aria-checked={weekly.on} onClick={toggleWeekly} disabled={weekly.busy}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition ${weekly.on ? "bg-[#4ade80]" : "bg-surface-2 ring-1 ring-line"} disabled:opacity-60`}>
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${weekly.on ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+          <div className="min-w-0">
+            <div className="text-base font-semibold text-ink">Weekly auto-run · Monday 08:30</div>
+            <div className="text-sm text-ink-faint">
+              {weekly.on
+                ? "ON. This brain researches every Monday morning and emails you to approve. Only new facts surface."
+                : "OFF. Turn on to research this brain automatically each week, so you never forget and never overspend."}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DURABLE RUN IN PROGRESS (resumed after navigating away, or running in another tab). Safe to leave. */}
       {collecting && !running && (
