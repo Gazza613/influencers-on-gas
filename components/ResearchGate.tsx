@@ -650,8 +650,9 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         </div>
       )}
       {run?.status === "gate1_approved" && (
-        <div className="mt-6 rounded-xl border border-[#4ade80]/30 bg-[#4ade80]/[0.06] p-4 text-base text-[#86efac]">
-          <b>Fact base locked.</b> The Strategist can build from research v{run.version}. Collect again only if the ground truth has moved.
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#4ade80]/30 bg-[#4ade80]/[0.06] p-4 text-base text-[#86efac]">
+          <span><b>Fact base locked.</b> The facts are in the brain and the Strategist can build from research v{run.version}. Collect again only if the ground truth has moved.</span>
+          <button onClick={() => router.push("/strategist/plan")} className="shrink-0 rounded-lg bg-[#4ade80] px-4 py-2 text-base font-bold text-black hover:opacity-90">Go to the Strategist →</button>
         </div>
       )}
 
