@@ -8,8 +8,8 @@ import Link from "next/link";
 // The active step is lit in the accent; done/other steps are quiet links. Kept deliberately compact so it reads
 // as a breadcrumb-with-progress, not a second navigation bar.
 const STEPS: { n: number; label: string; href: string }[] = [
-  { n: 1, label: "Researcher", href: "/researcher" },
-  { n: 2, label: "Brain", href: "/setup/brains" },
+  { n: 1, label: "Brain", href: "/setup/brains" },
+  { n: 2, label: "Researcher", href: "/researcher" },
   { n: 3, label: "Strategist", href: "/strategist/plan" },
   { n: 4, label: "Proposal", href: "/strategist/plan" },
 ];

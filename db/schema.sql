@@ -39,6 +39,7 @@ alter table clients add column if not exists website text;
 alter table clients add column if not exists websites jsonb;   -- additional official sites (some clients run several)
 alter table clients add column if not exists socials jsonb not null default '[]'::jsonb;   -- the client's official social accounts (FB/IG/TikTok/LinkedIn/YouTube/X), mined by the Researcher
 alter table clients add column if not exists research_weekly boolean not null default false;   -- weekly auto-run of the Researcher (Mon 08:30 SAST); OFF by default so no spend happens without opting in
+alter table clients add column if not exists owner_context text;   -- when the subject is a product/brand owned by a parent (e.g. egifts24 owned by StellR): the Researcher researches the parent for context but attributes its people/numbers to the parent
 
 create table if not exists client_profiles (
   id                  uuid primary key default gen_random_uuid(),

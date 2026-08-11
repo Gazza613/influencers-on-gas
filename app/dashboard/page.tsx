@@ -48,19 +48,22 @@ function StudioMark() {
 
 // The Brain: a knowledge graph - a central node the whole engine reads and writes, with its connected memory.
 function BrainMark() {
+  // An actual brain (Gary): two hemispheres, the centre divide and inner folds, in the accent gradient.
   return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
+    <svg viewBox="0 0 24 24" fill="none" className="h-9 w-9" stroke="url(#br-g)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <defs>
-        <linearGradient id="br-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+        <linearGradient id="br-g" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
           <stop stopColor="#A855F7" /><stop offset="0.55" stopColor="#818CF8" /><stop offset="1" stopColor="#22D3EE" />
         </linearGradient>
       </defs>
-      <circle cx="24" cy="24" r="6" stroke="url(#br-g)" strokeWidth="2.6" />
-      <circle cx="10" cy="12" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
-      <circle cx="39" cy="13" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
-      <circle cx="12" cy="38" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
-      <circle cx="38" cy="37" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
-      <path d="M13 14.5l6.5 5.5M35.5 15.5l-6.5 4.5M15 35.5l5-6.5M35 34l-6-5" stroke="url(#br-g)" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M12 18V5" />
+      <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4" />
+      <path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5" />
+      <path d="M17.997 5.125a4 4 0 0 1 2.526 5.77" />
+      <path d="M18 18a4 4 0 0 0 2-7.464" />
+      <path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" />
+      <path d="M6 18a4 4 0 0 1-2-7.464" />
+      <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" />
     </svg>
   );
 }
@@ -209,29 +212,29 @@ function EyeMark() {
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
     label: "Intelligence",
-    note: "Know your customer: research → brain → strategy → proposal.",
+    note: "Know your customer: brain → research → strategy → proposal.",
     doors: [
-      {
-        name: <>The Researcher</>,
-        href: "/researcher",
-        mark: <ResearcherMark />,
-        blurb: "A commissioned deep dive on the client: the market, competitors, positioning and the facts, gathered and verified. It feeds the Brain directly, no duplication.",
-        action: "Research the market",
-        step: 1,
-        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
-        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
-        accent: "text-[#67e8f9]",
-      },
       {
         name: <>The <span className="brand-grad">Brain</span></>,
         href: "/setup/brains",
         mark: <BrainMark />,
-        blurb: "The client's living knowledge base. The Researcher's findings plus their site, documents and brand rules, chunked and embedded so every desk reads and writes to it.",
+        blurb: "The starting point and the client's living knowledge base. Enter their website(s) and it crawls them in with Firecrawl, so even JavaScript and Cloudflare sites read; add documents, logo and brand rules too.",
         action: "Build the Brain",
-        step: 2,
+        step: 1,
         ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
         wash: "from-[#a855f7]/[0.10] to-[#22d3ee]/[0.04]",
         accent: "text-[#c4b5fd]",
+      },
+      {
+        name: <>The Researcher</>,
+        href: "/researcher",
+        mark: <ResearcherMark />,
+        blurb: "A commissioned deep dive built on the brain: it reads the client's own crawled material as ground truth, then verifies the external record, the market, competitors and positioning, and feeds its findings back.",
+        action: "Research the market",
+        step: 2,
+        ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
+        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
+        accent: "text-[#67e8f9]",
       },
       {
         name: <>The Strategist</>,
