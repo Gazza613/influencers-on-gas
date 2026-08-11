@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { OBJECTIVES, TIERS, type ObjectiveId, type TierId } from "@/lib/proposal-config";
 import type { Proposal, ProposalContent } from "@/lib/proposal";
+import Working, { WORKING_PROPOSAL, WORKING_PDF } from "@/components/Working";
 
 // THE PROPOSAL BUILDER (in the Strategist POD). Runs from an approved strategy: pick the objective and tier, build
 // the client-facing growth proposal (Fable 5), review it. The branded PDF is the next increment. Never commits an
@@ -95,11 +96,16 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
             ))}
           </div>
         </div>
-        <button onClick={build} disabled={busy} className="rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+        <button onClick={build} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+          {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
           {busy ? "Working…" : proposal ? "Rebuild the proposal" : "Build the proposal"}
         </button>
       </div>
-      {msg && <p className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-ink-dim">{msg}</p>}
+      {pdfBusy
+        ? <div className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-accent"><Working messages={WORKING_PDF} /></div>
+        : (busy || gateBusy)
+          ? <div className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-accent"><Working messages={WORKING_PROPOSAL} /></div>
+          : msg && <p className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-ink-dim">{msg}</p>}
 
       {/* THE PROPOSAL DRAFT */}
       {c && (
@@ -281,7 +287,8 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
                   <input type="color" value={accent || "#3a5bd9"} onChange={(e) => setAccent(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-line bg-surface-2" />
                   {accent && <button onClick={() => setAccent("")} className="text-sm text-ink-faint hover:text-ink">auto-detect</button>}
                 </label>
-                <button onClick={makePdf} disabled={pdfBusy} className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                <button onClick={makePdf} disabled={pdfBusy} className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                  {pdfBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
                   {pdfBusy ? "Rendering…" : proposal?.pdf_url ? "Re-render PDF" : "Cut the final PDF"}
                 </button>
                 {proposal?.pdf_url && <a href={proposal.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink-dim hover:text-ink">Download PDF ↓</a>}

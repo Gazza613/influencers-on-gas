@@ -9,8 +9,11 @@ import { listStudioClients } from "@/lib/studio";
 // the last place anyone looks for a daily tool.
 export const dynamic = "force-dynamic";
 
-export default async function AskPage() {
+export default async function AskPage({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
   const clients = await listStudioClients().catch(() => []);
+  // Pre-focus on a brain when opened from its page ("Ask this brain"), so the team never re-picks the client.
+  const { client } = await searchParams;
+  const initialClientId = clients.some((c) => c.id === client) ? client! : "";
   return (
     <div className="min-h-screen bg-surface-0">
       <AppHeader />
@@ -24,7 +27,7 @@ export default async function AskPage() {
         </p>
         {clients.length === 0
           ? <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-lg text-ink-dim">No brains yet. Create one under Setup, Brains.</p>
-          : <AskBrain clients={clients} />}
+          : <AskBrain clients={clients} initialClientId={initialClientId} />}
       </main>
     </div>
   );

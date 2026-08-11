@@ -30,8 +30,8 @@ const MODES: { id: Mode; label: string; note: string }[] = [
 ];
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
-export default function AskBrain({ clients }: { clients: Client[] }) {
-  const [clientId, setClientId] = useState(clients[0]?.id || "");
+export default function AskBrain({ clients, initialClientId }: { clients: Client[]; initialClientId?: string }) {
+  const [clientId, setClientId] = useState(initialClientId || clients[0]?.id || "");
   const [q, setQ] = useState("");
   const [asked, setAsked] = useState("");
   const [answer, setAnswer] = useState("");

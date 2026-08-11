@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Strategy, StrategyContent } from "@/lib/cycle";
 import ProposalBuilder from "@/components/ProposalBuilder";
+import Working, { WORKING_STRATEGY } from "@/components/Working";
 
 // GATE 2 surface. Build a strategy from the approved fact base, review it, refine with notes if needed, then
 // approve. The Proposal (next step, same POD) will run from the approved strategy - shown here as the next move.
@@ -100,13 +101,16 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
             placeholder="The commercial objective for this strategy…"
             className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
           <button onClick={build} disabled={busy}
-            className="mt-3 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
-            {busy ? "Working…" : strategy ? "Build a new strategy" : "Build the strategy"}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+            {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+            {busy ? "Drafting and red-teaming…" : strategy ? "Build a new strategy" : "Build the strategy"}
           </button>
         </div>
       )}
 
-      {msg && <p className="mt-3 rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-lg text-ink-dim">{msg}</p>}
+      {busy
+        ? <div className="mt-3 rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-lg text-accent"><Working messages={WORKING_STRATEGY} /></div>
+        : msg && <p className="mt-3 rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-lg text-ink-dim">{msg}</p>}
 
       {/* THE STRATEGY */}
       {strategy && content && (
@@ -116,6 +120,11 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
             {status && <span className={`rounded-full border px-3 py-1 text-base font-semibold ${status.cls}`}>v{strategy.version} · {status.label}</span>}
             {data?.objective && <span className="text-base text-ink-faint">Objective: {data.objective}</span>}
           </div>
+          {/* Legend for the provenance badges used throughout, so "grounded" vs "assumption" is never a mystery. */}
+          <p className="text-base text-ink-faint">
+            <span className="mr-1.5 rounded bg-[#4ade80]/15 px-1.5 py-0.5 text-sm font-bold text-[#86efac]">grounded</span> traced to a verified fact ·
+            <span className="mx-1.5 rounded bg-[#fbbf24]/15 px-1.5 py-0.5 text-sm font-bold text-[#fcd34d]">assumption</span> the Strategist&apos;s reasoning, not in the fact base yet
+          </p>
 
           {/* PROPOSITION */}
           <section className="rounded-xl border border-accent/40 bg-surface-1 p-5">
@@ -232,7 +241,7 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
           {canGate && (
             <div className="rounded-xl border border-line bg-surface-1 p-5">
               <div className="text-lg font-bold text-ink">Gate 2 · your decision</div>
-              <p className="mt-0.5 text-base text-ink-faint">Approve the direction, or refine it with a note first.</p>
+              <p className="mt-0.5 text-base text-ink-faint">Approve the direction, or refine it with a note first. Approving unlocks the Proposal, which is generated from this strategy below.</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button onClick={approve} disabled={busy} className="rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">Approve the strategy</button>
                 <button onClick={() => setShowNotes((s) => !s)} disabled={busy} className="rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink-dim hover:text-ink">Refine with notes</button>

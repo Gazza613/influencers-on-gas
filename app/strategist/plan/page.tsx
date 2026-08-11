@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import StrategyGate from "@/components/StrategyGate";
+import FlowSteps from "@/components/FlowSteps";
 import { listStudioClients } from "@/lib/studio";
 import { db } from "@/lib/db";
 
@@ -19,6 +20,7 @@ export default async function StrategistPlanPage() {
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <Link href="/dashboard" className="text-lg font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
+        <FlowSteps active={3} />
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Strategist</h1>
         <p className="mt-2 max-w-3xl text-[22px] leading-relaxed text-ink-dim">
           It turns the Researcher&apos;s <b className="text-ink">verified fact base</b> into one single-minded,
