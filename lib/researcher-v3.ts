@@ -915,9 +915,11 @@ export async function latestResearchRun(clientId: string): Promise<ResearchRun |
  */
 export async function ingestApprovedResearch(clientId: string, runId: string, userEmail?: string | null): Promise<number> {
   const claims = (await listResearchClaims(runId)).filter((c) => !c.rejected && c.section !== "unverified" && c.claim.trim().length > 0);
+  // NOTHING ELIGIBLE -> do NOT touch the brain. Deleting first (as this used to) meant approving a run whose facts
+  // were all rejected silently wiped the brain's previously-approved research. Guard the delete on having new facts.
+  if (!claims.length) return 0;
   // Replace any previous approved research in this brain first - no duplication across approvals.
   await db().query(`delete from knowledge_chunks where client_id = $1 and metadata->>'kind' = 'research'`, [clientId]).catch(() => {});
-  if (!claims.length) return 0;
   const label = Object.fromEntries(RESEARCH_SECTIONS.map((s) => [s.id, s.label]));
   const items = claims.map((c) => ({
     content: `[${label[c.section] || c.section}] ${c.subject ? c.subject + " - " : ""}${c.claim}`

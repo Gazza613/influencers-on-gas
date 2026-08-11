@@ -29,14 +29,17 @@ export async function GET(req: Request) {
   // start up to the next run for the same client (or now). Research runs for one client are sequential, so this is
   // an accurate reflection of what the run actually cost.
   let runCents: number | null = null;
-  const runId = new URL(req.url).searchParams.get("runId") || "";
+  const params = new URL(req.url).searchParams;
+  const runId = params.get("runId") || "";
+  const scopeClient = params.get("clientId") || "";
   if (runId) {
+    // Scope the run lookup by client too, so a run id from another brain can't surface that brain's spend.
     const win = (await db().query(
       `select client_id, created_at,
               (select min(created_at) from research_runs n
                  where n.client_id = research_runs.client_id and n.created_at > research_runs.created_at) as next_at
-         from research_runs where id = $1`,
-      [runId],
+         from research_runs where id = $1${scopeClient ? " and client_id = $2" : ""}`,
+      scopeClient ? [runId, scopeClient] : [runId],
     )) as { client_id: string; created_at: string; next_at: string | null }[];
     const w = win[0];
     if (w) {

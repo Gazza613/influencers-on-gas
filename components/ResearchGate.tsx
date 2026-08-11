@@ -126,9 +126,15 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const clientName = clients.find((c) => c.id === clientId)?.name || "the client";
   const isConfigured = configured.length === 0 || configured.includes(clientId);
 
+  // The LIVE selected client, so an async response that resolves after the user switched brains is discarded
+  // rather than overwriting the new brain's view with the old brain's run/claims (a real cross-brain display bug).
+  const clientRef = useRef(clientId);
+  useEffect(() => { clientRef.current = clientId; }, [clientId]);
+
   const load = useCallback(async (id: string) => {
     if (!id) return;
     const d = await fetch(`/api/studio/researcher/collect?clientId=${id}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+    if (clientRef.current !== id) return;   // the user switched brains while this was in flight - drop it
     setRun(d?.run || null);
     setClaims(Array.isArray(d?.claims) ? d.claims : []);
     setCompetitors(Array.isArray(d?.competitors) ? d.competitors : []);
@@ -158,6 +164,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // never missing.
   const polledRef = useRef<string | null>(null);   // which run we're already polling for a PDF (avoids duplicates)
   const pollDocument = useCallback(async (runId: string) => {
+    const forClient = clientId;
     polledRef.current = runId;
     setDocBusy(true);
     // The brief writes prose (Opus) then renders + files, which can take a minute or two. Poll patiently (~4 min)
@@ -165,7 +172,9 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     // truly never lands do we fall back to a synchronous build. Poll the exact run, so a newer run can't confuse it.
     for (let i = 0; i < 48; i++) {
       await new Promise((r) => setTimeout(r, 5000));
-      const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (clientRef.current !== forClient) return;   // switched brains - stop touching this brain's view
+      const d = await fetch(`/api/studio/researcher/collect?clientId=${forClient}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (clientRef.current !== forClient) return;
       if (d?.run?.id === runId) {
         setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []);
         if (d.run.pdf_url) { setDocBusy(false); return; }
@@ -178,9 +187,12 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   // decoupled from any request, so it can run well past the old ~13-minute ceiling. We reflect the run's progress
   // column into the live panel as we go (no SSE any more). Returns the final run, or null if it never settles.
   const pollCollectingRun = useCallback(async (runId: string): Promise<Run | null> => {
+    const forClient = clientId;
     for (let i = 0; i < 400; i++) {   // ~33 min at 5s; the run's own backstop reclaims a genuinely hung job at 45
       await new Promise((r) => setTimeout(r, 5000));
-      const d = await fetch(`/api/studio/researcher/collect?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (clientRef.current !== forClient) return null;   // switched brains - abandon this poll, don't overwrite
+      const d = await fetch(`/api/studio/researcher/collect?clientId=${forClient}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (clientRef.current !== forClient) return null;
       if (!d?.run || d.run.id !== runId) continue;
       setRun(d.run); setClaims(Array.isArray(d.claims) ? d.claims : []); setCompetitors(Array.isArray(d.competitors) ? d.competitors : []);
       if (d.run.progress) setProgress({ label: d.run.progress.label || "Working", searches: [], sources: d.run.progress.sources || 0, filed: d.run.progress.filed || 0 });
@@ -217,10 +229,11 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   }, [run, running, pollCollectingRun, pollDocument]);
 
   const loadSpend = useCallback(async (runId?: string) => {
-    const q = runId ? `?runId=${encodeURIComponent(runId)}` : "";
+    // Scope the per-run cost to this client too, so a run id can only surface its own brain's spend.
+    const q = runId ? `?runId=${encodeURIComponent(runId)}&clientId=${encodeURIComponent(clientId)}` : "";
     const d = await fetch(`/api/studio/researcher/spend${q}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
     if (d && typeof d.monthCents === "number") setSpend(d);
-  }, []);
+  }, [clientId]);
   useEffect(() => { loadSpend(run?.id); }, [loadSpend, run?.id]);
 
   // WEEKLY AUTO-RUN toggle (Gary): per client, Monday 08:30 SAST. Loaded for the selected client, off by default.
@@ -461,11 +474,13 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     const kept = claims.filter((c) => c.in_brain);
     if (!kept.length) return;
     setClaims((cs) => cs.map((x) => x.in_brain ? { ...x, in_brain: false } : x));
-    await Promise.all(kept.map((c) => fetch(`/api/studio/researcher/claim`, {
+    const results = await Promise.all(kept.map((c) => fetch(`/api/studio/researcher/claim`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, claimId: c.id, action: "remove_brain" }),
-    }).catch(() => {})));
-    flex(`Restored ${kept.length} fact${kept.length === 1 ? "" : "s"} to the review list.`);
+    }).then((r) => r.ok).catch(() => false)));
+    // If any restore failed, the optimistic UI is now ahead of the server, so reconcile from the source of truth.
+    if (results.some((ok) => !ok)) { flex("Some facts could not be restored. Refreshing."); await load(clientId); }
+    else flex(`Restored ${kept.length} fact${kept.length === 1 ? "" : "s"} to the review list.`);
   }
 
   const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -485,8 +500,9 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       <div className="flex flex-wrap items-end justify-between gap-4">
         <label className="block">
           <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Client</span>
-          <select value={clientId} onChange={(e) => { if (e.target.value === "__new__") setShowCreate(true); else setClientId(e.target.value); }}
-            className="mt-1 block w-72 rounded-lg border border-line bg-surface-1 px-3 py-2 text-lg outline-none focus:border-accent">
+          <select value={clientId} disabled={running || collecting} title={running || collecting ? "A run is in progress. It finishes on its own, even if you navigate away." : undefined}
+            onChange={(e) => { if (e.target.value === "__new__") setShowCreate(true); else setClientId(e.target.value); }}
+            className="mt-1 block w-72 rounded-lg border border-line bg-surface-1 px-3 py-2 text-lg outline-none focus:border-accent disabled:opacity-60">
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{configured.includes(c.id) ? "" : " (not researchable yet)"}</option>)}
             <option value="__new__">+ New brain…</option>
           </select>
@@ -872,7 +888,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                       )}
                       <div className="mt-2 flex items-center gap-3">
                         <a href={nl.img} download target="_blank" rel="noreferrer" className="text-sm font-semibold text-[#c79bff] hover:underline">Download image</a>
-                        {nl.imgs.length > 1 && <span className="text-sm text-ink-faint">Option {nl.imgs.indexOf(nl.img) + 1} of {nl.imgs.length}</span>}
+                        {nl.imgs.length > 1 && <span className="text-sm text-ink-faint">Option {Math.max(0, nl.imgs.indexOf(nl.img)) + 1} of {nl.imgs.length}</span>}
                       </div>
                     </>
                   ) : (

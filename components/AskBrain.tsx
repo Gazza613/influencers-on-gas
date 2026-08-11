@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Working, { WORKING_ASK, WORKING_ASK_WEB } from "@/components/Working";
 import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
@@ -51,13 +51,20 @@ export default function AskBrain({ clients, initialClientId }: { clients: Client
 
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
 
+  // The LIVE brain, so an answer that returns AFTER the user switched brains is discarded rather than rendered
+  // under the wrong brain's name - provenance is the whole point of this screen, so a mislabelled answer is a bug.
+  const clientRef = useRef(clientId);
+  useEffect(() => { clientRef.current = clientId; }, [clientId]);
+
   async function ask(question?: string) {
     const text = (question ?? q).trim();
     if (!text || !clientId || busy) return;
+    const forClient = clientId;
     setBusy(true); setErr(""); setAnswer(""); setHits([]); setAsked(text); setOpenSources(false); setSaved("");
-    const d = await fetch(`/api/brains/${clientId}/query`, {
+    const d = await fetch(`/api/brains/${forClient}/query`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: text, mode }),
     }).then((r) => r.json()).catch(() => null);
+    if (clientRef.current !== forClient) return;   // switched brains mid-ask - drop this answer entirely
     setBusy(false);
     if (!d || d.error) { setErr(d?.error || "Could not reach the brain."); return; }
     setAnswer(d.answer || "");
@@ -112,7 +119,7 @@ export default function AskBrain({ clients, initialClientId }: { clients: Client
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Brain</label>
-            <select value={clientId} onChange={(e) => { setClientId(e.target.value); setAnswer(""); setHits([]); setTip(null); }}
+            <select value={clientId} onChange={(e) => { setClientId(e.target.value); setAnswer(""); setHits([]); setTip(null); setErr(""); setSaved(""); setBusy(false); }}
               className="mt-1.5 rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none focus:border-accent">
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>

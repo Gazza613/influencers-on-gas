@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getBrain } from "@/lib/brains";
-import { isSafePublicUrl } from "@/lib/safe-url";
+import { isOwnBlobUrl } from "@/lib/safe-url";
 import { addAsset, deleteAsset, getBrandKit, listAssets, upsertBrandKit } from "@/lib/studio";
 
 // THE BRAND LIBRARY, SHOWN WHERE IT ALREADY LIVES (Gary: "those intake reference images ... should actually
@@ -72,8 +72,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const url = String(b.url || "").trim();
   const name = String(b.name || "").trim();
   if (!UPLOADABLE.has(kind)) return NextResponse.json({ error: `Can't add a "${kind}" here.` }, { status: 400 });
-  // Only ever register a blob from OUR OWN store, never an arbitrary URL (SSRF).
-  if (!url || !/\.blob\.vercel-storage\.com\//i.test(url) || !isSafePublicUrl(url)) {
+  // Only ever register a blob from OUR OWN store (HOST check, not a substring), never an arbitrary URL (SSRF).
+  if (!isOwnBlobUrl(url)) {
     return NextResponse.json({ error: "That file isn't in our storage." }, { status: 400 });
   }
 

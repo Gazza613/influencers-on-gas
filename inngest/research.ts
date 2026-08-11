@@ -82,8 +82,10 @@ export const onResearchApproved = inngest.createFunction(
       return !!rows[0]?.pdf_url;
     });
     if (!has) await step.run("ensure-document", () => buildResearchDocument(clientId, runId).catch(() => null));
-    // Ingest the approved fact base into the brain (durable, retryable, deduped).
-    const ingested = await step.run("ingest-to-brain", () => ingestApprovedResearch(clientId, runId).catch(() => 0));
+    // Ingest the approved fact base into the brain (durable, retryable, deduped). Do NOT swallow errors here: if the
+    // embed blips after the old chunks were replaced, the step must FAIL so Inngest retries and re-runs the whole
+    // delete+insert, rather than succeeding and leaving the brain with no research chunks.
+    const ingested = await step.run("ingest-to-brain", () => ingestApprovedResearch(clientId, runId));
     // SEAM (Phase 2): trigger the Strategist here. It is only ever reachable from an approved fact base.
     return { approved: runId, ingestedFacts: ingested };
   },
@@ -108,11 +110,16 @@ export const weeklyResearch = inngest.createFunction(
     let started = 0;
     for (const clientId of clientIds) {
       const ok = await step.run(`start-${clientId}`, async () => {
+        let runId = "";
         try {
-          const { runId, version } = await startResearchRun(clientId, { userEmail: WEEKLY_TO, notes: "Weekly automatic run." });
-          await inngest.send({ name: "research/collect", data: { clientId, runId, version, today, userEmail: WEEKLY_TO, notes: "Weekly automatic run.", focus: null } });
+          const started = await startResearchRun(clientId, { userEmail: WEEKLY_TO, notes: "Weekly automatic run." });
+          runId = started.runId;
+          await inngest.send({ name: "research/collect", data: { clientId, runId, version: started.version, today, userEmail: WEEKLY_TO, notes: "Weekly automatic run.", focus: null } });
           return true;
         } catch {
+          // The run row exists but the collect event never fired: mark it failed so it is not left spinning as
+          // 'collecting' until the 45-min stall reclaim. A concurrency refusal has no runId, so nothing to clean.
+          if (runId) await markResearchFailed(runId, "The weekly run could not be dispatched. It was not charged. It will try again next week.").catch(() => {});
           return false;   // concurrency guard or a not-ready brain: skip it, keep the batch going
         }
       });

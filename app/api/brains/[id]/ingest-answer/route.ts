@@ -39,7 +39,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!answer) return NextResponse.json({ error: "There is no answer to save yet." }, { status: 400 });
 
   // Not pure-brain answers carry knowledge the client has not verified. We keep it, but never as ground truth.
-  const unverified = mode !== "brain";
+  // Do NOT trust the client-declared mode alone: if the answer text carries any [general] or [web] label, it
+  // contains non-brain knowledge regardless of what mode was passed, so it is unverified. This closes a caller
+  // spoofing mode:"brain" to skip the unverified banner.
+  const hasNonBrainClaims = /\[(general|web)\]/i.test(answer);
+  const unverified = mode !== "brain" || hasNonBrainClaims;
   const answerKey = norm(`${question} ${answer}`);
 
   // "Already there?" - a matching saved answer means nothing to add.

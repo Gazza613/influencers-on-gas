@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Strategy, StrategyContent } from "@/lib/cycle";
 import ProposalBuilder from "@/components/ProposalBuilder";
 import Working, { WORKING_STRATEGY } from "@/components/Working";
@@ -25,9 +25,13 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
   const [showNotes, setShowNotes] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // The LIVE client, so a slow response for a previously-selected client cannot overwrite the current one's view.
+  const clientRef = useRef(clientId);
+  useEffect(() => { clientRef.current = clientId; }, [clientId]);
   const load = useCallback(async (id: string) => {
     if (!id) return;
     const d = await fetch(`/api/studio/strategist/latest?clientId=${id}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+    if (clientRef.current !== id) return;   // client switched while this was in flight - discard
     setData(d || { strategy: null, objective: null, hasApprovedResearch: false });
   }, []);
   useEffect(() => { load(clientId); }, [clientId, load]);

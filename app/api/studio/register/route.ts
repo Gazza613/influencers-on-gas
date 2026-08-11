@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { imageSize } from "image-size";
 import { auth } from "@/auth";
-import { isSafePublicUrl } from "@/lib/safe-url";
+import { isOwnBlobUrl } from "@/lib/safe-url";
 import { addAsset, createTemplateFromReference, getBrandKit, upsertBrandKit } from "@/lib/studio";
 
 // REGISTER a blob the browser just uploaded directly (see blob-upload/route.ts).
@@ -31,8 +31,8 @@ export async function POST(req: Request) {
 
   if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });
   if (!KINDS.has(kind)) return NextResponse.json({ error: `Unknown kind "${kind}".` }, { status: 400 });
-  // Only ever ingest a blob from OUR OWN store - never an arbitrary URL a caller hands us (SSRF).
-  if (!url || !/\.blob\.vercel-storage\.com\//i.test(url) || !isSafePublicUrl(url)) {
+  // Only ever ingest a blob from OUR OWN store (HOST check, not a substring) - never an arbitrary URL (SSRF).
+  if (!isOwnBlobUrl(url)) {
     return NextResponse.json({ error: "That file isn't in our storage." }, { status: 400 });
   }
 

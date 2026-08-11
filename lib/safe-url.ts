@@ -33,3 +33,16 @@ export function isSafePublicUrl(url: unknown): url is string {
   // (DNS rebind, e.g. 169.254.169.254.nip.io) and a public URL that 302-redirects to an internal IP are NOT
   // caught here - that needs async DNS re-resolution + redirect:"manual" re-validation at each fetch site.
 }
+
+// IS THIS A URL IN OUR OWN BLOB STORE? A HOST check, not a substring: a substring test
+// (/\.blob\.vercel-storage\.com\//.test(url)) matches the PATH too, so
+// https://attacker.com/.blob.vercel-storage.com/x.png would pass and be trusted as "ours".
+// We register/ingest blobs by URL, so this must be exact: the hostname itself must be the store.
+export function isOwnBlobUrl(url: unknown): url is string {
+  if (!isSafePublicUrl(url)) return false;
+  try {
+    return new URL(url as string).hostname.toLowerCase().endsWith(".blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
