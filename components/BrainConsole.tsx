@@ -140,7 +140,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
     <div className="mt-6 space-y-6">
       {/* Add knowledge */}
       <div className="rounded-xl border border-line bg-surface-1 p-6">
-        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Feed the brain</div>
+        <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Feed the brain</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {([["file", "Documents"], ["website", "One page"], ["crawl", "Whole section"], ["text", "Paste text"]] as const).map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)}
@@ -157,10 +157,10 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
               <input type="file" multiple accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown,text/csv"
                 onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} disabled={adding} className="hidden" />
               <span className="text-base font-bold text-ink">Choose documents, or drop them here</span>
-              <span className="text-[15px] text-ink-dim">Articles, PDFs, research, notes. Each one ingests as it lands.</span>
-              <span className="mt-1 text-[14px] text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
+              <span className="text-base text-ink-dim">Articles, PDFs, research, notes. Each one ingests as it lands.</span>
+              <span className="mt-1 text-base text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
             </label>
-            {progress && <p className="mt-2 text-[15px] text-ink-dim">Uploading {progress}…</p>}
+            {progress && <p className="mt-2 text-base text-ink-dim">Uploading {progress}…</p>}
           </>
         ) : mode === "crawl" ? (
           <>
@@ -178,7 +178,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
             <button onClick={add} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">
               {adding ? "Starting the crawl…" : "Crawl and add everything"}
             </button>
-            <p className="mt-2.5 text-[15px] text-ink-dim">
+            <p className="mt-2.5 text-base text-ink-dim">
               Reads every article it finds, up to 80 pages. Takes a few minutes and keeps running if you close
               the tab. <b className="text-ink-dim">Set the path</b> when the articles live somewhere other than
               the address you started from, which is the usual shape of a blog - an index at one path, the
@@ -203,9 +203,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
           </>
         )}
 
-        {addErr && <p className="mt-2 text-[15px] text-alert">{addErr}</p>}
+        {addErr && <p className="mt-2 text-base text-alert">{addErr}</p>}
         {/* The isolation guarantee, said out loud where someone is about to hand us a client's private material. */}
-        <p className="mt-3 text-[15px] text-ink-faint">
+        <p className="mt-3 text-base text-ink-faint">
           Everything added here is chunked and embedded into <b className="text-ink-dim">this brain only</b>. No other brain can read it.
         </p>
       </div>
@@ -213,7 +213,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
       {/* Sources */}
       <div className="rounded-xl border border-line bg-surface-1 p-6">
         <div className="flex items-center justify-between gap-2">
-          <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Knowledge sources</div>
+          <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Knowledge sources</div>
           {sources.length > 0 && (
             <div className="flex items-center gap-2">
               <button onClick={reindex} disabled={reindexing} title="Rebuild every chunk's embedding with the current model. Needed once after an embedding-model change, otherwise retrieval returns noise. Your text is not touched." className="rounded-md border border-[#a855f7]/40 px-2.5 py-1 text-[13px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reindexing ? "Re-indexing…" : "↻ Re-index"}</button>
@@ -237,7 +237,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
                 </div>
                 {/* The reason, in plain sight. A source that says only "failed" gives nobody anything to act on. */}
                 {s.status === "failed" && s.error && (
-                  <p className="mt-1.5 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-[15px] leading-relaxed text-alert">{s.error}</p>
+                  <p className="mt-1.5 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-base leading-relaxed text-alert">{s.error}</p>
                 )}
               </li>
             ))}
@@ -253,7 +253,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
 
       {/* Test the brain */}
       <div className="rounded-xl border border-line bg-surface-1 p-6">
-        <div className="tabular text-sm uppercase tracking-[0.2em] text-ink-faint">Test the brain</div>
+        <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Test the brain</div>
         <div className="mt-3 flex gap-2">
           <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runQuery()}
             placeholder="Ask the brain anything, e.g. who is the CEO? what is our positioning?"
@@ -272,13 +272,13 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
           </div>
         )}
         {hits && hits.length === 0 && !answer && <p className="mt-3 text-base text-ink-dim">No matches. Feed the brain some knowledge first.</p>}
-        {hits && hits.length > 0 && <p className="mt-4 text-[14px] uppercase tracking-wider text-ink-faint">What it read to answer that</p>}
+        {hits && hits.length > 0 && <p className="mt-4 text-base uppercase tracking-wider text-ink-faint">What it read to answer that</p>}
         {hits && hits.length > 0 && (
           <ul className="mt-3 space-y-2">
             {hits.map((h, i) => (
               <li key={i} className="rounded-lg border border-line bg-surface-2 p-3">
                 <div className="tabular mb-1 text-[12px] text-ink-faint">match {Math.round(h.score * 100)}%{(h.metadata?.title as string) ? ` · ${h.metadata.title}` : ""}</div>
-                <div className="text-[15px] leading-relaxed text-ink-dim">{h.content.slice(0, 280)}{h.content.length > 280 ? "…" : ""}</div>
+                <div className="text-base leading-relaxed text-ink-dim">{h.content.slice(0, 280)}{h.content.length > 280 ? "…" : ""}</div>
               </li>
             ))}
           </ul>
@@ -287,8 +287,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0 }
 
       {/* Danger zone */}
       <div className="rounded-xl border border-alert/30 bg-alert/5 p-6">
-        <div className="tabular text-sm uppercase tracking-[0.2em] text-alert">Danger zone</div>
-        <p className="mt-2 text-[15px] text-ink-dim">Delete this entire brain and everything in it. This cannot be undone.</p>
+        <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-alert">Danger zone</div>
+        <p className="mt-2 text-base text-ink-dim">Delete this entire brain and everything in it. This cannot be undone.</p>
         <button onClick={deleteBrainNow} className="mt-3 rounded-lg border border-alert/50 px-4 py-2 text-base font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
       </div>
     </div>
