@@ -153,6 +153,23 @@ function AudienceMark() {
   );
 }
 
+// The Proposal: a document with a signed-off checkmark - the client-ready deliverable at the end of the flow.
+function ProposalMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
+      <defs>
+        <linearGradient id="pp-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#EC4899" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#60A5FA" />
+        </linearGradient>
+      </defs>
+      <path d="M13 5h16l7 7v31a1 1 0 0 1-1 1H13a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" stroke="url(#pp-g)" strokeWidth="2.6" strokeLinejoin="round" />
+      <path d="M29 5v7h7" stroke="url(#pp-g)" strokeWidth="2.6" strokeLinejoin="round" />
+      <path d="M18 24h12M18 30h12" stroke="url(#pp-g)" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M18 37l3 3 7-7" stroke="url(#pp-g)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 type Door = {
   name: React.ReactNode;
   href: string;
@@ -171,6 +188,9 @@ type Door = {
   // A desk that does not exist yet. Rendered as a real tile so the shape of the platform is visible, but it
   // does not pretend to be clickable - a placeholder that looks live is just a dead end with better manners.
   soon?: boolean;
+  // A STEP in a sequenced flow (the Intelligence section is a 1-2-3-4 stepped system). Drawn as a faint
+  // number watermark so the order reads at a glance.
+  step?: number;
 };
 
 // The showcase eye. An eye, not a link icon, because the job is "go and SEE the work".
@@ -183,46 +203,59 @@ function EyeMark() {
   );
 }
 
-// GARY'S ORDER (July 2026): the two intelligence desks LEAD the whole page - The Researcher first, The
-// Strategist second - then Make, Run, and the rest of Know. Gary drew arrows putting them at the very top: the
-// market read is what he wants the eye to hit first, ahead of the production tools.
+// GARY'S STEPPED INTELLIGENCE FLOW (Aug 2026): the first section is a sequenced "Know your customer" system,
+// 1-2-3-4. The Researcher feeds the Brain (no duplication), the Strategist reasons over it, the Proposal is the
+// deliverable. Order + step-number watermarks make it read as one guided flow, not four separate tools.
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
     label: "Intelligence",
-    note: "Build the brain, read the market, set the strategy",
+    note: "Know your customer: research → brain → strategy → proposal",
     doors: [
-      {
-        // THE BRAIN leads the whole system (Gary): the per-client knowledge base is the foundation every pod
-        // reads and writes. It is the first tier, ahead of the Researcher that fills it and the Strategist that
-        // reasons over it. Not one of the eight pods - the substrate they all sit on.
-        name: <>The <span className="brand-grad">Brain</span></>,
-        href: "/setup/brains",
-        mark: <BrainMark />,
-        blurb: "The client's living knowledge base. Crawl their site and add their material, and every desk reads and writes to it. The foundation the whole engine sits on.",
-        action: "Build the Brain",
-        ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
-        wash: "from-[#a855f7]/[0.10] to-[#22d3ee]/[0.04]",
-        accent: "text-[#c4b5fd]",
-      },
       {
         name: <>The Researcher</>,
         href: "/researcher",
         mark: <ResearcherMark />,
-        blurb: "A commissioned deep dive on a client: threats, opportunities, gaps, positioning, and campaigns worth stealing.",
-        action: "Open the desk",
+        blurb: "A commissioned deep dive on the client: the market, competitors, positioning and the facts, gathered and verified. It feeds the Brain directly, no duplication.",
+        action: "Research the market",
+        step: 1,
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
         accent: "text-[#67e8f9]",
       },
       {
+        name: <>The <span className="brand-grad">Brain</span></>,
+        href: "/setup/brains",
+        mark: <BrainMark />,
+        blurb: "The client's living knowledge base. The Researcher's findings plus their site, documents and brand rules, chunked and embedded so every desk reads and writes to it.",
+        action: "Build the Brain",
+        step: 2,
+        ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
+        wash: "from-[#a855f7]/[0.10] to-[#22d3ee]/[0.04]",
+        accent: "text-[#c4b5fd]",
+      },
+      {
         name: <>The Strategist</>,
         href: "/strategist/plan",
         mark: <StrategistMark />,
-        blurb: "Turns the Researcher's approved fact base into one single-minded, defensible strategy, every point traced to a fact. You refine and approve at Gate 2.",
-        action: "Open the desk",
+        blurb: "Turns the approved fact base into one single-minded, defensible strategy, every point traced to a fact. You refine and approve at Gate 2.",
+        action: "Set the strategy",
+        step: 3,
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
         wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#a5b4fc]",
+      },
+      {
+        // The proposal is generated from the APPROVED strategy, on the strategist plan page (Gate 3), so it
+        // shares that destination for now. A dedicated /proposal surface can split it out later.
+        name: <>The <span className="brand-grad">Proposal</span></>,
+        href: "/strategist/plan",
+        mark: <ProposalMark />,
+        blurb: "Turns the approved strategy into a client-ready, 24-page branded proposal, recoloured to the client's own brand and ready to sign.",
+        action: "Generate the proposal",
+        step: 4,
+        ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
+        wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
+        accent: "text-[#f9a8d4]",
       },
     ],
   },
@@ -344,6 +377,8 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
     <div className={`${cls} gas-rise`} style={{ animationDelay: `${80 + index * 90}ms` }}>
       {/* A soft light that only wakes on hover - the card feels lit rather than decorated. */}
       <span aria-hidden className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${d.wash} opacity-0 blur-2xl transition duration-500 group-hover:opacity-100`} />
+      {/* STEP NUMBER: a faint watermark so a sequenced section reads as one guided flow, 1-2-3-4. */}
+      {d.step && <span aria-hidden className={`tabular pointer-events-none absolute right-5 top-3 z-0 text-[42px] font-black leading-none ${d.accent} opacity-[0.14]`}>{String(d.step).padStart(2, "0")}</span>}
 
       {/* The main destination, covering the whole card. */}
       {d.external ? (
@@ -414,7 +449,7 @@ export default function HomePage() {
         <div className="max-w-2xl">
           <p className="tabular text-[15px] font-semibold uppercase tracking-[0.34em] text-white">GAS Marketing</p>
           <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">
-            The Agency of <span className="brand-grad-anim">NOW</span>
+            The Studio of <span className="brand-grad-anim">NOW</span>
           </h1>
           <p className="mt-4 text-[19px] leading-relaxed text-ink-dim">
             Human command. AI execution. One platform.

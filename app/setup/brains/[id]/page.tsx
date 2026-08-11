@@ -16,7 +16,11 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mx-auto max-w-5xl">
-      <Link href="/setup/brains" className="text-base text-ink-dim hover:text-ink">← Brains</Link>
+      <div className="flex items-center gap-2 text-base text-ink-dim">
+        <Link href="/dashboard" className="font-semibold hover:text-ink">← Dashboard</Link>
+        <span className="text-ink-faint">/</span>
+        <Link href="/setup/brains" className="hover:text-ink">Brains</Link>
+      </div>
       <div className="mt-2 flex items-center gap-3">
         <h1 className="text-3xl font-bold">{brain.name}</h1>
         <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[12px] uppercase tracking-wide text-ink-faint">brain</span>
