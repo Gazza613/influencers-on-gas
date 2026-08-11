@@ -97,7 +97,8 @@ export default function BrainLibrary({ brainId }: { brainId: string }) {
         <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple className="hidden"
           onChange={(e) => addFiles(e.target.files)} />
         <button onClick={() => fileRef.current?.click()} disabled={!!busy}
-          className="rounded-md bg-accent px-4 py-2 text-base font-semibold text-white hover:opacity-90 disabled:opacity-50">
+          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-base font-semibold text-white hover:opacity-90 disabled:opacity-50">
+          {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
           {busy ? `Uploading ${busy}` : "Choose file"}
         </button>
       </div>

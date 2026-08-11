@@ -149,7 +149,8 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
                 matches per question, so repeats crowd out facts it should be using instead.
               </p>
               <button onClick={dedupe} disabled={cleaning}
-                className="shrink-0 rounded-lg border border-[#fbbf24]/50 px-3.5 py-2 text-[15px] font-bold text-[#fcd34d] hover:bg-[#fbbf24]/15 disabled:opacity-50">
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[#fbbf24]/50 px-3.5 py-2 text-[15px] font-bold text-[#fcd34d] hover:bg-[#fbbf24]/15 disabled:opacity-50">
+                {cleaning && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
                 {cleaning ? "Cleaning…" : "Remove the duplicates"}
               </button>
             </div>

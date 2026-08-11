@@ -48,3 +48,34 @@ export const WORKING_PDF = [
   "Checking the margins twice…",
   "Cutting the final PDF…",
 ];
+export const WORKING_ASK = [
+  "Reading this brain…",
+  "Finding the right passages…",
+  "Checking it against the sources…",
+  "Writing you a straight answer…",
+];
+export const WORKING_ASK_WEB = [
+  "Searching the web right now…",
+  "Reading this brain alongside it…",
+  "Keeping the fetched facts cited…",
+  "Separating what is known from what is fresh…",
+];
+export const WORKING_RESEARCH = [
+  "Reading the client's own site…",
+  "Chasing down the real sources…",
+  "Grading each fact by how solid it is…",
+  "Binning anything it cannot stand up…",
+  "Filing the fact base…",
+];
+export const WORKING_NEWSLETTER = [
+  "Finding the CEO's voice…",
+  "Writing in their register, not ours…",
+  "Keeping it inside compliance…",
+  "Art-directing the image…",
+];
+export const WORKING_BRAIN = [
+  "Reading every page…",
+  "Chunking it for retrieval…",
+  "Embedding it into the brain…",
+  "Making it findable…",
+];

@@ -245,7 +245,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
               </div>
             ))}
             <button onClick={() => setSites((list) => [...list, ""])} className="mt-2.5 text-[15px] font-semibold text-[#c79bff] hover:underline">+ Add another website</button>
-            <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding ? "Adding…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
+            <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading and adding the pages…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
             <p className="mt-2.5 text-base text-ink-dim">{fullSite ? "Reads every page it can reach, up to 80 per site. Takes a few minutes and keeps running if you close the tab." : "Reads just the page at each URL."}</p>
           </>
         ) : mode === "youtube" ? (
@@ -258,7 +258,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <>
             <textarea value={compliance} onChange={(e) => setCompliance(e.target.value)} rows={5} placeholder="Paste the client's mandatory compliance copy: disclaimers, licence wording, advertising rules…"
               className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
-            <button onClick={() => addText("compliance")} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding ? "Adding…" : "Add compliance copy"}</button>
+            <button onClick={() => addText("compliance")} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Adding…" : "Add compliance copy"}</button>
             <p className="mt-2.5 text-base text-ink-dim">Tagged as <b className="text-ink-dim">compliance</b> so creative and the proposal&apos;s governance page can pull it specifically.</p>
           </>
         ) : mode === "positioning" ? (
@@ -272,7 +272,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <>
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="Paste brand notes, proof points, a transcript, a key document…"
               className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
-            <button onClick={() => addText()} disabled={adding} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding ? "Adding…" : "Add to brain"}</button>
+            <button onClick={() => addText()} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Adding…" : "Add to brain"}</button>
           </>
         )}
         </div>
@@ -290,7 +290,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Knowledge sources</div>
           {sources.length > 0 && (
             <div className="flex items-center gap-2">
-              <button onClick={reindex} disabled={reindexing} title="Rebuild every chunk's embedding with the current model. Needed once after an embedding-model change, otherwise retrieval returns noise. Your text is not touched." className="rounded-md border border-[#a855f7]/40 px-2.5 py-1 text-[13px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reindexing ? "Re-indexing…" : "↻ Re-index"}</button>
+              <button onClick={reindex} disabled={reindexing} title="Rebuild every chunk's embedding with the current model. Needed once after an embedding-model change, otherwise retrieval returns noise. Your text is not touched." className="inline-flex items-center gap-1.5 rounded-md border border-[#a855f7]/40 px-2.5 py-1 text-[13px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reindexing && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{reindexing ? "Re-indexing…" : "↻ Re-index"}</button>
               <button onClick={nukeAll} className="rounded-md border border-alert/40 px-2.5 py-1 text-[13px] font-semibold text-alert hover:bg-alert/10">Nuke all data</button>
             </div>
           )}
@@ -332,7 +332,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runQuery()}
             placeholder="Ask the brain anything, e.g. who is the CEO? what is our positioning?"
             className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
-          <button onClick={runQuery} disabled={querying || !query.trim()} className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink hover:border-line-strong disabled:opacity-50">
+          <button onClick={runQuery} disabled={querying || !query.trim()} className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink hover:border-line-strong disabled:opacity-50">
+            {querying && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
             {querying ? "Thinking…" : "Ask"}
           </button>
         </div>

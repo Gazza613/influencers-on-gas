@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Working, { WORKING_ASK, WORKING_ASK_WEB } from "@/components/Working";
 
 // ASK THE BRAIN. The team's everyday way into a client's knowledge, wherever they are working.
 //
@@ -113,15 +114,18 @@ export default function AskBrain({ clients, initialClientId }: { clients: Client
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button onClick={() => ask()} disabled={busy || !q.trim()}
-            className="btn-brand rounded-lg px-5 py-2.5 text-lg font-bold disabled:opacity-50">
-            {busy ? (mode === "live" ? "Searching the web…" : "Reading the brain…") : "Ask"}
+            className="btn-brand inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-lg font-bold disabled:opacity-50">
+            {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+            {busy ? (mode === "live" ? "Searching…" : "Reading…") : "Ask"}
           </button>
           <button onClick={sharpen} disabled={sharpening || !q.trim()}
-            className="rounded-lg border border-[#a855f7]/40 px-4 py-2.5 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+            className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 px-4 py-2.5 text-lg font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
+            {sharpening && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#c79bff]/30 border-t-[#c79bff]" />}
             {sharpening ? "Thinking…" : "✦ Sharpen my question"}
           </button>
           <span className="text-[14px] text-ink-faint">⌘/Ctrl + Enter to ask</span>
         </div>
+        {busy && <div className="mt-3 text-lg text-[#c79bff]"><Working messages={mode === "live" ? WORKING_ASK_WEB : WORKING_ASK} /></div>}
 
         {/* What the sharpener changed, and why. Shown rather than applied silently. */}
         {tip && (

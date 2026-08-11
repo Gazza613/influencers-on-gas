@@ -352,7 +352,8 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
           </button>
         </div>
         <button onClick={() => runNow()} disabled={running || !clientId}
-          className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-lg font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
+          className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-lg font-bold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-40">
+          {running && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
           {running ? "Researching…" : (isResearcher ? "✦ Deep Dive Research" : "↻ Run research now")}
         </button>
       </div>

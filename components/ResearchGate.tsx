@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flex } from "@/lib/flex";
+import Working, { WORKING_NEWSLETTER } from "@/components/Working";
 import { askConfirm } from "@/lib/confirm";
 
 // THE RESEARCHER (V3) + GATE 1. The Researcher COLLECTS facts, it never analyses (that is the Strategist's job).
@@ -630,13 +631,15 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         <div className="mt-6 rounded-xl border border-[#fbbf24]/30 bg-[#fbbf24]/[0.06] p-5">
           <div className="text-lg font-bold text-ink">Gate 1 · your review</div>
           <p className="mt-1 text-base text-ink-dim">Approve the facts you have checked. Rerun with notes if anything is wrong, that files a fresh version and never overwrites this one.</p>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <button onClick={() => gate("approve")} disabled={busy}
-              className="rounded-lg bg-[#4ade80] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">Approve</button>
+              className="inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+              {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}Approve</button>
             <button onClick={() => setShowNotes((s) => !s)} disabled={busy}
               className="rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink hover:border-accent">Rerun with notes</button>
             <button onClick={() => gate("reject")} disabled={busy}
               className="rounded-lg border border-[#f87171]/40 px-5 py-2.5 text-lg font-semibold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
+            {busy && <span className="text-base text-ink-dim">Locking the fact base and adding it to the brain…</span>}
           </div>
           {showNotes && (
             <div className="mt-4">
@@ -804,12 +807,12 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             {nl.err ? (
               <div className="mt-4 rounded-lg border border-alert/40 bg-alert/5 p-4 text-base text-alert">{nl.err}</div>
             ) : nl.busy ? (
-              <div className="mt-8 text-center text-base text-ink-dim">Writing the piece…</div>
+              <div className="mt-8 flex justify-center text-lg text-[#c79bff]"><Working messages={WORKING_NEWSLETTER} /></div>
             ) : (
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
                 <div>
                   {nl.imgBusy ? (
-                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 text-base text-ink-dim">Rendering three options…</div>
+                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 text-base text-[#c79bff]"><span className="h-5 w-5 mr-2 animate-spin rounded-full border-2 border-[#c79bff]/30 border-t-[#c79bff]" />Rendering three options…</div>
                   ) : nl.img ? (
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
