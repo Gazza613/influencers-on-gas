@@ -114,6 +114,8 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const [siteSaved, setSiteSaved] = useState(false);
   const [socials, setSocials] = useState<string[]>([""]);   // the client's official social accounts (Gary: mine these too)
   const [socSaved, setSocSaved] = useState(false);
+  // CEO NEWSLETTER (Gary): tag a fact -> write the CEO's LinkedIn piece + its creative, then approve/reject/rewrite.
+  const [nl, setNl] = useState<null | { claim: Claim; post: string; art: { subject: string; callout: string } | null; img: string | null; busy: boolean; imgBusy: boolean; err: string; note: string; showNote: boolean }>(null);
 
   const clientName = clients.find((c) => c.id === clientId)?.name || "the client";
   const isConfigured = configured.length === 0 || configured.includes(clientId);
@@ -366,6 +368,23 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const canGate = run?.status === "ready";
   // A durable run still collecting server-side (this session's SSE, or one resumed after navigating away).
   const collecting = run?.status === "collecting";
+  // Write the CEO's LinkedIn newsletter from ONE fact, in the brain's voice, then render its creative. `note` folds
+  // in a rewrite instruction. The piece lands first (fast); the image follows as its own short request.
+  async function openNewsletter(c: Claim, note?: string) {
+    setNl({ claim: c, post: "", art: null, img: null, busy: true, imgBusy: false, err: "", note: "", showNote: false });
+    const r = await fetch(`/api/studio/researcher/newsletter`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, claimId: c.id, notes: note || "" }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { setNl((s) => s ? { ...s, busy: false, err: r?.error || "Couldn't write the piece." } : s); return; }
+    setNl((s) => s ? { ...s, busy: false, post: r.newsletter, art: r.art, imgBusy: true } : s);
+    const img = await fetch(`/api/studio/intel/newsletter-creative`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, subject: r.art?.subject, callout: r.art?.callout }),
+    }).then((x) => x.json()).catch(() => null);
+    setNl((s) => s ? { ...s, imgBusy: false, img: img?.ok ? img.url : null } : s);
+  }
+
   const bySection = (id: string) => claims.filter((c) => c.section === id);
   const rejectedCount = claims.filter((c) => c.rejected && !c.in_brain).length;
   const inBrainCount = claims.filter((c) => c.in_brain).length;
@@ -633,6 +652,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                           {c.claim}
                         </p>
                         <div className="flex shrink-0 gap-2">
+                          <button onClick={() => openNewsletter(c)} className="rounded-lg border border-[#a855f7]/40 px-3 py-1.5 text-sm font-semibold text-[#c79bff] hover:bg-[#a855f7]/10" title="Write the CEO's LinkedIn newsletter from this fact, then approve, reject or rewrite">CEO Newsletter</button>
                           <button onClick={() => brainClaim(c, true)} className="rounded-lg border border-[#86efac]/40 px-3 py-1.5 text-sm font-semibold text-[#86efac] hover:bg-[#86efac]/10" title="Keep this fact - it moves to In the Brain and drops out of the next run's new list">Add to Brain</button>
                           <button onClick={() => rejectClaim(c, true)} className="rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this fact - it disappears and is never referenced again">Reject</button>
                         </div>
@@ -692,6 +712,63 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       )}
       {run && claims.length === 0 && !running && !collecting && run.status !== "failed" && (
         <p className="mt-8 text-base text-ink-dim">This version filed no claims. Run again, or check the client has crawled material and a website set.</p>
+      )}
+
+      {/* CEO NEWSLETTER preview: the post + its creative, with approve / reject / rewrite. */}
+      {nl && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:p-8" onClick={() => setNl(null)}>
+          <div className="w-full max-w-3xl rounded-2xl border border-[#a855f7]/30 bg-surface-1 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-[#c79bff]">CEO Newsletter</h3>
+              <button onClick={() => setNl(null)} className="rounded px-2 text-lg text-ink-faint hover:text-ink" aria-label="Close">✕</button>
+            </div>
+            <p className="mt-1 text-sm text-ink-faint">In the CEO&apos;s voice, from: &ldquo;{nl.claim.claim.slice(0, 90)}{nl.claim.claim.length > 90 ? "…" : ""}&rdquo;</p>
+
+            {nl.err ? (
+              <div className="mt-4 rounded-lg border border-alert/40 bg-alert/5 p-4 text-base text-alert">{nl.err}</div>
+            ) : nl.busy ? (
+              <div className="mt-8 text-center text-base text-ink-dim">Writing the piece…</div>
+            ) : (
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                <div>
+                  {nl.imgBusy ? (
+                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 text-base text-ink-dim">Rendering the image…</div>
+                  ) : nl.img ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={nl.img} alt="CEO newsletter creative" className="w-full rounded-xl border border-line" />
+                      <a href={nl.img} download target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-semibold text-[#c79bff] hover:underline">Download image</a>
+                    </>
+                  ) : (
+                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 p-4 text-center text-base text-ink-faint">No image. Upload a CEO photo to this brain to composite the real portrait.</div>
+                  )}
+                </div>
+                <div>
+                  <div className="tabular text-sm uppercase tracking-[0.16em] text-ink-faint">The post</div>
+                  <p className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap text-base leading-relaxed text-ink">{nl.post}</p>
+                  <button onClick={() => { navigator.clipboard?.writeText(nl.post); flex("Post copied."); }} className="mt-2 text-sm font-semibold text-[#c79bff] hover:underline">Copy post</button>
+                </div>
+              </div>
+            )}
+
+            {!nl.busy && !nl.err && (
+              <>
+                {nl.showNote && (
+                  <div className="mt-4 flex gap-2">
+                    <input value={nl.note} onChange={(e) => setNl((s) => s ? { ...s, note: e.target.value } : s)} placeholder="What should change? e.g. lead with the number, make it warmer"
+                      className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
+                    <button onClick={() => openNewsletter(nl.claim, nl.note)} className="btn-brand rounded-lg px-4 py-2 text-base font-bold">Rewrite</button>
+                  </div>
+                )}
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button onClick={() => { setNl(null); flex("Approved. Copy the post and download the image to publish on LinkedIn."); }} className="rounded-lg border border-[#86efac]/50 px-4 py-2 text-base font-bold text-[#86efac] hover:bg-[#86efac]/10">Approve</button>
+                  <button onClick={() => setNl(null)} className="rounded-lg border border-[#f87171]/50 px-4 py-2 text-base font-bold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
+                  <button onClick={() => setNl((s) => s ? { ...s, showNote: !s.showNote } : s)} className="rounded-lg border border-line px-4 py-2 text-base font-bold text-ink hover:border-line-strong">Rewrite</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
