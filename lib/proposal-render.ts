@@ -63,6 +63,14 @@ export type ProposalDoc = {
     rows: { name: string; platforms: string; segments: { label: string; text: string }[] }[];   // 4
     matrix: { channels: string[]; rows: { persona: string; cells: ("lead" | "support" | "test")[] }[] };
   };
+  creative: {
+    intro: string; for_client: string;
+    asset_formats: { ratio: string; icon: string; title: string; caption: string }[];            // 4
+  };
+  channels5: {
+    intro: string;
+    rows: { icon: string; name: string; role: string; kind: "lead" | "support" | "test"; what: string; why: string }[];  // up to 5
+  };
 };
 
 // ── primitives ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -422,6 +430,60 @@ function targetingPage(d: ProposalDoc, ci: CiTokens): string {
     + footerLight(ci, d.brand_short, 11));
 }
 
+// A pod-page header: 44px icon disc + eyebrow ("Pod IV of VIII · ...") + a two-line headline (2nd line gradient).
+function podHeader(ci: CiTokens, icon: string, eb: string, line1: string, grad2: string, onDark: boolean): string {
+  const ebColor = onDark ? ci.accentOnDark : ci.accentDeep;
+  const gradTextColor = onDark ? ci.accentOnDark : ci.accent;
+  const glow = onDark ? "box-shadow:0 0 20px rgba(155,79,201,0.4);" : "";
+  return `<div style="display:flex;align-items:center;gap:14px;"><div style="width:44px;height:44px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;${glow}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>`
+    + `<div><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ebColor};">${esc(eb)}</div>`
+    + `<div style="font-size:24px;font-weight:800;text-transform:uppercase;line-height:1.1;">${esc(line1)}<br><span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${gradTextColor};">${esc(grad2)}</span></div></div></div>`;
+}
+// The oversized ghost roman numeral top-right on pod pages.
+const ghostNumeral = (ci: CiTokens, roman: string, onDark: boolean) =>
+  `<div style="position:absolute;right:28px;top:-30px;font-size:190px;font-weight:800;line-height:1;letter-spacing:-0.02em;color:${onDark ? ci.ghostDark : ci.ghostLight};pointer-events:none;">${roman}</div>`;
+
+// 12 POD IV CREATIVE (light, ghost IV). Header + intro + dark for-client box + 4 fixed capability cards + 2 benefit
+// cards + the launch asset system (4 mini format frames). Capability cards are fixed doctrine; only copy varies.
+const WAND = `<path d="m12 19 7-7 3 3-7 7-3-3z"></path><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="m2 2 7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle>`;
+const CREATIVE_CAPS: { title: string; body: string }[] = [
+  { title: "Dynamic formats", body: "High-impact statics, motion graphics, rapid-fire video and short-form, tested at volume." },
+  { title: "AI influencers and ambassadors", body: "Bespoke AI brand ambassadors that resonate with niche demographics." },
+  { title: "Performance copywriting", body: "Message engineered for the platform, the audience and the point in the journey." },
+  { title: "Test, measure, optimise", body: "Creative testing and measurement built into the workflow, not bolted on after." },
+];
+function creativePage(d: ProposalDoc, ci: CiTokens): string {
+  const caps = CREATIVE_CAPS.map((c) => `<div style="background:#FFFFFF;border-radius:14px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:11.5px;font-weight:700;">${esc(c.title)}</div><div style="font-size:10.5px;color:${ci.muted};line-height:1.55;margin-top:4px;">${esc(c.body)}</div></div>`).join("");
+  const frames = d.creative.asset_formats.slice(0, 4).map((f) =>
+    `<div style="background:#FFFFFF;border-radius:12px;box-shadow:0 6px 18px ${ci.shadow};overflow:hidden;"><div style="height:56px;background:${ci.darkCard};display:flex;align-items:center;justify-content:center;position:relative;"><div style="position:absolute;top:6px;left:8px;font-size:6.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);">${esc(f.ratio)}</div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${f.icon}</svg></div><div style="padding:8px 11px;"><div style="font-size:9px;font-weight:700;line-height:1.3;">${esc(f.title)}</div><div style="font-size:8px;color:${ci.muted};line-height:1.4;margin-top:2px;">${esc(f.caption)}</div></div></div>`).join("");
+  const benefit = (eb: string, body: string) => `<div style="flex:1;background:${ci.tint};border-radius:14px;padding:12px 16px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentDeep};">${esc(eb)}</div>${body}</div>`;
+  const p = (t: string) => `<div style="font-size:11px;line-height:1.6;color:${ci.body};margin-top:4px;">${esc(t)}</div>`;
+  return section(pageLight("52px 60px 40px", "position:relative;overflow:hidden;"),
+    ghostNumeral(ci, "IV", false)
+    + podHeader(ci, WAND, "Pod IV of VIII · The Execution Layer", "Performance Creative Studio", "Emotive StorySelling", false)
+    + `<p style="font-size:12.5px;line-height:1.7;color:${ci.body};margin:16px 0 0;">${esc(d.creative.intro)}</p>`
+    + `<div style="margin-top:16px;background:${ci.darkCard};border-radius:16px;padding:18px 22px;color:#FFFFFF;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">For ${esc(d.client_name)}</div><p style="font-size:12px;line-height:1.7;margin:8px 0 0;color:rgba(255,255,255,0.85);">${esc(d.creative.for_client)}</p></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">${caps}</div>`
+    + `<div style="display:flex;gap:10px;margin-top:16px;">${benefit("Client benefit", p("More shots on goal, faster learning, and creative accountable to conversion rather than applause."))}${benefit("Connects forward", p("Supplies the assets Channel Management deploys to your defined audiences."))}</div>`
+    + `<div style="margin-top:12px;background:#FAF5FE;border:1px solid #EEE3F8;border-radius:14px;padding:12px 16px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">The launch asset system, format by format</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:9px;">${frames}</div></div>`
+    + footerLight(ci, d.brand_short, 12));
+}
+
+// 13 POD V CHANNELS (light). intro + up to 5 channel rows (icon + name + role chip + what + why-italic).
+function channelsPage(d: ProposalDoc, ci: CiTokens): string {
+  const roleBg = (k: "lead" | "support" | "test") => k === "lead" ? ci.accentGrad : k === "support" ? ci.accentDeep : ci.accent;
+  const row = (r: (typeof d.channels5.rows)[number]) =>
+    `<div style="background:#FFFFFF;border-radius:12px;padding:12px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 26, r.icon)}<div style="font-size:11.5px;font-weight:700;">${esc(r.name)}</div><div style="background:${roleBg(r.kind)};border-radius:999px;padding:3px 10px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#FFFFFF;">${esc(r.role)}</div></div>`
+    + `<div style="font-size:9.8px;line-height:1.55;color:${ci.body};margin-top:5px;">${esc(r.what)}</div>`
+    + `<div style="font-size:9.3px;line-height:1.5;color:${ci.muted};margin-top:4px;font-style:italic;">${esc(r.why)}</div></div>`;
+  return section(pageLight("48px 60px 36px"),
+    eyebrow(ci, "The Engine · Execution Layer") + headline28(ci, { lead: "Pod V ·", gradient: "The channel plan" })
+    + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(d.channels5.intro)}</p>`
+    + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:12px;">${d.channels5.rows.slice(0, 5).map(row).join("")}</div>`
+    + footerLight(ci, d.brand_short, 13));
+}
+
 // ── document shell ────────────────────────────────────────────────────────────────────────────────────────────
 
 // Assemble the full HTML document: Poppins from Google Fonts, one fixed A4 page box per section, print geometry.
@@ -430,6 +492,7 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
     coverPage(d, ci), execPage(d, ci), opportunityPage(d, ci), strategyPage(d, ci), marketPage(d, ci),
     philosophyPage(d, ci), ecosystemPage(d, ci), dividerPage(d, ci),
     pods12Page(d, ci), audiencePage(d, ci), targetingPage(d, ci),
+    creativePage(d, ci), channelsPage(d, ci),
   ].join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`
     + `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`
