@@ -250,7 +250,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The <span className="brand-grad">Proposal</span></>,
         href: "/strategist/plan",
         mark: <ProposalMark />,
-        blurb: "Turns the approved strategy into a client-ready, 24-page branded proposal, recoloured to the client's own brand and ready to sign.",
+        blurb: "Turns the approved strategy into a client-ready, 24-page branded proposal, recoloured to the client's own brand. Three investment options, dated on download and ready to sign.",
         action: "Generate the proposal",
         step: 4,
         ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",

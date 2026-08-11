@@ -103,7 +103,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const [docBusy, setDocBusy] = useState(false);
   const [delivery, setDelivery] = useState<{ drive: boolean; email: boolean } | null>(null);
   // COST METER (Gary): the Researcher's spend, so the team sees it as they run. Refreshed after every run.
-  const [spend, setSpend] = useState<{ monthCents: number; todayCents: number; runsThisMonth: number } | null>(null);
+  const [spend, setSpend] = useState<{ monthCents: number; todayCents: number; runsThisMonth: number; runCents: number | null } | null>(null);
   // NEW BRAIN (Gary): create a client from the dropdown - name + one or more websites.
   const [showCreate, setShowCreate] = useState(false);
   const [nb, setNb] = useState<{ name: string; sites: string[] }>({ name: "", sites: [""] });
@@ -210,11 +210,12 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run, running, pollCollectingRun, pollDocument]);
 
-  const loadSpend = useCallback(async () => {
-    const d = await fetch(`/api/studio/researcher/spend`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+  const loadSpend = useCallback(async (runId?: string) => {
+    const q = runId ? `?runId=${encodeURIComponent(runId)}` : "";
+    const d = await fetch(`/api/studio/researcher/spend${q}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
     if (d && typeof d.monthCents === "number") setSpend(d);
   }, []);
-  useEffect(() => { loadSpend(); }, [loadSpend]);
+  useEffect(() => { loadSpend(run?.id); }, [loadSpend, run?.id]);
 
   async function createBrain() {
     const name = nb.name.trim();
@@ -305,7 +306,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
     flex(`Research v${final.version} is ready for your review.`);
     await load(clientId);
     setJustDone(true); setTimeout(() => setJustDone(false), 9000);   // green "complete" flash
-    loadSpend();   // refresh the cost meter with what this run spent
+    loadSpend(final.id);   // refresh the cost meter, including what THIS run spent
     // The Research Document builds in a durable background job; poll for it (synchronous fallback inside).
     if (!final.pdf_url) pollDocument(final.id);
   }
@@ -388,6 +389,20 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const bySection = (id: string) => claims.filter((c) => c.section === id);
   const rejectedCount = claims.filter((c) => c.rejected && !c.in_brain).length;
   const inBrainCount = claims.filter((c) => c.in_brain).length;
+  const liveCount = claims.filter((c) => !c.rejected && !c.in_brain).length;   // what actually shows in the review list
+
+  // Bring EVERY carried-forward "in the brain" fact back to the live review list at once. Fixes the confusing
+  // empty fact base on a re-run, when a previous run had kept facts that this run auto-tagged as already-kept.
+  async function restoreAllToReview() {
+    const kept = claims.filter((c) => c.in_brain);
+    if (!kept.length) return;
+    setClaims((cs) => cs.map((x) => x.in_brain ? { ...x, in_brain: false } : x));
+    await Promise.all(kept.map((c) => fetch(`/api/studio/researcher/claim`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, claimId: c.id, action: "remove_brain" }),
+    }).catch(() => {})));
+    flex(`Restored ${kept.length} fact${kept.length === 1 ? "" : "s"} to the review list.`);
+  }
 
   const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -506,7 +521,12 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             v{run.version} · {status.label}
           </span>
         )}
-        {run && !collecting && <span className="text-sm text-ink-faint">{claims.length} claim{claims.length === 1 ? "" : "s"} · collected {ukDate(run.created_at)}</span>}
+        {run && !collecting && (
+          <span className="text-sm text-ink-faint">
+            {claims.length} claim{claims.length === 1 ? "" : "s"} · collected {ukDate(run.created_at)}
+            {spend && typeof spend.runCents === "number" && spend.runCents > 0 && <> · <span className="tabular text-ink-dim">this run cost {rand(spend.runCents)}</span></>}
+          </span>
+        )}
       </div>
       {!isConfigured && <p className="mt-2 text-base text-[#fca5a5]">This brain has nothing to research yet. Add the client and crawl their site into the brain first.</p>}
 
@@ -630,6 +650,12 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               {(inBrainCount > 0 || rejectedCount > 0) && <><button onClick={() => run && buildDoc(run.id)} className="underline hover:text-accent">Regenerate the document</button> to update the PDF.</>}
             </span>
           </div>
+          {liveCount === 0 && inBrainCount > 0 && (
+            <div className="rounded-xl border border-[#86efac]/30 bg-[#86efac]/[0.06] p-4 text-base leading-relaxed text-ink">
+              All {inBrainCount} fact{inBrainCount === 1 ? "" : "s"} from this run {inBrainCount === 1 ? "was" : "were"} carried forward as <b className="text-[#86efac]">already in the brain</b> (you kept {inBrainCount === 1 ? "it" : "them"} on an earlier run), so the review list below is empty. That is why there is nothing to approve.{" "}
+              <button onClick={restoreAllToReview} className="font-semibold text-[#86efac] underline hover:text-[#86efac]/80">Restore {inBrainCount === 1 ? "it" : "them all"} to review</button> to check {inBrainCount === 1 ? "it" : "them"} again here.
+            </div>
+          )}
           {SECTIONS.map((sec) => {
             const rows = bySection(sec.id).filter((c) => !c.rejected && !c.in_brain);   // tagged facts leave the live list
             if (rows.length === 0) return null;
