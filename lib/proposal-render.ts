@@ -43,6 +43,26 @@ export type ProposalDoc = {
   };
   ecosystem_intro: string;   // 1 client-specific line on the ecosystem page (pods/layers are fixed)
   divider_line: string;      // 1 client-specific line on the VIII divider ("...the {campaign} specifically")
+  pods12: {
+    headline: Headline; researcher_para: string; researcher_chip: string; strategist_para: string; strategist_chip: string;
+    map: {
+      title: string; y_top: string; y_bottom: string; x_left: string; x_right: string;
+      competitors: { name: string; note: string; left: string; top: string }[];   // muted dots
+      client: { name: string; note: string; left: string; top: string };            // glowing dot
+    };
+  };
+  audience: {
+    headline: Headline; intro: string;
+    personas: { icon: string; name: string; geo: string; quote: string }[];         // 4
+    discipline_note: string; blueprint_note: string;
+    geo_label: string; geo_chips: { label: string; accent: boolean }[];
+    budget: { label: string; body: string; flex: number }[];                        // 3 (primary/tighter/gated)
+  };
+  targeting: {
+    headline: Headline;
+    rows: { name: string; platforms: string; segments: { label: string; text: string }[] }[];   // 4
+    matrix: { channels: string[]; rows: { persona: string; cells: ("lead" | "support" | "test")[] }[] };
+  };
 };
 
 // ── primitives ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -312,6 +332,96 @@ function dividerPage(d: ProposalDoc, ci: CiTokens): string {
     + footerDark(d.brand_short, null, "28px"));
 }
 
+// A 28px headline variant (the pod pages use a slightly smaller headline than the 30px content pages).
+const headline28 = (ci: CiTokens, h: Headline) => headline(ci, h, 28);
+// A soft tint outcome chip (F3EDF9 family), used on pod pages.
+const tintChip = (ci: CiTokens, body: string, mt = "10px") =>
+  `<div style="margin-top:${mt};background:${ci.tint};border-radius:10px;padding:9px 13px;font-size:10px;line-height:1.55;color:${ci.accentDeep};font-weight:600;">${esc(body)}</div>`;
+// A numbered pod disc (roman numeral in the CI icon-disc).
+const podDisc = (ci: CiTokens, roman: string, size = 34) =>
+  `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${ci.iconDisc};color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0;">${roman}</div>`;
+
+// 09 PODS I-II (light). Two pod blocks (disc + name + subtitle + para + tint chip) + the competitive positioning map.
+function pods12Page(d: ProposalDoc, ci: CiTokens): string {
+  const m = d.pods12.map;
+  const podBlock = (roman: string, name: string, subtitle: string, para: string, chip: string) =>
+    `<div style="background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:center;gap:10px;">${podDisc(ci, roman)}<div><div style="font-size:14px;font-weight:800;text-transform:uppercase;">${esc(name)}</div><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accent};">${esc(subtitle)}</div></div></div>`
+    + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(para)}</p>${tintChip(ci, chip)}</div>`;
+  const dot = (c: { name: string; note: string; left: string; top: string }) =>
+    `<div style="position:absolute;left:${c.left};top:${c.top};display:flex;align-items:center;gap:5px;"><div style="width:11px;height:11px;border-radius:50%;background:#B7AECB;"></div><div style="font-size:9px;font-weight:700;color:${ci.muted};">${esc(c.name)} <span style="font-weight:400;">· ${esc(c.note)}</span></div></div>`;
+  const clientDot = `<div style="position:absolute;left:${m.client.left};top:${m.client.top};display:flex;align-items:center;gap:6px;"><div style="width:15px;height:15px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 12px rgba(155,79,201,0.5);"></div><div style="font-size:10px;font-weight:800;color:${ci.accentDeep};">${esc(m.client.name)} <span style="font-weight:400;color:${ci.muted};">· ${esc(m.client.note)}</span></div></div>`;
+  const axisLbl = (pos: string, t: string) => `<div style="position:absolute;${pos};font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8496;">${esc(t)}</div>`;
+  return section(pageLight("48px 60px 36px"),
+    eyebrow(ci, "The Engine · Intelligence Layer") + headline28(ci, d.pods12.headline)
+    + `<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">`
+    +   podBlock("I", "The Researcher", "The business brain: market, competitors, customer", d.pods12.researcher_para, d.pods12.researcher_chip)
+    +   podBlock("II", "The Strategist", "Intelligence converted into a commercial plan and KPIs", d.pods12.strategist_para, d.pods12.strategist_chip)
+    + `</div>`
+    + `<div style="margin-top:12px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
+    +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:8px;">${esc(m.title)}</div>`
+    +   `<div style="position:relative;height:130px;border-left:2px solid #E4DEEF;border-bottom:2px solid #E4DEEF;margin:0 10px 18px 10px;">`
+    +     axisLbl("left:-8px;top:-14px", m.y_top) + axisLbl("left:-8px;bottom:-16px", m.y_bottom)
+    +     axisLbl("right:0;bottom:-16px", m.x_right) + axisLbl("left:14%;bottom:-16px", m.x_left)
+    +     m.competitors.map(dot).join("") + clientDot
+    +   `</div></div>`
+    + footerLight(ci, d.brand_short, 9));
+}
+
+// 10 POD III + PERSONAS (light). intro + 4 persona cards (+ discipline note) + blueprint chip + geo chips + budget bar.
+function audiencePage(d: ProposalDoc, ci: CiTokens): string {
+  const a = d.audience;
+  const personaCard = (p: { icon: string; name: string; geo: string; quote: string }) =>
+    `<div style="background:#FFFFFF;border-radius:12px;padding:11px 14px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:center;gap:8px;">${disc(ci, 24, p.icon)}<div style="font-size:10.5px;font-weight:700;">${esc(p.name)}</div></div>`
+    + `<div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};margin-top:2px;">${esc(p.geo)}</div>`
+    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:5px;font-style:italic;">${esc(p.quote)}</div></div>`;
+  const disciplineCard = `<div style="background:${ci.tint};border-radius:12px;padding:11px 14px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentDeep};">Trade-only discipline</div><div style="font-size:9.5px;line-height:1.5;color:${ci.body};margin-top:4px;">${esc(a.discipline_note)}</div></div>`;
+  const geoChip = (c: { label: string; accent: boolean }) => c.accent
+    ? `<div style="background:${ci.accentGrad};color:#FFFFFF;border-radius:999px;padding:5px 13px;font-size:8.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;white-space:nowrap;">${esc(c.label)}</div>`
+    : `<div style="background:#FFFFFF;border-radius:999px;padding:5px 13px;font-size:8.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;box-shadow:0 4px 12px ${ci.shadow};white-space:nowrap;">${esc(c.label)}</div>`;
+  const seg = (b: { label: string; body: string; flex: number }, i: number) => {
+    const bg = i === 0 ? `linear-gradient(90deg,${ci.accent} 0%,${ci.accentDeep} 100%)` : i === 1 ? "#D9CBEA" : "#EFE8F7";
+    const col = i === 0 ? "#FFFFFF" : "#3A2A55";
+    const sub = i === 0 ? "rgba(255,255,255,0.85)" : "#3A2A55";
+    return `<div style="flex:${b.flex};background:${bg};border-radius:8px;padding:7px 12px;color:${col};"><div style="font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">${esc(b.label)}</div><div style="font-size:9px;color:${sub};margin-top:2px;">${esc(b.body)}</div></div>`;
+  };
+  return section(pageLight("48px 60px 36px"),
+    eyebrow(ci, "The Engine · Execution Layer") + headline28(ci, a.headline)
+    + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(a.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px;">${a.personas.slice(0, 4).map(personaCard).join("")}${disciplineCard}</div>`
+    + tintChip(ci, a.blueprint_note)
+    + `<div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">${esc(a.geo_label)}</div><div style="display:flex;gap:7px;flex-wrap:nowrap;">${a.geo_chips.map(geoChip).join("")}</div></div>`
+    + `<div style="margin-top:10px;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:8px;">Where the money goes</div><div style="display:flex;gap:6px;align-items:stretch;">${a.budget.slice(0, 3).map(seg).join("")}</div></div>`
+    + footerLight(ci, d.brand_short, 10));
+}
+
+// 11 PLATFORM-LEVEL TARGETING (light). 4 targeting-stack rows + the persona-to-channel dot matrix.
+function targetingPage(d: ProposalDoc, ci: CiTokens): string {
+  const t = d.targeting;
+  const row = (r: { name: string; platforms: string; segments: { label: string; text: string }[] }) =>
+    `<div style="background:#FFFFFF;border-radius:12px;padding:11px 14px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;"><span style="font-size:12px;font-weight:700;">${esc(r.name)}</span><span style="font-size:8.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(r.platforms)}</span></div>`
+    + `<div style="color:${ci.muted};margin-top:4px;">${r.segments.map((s) => s.label ? `<strong>${esc(s.label)}:</strong> ${esc(s.text)}` : esc(s.text)).join(" ")}</div></div>`;
+  const dotFor = (lvl: "lead" | "support" | "test") => lvl === "lead"
+    ? `<div style="width:13px;height:13px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 8px rgba(155,79,201,0.4);"></div>`
+    : lvl === "support" ? `<div style="width:10px;height:10px;border-radius:50%;background:${ci.dotMid};"></div>`
+    : `<div style="width:6px;height:6px;border-radius:50%;background:${ci.dotLight};"></div>`;
+  const legend = `<div style="display:flex;gap:12px;font-size:7.5px;letter-spacing:0.1em;text-transform:uppercase;color:#8A8496;"><span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:${ci.iconDisc};display:inline-block;"></span>Lead</span><span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:${ci.dotMid};display:inline-block;"></span>Support</span><span style="display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:${ci.dotLight};display:inline-block;"></span>Test / none</span></div>`;
+  const headRow = `<div></div><div style="display:grid;grid-template-columns:repeat(${t.matrix.channels.length},1fr);font-size:8.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${ci.accentDeep};text-align:center;">${t.matrix.channels.map((c) => `<div>${esc(c)}</div>`).join("")}</div>`;
+  const matrixRows = t.matrix.rows.map((mr) =>
+    `<div style="padding:6px 12px;border-top:1px solid #EEE8F5;font-weight:700;color:${ci.body};font-size:10px;display:flex;align-items:center;">${esc(mr.persona)}</div>`
+    + `<div style="border-top:1px solid #EEE8F5;display:grid;grid-template-columns:repeat(${t.matrix.channels.length},1fr);align-items:center;">${mr.cells.map((c) => `<div style="display:flex;align-items:center;justify-content:center;">${dotFor(c)}</div>`).join("")}</div>`).join("");
+  return section(pageLight("48px 60px 36px"),
+    eyebrow(ci, "Pod III · Applied") + headline28(ci, t.headline)
+    + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:12px;font-size:10.5px;line-height:1.55;">${t.rows.slice(0, 4).map(row).join("")}</div>`
+    + `<div style="margin-top:10px;background:#FFFFFF;border-radius:14px;padding:12px 16px 10px;box-shadow:0 6px 18px ${ci.shadow};">`
+    +   `<div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">Persona to channel map</div>${legend}</div>`
+    +   `<div style="display:grid;grid-template-columns:1.3fr 2fr;margin-top:7px;">${headRow}${matrixRows}</div>`
+    + `</div>`
+    + footerLight(ci, d.brand_short, 11));
+}
+
 // ── document shell ────────────────────────────────────────────────────────────────────────────────────────────
 
 // Assemble the full HTML document: Poppins from Google Fonts, one fixed A4 page box per section, print geometry.
@@ -319,6 +429,7 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
   const pages = [
     coverPage(d, ci), execPage(d, ci), opportunityPage(d, ci), strategyPage(d, ci), marketPage(d, ci),
     philosophyPage(d, ci), ecosystemPage(d, ci), dividerPage(d, ci),
+    pods12Page(d, ci), audiencePage(d, ci), targetingPage(d, ci),
   ].join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`
     + `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`
