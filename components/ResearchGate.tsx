@@ -466,7 +466,11 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
   const bySection = (id: string) => claims.filter((c) => c.section === id);
   const rejectedCount = claims.filter((c) => c.rejected && !c.in_brain).length;
   const inBrainCount = claims.filter((c) => c.in_brain).length;
-  const liveCount = claims.filter((c) => !c.rejected && !c.in_brain).length;   // what actually shows in the review list
+  // A "gap" is the Researcher honestly reporting what it could NOT find - not a fact. Facts and gaps are counted
+  // separately so a thin-record client (all gaps) never reads as "8 claims" and then shows an empty fact base.
+  const gapClaims = claims.filter((c) => c.section === "gaps" && !c.rejected && !c.in_brain);
+  const factCount = claims.filter((c) => !c.rejected && !c.in_brain && c.section !== "gaps" && c.section !== "unverified").length;
+  const liveCount = factCount;   // real facts in the live review list (gaps/unverified are shown separately)
 
   // Bring EVERY carried-forward "in the brain" fact back to the live review list at once. Fixes the confusing
   // empty fact base on a re-run, when a previous run had kept facts that this run auto-tagged as already-kept.
@@ -603,7 +607,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         )}
         {run && !collecting && (
           <span className="text-sm text-ink-faint">
-            {claims.length} claim{claims.length === 1 ? "" : "s"} · collected {ukDate(run.created_at)}
+            {factCount} fact{factCount === 1 ? "" : "s"}{gapClaims.length > 0 && <> · <span className="text-[#fcd34d]">{gapClaims.length} gap{gapClaims.length === 1 ? "" : "s"}</span></>} · collected {ukDate(run.created_at)}
             {spend && typeof spend.runCents === "number" && spend.runCents > 0 && <> · <span className="tabular text-ink-dim">this run cost {rand(spend.runCents)}</span></>}
           </span>
         )}
@@ -758,6 +762,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               <button onClick={restoreAllToReview} className="font-semibold text-[#86efac] underline hover:text-[#86efac]/80">Restore {inBrainCount === 1 ? "it" : "them all"} to review</button> to check {inBrainCount === 1 ? "it" : "them"} again here.
             </div>
           )}
+          {/* THIN PUBLIC RECORD: the Researcher found no verified facts, only gaps. It refuses to invent facts, so
+              an empty fact base here is honest, not broken. Explain it and point at the fix rather than leave a
+              blank screen (this is exactly what happened on a small/new client like StellR). */}
+          {factCount === 0 && inBrainCount === 0 && gapClaims.length > 0 && (
+            <div className="rounded-xl border border-[#fbbf24]/40 bg-[#fbbf24]/[0.06] p-4 text-base leading-relaxed text-ink">
+              <b className="text-[#fcd34d]">No verified facts yet, only gaps.</b> This client&apos;s public record is thin, so the Researcher could not stand up a single sourced fact, and it will never invent one. What it looked for and could not find is listed below. To get facts: <b>feed the Brain</b> the client&apos;s own material (their site scrape, documents, decks) and run again, add a sharper <b>focus</b>, or <b>rerun with notes</b> pointing it at where the information lives.
+            </div>
+          )}
           {SECTIONS.map((sec) => {
             const rows = bySection(sec.id).filter((c) => !c.rejected && !c.in_brain);   // tagged facts leave the live list
             if (rows.length === 0) return null;
@@ -801,6 +813,22 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               </section>
             );
           })}
+          {/* GAPS - what the Researcher could NOT verify. Not facts, so shown apart, in amber, as open questions
+              to confirm with the client. Visible now (they used to fall into a section that never rendered). */}
+          {gapClaims.length > 0 && (
+            <section>
+              <div className="flex items-baseline justify-between border-b-2 border-[#fbbf24]/30 pb-2">
+                <h3 className="text-2xl font-bold text-[#fcd34d]">Gaps · what could not be verified</h3>
+                <span className="text-base text-ink-faint">{gapClaims.length}</span>
+              </div>
+              <p className="mt-1.5 text-base text-ink-faint">Open questions, not findings. Confirm these with the client, or feed the Brain material that answers them and run again.</p>
+              <ul className="mt-4 space-y-2">
+                {gapClaims.map((c) => (
+                  <li key={c.id} className="rounded-xl border border-[#fbbf24]/20 bg-surface-1 p-4 text-lg leading-relaxed text-ink-dim">{c.claim}</li>
+                ))}
+              </ul>
+            </section>
+          )}
           {/* IN THE BRAIN - facts Gary has kept. Out of the live list so the next run's genuinely-new facts stand
               out, recoverable with Restore. */}
           {inBrainCount > 0 && (
