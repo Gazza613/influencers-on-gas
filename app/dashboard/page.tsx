@@ -46,6 +46,25 @@ function StudioMark() {
   );
 }
 
+// The Brain: a knowledge graph - a central node the whole engine reads and writes, with its connected memory.
+function BrainMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
+      <defs>
+        <linearGradient id="br-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#A855F7" /><stop offset="0.55" stopColor="#818CF8" /><stop offset="1" stopColor="#22D3EE" />
+        </linearGradient>
+      </defs>
+      <circle cx="24" cy="24" r="6" stroke="url(#br-g)" strokeWidth="2.6" />
+      <circle cx="10" cy="12" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
+      <circle cx="39" cy="13" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
+      <circle cx="12" cy="38" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
+      <circle cx="38" cy="37" r="3.4" stroke="url(#br-g)" strokeWidth="2.4" />
+      <path d="M13 14.5l6.5 5.5M35.5 15.5l-6.5 4.5M15 35.5l5-6.5M35 34l-6-5" stroke="url(#br-g)" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // The Researcher: a magnifying glass over a small bar chart - analysis, not reporting.
 function ResearcherMark() {
   return (
@@ -170,8 +189,21 @@ function EyeMark() {
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
     label: "Intelligence",
-    note: "The market, and what to do about it",
+    note: "Build the brain, read the market, set the strategy",
     doors: [
+      {
+        // THE BRAIN leads the whole system (Gary): the per-client knowledge base is the foundation every pod
+        // reads and writes. It is the first tier, ahead of the Researcher that fills it and the Strategist that
+        // reasons over it. Not one of the eight pods - the substrate they all sit on.
+        name: <>The <span className="brand-grad">Brain</span></>,
+        href: "/setup/brains",
+        mark: <BrainMark />,
+        blurb: "The client's living knowledge base. Crawl their site and add their material, and every desk reads and writes to it. The foundation the whole engine sits on.",
+        action: "Build the Brain",
+        ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
+        wash: "from-[#a855f7]/[0.10] to-[#22d3ee]/[0.04]",
+        accent: "text-[#c4b5fd]",
+      },
       {
         name: <>The Researcher</>,
         href: "/researcher",
@@ -237,9 +269,9 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#d8b4fe]",
       },
       {
-        // "Creatives on GAS", not "Studio on GAS" (Gary). STUDIO ON GAS is now the PLATFORM - the whole thing,
-        // all six desks. This tile is one desk inside it: the creative factory. Sharing the name made the part
-        // look like the whole, so the desk is named for what it actually produces.
+        // "Creatives on GAS" (Gary, Aug 2026): the PLATFORM is now "The Agency of NOW". "Studio" is retired as a
+        // platform name and kept ONLY as this route - the creative factory desk. The desk is named for what it
+        // actually produces, so the part never reads as the whole.
         name: <>Creatives <span className="brand-grad">on</span> GAS</>,
         href: "/studio",
         mark: <StudioMark />,

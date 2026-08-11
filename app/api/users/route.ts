@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   const token = await inviteUser({ email, name, role });
   const link = `${APP_URL}/invite/${token}`;
   const { subject, html } = inviteEmail({ inviterName: a.session.user.name ?? "GAS", inviteeName: name, link });
-  const result = await sendEmail({ to: email, subject, html, fromName: "Studio on GAS" });
+  const result = await sendEmail({ to: email, subject, html, fromName: "The Agency of NOW" });
 
   return NextResponse.json({ ok: true, emailed: result.sent, configured: emailConfigured(), link });
 }

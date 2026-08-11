@@ -32,7 +32,7 @@ export function RequestReset() {
       <div className="text-center">
         <div className="text-[17px] font-bold text-ink">Check your email</div>
         <p className="mt-3 text-[15px] leading-relaxed text-ink-dim">
-          If that address has a Studio on GAS account, a reset link is on its way. It expires in an hour.
+          If that address has a The Agency of NOW account, a reset link is on its way. It expires in an hour.
         </p>
         <a href="/login" className="mt-6 inline-block text-[15px] font-semibold text-accent">← Back to sign in</a>
       </div>

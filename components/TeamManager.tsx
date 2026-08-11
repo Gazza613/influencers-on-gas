@@ -194,7 +194,7 @@ export default function TeamManager() {
             </table>
           </div>
           <p className="mt-3 text-[15px] text-ink-faint">
-            Studio on GAS only. Media on GAS is a separate product with its own team controls and reporting, so its
+            The Agency of NOW only. Media on GAS is a separate product with its own team controls and reporting, so its
             activity cannot appear here.
           </p>
         </section>

@@ -82,7 +82,7 @@ export default function Landing() {
   // - not even with a hard refresh. A public homepage you cannot visit is just broken.
   //
   // So nothing redirects now. The page renders for everyone, and the only thing the session changes is the
-  // CTA: signed out it says "Get Started" and goes to /login, signed in it says "Enter the Studio" and goes
+  // CTA: signed out it says "Get Started" and goes to /login, signed in it says "Enter the Agency" and goes
   // to the dashboard. Same page, right door.
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
@@ -227,8 +227,8 @@ export default function Landing() {
           {/* SET IN CAPS (Gary) - the platform name should make a statement. Caps need POSITIVE tracking:
               the -0.6px that suited mixed case jams uppercase letterforms together and reads as a smudge. */}
           <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.32em", fontSize: "clamp(19px, 4.6vw, 30px)", fontWeight: 800, letterSpacing: "0.08em" }}>
-            <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>STUDIO ON</span>
-            <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
+            <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>THE AGENCY OF</span>
+            <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>NOW</span>
           </div>
         </div>
 
@@ -249,7 +249,7 @@ export default function Landing() {
           onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.04) translateY(-2px)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(168,85,247,0.65), 0 8px 32px rgba(0,0,0,0.5)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1) translateY(0)"; e.currentTarget.style.boxShadow = "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)"; }}
         >
-          {signedIn ? "Enter the Studio →" : "Get Started →"}
+          {signedIn ? "Enter the Agency →" : "Get Started →"}
         </button>
       </div>
 

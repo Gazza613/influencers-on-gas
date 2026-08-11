@@ -7,8 +7,8 @@ import CostReadout from "@/components/CostReadout";
 import SetupNav from "@/components/SetupNav";
 
 // Persistent top navigation shown on every signed-in page so you can always move around (and never
-// get stuck). The logo goes HOME - the two doors (Influencers on GAS / GAS Studio) - so you can always
-// switch product from anywhere. Then the section nav, cost readout, sign out.
+// get stuck). The logo goes HOME to The Agency of NOW dashboard (all the desks), so you can always
+// switch desk from anywhere. Then the section nav, cost readout, sign out.
 export default function AppHeader() {
   const [me, setMe] = useState<{ email: string; role: string } | null>(null);
   useEffect(() => {

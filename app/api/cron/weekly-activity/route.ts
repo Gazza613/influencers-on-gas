@@ -69,7 +69,7 @@ export async function GET(req: Request) {
 
     const body = `
       <p class="p" style="font-size:14px;line-height:1.7;color:#9aa0a8;margin:0 0 14px;">
-        How the team used <b style="color:#ffffff;">Studio on GAS</b> from ${a.from} to ${a.to}.
+        How the team used <b style="color:#ffffff;">The Agency of NOW</b> from ${a.from} to ${a.to}.
       </p>
 
       <table role="presentation" width="100%" cellpadding="0" cellspacing="6" style="margin:0 0 6px;">
@@ -97,7 +97,7 @@ export async function GET(req: Request) {
         Sessions are visits to the studio, counted as activity with no gap longer than 30 minutes. We do not
         track time at a desk, so this reports how often and how regularly people come in, not hours worked.
         <br /><br />
-        Studio on GAS only. Media on GAS is a separate product with its own team controls and its own reporting,
+        The Agency of NOW only. Media on GAS is a separate product with its own team controls and its own reporting,
         so its activity is not included here and this is not a view of it.
       </p>`;
 
@@ -110,7 +110,7 @@ export async function GET(req: Request) {
       department: "GAS Marketing",
     });
 
-    await sendEmail({ fromName: "Studio on GAS", to: TO.join(","), subject: `Studio on GAS - team activity, ${a.from} to ${a.to}`, html });
+    await sendEmail({ fromName: "The Agency of NOW", to: TO.join(","), subject: `The Agency of NOW - team activity, ${a.from} to ${a.to}`, html });
     return NextResponse.json({ ok: true, sent: TO, members: a.members.length, ...t });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 500 });
