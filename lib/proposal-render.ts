@@ -83,6 +83,19 @@ export type ProposalDoc = {
     dashboard_para: string; dashboard_chip: string; media_para: string; media_chip: string;
     tiles: { label: string; spark: "line-down" | "bars" | "line-up" | "gauge"; caption: string }[];   // 4
   };
+  closedloop: { intro: string; compounding: string; step5_sub?: string };
+  rollout: {
+    headline: Headline; intro: string;
+    rail: { badge: string; label: string }[];
+    weeks: { icon: string; title: string; pods: string; bullets: string[]; gate: string }[];
+  };
+  funnel: {
+    disclaimer: string;
+    bars: string[];                                              // stage labels (widths fixed by index)
+    kpis: { metric: string; why: string; baseline: string }[];
+  };
+  governance: { intro: string; commitments: { title: string; body: string }[] };   // 8
+  deal_divider: string;                                          // 1 line on the "No Fine Print" divider
 };
 
 // ── primitives ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -555,6 +568,107 @@ function pods78Page(d: ProposalDoc, ci: CiTokens): string {
     + footerLight(ci, d.brand_short, 15));
 }
 
+// 16 CLOSED LOOP (dark). Fixed 6-step wheel (ring + 6 arrow discs + 6 step cards + centre GAS disc); intro +
+// compounding callout vary. The step titles are fixed doctrine; step 5's sub can be tuned per client.
+const LOOP_STEPS: { left: number; top: number; title: string; sub: string }[] = [
+  { left: 310, top: 85, title: "Research and strategise", sub: "The business brain sets the plan" },
+  { left: 505, top: 197, title: "Target the audience", sub: "Precision over reach" },
+  { left: 505, top: 423, title: "Create and deploy", sub: "StorySelling at machine speed" },
+  { left: 310, top: 535, title: "Qualify with PSI", sub: "Interest scored into intent" },
+  { left: 115, top: 423, title: "Manage and convert", sub: "Your team works warm leads" },
+  { left: 115, top: 197, title: "Optimise and learn", sub: "Every result sharpens the next" },
+];
+const LOOP_ARROWS: { left: number; top: number; rot: number }[] = [
+  { left: 422, top: 115, rot: 30 }, { left: 535, top: 310, rot: 90 }, { left: 422, top: 505, rot: 150 },
+  { left: 198, top: 505, rot: 210 }, { left: 85, top: 310, rot: 270 }, { left: 198, top: 115, rot: 330 },
+];
+function closedLoopPage(d: ProposalDoc, ci: CiTokens): string {
+  const arrow = (a: { left: number; top: number; rot: number }) =>
+    `<div style="position:absolute;left:${a.left}px;top:${a.top}px;transform:translate(-50%,-50%) rotate(${a.rot}deg);width:26px;height:26px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(155,79,201,0.5);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div>`;
+  const stepCard = (s: { left: number; top: number; title: string; sub: string }, i: number) =>
+    `<div style="position:absolute;left:${s.left}px;top:${s.top}px;transform:translate(-50%,-50%);width:172px;background:rgba(28,17,64,0.85);border:1px solid rgba(199,125,232,0.4);border-radius:14px;padding:10px 12px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.35);"><div style="font-size:9px;font-weight:600;letter-spacing:0.18em;color:${ci.accentOnDark};">STEP ${i + 1}</div><div style="font-size:12px;font-weight:700;margin-top:2px;line-height:1.3;">${esc(s.title)}</div><div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.4;margin-top:2px;">${esc(i === 4 && d.closedloop.step5_sub ? d.closedloop.step5_sub : s.sub)}</div></div>`;
+  return section(pageDark(ci, "52px 60px 40px"),
+    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">07 · Ecosystem Integration</div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.1;margin-top:10px;">One closed-loop <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">growth engine</span></div>`
+    + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(d.closedloop.intro)}</p>`
+    + `<div style="flex:1;display:flex;align-items:center;justify-content:center;margin-top:6px;"><div style="position:relative;width:620px;height:620px;">`
+    +   `<svg width="620" height="620" viewBox="0 0 620 620" style="position:absolute;inset:0;"><circle cx="310" cy="310" r="225" fill="none" stroke="rgba(199,125,232,0.35)" stroke-width="2" stroke-dasharray="3 7"></circle></svg>`
+    +   LOOP_ARROWS.map(arrow).join("") + LOOP_STEPS.map(stepCard).join("")
+    +   `<div style="position:absolute;left:310px;top:310px;transform:translate(-50%,-50%);width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,rgba(155,79,201,0.35) 0%,rgba(155,79,201,0) 70%);"></div>`
+    +   `<div style="position:absolute;left:310px;top:310px;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;text-align:center;"><div style="width:89px;height:89px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:25px;color:#FFFFFF;box-shadow:0 0 44px rgba(155,79,201,0.75),0 0 0 6px rgba(255,255,255,0.08);">GAS</div><div style="font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-top:12px;">The Agency of NOW</div><div style="font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;margin-top:4px;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">From Interest to Intent</div></div>`
+    + `</div></div>`
+    + `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:14px 20px;margin-bottom:22px;"><p style="font-size:11px;line-height:1.65;margin:0;color:rgba(255,255,255,0.82);"><strong style="color:${ci.accentOnDark};">The compounding mechanism.</strong> ${esc(d.closedloop.compounding)}</p></div>`
+    + footerDark(d.brand_short, 16));
+}
+
+// 17 ROLLOUT (light). Timeline rail (gate discs) + gated week cards (icon + title + pods tag + bullets + gate pill).
+function rolloutPage(d: ProposalDoc, ci: CiTokens): string {
+  const r = d.rollout;
+  const railDisc = (badge: string, label: string) =>
+    `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;"><div style="min-width:26px;height:26px;padding:0 6px;border-radius:999px;background:${ci.iconDisc};color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:9.5px;white-space:nowrap;position:relative;z-index:1;box-shadow:0 0 0 4px #FAF8FC;">${esc(badge)}</div><div style="font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accentDeep};text-align:center;">${esc(label)}</div></div>`;
+  const weekCard = (w: (typeof r.weeks)[number]) =>
+    `<div style="background:#FFFFFF;border-radius:14px;padding:13px 16px;box-shadow:0 6px 18px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="display:flex;align-items:center;gap:8px;">${disc(ci, 24, w.icon)}<div style="font-size:11px;font-weight:700;">${esc(w.title)}</div></div>`
+    + `<div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};margin-top:2px;">${esc(w.pods)}</div>`
+    + `<ul style="margin:7px 0 0;padding-left:14px;font-size:9.3px;line-height:1.5;color:${ci.muted};flex:1;">${w.bullets.map((b) => `<li style="margin-top:2px;">${esc(b)}</li>`).join("")}</ul>`
+    + `<div style="margin-top:9px;background:${ci.accentGrad};border-radius:999px;padding:5px 12px;font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;align-self:flex-start;">${esc(w.gate)}</div></div>`;
+  return section(pageLight("48px 60px 36px"),
+    eyebrow(ci, "08 · Your Rollout") + headline28(ci, r.headline)
+    + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(r.intro)}</p>`
+    + `<div style="margin-top:12px;position:relative;padding:0 30px;"><div style="position:absolute;left:60px;right:60px;top:13px;height:2px;background:linear-gradient(90deg,${ci.accentOnDark} 0%,${ci.accentDeep} 100%);"></div><div style="display:flex;align-items:flex-start;">${r.rail.map((x) => railDisc(x.badge, x.label)).join("")}</div></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;flex:1;">${r.weeks.map(weekCard).join("")}</div>`
+    + footerLight(ci, d.brand_short, 17));
+}
+
+// 18 FUNNEL + KPIS (light). Illustrative disclaimer + 6 narrowing funnel bars + the KPI table (dark header).
+const FUNNEL_WIDTHS = ["100%", "86%", "72%", "58%", "44%", "30%"];
+function funnelPage(d: ProposalDoc, ci: CiTokens): string {
+  const f = d.funnel;
+  const bar = (label: string, i: number) =>
+    `<div style="display:flex;align-items:center;gap:9px;"><div style="width:20px;height:20px;border-radius:50%;background:${ci.iconDisc};color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:9.5px;flex-shrink:0;">${i + 1}</div><div style="width:${FUNNEL_WIDTHS[i] || "30%"};background:${ci.darkCard};border-radius:9px;padding:6px 12px;color:#FFFFFF;font-size:9.5px;font-weight:600;">${esc(label)}</div></div>`;
+  const th = (t: string) => `<div style="padding:7px 12px;background:${ci.darkCard};color:#FFFFFF;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;font-size:8.5px;">${t}</div>`;
+  const td = (t: string, bold: boolean) => `<div style="padding:7px 12px;border-top:1px solid #EEE8F5;color:${bold ? ci.body : ci.muted};${bold ? "font-weight:700;" : ""}">${esc(t)}</div>`;
+  const rows = f.kpis.map((k) => td(k.metric, true) + td(k.why, false) + td(k.baseline, false)).join("");
+  return section(pageLight("48px 60px 36px"),
+    eyebrow(ci, "09 · Funnel Economics and KPIs") + headline28(ci, { lead: "A precision funnel,", gradient: "measured against reality" })
+    + `<p style="font-size:9.5px;line-height:1.55;color:${ci.muted};margin:8px 0 0;font-style:italic;">${esc(f.disclaimer)}</p>`
+    + `<div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">${f.bars.slice(0, 6).map(bar).join("")}</div>`
+    + miniEyebrow(ci, "KPIs, agreed up front")
+    + `<div style="display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:0;margin-top:8px;background:#FFFFFF;border-radius:14px;box-shadow:0 6px 18px ${ci.shadow};overflow:hidden;font-size:9px;line-height:1.45;">${th("Metric")}${th("Why it matters")}${th("Baseline and target")}${rows}</div>`
+    + footerLight(ci, d.brand_short, 18));
+}
+
+// 19 GOVERNANCE (light). intro + 8 commitment cards (check disc) + the fixed compliance stack pills.
+const SHIELD = `<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 .58-.91l7-3.5a1 1 0 0 1 .84 0l7 3.5A1 1 0 0 1 20 6Z"></path><path d="m9 12 2 2 4-4"></path>`;
+function governancePage(d: ProposalDoc, ci: CiTokens): string {
+  const card = (title: string, body: string) =>
+    `<div style="background:#FFFFFF;border-radius:14px;padding:13px 17px;box-shadow:0 6px 18px ${ci.shadow};display:flex;gap:10px;align-items:flex-start;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${ci.accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6 9 17l-5-5"></path></svg><div><div style="font-size:11px;font-weight:700;">${esc(title)}</div><div style="font-size:10px;line-height:1.55;color:${ci.muted};margin-top:3px;">${esc(body)}</div></div></div>`;
+  const pill = (t: string) =>
+    `<div style="display:flex;align-items:center;gap:7px;background:${ci.darkCard};border-radius:999px;padding:6px 11px;color:#FFFFFF;white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${SHIELD}</svg><span style="font-size:7.8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${t}</span></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "10 · Governance") + headline(ci, { lead: "Trusted with data,", gradient: "by design" })
+    + `<p style="font-size:11.5px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.governance.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">${d.governance.commitments.slice(0, 8).map((c) => card(c.title, c.body)).join("")}</div>`
+    + `<div style="margin-top:12px;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:10px;justify-content:space-between;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">Compliance stack</div><div style="display:flex;gap:8px;flex-wrap:nowrap;">${["POPIA", "GDPR-aligned", "Platform policies", "Verified-claims register"].map(pill).join("")}</div></div>`
+    + footerLight(ci, d.brand_short, 19));
+}
+
+// 20 "NO FINE PRINT" DIVIDER (dark). Fixed giant type + subhead + 4 chips; one client line.
+function dealDividerPage(d: ProposalDoc, ci: CiTokens): string {
+  const chips = ["Rate card", "Commercial terms", "One-page agreement", "Sign-off"]
+    .map((t) => `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);border-radius:999px;padding:7px 16px;font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;">${t}</div>`).join("");
+  return section(pageDark(ci, "56px 64px 44px", "position:relative;overflow:hidden;background:" + ci.darkCard + ";"),
+    `<div style="position:absolute;right:-160px;top:-160px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,rgba(199,125,232,0) 70%);"></div>`
+    + `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};position:relative;">The Commercials</div>`
+    + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
+    +   `<div style="font-size:84px;font-weight:800;line-height:0.98;letter-spacing:-0.02em;text-transform:uppercase;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">No Fine Print</div>`
+    +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.12;margin-top:18px;max-width:660px;">One tier. One page of terms.</div>`
+    +   `<p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.68);margin:16px 0 0;max-width:500px;">${esc(d.deal_divider)}</p>`
+    + `</div>`
+    + `<div style="display:flex;flex-wrap:wrap;gap:8px;position:relative;">${chips}</div>`
+    + footerDark(d.brand_short, null, "28px"));
+}
+
 // ── document shell ────────────────────────────────────────────────────────────────────────────────────────────
 
 // Assemble the full HTML document: Poppins from Google Fonts, one fixed A4 page box per section, print geometry.
@@ -564,6 +678,7 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
     philosophyPage(d, ci), ecosystemPage(d, ci), dividerPage(d, ci),
     pods12Page(d, ci), audiencePage(d, ci), targetingPage(d, ci),
     creativePage(d, ci), channelsPage(d, ci), psiPage(d, ci), pods78Page(d, ci),
+    closedLoopPage(d, ci), rolloutPage(d, ci), funnelPage(d, ci), governancePage(d, ci), dealDividerPage(d, ci),
   ].join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`
     + `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`
