@@ -96,6 +96,15 @@ export type ProposalDoc = {
   };
   governance: { intro: string; commitments: { title: string; body: string }[] };   // 8
   deal_divider: string;                                          // 1 line on the "No Fine Print" divider
+  investment: {
+    intro: string; tier_name: string; tagline: string; poc_chip: string; price: string; price_unit: string; body: string;
+    inclusions: { title: string; pod_tag: string }[];           // up to 8
+    footnotes: { label: string; body: string }[];               // 3
+    honest_para: string;
+  };
+  terms: { validity: string; engagement: string; media: string; ownership: string; poc_proves: string };
+  agreement: { intro: string; clauses: { title: string; body: string }[] };   // 6
+  signoff: { intro: string; client: { name: string; signatory_label: string; contacts: string[]; tagline: string } };
 };
 
 // ── primitives ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -669,6 +678,86 @@ function dealDividerPage(d: ProposalDoc, ci: CiTokens): string {
     + footerDark(d.brand_short, null, "28px"));
 }
 
+// 21 INVESTMENT (light). The flat-retainer tier card (Dominate / Launch) - dark hero + 8 inclusion tiles + 3
+// footnotes + honest para. (Bespoke uses a separate provincial-scale layout, added later per Gary's locked call.)
+function investmentPage(d: ProposalDoc, ci: CiTokens): string {
+  const iv = d.investment;
+  const incl = (t: { title: string; pod_tag: string }) =>
+    `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6 9 17l-5-5"></path></svg><div><div style="font-size:11px;font-weight:700;">${esc(t.title)}</div><div style="font-size:8.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-top:2px;">${esc(t.pod_tag)}</div></div></div>`;
+  const foot = (f: { label: string; body: string }) =>
+    `<div style="background:${ci.tint};border-radius:14px;padding:12px 16px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentDeep};">${esc(f.label)}</div><div style="font-size:10.5px;line-height:1.55;color:${ci.body};margin-top:4px;">${esc(f.body)}</div></div>`;
+  return section(pageLight("48px 60px 40px"),
+    eyebrow(ci, "11 · Investment") + headline(ci, { lead: "The investment ·", gradient: `the ${iv.tier_name} engine` })
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(iv.intro)}</p>`
+    + `<div style="margin-top:16px;background:${ci.darkPage};border-radius:18px;padding:22px 26px;color:#FFFFFF;position:relative;box-shadow:0 12px 30px rgba(46,26,74,0.28);">`
+    +   `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><div><div style="font-size:20px;font-weight:800;text-transform:uppercase;">${esc(iv.tier_name)}</div><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:2px;">${esc(iv.tagline)}</div></div><div style="background:${ci.accentGrad};border-radius:999px;padding:6px 14px;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap;align-self:flex-start;">${esc(iv.poc_chip)}</div></div>`
+    +   `<div style="display:flex;align-items:baseline;gap:14px;margin-top:8px;"><div style="font-size:58px;font-weight:800;letter-spacing:-0.02em;line-height:1;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">${esc(iv.price)}</div><div style="font-size:12px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.65);line-height:1.5;">${esc(iv.price_unit).replace(/&lt;br\s*\/?&gt;/gi, "<br>")}</div></div>`
+    +   `<p style="font-size:11px;line-height:1.65;color:rgba(255,255,255,0.75);margin:10px 0 0;">${esc(iv.body)}</p>`
+    +   `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">${iv.inclusions.slice(0, 8).map(incl).join("")}</div>`
+    + `</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px;">${iv.footnotes.slice(0, 3).map(foot).join("")}</div>`
+    + `<p style="font-size:10px;line-height:1.6;color:${ci.muted};margin:12px 0 0;">${esc(iv.honest_para)}</p>`
+    + footerLight(ci, d.brand_short, 21));
+}
+
+// 22 TERMS AND CLOSING (dark). 4 term cards + PoC-proves callout + 3 chips + logo footer.
+function termsPage(d: ProposalDoc, ci: CiTokens): string {
+  const t = d.terms;
+  const glass = (label: string, body: string) =>
+    `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.20);border-radius:16px;padding:16px 20px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(label)}</div><p style="font-size:11.5px;line-height:1.65;color:rgba(255,255,255,0.85);margin:6px 0 0;">${esc(body)}</p></div>`;
+  const chip = (t2: string, accent: boolean) => accent
+    ? `<div style="background:${ci.accentGrad};border-radius:999px;padding:9px 20px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(t2)}</div>`
+    : `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.22);border-radius:999px;padding:9px 20px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(t2)}</div>`;
+  const clientMark = d.client_logo
+    ? `<img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" width="126" height="44" style="width:126px;height:44px;">`
+    : `<span style="font-size:12px;font-weight:700;color:#FFFFFF;">${esc(d.client_name)}</span>`;
+  return section(pageDark(ci, "52px 60px 44px"),
+    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">12 · Commercial Terms and Next Steps</div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.12;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;">${glass("Validity", t.validity)}${glass("Engagement", t.engagement)}${glass("Media budget", t.media)}${glass("Ownership", t.ownership)}</div>`
+    + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:18px 22px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the proof of concept proves</div><p style="font-size:12px;line-height:1.7;color:rgba(255,255,255,0.85);margin:8px 0 0;">${esc(t.poc_proves)}</p></div>`
+    + `<div style="display:flex;gap:10px;margin-top:auto;padding-top:20px;flex-wrap:nowrap;">${chip("Human Command. AI Execution.", true)}${chip("Eight integrated pods", false)}${chip("One closed-loop engine", false)}</div>`
+    + `<div style="margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;align-items:center;"><div style="display:flex;align-items:center;gap:12px;"><div style="width:40px;height:40px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#FFFFFF;">GAS</div><div><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;">GAS MARKETING AUTOMATION</div><div style="font-size:9px;letter-spacing:0.24em;color:${ci.accentOnDark};font-weight:600;">THE AGENCY OF NOW</div></div></div><div style="display:flex;align-items:center;gap:16px;">${clientMark}<span style="font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);">www.gasmarketing.co.za</span></div></div>`);
+}
+
+// 23 AGENCY AGREEMENT (light). 6 clause cards + dark closing strip. Clause titles are fixed; bodies carry the deal.
+const CLAUSE_TITLES = ["1 · Engagement", "2 · Payment", "3 · Media spend", "4 · Ownership", "5 · Confidentiality and data", "6 · Exit"];
+function agreementPage(d: ProposalDoc, ci: CiTokens): string {
+  const clause = (title: string, body: string) =>
+    `<div style="background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accent};">${esc(title)}</div><div style="font-size:11px;line-height:1.6;color:${ci.body};margin-top:6px;">${esc(body)}</div></div>`;
+  const cards = d.agreement.clauses.slice(0, 6).map((c, i) => clause(CLAUSE_TITLES[i] || c.title, c.body)).join("");
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "13 · Agency Agreement") + headline(ci, { lead: "Simple terms,", gradient: "in plain language" })
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.muted};margin:12px 0 0;">${esc(d.agreement.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;flex:1;">${cards}</div>`
+    + `<div style="margin-top:14px;background:${ci.darkPage};border-radius:16px;padding:16px 24px;color:#FFFFFF;display:flex;align-items:center;gap:16px;"><div style="width:34px;height:34px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></div><div style="font-size:11.5px;line-height:1.6;color:rgba(255,255,255,0.85);">That is the whole agreement: six clauses, one page. Deliberately simple, binding on signature, and written so a decision can be made in the room.</div></div>`);
+}
+
+// 24 SIGN-OFF (light). Two signature cards: client (data) + agency (fixed GAS/Gary Berman).
+function signoffPage(d: ProposalDoc, ci: CiTokens): string {
+  const s = d.signoff;
+  const sigRule = `<div style="margin-top:26px;"><div style="border-bottom:1.5px solid rgba(26,16,48,0.35);height:34px;"></div><div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};margin-top:6px;"><span>Signature</span><span>Date</span></div></div>`;
+  const clientCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the client</div>`
+    + `<div style="font-size:16px;font-weight:800;text-transform:uppercase;margin-top:6px;">${esc(d.client_name)}</div>`
+    + `<div style="margin-top:14px;"><div style="font-size:13px;font-weight:700;">Authorised Signatory</div><div style="font-size:11px;color:${ci.muted};margin-top:2px;">${esc(s.client.signatory_label)}</div></div>`
+    + `<div style="font-size:10.5px;line-height:1.8;color:${ci.muted};margin-top:10px;">${s.client.contacts.map((c) => `<div>${esc(c)}</div>`).join("")}</div>`
+    + sigRule
+    + `<div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;"><div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};"></div><div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};">${esc(s.client.tagline)}</div></div></div>`;
+  const agencyCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;color:#1A1030;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the agency</div>`
+    + `<div style="font-size:16px;font-weight:800;text-transform:uppercase;margin-top:6px;">GAS Marketing Automation</div>`
+    + `<div style="margin-top:14px;"><div style="font-size:13px;font-weight:700;">Gary Berman</div><div style="font-size:11px;color:${ci.muted};margin-top:2px;">Managing Director</div></div>`
+    + `<div style="font-size:10.5px;line-height:1.8;color:${ci.muted};margin-top:10px;min-height:76px;"><div>Cell: 082 566 3708</div><div>Email: gary@gasmarketing.co.za</div><div>www.gasmarketing.co.za</div></div>`
+    + sigRule
+    + `<div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;"><div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;color:#FFFFFF;">GAS</div><div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};">Human Command. AI Execution.</div></div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "14 · Acceptance and Sign-off") + headline(ci, { lead: "Agreement", gradient: "and sign-off" })
+    + `<p style="font-size:12px;line-height:1.7;color:${ci.body};margin:14px 0 0;">${esc(s.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;align-items:stretch;">${clientCard}${agencyCard}</div>`
+    + footerLight(ci, d.brand_short, 24));
+}
+
 // ── document shell ────────────────────────────────────────────────────────────────────────────────────────────
 
 // Assemble the full HTML document: Poppins from Google Fonts, one fixed A4 page box per section, print geometry.
@@ -679,6 +768,7 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
     pods12Page(d, ci), audiencePage(d, ci), targetingPage(d, ci),
     creativePage(d, ci), channelsPage(d, ci), psiPage(d, ci), pods78Page(d, ci),
     closedLoopPage(d, ci), rolloutPage(d, ci), funnelPage(d, ci), governancePage(d, ci), dealDividerPage(d, ci),
+    investmentPage(d, ci), termsPage(d, ci), agreementPage(d, ci), signoffPage(d, ci),
   ].join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`
     + `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`
