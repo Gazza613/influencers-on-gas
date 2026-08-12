@@ -269,9 +269,18 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
                 placeholder="Comments to rework (leave blank to accept as is). e.g. 'Lead the audience on the LinkedIn segment for the business-owner persona. Test TikTok, do not lead with it. Tighten the funnel note.'"
                 className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button onClick={() => gate("refine")} disabled={gateBusy || !comments.trim()} className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">Rework with my comments</button>
-                <button onClick={() => gate("approve")} disabled={gateBusy} className="rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">Approve as is →</button>
+                <button onClick={() => gate("refine")} disabled={gateBusy || !comments.trim()} className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                  {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+                  {gateBusy ? "Reworking…" : "Rework with my comments"}
+                </button>
+                <button onClick={() => gate("approve")} disabled={gateBusy} className="inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                  {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+                  Approve as is →
+                </button>
               </div>
+              {/* The rework runs a full Fable-5 pass and can take a minute; show it right here, where the click was,
+                  not only in the status line far above (Gary: no visible spinner near the button). */}
+              {gateBusy && <div className="mt-3 text-lg text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
             </div>
           ) : (
             /* APPROVED -> the branded PDF (final cut). Client colours auto-detected, override if needed. */
