@@ -4,7 +4,7 @@ import { refineStrategy } from "@/lib/strategist";
 
 // GATE 2 pre-step, Human Command: "look at the strategy, edit if needed". Refines the draft in place from the
 // team's notes (regenerated against the same fact base), still awaiting approval. Then the team approves.
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {

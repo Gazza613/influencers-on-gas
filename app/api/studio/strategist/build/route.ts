@@ -5,7 +5,10 @@ import { buildStrategy } from "@/lib/strategist";
 // THE STRATEGIST (Pillar II), Phase C. Build a strategy from the client's APPROVED research fact base. This is the
 // demonstrable Research -> Strategy hand-off: it only ever runs from a Gate-1-approved run, and produces the
 // structured brief (awaiting Gate 2). Two Opus 5 passes (draft + adversarial red-team) can take a moment.
-export const maxDuration = 300;
+// Two sequential Opus 5 passes (draft + adversarial red-team) at 12k tokens each over a rich fact base can run
+// past 300s and the platform then kills the function - the client saw a non-JSON 504 as "Couldn't build the
+// strategy". 800s (the durable-route ceiling this plan already uses) gives both passes ample room.
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {

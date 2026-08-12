@@ -4,7 +4,7 @@ import { refineProposal, approveProposal, reopenProposal } from "@/lib/proposal"
 
 // THE PROPOSAL GATE (Human Command). A senior strategist reviews the draft: send it back with comments (refine),
 // approve it for the final cut, or reopen an approved one. Our experts gate every step.
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {

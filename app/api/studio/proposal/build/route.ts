@@ -5,7 +5,7 @@ import { OBJECTIVES, TIERS, type ObjectiveId, type TierId } from "@/lib/proposal
 
 // Build the client-facing growth proposal from an approved strategy, on the chosen objective + tier. Fable 5, so
 // it can take a moment.
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {

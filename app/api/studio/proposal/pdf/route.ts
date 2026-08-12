@@ -4,7 +4,7 @@ import { buildProposalPdf } from "@/lib/proposal-pdf";
 
 // Render the branded proposal PDF (client colour from their website + GAS as Agency of NOW). Chromium render, so
 // give it room. accent (optional hex) lets the team override the auto-detected colour.
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
