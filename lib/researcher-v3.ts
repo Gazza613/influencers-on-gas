@@ -6,6 +6,7 @@ import { clientWebsites, siteAnchor, deriveResearchBrief, loadIntelBrief } from 
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
 import { ingestChunks } from "./rag";
+import { scrape } from "./vendors/firecrawl";
 
 // THE RESEARCHER, V3 - A COLLECTOR, NEVER AN ANALYST (build spec V3, section 3).
 //
@@ -220,7 +221,7 @@ function pageScore(u: string): number {
 // LIVE-FETCH THE CORE PAGES (Gary). A crawl can be incomplete - GAS's brain was blog-only, missing home/about/
 // products/contact. So at run time we fetch the client's foundational pages DIRECTLY from their live site, so the
 // brief is never hostage to a partial crawl. fetchSourcePage returns clean text (HTML stripped) and is SSRF-safe.
-async function loadCorePages(websites: string[]): Promise<string> {
+async function loadCorePages(websites: string[], clientId?: string, userEmail?: string | null): Promise<string> {
   if (!websites.length) return "";
   const paths = ["", "/about", "/about-us", "/who-we-are", "/company", "/our-story", "/products", "/services",
     "/solutions", "/our-solution", "/what-we-do", "/offering", "/pricing", "/plans", "/contact", "/contact-us",
@@ -253,12 +254,35 @@ async function loadCorePages(websites: string[]): Promise<string> {
   }));
   // Score, read the top pages in full (foundational pages first, blog sinks - it has its own reader).
   const top = urls.sort((a, b) => pageScore(b.replace(/^https?:\/\/[^/]+/, "") || "/") - pageScore(a.replace(/^https?:\/\/[^/]+/, "") || "/")).slice(0, 30);
+  const originOf = (u: string) => u.match(/^https?:\/\/[^/]+/)?.[0] || u;
   const fetched = await Promise.all(top.map(async (u) => {
     const r = await fetchSourcePage(u).catch(() => null);
     return r && r.ok && r.text.trim().length > 200 ? { url: u, text: r.text.trim() } : null;
   }));
   let acc = "";
-  for (const f of fetched) { if (f) acc += `[${f.url}] (live)\n${f.text.slice(0, 3000)}\n\n`; }
+  const readOrigins = new Set<string>();
+  for (const f of fetched) { if (f) { acc += `[${f.url}] (live)\n${f.text.slice(0, 3000)}\n\n`; readOrigins.add(originOf(f.url)); } }
+
+  // FIRECRAWL FALLBACK (Gary: egifts24 returned 403/Cloudflare and the run found nothing). A raw fetch cannot read a
+  // JS-rendered or bot-walled site; Firecrawl renders it and clears the challenge. So for any of the client's OWN
+  // sites the raw pass could not read a single page from, Firecrawl the core pages. Bounded (few sites, few pages
+  // each) and metered, so the cost is contained. This is what turns an unreadable subject site into real facts.
+  const wantOrigins = [...new Set(websites.map((w) => originOf(String(w).replace(/\/+$/, ""))))];
+  const blocked = wantOrigins.filter((o) => !readOrigins.has(o));
+  if (blocked.length) {
+    const fcPaths = ["", "/about", "/about-us", "/products", "/services", "/shop", "/contact", "/faq"];
+    let fcPages = 0;
+    for (const origin of blocked.slice(0, 3)) {
+      const targets = fcPaths.map((p) => origin + p);
+      const scraped = await Promise.all(targets.map((u) =>
+        scrape(u).then((s) => (s.content && s.content.trim().length > 120 ? { url: u, text: s.content.trim() } : null)).catch(() => null),
+      ));
+      for (const s of scraped) { if (s) { acc += `[${s.url}] (firecrawl)\n${s.text.slice(0, 3000)}\n\n`; fcPages++; } }
+    }
+    if (fcPages && clientId) {
+      await recordUsage({ clientId, userEmail: userEmail ?? null, provider: "firecrawl", model: "scrape", unit: "page", action: "research-scrape", count: fcPages }).catch(() => {});
+    }
+  }
   return acc.trim();
 }
 
@@ -630,7 +654,7 @@ export async function prepareResearch(clientId: string, runId: string, version: 
   // current, competitors, press, the team on LinkedIn). No scrimping here (Gary): this runs periodically and the
   // aim is the best possible research, so we read widely.
   const [corePages, articles, crawled] = await Promise.all([
-    loadCorePages(websites).catch(() => ""),
+    loadCorePages(websites, clientId, userEmail).catch(() => ""),
     loadRecentArticles(websites, 20000).catch(() => ""),
     loadSiteContent(clientId, 16000).catch(() => ""),
   ]);
