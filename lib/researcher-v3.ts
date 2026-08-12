@@ -6,7 +6,7 @@ import { clientWebsites, siteAnchor, deriveResearchBrief, loadIntelBrief } from 
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
 import { ingestChunks } from "./rag";
-import { scrape } from "./vendors/firecrawl";
+import { scrape, looksBlocked } from "./vendors/firecrawl";
 
 // THE RESEARCHER, V3 - A COLLECTOR, NEVER AN ANALYST (build spec V3, section 3).
 //
@@ -274,8 +274,14 @@ async function loadCorePages(websites: string[], clientId?: string, userEmail?: 
     let fcPages = 0;
     for (const origin of blocked.slice(0, 3)) {
       const targets = fcPaths.map((p) => origin + p);
+      // STEALTH so a hard Cloudflare wall (egifts24 blocked BOTH the raw fetch AND default Firecrawl - the brain
+      // ended up holding the "you have been blocked" page) is actually cleared. Reject any page that STILL comes
+      // back as a block/challenge page, so a bot-wall is never fed to the model as if it were the site.
       const scraped = await Promise.all(targets.map((u) =>
-        scrape(u).then((s) => (s.content && s.content.trim().length > 120 ? { url: u, text: s.content.trim() } : null)).catch(() => null),
+        scrape(u, { stealth: true }).then((s) => {
+          const t = (s.content || "").trim();
+          return t && !looksBlocked(t) ? { url: u, text: t } : null;
+        }).catch(() => null),
       ));
       for (const s of scraped) { if (s) { acc += `[${s.url}] (firecrawl)\n${s.text.slice(0, 3000)}\n\n`; fcPages++; } }
     }

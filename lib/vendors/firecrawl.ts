@@ -12,11 +12,23 @@ async function key(): Promise<string> {
 export type ScrapedPage = { url: string; title: string; content: string };
 
 // Scrape a single page → main-content markdown.
-export async function scrape(url: string): Promise<ScrapedPage> {
+// A page whose "content" is really a bot-wall challenge (Cloudflare "you have been blocked" / "Just a moment",
+// cookie walls). It must NEVER be treated as real site content: fed to the research model it produces zero facts
+// (or worse, a fact about the block page). Detected here so every caller can reject it.
+const BLOCK_RE = /(you have been blocked|attention required|cf-browser-verification|just a moment|enable (cookies|javascript)( and reload)?|checking your browser|verify you are (a )?human|access denied|ddos protection by)/i;
+export function looksBlocked(content: string): boolean {
+  const c = (content || "").trim();
+  return c.length < 200 || (BLOCK_RE.test(c) && c.length < 1200);
+}
+
+// Scrape a single page → main-content markdown. `stealth` routes through Firecrawl's stealth proxy, which renders
+// JS and clears harder anti-bot walls (Cloudflare) that the basic fetch and default proxy cannot - needed for sites
+// like egifts24 that block both a raw fetch AND a default Firecrawl. It costs more, so it is opt-in per call.
+export async function scrape(url: string, opts: { stealth?: boolean } = {}): Promise<ScrapedPage> {
   const res = await fetch(`${BASE}/scrape`, {
     method: "POST",
     headers: { Authorization: `Bearer ${await key()}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
+    body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true, ...(opts.stealth ? { proxy: "stealth", waitFor: 3500 } : {}) }),
   });
   const data = (await res.json().catch(() => ({}))) as { data?: { markdown?: string; metadata?: { title?: string } }; error?: string };
   if (!res.ok) throw new Error(`Firecrawl scrape failed (${res.status}): ${(data.error || JSON.stringify(data)).slice(0, 160)}`);
