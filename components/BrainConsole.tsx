@@ -6,6 +6,7 @@ import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
 import BrainKnowledge from "@/components/BrainKnowledge";
 import BrainLibrary from "@/components/BrainLibrary";
+import LivingBrain from "@/components/LivingBrain";
 
 type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null; last_synced_at?: string | null };
 
@@ -260,54 +261,67 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const metCount = checklist.filter((c) => c.met).length;
   const empty = sources.length === 0 && !hasDoctrine && liveChunks === 0;
   const ready = hasSite && metCount >= 3;
+  const lit = empty ? 0.06 : Math.max(metCount / checklist.length, liveChunks > 0 ? 0.22 : 0);
 
   return (
     <div className="mt-6 space-y-6">
-      {/* BRAIN READINESS - the header card. Turns a passive data dump into a guided, scored asset: is this brain
-          strong enough to build on, and what is it still missing? */}
-      <div className={`rounded-2xl border p-6 transition ${ready ? "border-[#4ade80]/40 bg-[#4ade80]/[0.05]" : empty ? "border-[#a855f7]/40 bg-[#a855f7]/[0.06]" : "border-line bg-surface-1"}`}>
-        {empty ? (
-          <div>
-            <h2 className="text-xl font-extrabold tracking-tight text-ink">Let&apos;s build this brain</h2>
-            <p className="mt-1 text-base text-ink-dim">Start with the client&apos;s website, it is the anchor everything else is checked against. Paste it below and it crawls in (JavaScript and Cloudflare sites included), usually a few minutes.</p>
-            <button onClick={() => goto("website")} className="btn-brand mt-4 rounded-lg px-5 py-2.5 text-base font-bold">Start with their website ↓</button>
+      {/* BRAIN READINESS - the living-brain header. The neural graphic comes alive as the brain is fed, so "is it
+          strong enough to build on, and what is it missing?" reads at a glance and feels like a growing asset. */}
+      <div className={`gas-rise relative overflow-hidden rounded-2xl border p-6 transition ${ready ? "border-[#4ade80]/40 bg-[#4ade80]/[0.05]" : empty ? "border-[#a855f7]/45 bg-[#a855f7]/[0.06]" : "border-[#a855f7]/25 bg-surface-1"}`}>
+        {/* Signature violet aura behind the card, brighter the more the brain knows. */}
+        <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full blur-[90px]"
+          style={{ background: "radial-gradient(circle, rgba(168,85,247,0.18), transparent 70%)", opacity: 0.4 + 0.6 * Math.min(1, lit) }} />
+        <div className="relative flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-7">
+          {/* THE LIVING BRAIN. */}
+          <div className="relative h-32 w-32 shrink-0 text-ink-faint">
+            <LivingBrain lit={lit} />
+            {!empty && (
+              <div className="pointer-events-none absolute inset-x-0 -bottom-1 text-center">
+                <span className={`tabular rounded-full px-2.5 py-0.5 text-[13px] font-extrabold ${ready ? "bg-[#4ade80]/20 text-[#86efac]" : "bg-[#a855f7]/20 text-[#c79bff]"}`}>{metCount}/4</span>
+              </div>
+            )}
           </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h2 className="text-xl font-extrabold tracking-tight text-ink">Brain strength</h2>
-                  <span className={`tabular rounded-full px-2.5 py-0.5 text-sm font-bold ${ready ? "bg-[#4ade80]/15 text-[#86efac]" : "bg-[#fbbf24]/15 text-[#fcd34d]"}`}>{metCount}/4</span>
+
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            {empty ? (
+              <>
+                <h2 className="text-2xl font-extrabold tracking-tight text-ink">Let&apos;s bring this brain to life</h2>
+                <p className="mt-1.5 text-base leading-relaxed text-ink-dim">Start with the client&apos;s website, the anchor everything else is checked against. Paste it below and it crawls in, JavaScript and Cloudflare sites included, usually a few minutes.</p>
+                <button onClick={() => goto("website")} className="btn-brand mt-4 rounded-lg px-5 py-2.5 text-base font-bold">Start with their website ↓</button>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
+                  <h2 className="text-2xl font-extrabold tracking-tight text-ink">Brain strength</h2>
+                  <span className="tabular text-base text-ink-faint"><b className="text-ink">{liveChunks}</b> passages · <b className="text-ink">{indexedSources}</b> sources{crawling && <span className="text-active"> · indexing…</span>}</span>
                 </div>
                 <p className="mt-1 text-base text-ink-dim">
-                  {ready ? "Strong enough to build on. Test it below, then commission the Researcher." : "Fill the gaps below to make it strong enough for the Researcher to build on."}
+                  {ready ? "Strong enough to build on. Test it below, then commission the Researcher." : "Fill the gaps to make it strong enough for the Researcher to build on."}
                 </p>
-              </div>
-              <div className="tabular flex gap-5 text-right text-sm text-ink-faint">
-                <span><b className="block text-lg font-bold text-ink">{liveChunks}</b>passages</span>
-                <span><b className="block text-lg font-bold text-ink">{indexedSources}</b>sources</span>
-                {crawling && <span className="self-center text-active">indexing…</span>}
-              </div>
-            </div>
-            {/* Segmented strength bar. */}
-            <div className="mt-4 flex gap-1.5">
-              {checklist.map((c) => <div key={c.key} className={`h-1.5 flex-1 rounded-full ${c.met ? (ready ? "bg-[#4ade80]" : "bg-[#fbbf24]") : "bg-surface-2"}`} />)}
-            </div>
-            {/* The checklist - each unmet item jumps to where you fix it. */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {checklist.map((c) => (
-                <button key={c.key} onClick={c.go} aria-label={c.met ? `${c.label}: done` : `Add ${c.label}`}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
-                  <span aria-hidden>{c.met ? "✓" : "＋"}</span>{c.label}
-                </button>
-              ))}
-            </div>
-            {ready && (
-              <a href="/researcher" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-base font-bold text-black hover:opacity-90">Commission the Researcher →</a>
+                {/* Segmented strength bar, each segment growing in. */}
+                <div className="mt-3 flex gap-1.5">
+                  {checklist.map((c, i) => (
+                    <div key={c.key} className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
+                      {c.met && <div className={`h-full w-full origin-left rounded-full ${ready ? "bg-[#4ade80]" : "bg-gradient-to-r from-[#a855f7] to-[#22d3ee]"}`} style={{ animation: `growBar 0.5s ease-out ${i * 0.08}s both` }} />}
+                    </div>
+                  ))}
+                </div>
+                {/* The checklist - each unmet item jumps to where you fix it. */}
+                <div className="mt-3.5 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  {checklist.map((c) => (
+                    <button key={c.key} onClick={c.go} aria-label={c.met ? `${c.label}: done` : `Add ${c.label}`}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
+                      <span aria-hidden>{c.met ? "✓" : "＋"}</span>{c.label}
+                    </button>
+                  ))}
+                </div>
+                {ready && (
+                  <a href="/researcher" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-base font-bold text-black transition hover:opacity-90">Commission the Researcher →</a>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* Add knowledge */}
@@ -478,7 +492,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           ) : (
             <div className="mt-3 flex flex-wrap gap-2">
               {coverage.topics.map((t, i) => (
-                <span key={i} className="rounded-full border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-1.5 text-[15px] text-ink-dim">{t}</span>
+                <span key={i} style={{ animation: `rise 0.4s ease-out ${i * 0.05}s both` }}
+                  className="rounded-full border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-1.5 text-[15px] text-ink-dim">{t}</span>
               ))}
             </div>
           )}

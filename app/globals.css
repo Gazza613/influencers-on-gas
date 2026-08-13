@@ -206,6 +206,10 @@ body {
 }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 @keyframes shrinkBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* The living brain: lit synapse nodes breathe (opacity only, so SVG needs no transform-origin). */
+@keyframes brainPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes growBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.gas-rise { animation: rise 0.5s ease-out both; }
 
 /* Branded spinner ring — use inline (1em) or sized via font-size/width. */
 .spinner-ring {
