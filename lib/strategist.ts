@@ -65,6 +65,46 @@ function extractContent(msg: Anthropic.Message): StrategyContent | null {
   return b && b.type === "tool_use" ? (b.input as StrategyContent) : null;
 }
 
+// SANITISE THE MODEL OUTPUT TO THE SCHEMA before it is ever stored. The write_strategy tool has a strict schema,
+// but the model occasionally returns a string where an array is expected (MoMo came back with kpis, risks and
+// channel_logic as strings), which then white-screened the render. Coerce EVERY field to its declared shape here
+// so a malformed strategy can never be persisted - the store, the render and the proposal all get clean data.
+const sStr = (v: unknown): string => (typeof v === "string" ? v : "");
+const sRec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const sStrArr = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : (typeof v === "string" && v.trim() ? [v] : []);
+const sObjArr = (v: unknown): Record<string, unknown>[] =>
+  Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x)) : [];
+const sFactId = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
+
+function normalizeStrategyContent(raw: unknown): StrategyContent {
+  const c = sRec(raw);
+  const target = sRec(c.target), positioning = sRec(c.positioning), audience = sRec(c.audience), objective = sRec(c.objective);
+  return {
+    proposition: sStr(c.proposition),
+    target: { segment: sStr(target.segment), insight: sStr(target.insight) },
+    audience: {
+      overview: sStr(audience.overview),
+      personas: sObjArr(audience.personas).map((p) => ({
+        label: sStr(p.label), trigger: sStr(p.trigger), need: sStr(p.need), who: sStr(p.who),
+        signals: sStrArr(p.signals), propensity: sStr(p.propensity), angle: sStr(p.angle), scale: sStr(p.scale),
+        fact_id: sFactId(p.fact_id),
+      })),
+    },
+    positioning: { promise: sStr(positioning.promise), usps: sStrArr(positioning.usps) },
+    angle: sStr(c.angle),
+    message_hierarchy: sStrArr(c.message_hierarchy),
+    channel_logic: sObjArr(c.channel_logic).map((x) => ({ channel: sStr(x.channel), role: sStr(x.role) })),
+    objective: { type: sStr(objective.type), target: sStr(objective.target) },
+    kpis: sObjArr(c.kpis).map((x) => ({ metric: sStr(x.metric), target: sStr(x.target), baseline: sStr(x.baseline) })),
+    sales_ready_def: sStr(c.sales_ready_def),
+    rationale: sObjArr(c.rationale).map((x) => ({ point: sStr(x.point), fact_id: sFactId(x.fact_id) })),
+    market_opportunities: sObjArr(c.market_opportunities).map((x) => ({ insight: sStr(x.insight), why_it_matters: sStr(x.why_it_matters), digital: !!x.digital, fact_id: sFactId(x.fact_id) })),
+    risks: sStrArr(c.risks),
+    changes_from_last: sObjArr(c.changes_from_last).map((x) => ({ change: sStr(x.change), because: sStr(x.because) })),
+  };
+}
+
 // Map the model's "Fn" citations back to real research_claim ids, so rationale and personas are traceable to the
 // fact store.
 function resolveFactIds(content: StrategyContent, claims: ClaimLite[]): StrategyContent {
@@ -128,7 +168,8 @@ async function generateStrategyContent(
     content = extractContent(advMsg) || content;
   } catch { /* red-team is best-effort; the draft still stands */ }
 
-  return { content: resolveFactIds(content, claims), runId, clientName };
+  // Normalise to the schema BEFORE storing (kills the malformed-field crash at the source), then resolve fact ids.
+  return { content: resolveFactIds(normalizeStrategyContent(content), claims), runId, clientName };
 }
 
 // BUILD a fresh strategy: spins up the engagement (if first time), a campaign for this objective, a foundation
