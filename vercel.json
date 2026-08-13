@@ -18,7 +18,7 @@
     },
     {
       "path": "/api/cron/daily-intel",
-      "schedule": "30 6 * * 5"
+      "schedule": "30 6 * * 1-5"
     },
     {
       "path": "/api/cron/weekly-activity",
