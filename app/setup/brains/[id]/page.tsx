@@ -49,7 +49,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
           <span className="tabular rounded-md bg-[#a855f7]/12 px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.16em] text-[#c79bff]">Test the Brain</span>
           <span className="text-base text-ink-dim">Check it answers well, straight from this brain&apos;s own material.</span>
         </div>
-        <AskBrain clients={[{ id: brain.id, name: brain.name }]} initialClientId={brain.id} />
+        <AskBrain clients={[{ id: brain.id, name: brain.name }]} initialClientId={brain.id} lockClient />
       </div>
     </div>
   );

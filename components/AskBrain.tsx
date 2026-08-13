@@ -33,7 +33,7 @@ const MODES: { id: Mode; label: string; note: string }[] = [
 ];
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
-export default function AskBrain({ clients, initialClientId }: { clients: Client[]; initialClientId?: string }) {
+export default function AskBrain({ clients, initialClientId, lockClient }: { clients: Client[]; initialClientId?: string; lockClient?: boolean }) {
   const [clientId, setClientId] = useState(initialClientId || clients[0]?.id || "");
   const [q, setQ] = useState("");
   const [asked, setAsked] = useState("");
@@ -117,13 +117,15 @@ export default function AskBrain({ clients, initialClientId }: { clients: Client
     <div className="mt-6">
       <div className="rounded-xl border border-line bg-surface-1 p-6">
         <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Brain</label>
-            <select value={clientId} onChange={(e) => { setClientId(e.target.value); setAnswer(""); setHits([]); setTip(null); setErr(""); setSaved(""); setBusy(false); }}
-              className="mt-1.5 rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none focus:border-accent">
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          {!lockClient && (
+            <div>
+              <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Brain</label>
+              <select value={clientId} onChange={(e) => { setClientId(e.target.value); setAnswer(""); setHits([]); setTip(null); setErr(""); setSaved(""); setBusy(false); }}
+                className="mt-1.5 rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink outline-none focus:border-accent">
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
           <p className="pb-2 text-[15px] text-ink-faint">
             Answers come only from <b className="text-ink-dim">{brainName}</b>. No other brain is ever read.
           </p>

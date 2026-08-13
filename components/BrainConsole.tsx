@@ -290,12 +290,23 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-2.5">
-          {([["website", "Website"], ["documents", "Documents"], ["youtube", "YouTube"], ["text", "Paste text"], ["compliance", "Compliance"], ["positioning", "Positioning & rules"]] as const).map(([m, label]) => (
-            <button key={m} onClick={() => setMode(m)} disabled={m === "youtube"}
-              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : m === "youtube" ? "cursor-not-allowed border border-line/70 text-ink-faint" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
-              <SourceIcon m={m} />{label}{m === "youtube" && <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-ink-faint">soon</span>}
-            </button>
+        {/* TWO HONEST ZONES (world-class IA): "Feed it" is raw source material; "Teach it" is the structured rules
+            and positioning the brain applies. The brand library (the artwork) is its own zone lower down. Splitting
+            them means the team holds one mental model at a time instead of six chips in a row. */}
+        <div className="mt-5 space-y-4">
+          {([["Feed it", "raw source material", [["website", "Website"], ["documents", "Documents"], ["youtube", "YouTube"], ["text", "Paste text"]]],
+             ["Teach it", "rules & positioning it applies", [["positioning", "Positioning & rules"], ["compliance", "Compliance"]]]] as const).map(([zone, note, modes]) => (
+            <div key={zone}>
+              <div className="tabular text-[12px] font-bold uppercase tracking-[0.16em] text-ink-faint">{zone} <span className="ml-1 font-normal normal-case tracking-normal text-ink-faint">· {note}</span></div>
+              <div className="mt-2 flex flex-wrap gap-2.5">
+                {modes.map(([m, label]) => (
+                  <button key={m} onClick={() => setMode(m as Mode)} disabled={m === "youtube"}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : m === "youtube" ? "cursor-not-allowed border border-line/70 text-ink-faint" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+                    <SourceIcon m={m as Mode} />{label}{m === "youtube" && <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-ink-faint">soon</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
