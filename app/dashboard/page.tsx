@@ -212,7 +212,7 @@ function EyeMark() {
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
     label: "Intelligence",
-    note: "Know your customer: brain → research → strategy → proposal.",
+    note: "Know your customer: brain → test → research → strategy → proposal.",
     doors: [
       {
         name: <>The <span className="brand-grad">Brain</span></>,
@@ -226,12 +226,23 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#c4b5fd]",
       },
       {
+        name: <>Test the <span className="brand-grad">Brain</span></>,
+        href: "/ask",
+        mark: <AskMark />,
+        blurb: "Ask the brain anything it should know and check it answers well, straight from the client's own material, before the Researcher builds on it. Every answer shows the passages it used.",
+        action: "Test the Brain",
+        step: 2,
+        ring: "border-[#f472b6]/30 hover:border-[#f472b6]/70 hover:shadow-[0_0_50px_-12px_rgba(244,114,182,0.45)]",
+        wash: "from-[#f472b6]/[0.10] to-[#a855f7]/[0.04]",
+        accent: "text-[#f9a8d4]",
+      },
+      {
         name: <>The Researcher</>,
         href: "/researcher",
         mark: <ResearcherMark />,
         blurb: "A commissioned deep dive built on the brain: it reads the client's own crawled material as ground truth, then verifies the external record, the market, competitors and positioning, and feeds its findings back.",
         action: "Research the market",
-        step: 2,
+        step: 3,
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
         accent: "text-[#67e8f9]",
@@ -242,7 +253,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <StrategistMark />,
         blurb: "Turns the approved fact base into one single-minded, defensible strategy, every point traced to a fact. You refine and approve at Gate 2.",
         action: "Set the strategy",
-        step: 3,
+        step: 4,
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
         wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#a5b4fc]",
@@ -255,7 +266,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <ProposalMark />,
         blurb: "Turns the approved strategy into a client-ready, 24-page branded proposal, recoloured to the client's own brand. Three investment options, dated on download and ready to sign.",
         action: "Generate the proposal",
-        step: 4,
+        step: 5,
         ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#f9a8d4]",
@@ -266,16 +277,6 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
     label: "Know",
     note: "What we know, and how to ask it.",
     doors: [
-      {
-        name: <>Ask the <span className="brand-grad">Brain</span></>,
-        href: "/ask",
-        mark: <AskMark />,
-        blurb: "Ask any client's knowledge base a question and get an answer built only from their own material, with the passages it used shown beside it.",
-        action: "Ask a question",
-        ring: "border-[#f472b6]/30 hover:border-[#f472b6]/70 hover:shadow-[0_0_50px_-12px_rgba(244,114,182,0.45)]",
-        wash: "from-[#f472b6]/[0.10] to-[#a855f7]/[0.04]",
-        accent: "text-[#f9a8d4]",
-      },
       {
         name: <>Audience <span className="brand-grad">on</span> GAS</>,
         href: "#",

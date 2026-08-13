@@ -9,12 +9,13 @@ import Link from "next/link";
 // as a breadcrumb-with-progress, not a second navigation bar.
 const STEPS: { n: number; label: string; href: string }[] = [
   { n: 1, label: "Brain", href: "/setup/brains" },
-  { n: 2, label: "Researcher", href: "/researcher" },
-  { n: 3, label: "Strategist", href: "/strategist/plan" },
-  { n: 4, label: "Proposal", href: "/strategist/plan" },
+  { n: 2, label: "Test the Brain", href: "/ask" },
+  { n: 3, label: "Researcher", href: "/researcher" },
+  { n: 4, label: "Strategist", href: "/strategist/plan" },
+  { n: 5, label: "Proposal", href: "/strategist/plan" },
 ];
 
-export default function FlowSteps({ active }: { active: 1 | 2 | 3 | 4 }) {
+export default function FlowSteps({ active }: { active: 1 | 2 | 3 | 4 | 5 }) {
   return (
     <nav aria-label="Intelligence flow" className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-2 text-[15px]">
       <span className="tabular mr-1 text-[13px] font-semibold uppercase tracking-[0.2em] text-ink-faint">Intelligence</span>

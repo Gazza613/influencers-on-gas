@@ -24,7 +24,7 @@ export default async function ResearcherPage() {
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <Link href="/dashboard" className="text-lg font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
-        <FlowSteps active={2} />
+        <FlowSteps active={3} />
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Researcher</h1>
         <p className="mt-2 max-w-3xl text-[22px] leading-relaxed text-ink-dim">
           It collects a <b className="text-ink">verified fact base</b> on the selected client, their market and

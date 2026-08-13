@@ -26,7 +26,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
       {/* Ask THIS brain, pre-focused (Gary: ask it in context, not via a separate tile with a re-pick). */}
       <div className="mt-3">
         <Link href={`/ask?client=${brain.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-[#a855f7]/40 px-3.5 py-2 text-base font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">
-          Ask this brain →
+          Test the Brain →
         </Link>
       </div>
       <div className="mt-2 flex items-center gap-3">
