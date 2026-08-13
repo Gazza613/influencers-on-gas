@@ -903,6 +903,14 @@ alter table research_claims add column if not exists pillar_tags jsonb not null 
 -- The CEO newsletter drafted off a fact, kept so it SURVIVES a logout (Gary: "I clicked approve and it did
 -- nothing and when I went back it was gone"). Mirrors the studio_intel newsletter columns: the piece, the chosen
 -- creative, and the other renders so the choice can be revisited. Approving at the fact writes these; they reload.
+-- BRAIN COVERAGE: a cached, auto-generated "what this brain can answer on" topic list, so the team sees the
+-- brain's strengths and holes without querying. Regenerated when the passage count drifts or on manual refresh.
+create table if not exists brain_coverage (
+  client_id    uuid primary key references clients(id) on delete cascade,
+  topics       jsonb not null default '[]'::jsonb,
+  chunk_count  int not null default 0,
+  generated_at timestamptz not null default now()
+);
 alter table research_claims add column if not exists newsletter text;
 alter table research_claims add column if not exists newsletter_art text;
 alter table research_claims add column if not exists newsletter_options jsonb not null default '[]'::jsonb;

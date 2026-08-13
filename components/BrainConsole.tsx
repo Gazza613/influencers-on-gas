@@ -7,7 +7,17 @@ import { flex } from "@/lib/flex";
 import BrainKnowledge from "@/components/BrainKnowledge";
 import BrainLibrary from "@/components/BrainLibrary";
 
-type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null };
+type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null; last_synced_at?: string | null };
+
+// "crawled 3 days ago", and a stale flag past ~90 days so a site read months ago is not silently trusted as current.
+function freshness(iso?: string | null): { label: string; stale: boolean } | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  const label = days <= 0 ? "just now" : days === 1 ? "1 day ago" : days < 31 ? `${days} days ago` : days < 62 ? "1 month ago" : `${Math.floor(days / 30)} months ago`;
+  return { label, stale: days >= 90 };
+}
 
 type Mode = "website" | "documents" | "youtube" | "text" | "compliance" | "positioning";
 
@@ -52,6 +62,15 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       setAssetKinds(counts);
     }).catch(() => {});
   }, [brainId]);
+  // WHAT THIS BRAIN CAN ANSWER ON: a passive topic map, cached server-side and regenerated on drift/refresh.
+  const [coverage, setCoverage] = useState<{ topics: string[]; loading: boolean }>({ topics: [], loading: true });
+  const loadCoverage = (refresh = false) => {
+    setCoverage((c) => ({ ...c, loading: true }));
+    fetch(`/api/brains/${brainId}/coverage${refresh ? "?refresh=1" : ""}`, { cache: "no-store" })
+      .then((r) => r.json()).then((d) => setCoverage({ topics: Array.isArray(d?.topics) ? d.topics : [], loading: false }))
+      .catch(() => setCoverage((c) => ({ ...c, loading: false })));
+  };
+  useEffect(() => { loadCoverage(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [brainId]);
   const goto = (m: Mode) => { setMode(m); feedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const scrollToId = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -187,6 +206,19 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     if (!(await askConfirm({ title: "NUKE all knowledge in this brain?", body: "Every source, chunk and embedding is permanently deleted. The brain stays but forgets everything. This cannot be undone.", tone: "danger", confirmLabel: "Nuke" }))) return;
     await fetch(`/api/brains/${brainId}/sources?sourceId=all`, { method: "DELETE" }).catch(() => {});
     setSources([]);
+  }
+
+  // RE-CRAWL one website source in place (a site changed). Clears its passages, sets it re-reading, re-fires the
+  // ingest - then the existing poll picks up the "pending" status and shows it indexing through to a fresh Ready.
+  async function recrawl(s: Source) {
+    setSources((list) => list.map((x) => x.id === s.id ? { ...x, status: "pending", chunk_count: 0 } : x));
+    const r = await fetch(`/api/brains/${brainId}/sources/recrawl`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceId: s.id }),
+    }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { flex(r?.error || "Couldn't re-crawl that source."); await refresh(); return; }
+    flex("Re-crawling. It reads the live site again now.");
+    seenStatus.current[s.id] = "pending";
+    refresh();
   }
 
   // RE-INDEX: re-embed the brain's existing chunks with the current embedding model. Needed once after an
@@ -411,6 +443,16 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                   <button onClick={() => removeSource(s)} title="Delete this source" aria-label="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
                 </span>
                 </div>
+                {/* Freshness + re-crawl, for website sources only (a note/file has no live URL to re-read). */}
+                {(s.type === "website" || s.type === "crawl") && s.status !== "pending" && (() => {
+                  const f = freshness(s.last_synced_at);
+                  return (
+                    <div className="mt-1 flex items-center gap-3 text-[13px] text-ink-faint">
+                      {f && <span className={f.stale ? "font-semibold text-[#fcd34d]" : ""}>crawled {f.label}{f.stale ? " · stale, worth a refresh" : ""}</span>}
+                      <button onClick={() => recrawl(s)} className="font-semibold text-ink-dim hover:text-ink">↻ Re-crawl</button>
+                    </div>
+                  );
+                })()}
                 {/* The reason, in plain sight. A source that says only "failed" gives nobody anything to act on. */}
                 {s.status === "failed" && s.error && (
                   <p className="mt-1.5 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-base leading-relaxed text-alert">{s.error}</p>
@@ -424,6 +466,25 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       {/* WHAT IT KNOWS + WHAT IT BUILDS FROM. Both sit above "Test the brain" deliberately: when an answer
           comes back wrong the first question is "what is actually in there?", and that has to be one scroll
           away, not buried under the tools that add more. */}
+      {/* WHAT THIS BRAIN CAN ANSWER ON - the passive coverage map, so strengths and holes are visible at a glance. */}
+      {(coverage.loading || coverage.topics.length > 0) && (
+        <div className="rounded-xl border border-line bg-surface-1 p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What this brain can answer on</div>
+            {!coverage.loading && <button onClick={() => loadCoverage(true)} className="text-[13px] font-semibold text-ink-faint hover:text-ink">↻ Refresh</button>}
+          </div>
+          {coverage.loading ? (
+            <p className="mt-3 inline-flex items-center gap-2 text-base text-ink-dim"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />Reading the brain to map its coverage…</p>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {coverage.topics.map((t, i) => (
+                <span key={i} className="rounded-full border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-1.5 text-[15px] text-ink-dim">{t}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <BrainKnowledge brainId={brainId} total={chunkCount} />
       <div id="brand-library"><BrainLibrary brainId={brainId} /></div>
 
