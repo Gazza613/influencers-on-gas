@@ -463,9 +463,11 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   // price. Retried on a transient overload (529) / rate limit, so a single Anthropic blip does not kill the run.
   const gathered = await withAnthropicRetry(async () => {
     const g = client.messages.stream({
-      // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large). At 8k it
-      // truncated mid-search - discarding paid searches and leaving a dangling tool_use that 400'd the file step.
-      model: OPUS5, max_tokens: 16000,
+      // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large) AND the
+      // model's own text between searches. At 16k a 26-search gather truncated (stop=max_tokens, ~18.5k out) - the
+      // cut-off turn then made the file step file NOTHING (The Bed Shop: a fed brain returning 0 facts). 40k gives
+      // a deep gather room to finish; the fileFromSite fallback still catches any residual truncation.
+      model: OPUS5, max_tokens: 40000,
       system: `${ctx.scope}\n\n${FACTS_ONLY}`,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: passBrief }],
@@ -512,6 +514,26 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
   const block = filed.content.find((b) => b.type === "tool_use");
   return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
+}
+
+// FALLBACK: file DIRECTLY from the client's own site content, with NO gather turn and NO web_search in the tools.
+// At production scale (26 searches) the gather turn is huge and the file step that replays it sometimes files
+// nothing - but the SAME model, given just the brief + site content and forced to file_facts, reliably files the
+// facts (verified: a rich readable site -> 80 claims). So when the search-heavy pass comes back empty on a brain we
+// KNOW has content, this clean pass rescues it. A well-fed brain must never return zero facts.
+async function fileFromSite(client: Anthropic, ctx: ResearchCtx): Promise<RawClaim[]> {
+  if (!ctx.siteBlock) return [];
+  const filed = await withAnthropicRetry(() => client.messages.stream({
+    model: OPUS5, max_tokens: 20000,
+    system: `${ctx.scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact from the CLIENT'S OWN WEBSITE CONTENT below (Tier 1, their own channel) as a structured claim via file_facts, up to about 120 claims. File everything the content plainly states: what they are and sell, their positioning and USPs, products and pricing, who they serve, their contact details and social profiles, any leadership named, and any owner/parent relationship. Cite the [bracketed] page URL for each. Be thorough and specific, never invent. Do not search.`,
+    tools: [{ name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA }],
+    tool_choice: { type: "tool", name: "file_facts" },
+    messages: [{ role: "user", content: ctx.brief + ctx.siteBlock }],
+  }).finalMessage());
+  const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+  const block = filed.content.find((b) => b.type === "tool_use");
+  return parseClaims(ctx.name, (block && block.type === "tool_use" ? block.input : {}) as FileOut);
 }
 
 // ==== THE PHASES (each its own Inngest step / invocation) ======================================================
@@ -694,6 +716,18 @@ export async function researchGatherPass1(ctx: ResearchCtx, emit: (e: CollectEve
     contact_details: noDash(idIn.contact_details).slice(0, 200) || null,
   };
   const rawClaims = parseClaims(ctx.name, out);
+  // RESCUE: if the search-heavy pass came back with almost no real facts but we DID read the client's own site,
+  // file directly from that site content (no gather turn to truncate). A fed brain must never return 0 facts.
+  const realFacts = rawClaims.filter((c) => c.section !== "gaps" && c.section !== "unverified").length;
+  if (realFacts < 3 && ctx.siteBlock) {
+    emit({ t: "phase", label: `Filing ${ctx.name}'s own site facts directly` });
+    const siteClaims = await fileFromSite(client, ctx).catch(() => [] as RawClaim[]);
+    const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
+    for (const c of siteClaims) {
+      const k = `${c.section}::${normKey(c.claim)}`;
+      if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
+    }
+  }
   return { rawClaims, competitors: Array.isArray(out.competitors) ? out.competitors : [], vertical, identity };
 }
 
