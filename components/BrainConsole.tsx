@@ -297,9 +297,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             {/* The checklist - each unmet item jumps to where you fix it. */}
             <div className="mt-4 flex flex-wrap gap-2">
               {checklist.map((c) => (
-                <button key={c.key} onClick={c.go}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
-                  <span>{c.met ? "✓" : "＋"}</span>{c.label}
+                <button key={c.key} onClick={c.go} aria-label={c.met ? `${c.label}: done` : `Add ${c.label}`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
+                  <span aria-hidden>{c.met ? "✓" : "＋"}</span>{c.label}
                 </button>
               ))}
             </div>
@@ -332,8 +332,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
               <div className="tabular text-[12px] font-bold uppercase tracking-[0.16em] text-ink-faint">{zone} <span className="ml-1 font-normal normal-case tracking-normal text-ink-faint">· {note}</span></div>
               <div className="mt-2 flex flex-wrap gap-2.5">
                 {modes.map(([m, label]) => (
-                  <button key={m} onClick={() => setMode(m as Mode)} disabled={m === "youtube"}
-                    className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : m === "youtube" ? "cursor-not-allowed border border-line/70 text-ink-faint" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+                  <button key={m} onClick={() => setMode(m as Mode)} disabled={m === "youtube"} aria-pressed={mode === m}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : m === "youtube" ? "cursor-not-allowed border border-line/70 text-ink-faint" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
                     <SourceIcon m={m as Mode} />{label}{m === "youtube" && <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-ink-faint">soon</span>}
                   </button>
                 ))}
@@ -360,8 +360,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             {/* Full site crawls every page it can reach (no path scope); single page reads just that URL. Each
                 page keeps its own title + URL so a passage always traces back to its source. */}
             <div className="inline-flex rounded-lg border border-line p-1 text-[14px]">
-              <button onClick={() => setFullSite(true)} className={`rounded-md px-3 py-1.5 font-semibold ${fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Full site, all pages</button>
-              <button onClick={() => setFullSite(false)} className={`rounded-md px-3 py-1.5 font-semibold ${!fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Single page</button>
+              <button onClick={() => setFullSite(true)} aria-pressed={fullSite} className={`rounded-md px-3 py-1.5 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Full site, all pages</button>
+              <button onClick={() => setFullSite(false)} aria-pressed={!fullSite} className={`rounded-md px-3 py-1.5 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${!fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Single page</button>
             </div>
             {sites.map((s, i) => (
               <div key={i} className="mt-2.5 flex gap-2">
@@ -424,9 +424,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <ul className="mt-3 space-y-2">
             {sources.map((s) => (
               <li key={s.id} className="border-b border-line/60 py-2.5 text-base">
-                <div className="flex items-center justify-between gap-3">
-                <span className="min-w-0 truncate text-ink">{s.type === "website" ? s.uri : s.uri || "Pasted note"}</span>
-                <span className="flex shrink-0 items-center gap-3 text-[13px]">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                <span className="min-w-0 flex-1 truncate text-ink">{s.type === "website" ? s.uri : s.uri || "Pasted note"}</span>
+                <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
                   <span className={s.status === "indexed" ? "font-semibold text-ink-dim" : "text-ink-faint"}>{s.chunk_count ?? 0} passages</span>
                   {s.status === "indexed" && (s.chunk_count ?? 0) <= 2 && (s.type === "crawl" || s.type === "website") && (
                     <span title="This site returned almost nothing, it may be bot-blocked or JavaScript-only. Check it opened." className="rounded bg-[#fbbf24]/15 px-2 py-0.5 font-bold text-[#fcd34d]">thin, check it</span>
