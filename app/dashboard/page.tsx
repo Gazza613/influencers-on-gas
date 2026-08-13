@@ -1,5 +1,7 @@
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import MarketQuestion from "@/components/MarketQuestion";
+import { listStudioClients } from "@/lib/studio";
 
 // THE AGENCY OF NOW - the first screen after sign-in. It does one job: get the team to the right desk.
 //
@@ -412,7 +414,8 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const clients = await listStudioClients().catch(() => [] as { id: string; name: string }[]);
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* AMBIENT DEPTH. The page was reading flat (Gary), so it now breathes: soft flares that slowly pulse and
@@ -475,6 +478,19 @@ export default function HomePage() {
             </section>
           ))}
         </div>
+
+        {/* ASK THE MARKET (Gary): the Strategist desk on demand, right on the dashboard - the same sourced market
+            read the daily email gives, triggered by a free-text question. */}
+        {clients.length > 0 && (
+          <section className="mt-12">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <h2 className="tabular text-[20px] font-bold uppercase tracking-[0.18em] text-ink">Daily Intelligence</h2>
+              <span className="text-[17px] text-ink-dim">The market, on demand.</span>
+              <span aria-hidden className="gas-draw h-px flex-1 bg-gradient-to-r from-line to-transparent" />
+            </div>
+            <div className="mt-4"><MarketQuestion clients={clients} /></div>
+          </section>
+        )}
       </main>
     </div>
   );

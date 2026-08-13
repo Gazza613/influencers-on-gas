@@ -304,7 +304,7 @@ const SCHEMA = {
 // not of the engine, and two sources of truth for the same setting is how they drift apart.
 
 // Run one role's daily research. Returns the findings it PROPOSES (already stored, status 'new').
-export async function runIntel(clientId: string, role: "journalist" | "strategist", today: string, userEmail?: string | null): Promise<Intel[]> {
+export async function runIntel(clientId: string, role: "journalist" | "strategist", today: string, userEmail?: string | null, focus?: string | null): Promise<Intel[]> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
 
@@ -334,7 +334,13 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   // then simply finish after searching without ever filing. That is exactly what happened on the first live
   // run: the Strategist filed 6 findings, the Journalist filed NOTHING, silently. Forcing the report tool in
   // its own call makes a missing report impossible rather than merely unlikely.
-  const brief = `Today is ${today}. Research what has changed that matters to ${cfg.clientName}, strictly inside your scope lock.\n\n` +
+  // A FREE-TEXT QUESTION from the team (the dashboard "Ask the market" box). It steers this run to answer that
+  // question directly, with sourced findings, while still surfacing anything else genuinely material. It never
+  // loosens the scope lock or the no-fabrication rule.
+  const focusLine = focus?.trim()
+    ? `\n\nTHE TEAM HAS A SPECIFIC QUESTION FOR THIS RUN - make answering it the PRIORITY: "${focus.trim().slice(0, 600)}"\nSearch specifically to answer it and file sourced findings that address it directly. Still flag anything else genuinely material you find, but lead with the answer to this question. If the honest answer is "nothing solid found", say so rather than padding.`
+    : "";
+  const brief = `Today is ${today}. Research what has changed that matters to ${cfg.clientName}, strictly inside your scope lock.${focusLine}\n\n` +
     `WHAT WE ALREADY KNOW (do NOT report these back as new - only report what ADDS to or CONTRADICTS this):\n` +
     `${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}${researchContext}\n\n` +
     `Search the web now. Then set out what is genuinely new and worth our attention, with the real source for each.`;
