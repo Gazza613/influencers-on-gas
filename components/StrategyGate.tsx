@@ -9,6 +9,11 @@ import Working, { WORKING_STRATEGY } from "@/components/Working";
 type Client = { id: string; name: string };
 type Latest = { strategy: Strategy | null; objective: string | null; hasApprovedResearch: boolean };
 
+// The model occasionally returns a string (or object) where the schema wants an array - and `(str || []).map()`
+// then throws and takes the ENTIRE page down ("This page couldn't load", seen on MoMo's strategy where kpis,
+// risks and channel_logic came back as strings). Coerce anything non-array to [] before mapping, always.
+function arr<T>(v: T[] | null | undefined): T[] { return Array.isArray(v) ? v : []; }
+
 const STATUS: Record<string, { label: string; cls: string }> = {
   awaiting_approval: { label: "Awaiting your approval", cls: "border-[#fbbf24]/40 bg-[#fbbf24]/10 text-[#fcd34d]" },
   approved: { label: "Approved · direction locked", cls: "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#86efac]" },
@@ -143,13 +148,13 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
             </Block>
             <Block title="Positioning">
               <p className="text-lg font-semibold text-ink">{content.positioning?.promise}</p>
-              <ul className="mt-1.5 list-disc pl-5 text-lg text-ink-dim">{(content.positioning?.usps || []).map((u, i) => <li key={i}>{u}</li>)}</ul>
+              <ul className="mt-1.5 list-disc pl-5 text-lg text-ink-dim">{arr(content.positioning?.usps).map((u, i) => <li key={i}>{u}</li>)}</ul>
             </Block>
             <Block title="The angle">
               <p className="text-lg text-ink">{content.angle}</p>
             </Block>
             <Block title="Message hierarchy">
-              <ol className="list-decimal pl-5 text-lg text-ink-dim">{(content.message_hierarchy || []).map((m, i) => <li key={i}>{m}</li>)}</ol>
+              <ol className="list-decimal pl-5 text-lg text-ink-dim">{arr(content.message_hierarchy).map((m, i) => <li key={i}>{m}</li>)}</ol>
             </Block>
           </div>
 
@@ -159,7 +164,7 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
               <div className="text-base font-semibold uppercase tracking-wide text-accent">The target audience</div>
               {content.audience.overview && <p className="mt-2 text-lg text-ink-dim">{content.audience.overview}</p>}
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {(content.audience.personas || []).map((p, i) => (
+                {arr(content.audience.personas).map((p, i) => (
                   <div key={i} className="rounded-lg border border-line bg-surface-2 p-4">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-lg font-bold text-ink">{p.label}</span>
@@ -168,8 +173,8 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
                     <p className="mt-1.5 text-base text-ink-faint"><b className="text-ink-dim">Trigger</b> · {p.trigger}</p>
                     <p className="mt-0.5 text-base text-ink-faint"><b className="text-ink-dim">Need</b> · {p.need}</p>
                     <p className="mt-0.5 text-base text-ink-faint"><b className="text-ink-dim">Who</b> · {p.who}</p>
-                    {(p.signals || []).length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">{p.signals.map((s, j) => <span key={j} className="rounded-full border border-line px-2 py-0.5 text-sm text-ink-dim">{s}</span>)}</div>
+                    {arr(p.signals).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">{arr(p.signals).map((s, j) => <span key={j} className="rounded-full border border-line px-2 py-0.5 text-sm text-ink-dim">{s}</span>)}</div>
                     )}
                     <p className="mt-2 text-base text-ink-dim"><b className="text-ink">Why they convert</b> · {p.propensity}</p>
                     <p className="mt-1 text-base text-ink-dim"><b className="text-ink">Angle</b> · {p.angle}</p>
@@ -181,7 +186,7 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
           )}
 
           <Block title="Channel logic">
-            <ul className="space-y-1.5">{(content.channel_logic || []).map((c, i) => (
+            <ul className="space-y-1.5">{arr(content.channel_logic).map((c, i) => (
               <li key={i} className="text-lg text-ink-dim"><b className="text-ink">{c.channel}</b> · {c.role}</li>
             ))}</ul>
           </Block>
@@ -193,7 +198,7 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
               <table className="w-full text-left text-lg">
                 <thead><tr className="border-b border-line text-base uppercase tracking-wide text-ink-faint">
                   <th className="py-1.5 pr-3 font-semibold">Metric</th><th className="py-1.5 pr-3 font-semibold">Target</th><th className="py-1.5 font-semibold">Baseline</th></tr></thead>
-                <tbody>{(content.kpis || []).map((k, i) => (
+                <tbody>{arr(content.kpis).map((k, i) => (
                   <tr key={i} className="border-b border-line/50 last:border-0">
                     <td className="py-1.5 pr-3 text-ink">{k.metric}</td><td className="py-1.5 pr-3 tabular text-ink-dim">{k.target}</td><td className="py-1.5 tabular text-ink-faint">{k.baseline}</td>
                   </tr>))}</tbody>
@@ -205,26 +210,26 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
 
           {/* RATIONALE - each point grounded to a fact */}
           <Block title="Why this works (traced to the facts)">
-            <ul className="space-y-2">{(content.rationale || []).map((r, i) => (
+            <ul className="space-y-2">{arr(content.rationale).map((r, i) => (
               <li key={i} className="flex items-start gap-2 text-lg text-ink-dim">
                 <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-sm font-bold ${r.fact_id ? "bg-[#4ade80]/15 text-[#86efac]" : "bg-[#fbbf24]/15 text-[#fcd34d]"}`}>{r.fact_id ? "grounded" : "assumption"}</span>
                 <span>{r.point}</span>
               </li>))}</ul>
           </Block>
 
-          {content.changes_from_last?.length > 0 && (
+          {arr(content.changes_from_last).length > 0 && (
             <Block title="What changed in this version">
-              <ul className="space-y-1.5">{content.changes_from_last.map((c, i) => (
+              <ul className="space-y-1.5">{arr(content.changes_from_last).map((c, i) => (
                 <li key={i} className="text-lg text-ink-dim"><b className="text-ink">{c.change}</b> — {c.because}</li>
               ))}</ul>
             </Block>
           )}
 
-          {content.market_opportunities?.length > 0 && (
+          {arr(content.market_opportunities).length > 0 && (
             <section className="rounded-xl border border-[#60a5fa]/30 bg-surface-1 p-5">
               <div className="text-base font-semibold uppercase tracking-wide text-[#93c5fd]">Market opportunities · the whole board</div>
               <p className="mt-1 text-base text-ink-faint">Industry insights the client should consider, including beyond our digital scope. These carry into the proposal.</p>
-              <ul className="mt-3 space-y-2">{content.market_opportunities.map((m, i) => (
+              <ul className="mt-3 space-y-2">{arr(content.market_opportunities).map((m, i) => (
                 <li key={i} className="rounded-lg border border-line bg-surface-2 p-3">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-lg font-semibold text-ink">{m.insight}</span>
@@ -238,7 +243,7 @@ export default function StrategyGate({ clients, ready }: { clients: Client[]; re
 
           <section className="rounded-xl border border-[#f87171]/30 bg-surface-1 p-5">
             <div className="text-base font-semibold uppercase tracking-wide text-[#fca5a5]">Pre-mortem · risks</div>
-            <ul className="mt-2 list-disc pl-5 text-lg text-ink-dim">{(content.risks || []).map((r, i) => <li key={i}>{r}</li>)}</ul>
+            <ul className="mt-2 list-disc pl-5 text-lg text-ink-dim">{arr(content.risks).map((r, i) => <li key={i}>{r}</li>)}</ul>
           </section>
 
           {/* GATE 2 + edit */}
