@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
@@ -45,17 +45,40 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const [qErr, setQErr] = useState("");
   const [reindexing, setReindexing] = useState(false);
 
+  // Track each source's last-seen status so we can flash + toast the moment a crawl finishes (Gary: "I need to
+  // SEE when the brain is completed"). And keep polling long enough for a real crawl: an 80-page site can take
+  // 6-8 minutes, and the old 60x4s=4min cap gave up BEFORE it finished, freezing the row on "indexing... 0 chunks".
+  const seenStatus = useRef<Record<string, string>>({});
+  const [flashDone, setFlashDone] = useState<Set<string>>(new Set());
   async function refresh(tries = 0): Promise<void> {
     const r = await fetch(`/api/brains/${brainId}`, { cache: "no-store" });
-    if (r.ok) {
-      const d = await r.json();
-      setSources(d.sources);
-      if (d.sources.some((s: Source) => s.status === "pending") && tries < 60) {
-        await new Promise((res) => setTimeout(res, 4000));
-        return refresh(tries + 1);
-      }
+    if (!r.ok) return;
+    const d = await r.json();
+    const next: Source[] = Array.isArray(d.sources) ? d.sources : [];
+    const newlyDone: string[] = [];
+    for (const s of next) {
+      if (seenStatus.current[s.id] === "pending" && s.status === "indexed") newlyDone.push(s.id);
+      seenStatus.current[s.id] = s.status;
+    }
+    setSources(next);
+    if (newlyDone.length) {
+      setFlashDone((cur) => new Set([...cur, ...newlyDone]));
+      const total = next.filter((s) => newlyDone.includes(s.id)).reduce((a, s) => a + (s.chunk_count ?? 0), 0);
+      flex(`✓ Brain ready. ${total} passage${total === 1 ? "" : "s"} indexed and retrievable.`);
+      setTimeout(() => setFlashDone((cur) => { const n = new Set(cur); newlyDone.forEach((id) => n.delete(id)); return n; }), 15000);
+    }
+    if (next.some((s) => s.status === "pending") && tries < 200) {   // ~13 min, enough for a full-site crawl
+      await new Promise((res) => setTimeout(res, 4000));
+      return refresh(tries + 1);
     }
   }
+
+  // Resume polling on load if a crawl is still running (Gary reloaded the page mid-crawl and it looked frozen).
+  useEffect(() => {
+    for (const s of initialSources) seenStatus.current[s.id] = s.status;
+    if (initialSources.some((s) => s.status === "pending")) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // WEBSITE(S). Multi-site: each row is scraped. Full-site crawls every page it can reach (no path scope);
   // single-page reads just that URL. Both keep each page's own title + URL so a passage traces back to source.
@@ -190,8 +213,6 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     setQuerying(false);
   }
 
-  const badge = (s: string) =>
-    s === "indexed" ? "text-ready" : s === "failed" ? "text-alert" : "text-active";
 
   return (
     <div className="mt-6 space-y-6">
@@ -304,8 +325,16 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate text-ink">{s.type === "website" ? s.uri : s.uri || "Pasted note"}</span>
                 <span className="flex shrink-0 items-center gap-3 text-[13px]">
-                  <span className="text-ink-faint">{s.chunk_count ?? 0} chunks</span>
-                  <span className={badge(s.status)}>{s.status === "pending" ? "indexing…" : s.status}</span>
+                  <span className={s.status === "indexed" ? "font-semibold text-ink-dim" : "text-ink-faint"}>{s.chunk_count ?? 0} passages</span>
+                  {s.status === "failed" ? (
+                    <span className="rounded bg-alert/15 px-2 py-0.5 font-bold text-alert">failed</span>
+                  ) : s.status === "indexed" ? (
+                    <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-bold text-ready bg-ready/15 ${flashDone.has(s.id) ? "animate-pulse ring-2 ring-ready/70" : ""}`}>✓ Ready</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded bg-active/10 px-2 py-0.5 font-semibold text-active">
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />Reading &amp; indexing…
+                    </span>
+                  )}
                   <button onClick={() => removeSource(s)} title="Delete this source" aria-label="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
                 </span>
                 </div>
