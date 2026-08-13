@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getBrain, listSources } from "@/lib/brains";
 import { getBrandKit } from "@/lib/studio";
 import BrainConsole from "@/components/BrainConsole";
+import AskBrain from "@/components/AskBrain";
 import FlowSteps from "@/components/FlowSteps";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +24,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
         <Link href="/setup/brains" className="hover:text-ink">Brains</Link>
       </div>
       <FlowSteps active={1} />
-      {/* Ask THIS brain, pre-focused (Gary: ask it in context, not via a separate tile with a re-pick). */}
-      <div className="mt-3">
-        <Link href={`/ask?client=${brain.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-[#a855f7]/40 px-3.5 py-2 text-base font-semibold text-[#c79bff] hover:bg-[#a855f7]/10">
-          Test the Brain →
-        </Link>
-      </div>
-      <div className="mt-2 flex items-center gap-3">
+      <div className="mt-3 flex items-center gap-3">
         <svg viewBox="0 0 24 24" fill="none" className="h-8 w-8 shrink-0" stroke="url(#brain-hd)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <defs>
             <linearGradient id="brain-hd" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
@@ -46,6 +41,16 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
         <span className="tabular text-base text-ink-faint">{brain.chunk_count ?? 0} passages</span>
       </div>
       <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} initialDoctrine={kit?.tone_notes ?? ""} />
+
+      {/* TEST THE BRAIN, in the same place you built it (Gary: fold Test the Brain into The Brain, one tile not two).
+          Ask this brain a question and check it answers well before the Researcher builds on it. */}
+      <div className="mt-12 border-t border-line pt-8">
+        <div className="flex items-center gap-3">
+          <span className="tabular rounded-md bg-[#a855f7]/12 px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.16em] text-[#c79bff]">Test the Brain</span>
+          <span className="text-base text-ink-dim">Check it answers well, straight from this brain&apos;s own material.</span>
+        </div>
+        <AskBrain clients={[{ id: brain.id, name: brain.name }]} initialClientId={brain.id} />
+      </div>
     </div>
   );
 }

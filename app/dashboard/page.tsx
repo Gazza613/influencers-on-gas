@@ -132,21 +132,6 @@ function PsiMark() {
   );
 }
 
-function AskMark() {
-  return (
-    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
-      <defs>
-        <linearGradient id="ask-g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#F472B6" /><stop offset="0.55" stopColor="#A855F7" /><stop offset="1" stopColor="#60A5FA" />
-        </linearGradient>
-      </defs>
-      <path d="M8 6h32a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H22l-10 8v-8H8a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4Z" stroke="url(#ask-g)" strokeWidth="2.6" strokeLinejoin="round" />
-      <path d="M19.5 16.5a4.5 4.5 0 1 1 5.6 4.36c-.9.24-1.6 1-1.6 2.14" stroke="url(#ask-g)" strokeWidth="2.6" strokeLinecap="round" />
-      <circle cx="23.5" cy="27.5" r="1.6" fill="url(#ask-g)" />
-    </svg>
-  );
-}
-
 function AudienceMark() {
   return (
     <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
@@ -214,7 +199,7 @@ function EyeMark() {
 const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   {
     label: "Intelligence",
-    note: "Know your customer: brain → test → research → strategy → proposal.",
+    note: "Know your customer: brain → research → strategy → proposal.",
     doors: [
       {
         name: <>The <span className="brand-grad">Brain</span></>,
@@ -228,23 +213,12 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         accent: "text-[#c4b5fd]",
       },
       {
-        name: <>Test the <span className="brand-grad">Brain</span></>,
-        href: "/ask",
-        mark: <AskMark />,
-        blurb: "Ask the brain anything it should know and check it answers well, straight from the client's own material, before the Researcher builds on it. Every answer shows the passages it used.",
-        action: "Test the Brain",
-        step: 2,
-        ring: "border-[#f472b6]/30 hover:border-[#f472b6]/70 hover:shadow-[0_0_50px_-12px_rgba(244,114,182,0.45)]",
-        wash: "from-[#f472b6]/[0.10] to-[#a855f7]/[0.04]",
-        accent: "text-[#f9a8d4]",
-      },
-      {
         name: <>The Researcher</>,
         href: "/researcher",
         mark: <ResearcherMark />,
         blurb: "A commissioned deep dive built on the brain: it reads the client's own crawled material as ground truth, then verifies the external record, the market, competitors and positioning, and feeds its findings back.",
         action: "Research the market",
-        step: 3,
+        step: 2,
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
         accent: "text-[#67e8f9]",
@@ -255,7 +229,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <StrategistMark />,
         blurb: "Turns the approved fact base into one single-minded, defensible strategy, every point traced to a fact. You refine and approve at Gate 2.",
         action: "Set the strategy",
-        step: 4,
+        step: 3,
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
         wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#a5b4fc]",
@@ -268,7 +242,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <ProposalMark />,
         blurb: "Turns the approved strategy into a client-ready, 24-page branded proposal, recoloured to the client's own brand. Three investment options, dated on download and ready to sign.",
         action: "Generate the proposal",
-        step: 5,
+        step: 4,
         ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#f9a8d4]",
