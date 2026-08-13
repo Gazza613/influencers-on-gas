@@ -8,7 +8,6 @@ import BrainKnowledge from "@/components/BrainKnowledge";
 import BrainLibrary from "@/components/BrainLibrary";
 
 type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null };
-type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
 type Mode = "website" | "documents" | "youtube" | "text" | "compliance" | "positioning";
 
@@ -38,12 +37,23 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState("");
 
-  const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<Hit[] | null>(null);
-  const [answer, setAnswer] = useState("");
-  const [querying, setQuerying] = useState(false);
-  const [qErr, setQErr] = useState("");
   const [reindexing, setReindexing] = useState(false);
+
+  // BRAIN READINESS (world-class UX): the one thing the team needs to know before building on a brain is "is it
+  // strong enough?". We derive a live checklist + score from what the brain actually holds, so the page guides
+  // completion instead of being a passive form. Asset presence (logo/CEO/team) is fetched once; sources + doctrine
+  // update live as you feed it.
+  const [assetKinds, setAssetKinds] = useState<Record<string, number>>({});
+  const feedRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    fetch(`/api/brains/${brainId}/assets`, { cache: "no-store" }).then((r) => r.json()).then((d) => {
+      const counts: Record<string, number> = {};
+      for (const g of (d?.groups || [])) counts[String(g.kind)] = Array.isArray(g.assets) ? g.assets.length : 0;
+      setAssetKinds(counts);
+    }).catch(() => {});
+  }, [brainId]);
+  const goto = (m: Mode) => { setMode(m); feedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const scrollToId = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   // Track each source's last-seen status so we can flash + toast the moment a crawl finishes (Gary: "I need to
   // SEE when the brain is completed"). And keep polling long enough for a real crawl: an 80-page site can take
@@ -176,7 +186,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   async function nukeAll() {
     if (!(await askConfirm({ title: "NUKE all knowledge in this brain?", body: "Every source, chunk and embedding is permanently deleted. The brain stays but forgets everything. This cannot be undone.", tone: "danger", confirmLabel: "Nuke" }))) return;
     await fetch(`/api/brains/${brainId}/sources?sourceId=all`, { method: "DELETE" }).catch(() => {});
-    setSources([]); setHits(null);
+    setSources([]);
   }
 
   // RE-INDEX: re-embed the brain's existing chunks with the current embedding model. Needed once after an
@@ -189,7 +199,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     const r = await fetch(`/api/brains/${brainId}/reindex`, { method: "POST" }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
     setReindexing(false);
-    if (r?.ok) { setHits(null); flex(`Re-indexed ${d.chunks} chunk${d.chunks === 1 ? "" : "s"}. Retrieval is now accurate.`); }
+    if (r?.ok) { flex(`Re-indexed ${d.chunks} chunk${d.chunks === 1 ? "" : "s"}. Retrieval is now accurate.`); }
     else flex(d?.error || "Could not re-index the brain.");
   }
 
@@ -200,24 +210,76 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     else flex("Could not delete the brain. Please try again.");
   }
 
-  async function runQuery() {
-    if (!query.trim() || querying) return;
-    setQuerying(true); setQErr(""); setHits(null); setAnswer("");
-    const r = await fetch(`/api/brains/${brainId}/query`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) { setQErr(d?.error || "Query failed"); setQuerying(false); return; }
-    setHits(d.hits || []);
-    setAnswer(d.answer || "");
-    setQuerying(false);
-  }
 
+  // Live readiness signals.
+  const liveChunks = sources.reduce((a, s) => a + (s.chunk_count ?? 0), 0) || chunkCount;
+  const indexedSources = sources.filter((s) => s.status === "indexed").length;
+  const crawling = sources.some((s) => s.status === "pending");
+  const hasSite = sources.some((s) => (s.type === "crawl" || s.type === "website") && s.status === "indexed" && (s.chunk_count ?? 0) > 1);
+  const hasDocs = sources.some((s) => (s.type === "file" || s.type === "text") && s.status === "indexed");
+  const hasDoctrine = doctrine.trim().length > 0;
+  const hasAssets = (assetKinds.logo || 0) + (assetKinds.ceo_photo || 0) + (assetKinds.team_photo || 0) > 0;
+  const checklist: { key: string; label: string; met: boolean; go: () => void }[] = [
+    { key: "site", label: "Website crawled", met: hasSite, go: () => goto("website") },
+    { key: "docs", label: "Documents or notes", met: hasDocs, go: () => goto("documents") },
+    { key: "doctrine", label: "Brand doctrine", met: hasDoctrine, go: () => goto("positioning") },
+    { key: "assets", label: "Logo & photos", met: hasAssets, go: () => scrollToId("brand-library") },
+  ];
+  const metCount = checklist.filter((c) => c.met).length;
+  const empty = sources.length === 0 && !hasDoctrine && liveChunks === 0;
+  const ready = hasSite && metCount >= 3;
 
   return (
     <div className="mt-6 space-y-6">
+      {/* BRAIN READINESS - the header card. Turns a passive data dump into a guided, scored asset: is this brain
+          strong enough to build on, and what is it still missing? */}
+      <div className={`rounded-2xl border p-6 transition ${ready ? "border-[#4ade80]/40 bg-[#4ade80]/[0.05]" : empty ? "border-[#a855f7]/40 bg-[#a855f7]/[0.06]" : "border-line bg-surface-1"}`}>
+        {empty ? (
+          <div>
+            <h2 className="text-xl font-extrabold tracking-tight text-ink">Let&apos;s build this brain</h2>
+            <p className="mt-1 text-base text-ink-dim">Start with the client&apos;s website, it is the anchor everything else is checked against. Paste it below and it crawls in (JavaScript and Cloudflare sites included), usually a few minutes.</p>
+            <button onClick={() => goto("website")} className="btn-brand mt-4 rounded-lg px-5 py-2.5 text-base font-bold">Start with their website ↓</button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-xl font-extrabold tracking-tight text-ink">Brain strength</h2>
+                  <span className={`tabular rounded-full px-2.5 py-0.5 text-sm font-bold ${ready ? "bg-[#4ade80]/15 text-[#86efac]" : "bg-[#fbbf24]/15 text-[#fcd34d]"}`}>{metCount}/4</span>
+                </div>
+                <p className="mt-1 text-base text-ink-dim">
+                  {ready ? "Strong enough to build on. Test it below, then commission the Researcher." : "Fill the gaps below to make it strong enough for the Researcher to build on."}
+                </p>
+              </div>
+              <div className="tabular flex gap-5 text-right text-sm text-ink-faint">
+                <span><b className="block text-lg font-bold text-ink">{liveChunks}</b>passages</span>
+                <span><b className="block text-lg font-bold text-ink">{indexedSources}</b>sources</span>
+                {crawling && <span className="self-center text-active">indexing…</span>}
+              </div>
+            </div>
+            {/* Segmented strength bar. */}
+            <div className="mt-4 flex gap-1.5">
+              {checklist.map((c) => <div key={c.key} className={`h-1.5 flex-1 rounded-full ${c.met ? (ready ? "bg-[#4ade80]" : "bg-[#fbbf24]") : "bg-surface-2"}`} />)}
+            </div>
+            {/* The checklist - each unmet item jumps to where you fix it. */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {checklist.map((c) => (
+                <button key={c.key} onClick={c.go}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
+                  <span>{c.met ? "✓" : "＋"}</span>{c.label}
+                </button>
+              ))}
+            </div>
+            {ready && (
+              <a href="/researcher" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-base font-bold text-black hover:opacity-90">Commission the Researcher →</a>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Add knowledge */}
-      <div className="overflow-hidden rounded-2xl border border-[#a855f7]/25 bg-surface-1 p-6">
+      <div ref={feedRef} className="overflow-hidden rounded-2xl border border-[#a855f7]/25 bg-surface-1 p-6">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a855f7]/15 text-[#c79bff]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden><path d="M12 3a4 4 0 0 0-4 4 3.5 3.5 0 0 0-2 6.3A3.5 3.5 0 0 0 8 20a4 4 0 0 0 8 0 3.5 3.5 0 0 0 2-6.7A3.5 3.5 0 0 0 16 7a4 4 0 0 0-4-4Z" /><path d="M12 7v13M8.5 10.5 12 12l3.5-1.5" /></svg>
@@ -310,10 +372,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
         <div className="flex items-center justify-between gap-2">
           <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Knowledge sources</div>
           {sources.length > 0 && (
-            <div className="flex items-center gap-2">
-              <button onClick={reindex} disabled={reindexing} title="Rebuild every chunk's embedding with the current model. Needed once after an embedding-model change, otherwise retrieval returns noise. Your text is not touched." className="inline-flex items-center gap-1.5 rounded-md border border-[#a855f7]/40 px-2.5 py-1 text-[13px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">{reindexing && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{reindexing ? "Re-indexing…" : "↻ Re-index"}</button>
-              <button onClick={nukeAll} className="rounded-md border border-alert/40 px-2.5 py-1 text-[13px] font-semibold text-alert hover:bg-alert/10">Nuke all data</button>
-            </div>
+            <button onClick={reindex} disabled={reindexing} title="Rebuild every passage's embedding with the current model. Only needed after an embedding-model change; otherwise leave it. Your text is not touched." className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[13px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">{reindexing && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{reindexing ? "Re-indexing…" : "↻ Re-index"} <span className="text-ink-faint">· rarely needed</span></button>
           )}
         </div>
         {sources.length === 0 ? (
@@ -326,6 +385,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 <span className="min-w-0 truncate text-ink">{s.type === "website" ? s.uri : s.uri || "Pasted note"}</span>
                 <span className="flex shrink-0 items-center gap-3 text-[13px]">
                   <span className={s.status === "indexed" ? "font-semibold text-ink-dim" : "text-ink-faint"}>{s.chunk_count ?? 0} passages</span>
+                  {s.status === "indexed" && (s.chunk_count ?? 0) <= 2 && (s.type === "crawl" || s.type === "website") && (
+                    <span title="This site returned almost nothing, it may be bot-blocked or JavaScript-only. Check it opened." className="rounded bg-[#fbbf24]/15 px-2 py-0.5 font-bold text-[#fcd34d]">thin, check it</span>
+                  )}
                   {s.status === "failed" ? (
                     <span className="rounded bg-alert/15 px-2 py-0.5 font-bold text-alert">failed</span>
                   ) : s.status === "indexed" ? (
@@ -352,49 +414,19 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           comes back wrong the first question is "what is actually in there?", and that has to be one scroll
           away, not buried under the tools that add more. */}
       <BrainKnowledge brainId={brainId} total={chunkCount} />
-      <BrainLibrary brainId={brainId} />
+      <div id="brand-library"><BrainLibrary brainId={brainId} /></div>
 
-      {/* Test the brain */}
-      <div className="rounded-xl border border-line bg-surface-1 p-6">
-        <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Test the brain</div>
-        <div className="mt-3 flex gap-2">
-          <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runQuery()}
-            placeholder="Ask the brain anything, e.g. who is the CEO? what is our positioning?"
-            className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
-          <button onClick={runQuery} disabled={querying || !query.trim()} className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink hover:border-line-strong disabled:opacity-50">
-            {querying && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
-            {querying ? "Thinking…" : "Ask"}
-          </button>
+      {/* DANGER ZONE - both destructive actions live here, tucked at the very bottom out of eye-line (they used to
+          sit next to Re-index and here, doubled up). "Test the brain" is now the full Ask panel on the page below,
+          so the old simple query box is removed to avoid two test boxes. */}
+      <details className="rounded-xl border border-line bg-surface-1 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-ink-faint hover:text-ink-dim">Danger zone</summary>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <button onClick={nukeAll} className="rounded-lg border border-alert/40 px-4 py-2 text-base font-semibold text-alert hover:bg-alert/10">Nuke all knowledge</button>
+          <button onClick={deleteBrainNow} className="rounded-lg border border-alert/50 px-4 py-2 text-base font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
         </div>
-        {qErr && <p className="mt-2 text-sm text-alert">{qErr}</p>}
-        {/* THE ANSWER, not a pile of search results. The passages stay below it so any answer can be checked
-            against the material it was written from - that is what makes it trustworthy rather than just fluent. */}
-        {answer && (
-          <div className="mt-4 rounded-lg border border-[#a855f7]/35 bg-[#a855f7]/[0.07] p-4">
-            <div className="tabular mb-2 text-[13px] uppercase tracking-[0.18em] text-[#c79bff]">The brain says</div>
-            <p className="whitespace-pre-wrap text-[17px] leading-relaxed text-ink">{answer}</p>
-          </div>
-        )}
-        {hits && hits.length === 0 && !answer && <p className="mt-3 text-base text-ink-dim">No matches. Feed the brain some knowledge first.</p>}
-        {hits && hits.length > 0 && <p className="mt-4 text-base uppercase tracking-wider text-ink-faint">What it read to answer that</p>}
-        {hits && hits.length > 0 && (
-          <ul className="mt-3 space-y-2">
-            {hits.map((h, i) => (
-              <li key={i} className="rounded-lg border border-line bg-surface-2 p-3">
-                <div className="tabular mb-1 text-[12px] text-ink-faint">match {Math.round(h.score * 100)}%{(h.metadata?.title as string) ? ` · ${h.metadata.title}` : ""}</div>
-                <div className="text-base leading-relaxed text-ink-dim">{h.content.slice(0, 280)}{h.content.length > 280 ? "…" : ""}</div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Danger zone */}
-      <div className="rounded-xl border border-alert/30 bg-alert/5 p-6">
-        <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-alert">Danger zone</div>
-        <p className="mt-2 text-base text-ink-dim">Delete this entire brain and everything in it. This cannot be undone.</p>
-        <button onClick={deleteBrainNow} className="mt-3 rounded-lg border border-alert/50 px-4 py-2 text-base font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
-      </div>
+        <p className="mt-2 text-sm text-ink-faint">Nuke wipes every source and passage but keeps the brain. Delete removes the brain entirely. Both are permanent.</p>
+      </details>
     </div>
   );
 }
