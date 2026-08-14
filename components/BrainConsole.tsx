@@ -244,7 +244,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
 
 
   // Live readiness signals.
-  const liveChunks = sources.reduce((a, s) => a + (s.chunk_count ?? 0), 0) || chunkCount;
+  const liveChunks = sources.reduce((a, s) => a + Number(s.chunk_count ?? 0), 0) || chunkCount;
   const indexedSources = sources.filter((s) => s.status === "indexed").length;
   const crawling = sources.some((s) => s.status === "pending");
   const hasSite = sources.some((s) => (s.type === "crawl" || s.type === "website") && s.status === "indexed" && (s.chunk_count ?? 0) > 1);
@@ -295,7 +295,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
               <>
                 <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
                   <h2 className="text-2xl font-extrabold tracking-tight text-ink">Brain strength</h2>
-                  <span className="tabular text-base text-ink-faint"><b className="text-ink">{liveChunks}</b> passages · <b className="text-ink">{indexedSources}</b> sources{crawling && <span className="text-active"> · indexing…</span>}</span>
+                  <span className="tabular text-base text-ink-faint"><b className="text-ink">{liveChunks.toLocaleString("en-ZA")}</b> passages · <b className="text-ink">{indexedSources}</b> source{indexedSources === 1 ? "" : "s"}{crawling && <span className="text-active"> · indexing…</span>}</span>
                 </div>
                 <p className="mt-1 text-base text-ink-dim">
                   {ready ? "Strong enough to build on. Test it below, then commission the Researcher." : "Fill the gaps to make it strong enough for the Researcher to build on."}
@@ -331,7 +331,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           </span>
           <div>
             <h2 className="text-xl font-extrabold tracking-tight text-ink">Feed the knowledge</h2>
-            <p className="text-base text-ink-dim">Everything here becomes the brain&apos;s memory: chunked, embedded, and retrievable by every desk.</p>
+            <p className="text-base text-ink-dim">Everything here becomes the brain&apos;s memory: chunked, embedded, and retrievable by every pod.</p>
           </div>
         </div>
 

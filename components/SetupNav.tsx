@@ -73,12 +73,12 @@ export default function SetupNav({ isSuperAdmin = false }: { isSuperAdmin?: bool
 
   return (
     <nav className="flex items-center gap-1">
-      {/* Back to the six desks, from anywhere that is not already there. */}
+      {/* Back to the six pods, from anywhere that is not already there. */}
       {!onDashboard && (
-        <Link href="/dashboard" className={cls(false)} title="All six desks">← Dashboard</Link>
+        <Link href="/dashboard" className={cls(false)} title="All six pods">← Dashboard</Link>
       )}
 
-      {/* The desk's own create action, where it has one. */}
+      {/* The pod's own create action, where it has one. */}
       {desk?.newHref && (
         <Link href={desk.newHref} className="mr-1 rounded-md border border-[#a855f7]/40 bg-[#a855f7]/15 px-3 py-1.5 text-[13px] font-bold text-[#c79bff] transition hover:bg-[#a855f7]/25">
           {desk.newLabel}
@@ -92,7 +92,7 @@ export default function SetupNav({ isSuperAdmin = false }: { isSuperAdmin?: bool
             {desk.links.map((l) => <Link key={l.href} href={l.href} className={cls(isActive(l.href))}>{l.label}</Link>)}
           </span>
 
-          {/* Below md the desk links collapse rather than breaking into a stack. */}
+          {/* Below md the pod links collapse rather than breaking into a stack. */}
           <div className="relative md:hidden">
             <button onClick={() => setOpen((o) => !o)} aria-label="Open navigation menu" aria-expanded={open} className={cls(false)}>☰ Menu</button>
             {open && (

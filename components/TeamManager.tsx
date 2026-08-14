@@ -148,7 +148,7 @@ export default function TeamManager() {
 
       {/* ADOPTION. Two sources that were already being written and had never been read together: successful
           sign-ins (recorded by the login throttle) and metered jobs (usage_events, which carry the user's
-          email). Reports who is USING the studio and which desks - not a surveillance tool, and it makes no
+          email). Reports who is USING the studio and which pods - not a surveillance tool, and it makes no
           attempt to time anyone. */}
       {act && (
         <section className="mt-8">

@@ -127,7 +127,9 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
             </div>
           )}
           <p className="pb-2 text-[15px] text-ink-faint">
-            Answers come only from <b className="text-ink-dim">{brainName}</b>. No other brain is ever read.
+            {mode === "claude"
+              ? <>Claude&apos;s general knowledge only. <b className="text-ink-dim">{brainName}</b>&apos;s own material is not read in this mode.</>
+              : <>Grounded in <b className="text-ink-dim">{brainName}</b>&apos;s own material. No other client&apos;s brain is ever read.</>}
           </p>
         </div>
 

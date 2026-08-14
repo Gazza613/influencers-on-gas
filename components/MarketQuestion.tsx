@@ -47,7 +47,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
     <div className="rounded-2xl border border-[#818cf8]/30 bg-gradient-to-br from-[#818cf8]/[0.08] to-[#22d3ee]/[0.03] p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-xl font-bold text-ink">Ask the market a question</h3>
-        <span className="text-sm text-ink-faint">Live Strategist desk · sourced, never invented</span>
+        <span className="text-sm text-ink-faint">Live Strategist pod · sourced, never invented</span>
       </div>
       <p className="mt-1 text-base text-ink-dim">A one-off market read on demand: what a rival did, a category shift, a threat or an opening, with the move it argues for.</p>
 
@@ -79,7 +79,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
       {findings && !busy && (
         <div className="mt-5 space-y-3">
           {findings.length === 0 ? (
-            <p className="rounded-lg border border-line bg-surface-1 px-4 py-3 text-base text-ink-dim">Nothing solid came back on that. A quiet answer is a real one, the desk never pads or invents. Try a sharper question.</p>
+            <p className="rounded-lg border border-line bg-surface-1 px-4 py-3 text-base text-ink-dim">Nothing solid came back on that. A quiet answer is a real one, the pod never pads or invents. Try a sharper question.</p>
           ) : findings.map((f, i) => {
             const move = String(f.campaign_response || "");
             const tag = /\bdefensive\b/i.test(move) && /\bproactive\b/i.test(move) ? "defensive + proactive" : /\bdefensive\b/i.test(move) ? "defensive" : /\bproactive\b/i.test(move) ? "proactive" : "";

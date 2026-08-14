@@ -359,7 +359,7 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
       </div>
 
       {/* GROUND-TRUTH WEBSITE. The team confirms the client's real site; every run anchors to it and validates
-          each source is that exact organisation, so the desk can never drift to a same-named business (Gary). */}
+          each source is that exact organisation, so the pod can never drift to a same-named business (Gary). */}
       {isResearcher && (
         <div className="rounded-xl border border-line bg-surface-1 p-4">
           <label className="tabular block text-sm uppercase tracking-[0.2em] text-ink-faint">Client website (the ground truth)</label>
@@ -373,7 +373,7 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
               {siteSaved ? "Saved ✓" : "Save website"}
             </button>
           </div>
-          {!website && <p className="mt-1.5 text-[14px] text-[#fcd34d]">⚠ No website set. Without it the desk anchors only to the crawled pages, and a same-named business could slip in. Set it before running.</p>}
+          {!website && <p className="mt-1.5 text-[14px] text-[#fcd34d]">⚠ No website set. Without it the pod anchors only to the crawled pages, and a same-named business could slip in. Set it before running.</p>}
         </div>
       )}
 
@@ -455,7 +455,7 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
                 <b>{clientName}</b> has no {role === "journalist" ? "Journalist" : "Strategist"} brief yet, so this desk has nothing to research for it.
               </p>
               <p className="mt-2 text-lg text-ink-dim">
-                A brief is what tells the desk what this brain is about and what is out of bounds. Until one
+                A brief is what tells the pod what this brain is about and what is out of bounds. Until one
                 exists no research can run, and none of another brain&apos;s will ever be borrowed.
               </p>
             </>
