@@ -7,6 +7,18 @@ import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
 import { ingestChunks } from "./rag";
 import { scrape, looksBlocked } from "./vendors/firecrawl";
+import { FABLE } from "./vendors/anthropic";
+
+// THE RESEARCH MODEL - one swap point (Gary: this is the most foundational step). Default Opus 5, a top-tier
+// reasoning + search model. To TRIAL Fable 5 (the most capable model), set this to FABLE on ONE run and revert if
+// it errors: Fable's web_search server-tool support is NOT documented, and the whole gather depends on web_search,
+// so treat a Fable run as an experiment, not a default. `void FABLE` keeps the import live while Opus 5 is the pick.
+const RESEARCH_MODEL: string = OPUS5;
+void FABLE;
+// Reasoning EFFORT for the research passes (Gary: turn it up for the foundational step). `max` makes Opus 5 think
+// and search harder - the safe model-side quality lever, no compatibility risk. NOT applied to the Haiku verify
+// pass (effort errors on Haiku).
+const RESEARCH_EFFORT = "max" as const;
 
 // THE RESEARCHER, V3 - A COLLECTOR, NEVER AN ANALYST (build spec V3, section 3).
 //
@@ -471,11 +483,12 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   // so a deep gather never truncates (truncation was the 0-facts bug) - quality safety over a marginal token saving.
   const gathered = await withAnthropicRetry(async () => {
     const g = client.messages.stream({
-      model: OPUS5, max_tokens: 40000,
+      model: RESEARCH_MODEL, max_tokens: 40000,
+      output_config: { effort: RESEARCH_EFFORT },
       system: sysBlocks,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: briefBlocks }],
-    });
+    } as unknown as Anthropic.MessageStreamParams);
     g.on("contentBlock", (blk) => {
       const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
       if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) { emit({ t: "search", q: String(b.input.query).slice(0, 160) }); }
@@ -484,7 +497,7 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
     return await g.finalMessage();
   });
   const gu = gathered.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined;
-  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: RESEARCH_MODEL, action: "deep-research", inputTokens: gu?.input_tokens || 0, outputTokens: gu?.output_tokens || 0, cacheReadTokens: gu?.cache_read_input_tokens || 0, cacheCreationTokens: gu?.cache_creation_input_tokens || 0, webSearches: gu?.server_tool_use?.web_search_requests ?? 0 }).catch(() => {});
 
   // SANITISE THE GATHER TURN before replaying it into the file step. If the gather hit max_tokens WHILE a web_search
   // was in flight, its assistant content ends with a `server_tool_use` that has no matching `web_search_tool_result`
@@ -507,7 +520,7 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   const fileInstruction = fileInstructionOverride ||
     `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact as a structured claim via file_facts, up to about 120 claims. YOUR SOURCES ARE BOTH: (1) the CLIENT'S OWN SITE CONTENT and any OWNER/PARENT CONTEXT in my first message - these are primary Tier-1 material and you MUST file the facts they contain (what the client is, what they sell, who owns them, contact details, positioning) EVEN IF the web searches returned little or nothing; and (2) the web search results above. Never let empty or thin search results stop you filing the facts that are plainly in the brief and site content. If a site is bot-blocked and the brief carries only owner/parent context, still file the ownership relationship and the owner context, correctly attributed. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Each with its real source URL, date and tier. Do not search again.`;
   const filed = await withAnthropicRetry(() => client.messages.stream({
-    model: OPUS5, max_tokens: 22000,
+    model: RESEARCH_MODEL, max_tokens: 22000,
     system: sysBlocks,
     tools: [
       { type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool,
@@ -521,7 +534,7 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
     ],
   }).finalMessage());
   const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: RESEARCH_MODEL, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
   const block = filed.content.find((b) => b.type === "tool_use");
   return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
 }
@@ -534,14 +547,14 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
 async function fileFromSite(client: Anthropic, ctx: ResearchCtx): Promise<RawClaim[]> {
   if (!ctx.siteBlock) return [];
   const filed = await withAnthropicRetry(() => client.messages.stream({
-    model: OPUS5, max_tokens: 20000,
+    model: RESEARCH_MODEL, max_tokens: 20000,
     system: `${ctx.scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact from the CLIENT'S OWN WEBSITE CONTENT below (Tier 1, their own channel) as a structured claim via file_facts, up to about 120 claims. File everything the content plainly states: what they are and sell, their positioning and USPs, products and pricing, who they serve, their contact details and social profiles, any leadership named, and any owner/parent relationship. Cite the [bracketed] page URL for each. Be thorough and specific, never invent. Do not search.`,
     tools: [{ name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "file_facts" },
     messages: [{ role: "user", content: ctx.brief + ctx.siteBlock }],
   }).finalMessage());
   const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: RESEARCH_MODEL, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
   const block = filed.content.find((b) => b.type === "tool_use");
   return parseClaims(ctx.name, (block && block.type === "tool_use" ? block.input : {}) as FileOut);
 }
@@ -860,14 +873,14 @@ export async function researchReview(ctx: ResearchCtx, rawClaimsIn: RawClaim[], 
     const list = rawClaims.map((c, i) => `${i}. [section=${c.section} | about: ${c.subject}] ${c.claim}${c.source_url ? ` (src: ${c.source_url})` : " (no source)"}`).join("\n");
     try {
       const qa = await withAnthropicRetry(() => client.messages.stream({
-        model: OPUS5, max_tokens: 16000,
+        model: RESEARCH_MODEL, max_tokens: 16000,
         system: `You are a ruthless senior research editor. Review a fact base about ${ctx.name} before it reaches a marketing strategist and rule on EVERY numbered claim:\n- keep: a correct, relevant fact, correctly placed and correctly attributed (${ctx.name}'s OWN fact, or a clearly-labelled competitor fact in a competitor section).\n- drop: WRONG, tangential trivia that will not inform strategy, or MIS-ATTRIBUTED - a fact about a parent, partner or other company presented as ${ctx.name}'s own (for example a partner's CEO, size or numbers shown as ${ctx.name}'s).\n- move: a real fact in the WRONG section - give the correct section id. Advisers/staff filed under leadership belong in snapshot; a competitor fact outside a competitor section moves to competitor.\n- demote: a load-bearing claim on a single weak or uncorroborated source, or stale data shown as current - give section "unverified".\nValid section ids: ${RESEARCH_SECTIONS.map((s) => s.id).join(", ")}.\nRULES: ${ctx.name}'s LEADERSHIP means ${ctx.name}'s OWN executives, never a parent or partner's. Be strict about noise, a strategist wants signal not filler.${ctx.hasCeoLock ? ` GROUND TRUTH: ${ctx.ceoName} IS ${ctx.name}'s ${ctx.ceoTitle} - always keep that, never drop or demote it, and drop or fix anything that reframes them as only a parent company's executive.` : ""}\nReturn a verdict for EVERY claim index, using the exact index shown.`,
         tools: [{ name: "review", description: "A verdict for every claim.", input_schema: QA_SCHEMA }],
         tool_choice: { type: "tool", name: "review" },
         messages: [{ role: "user", content: `Fact base to review (${rawClaims.length} claims):\n\n${list}` }],
       }).finalMessage());
       const qu = qa.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-      await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
+      await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: RESEARCH_MODEL, action: "research-qa", inputTokens: qu?.input_tokens || 0, outputTokens: qu?.output_tokens || 0, cacheReadTokens: qu?.cache_read_input_tokens || 0, cacheCreationTokens: qu?.cache_creation_input_tokens || 0 }).catch(() => {});
       const qblock = qa.content.find((b) => b.type === "tool_use");
       const reviews = (qblock && qblock.type === "tool_use" ? (qblock.input as { reviews?: { index: number; action: string; section: string; reason: string }[] }).reviews : []) || [];
       const drop = new Set<number>();
