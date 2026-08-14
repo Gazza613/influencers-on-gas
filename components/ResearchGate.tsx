@@ -813,7 +813,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             <SectionTile d={ICON.competitors} />
             <div>
               <h2 className="text-[23px] font-extrabold tracking-tight text-ink">Competitor set</h2>
-              <p className="mt-0.5 text-[16px] text-ink-dim">Auto-detected from the category. Add or remove before you approve, adding one commissions a targeted pass on the next run.</p>
+              <p className="mt-0.5 text-[16px] text-ink-dim">The rivals the Researcher found. Edit the list if you need to. Anything you add gets a full profile on the next run.</p>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
