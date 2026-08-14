@@ -582,56 +582,99 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           <span className="text-[15px] text-ink-faint">{spend.runsThisMonth} run{spend.runsThisMonth === 1 ? "" : "s"} this month</span>
         </div>
       )}
-      {/* CLIENT + GROUND TRUTH */}
-      <div className="mt-5 tabular text-[15px] font-semibold uppercase tracking-[0.16em] text-ink-faint">Setup</div>
-      <p className="mb-3 text-[16px] text-ink-dim">Pick the brain, confirm its ground-truth website(s) and social accounts, then commission the run above.</p>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <label className="block">
-          <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Client</span>
-          <select value={clientId} disabled={running || collecting} title={running || collecting ? "A run is in progress. It finishes on its own, even if you navigate away." : undefined}
-            onChange={(e) => { if (e.target.value === "__new__") setShowCreate(true); else setClientId(e.target.value); }}
-            className="mt-1 block w-72 rounded-lg border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent disabled:opacity-60">
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{configured.includes(c.id) ? "" : " (not researchable yet)"}</option>)}
-            <option value="__new__">+ New brain…</option>
-          </select>
-        </label>
-        <div>
-          <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Ground-truth website(s)</span>
-          <div className="mt-1 space-y-2">
-            {sites.map((s, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input value={s} onChange={(e) => { const next = [...sites]; next[i] = e.target.value; setSites(next); }}
-                  placeholder={i === 0 ? "https://www.the-amber-room.co.za/" : "https://another-official-site.co.za"}
-                  className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent" />
-                {sites.length > 1 && <button onClick={() => setSites(sites.filter((_, j) => j !== i))} aria-label="Remove website" className="text-ink-faint hover:text-alert">✕</button>}
+      {/* SETUP - one balanced card, top-aligned, so nothing floats in dead space: the brain and how it runs on the
+          left, its ground-truth sources on the right. Inputs are full-width to fill their column. */}
+      <div className="mt-6 rounded-2xl border border-line bg-surface-1 p-5 sm:p-6">
+        <div className="tabular text-[15px] font-semibold uppercase tracking-[0.16em] text-ink-faint">Setup</div>
+        <p className="mt-0.5 text-[16px] text-ink-dim">Pick the brain and confirm its ground truth, then commission the run above.</p>
+
+        <div className="mt-5 grid gap-x-8 gap-y-6 sm:grid-cols-2">
+          {/* LEFT: the brain, and how it runs */}
+          <div className="space-y-5">
+            <label className="block">
+              <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Client</span>
+              <select value={clientId} disabled={running || collecting} title={running || collecting ? "A run is in progress. It finishes on its own, even if you navigate away." : undefined}
+                onChange={(e) => { if (e.target.value === "__new__") setShowCreate(true); else setClientId(e.target.value); }}
+                className="mt-1 block w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] outline-none focus:border-accent disabled:opacity-60">
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{configured.includes(c.id) ? "" : " (not researchable yet)"}</option>)}
+                <option value="__new__">+ New brain…</option>
+              </select>
+            </label>
+
+            {/* FOCUS (Gary): an optional steer before the run. Hidden once a run is in flight. */}
+            {!running && (
+              <div>
+                <label className="block text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Focus for this run (optional)</label>
+                <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={3}
+                  placeholder="Steer the research. e.g. 'Focus on the Southern Suburbs: Constantia, Claremont, Newlands, Bishopscourt.' Leave blank for a full run."
+                  className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[17px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
+                <p className="mt-1 text-[15px] text-ink-faint">An emphasis, not a filter: every section is still collected, and nothing is ever made up to fit the focus.</p>
               </div>
-            ))}
-          </div>
-          <div className="mt-2 flex items-center gap-3">
-            <button onClick={() => setSites([...sites, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add another website</button>
-            <button onClick={saveSites} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{siteSaved ? "✓ Saved" : "Save"}</button>
-          </div>
-          {/* SOCIAL ACCOUNTS (Gary): the client's own social profiles, mined for cadence, content themes and audience. */}
-          <div className="mt-4">
-            <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Social media accounts</span>
-            <div className="mt-1 space-y-2">
-              {socials.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input value={s} onChange={(e) => { const next = [...socials]; next[i] = e.target.value; setSocials(next); }}
-                    placeholder={i === 0 ? "https://www.instagram.com/theclient" : "https://www.linkedin.com/company/theclient"}
-                    className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent" />
-                  {socials.length > 1 && <button onClick={() => setSocials(socials.filter((_, j) => j !== i))} aria-label="Remove social account" className="text-ink-faint hover:text-alert">✕</button>}
+            )}
+
+            {/* WEEKLY AUTO-RUN (Gary): opt this brain into a Monday 08:30 run, off by default so nothing is charged
+                without opting in. It emails you when it lands, then you approve or reject at Gate 1 as usual. */}
+            {isConfigured && (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-2/50 px-4 py-3">
+                <button role="switch" aria-checked={weekly.on} onClick={toggleWeekly} disabled={weekly.busy}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${weekly.on ? "bg-[#4ade80]" : "bg-surface-2 ring-1 ring-line"} disabled:opacity-60`}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${weekly.on ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+                <div className="min-w-0">
+                  <div className="text-[17px] font-semibold text-ink">Weekly auto-run · Monday 08:30</div>
+                  <div className="text-[15px] text-ink-faint">
+                    {weekly.on
+                      ? "ON. This brain researches every Monday morning and emails you to approve. Only new facts surface."
+                      : "OFF. Turn on to research this brain automatically each week, so you never forget and never overspend."}
+                  </div>
                 </div>
-              ))}
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT: the ground truth */}
+          <div className="space-y-5">
+            <div>
+              <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Ground-truth website(s)</span>
+              <div className="mt-1.5 space-y-2">
+                {sites.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input value={s} onChange={(e) => { const next = [...sites]; next[i] = e.target.value; setSites(next); }}
+                      placeholder={i === 0 ? "https://www.the-amber-room.co.za/" : "https://another-official-site.co.za"}
+                      className="block w-full min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] outline-none focus:border-accent" />
+                    {sites.length > 1 && <button onClick={() => setSites(sites.filter((_, j) => j !== i))} aria-label="Remove website" className="shrink-0 text-ink-faint hover:text-alert">✕</button>}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <button onClick={() => setSites([...sites, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add another website</button>
+                <button onClick={saveSites} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{siteSaved ? "✓ Saved" : "Save"}</button>
+              </div>
             </div>
-            <div className="mt-2 flex items-center gap-3">
-              <button onClick={() => setSocials([...socials, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add a social account</button>
-              <button onClick={saveSocials} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{socSaved ? "✓ Saved" : "Save"}</button>
+
+            {/* SOCIAL ACCOUNTS (Gary): the client's own social profiles, mined for cadence, content themes and audience. */}
+            <div>
+              <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Social media accounts</span>
+              <div className="mt-1.5 space-y-2">
+                {socials.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input value={s} onChange={(e) => { const next = [...socials]; next[i] = e.target.value; setSocials(next); }}
+                      placeholder={i === 0 ? "https://www.instagram.com/theclient" : "https://www.linkedin.com/company/theclient"}
+                      className="block w-full min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] outline-none focus:border-accent" />
+                    {socials.length > 1 && <button onClick={() => setSocials(socials.filter((_, j) => j !== i))} aria-label="Remove social account" className="shrink-0 text-ink-faint hover:text-alert">✕</button>}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <button onClick={() => setSocials([...socials, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add a social account</button>
+                <button onClick={saveSocials} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{socSaved ? "✓ Saved" : "Save"}</button>
+              </div>
             </div>
           </div>
         </div>
+
+        <p className="mt-5 border-t border-line pt-4 text-[15px] text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them. Social accounts are mined for cadence, content themes and audience signals.</p>
       </div>
-      <p className="mt-2 text-[15px] text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them. Social accounts are mined for cadence, content themes and audience signals.</p>
 
       {/* NEW BRAIN */}
       {showCreate && (
@@ -658,38 +701,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         </div>
       )}
 
-      {/* FOCUS (Gary): an optional steer before the run - e.g. specific suburbs for an estate agency, a product
-          line, a region. Prioritises that angle without narrowing the brief. Hidden once a run is in flight. */}
-      {!running && (
-        <div className="mt-5">
-          <label className="block text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Focus for this run (optional)</label>
-          <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2}
-            placeholder="Steer the research. e.g. 'Focus on the Southern Suburbs: Constantia, Claremont, Newlands, Bishopscourt.' Leave blank for a full run."
-            className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-1 px-3.5 py-2.5 text-[17px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
-          <p className="mt-1 text-[15px] text-ink-faint">An emphasis, not a filter: every section is still collected, and nothing is ever made up to fit the focus.</p>
-        </div>
-      )}
-
-      {/* The run control + status now live in the hero card at the top. */}
-
-      {/* WEEKLY AUTO-RUN (Gary): opt this brain into a Monday 08:30 run, off by default so nothing is charged
-          without opting in. It emails you when it lands, then you approve or reject at Gate 1 as usual. */}
-      {isConfigured && (
-        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-1 px-4 py-3">
-          <button role="switch" aria-checked={weekly.on} onClick={toggleWeekly} disabled={weekly.busy}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition ${weekly.on ? "bg-[#4ade80]" : "bg-surface-2 ring-1 ring-line"} disabled:opacity-60`}>
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${weekly.on ? "left-[22px]" : "left-0.5"}`} />
-          </button>
-          <div className="min-w-0">
-            <div className="text-[17px] font-semibold text-ink">Weekly auto-run · Monday 08:30</div>
-            <div className="text-[15px] text-ink-faint">
-              {weekly.on
-                ? "ON. This brain researches every Monday morning and emails you to approve. Only new facts surface."
-                : "OFF. Turn on to research this brain automatically each week, so you never forget and never overspend."}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* The run control, focus and weekly auto-run now live in the hero and the Setup card above. */}
 
       {/* DURABLE RUN IN PROGRESS (resumed after navigating away, or running in another tab). Safe to leave. */}
       {collecting && !running && (
