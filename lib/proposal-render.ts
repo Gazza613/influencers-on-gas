@@ -121,9 +121,11 @@ function gasLockup(ci: CiTokens, onDark: boolean): string {
 
 // An icon disc (radial gradient) holding a 2px-stroke white lucide SVG. `inner` is the svg's inner markup.
 function disc(ci: CiTokens, size: number, inner: string): string {
-  const ic = Math.round(size * 0.53);
-  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;flex-shrink:0;">`
-    + `<svg width="${ic}" height="${ic}" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${inner}</svg></div>`;
+  const ic = Math.round(size * 0.52);
+  // A hairline inset ring gives the circle a crisp, defined edge in print (a flat gradient disc alone reads soft
+  // and "not a precise circle", Gary). aspect-ratio + fixed box keep it a true circle, never an oval.
+  return `<div style="width:${size}px;height:${size}px;min-width:${size}px;aspect-ratio:1;border-radius:50%;background:${ci.iconDisc};box-shadow:inset 0 0 0 1px rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;">`
+    + `<svg width="${ic}" height="${ic}" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${inner}</svg></div>`;
 }
 
 const eyebrow = (ci: CiTokens, t: string) =>
@@ -222,7 +224,7 @@ function coverPage(d: ProposalDoc, ci: CiTokens): string {
 // 02 EXECUTIVE SUMMARY (light). intro + 4 icon cards (2x2) + the fixed "journey" strip.
 function execPage(d: ProposalDoc, ci: CiTokens): string {
   const cards = d.exec.cards.slice(0, 4).map((c) => card(ci, "16px 20px",
-    `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 30, c.icon)}<div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${esc(c.title)}</div></div>`
+    `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 36, c.icon)}<div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${esc(c.title)}</div></div>`
     + `<p style="font-size:11px;line-height:1.65;color:${ci.muted};margin:6px 0 0;">${esc(c.body)}</p>`)).join("");
   return `<section class="page" style="${pageLight("52px 60px 40px")}">`
     + eyebrow(ci, "01 · Executive Summary") + headline(ci, d.exec.headline)
@@ -232,12 +234,14 @@ function execPage(d: ProposalDoc, ci: CiTokens): string {
     + footerLight(ci, d.brand_short, 2) + `</section>`;
 }
 
-// The fixed journey strip (doctrine: paid ad -> WhatsApp -> PSI score -> booked step). Never landing-page/form.
+// The fixed journey strip (doctrine: paid ad -> OUR PSI WhatsApp -> PSI intent score -> high-intent lead to sales).
+// Client/objective-agnostic: NEVER a landing-page/form, and NEVER a client-specific outcome (a leftover "Tasting
+// booked" from the Chilla fixture shipped on a bed retailer). The WhatsApp step is OUR PSI system, never theirs.
 const JOURNEY: { icon: string; label: string; sub: string }[] = [
-  { icon: `<path d="m3 11 18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path>`, label: "Paid ad", sub: "Meta, LinkedIn, Google" },
-  { icon: `<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>`, label: "WhatsApp", sub: "One click, no forms" },
-  { icon: `<path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path>`, label: "PSI score", sub: "Qualified in-conversation" },
-  { icon: `<rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path><path d="m9 16 2 2 4-4"></path>`, label: "Tasting booked", sub: "Routed to the sales team" },
+  { icon: `<path d="m3 11 18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path>`, label: "Paid ad", sub: "Meta, Google, more" },
+  { icon: `<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>`, label: "PSI WhatsApp", sub: "One conversation, no forms" },
+  { icon: `<path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path>`, label: "PSI intent score", sub: "Qualified by intent" },
+  { icon: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="m16 11 2 2 4-4"></path>`, label: "High-intent lead", sub: "Routed to your sales team" },
 ];
 function journeyStrip(ci: CiTokens): string {
   const arrow = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${ci.arrow}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`;
@@ -348,13 +352,13 @@ function ecosystemPage(d: ProposalDoc, ci: CiTokens): string {
   const arrow = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${ci.arrow}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:9px;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`;
   const flow = FLOW.map(node).join(arrow);
   return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "06 · The Ecosystem") + headline(ci, { lead: "Eight integrated pods", gradient: "one engine" })
+    eyebrow(ci, "06 · The Ecosystem") + headline(ci, { lead: "Eight integrated pods", gradient: "one system" })
     + `<p style="font-size:12.5px;line-height:1.7;color:${ci.body};margin:14px 0 0;">${esc(d.ecosystem_intro)}</p>`
     + `<div style="margin-top:20px;">${layerLabel("Intelligence Layer")}<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${ecoDark(ci, "POD I", "The Researcher", "Your business brain: market, competitors, customer sentiment")}${ecoDark(ci, "POD II", "The Strategist", "Intelligence converted into a commercial plan and KPIs")}</div></div>`
     + `<div style="margin-top:16px;">${layerLabel("Execution Layer")}<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">${ecoLight(ci, "POD III", "Audience Intelligence", "The right people, not the most people")}${ecoLight(ci, "POD IV", "Creative Studio", "Emotive StorySelling, tested at volume")}${ecoLight(ci, "POD V", "Channel Management", "Omnichannel media, tuned daily")}</div></div>`
     + `<div style="margin-top:16px;">${layerLabel("Conversion and Learning Layers")}<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">${ecoDark(ci, "POD VI", "PSI · Pre-Sales Intelligence", "Every enquiry scored for intent, in real time")}${ecoDark(ci, "POD VII", "PSI Conversion Dashboard", "The bridge from marketing to your team")}${ecoDark(ci, "POD VIII", "Media on GAS", "Identifies the metrics that matter. Learns and scales winners.")}</div></div>`
-    + `<div style="margin-top:16px;background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};text-align:center;">How intelligence flows through the engine</div><div style="display:flex;align-items:flex-start;justify-content:center;gap:5px;margin-top:10px;">${flow}</div></div>`
-    + `<div style="margin-top:auto;background:${ci.accentGrad};border-radius:999px;padding:10px 22px;box-shadow:0 6px 18px rgba(46,26,74,0.2);color:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:12px;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;"><span style="width:22px;height:22px;border-radius:50%;background:${ci.iconDisc};display:inline-flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;">&#8635;</span><span>Feedback loop: every outcome flows back to sharpen the whole engine</span></div>`
+    + `<div style="margin-top:16px;background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};text-align:center;">How intelligence flows through the system</div><div style="display:flex;align-items:flex-start;justify-content:center;gap:5px;margin-top:10px;">${flow}</div></div>`
+    + `<div style="margin-top:auto;background:${ci.accentGrad};border-radius:999px;padding:10px 22px;box-shadow:0 6px 18px rgba(46,26,74,0.2);color:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:12px;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;"><span style="width:22px;height:22px;border-radius:50%;background:${ci.iconDisc};display:inline-flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;">&#8635;</span><span>Feedback loop: every outcome flows back to sharpen the whole system</span></div>`
     + footerLight(ci, d.brand_short, 7));
 }
 
@@ -395,7 +399,7 @@ function pods12Page(d: ProposalDoc, ci: CiTokens): string {
   const clientDot = `<div style="position:absolute;left:${m.client.left};top:${m.client.top};display:flex;align-items:center;gap:6px;"><div style="width:15px;height:15px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 12px rgba(155,79,201,0.5);"></div><div style="font-size:10px;font-weight:800;color:${ci.accentDeep};">${esc(m.client.name)} <span style="font-weight:400;color:${ci.muted};">· ${esc(m.client.note)}</span></div></div>`;
   const axisLbl = (pos: string, t: string) => `<div style="position:absolute;${pos};font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8496;">${esc(t)}</div>`;
   return section(pageLight("48px 60px 36px"),
-    eyebrow(ci, "The Engine · Intelligence Layer") + headline28(ci, d.pods12.headline)
+    eyebrow(ci, "The System · Intelligence Layer") + headline28(ci, d.pods12.headline)
     + `<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">`
     +   podBlock("I", "The Researcher", "The business brain: market, competitors, customer", d.pods12.researcher_para, d.pods12.researcher_chip)
     +   podBlock("II", "The Strategist", "Intelligence converted into a commercial plan and KPIs", d.pods12.strategist_para, d.pods12.strategist_chip)
@@ -429,7 +433,7 @@ function audiencePage(d: ProposalDoc, ci: CiTokens): string {
     return `<div style="flex:${b.flex};background:${bg};border-radius:8px;padding:7px 12px;color:${col};"><div style="font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">${esc(b.label)}</div><div style="font-size:9px;color:${sub};margin-top:2px;">${esc(b.body)}</div></div>`;
   };
   return section(pageLight("48px 60px 36px"),
-    eyebrow(ci, "The Engine · Execution Layer") + headline28(ci, a.headline)
+    eyebrow(ci, "The System · Execution Layer") + headline28(ci, a.headline)
     + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(a.intro)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px;">${a.personas.slice(0, 4).map(personaCard).join("")}${disciplineCard}</div>`
     + tintChip(ci, a.blueprint_note)
@@ -512,7 +516,7 @@ function channelsPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="font-size:9.8px;line-height:1.55;color:${ci.body};margin-top:5px;">${esc(r.what)}</div>`
     + `<div style="font-size:9.3px;line-height:1.5;color:${ci.muted};margin-top:4px;font-style:italic;">${esc(r.why)}</div></div>`;
   return section(pageLight("48px 60px 36px"),
-    eyebrow(ci, "The Engine · Execution Layer") + headline28(ci, { lead: "Pod V ·", gradient: "The channel plan" })
+    eyebrow(ci, "The System · Execution Layer") + headline28(ci, { lead: "Pod V ·", gradient: "The channel plan" })
     + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(d.channels5.intro)}</p>`
     + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:12px;">${d.channels5.rows.slice(0, 5).map(row).join("")}</div>`
     + footerLight(ci, d.brand_short, 13));
@@ -565,7 +569,7 @@ function pods78Page(d: ProposalDoc, ci: CiTokens): string {
   const kpiTile = (t: { label: string; spark: "line-down" | "bars" | "line-up" | "gauge"; caption: string }) =>
     `<div style="background:${ci.darkCard};border-radius:14px;padding:14px 18px;color:#FFFFFF;"><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(t.label)}</div><div style="margin-top:6px;">${sparkline(ci, t.spark)}</div><div style="font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-top:7px;">${esc(t.caption)}</div></div>`;
   return section(pageLight("48px 60px 36px"),
-    eyebrow(ci, "The Engine · Conversion and Learning Layers") + headline28(ci, p.headline)
+    eyebrow(ci, "The System · Conversion and Learning Layers") + headline28(ci, p.headline)
     + `<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">`
     +   podBlock("VII", "PSI Conversion Dashboard", "The bridge from marketing to your team", p.dashboard_para, p.dashboard_chip)
     +   podBlock("VIII", "Media on GAS", "Learns, reallocates and scales winners", p.media_para, p.media_chip)
@@ -598,7 +602,7 @@ function closedLoopPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="position:absolute;left:${s.left}px;top:${s.top}px;transform:translate(-50%,-50%);width:172px;background:rgba(28,17,64,0.85);border:1px solid rgba(199,125,232,0.4);border-radius:14px;padding:10px 12px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.35);"><div style="font-size:9px;font-weight:600;letter-spacing:0.18em;color:${ci.accentOnDark};">STEP ${i + 1}</div><div style="font-size:12px;font-weight:700;margin-top:2px;line-height:1.3;">${esc(s.title)}</div><div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.4;margin-top:2px;">${esc(i === 4 && d.closedloop.step5_sub ? d.closedloop.step5_sub : s.sub)}</div></div>`;
   return section(pageDark(ci, "52px 60px 40px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">07 · Ecosystem Integration</div>`
-    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.1;margin-top:10px;">One closed-loop <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">growth engine</span></div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.1;margin-top:10px;">One closed-loop <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">growth system</span></div>`
     + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(d.closedloop.intro)}</p>`
     + `<div style="flex:1;display:flex;align-items:center;justify-content:center;margin-top:6px;"><div style="position:relative;width:620px;height:620px;">`
     +   `<svg width="620" height="620" viewBox="0 0 620 620" style="position:absolute;inset:0;"><circle cx="310" cy="310" r="225" fill="none" stroke="rgba(199,125,232,0.35)" stroke-width="2" stroke-dasharray="3 7"></circle></svg>`
@@ -687,7 +691,7 @@ function investmentPage(d: ProposalDoc, ci: CiTokens): string {
   const foot = (f: { label: string; body: string }) =>
     `<div style="background:${ci.tint};border-radius:14px;padding:12px 16px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentDeep};">${esc(f.label)}</div><div style="font-size:10.5px;line-height:1.55;color:${ci.body};margin-top:4px;">${esc(f.body)}</div></div>`;
   return section(pageLight("48px 60px 40px"),
-    eyebrow(ci, "11 · Investment") + headline(ci, { lead: "The investment ·", gradient: `the ${iv.tier_name} engine` })
+    eyebrow(ci, "11 · Investment") + headline(ci, { lead: "The investment ·", gradient: `the ${iv.tier_name} system` })
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(iv.intro)}</p>`
     + `<div style="margin-top:16px;background:${ci.darkPage};border-radius:18px;padding:22px 26px;color:#FFFFFF;position:relative;box-shadow:0 12px 30px rgba(46,26,74,0.28);">`
     +   `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><div><div style="font-size:20px;font-weight:800;text-transform:uppercase;">${esc(iv.tier_name)}</div><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:2px;">${esc(iv.tagline)}</div></div><div style="background:${ci.accentGrad};border-radius:999px;padding:6px 14px;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap;align-self:flex-start;">${esc(iv.poc_chip)}</div></div>`
@@ -716,7 +720,7 @@ function termsPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.12;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;">${glass("Validity", t.validity)}${glass("Engagement", t.engagement)}${glass("Media budget", t.media)}${glass("Ownership", t.ownership)}</div>`
     + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:18px 22px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the proof of concept proves</div><p style="font-size:12px;line-height:1.7;color:rgba(255,255,255,0.85);margin:8px 0 0;">${esc(t.poc_proves)}</p></div>`
-    + `<div style="display:flex;gap:10px;margin-top:auto;padding-top:20px;flex-wrap:nowrap;">${chip("Human Command. AI Execution.", true)}${chip("Eight integrated pods", false)}${chip("One closed-loop engine", false)}</div>`
+    + `<div style="display:flex;gap:10px;margin-top:auto;padding-top:20px;flex-wrap:nowrap;">${chip("Human Command. AI Execution.", true)}${chip("Eight integrated pods", false)}${chip("One closed-loop system", false)}</div>`
     + `<div style="margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;align-items:center;"><div style="display:flex;align-items:center;gap:12px;"><div style="width:40px;height:40px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#FFFFFF;">GAS</div><div><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;">GAS MARKETING AUTOMATION</div><div style="font-size:9px;letter-spacing:0.24em;color:${ci.accentOnDark};font-weight:600;">THE AGENCY OF NOW</div></div></div><div style="display:flex;align-items:center;gap:16px;">${clientMark}<span style="font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);">www.gasmarketing.co.za</span></div></div>`);
 }
 

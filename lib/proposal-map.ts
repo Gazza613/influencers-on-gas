@@ -24,7 +24,15 @@ export type ProposalDocCtx = {
 };
 
 // ── small helpers ─────────────────────────────────────────────────────────────────────────────────────────────
-const firstWord = (s: string) => (s.trim().split(/\s+/)[0] || s).trim();
+// A footer/reference short name. NOT the first word: "THE BED SHOP" -> "THE" was the bug (footer read "THE · 02"
+// and the PSI demo said "THE assistant"). Use the real name when it fits; only shorten a genuinely long one, and
+// drop a leading article first so the brand survives.
+const shortBrand = (s: string) => {
+  const n = s.trim();
+  if (n.length <= 22) return n;
+  const noArticle = n.replace(/^(the|a|an)\s+/i, "").trim();
+  return noArticle.length <= 22 ? noArticle : noArticle.split(/\s+/).slice(0, 2).join(" ");
+};
 // A headline that carries a comma must close with a full stop (Gary's copy rule).
 const stopIfComma = (s: string) => (s.includes(",") && !/[.!?]$/.test(s.trim()) ? s.trim() + "." : s.trim());
 function hl(lead: string, gradient: string): Headline { return { lead: lead.trim(), gradient: stopIfComma(gradient) }; }
@@ -70,14 +78,14 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
   const personas = (c.audience?.personas || []).slice(0, 4);
 
   return {
-    brand_short: firstWord(name),
+    brand_short: shortBrand(name),
     client_name: name,
     client_logo: x.clientLogo || null,
     date_label: x.dateLabel,
     validity_label: x.validityLabel,
 
     cover: {
-      headline: splitCoverHeadline(c.headline || `The Integrated Growth Engine for ${name}`, name),
+      headline: splitCoverHeadline(c.headline || `The Integrated Growth System for ${name}`, name),
       summary: c.subhead || "",
       audience_chip: `Prepared for ${name} · ${x.objectiveLabel}`,
     },
@@ -111,8 +119,8 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       actions: (c.market_intel?.opportunities || []).slice(0, 6).map((o) => ({ title: o.insight, body: o.why })),
     },
 
-    ecosystem_intro: `One closed-loop engine that carries a prospect from first impression to a booked outcome, and then compounds: each pod passes sharper intelligence to the next.`,
-    divider_line: `The pages that follow walk through the engine pod by pod: what each does, and what it means for ${name}'s ${x.objectiveLabel.toLowerCase()} specifically.`,
+    ecosystem_intro: `One closed-loop system that carries a prospect from first impression to a booked outcome, and then compounds: each pod passes sharper intelligence to the next.`,
+    divider_line: `The pages that follow walk through the system pod by pod: what each does, and what it means for ${name}'s ${x.objectiveLabel.toLowerCase()} specifically.`,
 
     pods12: {
       headline: hl("Pods I and II ·", "Research and Strategy"),
@@ -166,7 +174,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     },
 
     psi: {
-      intro: `PSI is our proprietary lead-qualification engine and the ecosystem's most defensible asset. AI data-driven scorecarding across social lead forms and interactive WhatsApp funnels qualifies every prospect in real time, before a human ever picks up the phone.`,
+      intro: `PSI is our proprietary lead-qualification system and the ecosystem's most defensible asset. AI data-driven scorecarding across social lead forms and interactive WhatsApp funnels qualifies every prospect in real time, before a human ever picks up the phone.`,
       for_client: pod(5).for_client,
       tiles: [
         { level: "HIGH", caption: "Routed to your team", kind: "high" },
@@ -174,7 +182,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
         { level: "LOW", caption: "Filtered out by design", kind: "low" },
       ],
       chat: {
-        assistant: `${firstWord(name)} assistant`,
+        assistant: `${shortBrand(name)} assistant`,
         bubbles: [
           { role: "in", text: `Hi, welcome to ${name}. Tell me what you're looking for and I can check the details for you right now.` },
           { role: "out", text: "I'm interested but not sure it's the right fit for me." },
@@ -183,7 +191,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
         closing: "High intent · Booked",
       },
       side_cards: [
-        { title: "Conversational qualification", body: `WhatsApp funnels ask intelligent, ${firstWord(name)}-specific questions.` },
+        { title: "Conversational qualification", body: `WhatsApp funnels ask intelligent, ${shortBrand(name)}-specific questions.` },
         { title: "Warm hand-off", body: "Each qualified lead arrives with context, so the conversation starts warm." },
         { title: "Real-time alerts", body: "The moment intent scores high, the right person knows." },
       ],
@@ -210,7 +218,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
 
     rollout: {
       headline: hl("Your rollout,", "gated week by week"),
-      intro: `The rollout mirrors the engine. Each stage ends at a sign-off gate: nothing proceeds until the previous stage is proven.`,
+      intro: `The rollout mirrors the system. Each stage ends at a sign-off gate: nothing proceeds until the previous stage is proven.`,
       rail: (c.rollout || []).slice(0, 4).map((r, i) => ({ badge: `W${i + 1}`, label: shortLabel(r.title) })),
       weeks: (c.rollout || []).slice(0, 4).map((r, i) => ({ icon: WEEK_ICONS[i % 4], title: r.title, pods: r.pods, bullets: r.points || [], gate: r.gate })),
     },
@@ -229,18 +237,18 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     deal_divider: `The final pages cover the investment, the commercial terms and a deliberately simple one-page agreement, written so a decision can be made in the room.`,
 
     investment: {
-      intro: `One engagement, engineered for this mandate: the complete eight-pod closed loop, with the full PSI stack. This is the ${x.tierName} engine.`,
-      tier_name: x.tierName, tagline: x.tierName === "Dominate" ? "Own the category" : "Establish the engine",
+      intro: `One engagement, engineered for this mandate: the complete eight-pod closed loop, with the full PSI stack. This is the ${x.tierName} system.`,
+      tier_name: x.tierName, tagline: x.tierName === "Dominate" ? "Own the category" : "Establish the system",
       poc_chip: "Three-month proof of concept",
       price: x.price, price_unit: x.priceUnit,
-      body: c.investment?.engine_includes?.length ? `The complete eight-pod engine at this tier, tuned continuously so the compounding advantage widens quarter on quarter.` : "",
+      body: c.investment?.engine_includes?.length ? `The complete eight-pod system at this tier, tuned continuously so the compounding advantage widens quarter on quarter.` : "",
       inclusions: (c.investment?.engine_includes || []).slice(0, 8).map((t) => ({ title: t, pod_tag: "" })),
       footnotes: [
         { label: "Fixed monthly retainer", body: "A predictable monthly investment. No time-billing, no surprise line items." },
         { label: "Media and scope", body: `Media budget is decided separately by ${name} and is additional to the retainer. Your data, accounts and audiences remain yours.` },
         { label: "Performance incentive", body: "An optional upside linked to PSI scorecarding, so both parties win from the same result." },
       ],
-      honest_para: (c.investment?.notes || []).join(" ") || `We do not quote a guaranteed return; we commit to running the engine well, reporting transparently and reallocating budget quickly toward what works.`,
+      honest_para: (c.investment?.notes || []).join(" ") || `We do not quote a guaranteed return; we commit to running the system well, reporting transparently and reallocating budget quickly toward what works.`,
     },
 
     terms: {
@@ -265,9 +273,14 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
 
 // ── derivations ───────────────────────────────────────────────────────────────────────────────────────────────
 // A short numeric/label version of a stat for the big card figure (falls back to the first token).
+// The big accent token on a stat card. A real number wins. If the "stat" is prose with no number, take the first
+// meaningful CONTENT word (never a bare "The" - that was the bug that put "The" as a headline number), else nothing.
+const STAT_STOP = new Set(["the", "a", "an", "of", "to", "in", "on", "and", "for", "with", "their", "its", "this", "that", "every", "essentially", "across", "is", "are", "was", "were", "has", "have"]);
 function shortStat(s: string): string {
   const m = s.match(/([+-]?\d[\d,.]*\s?(?:%|k|m|bn|x|★|\+)?)/i);
-  return (m ? m[1] : s.split(/[\s,]/)[0]).trim().slice(0, 10);
+  if (m) return m[1].trim().slice(0, 10);
+  const word = s.split(/\s+/).map((w) => w.replace(/[^a-z0-9-]/gi, "")).find((w) => w.length >= 4 && !STAT_STOP.has(w.toLowerCase()));
+  return word ? (word[0].toUpperCase() + word.slice(1)).slice(0, 10) : "";
 }
 function splitTitleBody(w: string): { title: string; body: string } {
   const m = w.match(/^(.{8,60}?[.:])\s+(.+)$/);
@@ -284,7 +297,7 @@ function competitiveMap(name: string, competitors: string[]) {
     title: "The competitive map the Researcher watches continually",
     y_top: "Owned value", y_bottom: "Commodity", x_left: "Slower to respond", x_right: "Speed and qualification",
     competitors: competitors.slice(0, 3).map((cName, i) => ({ name: cName, note: "monitored continually", left: pos[i].left, top: pos[i].top })),
-    client: { name, note: "the engine's edge", left: "52%", top: "12%" },
+    client: { name, note: "the system's edge", left: "52%", top: "12%" },
   };
 }
 

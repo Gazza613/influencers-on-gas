@@ -15,13 +15,13 @@ export type ObjectiveId = (typeof OBJECTIVES)[number]["id"];
 // The rate card (toggle; Dominate is the anchor).
 export const TIERS = {
   launch: {
-    id: "launch", name: "Launch", tagline: "Establish the engine", rate: "R100 000 / month excl VAT", recommended: false,
+    id: "launch", name: "Launch", tagline: "Establish the system", rate: "R100 000 / month excl VAT", recommended: false,
     scope: "The full eight-pod closed loop, configured around a single core objective and a focused primary channel set, run end to end from research to real-time optimisation.",
     cadence: "Monthly strategic review. Live within the first three weeks; closed loop running by day thirty-one.",
   },
   dominate: {
     id: "dominate", name: "Dominate", tagline: "Own the category", rate: "R150 000 / month excl VAT", recommended: true,
-    scope: "The full eight-pod engine at full omnichannel scale, with the complete PSI stack and a bi-weekly optimisation cadence, so the compounding advantage widens quarter on quarter.",
+    scope: "The full eight-pod system at full omnichannel scale, with the complete PSI stack and a bi-weekly optimisation cadence, so the compounding advantage widens quarter on quarter.",
     cadence: "Bi-weekly strategic review and priority senior access, with an optional performance incentive linked to PSI-qualified outcomes.",
   },
 } as const;
