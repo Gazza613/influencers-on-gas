@@ -5,6 +5,23 @@ import { useRouter } from "next/navigation";
 import { flex } from "@/lib/flex";
 import Working, { WORKING_NEWSLETTER } from "@/components/Working";
 import { askConfirm } from "@/lib/confirm";
+import LivingResearch from "@/components/LivingResearch";
+
+// A CONSISTENT SECTION MARKER, the same treatment the Brain page uses so the two steps read as one system: a
+// rounded violet tile holding a 2px line icon. `d` is a constant SVG path string, never user text.
+function SectionTile({ d }: { d: string }) {
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a855f7]/15 text-[#c79bff]">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px]" aria-hidden dangerouslySetInnerHTML={{ __html: d }} />
+    </span>
+  );
+}
+const ICON = {
+  facts: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/>`,
+  competitors: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
+  brief: `<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/>`,
+  gate: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>`,
+} as const;
 
 // THE RESEARCHER (V3) + GATE 1. The Researcher COLLECTS facts, it never analyses (that is the Strategist's job).
 // This screen commissions a collect, shows the fact base as typed claims - claim on the left, source and TIER
@@ -489,87 +506,154 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
 
   const rand = (cents: number) => "R" + (cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // THE LIVING HERO's readiness fraction (0..1), the Researcher's answer to the Brain's strength bar: dim when
+  // nothing has run, an active sweep while collecting, and fuller the more verified facts are standing. A locked
+  // fact base reads brightest of all.
+  const busyRun = running || collecting;
+  const approved = run?.status === "gate1_approved";
+  const lit = busyRun ? 0.5
+    : approved ? Math.min(1, 0.6 + factCount / 45)
+    : canGate ? Math.min(1, 0.45 + factCount / 50)
+    : run ? 0.4
+    : 0.12;
+  // The one-line state under the hero title, honest to exactly where the run is.
+  const heroLine = busyRun ? `Researching ${clientName}. This runs in the background, safe to navigate away.`
+    : approved ? `Fact base locked. ${factCount} verified fact${factCount === 1 ? "" : "s"} are in the brain and ready for the Strategist.`
+    : canGate ? `Version ${run?.version} is ready for your review: ${factCount} verified fact${factCount === 1 ? "" : "s"}${gapClaims.length ? `, ${gapClaims.length} gap${gapClaims.length === 1 ? "" : "s"}` : ""}. Approve, rerun with notes, or reject below.`
+    : run?.status === "failed" ? "The last run did not finish, and nothing was charged. Run it again when you are ready."
+    : run ? `Version ${run.version} on file. Collect again for a fresh version whenever the ground truth moves.`
+    : `Ready to collect a verified, source-tiered fact base on ${clientName}. Every claim carries a source and a Tier 1/2/3 grade.`;
+
   return (
     <div className="mt-8">
+      {/* THE LIVING HERO. The Researcher's answer to the Brain's readiness card: the radar visual on the left, the
+          commission state + the primary Run control on the right, so the team sees what the step IS the moment
+          they land, and the run affordance is the biggest thing on the page. */}
+      <div className={`gas-rise relative overflow-hidden rounded-2xl border p-6 transition ${approved ? "border-[#4ade80]/40 bg-[#4ade80]/[0.05]" : busyRun ? "border-[#a855f7]/45 bg-[#a855f7]/[0.06]" : "border-[#a855f7]/25 bg-surface-1"}`}>
+        <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full blur-[90px]"
+          style={{ background: "radial-gradient(circle, rgba(168,85,247,0.18), transparent 70%)", opacity: 0.35 + 0.6 * Math.min(1, lit) }} />
+        <div className="relative flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-7">
+          <div className="relative h-32 w-32 shrink-0 text-ink-faint">
+            <LivingResearch lit={lit} active={busyRun} />
+          </div>
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
+              <h2 className="text-[27px] font-extrabold tracking-tight text-ink">Commission the Researcher</h2>
+              {run && status && <span className={`rounded-full border px-3 py-1 text-[15px] font-semibold ${status.cls}`}>v{run.version} · {status.label}</span>}
+            </div>
+            <p className="mt-1.5 text-[18px] leading-relaxed text-ink-dim">{heroLine}</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+              <button onClick={() => runCollect()} disabled={running || collecting || !isConfigured}
+                className={`rounded-lg px-5 py-2.5 text-[18px] font-bold transition ${
+                  running || collecting ? "bg-accent text-black glow-accent"
+                  : justDone ? "next-pulse"
+                  : `bg-accent text-black ${!isConfigured ? "opacity-50" : ""}`
+                }`}>
+                {running
+                  ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Collecting… <span className="tabular font-semibold opacity-80">{fmtElapsed(elapsed)}</span></span>
+                  : collecting ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Researching…</span>
+                  : justDone ? "✓ Research complete"
+                  : run ? "Collect again (new version)" : "Run the Researcher"}
+              </button>
+              {run && !collecting && (
+                <span className="text-[16px] text-ink-faint">
+                  {factCount} fact{factCount === 1 ? "" : "s"}{gapClaims.length > 0 && <> · <span className="text-[#fcd34d]">{gapClaims.length} gap{gapClaims.length === 1 ? "" : "s"}</span></>} · collected {ukDate(run.created_at)}
+                  {spend && typeof spend.runCents === "number" && spend.runCents > 0 && <> · <span className="tabular text-ink-dim">this run cost {rand(spend.runCents)}</span></>}
+                </span>
+              )}
+            </div>
+            {/* The tier legend, tying the radar's coloured points to the grades in the fact base below. */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[14px] text-ink-faint sm:justify-start">
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#4ade80]" />Tier 1 · load-bearing</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#60a5fa]" />Tier 2 · reliable</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#fbbf24]" />Tier 3 · directional</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {!isConfigured && <p className="mt-2 text-[16px] text-[#fca5a5]">This brain has nothing to research yet. Add the client and crawl their site into the brain first.</p>}
+
       {/* COST METER */}
       {spend && (
-        <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-line bg-surface-1 px-4 py-2.5">
-          <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Researcher spend</span>
-          <span className="tabular"><b className="text-xl font-bold text-ink">{rand(spend.monthCents)}</b> <span className="text-sm text-ink-faint">this month</span></span>
-          <span className="tabular text-base text-ink-dim">{rand(spend.todayCents)} <span className="text-sm text-ink-faint">today</span></span>
-          <span className="text-sm text-ink-faint">{spend.runsThisMonth} run{spend.runsThisMonth === 1 ? "" : "s"} this month</span>
+        <div className="mt-5 mb-1 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-line bg-surface-1 px-4 py-2.5">
+          <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Researcher spend</span>
+          <span className="tabular"><b className="text-[22px] font-bold text-ink">{rand(spend.monthCents)}</b> <span className="text-[15px] text-ink-faint">this month</span></span>
+          <span className="tabular text-[17px] text-ink-dim">{rand(spend.todayCents)} <span className="text-[15px] text-ink-faint">today</span></span>
+          <span className="text-[15px] text-ink-faint">{spend.runsThisMonth} run{spend.runsThisMonth === 1 ? "" : "s"} this month</span>
         </div>
       )}
       {/* CLIENT + GROUND TRUTH */}
+      <div className="mt-5 tabular text-[15px] font-semibold uppercase tracking-[0.16em] text-ink-faint">Setup</div>
+      <p className="mb-3 text-[16px] text-ink-dim">Pick the brain, confirm its ground-truth website(s) and social accounts, then commission the run above.</p>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <label className="block">
-          <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Client</span>
+          <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Client</span>
           <select value={clientId} disabled={running || collecting} title={running || collecting ? "A run is in progress. It finishes on its own, even if you navigate away." : undefined}
             onChange={(e) => { if (e.target.value === "__new__") setShowCreate(true); else setClientId(e.target.value); }}
-            className="mt-1 block w-72 rounded-lg border border-line bg-surface-1 px-3 py-2 text-lg outline-none focus:border-accent disabled:opacity-60">
+            className="mt-1 block w-72 rounded-lg border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent disabled:opacity-60">
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{configured.includes(c.id) ? "" : " (not researchable yet)"}</option>)}
             <option value="__new__">+ New brain…</option>
           </select>
         </label>
         <div>
-          <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Ground-truth website(s)</span>
+          <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Ground-truth website(s)</span>
           <div className="mt-1 space-y-2">
             {sites.map((s, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input value={s} onChange={(e) => { const next = [...sites]; next[i] = e.target.value; setSites(next); }}
                   placeholder={i === 0 ? "https://www.the-amber-room.co.za/" : "https://another-official-site.co.za"}
-                  className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-base outline-none focus:border-accent" />
+                  className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent" />
                 {sites.length > 1 && <button onClick={() => setSites(sites.filter((_, j) => j !== i))} aria-label="Remove website" className="text-ink-faint hover:text-alert">✕</button>}
               </div>
             ))}
           </div>
           <div className="mt-2 flex items-center gap-3">
-            <button onClick={() => setSites([...sites, ""])} className="text-sm font-semibold text-accent hover:underline">+ Add another website</button>
-            <button onClick={saveSites} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:text-ink">{siteSaved ? "✓ Saved" : "Save"}</button>
+            <button onClick={() => setSites([...sites, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add another website</button>
+            <button onClick={saveSites} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{siteSaved ? "✓ Saved" : "Save"}</button>
           </div>
           {/* SOCIAL ACCOUNTS (Gary): the client's own social profiles, mined for cadence, content themes and audience. */}
           <div className="mt-4">
-            <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Social media accounts</span>
+            <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Social media accounts</span>
             <div className="mt-1 space-y-2">
               {socials.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <input value={s} onChange={(e) => { const next = [...socials]; next[i] = e.target.value; setSocials(next); }}
                     placeholder={i === 0 ? "https://www.instagram.com/theclient" : "https://www.linkedin.com/company/theclient"}
-                    className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-base outline-none focus:border-accent" />
+                    className="block w-80 rounded-lg border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent" />
                   {socials.length > 1 && <button onClick={() => setSocials(socials.filter((_, j) => j !== i))} aria-label="Remove social account" className="text-ink-faint hover:text-alert">✕</button>}
                 </div>
               ))}
             </div>
             <div className="mt-2 flex items-center gap-3">
-              <button onClick={() => setSocials([...socials, ""])} className="text-sm font-semibold text-accent hover:underline">+ Add a social account</button>
-              <button onClick={saveSocials} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-ink-dim hover:text-ink">{socSaved ? "✓ Saved" : "Save"}</button>
+              <button onClick={() => setSocials([...socials, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add a social account</button>
+              <button onClick={saveSocials} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{socSaved ? "✓ Saved" : "Save"}</button>
             </div>
           </div>
         </div>
       </div>
-      <p className="mt-2 text-sm text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them. Social accounts are mined for cadence, content themes and audience signals.</p>
+      <p className="mt-2 text-[15px] text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them. Social accounts are mined for cadence, content themes and audience signals.</p>
 
       {/* NEW BRAIN */}
       {showCreate && (
         <div className="mt-4 rounded-xl border border-accent/40 bg-surface-1 p-5">
-          <div className="text-lg font-bold text-ink">New brain</div>
-          <p className="mt-0.5 text-sm text-ink-faint">Create a client. Add every official website they run, the first is the primary ground-truth anchor.</p>
+          <div className="text-[18px] font-bold text-ink">New brain</div>
+          <p className="mt-0.5 text-[15px] text-ink-faint">Create a client. Add every official website they run, the first is the primary ground-truth anchor.</p>
           <input value={nb.name} onChange={(e) => setNb({ ...nb, name: e.target.value })} placeholder="Client name"
-            className="mt-3 block w-full max-w-md rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg outline-none focus:border-accent" />
+            className="mt-3 block w-full max-w-md rounded-lg border border-line bg-surface-2 px-3 py-2 text-[18px] outline-none focus:border-accent" />
           <div className="mt-3 space-y-2">
             {nb.sites.map((s, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input value={s} onChange={(e) => { const sites = [...nb.sites]; sites[i] = e.target.value; setNb({ ...nb, sites }); }}
                   placeholder={i === 0 ? "https://primary-website.co.za" : "https://another-site.co.za"}
-                  className="block w-full max-w-md rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-accent" />
+                  className="block w-full max-w-md rounded-lg border border-line bg-surface-2 px-3 py-2 text-[17px] outline-none focus:border-accent" />
                 {nb.sites.length > 1 && <button onClick={() => setNb({ ...nb, sites: nb.sites.filter((_, j) => j !== i) })} aria-label="Remove website" className="text-ink-faint hover:text-alert">✕</button>}
               </div>
             ))}
-            <button onClick={() => setNb({ ...nb, sites: [...nb.sites, ""] })} className="text-sm font-semibold text-accent hover:underline">+ Add another website</button>
+            <button onClick={() => setNb({ ...nb, sites: [...nb.sites, ""] })} className="text-[15px] font-semibold text-accent hover:underline">+ Add another website</button>
           </div>
           <div className="mt-4 flex gap-2">
-            <button onClick={createBrain} disabled={creating} className="rounded-lg bg-accent px-5 py-2.5 text-base font-bold text-black disabled:opacity-50">{creating ? "Creating…" : "Create brain"}</button>
-            <button onClick={() => { setShowCreate(false); setNb({ name: "", sites: [""] }); }} className="rounded-lg border border-line px-4 py-2.5 text-base font-semibold text-ink-dim hover:text-ink">Cancel</button>
+            <button onClick={createBrain} disabled={creating} className="rounded-lg bg-accent px-5 py-2.5 text-[17px] font-bold text-black disabled:opacity-50">{creating ? "Creating…" : "Create brain"}</button>
+            <button onClick={() => { setShowCreate(false); setNb({ name: "", sites: [""] }); }} className="rounded-lg border border-line px-4 py-2.5 text-[17px] font-semibold text-ink-dim hover:text-ink">Cancel</button>
           </div>
         </div>
       )}
@@ -578,41 +662,15 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           line, a region. Prioritises that angle without narrowing the brief. Hidden once a run is in flight. */}
       {!running && (
         <div className="mt-5">
-          <label className="block text-sm font-semibold uppercase tracking-wide text-ink-faint">Focus for this run (optional)</label>
+          <label className="block text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Focus for this run (optional)</label>
           <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2}
             placeholder="Steer the research. e.g. 'Focus on the Southern Suburbs: Constantia, Claremont, Newlands, Bishopscourt.' Leave blank for a full run."
-            className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-1 px-3.5 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
-          <p className="mt-1 text-sm text-ink-faint">An emphasis, not a filter: every section is still collected, and nothing is ever made up to fit the focus.</p>
+            className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-1 px-3.5 py-2.5 text-[17px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
+          <p className="mt-1 text-[15px] text-ink-faint">An emphasis, not a filter: every section is still collected, and nothing is ever made up to fit the focus.</p>
         </div>
       )}
 
-      {/* RUN BAR - obvious visual feedback for the team (Gary): glow + spinner while running, green when done. */}
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button onClick={() => runCollect()} disabled={running || collecting || !isConfigured}
-          className={`rounded-lg px-5 py-2.5 text-lg font-bold transition ${
-            running || collecting ? "bg-accent text-black glow-accent"
-            : justDone ? "next-pulse"
-            : `bg-accent text-black ${!isConfigured ? "opacity-50" : ""}`
-          }`}>
-          {running
-            ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Collecting… <span className="tabular font-semibold opacity-80">{fmtElapsed(elapsed)}</span></span>
-            : collecting ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Researching…</span>
-            : justDone ? "✓ Research complete"
-            : run ? "Collect again (new version)" : "Run the Researcher"}
-        </button>
-        {run && status && (
-          <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${status.cls}`}>
-            v{run.version} · {status.label}
-          </span>
-        )}
-        {run && !collecting && (
-          <span className="text-sm text-ink-faint">
-            {factCount} fact{factCount === 1 ? "" : "s"}{gapClaims.length > 0 && <> · <span className="text-[#fcd34d]">{gapClaims.length} gap{gapClaims.length === 1 ? "" : "s"}</span></>} · collected {ukDate(run.created_at)}
-            {spend && typeof spend.runCents === "number" && spend.runCents > 0 && <> · <span className="tabular text-ink-dim">this run cost {rand(spend.runCents)}</span></>}
-          </span>
-        )}
-      </div>
-      {!isConfigured && <p className="mt-2 text-base text-[#fca5a5]">This brain has nothing to research yet. Add the client and crawl their site into the brain first.</p>}
+      {/* The run control + status now live in the hero card at the top. */}
 
       {/* WEEKLY AUTO-RUN (Gary): opt this brain into a Monday 08:30 run, off by default so nothing is charged
           without opting in. It emails you when it lands, then you approve or reject at Gate 1 as usual. */}
@@ -623,8 +681,8 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${weekly.on ? "left-[22px]" : "left-0.5"}`} />
           </button>
           <div className="min-w-0">
-            <div className="text-base font-semibold text-ink">Weekly auto-run · Monday 08:30</div>
-            <div className="text-sm text-ink-faint">
+            <div className="text-[17px] font-semibold text-ink">Weekly auto-run · Monday 08:30</div>
+            <div className="text-[15px] text-ink-faint">
               {weekly.on
                 ? "ON. This brain researches every Monday morning and emails you to approve. Only new facts surface."
                 : "OFF. Turn on to research this brain automatically each week, so you never forget and never overspend."}
@@ -636,36 +694,39 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       {/* DURABLE RUN IN PROGRESS (resumed after navigating away, or running in another tab). Safe to leave. */}
       {collecting && !running && (
         <div className="mt-4 rounded-xl border border-accent/40 bg-surface-1 p-5 glow-accent">
-          <div className="flex items-center gap-2 text-lg font-bold text-ink"><span className="spinner-ring spinner-ring--solid" /> Researching {clientName}…</div>
-          <p className="mt-1 text-base text-ink-dim">{run?.progress?.label || "Collecting facts"}{typeof run?.progress?.sources === "number" ? ` · ${run.progress.sources} sources` : ""}{typeof run?.progress?.filed === "number" && run.progress.filed > 0 ? ` · ${run.progress.filed} filed` : ""}</p>
-          <p className="mt-2 text-sm text-ink-faint">This runs in the background, so you can safely navigate away, the research is saved when it finishes. This view updates on its own.</p>
+          <div className="flex items-center gap-2 text-[18px] font-bold text-ink"><span className="spinner-ring spinner-ring--solid" /> Researching {clientName}…</div>
+          <p className="mt-1 text-[17px] text-ink-dim">{run?.progress?.label || "Collecting facts"}{typeof run?.progress?.sources === "number" ? ` · ${run.progress.sources} sources` : ""}{typeof run?.progress?.filed === "number" && run.progress.filed > 0 ? ` · ${run.progress.filed} filed` : ""}</p>
+          <p className="mt-2 text-[15px] text-ink-faint">This runs in the background, so you can safely navigate away, the research is saved when it finishes. This view updates on its own.</p>
         </div>
       )}
       {run?.status === "failed" && !running && (
-        <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-base text-[#fca5a5]">The last run did not finish{run.error ? `: ${run.error}` : "."} Nothing was charged for an unsaved result. You can run it again.</p>
+        <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-[16px] text-[#fca5a5]">The last run did not finish{run.error ? `: ${run.error}` : "."} Nothing was charged for an unsaved result. You can run it again.</p>
       )}
-      {note && <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-base text-[#fca5a5]">{note}</p>}
+      {note && <p className="mt-3 rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-[16px] text-[#fca5a5]">{note}</p>}
 
       {/* THE RESEARCH DOCUMENT */}
       {run && !running && !collecting && (
         <div className="mt-4 rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-lg font-bold text-ink">Research Brief</div>
-              <div className="mt-0.5 text-sm text-ink-faint">
-                {docBusy ? "Writing and rendering the brief, this takes a minute or two. The Download button appears here when it is ready, and it is also emailed to you." : run.pdf_url ? "A GAS-branded research brief, written for your strategist." : "Not built for this version yet, use Generate."}
+            <div className="flex items-center gap-3">
+              <SectionTile d={ICON.brief} />
+              <div>
+                <div className="text-[18px] font-bold text-ink">Research Brief</div>
+                <div className="mt-0.5 text-[15px] text-ink-faint">
+                  {docBusy ? "Writing and rendering the brief, this takes a minute or two. The Download button appears here when it is ready, and it is also emailed to you." : run.pdf_url ? "A GAS-branded research brief, written for your strategist." : "Not built for this version yet, use Generate."}
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {run.pdf_url && <a href={run.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg bg-accent px-4 py-2 text-base font-bold text-black">Download PDF</a>}
-              {run.drive_url && <a href={run.drive_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink">Open in Drive</a>}
+              {run.pdf_url && <a href={run.pdf_url} target="_blank" rel="noreferrer" className="rounded-lg bg-accent px-4 py-2 text-[16px] font-bold text-black">Download PDF</a>}
+              {run.drive_url && <a href={run.drive_url} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-4 py-2 text-[16px] font-semibold text-ink-dim hover:text-ink">Open in Drive</a>}
               <button onClick={() => buildDoc(run.id)} disabled={docBusy}
-                className="rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink disabled:opacity-50">
+                className="rounded-lg border border-line px-4 py-2 text-[16px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">
                 {docBusy ? "…" : run.pdf_url ? "Regenerate" : "Generate document"}
               </button>
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-faint">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[15px] text-ink-faint">
             {run.notified_at ? <span className="text-[#86efac]">✓ Gary notified by email</span> : delivery && !delivery.email ? <span>Email notice off, set Gmail credentials to enable.</span> : null}
             {run.drive_url ? <span className="text-[#86efac]">✓ Filed to Google Drive</span> : delivery && !delivery.drive ? <span>Drive filing not switched on yet, share a folder with the service account to enable.</span> : null}
           </div>
@@ -676,12 +737,12 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       {progress && (
         <div className="mt-4 rounded-xl border border-line bg-surface-1 p-5">
           <div className="flex items-center justify-between">
-            <div className="text-lg font-semibold text-ink">{progress.label}</div>
-            <div className="tabular text-sm text-ink-faint">{fmtElapsed(elapsed)} · {progress.sources} sources · {progress.filed} filed</div>
+            <div className="text-[18px] font-semibold text-ink">{progress.label}</div>
+            <div className="tabular text-[15px] text-ink-faint">{fmtElapsed(elapsed)} · {progress.sources} sources · {progress.filed} filed</div>
           </div>
           {progress.searches.length > 0 && (
             <ul className="mt-3 space-y-1">
-              {progress.searches.map((q, i) => <li key={i} className="truncate text-sm text-ink-dim">🔍 {q}</li>)}
+              {progress.searches.map((q, i) => <li key={i} className="truncate text-[15px] text-ink-dim">🔍 {q}</li>)}
             </ul>
           )}
         </div>
@@ -690,57 +751,67 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       {/* GATE 1 ACTIONS */}
       {canGate && (
         <div className="mt-6 rounded-xl border border-[#fbbf24]/30 bg-[#fbbf24]/[0.06] p-5">
-          <div className="text-lg font-bold text-ink">Gate 1 · your review</div>
-          <p className="mt-1 text-base text-ink-dim">Approve the facts you have checked. Rerun with notes if anything is wrong, that files a fresh version and never overwrites this one.</p>
+          <div className="flex items-center gap-3">
+            <SectionTile d={ICON.gate} />
+            <div>
+              <div className="text-[18px] font-bold text-ink">Gate 1 · your review</div>
+              <p className="mt-1 text-[17px] text-ink-dim">Approve the facts you have checked. Rerun with notes if anything is wrong, that files a fresh version and never overwrites this one.</p>
+            </div>
+          </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button onClick={() => gate("approve")} disabled={busy}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+              className="inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-5 py-2.5 text-[18px] font-bold text-black disabled:opacity-50">
               {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}Approve</button>
             <button onClick={() => setShowNotes((s) => !s)} disabled={busy}
-              className="rounded-lg border border-line px-5 py-2.5 text-lg font-semibold text-ink hover:border-accent">Rerun with notes</button>
+              className="rounded-lg border border-line px-5 py-2.5 text-[18px] font-semibold text-ink hover:border-accent">Rerun with notes</button>
             <button onClick={() => gate("reject")} disabled={busy}
-              className="rounded-lg border border-[#f87171]/40 px-5 py-2.5 text-lg font-semibold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
-            {busy && <span className="text-base text-ink-dim">Locking the fact base and adding it to the brain…</span>}
+              className="rounded-lg border border-[#f87171]/40 px-5 py-2.5 text-[18px] font-semibold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
+            {busy && <span className="text-[16px] text-ink-dim">Locking the fact base and adding it to the brain…</span>}
           </div>
           {showNotes && (
             <div className="mt-4">
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
                 placeholder="What to fix, referencing the section. e.g. 'Foundations: wrong founder, it is Suzanne Stevens.' 'Drop the theamberroom.co.za items, wrong business.'"
-                className="block w-full rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-base outline-none focus:border-accent" />
+                className="block w-full rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-[17px] outline-none focus:border-accent" />
               <button onClick={() => runCollect(notes)} disabled={running || !notes.trim()}
-                className="mt-2 rounded-lg bg-accent px-4 py-2 text-base font-bold text-black disabled:opacity-50">Rerun with these notes</button>
+                className="mt-2 rounded-lg bg-accent px-4 py-2 text-[16px] font-bold text-black disabled:opacity-50">Rerun with these notes</button>
             </div>
           )}
         </div>
       )}
       {run?.status === "gate1_approved" && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#4ade80]/30 bg-[#4ade80]/[0.06] p-4 text-base text-[#86efac]">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#4ade80]/30 bg-[#4ade80]/[0.06] p-4 text-[17px] text-[#86efac]">
           <span><b>Fact base locked.</b> The facts are in the brain and the Strategist can build from research v{run.version}. Collect again only if the ground truth has moved.</span>
-          <button onClick={() => router.push("/strategist/plan")} className="shrink-0 rounded-lg bg-[#4ade80] px-4 py-2 text-base font-bold text-black hover:opacity-90">Go to the Strategist →</button>
+          <button onClick={() => router.push("/strategist/plan")} className="shrink-0 rounded-lg bg-[#4ade80] px-4 py-2 text-[16px] font-bold text-black hover:opacity-90">Go to the Strategist →</button>
         </div>
       )}
 
       {/* COMPETITOR SET */}
       {run && (
         <div className="mt-8">
-          <h2 className="text-xl font-bold text-ink">Competitor set</h2>
-          <p className="mt-0.5 text-base text-ink-dim">Auto-detected from the category. Add or remove before you approve, adding one commissions a targeted pass on the next run.</p>
+          <div className="flex items-center gap-3">
+            <SectionTile d={ICON.competitors} />
+            <div>
+              <h2 className="text-[23px] font-extrabold tracking-tight text-ink">Competitor set</h2>
+              <p className="mt-0.5 text-[16px] text-ink-dim">Auto-detected from the category. Add or remove before you approve, adding one commissions a targeted pass on the next run.</p>
+            </div>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {competitors.map((c) => (
-              <span key={c.id} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-1 px-3 py-1.5 text-base">
+              <span key={c.id} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-1 px-3 py-1.5 text-[16px]">
                 {c.website ? <a href={c.website} target="_blank" rel="noreferrer" className="font-semibold text-ink hover:text-accent">{c.name}</a> : <span className="font-semibold text-ink">{c.name}</span>}
-                {c.added_by === "auto" && <span className="text-xs text-ink-faint">auto</span>}
+                {c.added_by === "auto" && <span className="text-[13px] text-ink-faint">auto</span>}
                 <button onClick={() => removeCompetitor(c)} aria-label={`Remove ${c.name}`} className="text-ink-faint hover:text-alert">✕</button>
               </span>
             ))}
-            {competitors.length === 0 && <span className="text-base text-ink-faint">None yet, they land on the first run.</span>}
+            {competitors.length === 0 && <span className="text-[16px] text-ink-faint">None yet, they land on the first run.</span>}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <input value={newComp.name} onChange={(e) => setNewComp({ ...newComp, name: e.target.value })} placeholder="Competitor name"
-              className="w-52 rounded-md border border-line bg-surface-1 px-3 py-2 text-base outline-none focus:border-accent" />
+              className="w-52 rounded-md border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent" />
             <input value={newComp.website} onChange={(e) => setNewComp({ ...newComp, website: e.target.value })} placeholder="their website (optional)"
-              className="w-64 rounded-md border border-line bg-surface-1 px-3 py-2 text-base outline-none focus:border-accent" />
-            <button onClick={addCompetitor} className="rounded-md border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink">+ Add</button>
+              className="w-64 rounded-md border border-line bg-surface-1 px-3 py-2 text-[17px] outline-none focus:border-accent" />
+            <button onClick={addCompetitor} className="rounded-md border border-line px-4 py-2 text-[16px] font-semibold text-ink-dim hover:text-ink">+ Add</button>
           </div>
         </div>
       )}
@@ -748,16 +819,19 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       {/* THE FACT BASE, BY SECTION */}
       {run && claims.length > 0 && (
         <div className="mt-8 space-y-9">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-2xl font-bold text-ink">The fact base</h2>
-            <span className="text-base text-ink-faint">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <SectionTile d={ICON.facts} />
+              <h2 className="text-[23px] font-extrabold tracking-tight text-ink">The fact base</h2>
+            </div>
+            <span className="text-[16px] text-ink-faint">
               {inBrainCount > 0 && <span className="text-[#86efac]">{inBrainCount} in the brain. </span>}
               {rejectedCount > 0 && <span className="text-[#fca5a5]">{rejectedCount} rejected. </span>}
               {(inBrainCount > 0 || rejectedCount > 0) && <><button onClick={() => run && buildDoc(run.id)} className="underline hover:text-accent">Regenerate the document</button> to update the PDF.</>}
             </span>
           </div>
           {liveCount === 0 && inBrainCount > 0 && (
-            <div className="rounded-xl border border-[#86efac]/30 bg-[#86efac]/[0.06] p-4 text-base leading-relaxed text-ink">
+            <div className="rounded-xl border border-[#86efac]/30 bg-[#86efac]/[0.06] p-4 text-[16px] leading-relaxed text-ink">
               All {inBrainCount} fact{inBrainCount === 1 ? "" : "s"} from this run {inBrainCount === 1 ? "was" : "were"} carried forward as <b className="text-[#86efac]">already in the brain</b> (you kept {inBrainCount === 1 ? "it" : "them"} on an earlier run), so the review list below is empty. That is why there is nothing to approve.{" "}
               <button onClick={restoreAllToReview} className="font-semibold text-[#86efac] underline hover:text-[#86efac]/80">Restore {inBrainCount === 1 ? "it" : "them all"} to review</button> to check {inBrainCount === 1 ? "it" : "them"} again here.
             </div>
@@ -766,7 +840,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               an empty fact base here is honest, not broken. Explain it and point at the fix rather than leave a
               blank screen (this is exactly what happened on a small/new client like StellR). */}
           {factCount === 0 && inBrainCount === 0 && gapClaims.length > 0 && (
-            <div className="rounded-xl border border-[#fbbf24]/40 bg-[#fbbf24]/[0.06] p-4 text-base leading-relaxed text-ink">
+            <div className="rounded-xl border border-[#fbbf24]/40 bg-[#fbbf24]/[0.06] p-4 text-[16px] leading-relaxed text-ink">
               <b className="text-[#fcd34d]">No verified facts yet, only gaps.</b> This client&apos;s public record is thin, so the Researcher could not stand up a single sourced fact, and it will never invent one. What it looked for and could not find is listed below. To get facts: <b>feed the Brain</b> the client&apos;s own material (their site scrape, documents, decks) and run again, add a sharper <b>focus</b>, or <b>rerun with notes</b> pointing it at where the information lives.
             </div>
           )}
@@ -777,29 +851,29 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
             return (
               <section key={sec.id}>
                 <div className="flex items-baseline justify-between border-b-2 border-line pb-2">
-                  <h3 className={`text-2xl font-bold ${isUnverified ? "text-[#fca5a5]" : "text-ink"}`}>{sec.label}</h3>
-                  <span className="text-base text-ink-faint">{rows.length}</span>
+                  <h3 className={`text-[23px] font-extrabold tracking-tight ${isUnverified ? "text-[#fca5a5]" : "text-ink"}`}>{sec.label}</h3>
+                  <span className="text-[15px] text-ink-faint">{rows.length}</span>
                 </div>
-                <p className="mt-1.5 text-base text-ink-faint">{sec.blurb}</p>
+                <p className="mt-1.5 text-[15px] text-ink-faint">{sec.blurb}</p>
                 <ul className="mt-4 space-y-3">
                   {rows.map((c) => (
                     <li key={c.id} className="rounded-xl border border-line/70 bg-surface-1 p-4">
                       <div className="flex items-start justify-between gap-4">
-                        <p className="flex-1 text-xl leading-relaxed text-ink">
+                        <p className="flex-1 text-[18px] leading-relaxed text-ink">
                           {c.subject && !new RegExp(clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(c.subject) && (
-                            <span className="mr-2 rounded bg-surface-2 px-2 py-0.5 align-middle text-sm font-semibold text-ink-dim">{c.subject}</span>
+                            <span className="mr-2 rounded bg-surface-2 px-2 py-0.5 align-middle text-[14px] font-semibold text-ink-dim">{c.subject}</span>
                           )}
                           {c.claim}
                         </p>
                         <div className="flex shrink-0 gap-2">
-                          <button onClick={() => openNewsletter(c)} className={`rounded-lg border px-3 py-1.5 text-sm font-semibold hover:bg-[#a855f7]/10 ${c.newsletter ? "border-[#86efac]/50 text-[#86efac]" : "border-[#a855f7]/40 text-[#c79bff]"}`} title={c.newsletter ? "A CEO newsletter is saved on this fact - open to view, edit or download" : "Write the CEO's LinkedIn newsletter from this fact, then approve, reject or rewrite"}>{c.newsletter ? "CEO Newsletter ✓" : "CEO Newsletter"}</button>
-                          <button onClick={() => brainClaim(c, true)} className="rounded-lg border border-[#86efac]/40 px-3 py-1.5 text-sm font-semibold text-[#86efac] hover:bg-[#86efac]/10" title="Keep this fact and mute it in future runs - it moves to the Kept tray so the next run shows only genuinely-new facts. It does NOT duplicate anything: approving the run at Gate 1 is what hands the whole fact base to the Strategist.">Keep · mute in reruns</button>
-                          <button onClick={() => rejectClaim(c, true)} className="rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-sm font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this fact - it disappears and is never referenced again">Reject</button>
+                          <button onClick={() => openNewsletter(c)} className={`rounded-lg border px-3 py-1.5 text-[15px] font-semibold hover:bg-[#a855f7]/10 ${c.newsletter ? "border-[#86efac]/50 text-[#86efac]" : "border-[#a855f7]/40 text-[#c79bff]"}`} title={c.newsletter ? "A CEO newsletter is saved on this fact - open to view, edit or download" : "Write the CEO's LinkedIn newsletter from this fact, then approve, reject or rewrite"}>{c.newsletter ? "CEO Newsletter ✓" : "CEO Newsletter"}</button>
+                          <button onClick={() => brainClaim(c, true)} className="rounded-lg border border-[#86efac]/40 px-3 py-1.5 text-[15px] font-semibold text-[#86efac] hover:bg-[#86efac]/10" title="Keep this fact and mute it in future runs - it moves to the Kept tray so the next run shows only genuinely-new facts. It does NOT duplicate anything: approving the run at Gate 1 is what hands the whole fact base to the Strategist.">Keep · mute in reruns</button>
+                          <button onClick={() => rejectClaim(c, true)} className="rounded-lg border border-[#f87171]/40 px-3 py-1.5 text-[15px] font-semibold text-[#fca5a5] hover:bg-[#f87171]/10" title="Drop this fact - it disappears and is never referenced again">Reject</button>
                         </div>
                       </div>
-                      {c.conflict && <div className="mt-2 text-base text-[#fcd34d]">⚠ Sources conflict: {c.conflict}</div>}
-                      {isUnverified && c.unverified_reason && <div className="mt-2 text-base text-ink-faint">Why unverified: {c.unverified_reason}</div>}
-                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+                      {c.conflict && <div className="mt-2 text-[15px] text-[#fcd34d]">⚠ Sources conflict: {c.conflict}</div>}
+                      {isUnverified && c.unverified_reason && <div className="mt-2 text-[15px] text-ink-faint">Why unverified: {c.unverified_reason}</div>}
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[15px]">
                         {c.tier && TIER[c.tier] && <span title={TIER[c.tier].title} className={`rounded border px-2 py-0.5 font-semibold ${TIER[c.tier].cls}`}>{TIER[c.tier].label}</span>}
                         {c.verified ? <span title="Source fetched and confirmed" className="font-semibold text-[#86efac]">✓ verified</span> : <span className="text-ink-faint">unconfirmed</span>}
                         {c.source_date && <span className="tabular text-ink-faint">{ukDate(c.source_date)}</span>}
@@ -818,13 +892,13 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           {gapClaims.length > 0 && (
             <section>
               <div className="flex items-baseline justify-between border-b-2 border-[#fbbf24]/30 pb-2">
-                <h3 className="text-2xl font-bold text-[#fcd34d]">Gaps · what could not be verified</h3>
-                <span className="text-base text-ink-faint">{gapClaims.length}</span>
+                <h3 className="text-[23px] font-extrabold tracking-tight text-[#fcd34d]">Gaps · what could not be verified</h3>
+                <span className="text-[15px] text-ink-faint">{gapClaims.length}</span>
               </div>
-              <p className="mt-1.5 text-base text-ink-faint">Open questions, not findings. Confirm these with the client, or feed the Brain material that answers them and run again.</p>
+              <p className="mt-1.5 text-[15px] text-ink-faint">Open questions, not findings. Confirm these with the client, or feed the Brain material that answers them and run again.</p>
               <ul className="mt-4 space-y-2">
                 {gapClaims.map((c) => (
-                  <li key={c.id} className="rounded-xl border border-[#fbbf24]/20 bg-surface-1 p-4 text-lg leading-relaxed text-ink-dim">{c.claim}</li>
+                  <li key={c.id} className="rounded-xl border border-[#fbbf24]/20 bg-surface-1 p-4 text-[17px] leading-relaxed text-ink-dim">{c.claim}</li>
                 ))}
               </ul>
             </section>
@@ -834,14 +908,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           {inBrainCount > 0 && (
             <section>
               <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-[#86efac]/30 pb-2">
-                <h3 className="text-xl font-bold text-[#86efac]">In the Brain · {inBrainCount}</h3>
-                <span className="text-sm text-ink-faint">Kept. These drop out of the live list so the next run only shows what is new.</span>
+                <h3 className="text-[20px] font-bold text-[#86efac]">In the Brain · {inBrainCount}</h3>
+                <span className="text-[15px] text-ink-faint">Kept. These drop out of the live list so the next run only shows what is new.</span>
               </div>
               <ul className="mt-3 space-y-2">
                 {claims.filter((c) => c.in_brain).map((c) => (
                   <li key={c.id} className="flex items-start justify-between gap-4 rounded-lg border border-[#86efac]/20 bg-surface-1/30 px-4 py-2.5">
-                    <p className="flex-1 text-base leading-relaxed text-ink-dim">{c.claim}</p>
-                    <button onClick={() => brainClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink-dim hover:text-ink">Restore</button>
+                    <p className="flex-1 text-[16px] leading-relaxed text-ink-dim">{c.claim}</p>
+                    <button onClick={() => brainClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-[15px] font-semibold text-ink-dim hover:text-ink">Restore</button>
                   </li>
                 ))}
               </ul>
@@ -851,14 +925,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
           {rejectedCount > 0 && (
             <section>
               <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-[#f87171]/30 pb-2">
-                <h3 className="text-xl font-bold text-[#fca5a5]">Rejected · {rejectedCount}</h3>
-                <span className="text-sm text-ink-faint">Stored. The Researcher will never surface these again, on any future run.</span>
+                <h3 className="text-[20px] font-bold text-[#fca5a5]">Rejected · {rejectedCount}</h3>
+                <span className="text-[15px] text-ink-faint">Stored. The Researcher will never surface these again, on any future run.</span>
               </div>
               <ul className="mt-3 space-y-2">
                 {claims.filter((c) => c.rejected && !c.in_brain).map((c) => (
                   <li key={c.id} className="flex items-start justify-between gap-4 rounded-lg border border-line/40 bg-surface-1/30 px-4 py-2.5">
-                    <p className="flex-1 text-base leading-relaxed text-ink-faint line-through">{c.claim}</p>
-                    <button onClick={() => rejectClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink-dim hover:text-ink">Undo</button>
+                    <p className="flex-1 text-[16px] leading-relaxed text-ink-faint line-through">{c.claim}</p>
+                    <button onClick={() => rejectClaim(c, false)} className="shrink-0 rounded-lg border border-line px-3 py-1 text-[15px] font-semibold text-ink-dim hover:text-ink">Undo</button>
                   </li>
                 ))}
               </ul>
@@ -867,7 +941,7 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
         </div>
       )}
       {run && claims.length === 0 && !running && !collecting && run.status !== "failed" && (
-        <p className="mt-8 text-base text-ink-dim">This version filed no claims. Run again, or check the client has crawled material and a website set.</p>
+        <p className="mt-8 text-[16px] text-ink-dim">This version filed no claims. Run again, or check the client has crawled material and a website set.</p>
       )}
 
       {/* CEO NEWSLETTER preview: the post + its creative, with approve / reject / rewrite. */}
@@ -883,21 +957,21 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               onPointerMove={(e) => { const d = nlDrag.current; if (d) setNlBox({ x: d.ox + (e.clientX - d.sx), y: d.oy + (e.clientY - d.sy) }); }}
               onPointerUp={() => { nlDrag.current = null; }}
               className="flex cursor-move items-center justify-between border-b border-line px-6 py-4 select-none">
-              <h3 className="text-xl font-bold text-[#c79bff]">CEO Newsletter <span className="ml-1 text-sm font-normal text-ink-faint">⠿ drag to move</span></h3>
-              <button onClick={() => setNl(null)} className="rounded px-2 text-lg text-ink-faint hover:text-ink" aria-label="Close">✕</button>
+              <h3 className="text-[20px] font-bold text-[#c79bff]">CEO Newsletter <span className="ml-1 text-[14px] font-normal text-ink-faint">⠿ drag to move</span></h3>
+              <button onClick={() => setNl(null)} className="rounded px-2 text-[18px] text-ink-faint hover:text-ink" aria-label="Close">✕</button>
             </div>
             <div className="p-6">
-            <p className="mt-0 text-sm text-ink-faint">In the CEO&apos;s voice, from: &ldquo;{nl.claim.claim.slice(0, 90)}{nl.claim.claim.length > 90 ? "…" : ""}&rdquo;</p>
+            <p className="mt-0 text-[15px] text-ink-faint">In the CEO&apos;s voice, from: &ldquo;{nl.claim.claim.slice(0, 90)}{nl.claim.claim.length > 90 ? "…" : ""}&rdquo;</p>
 
             {nl.err ? (
-              <div className="mt-4 rounded-lg border border-alert/40 bg-alert/5 p-4 text-base text-alert">{nl.err}</div>
+              <div className="mt-4 rounded-lg border border-alert/40 bg-alert/5 p-4 text-[16px] text-alert">{nl.err}</div>
             ) : nl.busy ? (
-              <div className="mt-8 flex justify-center text-lg text-[#c79bff]"><Working messages={WORKING_NEWSLETTER} /></div>
+              <div className="mt-8 flex justify-center text-[18px] text-[#c79bff]"><Working messages={WORKING_NEWSLETTER} /></div>
             ) : (
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
                 <div>
                   {nl.imgBusy ? (
-                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 text-base text-[#c79bff]"><span className="h-5 w-5 mr-2 animate-spin rounded-full border-2 border-[#c79bff]/30 border-t-[#c79bff]" />Rendering three options…</div>
+                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 text-[16px] text-[#c79bff]"><span className="h-5 w-5 mr-2 animate-spin rounded-full border-2 border-[#c79bff]/30 border-t-[#c79bff]" />Rendering three options…</div>
                   ) : nl.img ? (
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -915,18 +989,18 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-3">
-                        <a href={nl.img} download target="_blank" rel="noreferrer" className="text-sm font-semibold text-[#c79bff] hover:underline">Download image</a>
-                        {nl.imgs.length > 1 && <span className="text-sm text-ink-faint">Option {Math.max(0, nl.imgs.indexOf(nl.img)) + 1} of {nl.imgs.length}</span>}
+                        <a href={nl.img} download target="_blank" rel="noreferrer" className="text-[15px] font-semibold text-[#c79bff] hover:underline">Download image</a>
+                        {nl.imgs.length > 1 && <span className="text-[15px] text-ink-faint">Option {Math.max(0, nl.imgs.indexOf(nl.img)) + 1} of {nl.imgs.length}</span>}
                       </div>
                     </>
                   ) : (
-                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 p-4 text-center text-base text-ink-faint">No image. Upload a CEO photo to this brain to composite the real portrait.</div>
+                    <div className="flex aspect-square items-center justify-center rounded-xl border border-line bg-surface-2 p-4 text-center text-[16px] text-ink-faint">No image. Upload a CEO photo to this brain to composite the real portrait.</div>
                   )}
                 </div>
                 <div>
-                  <div className="tabular text-sm uppercase tracking-[0.16em] text-ink-faint">The post</div>
-                  <p className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap text-base leading-relaxed text-ink">{nl.post}</p>
-                  <button onClick={() => { navigator.clipboard?.writeText(nl.post); flex("Post copied."); }} className="mt-2 text-sm font-semibold text-[#c79bff] hover:underline">Copy post</button>
+                  <div className="tabular text-[14px] uppercase tracking-[0.16em] text-ink-faint">The post</div>
+                  <p className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap text-[16px] leading-relaxed text-ink">{nl.post}</p>
+                  <button onClick={() => { navigator.clipboard?.writeText(nl.post); flex("Post copied."); }} className="mt-2 text-[15px] font-semibold text-[#c79bff] hover:underline">Copy post</button>
                 </div>
               </div>
             )}
@@ -936,17 +1010,17 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
                 {nl.showNote && (
                   <div className="mt-4 flex gap-2">
                     <input value={nl.note} onChange={(e) => setNl((s) => s ? { ...s, note: e.target.value } : s)} placeholder="What should change? e.g. lead with the number, make it warmer"
-                      className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-line-strong" />
-                    <button onClick={() => openNewsletter(nl.claim, nl.note)} className="btn-brand rounded-lg px-4 py-2 text-base font-bold">Rewrite</button>
+                      className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[16px] outline-none focus:border-line-strong" />
+                    <button onClick={() => openNewsletter(nl.claim, nl.note)} className="btn-brand rounded-lg px-4 py-2 text-[16px] font-bold">Rewrite</button>
                   </div>
                 )}
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <button onClick={approveNewsletter} disabled={nl.saving} className="rounded-lg border border-[#86efac]/50 px-4 py-2 text-base font-bold text-[#86efac] hover:bg-[#86efac]/10 disabled:opacity-50">{nl.saving ? "Saving…" : nl.saved ? "Save changes" : "Approve"}</button>
-                  <button onClick={rejectNewsletter} className="rounded-lg border border-[#f87171]/50 px-4 py-2 text-base font-bold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
-                  <button onClick={() => setNl((s) => s ? { ...s, showNote: !s.showNote } : s)} className="rounded-lg border border-line px-4 py-2 text-base font-bold text-ink hover:border-line-strong">Rewrite</button>
-                  {nl.saved && <span className="text-sm text-[#86efac]">✓ Saved to this fact</span>}
+                  <button onClick={approveNewsletter} disabled={nl.saving} className="rounded-lg border border-[#86efac]/50 px-4 py-2 text-[16px] font-bold text-[#86efac] hover:bg-[#86efac]/10 disabled:opacity-50">{nl.saving ? "Saving…" : nl.saved ? "Save changes" : "Approve"}</button>
+                  <button onClick={rejectNewsletter} className="rounded-lg border border-[#f87171]/50 px-4 py-2 text-[16px] font-bold text-[#fca5a5] hover:bg-[#f87171]/10">Reject</button>
+                  <button onClick={() => setNl((s) => s ? { ...s, showNote: !s.showNote } : s)} className="rounded-lg border border-line px-4 py-2 text-[16px] font-bold text-ink hover:border-line-strong">Rewrite</button>
+                  {nl.saved && <span className="text-[15px] text-[#86efac]">✓ Saved to this fact</span>}
                 </div>
-                <p className="mt-2 text-sm text-ink-faint">Approve keeps the piece and the chosen image on this fact, so it survives a logout and is ready to hand to the CEO.</p>
+                <p className="mt-2 text-[15px] text-ink-faint">Approve keeps the piece and the chosen image on this fact, so it survives a logout and is ready to hand to the CEO.</p>
               </>
             )}
             </div>

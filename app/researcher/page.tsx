@@ -23,10 +23,23 @@ export default async function ResearcherPage() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
-        <Link href="/dashboard" className="text-lg font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
+        <Link href="/dashboard" className="text-[18px] font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
         <FlowSteps active={2} />
-        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Researcher</h1>
-        <p className="mt-2 max-w-3xl text-[22px] leading-relaxed text-ink-dim">
+        <div className="mt-4 flex items-center gap-3">
+          {/* A radar/scope mark, the sibling of the Brain's neural icon, in the same violet->cyan family. */}
+          <svg viewBox="0 0 24 24" fill="none" className="h-8 w-8 shrink-0" stroke="url(#rsr-hd)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <defs>
+              <linearGradient id="rsr-hd" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#A855F7" /><stop offset="0.55" stopColor="#818CF8" /><stop offset="1" stopColor="#22D3EE" />
+              </linearGradient>
+            </defs>
+            <path d="M19.07 4.93A10 10 0 1 0 22 12" /><path d="M14.83 9.17A6 6 0 1 0 18 12" />
+            <path d="M12 12 22 2" /><circle cx="12" cy="12" r="1.6" />
+          </svg>
+          <h1 className="text-[34px] font-bold tracking-tight">The Researcher</h1>
+          <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[13px] uppercase tracking-wide text-ink-faint">step 2</span>
+        </div>
+        <p className="mt-2 max-w-3xl text-[18px] leading-relaxed text-ink-dim">
           It collects a <b className="text-ink">verified fact base</b> on the selected client, their market and
           their competitors. Facts only, never analysis: every claim carries a <b className="text-ink">source and a
           tier</b>, so what you approve at Gate 1 is checkable at a glance. The analysis comes next, from the
