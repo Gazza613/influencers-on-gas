@@ -15,10 +15,9 @@ import { FABLE } from "./vendors/anthropic";
 // so treat a Fable run as an experiment, not a default. `void FABLE` keeps the import live while Opus 5 is the pick.
 const RESEARCH_MODEL: string = OPUS5;
 void FABLE;
-// Reasoning EFFORT for the research passes (Gary: turn it up for the foundational step). `max` makes Opus 5 think
-// and search harder - the safe model-side quality lever, no compatibility risk. NOT applied to the Haiku verify
-// pass (effort errors on Haiku).
-const RESEARCH_EFFORT = "max" as const;
+// EFFORT: left at Opus 5's default (high). `max` effort was tried and reverted - it ran the gather past the 800s
+// per-step Vercel budget and failed the whole job. Depth (search counts + the dedicated competitor phase) is the
+// quality lever here, not effort.
 
 // THE RESEARCHER, V3 - A COLLECTOR, NEVER AN ANALYST (build spec V3, section 3).
 //
@@ -483,12 +482,14 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   // so a deep gather never truncates (truncation was the 0-facts bug) - quality safety over a marginal token saving.
   const gathered = await withAnthropicRetry(async () => {
     const g = client.messages.stream({
+      // NOTE: do NOT add output_config:{effort:"max"} here. It blew the 800s per-step Vercel budget (a deep gather
+      // at max effort + many web searches ran past the ceiling and the whole job failed). Opus 5's default effort
+      // (high) is already strong; keep search DEPTH as the quality lever, not effort.
       model: RESEARCH_MODEL, max_tokens: 40000,
-      output_config: { effort: RESEARCH_EFFORT },
       system: sysBlocks,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool],
       messages: [{ role: "user", content: briefBlocks }],
-    } as unknown as Anthropic.MessageStreamParams);
+    });
     g.on("contentBlock", (blk) => {
       const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
       if (b.type === "server_tool_use" && b.name === "web_search" && b.input?.query) { emit({ t: "search", q: String(b.input.query).slice(0, 160) }); }
@@ -828,7 +829,7 @@ export async function researchCompetitors(ctx: ResearchCtx, rawClaimsIn: RawClai
   const fileInstruction =
     `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the COMPETITOR facts from the web search results above via file_facts, up to about 120 claims. This pass is competitors ONLY: file competitor_set (a factual profile per rival, the material ones in depth) and competitor (observable public activity per rival), each with subject = the rival's name. Cover the WHOLE field you found, direct and adjacent, tiered - do not truncate to a handful. Where a rival matches ${ctx.name}'s differentiator (guarantee, finance, manufacturer-direct pricing), file that explicitly. Do NOT re-file ${ctx.name}'s own facts. Be specific (proposition, ranges, prices, footprint, channels, campaigns, ratings), never invent, carry the REAL source URLs and dates, and return the full competitor set in the 'competitors' field. Anything unverifiable goes to section=unverified with a reason. Do not search again.`;
 
-  const out = await gatherAndFile(client, ctx, competitorBrief, 32, emit, fileInstruction).catch(() => ({} as FileOut));
+  const out = await gatherAndFile(client, ctx, competitorBrief, 26, emit, fileInstruction).catch(() => ({} as FileOut));
   const rawClaims = [...rawClaimsIn];
   const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
   for (const c of parseClaims(ctx.name, out)) {
