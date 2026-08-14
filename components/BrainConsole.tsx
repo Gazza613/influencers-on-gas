@@ -258,6 +258,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     { key: "assets", label: "Logo & photos", met: hasAssets, go: () => scrollToId("brand-library") },
   ];
   const metCount = checklist.filter((c) => c.met).length;
+  // Order done-first so the strength bar fills continuously (2/4 = a solid 50%, no gaps) and the tags read as a
+  // timeline of what is in vs still to add.
+  const ordered = [...checklist].sort((a, b) => Number(b.met) - Number(a.met));
   const empty = sources.length === 0 && !hasDoctrine && liveChunks === 0;
   const ready = hasSite && metCount >= 3;
   const lit = empty ? 0.06 : Math.max(metCount / checklist.length, liveChunks > 0 ? 0.22 : 0);
@@ -297,17 +300,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 <p className="mt-1 text-base text-ink-dim">
                   {ready ? "Strong enough to build on. Test it below, then commission the Researcher." : "Fill the gaps to make it strong enough for the Researcher to build on."}
                 </p>
-                {/* Segmented strength bar, each segment growing in. */}
-                <div className="mt-3 flex gap-1.5">
-                  {checklist.map((c, i) => (
-                    <div key={c.key} className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
-                      {c.met && <div className={`h-full w-full origin-left rounded-full ${ready ? "bg-[#4ade80]" : "bg-gradient-to-r from-[#a855f7] to-[#22d3ee]"}`} style={{ animation: `growBar 0.5s ease-out ${i * 0.08}s both` }} />}
-                    </div>
-                  ))}
+                {/* One continuous strength bar - fills to the done fraction (2/4 = a solid 50%), no gaps. */}
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
+                  <div className={`h-full rounded-full ${ready ? "bg-[#4ade80]" : "bg-gradient-to-r from-[#a855f7] to-[#22d3ee]"}`}
+                    style={{ width: `${(metCount / checklist.length) * 100}%`, transition: "width 0.6s ease-out" }} />
                 </div>
-                {/* The checklist - each unmet item jumps to where you fix it. */}
+                {/* The checklist, done items first (a timeline), each unmet item jumps to where you fix it. */}
                 <div className="mt-3.5 flex flex-wrap justify-center gap-2 sm:justify-start">
-                  {checklist.map((c) => (
+                  {ordered.map((c) => (
                     <button key={c.key} onClick={c.go} aria-label={c.met ? `${c.label}: done` : `Add ${c.label}`}
                       className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
                       <span aria-hidden>{c.met ? "✓" : "＋"}</span>{c.label}
