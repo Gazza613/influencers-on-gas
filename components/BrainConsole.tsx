@@ -11,13 +11,18 @@ import LivingBrain from "@/components/LivingBrain";
 type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null; last_synced_at?: string | null };
 
 // "crawled 3 days ago", and a stale flag past ~90 days so a site read months ago is not silently trusted as current.
-function freshness(iso?: string | null): { label: string; stale: boolean } | null {
+// FRESHNESS OF A SOURCE. Returns the relative label ("3 days ago"), the actual crawl DATE for the team to read
+// (Gary), the age in days, and two thresholds: `due` at 30 days (a subtle nudge that a website could do with a
+// fresh crawl) and `stale` at 90 days (clearly old). A website's content drifts, so 30 days is the gentle
+// re-crawl reminder Gary asked for.
+function freshness(iso?: string | null): { label: string; date: string; days: number; due: boolean; stale: boolean } | null {
   if (!iso) return null;
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return null;
   const days = Math.floor((Date.now() - then) / 86_400_000);
   const label = days <= 0 ? "just now" : days === 1 ? "1 day ago" : days < 31 ? `${days} days ago` : days < 62 ? "1 month ago" : `${Math.floor(days / 30)} months ago`;
-  return { label, stale: days >= 90 };
+  const date = new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
+  return { label, date, days, due: days >= 30, stale: days >= 90 };
 }
 
 type Mode = "website" | "documents" | "text" | "compliance" | "positioning";
@@ -33,6 +38,23 @@ function SourceIcon({ m }: { m: Mode }) {
   };
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]" aria-hidden dangerouslySetInnerHTML={{ __html: paths[m] }} />;
 }
+
+// A CONSISTENT SECTION MARKER (Gary: professional, aligned iconography so every section stands out a little
+// better). A rounded violet tile holding a 2px line icon in the brain's violet->cyan family - the same treatment
+// as the "Feed the knowledge" header, reused across every panel. `d` is a constant SVG path string (never user
+// text), the same safe pattern as SourceIcon above.
+function SectionTile({ d }: { d: string }) {
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a855f7]/15 text-[#c79bff]">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px]" aria-hidden dangerouslySetInnerHTML={{ __html: d }} />
+    </span>
+  );
+}
+// The section marks, kept together so the set stays visually coherent.
+const ICON = {
+  sources: `<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M20 5v6c0 1.66-3.58 3-8 3s-8-1.34-8-3V5"/><path d="M20 11v6c0 1.66-3.58 3-8 3s-8-1.34-8-3v-6"/>`,
+  coverage: `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/>`,
+} as const;
 
 export default function BrainConsole({ brainId, initialSources, chunkCount = 0, initialDoctrine = "" }: { brainId: string; initialSources: Source[]; chunkCount?: number; initialDoctrine?: string }) {
   const [sources, setSources] = useState<Source[]>(initialSources);
@@ -92,7 +114,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     setSources(next);
     if (newlyDone.length) {
       setFlashDone((cur) => new Set([...cur, ...newlyDone]));
-      const total = next.filter((s) => newlyDone.includes(s.id)).reduce((a, s) => a + (s.chunk_count ?? 0), 0);
+      // Number() is load-bearing: a count from Postgres can arrive as a string, and `0 + "5" + "10"` would
+      // concatenate to "0510" rather than sum to 15 (the old "01372" bug). Coerce every term.
+      const total = next.filter((s) => newlyDone.includes(s.id)).reduce((a, s) => a + Number(s.chunk_count ?? 0), 0);
       flex(`✓ Brain ready. ${total} passage${total === 1 ? "" : "s"} indexed and retrievable.`);
       setTimeout(() => setFlashDone((cur) => { const n = new Set(cur); newlyDone.forEach((id) => n.delete(id)); return n; }), 15000);
     }
@@ -244,7 +268,10 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
 
 
   // Live readiness signals.
-  const liveChunks = sources.reduce((a, s) => a + Number(s.chunk_count ?? 0), 0) || chunkCount;
+  // chunkCount can arrive as a string from Postgres, so coerce before it feeds the `=== 0` empty check and the
+  // .toLocaleString() below - otherwise a brand-new brain reads "0" (string), `empty` is false, and the
+  // onboarding hero never shows.
+  const liveChunks = sources.reduce((a, s) => a + Number(s.chunk_count ?? 0), 0) || Number(chunkCount) || 0;
   const indexedSources = sources.filter((s) => s.status === "indexed").length;
   const crawling = sources.some((s) => s.status === "pending");
   const hasSite = sources.some((s) => (s.type === "crawl" || s.type === "website") && s.status === "indexed" && (s.chunk_count ?? 0) > 1);
@@ -375,9 +402,17 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             {(() => {
               const web = sources.filter((s) => s.type === "website" || s.type === "crawl");
               if (!web.length) return null;
+              // How many crawled sites are 30+ days old, so the team gets one quiet heads-up at the top rather
+              // than having to scan every row (Gary: "a subtle alert for them").
+              const dueCount = web.filter((s) => { const f = freshness(s.last_synced_at); return f?.due && s.status !== "pending"; }).length;
               return (
                 <div className="mb-4 rounded-xl border border-[#4ade80]/25 bg-[#4ade80]/[0.04] p-3.5">
                   <div className="tabular text-[13px] font-bold uppercase tracking-[0.14em] text-[#86efac]">✓ Already crawled</div>
+                  {dueCount > 0 && (
+                    <p className="mt-1.5 text-[15px] text-[#fcd34d]">
+                      <span aria-hidden>↻ </span>{dueCount === 1 ? "1 site is" : `${dueCount} sites are`} 30+ days old. A fresh crawl keeps the brain current.
+                    </p>
+                  )}
                   <ul className="mt-2 space-y-1.5">
                     {web.map((s) => {
                       const f = freshness(s.last_synced_at);
@@ -386,7 +421,11 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                           <span className="min-w-0 flex-1 truncate text-ink-dim">{s.uri}</span>
                           {s.status === "pending"
                             ? <span className="inline-flex items-center gap-1.5 text-active"><span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />indexing…</span>
-                            : <span className="shrink-0"><span className={f?.stale ? "font-semibold text-[#fcd34d]" : "text-ink-faint"}>crawled {f?.label ?? "recently"}{f?.stale ? " · stale" : ""}</span> · <button onClick={() => recrawl(s)} className="font-semibold text-ink-dim hover:text-ink">Re-crawl</button></span>}
+                            : <span className="shrink-0">
+                                <span className={f?.due ? "font-semibold text-[#fcd34d]" : "text-ink-faint"}>
+                                  {f ? <>crawled {f.date} <span className="text-ink-faint/80">· {f.label}</span>{f.due ? " · due a refresh" : ""}</> : "crawled recently"}
+                                </span> · <button onClick={() => recrawl(s)} className="font-semibold text-ink-dim hover:text-ink">Re-crawl</button>
+                              </span>}
                         </li>
                       );
                     })}
@@ -445,7 +484,10 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       {/* Sources */}
       <div className="rounded-xl border border-line bg-surface-1 p-6">
         <div className="flex items-center justify-between gap-2">
-          <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Knowledge sources</div>
+          <div className="flex items-center gap-3">
+            <SectionTile d={ICON.sources} />
+            <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Knowledge sources</div>
+          </div>
           {sources.length > 0 && (
             <button onClick={reindex} disabled={reindexing} title="Rebuild every passage's embedding with the current model. Only needed after an embedding-model change; otherwise leave it. Your text is not touched." className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[15px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">{reindexing && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{reindexing ? "Re-indexing…" : "↻ Re-index"} <span className="text-ink-faint">· rarely needed</span></button>
           )}
@@ -501,8 +543,11 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       {/* WHAT THIS BRAIN CAN ANSWER ON - the passive coverage map, so strengths and holes are visible at a glance. */}
       {(coverage.loading || coverage.topics.length > 0) && (
         <div className="rounded-xl border border-line bg-surface-1 p-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What this brain can answer on</div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <SectionTile d={ICON.coverage} />
+              <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What this brain can answer on</div>
+            </div>
             {!coverage.loading && <button onClick={() => loadCoverage(true)} className="text-[15px] font-semibold text-ink-faint hover:text-ink">↻ Refresh</button>}
           </div>
           {coverage.loading ? (

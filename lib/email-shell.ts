@@ -46,11 +46,14 @@ export function emailHeader(strapline: string, dateLabel: string, wordmark = "ST
 // the DEFAULT is STUDIO ON GAS, never Influencers (Gary: "we communicate as Studio on GAS, not Influencers on
 // GAS"). A hat is only put on when an email overrides it (the Strategist signs as Research Strategist); left
 // alone, every email speaks for the platform, which is Studio.
-export function emailSignature(cadence: string, role = "AI Studio Lead", department = "Studio on GAS", wordmark = "STUDIO"): string {
+// `signName` is the human signer at the top of the block (default "Sami"). Pass "" to omit it entirely: the
+// Strategist digest can go to a CLIENT, and Gary wants it signed by the ROLE ("AI Research Strategist MTN MoMo"),
+// not by an internal person the client has never met.
+export function emailSignature(cadence: string, role = "AI Studio Lead", department = "Studio on GAS", wordmark = "STUDIO", signName: string | null = "Sami"): string {
   return `
   <div class="pad" style="padding:26px 20px 30px;">
     <div style="height:1px;background:linear-gradient(90deg,${RULE},transparent);margin:0 0 16px;"></div>
-    <div class="sig-name" style="font-size:15px;font-weight:800;color:${TXT};">Sami</div>
+    ${signName ? `<div class="sig-name" style="font-size:15px;font-weight:800;color:${TXT};">${signName}</div>` : ""}
     <div class="sig-role" style="font-size:12px;font-weight:700;color:${EMBER};">${role}</div>
     <div class="sig-role" style="font-size:12px;color:${CAPTION};">${department}</div>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:16px;"><tr>
@@ -71,7 +74,7 @@ export function emailSignature(cadence: string, role = "AI Studio Lead", departm
 // Full email wrapper: the Pulse gradient panel on a dark field, header + body + signature inside it.
 export function emailShell(opts: {
   strapline: string; dateLabel: string; body: string; cadence: string;
-  wordmark?: string; role?: string; department?: string;
+  wordmark?: string; role?: string; department?: string; signName?: string | null;
 }): string {
   return `
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -96,7 +99,7 @@ export function emailShell(opts: {
     <div class="container" style="max-width:100%;margin:0 auto;background:linear-gradient(170deg,#0F1820 0%,#13202C 100%);border:1px solid ${RULE};border-radius:16px;overflow:hidden;">
       ${emailHeader(opts.strapline, opts.dateLabel, opts.wordmark)}
       <div class="pad" style="padding:4px 20px 4px;">${opts.body}</div>
-      ${emailSignature(opts.cadence, opts.role, opts.department, opts.wordmark)}
+      ${emailSignature(opts.cadence, opts.role, opts.department, opts.wordmark, opts.signName === undefined ? "Sami" : opts.signName)}
     </div>
   </div>`;
 }

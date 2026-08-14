@@ -20,8 +20,8 @@ function slugify(name: string): string {
 export async function listBrains(): Promise<Brain[]> {
   return (await db().query(
     `select c.id, c.name, c.slug, c.status, c.brand, c.created_at,
-            (select count(*) from knowledge_chunks k where k.client_id = c.id)  as chunk_count,
-            (select count(*) from knowledge_sources s where s.client_id = c.id) as source_count
+            (select count(*)::int from knowledge_chunks k where k.client_id = c.id)  as chunk_count,
+            (select count(*)::int from knowledge_sources s where s.client_id = c.id) as source_count
      from clients c order by c.created_at desc`,
   )) as Brain[];
 }
@@ -29,7 +29,7 @@ export async function listBrains(): Promise<Brain[]> {
 export async function getBrain(id: string): Promise<Brain | null> {
   const rows = (await db().query(
     `select id, name, slug, status, brand, created_at,
-            (select count(*) from knowledge_chunks k where k.client_id = clients.id) as chunk_count
+            (select count(*)::int from knowledge_chunks k where k.client_id = clients.id) as chunk_count
      from clients where id = $1`,
     [id],
   )) as Brain[];
@@ -69,7 +69,7 @@ export type KnowledgeSource = {
 export async function listSources(clientId: string): Promise<KnowledgeSource[]> {
   return (await db().query(
     `select s.id, s.client_id, s.type, s.uri, s.status, s.error, s.last_synced_at,
-            (select count(*) from knowledge_chunks k where k.source_id = s.id) as chunk_count
+            (select count(*)::int from knowledge_chunks k where k.source_id = s.id) as chunk_count
      from knowledge_sources s where s.client_id = $1 order by s.id desc`,
     [clientId],
   )) as KnowledgeSource[];

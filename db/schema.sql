@@ -709,6 +709,23 @@ alter table knowledge_sources add column if not exists include_path text;
 -- most useful thing on the page - so the Researcher deliberately does NOT inherit the daily recency gate.
 alter table intel_briefs add column if not exists researcher text;
 
+-- THE STRATEGIST EMAIL CADENCE, PER CLIENT (Gary: "I should have the ability to switch a client on/off on the
+-- daily or weekly strategist email"). A paid Opus + web-search pass runs for this brain EVERY time the email
+-- fires, so this switch is a cost dial as much as a delivery preference.
+--   'off'    - the brain is skipped on the automated run entirely (no research spend, no email).
+--   'daily'  - runs every weekday (Mon-Fri).
+--   'weekly' - runs on Monday only.
+-- Default 'weekly': the low-cost default, matching the email's own "Weekly Intelligence" branding. Turn a brain
+-- up to 'daily' deliberately, per client, rather than every brain quietly billing five days a week.
+alter table intel_briefs add column if not exists email_schedule text not null default 'weekly';
+alter table intel_briefs drop constraint if exists intel_briefs_email_schedule_check;
+alter table intel_briefs add constraint intel_briefs_email_schedule_check
+  check (email_schedule in ('off','daily','weekly'));
+-- WHO THIS BRAIN'S DIGEST GOES TO. A per-brain recipient list the team edits directly (add/remove). Empty means
+-- fall back to the platform default (INTEL_EMAIL_TO, else the cost recipient + Sam) so nothing silently stops
+-- mailing if a brain has never been given its own list.
+alter table intel_briefs add column if not exists email_recipients jsonb not null default '[]'::jsonb;
+
 -- Findings are filed into the same queue (so accept/bin and "publish as a CEO article" work unchanged), but a
 -- Researcher finding also carries WHICH of the five sections it belongs to.
 alter table studio_intel add column if not exists section text;

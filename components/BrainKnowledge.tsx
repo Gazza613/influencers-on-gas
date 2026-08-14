@@ -106,11 +106,18 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-6">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-3 text-left">
-        <div>
-          <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What the brain knows</div>
-          <p className="mt-1.5 text-[18px] text-ink-dim">
-            Read every passage the brain retrieves from, and cut out anything that is wrong.
-          </p>
+        <div className="flex items-center gap-3">
+          {/* A magnifier: this section is where you inspect and audit what the brain actually holds. Constant
+              SVG path, the same safe pattern used across the Brain page. */}
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a855f7]/15 text-[#c79bff]">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px]" aria-hidden><circle cx="11" cy="11" r="7" /><path d="m20 20-3.2-3.2" /></svg>
+          </span>
+          <div>
+            <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What the brain knows</div>
+            <p className="mt-1.5 text-[18px] text-ink-dim">
+              Read every passage the brain retrieves from, and cut out anything that is wrong.
+            </p>
+          </div>
         </div>
         <span className="shrink-0 rounded-lg border border-line px-3.5 py-2 text-[18px] font-bold text-ink">
           {open ? "Hide" : `Inspect ${total} passage${total === 1 ? "" : "s"}`}

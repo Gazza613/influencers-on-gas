@@ -160,12 +160,23 @@ export type IntelBrief = {
   // RETIRED PRODUCTS the client no longer sells but has not yet scrubbed from its own site (Gary: GAS still lists
   // Appitude / ROC / INGAiGE). Ground truth from the team: NEVER present these as current, never reference them.
   deprecatedProducts: string[];
+  // THE STRATEGIST EMAIL CADENCE for this brain: 'off' | 'daily' (weekdays) | 'weekly' (Monday). A cost dial -
+  // the automated run only spends on this brain when its cadence says fire today.
+  emailSchedule: "off" | "daily" | "weekly";
+  // The brain's own digest recipient list. Empty means fall back to the platform default.
+  emailRecipients: string[];
 };
+
+// Normalises a stored schedule to the three we allow, defaulting to 'weekly' for any legacy/blank value.
+function normSchedule(v: unknown): "off" | "daily" | "weekly" {
+  const s = String(v || "").trim().toLowerCase();
+  return s === "off" || s === "daily" ? s : "weekly";
+}
 
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const rows = (await db().query(
     `select b.client_id, c.name as client_name, c.website, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
-            b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title, b.deprecated_products
+            b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title, b.deprecated_products, b.email_schedule, b.email_recipients
      from intel_briefs b join clients c on c.id = b.client_id
      where b.client_id = $1`,
     [clientId],
@@ -186,6 +197,8 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
     ceoTitle: (r.ceo_title as string) || null,
     website: (r.website as string) || null,
     deprecatedProducts: Array.isArray(r.deprecated_products) ? (r.deprecated_products as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
+    emailSchedule: normSchedule(r.email_schedule),
+    emailRecipients: Array.isArray(r.email_recipients) ? (r.email_recipients as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
   };
 }
 
@@ -223,12 +236,13 @@ export async function clientWebsites(clientId: string): Promise<string[]> {
 
 // Which brains have research configured at all. The daily run iterates THESE, so adding a brain's brief is what
 // switches its research on - there is no hardcoded client list to keep in step.
-export async function brainsWithIntel(): Promise<{ clientId: string; clientName: string; journalist: boolean; strategist: boolean; researcher: boolean; ceoRules: boolean }[]> {
+export async function brainsWithIntel(): Promise<{ clientId: string; clientName: string; journalist: boolean; strategist: boolean; researcher: boolean; ceoRules: boolean; emailSchedule: "off" | "daily" | "weekly"; emailRecipients: string[] }[]> {
   const rows = (await db().query(
     `select b.client_id, c.name as client_name,
             (b.journalist is not null) as journalist, (b.strategist is not null) as strategist,
             (b.researcher is not null) as researcher,
-            (b.ceo_rules is not null and length(trim(b.ceo_rules)) > 0) as ceo_rules
+            (b.ceo_rules is not null and length(trim(b.ceo_rules)) > 0) as ceo_rules,
+            b.email_schedule, b.email_recipients
      from intel_briefs b join clients c on c.id = b.client_id
      order by c.name`,
     [],
@@ -239,6 +253,8 @@ export async function brainsWithIntel(): Promise<{ clientId: string; clientName:
     journalist: r.journalist === true,
     strategist: r.strategist === true,
     researcher: r.researcher === true,
+    emailSchedule: normSchedule(r.email_schedule),
+    emailRecipients: Array.isArray(r.email_recipients) ? (r.email_recipients as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
     // Whether this brain can publish a CEO article at all - it needs a CEO voice to write in. Used to gate the
     // "Publish as CEO article" button so a brain without rules never shows it, rather than erroring on click.
     ceoRules: r.ceo_rules === true,

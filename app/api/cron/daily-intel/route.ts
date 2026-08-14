@@ -4,7 +4,6 @@ import { cronAuthed } from "@/lib/cron";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { runIntel, loadIntelBrief, brainsWithIntel, type Intel } from "@/lib/intel";
 import { emailShell } from "@/lib/email-shell";
-import { APP_URL } from "@/lib/app-url";
 
 // THE DAILY INTELLIGENCE RUN. The Journalist and The Strategist each go and find what changed, decide whether
 // it is MATERIAL, and file it into the "Worth reviewing" queue. Only the material findings are emailed.
@@ -29,8 +28,14 @@ function intelRecipients(): string {
   return [...new Set(list)].join(",");
 }
 
+// Escapes for BOTH text and attribute context. The quote escapes are load-bearing: source URLs (LLM/crawl
+// output, not trusted) are interpolated into href="..." , so a bare " would break out of the attribute and
+// inject others. Insert-time filtering already restricts sources to http(s), which blocks javascript: hrefs;
+// this closes the attribute-injection gap on top of that.
 function esc(s: string): string {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 // THE DECISION, not just the news (Gary). Every finding carries an INTERNAL read of what it could do to MoMo SA
@@ -75,7 +80,12 @@ function ukDate(d: Date | string): string {
 // So it now uses the shared GAS shell (dark, orb, Sami's signature) like our other emails, instead of the
 // off-brand light layout it had. The Journalist still runs and still files to the review queue - it is the tool
 // for drafting the CEO's LinkedIn voice, not a daily bulletin, so it no longer pushes an inbox.
-export function buildEmail(client: string, strategist: Intel[], today: string, intro: string): string {
+export function buildEmail(client: string, strategist: Intel[], today: string, intro: string, cadence: "daily" | "weekly" = "weekly"): string {
+  // ONE SOURCE OF TRUTH for how the email describes itself. Everything below reads from these two so the
+  // heading, strapline and footer can never disagree (they used to: a "Weekly Intelligence" strapline over a
+  // "Daily Intelligence" heading in the same email).
+  const label = cadence === "weekly" ? "Weekly Intelligence" : "Daily Intelligence";
+  const footerCadence = cadence === "weekly" ? "WEEKLY INTELLIGENCE, MONDAY 08:30 SAST" : "DAILY INTELLIGENCE, WEEKDAYS 08:30 SAST";
   // GREEN / AMBER / RED, the way we always grade (Gary). Tuned for the dark shell.
   const badge = (c: string) => {
     const [bg, fg, label] =
@@ -144,7 +154,7 @@ export function buildEmail(client: string, strategist: Intel[], today: string, i
   }).join("");
 
   const body = `
-    <div class="h1" style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:.2px;line-height:1.25;">${esc(client)} · Daily Intelligence</div>
+    <div class="h1" style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:.2px;line-height:1.25;">${esc(client)} · ${label}</div>
     <div style="margin-top:4px;font-size:14px;color:#8a8f98;">${esc(ukDate(today))}</div>
 
     <div class="card" style="margin-top:14px;padding:13px 14px;background:#0d1117;border:1px solid #1f2630;border-radius:12px;">
@@ -152,20 +162,22 @@ export function buildEmail(client: string, strategist: Intel[], today: string, i
     </div>
 
     <div style="margin-top:22px;font-size:12px;letter-spacing:2px;color:#98a0ad;">MATERIAL FINDINGS</div>
-    <div style="margin-top:10px;">${cards}</div>
-
-    <div style="margin-top:20px;">
-      <a href="${APP_URL}/strategist" style="display:inline-block;background:#f96203;color:#07090d;text-decoration:none;border-radius:9px;padding:12px 16px;font-size:14px;font-weight:800;">Review and accept on the platform</a>
-    </div>`;
+    <div style="margin-top:10px;">${cards}</div>`;
+  // No "Review and accept on the platform" CTA (Gary): this digest can go to the CLIENT, who has no platform
+  // login, so a button into the internal tool has nothing to open. Acceptance happens on the Strategist page by
+  // the GAS team, not from the email.
 
   return emailShell({
-    strapline: "WEEKLY INTELLIGENCE",
+    strapline: label.toUpperCase(),
     dateLabel: `${client} · ${ukDate(today)}`,
     body,
-    cadence: "WEEKLY INTELLIGENCE, FRIDAY 08:30 SAST",
+    cadence: footerCadence,
     wordmark: "STRATEGIST",
-    role: "AI Research Strategist",
+    // Signed by the ROLE, carrying the client's name, not by an internal person (Gary): this digest can land in
+    // the client's inbox, where "AI Research Strategist MTN MoMo" is who it is from - not "Sami".
+    role: `AI Research Strategist ${client}`,
     department: "GAS Marketing Automation",
+    signName: null,
   });
 }
 
@@ -178,13 +190,25 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const only = url.searchParams.get("clientId") || "";
   const today = new Date().toISOString().slice(0, 10);
+  // The cron fires 06:30 UTC = 08:30 SAST, the same calendar day, so the UTC weekday IS the SAST weekday.
+  // Monday = 1. 'weekly' brains only fire on a Monday; 'daily' brains fire every weekday the cron runs.
+  const isMonday = new Date().getUTCDay() === 1;
 
   // WHICH BRAINS RUN. Any brain with an intel brief - adding the brief is what switches a brain's research on,
   // so there is no hardcoded client list here to fall out of step (it used to match /momo/i, which would have
   // silently skipped GAS's own brain).
   const configured = await brainsWithIntel().catch(() => []);
-  const clients = configured.filter((c) => (only ? c.clientId === only : true)).map((c) => ({ id: c.clientId, name: c.clientName }));
-  if (!clients.length) return NextResponse.json({ ok: true, skipped: "no brain has an intel brief" });
+  // A MANUAL single-client run (a super-admin hitting ?clientId=) is an explicit human request, so it overrides
+  // the schedule and even an 'off' switch - you asked for this brain, you get it. The AUTOMATED sweep instead
+  // honours each brain's cadence: 'off' is skipped entirely (no research spend), 'weekly' waits for Monday,
+  // 'daily' runs every weekday. That gate is the cost dial Gary asked for - not every brain billing five days a
+  // week by default.
+  const manual = !!only;
+  const clients = configured
+    .filter((c) => (only ? c.clientId === only : true))
+    .filter((c) => manual || (c.emailSchedule === "daily") || (c.emailSchedule === "weekly" && isMonday))
+    .map((c) => ({ id: c.clientId, name: c.clientName, schedule: c.emailSchedule, recipients: c.emailRecipients }));
+  if (!clients.length) return NextResponse.json({ ok: true, skipped: manual ? "no brain has an intel brief" : "no brain is scheduled to run today" });
 
   const out: Record<string, unknown>[] = [];
   for (const c of clients) {
@@ -209,21 +233,30 @@ export async function GET(req: Request) {
       // than mailing the team something to ignore.
       // The intro belongs to the brain: MoMo's briefing is about the SA fintech market, GAS's is about our own
       // agency growth, and one description cannot honestly cover both.
+      // THE CADENCE DRIVES THE COPY. A manual one-off is written as a daily bulletin. Everything the email says
+      // about itself - the "Daily/Weekly Intelligence" heading, the strapline, the footer cadence and the intro
+      // fallback - now comes from this one value, so a weekly brain can never send a mail branded "Daily".
+      const cadence: "daily" | "weekly" = c.schedule === "weekly" ? "weekly" : "daily";
       const cfg = await loadIntelBrief(c.id).catch(() => null);
+      const period = cadence === "weekly" ? "Weekly" : "Daily";
       const intro = cfg?.emailIntro
-        || `Weekly intelligence for ${c.name}. Only findings that should change something reach this email, and each one carries what it could do and what I think we should do about it. Every claim is sourced, so please check the links before repeating anything.`;
+        || `${period} intelligence for ${c.name}. Only findings that should change something reach this email, and each one carries what it could do and what I think we should do about it. Every claim is sourced, so please check the links before repeating anything.`;
+
+      // PER-BRAIN RECIPIENTS (Gary): each brain's own list, edited on the Strategist page. Empty falls back to
+      // the platform default so a brain that has never been given a list still reaches someone.
+      const to = c.recipients.length ? c.recipients.join(",") : intelRecipients();
 
       let emailed = false;
       if (sm.length && emailConfigured()) {
         await sendEmail({
-          to: intelRecipients(),
+          to,
           subject: `The Strategist · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
-          html: buildEmail(c.name, sm, today, intro),
+          html: buildEmail(c.name, sm, today, intro, cadence),
           fromName: "Strategist on GAS", // it lands with EXCO and MoMo's team: say what it is (Gary)
         }).catch(() => {});
         emailed = true;
       }
-      out.push({ client: c.name, strategist: strategist.length, material: sm.length, emailed, errors: errors.length ? errors : undefined });
+      out.push({ client: c.name, cadence, strategist: strategist.length, material: sm.length, emailed, errors: errors.length ? errors : undefined });
     } catch (e) {
       out.push({ client: c.name, error: String((e as Error)?.message || e).slice(0, 160) });
     }

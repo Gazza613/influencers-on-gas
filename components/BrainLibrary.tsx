@@ -81,11 +81,20 @@ export default function BrainLibrary({ brainId }: { brainId: string }) {
 
   return (
     <div className="rounded-xl border border-line bg-surface-1 p-6">
-      <div className="tabular text-[15px] uppercase tracking-[0.2em] text-ink-faint">Brand library</div>
-      <p className="mt-1.5 text-[18px] text-ink-dim">
-        The real artwork this brain builds from: <b className="text-ink">{total}</b> file{total === 1 ? "" : "s"}.
-        Add the logo, CEO and team photos here directly. Creatives are forensically matched to these, never invented.
-      </p>
+      <div className="flex items-center gap-3">
+        {/* An image mark: this section holds the brand's real artwork. Constant SVG path, the same safe pattern
+            used across the Brain page. */}
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a855f7]/15 text-[#c79bff]">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px]" aria-hidden><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-4.5-4.5L5 21" /></svg>
+        </span>
+        <div>
+          <div className="tabular text-[15px] uppercase tracking-[0.2em] text-ink-faint">Brand library</div>
+          <p className="mt-1.5 text-[18px] text-ink-dim">
+            The real artwork this brain builds from: <b className="text-ink">{total}</b> file{total === 1 ? "" : "s"}.
+            Add the logo, CEO and team photos here directly. Creatives are forensically matched to these, never invented.
+          </p>
+        </div>
+      </div>
 
       {/* ADD: pick what it is, then choose the file. Images upload straight to Blob so full-resolution files are fine. */}
       <div className="mt-4 flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-surface-2 p-3">

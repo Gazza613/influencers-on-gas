@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { flex } from "@/lib/flex";
+import IntelEmailControl from "@/components/IntelEmailControl";
 
 // WORTH REVIEWING. The Journalist and The Strategist research daily and file what they find here. They
 // PROPOSE - a human accepts or bins. Nothing reaches the client brain without that gate.
@@ -358,6 +359,12 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
         </button>
       </div>
 
+      {/* WHO GETS THE STRATEGIST EMAIL, AND HOW OFTEN. On/off + daily/weekly cadence and the recipient list, per
+          brain. This is the cost dial: 'off' skips the whole paid run on the automated sweep (Gary). */}
+      {role === "strategist" && clientId && (
+        <IntelEmailControl clientId={clientId} clientName={clientName} />
+      )}
+
       {/* GROUND-TRUTH WEBSITE. The team confirms the client's real site; every run anchors to it and validates
           each source is that exact organisation, so the pod can never drift to a same-named business (Gary). */}
       {isResearcher && (
@@ -437,7 +444,7 @@ export default function IntelQueue({ clients, configured = [], canPublish, role 
             <p className="text-lg text-ink-dim">
               {isResearcher
                 ? <>No research yet. Add a focus if you like, then hit <b className="text-ink">Deep Dive Research</b>.</>
-                : <>Nothing in the queue. The weekly run is Friday 08:30 SAST, or hit <b className="text-ink">Run research now</b>.</>}
+                : <>Nothing in the queue. The scheduled run follows this brain&apos;s Intelligence email setting above (08:30 SAST), or hit <b className="text-ink">Run research now</b>.</>}
             </p>
           ) : isResearcher ? (
             <>
