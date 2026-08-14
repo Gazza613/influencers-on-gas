@@ -104,6 +104,34 @@ export async function closeRenderer(): Promise<void> {
   _browser = null;
 }
 
+// SCREENSHOT A LIVE URL - so we can read a client's REAL brand palette off their homepage (image/SVG logos and
+// JS/Cloudflare sites that a regex scrape of the HTML never sees). Uses the same Chromium we already run. The
+// caller MUST pass a vetted public URL (SSRF). Returns an above-the-fold JPEG, small enough to hand to a vision
+// model, or null if the site cannot be reached in time. Never throws - a colour read must never break a render.
+export async function screenshotUrl(url: string, opts: { width?: number; height?: number; ms?: number } = {}): Promise<Buffer | null> {
+  let page: Awaited<ReturnType<Browser["newPage"]>> | null = null;
+  try {
+    const b = await browser();
+    page = await b.newPage();
+    await page.setViewport({ width: opts.width ?? 1280, height: opts.height ?? 900, deviceScaleFactor: 1 });
+    // networkidle2 settles most sites; the timeout is the hard stop so a slow site can never hang the render.
+    await page.goto(url, { waitUntil: "networkidle2", timeout: opts.ms ?? 20_000 }).catch(() => page!.goto(url, { waitUntil: "domcontentloaded", timeout: opts.ms ?? 20_000 }));
+    await page.evaluate(async () => {
+      const d = document as unknown as { fonts: { ready: Promise<unknown> } };
+      const cap = (p: Promise<unknown>, ms: number) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
+      await cap(d.fonts.ready, 3000);
+      await cap(Promise.all([...document.images].map((img) => img.complete ? null : new Promise((res) => { img.onload = res; img.onerror = res; }))), 4000);
+    }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 800));   // let the hero/late CSS settle
+    const shot = await page.screenshot({ type: "jpeg", quality: 82, fullPage: false });
+    return Buffer.from(shot);
+  } catch {
+    return null;
+  } finally {
+    await page?.close().catch(() => {});
+  }
+}
+
 // MULTI-PAGE DOCUMENT -> PDF. Same Chromium as the static renderer, but printToPDF instead of a screenshot, so
 // a long document (the Researcher's fact base) paginates properly with real, selectable text rather than being
 // one giant image. printBackground keeps the brand tints and rules; A4 portrait is the internal-document format

@@ -1,4 +1,6 @@
 import { isSafePublicUrl } from "./safe-url";
+import { screenshotUrl } from "./studio-render";
+import { brandPaletteFromImage } from "./vendors/anthropic";
 
 // EXTRACT A CLIENT'S BRAND COLOUR from their website, so the proposal wears their look (Gary: keep the client's
 // colours, co-brand as Agency of NOW). Best-effort and SSRF-safe: we read the homepage + a couple of its
@@ -81,4 +83,24 @@ export async function extractBrandColour(website: string | null | undefined): Pr
   const darks = [...tally.entries()].map(([hex]) => ({ hex, ...toHsl(hex) })).filter((c) => c.l <= 0.16).sort((a, b) => a.l - b.l);
   const dark = darks[0]?.hex || FALLBACK.dark;
   return { primary, dark };
+}
+
+// THE INTELLIGENT EXTRACTOR (Gary: "look at the pantones of the website and intelligently use them"). Screenshots
+// the live homepage with the Chromium we already run and has a vision model read the real brand palette off it,
+// the way a designer would - so image/SVG logos and JS/Cloudflare sites all work, where the regex scrape above
+// misses and falls back to a default. Falls back to the regex extractor, then the neutral default, so it ALWAYS
+// returns a usable palette and a colour read can never break a render. `meter` attributes the vision spend.
+export async function extractBrandPalette(website: string | null | undefined, clientName: string, meter?: { clientId?: string | null; userEmail?: string | null }): Promise<Palette> {
+  let base = String(website || "").trim();
+  if (base && !/^https?:\/\//i.test(base)) base = "https://" + base;   // a bare domain still gets screenshotted
+  if (base && isSafePublicUrl(base)) {
+    const shot = await screenshotUrl(base).catch(() => null);
+    if (shot && shot.length > 2000) {
+      const pal = await brandPaletteFromImage(shot.toString("base64"), clientName || "the client", meter).catch(() => null);
+      if (pal?.primary) return { primary: pal.primary, dark: pal.dark || FALLBACK.dark };
+    }
+  }
+  // Vision unavailable or the site could not be shot: fall back to the HTML/stylesheet scrape (which itself
+  // falls back to the neutral default).
+  return extractBrandColour(website);
 }

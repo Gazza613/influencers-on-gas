@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { renderPdf } from "./studio-render";
 import { putBytes } from "./blob";
-import { extractBrandColour } from "./brand-colours";
+import { extractBrandPalette } from "./brand-colours";
 import { TIERS, OBJECTIVES, type TierId } from "./proposal-config";
 import type { Proposal } from "./proposal";
 import { renderProposalHtml } from "./proposal-render";
@@ -22,19 +22,32 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
 
   const eng = (await db().query(`select client_id from engagements where id = $1`, [p.engagement_id])) as { client_id: string }[];
   const clientId = eng[0]?.client_id;
-  const crow = (await db().query(`select name, website from clients where id = $1`, [clientId])) as { name: string; website: string | null }[];
+  const crow = (await db().query(`select name, website, brand_palette from clients where id = $1`, [clientId])) as { name: string; website: string | null; brand_palette: { primary?: string; dark?: string } | null }[];
   const clientName = crow[0]?.name || "the client";
   const website = crow[0]?.website || null;
+  const cachedPalette = crow[0]?.brand_palette && /^#[0-9a-fA-F]{6}$/.test(String(crow[0].brand_palette.primary || "")) ? crow[0].brand_palette : null;
   // Client contact block for the sign-off comes from the approved research identity.
   const idrow = (await db().query(`select identity from research_runs where client_id = $1 and status = 'gate1_approved' order by version desc limit 1`, [clientId])) as { identity: { address?: string; contact_details?: string } | null }[];
   const identity = idrow[0]?.identity || {};
   // The competitive-map competitors come from the editable research set.
   const comps = (await db().query(`select name from research_competitors where client_id = $1 order by created_at asc limit 3`, [clientId]).catch(() => [])) as { name: string }[];
 
-  // Client CI: their website accent (or a manual override) + a dark ground. The renderer derives the full palette.
-  const palette = accentOverride && /^#[0-9a-fA-F]{6}$/.test(accentOverride)
-    ? { primary: accentOverride, dark: "#0E1016" }
-    : await extractBrandColour(website).catch(() => ({ primary: "#3A5BD9", dark: "#0E1016" }));
+  // Client CI: the proposal wears the CLIENT's real brand colours. Priority: a manual accent override (Human
+  // Command) -> the cached palette we read from their site before -> read it now (homepage screenshot + vision,
+  // the intelligent extractor). Read-once is cached on the client so every render uses the SAME colours and we do
+  // not re-spend on each PDF. Always yields a usable palette, so a colour read can never block the render.
+  let palette: { primary: string; dark: string };
+  if (accentOverride && /^#[0-9a-fA-F]{6}$/.test(accentOverride)) {
+    palette = { primary: accentOverride, dark: cachedPalette?.dark || "#0E1016" };
+  } else if (cachedPalette) {
+    palette = { primary: String(cachedPalette.primary), dark: String(cachedPalette.dark || "#0E1016") };
+  } else {
+    palette = await extractBrandPalette(website, clientName, { clientId }).catch(() => ({ primary: "#3A5BD9", dark: "#0E1016" }));
+    // Cache it on the client so the next render is instant and identical (only if we got a real read, not the default).
+    if (palette.primary && palette.primary.toLowerCase() !== "#3a5bd9") {
+      await db().query(`update clients set brand_palette = $2::jsonb where id = $1`, [clientId, JSON.stringify(palette)]).catch(() => {});
+    }
+  }
   const tier = TIERS[(p.tier as TierId)] || TIERS.dominate;
   const objectiveLabel = OBJECTIVES.find((o) => o.id === p.objective)?.label || String(p.objective);
   // Gary's rule: the proposal date is ALWAYS the current date (SA time) at generation, never a stored date.

@@ -95,6 +95,41 @@ export async function moderateText(text: string, meter?: MeterMeta): Promise<{ a
   }
 }
 
+// READ A BRAND'S CORE PALETTE off a homepage screenshot, the way a designer would (Gary: "look at the pantones of
+// the website and intelligently use those"). This is the robust replacement for regex-scraping the HTML for one
+// saturated hex: it sees the rendered page, so image/SVG logos and JS/Cloudflare sites all work. Returns hex
+// primary/secondary/dark, or null if it genuinely cannot read one. Metered. Never throws.
+export async function brandPaletteFromImage(jpegBase64: string, clientName: string, meter?: MeterMeta): Promise<{ primary: string; secondary: string | null; dark: string } | null> {
+  const hx = (h?: string | null): string | null => {
+    if (typeof h !== "string") return null;
+    let s = h.trim().toLowerCase();
+    if (!s.startsWith("#")) s = "#" + s;
+    if (/^#[0-9a-f]{3}$/.test(s)) s = "#" + s.slice(1).split("").map((c) => c + c).join("");
+    return /^#[0-9a-f]{6}$/.test(s) ? s : null;
+  };
+  try {
+    const c = await client();
+    const r = await c.messages.create({
+      model: OPUS5, max_tokens: 500,
+      system: "You are a senior brand designer. You are shown a screenshot of a company's website homepage. Identify the brand's CORE visual identity colours - the palette a designer would list as theirs - and return them as hex. PRIMARY is the dominant brand colour: the one used for the logo, primary buttons and calls-to-action, links and key headers. SECONDARY is a clear second brand colour if one is genuinely used, otherwise an empty string. DARK is a deep colour that suits the brand for dark backgrounds and ink (their darkest brand colour, or a brand-appropriate near-black). IGNORE generic page chrome - plain white, near-white, light greys and pure black are NOT the brand unless the brand truly has no colour of its own. Pick the colours a person would name as 'their brand colours'. Respond only via the tool.",
+      tools: [{ name: "palette", description: "The brand's core palette as hex codes.", input_schema: { type: "object" as const, additionalProperties: false, properties: { primary: { type: "string", description: "#RRGGBB, the dominant brand colour" }, secondary: { type: "string", description: "#RRGGBB, a second brand colour, or empty string if none" }, dark: { type: "string", description: "#RRGGBB, a brand-appropriate dark ground/ink" }, reasoning: { type: "string", description: "one line on what you keyed on" } }, required: ["primary", "dark"] } }],
+      tool_choice: { type: "tool", name: "palette" },
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpegBase64 } },
+        { type: "text", text: `This is ${clientName}'s website homepage. Return their core brand palette.` },
+      ] }],
+    });
+    await meterClaude(r, { ...meter, model: OPUS5, action: "brand-palette" }).catch(() => {});
+    const block = r.content.find((b) => b.type === "tool_use") as { input?: { primary?: string; secondary?: string; dark?: string } } | undefined;
+    const v = block?.input || {};
+    const primary = hx(v.primary);
+    if (!primary) return null;
+    return { primary, secondary: hx(v.secondary), dark: hx(v.dark) || "#0E1016" };
+  } catch {
+    return null;
+  }
+}
+
 // The Character Bible: a film-grade casting + costume + performance sheet, expanded
 // by Claude from a light brief. Drives casting, the photoshoot, voice and scripts.
 export type CharacterBible = {
