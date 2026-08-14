@@ -279,7 +279,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <LivingBrain lit={lit} />
             {!empty && (
               <div className="pointer-events-none absolute inset-x-0 -bottom-1 text-center">
-                <span className={`tabular rounded-full px-2.5 py-0.5 text-[13px] font-extrabold ${ready ? "bg-[#4ade80]/20 text-[#86efac]" : "bg-[#a855f7]/20 text-[#c79bff]"}`}>{metCount}/4</span>
+                <span className={`tabular rounded-full px-2.5 py-0.5 text-[15px] font-extrabold ${ready ? "bg-[#4ade80]/20 text-[#86efac]" : "bg-[#a855f7]/20 text-[#c79bff]"}`}>{metCount}/4</span>
               </div>
             )}
           </div>
@@ -287,17 +287,17 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <div className="min-w-0 flex-1 text-center sm:text-left">
             {empty ? (
               <>
-                <h2 className="text-2xl font-extrabold tracking-tight text-ink">Let&apos;s bring this brain to life</h2>
-                <p className="mt-1.5 text-base leading-relaxed text-ink-dim">Start with the client&apos;s website, the anchor everything else is checked against. Paste it below and it crawls in, JavaScript and Cloudflare sites included, usually a few minutes.</p>
-                <button onClick={() => goto("website")} className="btn-brand mt-4 rounded-lg px-5 py-2.5 text-base font-bold">Start with their website ↓</button>
+                <h2 className="text-[27px] font-extrabold tracking-tight text-ink">Let&apos;s bring this brain to life</h2>
+                <p className="mt-1.5 text-[18px] leading-relaxed text-ink-dim">Start with the client&apos;s website, the anchor everything else is checked against. Paste it below and it crawls in, JavaScript and Cloudflare sites included, usually a few minutes.</p>
+                <button onClick={() => goto("website")} className="btn-brand mt-4 rounded-lg px-5 py-2.5 text-[18px] font-bold">Start with their website ↓</button>
               </>
             ) : (
               <>
                 <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
-                  <h2 className="text-2xl font-extrabold tracking-tight text-ink">Brain strength</h2>
-                  <span className="tabular text-base text-ink-faint"><b className="text-ink">{liveChunks.toLocaleString("en-ZA")}</b> passages · <b className="text-ink">{indexedSources}</b> source{indexedSources === 1 ? "" : "s"}{crawling && <span className="text-active"> · indexing…</span>}</span>
+                  <h2 className="text-[27px] font-extrabold tracking-tight text-ink">Brain strength</h2>
+                  <span className="tabular text-[18px] text-ink-faint"><b className="text-ink">{liveChunks.toLocaleString("en-ZA")}</b> passages · <b className="text-ink">{indexedSources}</b> source{indexedSources === 1 ? "" : "s"}{crawling && <span className="text-active"> · indexing…</span>}</span>
                 </div>
-                <p className="mt-1 text-base text-ink-dim">
+                <p className="mt-1 text-[18px] text-ink-dim">
                   {ready ? "Strong enough to build on. Test it below, then commission the Researcher." : "Fill the gaps to make it strong enough for the Researcher to build on."}
                 </p>
                 {/* One continuous strength bar - fills to the done fraction (2/4 = a solid 50%), no gaps. */}
@@ -309,13 +309,13 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 <div className="mt-3.5 flex flex-wrap justify-center gap-2 sm:justify-start">
                   {ordered.map((c) => (
                     <button key={c.key} onClick={c.go} aria-label={c.met ? `${c.label}: done` : `Add ${c.label}`}
-                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${c.met ? "border-[#4ade80]/30 bg-[#4ade80]/[0.08] text-[#86efac]" : "border-line text-ink-dim hover:border-[#a855f7]/50 hover:text-ink"}`}>
                       <span aria-hidden>{c.met ? "✓" : "＋"}</span>{c.label}
                     </button>
                   ))}
                 </div>
                 {ready && (
-                  <a href="/researcher" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-base font-bold text-black transition hover:opacity-90">Commission the Researcher →</a>
+                  <a href="/researcher" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-[18px] font-bold text-black transition hover:opacity-90">Commission the Researcher →</a>
                 )}
               </>
             )}
@@ -330,8 +330,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden><path d="M12 3a4 4 0 0 0-4 4 3.5 3.5 0 0 0-2 6.3A3.5 3.5 0 0 0 8 20a4 4 0 0 0 8 0 3.5 3.5 0 0 0 2-6.7A3.5 3.5 0 0 0 16 7a4 4 0 0 0-4-4Z" /><path d="M12 7v13M8.5 10.5 12 12l3.5-1.5" /></svg>
           </span>
           <div>
-            <h2 className="text-xl font-extrabold tracking-tight text-ink">Feed the knowledge</h2>
-            <p className="text-base text-ink-dim">Everything here becomes the brain&apos;s memory: chunked, embedded, and retrievable by every pod.</p>
+            <h2 className="text-[23px] font-extrabold tracking-tight text-ink">Feed the knowledge</h2>
+            <p className="text-[18px] text-ink-dim">Everything here becomes the brain&apos;s memory: chunked, embedded, and retrievable by every pod.</p>
           </div>
         </div>
 
@@ -342,11 +342,11 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           {([["Feed it", "raw source material", [["website", "Website"], ["documents", "Documents"], ["text", "Paste text"]]],
              ["Teach it", "rules & positioning it applies", [["positioning", "Positioning & rules"], ["compliance", "Compliance"]]]] as const).map(([zone, note, modes]) => (
             <div key={zone}>
-              <div className="tabular text-[12px] font-bold uppercase tracking-[0.16em] text-ink-faint">{zone} <span className="ml-1 font-normal normal-case tracking-normal text-ink-faint">· {note}</span></div>
+              <div className="tabular text-[13px] font-bold uppercase tracking-[0.16em] text-ink-faint">{zone} <span className="ml-1 font-normal normal-case tracking-normal text-ink-faint">· {note}</span></div>
               <div className="mt-2 flex flex-wrap gap-2.5">
                 {modes.map(([m, label]) => (
                   <button key={m} onClick={() => setMode(m as Mode)} aria-pressed={mode === m}
-                    className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+                    className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[17px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
                     <SourceIcon m={m as Mode} />{label}
                   </button>
                 ))}
@@ -362,11 +362,11 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface-2/50 px-4 py-8 text-center hover:border-[#a855f7]/50">
               <input type="file" multiple accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown,text/csv"
                 onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} disabled={adding} className="hidden" />
-              <span className="text-base font-bold text-ink">Choose documents, or drop them here</span>
-              <span className="text-base text-ink-dim">PDFs, decks, research, notes. Each one ingests as it lands.</span>
-              <span className="mt-1 text-base text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
+              <span className="text-[18px] font-bold text-ink">Choose documents, or drop them here</span>
+              <span className="text-[18px] text-ink-dim">PDFs, decks, research, notes. Each one ingests as it lands.</span>
+              <span className="mt-1 text-[18px] text-ink-faint">PDF · TXT · MD · CSV, up to 50MB each</span>
             </label>
-            {progress && <p className="mt-2 text-base text-ink-dim">Uploading {progress}…</p>}
+            {progress && <p className="mt-2 text-[18px] text-ink-dim">Uploading {progress}…</p>}
           </>
         ) : mode === "website" ? (
           <>
@@ -377,12 +377,12 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
               if (!web.length) return null;
               return (
                 <div className="mb-4 rounded-xl border border-[#4ade80]/25 bg-[#4ade80]/[0.04] p-3.5">
-                  <div className="tabular text-[12px] font-bold uppercase tracking-[0.14em] text-[#86efac]">✓ Already crawled</div>
+                  <div className="tabular text-[13px] font-bold uppercase tracking-[0.14em] text-[#86efac]">✓ Already crawled</div>
                   <ul className="mt-2 space-y-1.5">
                     {web.map((s) => {
                       const f = freshness(s.last_synced_at);
                       return (
-                        <li key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[14px]">
+                        <li key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[16px]">
                           <span className="min-w-0 flex-1 truncate text-ink-dim">{s.uri}</span>
                           {s.status === "pending"
                             ? <span className="inline-flex items-center gap-1.5 text-active"><span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />indexing…</span>
@@ -391,53 +391,53 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                       );
                     })}
                   </ul>
-                  <p className="mt-2 text-[13px] text-ink-faint">Add a website below only if it is a NEW site. To refresh one you already added, Re-crawl it.</p>
+                  <p className="mt-2 text-[15px] text-ink-faint">Add a website below only if it is a NEW site. To refresh one you already added, Re-crawl it.</p>
                 </div>
               );
             })()}
             {/* Full site crawls every page it can reach (no path scope); single page reads just that URL. Each
                 page keeps its own title + URL so a passage always traces back to its source. */}
-            <div className="inline-flex rounded-lg border border-line p-1 text-[14px]">
+            <div className="inline-flex rounded-lg border border-line p-1 text-[16px]">
               <button onClick={() => setFullSite(true)} aria-pressed={fullSite} className={`rounded-md px-3 py-1.5 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Full site, all pages</button>
               <button onClick={() => setFullSite(false)} aria-pressed={!fullSite} className={`rounded-md px-3 py-1.5 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${!fullSite ? "bg-[#a855f7]/15 text-[#c79bff]" : "text-ink-dim hover:text-ink"}`}>Single page</button>
             </div>
             {sites.map((s, i) => (
               <div key={i} className="mt-2.5 flex gap-2">
                 <input value={s} onChange={(e) => setSites((list) => list.map((x, j) => (j === i ? e.target.value : x)))} placeholder="https://the-client.com"
-                  className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong" />
+                  className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] outline-none focus:border-line-strong" />
                 {sites.length > 1 && <button onClick={() => setSites((list) => list.filter((_, j) => j !== i))} aria-label="Remove this website" className="shrink-0 rounded-lg border border-line px-3 text-ink-faint hover:border-alert/50 hover:text-alert">✕</button>}
               </div>
             ))}
-            <button onClick={() => setSites((list) => [...list, ""])} className="mt-2.5 text-[15px] font-semibold text-[#c79bff] hover:underline">+ Add another website</button>
-            <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading and adding the pages…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
-            <p className="mt-2.5 text-base text-ink-dim">{fullSite ? "Reads every page it can reach, up to 80 per site. Takes a few minutes and keeps running if you close the tab." : "Reads just the page at each URL."}</p>
+            <button onClick={() => setSites((list) => [...list, ""])} className="mt-2.5 text-[17px] font-semibold text-[#c79bff] hover:underline">+ Add another website</button>
+            <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading and adding the pages…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
+            <p className="mt-2.5 text-[18px] text-ink-dim">{fullSite ? "Reads every page it can reach, up to 80 per site. Takes a few minutes and keeps running if you close the tab." : "Reads just the page at each URL."}</p>
           </>
         ) : mode === "compliance" ? (
           <>
             <textarea value={compliance} onChange={(e) => setCompliance(e.target.value)} rows={5} placeholder="Paste the client's mandatory compliance copy: disclaimers, licence wording, advertising rules…"
-              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
-            <button onClick={() => addText("compliance")} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Adding…" : "Add compliance copy"}</button>
-            <p className="mt-2.5 text-base text-ink-dim">Tagged as <b className="text-ink-dim">compliance</b> so creative and the proposal&apos;s governance page can pull it specifically.</p>
+              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] leading-relaxed outline-none focus:border-line-strong" />
+            <button onClick={() => addText("compliance")} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Adding…" : "Add compliance copy"}</button>
+            <p className="mt-2.5 text-[18px] text-ink-dim">Tagged as <b className="text-ink-dim">compliance</b> so creative and the proposal&apos;s governance page can pull it specifically.</p>
           </>
         ) : mode === "positioning" ? (
           <>
             <textarea value={doctrine} onChange={(e) => setDoctrine(e.target.value)} rows={7} placeholder="The client's positioning, brand rules and proof points. What they stand for, how they talk, what is true about them, what must never be said…"
-              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
-            <button onClick={saveDoctrine} disabled={savingDoc} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{savingDoc ? "Saving…" : "Save & teach the brain"}</button>
-            <p className="mt-2.5 text-base text-ink-dim">This is the <b className="text-ink-dim">brand book</b>: the client&apos;s positioning, rules and proof points, what they stand for, how they talk, and what must never be said. Saved and embedded automatically, no separate sync step.</p>
+              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] leading-relaxed outline-none focus:border-line-strong" />
+            <button onClick={saveDoctrine} disabled={savingDoc} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{savingDoc ? "Saving…" : "Save & teach the brain"}</button>
+            <p className="mt-2.5 text-[18px] text-ink-dim">This is the <b className="text-ink-dim">brand book</b>: the client&apos;s positioning, rules and proof points, what they stand for, how they talk, and what must never be said. Saved and embedded automatically, no separate sync step.</p>
           </>
         ) : (
           <>
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="Paste brand notes, proof points, a transcript, a key document…"
-              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
-            <button onClick={() => addText()} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Adding…" : "Add to brain"}</button>
+              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] leading-relaxed outline-none focus:border-line-strong" />
+            <button onClick={() => addText()} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Adding…" : "Add to brain"}</button>
           </>
         )}
         </div>
 
-        {addErr && <p className="mt-3 text-base text-alert">{addErr}</p>}
+        {addErr && <p className="mt-3 text-[18px] text-alert">{addErr}</p>}
         {/* The isolation guarantee, said out loud where someone is about to hand us a client's private material. */}
-        <p className="mt-4 text-base text-ink-faint">
+        <p className="mt-4 text-[18px] text-ink-faint">
           Everything added here is chunked and embedded into <b className="text-ink-dim">this brain only</b>. No other brain can read it.
         </p>
       </div>
@@ -445,20 +445,20 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       {/* Sources */}
       <div className="rounded-xl border border-line bg-surface-1 p-6">
         <div className="flex items-center justify-between gap-2">
-          <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Knowledge sources</div>
+          <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Knowledge sources</div>
           {sources.length > 0 && (
-            <button onClick={reindex} disabled={reindexing} title="Rebuild every passage's embedding with the current model. Only needed after an embedding-model change; otherwise leave it. Your text is not touched." className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[13px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">{reindexing && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{reindexing ? "Re-indexing…" : "↻ Re-index"} <span className="text-ink-faint">· rarely needed</span></button>
+            <button onClick={reindex} disabled={reindexing} title="Rebuild every passage's embedding with the current model. Only needed after an embedding-model change; otherwise leave it. Your text is not touched." className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[15px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">{reindexing && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{reindexing ? "Re-indexing…" : "↻ Re-index"} <span className="text-ink-faint">· rarely needed</span></button>
           )}
         </div>
         {sources.length === 0 ? (
-          <p className="mt-3 text-base text-ink-dim">No sources yet.</p>
+          <p className="mt-3 text-[18px] text-ink-dim">No sources yet.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {sources.map((s) => (
-              <li key={s.id} className="border-b border-line/60 py-2.5 text-base">
+              <li key={s.id} className="border-b border-line/60 py-2.5 text-[18px]">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                 <span className="min-w-0 flex-1 truncate text-ink">{s.type === "website" ? s.uri : s.uri || "Pasted note"}</span>
-                <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
+                <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[15px]">
                   <span className={s.status === "indexed" ? "font-semibold text-ink-dim" : "text-ink-faint"}>{s.chunk_count ?? 0} passages</span>
                   {s.status === "indexed" && (s.chunk_count ?? 0) <= 2 && (s.type === "crawl" || s.type === "website") && (
                     <span title="This site returned almost nothing, it may be bot-blocked or JavaScript-only. Check it opened." className="rounded bg-[#fbbf24]/15 px-2 py-0.5 font-bold text-[#fcd34d]">thin, check it</span>
@@ -479,7 +479,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 {(s.type === "website" || s.type === "crawl") && s.status !== "pending" && (() => {
                   const f = freshness(s.last_synced_at);
                   return (
-                    <div className="mt-1 flex items-center gap-3 text-[13px] text-ink-faint">
+                    <div className="mt-1 flex items-center gap-3 text-[15px] text-ink-faint">
                       {f && <span className={f.stale ? "font-semibold text-[#fcd34d]" : ""}>crawled {f.label}{f.stale ? " · stale, worth a refresh" : ""}</span>}
                       <button onClick={() => recrawl(s)} className="font-semibold text-ink-dim hover:text-ink">↻ Re-crawl</button>
                     </div>
@@ -487,7 +487,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 })()}
                 {/* The reason, in plain sight. A source that says only "failed" gives nobody anything to act on. */}
                 {s.status === "failed" && s.error && (
-                  <p className="mt-1.5 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-base leading-relaxed text-alert">{s.error}</p>
+                  <p className="mt-1.5 rounded-md border border-alert/30 bg-alert/5 px-3 py-2 text-[18px] leading-relaxed text-alert">{s.error}</p>
                 )}
               </li>
             ))}
@@ -502,16 +502,16 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       {(coverage.loading || coverage.topics.length > 0) && (
         <div className="rounded-xl border border-line bg-surface-1 p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What this brain can answer on</div>
-            {!coverage.loading && <button onClick={() => loadCoverage(true)} className="text-[13px] font-semibold text-ink-faint hover:text-ink">↻ Refresh</button>}
+            <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What this brain can answer on</div>
+            {!coverage.loading && <button onClick={() => loadCoverage(true)} className="text-[15px] font-semibold text-ink-faint hover:text-ink">↻ Refresh</button>}
           </div>
           {coverage.loading ? (
-            <p className="mt-3 inline-flex items-center gap-2 text-base text-ink-dim"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />Reading the brain to map its coverage…</p>
+            <p className="mt-3 inline-flex items-center gap-2 text-[18px] text-ink-dim"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />Reading the brain to map its coverage…</p>
           ) : (
             <div className="mt-3 flex flex-wrap gap-2">
               {coverage.topics.map((t, i) => (
                 <span key={i} style={{ animation: `rise 0.4s ease-out ${i * 0.05}s both` }}
-                  className="rounded-full border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-1.5 text-[15px] text-ink-dim">{t}</span>
+                  className="rounded-full border border-[#a855f7]/25 bg-[#a855f7]/[0.06] px-3 py-1.5 text-[17px] text-ink-dim">{t}</span>
               ))}
             </div>
           )}
@@ -525,12 +525,12 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           sit next to Re-index and here, doubled up). "Test the brain" is now the full Ask panel on the page below,
           so the old simple query box is removed to avoid two test boxes. */}
       <details className="rounded-xl border border-line bg-surface-1 p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-ink-faint hover:text-ink-dim">Danger zone</summary>
+        <summary className="cursor-pointer text-[15px] font-semibold text-ink-faint hover:text-ink-dim">Danger zone</summary>
         <div className="mt-3 flex flex-wrap gap-3">
-          <button onClick={nukeAll} className="rounded-lg border border-alert/40 px-4 py-2 text-base font-semibold text-alert hover:bg-alert/10">Nuke all knowledge</button>
-          <button onClick={deleteBrainNow} className="rounded-lg border border-alert/50 px-4 py-2 text-base font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
+          <button onClick={nukeAll} className="rounded-lg border border-alert/40 px-4 py-2 text-[18px] font-semibold text-alert hover:bg-alert/10">Nuke all knowledge</button>
+          <button onClick={deleteBrainNow} className="rounded-lg border border-alert/50 px-4 py-2 text-[18px] font-semibold text-alert hover:bg-alert/10">🗑 Delete this brain</button>
         </div>
-        <p className="mt-2 text-sm text-ink-faint">Nuke wipes every source and passage but keeps the brain. Delete removes the brain entirely. Both are permanent.</p>
+        <p className="mt-2 text-[15px] text-ink-faint">Nuke wipes every source and passage but keeps the brain. Delete removes the brain entirely. Both are permanent.</p>
       </details>
     </div>
   );

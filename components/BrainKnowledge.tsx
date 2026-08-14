@@ -107,12 +107,12 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
     <div className="rounded-xl border border-line bg-surface-1 p-6">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-3 text-left">
         <div>
-          <div className="tabular text-[16px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What the brain knows</div>
-          <p className="mt-1.5 text-base text-ink-dim">
+          <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">What the brain knows</div>
+          <p className="mt-1.5 text-[18px] text-ink-dim">
             Read every passage the brain retrieves from, and cut out anything that is wrong.
           </p>
         </div>
-        <span className="shrink-0 rounded-lg border border-line px-3.5 py-2 text-base font-bold text-ink">
+        <span className="shrink-0 rounded-lg border border-line px-3.5 py-2 text-[18px] font-bold text-ink">
           {open ? "Hide" : `Inspect ${total} passage${total === 1 ? "" : "s"}`}
         </span>
       </button>
@@ -124,16 +124,16 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
             <input
               value={q} onChange={(e) => setQ(e.target.value)}
               placeholder="Find the exact words, e.g. R5, MAU, zero fees"
-              className="flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base outline-none focus:border-line-strong"
+              className="flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] outline-none focus:border-line-strong"
             />
-            <button type="submit" className="rounded-lg border border-line px-4 py-2.5 text-base font-semibold text-ink hover:border-line-strong">Search</button>
+            <button type="submit" className="rounded-lg border border-line px-4 py-2.5 text-[18px] font-semibold text-ink hover:border-line-strong">Search</button>
             {term && (
               <button type="button" onClick={() => { setQ(""); setChunks([]); load(0, ""); }}
-                className="rounded-lg px-3 py-2.5 text-base font-semibold text-ink-dim hover:text-ink">Clear</button>
+                className="rounded-lg px-3 py-2.5 text-[18px] font-semibold text-ink-dim hover:text-ink">Clear</button>
             )}
           </form>
 
-          <p className="mt-3 text-base text-ink-dim">
+          <p className="mt-3 text-[18px] text-ink-dim">
             {term
               ? <><b className="text-ink">{count}</b> passage{count === 1 ? "" : "s"} mention &ldquo;{term}&rdquo;</>
               : <><b className="text-ink">{count}</b> passage{count === 1 ? "" : "s"} in this brain</>}
@@ -144,12 +144,12 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
               different facts. A brain full of repeats is a brain that answers badly while looking well fed. */}
           {duplicates > 0 && (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#fbbf24]/40 bg-[#fbbf24]/10 px-4 py-3">
-              <p className="text-[15px] text-[#fcd34d]">
+              <p className="text-[17px] text-[#fcd34d]">
                 <b>{duplicates} of these passages are exact duplicates.</b> The brain only reads its top few
                 matches per question, so repeats crowd out facts it should be using instead.
               </p>
               <button onClick={dedupe} disabled={cleaning}
-                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[#fbbf24]/50 px-3.5 py-2 text-[15px] font-bold text-[#fcd34d] hover:bg-[#fbbf24]/15 disabled:opacity-50">
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[#fbbf24]/50 px-3.5 py-2 text-[17px] font-bold text-[#fcd34d] hover:bg-[#fbbf24]/15 disabled:opacity-50">
                 {cleaning && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
                 {cleaning ? "Cleaning…" : "Remove the duplicates"}
               </button>
@@ -163,20 +163,20 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
               return (
                 <li key={c.id} className="rounded-lg border border-line bg-surface-2 p-4">
                   <div className="mb-2 flex items-start justify-between gap-3">
-                    <div className="tabular min-w-0 truncate text-[13px] text-ink-faint">
+                    <div className="tabular min-w-0 truncate text-[15px] text-ink-faint">
                       {originOf(c)} · {c.added}
                     </div>
                     <button onClick={() => remove(c)} title="Remove this passage from the brain"
-                      className="shrink-0 rounded px-2 py-0.5 text-[13px] font-semibold text-ink-faint hover:bg-alert/15 hover:text-alert">
+                      className="shrink-0 rounded px-2 py-0.5 text-[15px] font-semibold text-ink-faint hover:bg-alert/15 hover:text-alert">
                       Remove
                     </button>
                   </div>
-                  <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink-dim">
+                  <div className="whitespace-pre-wrap text-[17px] leading-relaxed text-ink-dim">
                     {isOpen || !long ? c.content : c.content.slice(0, 320) + "…"}
                   </div>
                   {long && (
                     <button onClick={() => setExpanded((m) => ({ ...m, [c.id]: !isOpen }))}
-                      className="mt-2 text-[14px] font-semibold text-[#c79bff] hover:underline">
+                      className="mt-2 text-[16px] font-semibold text-[#c79bff] hover:underline">
                       {isOpen ? "Show less" : "Read the whole passage"}
                     </button>
                   )}
@@ -186,15 +186,15 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
           </ul>
 
           {!loading && chunks.length === 0 && (
-            <p className="mt-4 rounded-lg border border-dashed border-line p-6 text-center text-base text-ink-dim">
+            <p className="mt-4 rounded-lg border border-dashed border-line p-6 text-center text-[18px] text-ink-dim">
               {term ? `Nothing in this brain mentions "${term}".` : "This brain holds nothing yet."}
             </p>
           )}
-          {loading && <p className="mt-4 text-base text-ink-dim">Reading the brain…</p>}
+          {loading && <p className="mt-4 text-[18px] text-ink-dim">Reading the brain…</p>}
 
           {chunks.length < count && !loading && (
             <button onClick={() => load(offset + 50, term)}
-              className="mt-4 w-full rounded-lg border border-line py-2.5 text-base font-semibold text-ink-dim hover:text-ink">
+              className="mt-4 w-full rounded-lg border border-line py-2.5 text-[18px] font-semibold text-ink-dim hover:text-ink">
               Load more ({count - chunks.length} to go)
             </button>
           )}
