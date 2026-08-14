@@ -20,14 +20,13 @@ function freshness(iso?: string | null): { label: string; stale: boolean } | nul
   return { label, stale: days >= 90 };
 }
 
-type Mode = "website" | "documents" | "youtube" | "text" | "compliance" | "positioning";
+type Mode = "website" | "documents" | "text" | "compliance" | "positioning";
 
 // A professional 2px-stroke mark per source type, in the brain's violet->cyan family (via currentColor).
 function SourceIcon({ m }: { m: Mode }) {
   const paths: Record<Mode, string> = {
     website: `<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 3.5 5.8 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.8-3.5-9s1-6.5 3.5-9Z"/>`,
     documents: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/>`,
-    youtube: `<rect x="2" y="5" width="20" height="14" rx="4"/><path d="m10 9 5 3-5 3z"/>`,
     text: `<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/>`,
     compliance: `<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 .58-.91l7-3.5a1 1 0 0 1 .84 0l7 3.5A1 1 0 0 1 20 6Z"/><path d="m9 12 2 2 4-4"/>`,
     positioning: `<path d="m12 3 2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 15.9l-4.7 2.47.9-5.23-3.8-3.7 5.25-.76z"/>`,
@@ -255,7 +254,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const checklist: { key: string; label: string; met: boolean; go: () => void }[] = [
     { key: "site", label: "Website crawled", met: hasSite, go: () => goto("website") },
     { key: "docs", label: "Documents or notes", met: hasDocs, go: () => goto("documents") },
-    { key: "doctrine", label: "Brand doctrine", met: hasDoctrine, go: () => goto("positioning") },
+    { key: "doctrine", label: "Brand book", met: hasDoctrine, go: () => goto("positioning") },
     { key: "assets", label: "Logo & photos", met: hasAssets, go: () => scrollToId("brand-library") },
   ];
   const metCount = checklist.filter((c) => c.met).length;
@@ -340,15 +339,15 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             and positioning the brain applies. The brand library (the artwork) is its own zone lower down. Splitting
             them means the team holds one mental model at a time instead of six chips in a row. */}
         <div className="mt-5 space-y-4">
-          {([["Feed it", "raw source material", [["website", "Website"], ["documents", "Documents"], ["youtube", "YouTube"], ["text", "Paste text"]]],
+          {([["Feed it", "raw source material", [["website", "Website"], ["documents", "Documents"], ["text", "Paste text"]]],
              ["Teach it", "rules & positioning it applies", [["positioning", "Positioning & rules"], ["compliance", "Compliance"]]]] as const).map(([zone, note, modes]) => (
             <div key={zone}>
               <div className="tabular text-[12px] font-bold uppercase tracking-[0.16em] text-ink-faint">{zone} <span className="ml-1 font-normal normal-case tracking-normal text-ink-faint">· {note}</span></div>
               <div className="mt-2 flex flex-wrap gap-2.5">
                 {modes.map(([m, label]) => (
-                  <button key={m} onClick={() => setMode(m as Mode)} disabled={m === "youtube"} aria-pressed={mode === m}
-                    className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : m === "youtube" ? "cursor-not-allowed border border-line/70 text-ink-faint" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
-                    <SourceIcon m={m as Mode} />{label}{m === "youtube" && <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-ink-faint">soon</span>}
+                  <button key={m} onClick={() => setMode(m as Mode)} aria-pressed={mode === m}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${mode === m ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"}`}>
+                    <SourceIcon m={m as Mode} />{label}
                   </button>
                 ))}
               </div>
@@ -371,6 +370,31 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           </>
         ) : mode === "website" ? (
           <>
+            {/* ALREADY CRAWLED (Gary: a done section is confusing without a last-run flag). Shows what is already
+                in the brain for this type + when, with Re-crawl, so nobody re-adds a site they already ran. */}
+            {(() => {
+              const web = sources.filter((s) => s.type === "website" || s.type === "crawl");
+              if (!web.length) return null;
+              return (
+                <div className="mb-4 rounded-xl border border-[#4ade80]/25 bg-[#4ade80]/[0.04] p-3.5">
+                  <div className="tabular text-[12px] font-bold uppercase tracking-[0.14em] text-[#86efac]">✓ Already crawled</div>
+                  <ul className="mt-2 space-y-1.5">
+                    {web.map((s) => {
+                      const f = freshness(s.last_synced_at);
+                      return (
+                        <li key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[14px]">
+                          <span className="min-w-0 flex-1 truncate text-ink-dim">{s.uri}</span>
+                          {s.status === "pending"
+                            ? <span className="inline-flex items-center gap-1.5 text-active"><span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />indexing…</span>
+                            : <span className="shrink-0"><span className={f?.stale ? "font-semibold text-[#fcd34d]" : "text-ink-faint"}>crawled {f?.label ?? "recently"}{f?.stale ? " · stale" : ""}</span> · <button onClick={() => recrawl(s)} className="font-semibold text-ink-dim hover:text-ink">Re-crawl</button></span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <p className="mt-2 text-[13px] text-ink-faint">Add a website below only if it is a NEW site. To refresh one you already added, Re-crawl it.</p>
+                </div>
+              );
+            })()}
             {/* Full site crawls every page it can reach (no path scope); single page reads just that URL. Each
                 page keeps its own title + URL so a passage always traces back to its source. */}
             <div className="inline-flex rounded-lg border border-line p-1 text-[14px]">
@@ -388,12 +412,6 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading and adding the pages…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
             <p className="mt-2.5 text-base text-ink-dim">{fullSite ? "Reads every page it can reach, up to 80 per site. Takes a few minutes and keeps running if you close the tab." : "Reads just the page at each URL."}</p>
           </>
-        ) : mode === "youtube" ? (
-          <div className="rounded-xl border border-dashed border-line bg-surface-2/40 px-4 py-8 text-center">
-            <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-ink-faint"><SourceIcon m="youtube" /></span>
-            <p className="text-base font-bold text-ink">YouTube channel ingestion</p>
-            <p className="mt-1 text-base text-ink-dim">We will pull the channel&apos;s video transcripts into the brain, great for brand voice and thought leadership. This backend is being built next.</p>
-          </div>
         ) : mode === "compliance" ? (
           <>
             <textarea value={compliance} onChange={(e) => setCompliance(e.target.value)} rows={5} placeholder="Paste the client's mandatory compliance copy: disclaimers, licence wording, advertising rules…"
@@ -406,7 +424,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <textarea value={doctrine} onChange={(e) => setDoctrine(e.target.value)} rows={7} placeholder="The client's positioning, brand rules and proof points. What they stand for, how they talk, what is true about them, what must never be said…"
               className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed outline-none focus:border-line-strong" />
             <button onClick={saveDoctrine} disabled={savingDoc} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-base font-bold disabled:opacity-50">{savingDoc ? "Saving…" : "Save & teach the brain"}</button>
-            <p className="mt-2.5 text-base text-ink-dim">This is the <b className="text-ink-dim">brand doctrine</b>: positioning, rules and proof points. Saved and embedded automatically, no separate sync step.</p>
+            <p className="mt-2.5 text-base text-ink-dim">This is the <b className="text-ink-dim">brand book</b>: the client&apos;s positioning, rules and proof points, what they stand for, how they talk, and what must never be said. Saved and embedded automatically, no separate sync step.</p>
           </>
         ) : (
           <>
