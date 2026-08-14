@@ -3,7 +3,7 @@ import Link from "next/link";
 // THE STEPPED INTELLIGENCE FLOW, shown on every step's own screen (Gary: "each section must step to the next
 // system... should feel world class... all four steps equally world-class"). The dashboard already numbers the
 // tiles 1-2-3-4; this repeats that spine INSIDE each step so you always know where you are and what is next,
-// and can jump between them. Researcher (1) -> Brain (2) -> Strategist (3) -> Proposal (4).
+// and can jump between them. Brain (1) -> Researcher (2) -> Strategist (3) -> Proposal (4).
 //
 // The active step is lit in the accent; done/other steps are quiet links. Kept deliberately compact so it reads
 // as a breadcrumb-with-progress, not a second navigation bar.

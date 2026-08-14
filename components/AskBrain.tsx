@@ -9,7 +9,7 @@ import { flex } from "@/lib/flex";
 //
 // The retrieval and the answering already existed on the brain's own page, but that page lives under Setup -
 // which reads as configuration, not as a daily tool, so nobody would think to look there. Someone writing a
-// script needs the zero-fee list as much as the research desks do.
+// script needs the zero-fee list as much as the research pods do.
 //
 // Every answer shows WHAT IT READ. An answer you cannot check is worse than no answer on a brain that
 // carries a client's proprietary material, and the passages are what make a claim traceable.
@@ -137,8 +137,8 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
           <div className="tabular text-[15px] uppercase tracking-[0.2em] text-ink-faint">Where the answer comes from</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {MODES.map((m) => (
-              <button key={m.id} onClick={() => setMode(m.id)}
-                className={`rounded-lg px-3.5 py-2 text-[18px] font-semibold transition ${
+              <button key={m.id} onClick={() => setMode(m.id)} aria-pressed={mode === m.id}
+                className={`rounded-lg px-3.5 py-2 text-[18px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a855f7] ${
                   mode === m.id ? "bg-[#a855f7]/15 text-[#c79bff] ring-1 ring-[#a855f7]/40" : "border border-line text-ink-dim hover:text-ink"}`}>
                 {m.label}
               </button>

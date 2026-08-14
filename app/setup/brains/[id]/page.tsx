@@ -38,7 +38,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
         </svg>
         <h1 className="text-[34px] font-bold">{brain.name}</h1>
         <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[13px] uppercase tracking-wide text-ink-faint">brain</span>
-        <span className="tabular text-[18px] text-ink-faint">{brain.chunk_count ?? 0} passages</span>
+        <span className="tabular text-[18px] text-ink-faint">{brain.chunk_count ?? 0} passage{(brain.chunk_count ?? 0) === 1 ? "" : "s"}</span>
       </div>
       <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} initialDoctrine={kit?.tone_notes ?? ""} />
 

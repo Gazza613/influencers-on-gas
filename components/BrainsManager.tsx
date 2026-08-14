@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { flex } from "@/lib/flex";
@@ -15,9 +15,13 @@ export default function BrainsManager({ initial }: { initial: Brain[] }) {
   const [err, setErr] = useState("");
   // DELETE with an UNDO WINDOW (Gary): no modal, the Gmail pattern. Clicking delete dims the card and starts a
   // 6-second countdown; the server delete only fires when the window closes, so "Undo" truly reverses it (nothing
-  // is deleted yet). A second delete flushes any pending one first.
+  // is deleted yet). Deleting a SECOND brain commits the first one that was counting down (it is not silently
+  // reprieved). Leaving the page before the window closes cancels the pending delete (nothing is deleted).
   const [pendingId, setPendingId] = useState("");
   const pendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingBrainRef = useRef<Brain | null>(null);
+  // Cancel any pending delete on unmount, so a commit never fires setState after the component is gone.
+  useEffect(() => () => { if (pendingRef.current) clearTimeout(pendingRef.current); }, []);
 
   async function create() {
     if (!name.trim() || busy) return;
@@ -29,18 +33,25 @@ export default function BrainsManager({ initial }: { initial: Brain[] }) {
   }
 
   function startDelete(b: Brain) {
-    if (pendingRef.current) clearTimeout(pendingRef.current);
+    if (pendingRef.current) {
+      clearTimeout(pendingRef.current);
+      // A different brain was still counting down: commit it now rather than silently sparing it.
+      if (pendingBrainRef.current && pendingBrainRef.current.id !== b.id) commitDelete(pendingBrainRef.current);
+    }
+    pendingBrainRef.current = b;
     setPendingId(b.id);
     pendingRef.current = setTimeout(() => commitDelete(b), 6000);
   }
   function undoDelete() {
     if (pendingRef.current) { clearTimeout(pendingRef.current); pendingRef.current = null; }
+    pendingBrainRef.current = null;
     setPendingId("");
   }
   async function commitDelete(b: Brain) {
     pendingRef.current = null;
+    if (pendingBrainRef.current?.id === b.id) pendingBrainRef.current = null;
     const r = await fetch(`/api/brains/${b.id}`, { method: "DELETE" }).catch(() => null);
-    setPendingId("");
+    setPendingId((cur) => (cur === b.id ? "" : cur));   // don't clear a newer pending brain's countdown
     if (r?.ok) { setList((l) => l.filter((x) => x.id !== b.id)); flex(`${b.name} deleted.`); }
     else { const d = await r?.json().catch(() => ({})); flex(d?.error || "Could not delete that brain."); }
   }
@@ -82,8 +93,8 @@ export default function BrainsManager({ initial }: { initial: Brain[] }) {
                 <Link href={`/setup/brains/${b.id}`} className="block p-5">
                   <div className="text-xl font-bold text-ink">{b.name}</div>
                   <div className="mt-2 flex items-center gap-4 text-[15px] text-ink-faint">
-                    <span>{b.source_count ?? 0} sources</span>
-                    <span>{b.chunk_count ?? 0} passages</span>
+                    <span>{b.source_count ?? 0} source{(b.source_count ?? 0) === 1 ? "" : "s"}</span>
+                    <span>{b.chunk_count ?? 0} passage{(b.chunk_count ?? 0) === 1 ? "" : "s"}</span>
                   </div>
                 </Link>
                 <button onClick={() => startDelete(b)}
