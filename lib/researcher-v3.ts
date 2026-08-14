@@ -77,8 +77,9 @@ TIME-BOXING:
 - Activity signals default to the last 90 days: news, press, social activity, advertising and campaign activity, promotions, launches, hiring, reviews and sentiment. Mark these evergreen=false. You may go older only where it genuinely adds context, and the date must be recorded.`;
 
 // COMPETITOR INTELLIGENCE from observable public channels only (spec 3.5). No ad libraries - explicitly deferred.
-const COMPETITOR_BRIEF = `COMPETITOR INTELLIGENCE (for the client AND every competitor), from PUBLIC, OWNED channels only - record what is factually observable, never whether it is good:
-- WHO COUNTS AS A COMPETITOR (be precise, do NOT leak): a DIRECT competitor sells the SAME core service to the SAME buyer in the SAME market. Match on the client's ACTUAL business, not a loose theme. A performance-marketing agency competes with other performance-marketing / growth / media-buying agencies for the same clients, NOT with every company that mentions "AI", nor with the martech tools or platforms it USES, nor with its own clients or partners. Pick 3-6 genuine like-for-like rivals and, for each, capture in competitor_set one line on WHY it is a true competitor (same service, same buyer). If a candidate only shares a buzzword, leave it out and, where useful, note adjacent players separately as market context rather than filing them as competitors.
+const COMPETITOR_BRIEF = `COMPETITOR INTELLIGENCE (for the client AND every competitor), from PUBLIC, OWNED channels only - record what is factually observable, never whether it is good. This is a REQUIRED part of every brief, never optional: a strategist cannot position the client without knowing who they are up against.
+- YOU MUST NAME AND PROFILE 3 TO 6 GENUINE LIKE-FOR-LIKE COMPETITORS. Do not leave the competitor set empty. If none have been supplied, identify them yourself from the client's category, market and geography (default South Africa unless the ground truth says otherwise): real, specific, named companies that sell the SAME core product or service to the SAME kind of buyer in the SAME market. For EACH, file a competitor_set profile: what they sell, their stated positioning/USP and tone, price posture where public, store/branch or scale footprint, their official website and social handles, and one line on WHY they are a true like-for-like rival (same offer, same buyer).
+- WHO COUNTS (be precise, do NOT over-reach): match on the client's ACTUAL business, not a loose theme or a shared buzzword. A furniture/bedding retailer competes with other furniture/bedding retailers selling to the same shoppers, not with a logistics firm it uses or a mall it sits in. A B2B service competes with other providers of that same service to the same buyer, not with the tools it uses, its own clients, or its partners. If a candidate only shares a category word, leave it out of the competitor set and, where useful, note it separately as market context.
 - Websites: propositions, offers, pricing where public, calls to action, landing approaches.
 - Social presence: which platforms are in use, posting cadence, content formats, visible campaign themes and promotions within the activity window.
 - Search visibility: whether the brand is visibly present for the category's core terms, and with what visible message. Do NOT claim rankings or SEO metrics you cannot observe directly, state presence and visible messaging only.
@@ -457,7 +458,7 @@ async function anthropicClient(): Promise<Anthropic> {
 // model files from the actual sources rather than a text summary it does not always write (the 0-claims bug).
 // Streamed (the SDK refuses a large non-streaming call), and max_tokens is generous so the forced tool call is never
 // truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
-async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: string, maxSearches: number, emit: (e: CollectEvent) => void): Promise<FileOut> {
+async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: string, maxSearches: number, emit: (e: CollectEvent) => void, fileInstructionOverride?: string): Promise<FileOut> {
   let sourcesRead = 0;
   // PROMPT CACHING (Gary's cost pass): the system lock and the passBrief (which carries the 34k site block) are sent
   // by the gather AND then again by the file step. Marking them cache_control:ephemeral means the file step reads
@@ -503,7 +504,7 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   // is the SAME cached block as the gather and the passBrief is the same cached block, so the file step reads that
   // shared prefix + the 34k site block from cache at ~0.1x instead of full price. The file-specific instruction
   // moved to this step's own user turn so the cached system prefix is identical between the two calls.
-  const fileInstruction =
+  const fileInstruction = fileInstructionOverride ||
     `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact as a structured claim via file_facts, up to about 120 claims. YOUR SOURCES ARE BOTH: (1) the CLIENT'S OWN SITE CONTENT and any OWNER/PARENT CONTEXT in my first message - these are primary Tier-1 material and you MUST file the facts they contain (what the client is, what they sell, who owns them, contact details, positioning) EVEN IF the web searches returned little or nothing; and (2) the web search results above. Never let empty or thin search results stop you filing the facts that are plainly in the brief and site content. If a site is bot-blocked and the brief carries only owner/parent context, still file the ownership relationship and the owner context, correctly attributed. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Each with its real source URL, date and tier. Do not search again.`;
   const filed = await withAnthropicRetry(() => client.messages.stream({
     model: OPUS5, max_tokens: 22000,
@@ -666,6 +667,7 @@ export async function prepareResearch(clientId: string, runId: string, version: 
     `Also set the tool fields 'vertical' (the client's marketing category) and 'regulated' (whether they are in a licensed/regulated sector).\n\n` +
     `ALWAYS COLLECT, EVERY RUN, WITHOUT EXCEPTION (check the site footer, and the contact, about, team and help pages):\n` +
     `- LEADERSHIP (section=leadership): the EXECUTIVE and MANAGEMENT team ONLY - the CEO/MD, founders, directors, principals and practice managers - NOT the full roster of advisers or staff (a list of advisers is NOT the leadership). Names, roles and a short background each. Dig BEYOND the website: LinkedIn company page, news, and for a licensed FSP the regulator's register, which lists the KEY INDIVIDUALS (the legally responsible officers) - treat those as the authoritative leadership. Note any FORMER holders of a senior role if that is on record. If the company genuinely does not publish an executive team anywhere you can find, record that explicitly as a section=unverified note - do NOT pad the leadership section with advisers to make it look complete. You MAY capture the team's SIZE and make-up as a SINGLE snapshot fact (e.g. "the site lists roughly 14 advisers and 5 practice coordinators"), but never file each individual adviser as leadership.\n` +
+    `- COMPETITORS (sections=competitor_set and competitor): NON-NEGOTIABLE - name 3 to 6 genuine like-for-like competitors of ${name} and profile EACH one (see the competitor brief below). Never return an empty competitor set. If none are supplied, identify them yourself from ${name}'s category and market. For each, file a competitor_set profile (what they sell, positioning, pricing posture, footprint, channels) and any observable competitor activity (campaigns, promotions, recent moves, review ratings). A dedicated competitor pass runs after this one, but you must still surface the real rival set here.\n` +
     `- AUDIENCE (section=audience): who the client serves today, their customer base and segments, and any stated target audience.\n` +
     `- CURRENT MARKETING (section=marketing): the client's OWN observable marketing and advertising - which channels they post on, cadence, campaign themes, promotions, and whether they run paid ads.\n` +
     `- RECENT ARTICLES (sections=marketing/activity/positioning/products): read the client's OWN recent articles/blog (last 3 months, provided above where fetched) and mine them for PRODUCT LAUNCHES (e.g. a new product like PSI / Pre-Sales Intelligence), positioning shifts and thought-leadership themes. These are a primary source for what the business is pushing now.\n` +
@@ -708,12 +710,14 @@ export async function prepareResearch(clientId: string, runId: string, version: 
   };
 }
 
-/** PHASE: gather (pass 1). The broad sweep - gather wide, then file from the real results. Restored to 26 searches
- *  (was trimmed to 18 to fit the old single-invocation limit; each phase has its own budget now, so it goes deep). */
+/** PHASE: gather (pass 1). The broad sweep - gather wide across every section, then file from the real results. 28
+ *  searches: each phase has its own Inngest invocation budget, so depth is affordable, and a cost trim to 20 had
+ *  starved the deeper sections. Competitors get their OWN dedicated phase after this one (researchCompetitors), so
+ *  this pass no longer has to both discover AND profile rivals inside its shared budget. */
 export async function researchGatherPass1(ctx: ResearchCtx, emit: (e: CollectEvent) => void): Promise<{ rawClaims: RawClaim[]; competitors: { name?: string; website?: string }[]; vertical: string | null; identity: ResearchIdentity }> {
   const client = await anthropicClient();
   emit({ t: "phase", label: `Collecting facts on ${ctx.name}` });
-  const out = await gatherAndFile(client, ctx, ctx.brief + ctx.siteBlock, 20, emit);
+  const out = await gatherAndFile(client, ctx, ctx.brief + ctx.siteBlock, 28, emit);
   const vertical = noDash(out.vertical).slice(0, 80) || null;
   const idIn = (out.identity || {}) as Record<string, unknown>;
   const identity: ResearchIdentity = {
@@ -743,21 +747,24 @@ export async function researchGatherPass1(ctx: ResearchCtx, emit: (e: CollectEve
 /** PHASE: gap-fill. Audit the mandatory sections; if any came back thin, ONE targeted top-up, then merge (deduped). */
 export async function researchGapFill(ctx: ResearchCtx, rawClaimsIn: RawClaim[], competitorsIn: { name?: string; website?: string }[], emit: (e: CollectEvent) => void): Promise<{ rawClaims: RawClaim[]; competitors: { name?: string; website?: string }[] }> {
   // Never hand the Strategist a half-complete brief (Gary): the mandatory sections must have real depth.
-  const MANDATORY: { id: string; need: string; min: number }[] = [
-    { id: "leadership", need: "the management and executive team - names, roles and short backgrounds (use LinkedIn)", min: 2 },
-    { id: "products", need: "products/services, pricing where public, and the commercial model", min: 2 },
-    { id: "positioning", need: "how they position themselves - promise, USPs, tone", min: 1 },
-    { id: "audience", need: "who they serve and their audience segments", min: 1 },
-    { id: "contact", need: "phone, email, address and every official social profile URL", min: 2 },
-    { id: "marketing", need: "their own current marketing and advertising activity", min: 1 },
-    { id: "competitor_set", need: "a factual profile of each competitor", min: 2 },
+  const MANDATORY: { id: string; need: string; min: number; hint: string }[] = [
+    { id: "leadership", need: "the management and executive team - names, roles and short backgrounds (use LinkedIn)", min: 2, hint: `search LinkedIn and news for ${ctx.name}'s executives and founders by name, and a regulator's register if licensed` },
+    { id: "products", need: "products/services, pricing where public, and the commercial model", min: 2, hint: `read ${ctx.name}'s product, pricing and shop pages` },
+    { id: "positioning", need: "how they position themselves - promise, USPs, tone", min: 1, hint: `read ${ctx.name}'s about page and recent posts for their stated promise and USPs` },
+    { id: "audience", need: "who they serve and their audience segments", min: 1, hint: `read ${ctx.name}'s about and audience-facing pages` },
+    { id: "contact", need: "phone, email, address and every official social profile URL", min: 2, hint: `read ${ctx.name}'s contact and footer for phone, email, address and every social handle` },
+    { id: "marketing", need: "their own current marketing and advertising activity", min: 1, hint: `look at ${ctx.name}'s live social channels and any current campaigns or promotions` },
+    { id: "competitor_set", need: "3 to 6 named like-for-like competitors, each with a factual profile", min: 3, hint: `search "${ctx.name} competitors" and the category in their market, then NAME and profile 3-6 real like-for-like rivals (what they sell, positioning, pricing, footprint, channels)` },
+    { id: "competitor", need: "observable competitor activity - campaigns, promotions, recent moves, ratings", min: 1, hint: `check each competitor's own site and socials for current campaigns, promotions and recent activity` },
   ];
   const gaps = MANDATORY.filter((m) => rawClaimsIn.filter((c) => c.section === m.id).length < m.min);
   if (!gaps.length) return { rawClaims: rawClaimsIn, competitors: competitorsIn };
   const client = await anthropicClient();
   emit({ t: "phase", label: `Filling gaps: ${gaps.map((g) => g.id).join(", ")}` });
-  const gapBrief = `Targeted follow-up for the ${ctx.name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}`).join("\n")}\n\nSearch specifically for these: LinkedIn for the team, their pricing and product pages, their social profiles, their current campaigns.${ctx.siteBlock}`;
-  const out2 = await gatherAndFile(client, ctx, gapBrief, 10, emit);   // targeted top-up; its own step budget, so a touch deeper than before
+  // The search steer is now DERIVED from exactly which sections are thin - it no longer always pointed the model at
+  // the client's own LinkedIn/pricing even when the real gap was competitors (Gary: competitor research was missing).
+  const gapBrief = `Targeted follow-up for the ${ctx.name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}\n  How: ${g.hint}`).join("\n")}${ctx.siteBlock}`;
+  const out2 = await gatherAndFile(client, ctx, gapBrief, 14, emit);   // targeted top-up; its own step budget, so it goes deeper
   const rawClaims = [...rawClaimsIn];
   const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
   for (const c of parseClaims(ctx.name, out2)) {
@@ -765,6 +772,52 @@ export async function researchGapFill(ctx: ResearchCtx, rawClaimsIn: RawClaim[],
     if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
   }
   const competitors = Array.isArray(out2.competitors) ? [...competitorsIn, ...out2.competitors] : competitorsIn;
+  return { rawClaims, competitors };
+}
+
+/** PHASE: competitors (Gary: "I see no competitor research at all"). The broad pass has to cover ~18 sections in one
+ *  shared search budget, so competitors were always the first thing squeezed out - especially on a fresh brain with
+ *  none pre-entered. This is a DEDICATED pass with its OWN search budget that does only what the broad pass cannot:
+ *  identify the client's genuine like-for-like rivals (if not already named) and PROFILE EACH in depth - proposition,
+ *  pricing posture, footprint, channels, current campaigns, ratings. Facts only, each sourced and tiered. Best-effort,
+ *  never blocks the run. Runs right after pass 1, so its facts are in place before gap-fill audits the mandatory set. */
+export async function researchCompetitors(ctx: ResearchCtx, rawClaimsIn: RawClaim[], competitorsIn: { name?: string; website?: string }[], emit: (e: CollectEvent) => void): Promise<{ rawClaims: RawClaim[]; competitors: { name?: string; website?: string }[] }> {
+  // The set to profile = whatever the team pre-entered PLUS whatever pass 1 volunteered, deduped by name.
+  const named = new Map<string, { name: string; website?: string }>();
+  for (const c of [...ctx.knownCompetitors, ...(Array.isArray(competitorsIn) ? competitorsIn : [])]) {
+    const n = noDash(c?.name).slice(0, 200);
+    const key = n.toLowerCase().trim();
+    if (n && !named.has(key)) named.set(key, { name: n, website: typeof (c as { website?: string })?.website === "string" ? (c as { website?: string }).website : undefined });
+  }
+  const list = [...named.values()];
+  const client = await anthropicClient();
+  emit({ t: "phase", label: list.length ? `Profiling competitors: ${list.slice(0, 4).map((c) => c.name).join(", ")}${list.length > 4 ? "…" : ""}` : `Identifying and profiling ${ctx.name}'s competitors` });
+
+  const namedBlock = list.length
+    ? `PROFILE EACH of these competitors in depth, AND add any genuine like-for-like rival you find that is missing from the list:\n${list.map((c) => `- ${c.name}${c.website ? ` (${c.website})` : ""}`).join("\n")}`
+    : `No competitor has been named yet, so FIRST identify 3 to 6 genuine like-for-like competitors of ${ctx.name}: real, specific, named companies that sell the SAME core product or service to the SAME kind of buyer in the SAME market and geography (${ctx.name} is South African unless the ground truth says otherwise). Name actual companies, never categories, then profile each.`;
+
+  const competitorBrief =
+    `COMPETITOR DEEP-DIVE for ${ctx.name}. This pass is COMPETITORS ONLY: do not re-file ${ctx.name}'s own facts here.\n\n` +
+    `${namedBlock}\n\n` +
+    `For EVERY competitor, read their own website and public channels and build a REAL profile, not a single line for the whole set. File, each sourced and tiered, with subject = the competitor's name:\n` +
+    `- competitor_set: what they sell, their stated positioning/USP and tone, price posture where public, store/branch or scale footprint, their official website and social handles, and one line on why they are a true like-for-like rival of ${ctx.name}.\n` +
+    `- competitor: observable public activity - current campaigns or promotions, notable moves in the last 90 days, the product ranges they push, and public review ratings (SA platforms included: HelloPeter, Google, Facebook).\n` +
+    `Aim for a genuine profile of EACH competitor. Facts only, never invented; a genuinely thin competitor stays thin, but still name it and file what is observable.\n\n${COMPETITOR_BRIEF}`;
+
+  const fileInstruction =
+    `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the COMPETITOR facts from the web search results above via file_facts, up to about 90 claims. This pass is competitors ONLY: file competitor_set (a factual profile per competitor) and competitor (observable public activity per competitor), each with subject = the competitor's name. Do NOT re-file ${ctx.name}'s own facts. Be specific per competitor (proposition, ranges, prices, footprint, channels, campaigns, ratings), never invent, carry the REAL source URLs and dates, and also return the competitor set in the 'competitors' field. Anything you could not verify goes to section=unverified with a reason. Do not search again.`;
+
+  const out = await gatherAndFile(client, ctx, competitorBrief, 24, emit, fileInstruction).catch(() => ({} as FileOut));
+  const rawClaims = [...rawClaimsIn];
+  const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
+  for (const c of parseClaims(ctx.name, out)) {
+    const k = `${c.section}::${normKey(c.claim)}`;
+    if (!seen.has(k)) { seen.add(k); rawClaims.push(c); }
+  }
+  const competitors = Array.isArray(out.competitors) ? [...competitorsIn, ...out.competitors] : competitorsIn;
+  const added = rawClaims.length - rawClaimsIn.length;
+  emit({ t: "phase", label: `Competitor profiling complete: ${added} competitor fact${added === 1 ? "" : "s"}` });
   return { rawClaims, competitors };
 }
 
@@ -833,7 +886,7 @@ export async function researchReview(ctx: ResearchCtx, rawClaimsIn: RawClaim[], 
     { id: "positioning", label: "their stated positioning and USPs", min: 1 },
     { id: "audience", label: "who they serve and their target audience", min: 1 },
     { id: "marketing", label: "their own current marketing and advertising", min: 1 },
-    { id: "competitor_set", label: "a set of genuine like-for-like competitors", min: 2 },
+    { id: "competitor_set", label: "a set of genuine like-for-like competitors", min: 3 },
     { id: "activity", label: "dated developments in the last 90 days", min: 1 },
     { id: "customer_voice", label: "public reviews and sentiment", min: 1 },
   ];
@@ -850,6 +903,10 @@ export async function researchReview(ctx: ResearchCtx, rawClaimsIn: RawClaim[], 
   }
   return rawClaims;
 }
+
+// External, Tier 2/3 sections that are commonly bot-walled: on a dead-link fetch failure these are kept in-section
+// (marked unconfirmed) rather than demoted to 'unverified', so a competitor set is never lost to a fetch failure.
+const EXTERNAL_KEEP = new Set<string>(["competitor", "competitor_set", "market", "press", "activity", "customer_voice"]);
 
 /** PHASE: verify (spec 3.7). We do not take the model's word that a source exists, says what it claims, or carries
  *  the date it claims. For each sourced claim we FETCH the page, read its real date, and check support. A claim
@@ -885,11 +942,19 @@ export async function researchVerify(ctx: ResearchCtx, rawClaims: RawClaim[], em
   return rawClaims.map((c, i) => {
     const v = verdicts.get(i);
     if (!v) return { ...c, verified: false };
-    // Trust outcome: verified page -> keep in section, mark verified, use the real date. Dead/refuted -> move to
-    // Unverified with the reason (never silently dropped). Bot-blocked (unverified) -> keep, not verified.
+    // Trust outcome: verified page -> keep in section, mark verified, use the real date. Refuted -> move to
+    // Unverified (the page contradicts it). Dead link -> see below. Bot-blocked (unverified) -> keep, not verified.
     const realDate = v.date && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : c.source_date;
     if (v.status === "verified" || v.status === "partial") return { ...c, source_date: realDate, verified: true };
-    if (v.status === "dead") return { ...c, section: "unverified", verified: false, unverified_reason: c.unverified_reason || "Source link could not be confirmed (dead or moved)." };
+    if (v.status === "dead") {
+      // A COLLECTOR KEEPS SIGNAL (Gary: competitor research must survive). Competitor, market and press claims are
+      // exactly the external, Tier 2/3 sources most often bot-walled or unfetchable - and moving them to
+      // 'unverified' ALSO drops them from the brain (ingest excludes unverified), which is how a whole competitor
+      // set can vanish on fetch failures. For those sections, keep the claim IN its section marked unconfirmed
+      // rather than losing it. Everything else still moves to unverified on a dead link.
+      if (EXTERNAL_KEEP.has(c.section)) return { ...c, source_date: realDate, verified: false, unverified_reason: c.unverified_reason || "Source could not be fetched to confirm, kept as unconfirmed signal." };
+      return { ...c, section: "unverified", verified: false, unverified_reason: c.unverified_reason || "Source link could not be confirmed (dead or moved)." };
+    }
     if (v.status === "refuted") return { ...c, section: "unverified", verified: false, unverified_reason: c.unverified_reason || "The cited page did not support this claim." };
     return { ...c, source_date: realDate, verified: false, unverified_reason: c.unverified_reason || (c.section === "unverified" ? "Single or unverifiable source." : "Source could not be reached to verify.") };
   });
@@ -952,7 +1017,8 @@ export async function collectResearch(
   try {
     const ctx = await prepareResearch(clientId, runId, version, today, opts);
     const p1 = await researchGatherPass1(ctx, emit);
-    const gapd = await researchGapFill(ctx, p1.rawClaims, p1.competitors, emit);
+    const comp = await researchCompetitors(ctx, p1.rawClaims, p1.competitors, emit);
+    const gapd = await researchGapFill(ctx, comp.rawClaims, comp.competitors, emit);
     const reviewed = await researchReview(ctx, gapd.rawClaims, emit);
     const verified = await researchVerify(ctx, reviewed, emit);
     return await researchStore(ctx, verified, gapd.competitors, p1.vertical, p1.identity, emit);
