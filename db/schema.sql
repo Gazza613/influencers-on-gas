@@ -715,9 +715,11 @@ alter table intel_briefs add column if not exists researcher text;
 --   'off'    - the brain is skipped on the automated run entirely (no research spend, no email).
 --   'daily'  - runs every weekday (Mon-Fri).
 --   'weekly' - runs on Monday only.
--- Default 'weekly': the low-cost default, matching the email's own "Weekly Intelligence" branding. Turn a brain
--- up to 'daily' deliberately, per client, rather than every brain quietly billing five days a week.
+-- Default 'off' (Gary): a brain sends NOTHING until the team explicitly toggles it on, picks a cadence, and adds
+-- the recipient addresses. Opt-in, never opt-out - the same posture as the Researcher weekly toggle, so no brain
+-- ever spends on a run or mails a client that nobody switched on.
 alter table intel_briefs add column if not exists email_schedule text not null default 'weekly';
+alter table intel_briefs alter column email_schedule set default 'off';
 alter table intel_briefs drop constraint if exists intel_briefs_email_schedule_check;
 alter table intel_briefs add constraint intel_briefs_email_schedule_check
   check (email_schedule in ('off','daily','weekly'));
