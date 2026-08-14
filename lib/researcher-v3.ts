@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { OPUS5, INGEST, withAnthropicRetry } from "./vendors/anthropic";
+import { OPUS5, SONNET5, INGEST, withAnthropicRetry } from "./vendors/anthropic";
 import { clientWebsites, siteAnchor, deriveResearchBrief, loadIntelBrief } from "./intel";
 import { recordTokens, recordUsage } from "./usage";
 import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
@@ -459,18 +459,21 @@ async function anthropicClient(): Promise<Anthropic> {
 // truncated into invalid JSON. Callable twice: the broad first pass, then a targeted gap pass.
 async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: string, maxSearches: number, emit: (e: CollectEvent) => void): Promise<FileOut> {
   let sourcesRead = 0;
-  // GATHER on Opus 5 (Gary's cost call): the gather is search ORCHESTRATION - Opus is elite at it and half Fable's
-  // price. Retried on a transient overload (529) / rate limit, so a single Anthropic blip does not kill the run.
+  // PROMPT CACHING (Gary's cost pass): the system lock and the passBrief (which carries the 34k site block) are sent
+  // by the gather AND then again by the file step. Marking them cache_control:ephemeral means the file step reads
+  // that shared prefix from cache at ~0.1x instead of full price - a big cut on the biggest repeated input. The
+  // system is IDENTICAL between the two calls (the file-specific instructions moved to the file step's user turn)
+  // so the cached prefix actually hits. Caching only affects billing, never the model's output.
+  const sysBlocks = [{ type: "text" as const, text: `${ctx.scope}\n\n${FACTS_ONLY}`, cache_control: { type: "ephemeral" as const } }];
+  const briefBlocks = [{ type: "text" as const, text: passBrief, cache_control: { type: "ephemeral" as const } }];
+  // GATHER stays on Opus 5: it is search ORCHESTRATION + reasoning, where the top model earns its price. 28k output
+  // (down from 40k) still lets a ~20-search gather finish; the fileFromSite fallback catches any residual truncation.
   const gathered = await withAnthropicRetry(async () => {
     const g = client.messages.stream({
-      // max_tokens must be roomy enough to HOLD the search results (each web_search_tool_result is large) AND the
-      // model's own text between searches. At 16k a 26-search gather truncated (stop=max_tokens, ~18.5k out) - the
-      // cut-off turn then made the file step file NOTHING (The Bed Shop: a fed brain returning 0 facts). 40k gives
-      // a deep gather room to finish; the fileFromSite fallback still catches any residual truncation.
-      model: OPUS5, max_tokens: 40000,
-      system: `${ctx.scope}\n\n${FACTS_ONLY}`,
+      model: OPUS5, max_tokens: 28000,
+      system: sysBlocks,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool],
-      messages: [{ role: "user", content: passBrief }],
+      messages: [{ role: "user", content: briefBlocks }],
     });
     g.on("contentBlock", (blk) => {
       const b = blk as { type: string; name?: string; input?: { query?: string }; content?: unknown };
@@ -496,22 +499,28 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   // text turn so the file step still runs (it files from the user brief and site block).
   if (!gatheredContent.length) gatheredContent = [{ type: "text", text: "Search complete." } as unknown as (typeof rawContent)[number]];
 
+  // FILE on Sonnet 5 (Gary's cost pass): filing gathered facts into the schema is EXTRACTION, not open reasoning,
+  // so the mid-tier model does it nearly as well at ~60% of the Opus price. The system is the SAME cached block as
+  // the gather (so the shared prefix + the 34k site block are read from cache); the file-specific instruction moves
+  // to this step's own user turn.
+  const fileInstruction =
+    `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact as a structured claim via file_facts, up to about 120 claims. YOUR SOURCES ARE BOTH: (1) the CLIENT'S OWN SITE CONTENT and any OWNER/PARENT CONTEXT in my first message - these are primary Tier-1 material and you MUST file the facts they contain (what the client is, what they sell, who owns them, contact details, positioning) EVEN IF the web searches returned little or nothing; and (2) the web search results above. Never let empty or thin search results stop you filing the facts that are plainly in the brief and site content. If a site is bot-blocked and the brief carries only owner/parent context, still file the ownership relationship and the owner context, correctly attributed. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Each with its real source URL, date and tier. Do not search again.`;
   const filed = await withAnthropicRetry(() => client.messages.stream({
-    model: OPUS5, max_tokens: 22000,
-    system: `${ctx.scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact as a structured claim via file_facts, up to about 120 claims. YOUR SOURCES ARE BOTH: (1) the CLIENT'S OWN SITE CONTENT and any OWNER/PARENT CONTEXT given in the brief above - these are primary Tier-1 material and you MUST file the facts they contain (what the client is, what they sell, who owns them, contact details, positioning) EVEN IF the web searches returned little or nothing; and (2) the web search results. Never let empty or thin search results stop you filing the facts that are plainly in the brief and site content. If a site is bot-blocked and the brief carries only owner/parent context, still file the ownership relationship and the owner context, correctly attributed. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason.`,
+    model: SONNET5, max_tokens: 22000,
+    system: sysBlocks,
     tools: [
       { type: "web_search_20250305", name: "web_search", max_uses: 40 } as unknown as Anthropic.Tool,
       { name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA },
     ],
     tool_choice: { type: "tool", name: "file_facts" },
     messages: [
-      { role: "user", content: passBrief },
+      { role: "user", content: briefBlocks },
       { role: "assistant", content: gatheredContent },
-      { role: "user", content: "Now file the material facts via file_facts, each with its real source URL, date and tier. File from BOTH the client's own site content and owner/parent context in my first message AND the search results above. If the searches returned little, still file every fact the brief and site content plainly contain (what the client is and sells, who owns them, contact, positioning). Do not search again." },
+      { role: "user", content: fileInstruction },
     ],
   }).finalMessage());
   const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: SONNET5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
   const block = filed.content.find((b) => b.type === "tool_use");
   return (block && block.type === "tool_use" ? block.input : {}) as FileOut;
 }
@@ -524,14 +533,14 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
 async function fileFromSite(client: Anthropic, ctx: ResearchCtx): Promise<RawClaim[]> {
   if (!ctx.siteBlock) return [];
   const filed = await withAnthropicRetry(() => client.messages.stream({
-    model: OPUS5, max_tokens: 20000,
+    model: SONNET5, max_tokens: 20000,
     system: `${ctx.scope}\n\n${FACTS_ONLY}\n\n${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact from the CLIENT'S OWN WEBSITE CONTENT below (Tier 1, their own channel) as a structured claim via file_facts, up to about 120 claims. File everything the content plainly states: what they are and sell, their positioning and USPs, products and pricing, who they serve, their contact details and social profiles, any leadership named, and any owner/parent relationship. Cite the [bracketed] page URL for each. Be thorough and specific, never invent. Do not search.`,
     tools: [{ name: "file_facts", description: "The verified fact base, every claim sourced and tiered.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "file_facts" },
     messages: [{ role: "user", content: ctx.brief + ctx.siteBlock }],
   }).finalMessage());
   const fu = filed.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
-  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: OPUS5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
+  await recordTokens({ clientId: ctx.clientId, userEmail: ctx.userEmail, model: SONNET5, action: "research-file", inputTokens: fu?.input_tokens || 0, outputTokens: fu?.output_tokens || 0, cacheReadTokens: fu?.cache_read_input_tokens || 0, cacheCreationTokens: fu?.cache_creation_input_tokens || 0 }).catch(() => {});
   const block = filed.content.find((b) => b.type === "tool_use");
   return parseClaims(ctx.name, (block && block.type === "tool_use" ? block.input : {}) as FileOut);
 }
@@ -704,7 +713,7 @@ export async function prepareResearch(clientId: string, runId: string, version: 
 export async function researchGatherPass1(ctx: ResearchCtx, emit: (e: CollectEvent) => void): Promise<{ rawClaims: RawClaim[]; competitors: { name?: string; website?: string }[]; vertical: string | null; identity: ResearchIdentity }> {
   const client = await anthropicClient();
   emit({ t: "phase", label: `Collecting facts on ${ctx.name}` });
-  const out = await gatherAndFile(client, ctx, ctx.brief + ctx.siteBlock, 26, emit);
+  const out = await gatherAndFile(client, ctx, ctx.brief + ctx.siteBlock, 20, emit);
   const vertical = noDash(out.vertical).slice(0, 80) || null;
   const idIn = (out.identity || {}) as Record<string, unknown>;
   const identity: ResearchIdentity = {
@@ -748,7 +757,7 @@ export async function researchGapFill(ctx: ResearchCtx, rawClaimsIn: RawClaim[],
   const client = await anthropicClient();
   emit({ t: "phase", label: `Filling gaps: ${gaps.map((g) => g.id).join(", ")}` });
   const gapBrief = `Targeted follow-up for the ${ctx.name} research brief. Scope lock and ground truth unchanged. The first pass came back THIN on the items below - dig DEEPER and file MORE facts, but ONLY for these (facts only, each sourced and tiered):\n${gaps.map((g) => `- ${g.id}: ${g.need}`).join("\n")}\n\nSearch specifically for these: LinkedIn for the team, their pricing and product pages, their social profiles, their current campaigns.${ctx.siteBlock}`;
-  const out2 = await gatherAndFile(client, ctx, gapBrief, 12, emit);   // targeted top-up; its own step budget, so a touch deeper than before
+  const out2 = await gatherAndFile(client, ctx, gapBrief, 10, emit);   // targeted top-up; its own step budget, so a touch deeper than before
   const rawClaims = [...rawClaimsIn];
   const seen = new Set(rawClaims.map((c) => `${c.section}::${normKey(c.claim)}`));
   for (const c of parseClaims(ctx.name, out2)) {

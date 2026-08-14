@@ -27,6 +27,10 @@ export const FABLE = "claude-fable-5";
 // OPUS 5 - the new default (mtok_in 5 / mtok_out 25, half Fable's price). The Researcher's brain runs on this
 // now: near-Fable extraction and synthesis, at the Opus price we already pay for the gather. Verify stays Haiku.
 export const OPUS5 = "claude-opus-5";
+// SONNET 5 (mtok_in 3 / mtok_out 15) - used for the Researcher's MECHANICAL steps (filing gathered facts into the
+// schema), which is extraction, not open reasoning. Keeps the gather + adversarial QA on Opus where judgement
+// matters, but cuts the biggest repeated call to ~60% of the Opus price.
+export const SONNET5 = "claude-sonnet-5";
 // Ingestion: reading printed text off a card is not a judgement call. Running 68 of those on a premium model
 // is paying Opus prices to do OCR.
 export const INGEST = "claude-haiku-4-5";
