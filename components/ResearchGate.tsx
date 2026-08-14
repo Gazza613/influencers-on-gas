@@ -21,6 +21,8 @@ const ICON = {
   competitors: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
   brief: `<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/>`,
   gate: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>`,
+  // Sliders: brief/tune the run before you commission it.
+  brief_setup: `<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="2" y1="14" x2="6" y2="14"/><line x1="10" y1="8" x2="14" y2="8"/><line x1="18" y1="16" x2="22" y2="16"/>`,
 } as const;
 
 // THE RESEARCHER (V3) + GATE 1. The Researcher COLLECTS facts, it never analyses (that is the Strategist's job).
@@ -585,8 +587,14 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
       {/* SETUP - one balanced card, top-aligned, so nothing floats in dead space: the brain and how it runs on the
           left, its ground-truth sources on the right. Inputs are full-width to fill their column. */}
       <div className="mt-6 rounded-2xl border border-line bg-surface-1 p-5 sm:p-6">
-        <div className="tabular text-[15px] font-semibold uppercase tracking-[0.16em] text-ink-faint">Setup</div>
-        <p className="mt-0.5 text-[16px] text-ink-dim">Pick the brain and confirm its ground truth, then commission the run above.</p>
+        <div className="flex items-center gap-3">
+          <SectionTile d={ICON.brief_setup} />
+          <div>
+            <div className="tabular text-[13px] font-semibold uppercase tracking-[0.18em] text-ink-faint">Setup</div>
+            <h2 className="text-[23px] font-extrabold tracking-tight text-ink">Brief the Researcher</h2>
+          </div>
+        </div>
+        <p className="mt-2 text-[16px] text-ink-dim">Point it at the right organisation: confirm the brain, its ground-truth sites and social accounts, add a focus if you want, then commission the run above.</p>
 
         <div className="mt-5 grid gap-x-8 gap-y-6 sm:grid-cols-2">
           {/* LEFT: the brain, and how it runs */}
@@ -606,9 +614,9 @@ export default function ResearchGate({ clients, configured = [] }: { clients: Cl
               <div>
                 <label className="block text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Focus for this run (optional)</label>
                 <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={3}
-                  placeholder="Steer the research. e.g. 'Focus on the Southern Suburbs: Constantia, Claremont, Newlands, Bishopscourt.' Leave blank for a full run."
+                  placeholder="Optional. Steer this run at a specific angle: a competitor, a product or service line, a region or location, a time period, or a question you want answered. Leave blank to run the full brief."
                   className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[17px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
-                <p className="mt-1 text-[15px] text-ink-faint">An emphasis, not a filter: every section is still collected, and nothing is ever made up to fit the focus.</p>
+                <p className="mt-1 text-[15px] text-ink-faint">An emphasis, not a filter: every section is still collected, and nothing is ever invented to fit the focus.</p>
               </div>
             )}
 
