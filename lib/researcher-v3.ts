@@ -50,6 +50,7 @@ export const RESEARCH_SECTIONS = [
   { id: "audience", label: "Audience and customers" },
   { id: "digital", label: "Digital footprint" },
   { id: "contact", label: "Contact and social channels" },
+  { id: "online_presence", label: "Online presence" },
   { id: "marketing", label: "Current marketing and advertising" },
   { id: "competitor", label: "Competitor intelligence" },
   { id: "competitor_set", label: "Competitor set" },
@@ -112,7 +113,7 @@ const SCHEMA = {
           section: {
             type: "string",
             enum: RESEARCH_SECTIONS.map((s) => s.id),
-            description: "snapshot=who they are, what they sell, where they play. foundations=history, ownership, structure, milestones. leadership=a named member of the management or executive team with their role and a short factual background (research them, LinkedIn included). products=a product/service, pricing where public, propositions, AND the commercial model: how they make money, price points, deal size, how they sell/distribute (direct, adviser network, retail, online), and partnerships. market=market size and dynamics where sourced, AND current demand/NOW signals: category search interest and trending queries, seasonality of demand, and consumer-behaviour shifts (date and source each). positioning=how the CLIENT positions ITSELF: their stated promise, brand story, unique selling points, tone of voice, brand assets (observable, NOT your recommendation). audience=an audience segment in DEPTH: demographics AND psychographics, their jobs-to-be-done, pains, and buying triggers/occasions (observed from their pages, reviews and category research, never an invented persona). digital=website/SEO observations, social posting cadence and content, AND observable performance and scale: follower/subscriber counts, engagement, review volume and average rating, and store/branch footprint (observed only, never estimated). contact=a contact or channel fact: a phone number, email, physical address, operating hours, WhatsApp number, or an official social profile (platform + full URL/handle). marketing=the CLIENT's OWN current marketing and advertising, observed: channels in use, campaign themes, promotions, and whether they run paid ads. competitor=an observable public-channel fact about the CLIENT or a named competitor (see the competitor brief). competitor_set=a one-line factual profile of a competitor. activity=a dated development in the last 90 days. press=a media release, news article, interview, podcast, award or notable third-party mention of the client, at ANY date, sourced to the original. customer_voice=reviews, ratings, public sentiment and recurring themes (SA platforms included). faqs=one of the brand's OWN published frequently-asked questions, as the question and its answer, sourced to their FAQ/help page. regulatory=ONLY when the client is in a regulated sector (e.g. financial services): the licence identifier, licence status and authorised categories from the regulator's own register, AND the advertising/marketing rules that constrain campaigns (e.g. FAIS: no guarantees, no urgency devices, mandatory disclaimers). unverified=a claim you could not verify but which may carry signal.",
+            description: "snapshot=who they are, what they sell, where they play. foundations=history, ownership, structure, milestones. leadership=a named member of the management or executive team with their role and a short factual background (research them, LinkedIn included). products=a product/service, pricing where public, propositions, AND the commercial model: how they make money, price points, deal size, how they sell/distribute (direct, adviser network, retail, online), and partnerships. market=market size and dynamics where sourced, AND current demand/NOW signals: category search interest and trending queries, seasonality of demand, and consumer-behaviour shifts (date and source each). positioning=how the CLIENT positions ITSELF: their stated promise, brand story, unique selling points, tone of voice, brand assets (observable, NOT your recommendation). audience=an audience segment in DEPTH: demographics AND psychographics, their jobs-to-be-done, pains, and buying triggers/occasions (observed from their pages, reviews and category research, never an invented persona). digital=website/SEO observations, social posting cadence and content, AND observable performance and scale: follower/subscriber counts, engagement, review volume and average rating, and store/branch footprint (observed only, never estimated). contact=a contact or channel fact: a phone number, email, physical address, operating hours, WhatsApp number, or an official social profile (platform + full URL/handle). online_presence=one line per official URL so the team never has to hunt for them: the client's website(s), and EACH official social account as 'Platform: full URL (@handle)' (Facebook, Instagram, X/Twitter, LinkedIn, YouTube, TikTok). One entry per platform, the exact URL, nothing else. marketing=the CLIENT's OWN current marketing and advertising, observed: channels in use, campaign themes, promotions, and whether they run paid ads. competitor=an observable public-channel fact about the CLIENT or a named competitor (see the competitor brief). competitor_set=a one-line factual profile of a competitor. activity=a dated development in the last 90 days. press=a media release, news article, interview, podcast, award or notable third-party mention of the client, at ANY date, sourced to the original. customer_voice=reviews, ratings, public sentiment and recurring themes (SA platforms included). faqs=one of the brand's OWN published frequently-asked questions, as the question and its answer, sourced to their FAQ/help page. regulatory=ONLY when the client is in a regulated sector (e.g. financial services): the licence identifier, licence status and authorised categories from the regulator's own register, AND the advertising/marketing rules that constrain campaigns (e.g. FAIS: no guarantees, no urgency devices, mandatory disclaimers). unverified=a claim you could not verify but which may carry signal.",
           },
           subject: { type: "string", description: "The brand this fact is about: the client's name, or a named competitor." },
           claim: { type: "string", description: "The fact itself, plainly stated. No interpretation." },
@@ -396,6 +397,7 @@ export type ResearchCtx = {
   clientId: string; today: string; userEmail: string | null;
   runId: string; version: number;
   name: string; website: string | null;
+  websites: string[]; socials: string[];   // the team's supplied ground-truth URLs, for the Online Presence backfill
   scope: string; brief: string; siteBlock: string;
   ceoName: string | null; ceoTitle: string; hasCeoLock: boolean;
   rejectedFacts: string[]; deadProducts: string[];
@@ -519,7 +521,7 @@ async function gatherAndFile(client: Anthropic, ctx: ResearchCtx, passBrief: str
   // shared prefix + the 34k site block from cache at ~0.1x instead of full price. The file-specific instruction
   // moved to this step's own user turn so the cached system prefix is identical between the two calls.
   const fileInstruction = fileInstructionOverride ||
-    `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact as a structured claim via file_facts, up to about 120 claims. YOUR SOURCES ARE BOTH: (1) the CLIENT'S OWN SITE CONTENT and any OWNER/PARENT CONTEXT in my first message - these are primary Tier-1 material and you MUST file the facts they contain (what the client is, what they sell, who owns them, contact details, positioning) EVEN IF the web searches returned little or nothing; and (2) the web search results above. Never let empty or thin search results stop you filing the facts that are plainly in the brief and site content. If a site is bot-blocked and the brief carries only owner/parent context, still file the ownership relationship and the owner context, correctly attributed. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Each with its real source URL, date and tier. Do not search again.`;
+    `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile EVERY material fact as a structured claim via file_facts, up to about 120 claims. YOUR SOURCES ARE BOTH: (1) the CLIENT'S OWN SITE CONTENT and any OWNER/PARENT CONTEXT in my first message - these are primary Tier-1 material and you MUST file the facts they contain (what the client is, what they sell, who owns them, contact details, positioning) EVEN IF the web searches returned little or nothing; and (2) the web search results above. Never let empty or thin search results stop you filing the facts that are plainly in the brief and site content. If a site is bot-blocked and the brief carries only owner/parent context, still file the ownership relationship and the owner context, correctly attributed. Be thorough and detailed: file the specifics (figures, dates, exact titles, quotes, prices, mechanics), not just headlines. Do NOT pad and do NOT invent to reach a number, a genuinely thin area stays thin, but never omit a real sourced fact just to keep it short, and never omit the always-collect items. Carry the REAL source URLs and dates through, never invent one. Tag every claim with its section, subject, tier and whether it is evergreen. Put anything you could not verify into section=unverified with a reason. Each with its real source URL, date and tier. STALENESS: today is ${ctx.today}. If a PRICE, PROMOTION or dated OFFER is sourced to a date more than about 3 months before today, add "(price/offer dated {date}, may no longer be current)" to that claim - prices and promos change, and a strategist must not treat a year-old promotional price as live. Do not search again.`;
   const filed = await withAnthropicRetry(() => client.messages.stream({
     model: RESEARCH_MODEL, max_tokens: 22000,
     system: sysBlocks,
@@ -612,7 +614,7 @@ export async function prepareResearch(clientId: string, runId: string, version: 
   const socialRows = (await db().query(`select socials, owner_context from clients where id = $1`, [clientId]).catch(() => [])) as { socials: string[] | null; owner_context: string | null }[];
   const socials = (Array.isArray(socialRows[0]?.socials) ? socialRows[0]!.socials! : []).filter((s) => typeof s === "string" && s.trim());
   const socialBlock = socials.length
-    ? `\n\nKNOWN SOCIAL ACCOUNTS (the GAS team supplied these - they ARE ${name}'s, mine EACH one): ${socials.join(", ")}.\nFor each, capture the platform + handle (section=contact), and mine it for posting CADENCE, the CONTENT themes and campaigns they run, engagement signals, and who their AUDIENCE appears to be (sections=marketing/audience/activity). The most RECENT posts define their current positioning and marketing, so lead with those.`
+    ? `\n\nKNOWN SOCIAL ACCOUNTS (the GAS team supplied these - they ARE ${name}'s, VISIT and mine EACH one): ${socials.join(", ")}.\nFor EACH account: (1) file it under section=online_presence as 'Platform: full URL'; (2) capture its FOLLOWER/subscriber count and any visible engagement (section=digital); (3) mine it for posting CADENCE, the CONTENT themes and campaigns they run, and who their AUDIENCE appears to be (sections=marketing/audience/activity). The most RECENT posts define their current positioning and marketing, so lead with those. Do NOT skip a supplied account.`
     : "";
 
   // OWNER / PARENT CONTEXT (Gary): when the subject is a PRODUCT or BRAND owned by a parent company, the parent is
@@ -720,7 +722,7 @@ export async function prepareResearch(clientId: string, runId: string, version: 
 
   return {
     clientId, today, userEmail: userEmail ?? null, runId, version,
-    name, website, scope, brief, siteBlock,
+    name, website, websites, socials, scope, brief, siteBlock,
     ceoName: briefLock?.ceoName ?? null, ceoTitle: ceoTitleLock, hasCeoLock: !!briefLock?.ceoName,
     rejectedFacts, deadProducts, knownCompetitors,
   };
@@ -774,6 +776,7 @@ export async function researchGapFill(ctx: ResearchCtx, rawClaimsIn: RawClaim[],
     { id: "digital", need: "observable performance and scale - follower counts, engagement, review volume + average rating, store/branch count", min: 2, hint: `read ${ctx.name}'s live social profiles for follower counts and engagement, their review platforms for volume and average rating, and any store/branch footprint` },
     { id: "competitor_set", need: "the comprehensive rival set (direct + adjacent), the material ones profiled", min: 4, hint: `search "${ctx.name} competitors" and the category in their market, map the WHOLE field (direct specialists AND adjacent players), and profile the material rivals (what they sell, positioning, pricing, manufacturer-vs-reseller, guarantee/finance, footprint, channels)` },
     { id: "competitor", need: "observable competitor activity - campaigns, promotions, recent moves, ratings", min: 1, hint: `check each competitor's own site and socials for current campaigns, promotions and recent activity` },
+    { id: "customer_voice", need: "public reviews, ratings and recurring sentiment themes (the real objections)", min: 2, hint: `search "${ctx.name} HelloPeter", "${ctx.name} reviews Google", and Facebook/Trustpilot - capture the average rating, review volume, and the recurring themes (delivery, comfort, warranty, service) in customers' own words` },
   ];
   const gaps = MANDATORY.filter((m) => rawClaimsIn.filter((c) => c.section === m.id).length < m.min);
   if (!gaps.length) return { rawClaims: rawClaimsIn, competitors: competitorsIn };
@@ -827,7 +830,9 @@ export async function researchCompetitors(ctx: ResearchCtx, rawClaimsIn: RawClai
     `Facts only, each sourced and tiered, subject = the rival's name. Never invent a rival or a detail; a genuinely thin competitor stays thin, but still name and position it.\n\n${COMPETITOR_BRIEF}`;
 
   const fileInstruction =
-    `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the COMPETITOR facts from the web search results above via file_facts, up to about 120 claims. This pass is competitors ONLY: file competitor_set (a factual profile per rival, the material ones in depth) and competitor (observable public activity per rival), each with subject = the rival's name. Cover the WHOLE field you found, direct and adjacent, tiered - do not truncate to a handful. Where a rival matches ${ctx.name}'s differentiator (guarantee, finance, manufacturer-direct pricing), file that explicitly. Do NOT re-file ${ctx.name}'s own facts. Be specific (proposition, ranges, prices, footprint, channels, campaigns, ratings), never invent, carry the REAL source URLs and dates, and return the full competitor set in the 'competitors' field. Anything unverifiable goes to section=unverified with a reason. Do not search again.`;
+    `${COMPETITOR_BRIEF}\n\n${NO_DASH_NOTE}\n\nFile the COMPETITOR facts from the web search results above via file_facts, up to about 120 claims. This pass is competitors ONLY: file competitor_set (a REAL profile per rival) and competitor (observable public activity per rival), each with subject = the rival's name. Cover the WHOLE field you found, direct and adjacent, tiered - do not truncate to a handful.\n` +
+    `DEPTH, NOT A CATEGORY LABEL: a competitor_set entry of the form "X is a South African bed retailer, a like-for-like rival" is USELESS to a strategist and is NOT acceptable on its own. For each material rival file SEVERAL claims that COMPARE it to ${ctx.name}: their PRICE posture vs ${ctx.name} (are they cheaper, dearer, same band, and on what), whether they are a MANUFACTURER or a reseller (the cost-structure difference), whether they MATCH ${ctx.name}'s differentiators (a comfort/returns guarantee, interest-free finance, manufacturer-direct pricing) or not, their store/branch FOOTPRINT and scale, their channels, and where ${ctx.name} plausibly WINS or LOSES against them on the evidence. If a rival matches a ${ctx.name} differentiator, say so plainly.\n` +
+    `Do NOT re-file ${ctx.name}'s own facts. Be specific (proposition, ranges, prices, footprint, channels, campaigns, ratings), never invent, carry the REAL source URLs and dates, and return the full competitor set in the 'competitors' field. Anything unverifiable goes to section=unverified with a reason. Do not search again.`;
 
   const out = await gatherAndFile(client, ctx, competitorBrief, 26, emit, fileInstruction).catch(() => ({} as FileOut));
   const rawClaims = [...rawClaimsIn];
@@ -940,9 +945,14 @@ export async function researchVerify(ctx: ResearchCtx, rawClaims: RawClaim[], em
   // Each phase has its OWN time budget now, so the cap is generous enough to cover the whole sourced set on a normal
   // run (the file step tops out near 120 claims), not the old 55. Fetches are pooled so we do not hammer the network.
   const VERIFY_CAP = 140;
+  // TIER 1 IS TRUSTED, TIER 2/3 IS GATED (Gary). Tier 1 = load-bearing sources (the client's OWN channels,
+  // regulators, official releases, verified financials). We do NOT re-fetch and support-check those: a bot-blocked
+  // re-fetch of the client's JS/Cloudflare site was wrongly "refuting" true facts (the 180-night guarantee, WhatsApp,
+  // PayJustNow) and burying them in Unverified. So we verify ONLY Tier 2 and Tier 3 (and untiered) claims; a Tier 2/3
+  // that fails the check lands in Unverified for the human Gate-1 to scrutinise. This also cuts verify time/cost.
   const toVerify = rawClaims
     .map((c, i) => ({ c, i }))
-    .filter((x) => x.c.source_url)
+    .filter((x) => x.c.source_url && (x.c.tier == null || x.c.tier >= 2))
     .sort((a, b) => (a.c.tier ?? 9) - (b.c.tier ?? 9))
     .slice(0, VERIFY_CAP);
   if (toVerify.length) emit({ t: "phase", label: `Verifying ${toVerify.length} key source${toVerify.length === 1 ? "" : "s"}` });
@@ -963,6 +973,8 @@ export async function researchVerify(ctx: ResearchCtx, rawClaims: RawClaim[], em
   }
 
   return rawClaims.map((c, i) => {
+    // Tier 1 is trusted: auto-approved, kept in section, never demoted (see the toVerify note above).
+    if (c.tier === 1) return { ...c, verified: true };
     const v = verdicts.get(i);
     if (!v) return { ...c, verified: false };
     // Trust outcome: verified page -> keep in section, mark verified, use the real date. Refuted -> move to
@@ -993,10 +1005,40 @@ export async function researchStore(ctx: ResearchCtx, claims: VerifiedClaim[], c
   )) as ResearchRun[];
   const run = runRows[0];
 
+  // ONLINE PRESENCE, DETERMINISTIC (Gary: the team must never hunt for the client's URLs). We KNOW the client's
+  // websites and socials - they were supplied as ground truth - so we guarantee one clean entry per URL rather than
+  // hope the model files them. Tier 1, verified. The supplied set is canonical: any model-filed online_presence
+  // claim for a platform we already supplied is dropped (dedup), while a platform the model found that we did NOT
+  // supply (e.g. a TikTok the team missed) is kept.
+  const platformOf = (u: string): string => {
+    const s = (u || "").toLowerCase();
+    if (s.includes("facebook.") || s.includes("fb.com")) return "Facebook";
+    if (s.includes("instagram.")) return "Instagram";
+    if (s.includes("//x.com") || s.includes(".x.com") || s.includes("twitter.")) return "X (Twitter)";
+    if (s.includes("linkedin.")) return "LinkedIn";
+    if (s.includes("youtube.") || s.includes("youtu.be")) return "YouTube";
+    if (s.includes("tiktok.")) return "TikTok";
+    if (s.includes("pinterest.")) return "Pinterest";
+    return "Website";
+  };
+  const presenceSites = ctx.websites.length ? ctx.websites : (ctx.website ? [ctx.website] : []);
+  const suppliedPlatforms = new Set<string>([...presenceSites, ...ctx.socials].filter(Boolean).map(platformOf));
+  const presenceRows: VerifiedClaim[] = [
+    ...presenceSites.map((w, i) => ({ label: i === 0 ? "Website" : "Website (additional)", url: w })),
+    ...ctx.socials.filter(Boolean).map((s) => ({ label: platformOf(s), url: s })),
+  ].map(({ label, url }) => ({
+    section: "online_presence", subject: ctx.name, claim: `${label}: ${url}`,
+    source_name: `${ctx.name} official / team-supplied`, source_url: url, source_date: null,
+    tier: 1, verified: true, unverified_reason: null, conflict: null,
+  }));
+  // Drop the model's online_presence claims for platforms we already have canonical URLs for; keep the rest.
+  const deduped = claims.filter((c) => !(c.section === "online_presence" && suppliedPlatforms.has(platformOf(`${c.source_url || ""} ${c.claim}`))));
+  const allClaims = [...presenceRows, ...deduped];
+
   // Pre-tag facts Gary already kept on a past run, so this run's list shows only what is genuinely new.
   const inBrainPrev = await loadInBrainFacts(ctx.clientId).catch(() => new Set<string>());
   const saved: ResearchClaim[] = [];
-  for (const c of claims) {
+  for (const c of allClaims) {
     const kept = inBrainPrev.has(normKey(c.claim));
     const rows = (await db().query(
       `insert into research_claims (run_id, client_id, section, subject, claim, source_name, source_url, source_date, tier, verified, unverified_reason, conflict, in_brain, in_brain_by)

@@ -209,29 +209,29 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         action: "Build the Brain",
         step: 1,
         ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
-        wash: "from-[#a855f7]/[0.10] to-[#22d3ee]/[0.04]",
+        wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#c4b5fd]",
       },
       {
-        name: <>The Researcher</>,
+        name: <>The <span className="brand-grad">Researcher</span></>,
         href: "/researcher",
         mark: <ResearcherMark />,
         blurb: "A commissioned deep dive built on the brain: it reads the client's own crawled material as ground truth, then verifies the external record, the market, competitors and positioning, and feeds its findings back.",
         action: "Research the market",
         step: 2,
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
-        wash: "from-[#22d3ee]/[0.09] to-[#818cf8]/[0.04]",
+        wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#67e8f9]",
       },
       {
-        name: <>The Strategist</>,
+        name: <>The <span className="brand-grad">Strategist</span></>,
         href: "/strategist/plan",
         mark: <StrategistMark />,
         blurb: "Turns the approved fact base into one single-minded, defensible strategy, every point traced to a fact. You refine and approve at Gate 2.",
         action: "Set the strategy",
         step: 3,
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
-        wash: "from-[#818cf8]/[0.10] to-[#a855f7]/[0.04]",
+        wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
         accent: "text-[#a5b4fc]",
       },
       {
@@ -358,7 +358,7 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
       {/* A soft light that only wakes on hover - the card feels lit rather than decorated. */}
       <span aria-hidden className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${d.wash} opacity-0 blur-2xl transition duration-500 group-hover:opacity-100`} />
       {/* STEP NUMBER: a faint watermark so a sequenced section reads as one guided flow, 1-2-3-4. */}
-      {d.step && <span aria-hidden className={`tabular pointer-events-none absolute right-5 top-3 z-0 text-[42px] font-black leading-none ${d.accent} opacity-[0.14]`}>{String(d.step).padStart(2, "0")}</span>}
+      {d.step && <span aria-hidden className={`tabular pointer-events-none absolute right-5 top-4 z-0 text-[22px] font-black leading-none tracking-[0.06em] ${d.accent} opacity-[0.16]`}>POD {String(d.step).padStart(2, "0")}</span>}
 
       {/* The main destination, covering the whole card. */}
       {d.external ? (

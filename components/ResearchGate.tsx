@@ -54,6 +54,7 @@ const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: "audience", label: "Audience and customers", blurb: "Who they serve, and their segments" },
   { id: "digital", label: "Digital footprint", blurb: "Website, SEO basics, social activity" },
   { id: "contact", label: "Contact and channels", blurb: "Phone, email, address, hours, WhatsApp, socials" },
+  { id: "online_presence", label: "Online presence", blurb: "Website and every official social URL, in one place" },
   { id: "marketing", label: "Current marketing and advertising", blurb: "The client's own channels, campaigns, promos, paid" },
   { id: "competitor", label: "Competitor intelligence", blurb: "Observable public activity, client and competitors" },
   { id: "competitor_set", label: "Competitor set", blurb: "A factual profile per competitor" },

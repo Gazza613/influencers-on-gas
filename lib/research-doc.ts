@@ -36,6 +36,7 @@ const DOC_SECTIONS: { id: string; n: number; label: string; lead: string }[] = [
   { id: "audience", n: 7, label: "Audience and customers", lead: "Who the client serves today, and the audiences it speaks to." },
   { id: "digital", n: 8, label: "Digital footprint", lead: "Their website, search presence and social activity." },
   { id: "contact", n: 9, label: "Contact and channels", lead: "How to reach them, and every channel they run." },
+  { id: "online_presence", n: 9, label: "Online presence", lead: "The client's website and every official social account, in one place." },
   { id: "marketing", n: 10, label: "Current marketing and advertising", lead: "The marketing and advertising the client is running now." },
   { id: "competitor", n: 11, label: "Competitor landscape", lead: "The competitors in play and what they are doing, observed from public channels." },
   { id: "competitor_set", n: 12, label: "Competitor set", lead: "The competitors in play, a factual profile each." },
@@ -139,8 +140,11 @@ export function briefHtml(clientName: string, website: string | null, run: Resea
     if (!rows.length) return "";   // conditional/empty sections simply do not render
     n += 1;
     const unver = sec.id === "unverified";
-    // Prefer the written prose; fall back to the raw facts as sentences so the section is never empty.
-    const text = (prose[sec.id] || rows.map((r) => r.claim).join(" ")).trim();
+    // Prefer the written prose; fall back to the raw facts as sentences so the section is never empty. ONLINE
+    // PRESENCE is the exception: it must show the exact URLs verbatim (one per line), never paraphrased prose.
+    const text = sec.id === "online_presence"
+      ? rows.map((r) => r.claim).join("\n\n")
+      : (prose[sec.id] || rows.map((r) => r.claim).join(" ")).trim();
     const paras = text.split(/\n\n+/).map((p) => `<p class="pp">${esc(p.trim())}</p>`).join("");
     return `<section class="sec ${unver ? "warn-sec" : ""}">
       <h2><span class="n">${n}</span> ${esc(sec.label)}</h2>
