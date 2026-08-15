@@ -108,6 +108,21 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
     setMsg(""); setNote(""); setRefineFor(null); await load(clientId);
   }
 
+  // Reopen an approved strategy so it can be edited again (Gary). It flips back to awaiting_approval, which lights
+  // up the per-section refine controls + the Gate 2 bar below. The proposal should be rebuilt after re-approving.
+  async function reopen() {
+    if (!strategy || busy) return;
+    setBusy(true); setMsg("");
+    const r = await fetch(`/api/studio/strategist/reopen`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ strategyId: strategy.id }),
+    }).then((x) => x.json()).catch(() => null);
+    setBusy(false);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't reopen the strategy."); return; }
+    setMsg("Reopened for edits. Refine any section, then approve again. Rebuild the proposal from the new version afterwards.");
+    await load(clientId);
+  }
+
   async function approve() {
     if (!strategy) return;
     setBusy(true);
@@ -205,6 +220,12 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
             <h2 className="text-2xl font-extrabold tracking-tight text-ink">The strategy</h2>
             {status && <span className={`rounded-full border px-3 py-1 text-base font-semibold ${status.cls}`}>v{strategy.version} · {status.label}</span>}
             {data?.objective && <span className="text-base text-ink-faint">Objective: {data.objective}</span>}
+            {strategy.status === "approved" && (
+              <button onClick={reopen} disabled={busy}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-base font-semibold text-ink-dim transition hover:border-accent/50 hover:text-ink disabled:opacity-50">
+                ✎ Reopen to refine
+              </button>
+            )}
           </div>
           {/* Provenance legend + how to edit, so the two things the team needs are stated once, up top. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-base text-ink-faint">

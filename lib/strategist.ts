@@ -200,6 +200,21 @@ export async function refineStrategy(strategyId: string, notes: string, userEmai
   return upd[0];
 }
 
+// Reopen an APPROVED strategy for another round of edits (Gary: "reopen to refine"). It flips the status back to
+// awaiting_approval so the Gate 2 surface's per-section refine + approve controls apply again; the content is
+// untouched until the team actually refines, and re-approving re-locks it. A superseded strategy stays locked -
+// build a fresh one. NOTE: the proposal was built from this strategy, so after changing it the team should rebuild
+// the proposal from the re-approved version.
+export async function reopenStrategy(strategyId: string): Promise<Strategy> {
+  const rows = (await db().query(`select * from strategies where id = $1`, [strategyId])) as Strategy[];
+  const cur = rows[0];
+  if (!cur) throw new Error("That strategy was not found.");
+  if (cur.status === "awaiting_approval") return cur;   // already open for edits
+  if (cur.status !== "approved") throw new Error("Only an approved strategy can be reopened. Build a new version instead.");
+  const upd = (await db().query(`update strategies set status = 'awaiting_approval' where id = $1 returning *`, [strategyId])) as Strategy[];
+  return upd[0];
+}
+
 // The latest strategy for a client (any status), with its campaign objective, for the Gate 2 surface.
 export async function latestStrategyForClient(clientId: string): Promise<{ strategy: Strategy | null; objective: string | null; hasApprovedResearch: boolean }> {
   const eng = (await db().query(`select id from engagements where client_id = $1 order by created_at asc limit 1`, [clientId])) as { id: string }[];
