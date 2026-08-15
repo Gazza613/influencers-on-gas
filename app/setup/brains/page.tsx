@@ -11,12 +11,8 @@ export default async function BrainsPage() {
   const brains = await listBrains();
   return (
     <div className="mx-auto max-w-5xl">
-      <h1 className="text-3xl font-bold">Brains</h1>
-      <p className="mt-3 max-w-3xl text-lg leading-relaxed text-ink-dim">
-        A brain is a client&apos;s private knowledge base. Feed it the client&apos;s website and notes,
-        and the producer co-pilot writes every script on-brand from it. Each brain is fully
-        isolated: one client&apos;s brain can never read another&apos;s.
-      </p>
+      {/* Header + description now live inside BrainsManager's living hero, so the corpus tally can stay live
+          across create/delete. */}
       <BrainsManager initial={brains} />
     </div>
   );
