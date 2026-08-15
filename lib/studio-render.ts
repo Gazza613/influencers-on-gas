@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import type { Browser } from "puppeteer-core";
+import { isSafePublicUrl } from "./safe-url";
 
 // THE STATIC RENDERER. HTML/CSS in, a pixel-exact PNG out.
 //
@@ -109,10 +110,19 @@ export async function closeRenderer(): Promise<void> {
 // caller MUST pass a vetted public URL (SSRF). Returns an above-the-fold JPEG, small enough to hand to a vision
 // model, or null if the site cannot be reached in time. Never throws - a colour read must never break a render.
 export async function screenshotUrl(url: string, opts: { width?: number; height?: number; ms?: number } = {}): Promise<Buffer | null> {
+  // SSRF: the caller should pass a vetted URL, but we re-check here (defence in depth) AND block every redirect
+  // hop, since a public homepage can 302 to an internal host (169.254.169.254, localhost) that the initial check
+  // never sees. Request interception aborts any navigation to a non-public host, redirect hops included.
+  if (!isSafePublicUrl(url)) return null;
   let page: Awaited<ReturnType<Browser["newPage"]>> | null = null;
   try {
     const b = await browser();
     page = await b.newPage();
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      if (req.isNavigationRequest() && !isSafePublicUrl(req.url())) { req.abort().catch(() => {}); return; }
+      req.continue().catch(() => {});
+    });
     await page.setViewport({ width: opts.width ?? 1280, height: opts.height ?? 900, deviceScaleFactor: 1 });
     // networkidle2 settles most sites; the timeout is the hard stop so a slow site can never hang the render.
     await page.goto(url, { waitUntil: "networkidle2", timeout: opts.ms ?? 20_000 }).catch(() => page!.goto(url, { waitUntil: "domcontentloaded", timeout: opts.ms ?? 20_000 }));

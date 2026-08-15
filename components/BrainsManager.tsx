@@ -53,8 +53,10 @@ export default function BrainsManager({ initial }: { initial: Brain[] }) {
   const [pendingId, setPendingId] = useState("");
   const pendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBrainRef = useRef<Brain | null>(null);
-  // Cancel any pending delete on unmount, so a commit never fires setState after the component is gone.
-  useEffect(() => () => { if (pendingRef.current) clearTimeout(pendingRef.current); }, []);
+  const mountedRef = useRef(true);
+  // Cancel any pending delete on unmount, and flag unmount so an in-flight commit (e.g. one triggered by deleting
+  // a second brain) never fires setState after the component is gone. The server DELETE still completes.
+  useEffect(() => () => { mountedRef.current = false; if (pendingRef.current) clearTimeout(pendingRef.current); }, []);
 
   async function create() {
     if (!name.trim() || busy) return;
@@ -84,6 +86,7 @@ export default function BrainsManager({ initial }: { initial: Brain[] }) {
     pendingRef.current = null;
     if (pendingBrainRef.current?.id === b.id) pendingBrainRef.current = null;
     const r = await fetch(`/api/brains/${b.id}`, { method: "DELETE" }).catch(() => null);
+    if (!mountedRef.current) return;   // component gone; the DELETE already fired, just skip the UI updates
     setPendingId((cur) => (cur === b.id ? "" : cur));   // don't clear a newer pending brain's countdown
     if (r?.ok) { setList((l) => l.filter((x) => x.id !== b.id)); flex(`${b.name} deleted.`); }
     else { const d = await r?.json().catch(() => ({})); flex(d?.error || "Could not delete that brain."); }

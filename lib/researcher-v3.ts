@@ -8,6 +8,7 @@ import { verifyFinding, toISODate, fetchSourcePage } from "./verify";
 import { ingestChunks } from "./rag";
 import { scrape, looksBlocked } from "./vendors/firecrawl";
 import { FABLE } from "./vendors/anthropic";
+import { isSafePublicUrl } from "./safe-url";
 
 // THE RESEARCH MODEL - one swap point (Gary: this is the most foundational step). Default Opus 5, a top-tier
 // reasoning + search model. To TRIAL Fable 5 (the most capable model), set this to FABLE on ONE run and revert if
@@ -310,11 +311,25 @@ async function loadCorePages(websites: string[], clientId?: string, userEmail?: 
 // pull the individual article links, and read the most recent ones in full. This surfaces things like a "PSI /
 // Pre-Sales Intelligence" launch that a homepage never mentions.
 async function fetchRawHtml(url: string): Promise<string> {
+  // SSRF: this is a server-side fetch whose body is reflected into the research prompt (and thence the brief and
+  // brain), so it MUST pass the same guard as every other fetch chokepoint. We follow redirects MANUALLY and
+  // re-validate each hop, because a public URL can 302 to an internal host that the initial check never sees.
   try {
-    const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(8000), headers: { "User-Agent": "Mozilla/5.0 (compatible; GAS-Studio-Researcher/1.0; +https://gasmarketing.co.za)", Accept: "text/html" } });
-    if (!res.ok) return "";
-    if (!/html|text/i.test(res.headers.get("content-type") || "")) return "";
-    return (await res.text()).slice(0, 400_000);
+    let current = url;
+    for (let hop = 0; hop < 4; hop++) {
+      if (!isSafePublicUrl(current)) return "";
+      const res = await fetch(current, { redirect: "manual", signal: AbortSignal.timeout(8000), headers: { "User-Agent": "Mozilla/5.0 (compatible; GAS-Studio-Researcher/1.0; +https://gasmarketing.co.za)", Accept: "text/html" } });
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get("location");
+        if (!loc) return "";
+        current = new URL(loc, current).toString();   // re-validated at the top of the next hop
+        continue;
+      }
+      if (!res.ok) return "";
+      if (!/html|text/i.test(res.headers.get("content-type") || "")) return "";
+      return (await res.text()).slice(0, 400_000);
+    }
+    return "";   // too many redirects
   } catch { return ""; }
 }
 async function loadRecentArticles(websites: string[], maxChars: number): Promise<string> {
@@ -1011,6 +1026,9 @@ export async function researchStore(ctx: ResearchCtx, claims: VerifiedClaim[], c
   // hope the model files them. Tier 1, verified. The supplied set is canonical: any model-filed online_presence
   // claim for a platform we already supplied is dropped (dedup), while a platform the model found that we did NOT
   // supply (e.g. a TikTok the team missed) is kept.
+  // platformOf returns "" for anything it does NOT recognise - deliberately NOT "Website", so an unknown
+  // platform the model found (Threads, a secondary site) can never collide with the always-supplied website
+  // bucket and get wrongly dropped. Websites are handled separately, by URL.
   const platformOf = (u: string): string => {
     const s = (u || "").toLowerCase();
     if (s.includes("facebook.") || s.includes("fb.com")) return "Facebook";
@@ -1020,20 +1038,33 @@ export async function researchStore(ctx: ResearchCtx, claims: VerifiedClaim[], c
     if (s.includes("youtube.") || s.includes("youtu.be")) return "YouTube";
     if (s.includes("tiktok.")) return "TikTok";
     if (s.includes("pinterest.")) return "Pinterest";
-    return "Website";
+    if (s.includes("threads.")) return "Threads";
+    if (s.includes("wa.me") || s.includes("whatsapp.")) return "WhatsApp";
+    return "";
   };
+  const normUrl = (u: string) => String(u || "").replace(/\/+$/, "").toLowerCase();
   const presenceSites = ctx.websites.length ? ctx.websites : (ctx.website ? [ctx.website] : []);
-  const suppliedPlatforms = new Set<string>([...presenceSites, ...ctx.socials].filter(Boolean).map(platformOf));
+  // Canonical dedup keys: the SOCIAL platforms we were handed (non-empty only), and the website URLs we list.
+  const suppliedSocialPlatforms = new Set<string>(ctx.socials.filter(Boolean).map(platformOf).filter(Boolean));
+  const suppliedSiteUrls = new Set<string>(presenceSites.filter(Boolean).map(normUrl));
   const presenceRows: VerifiedClaim[] = [
     ...presenceSites.map((w, i) => ({ label: i === 0 ? "Website" : "Website (additional)", url: w })),
-    ...ctx.socials.filter(Boolean).map((s) => ({ label: platformOf(s), url: s })),
+    ...ctx.socials.filter(Boolean).map((s) => ({ label: platformOf(s) || "Social", url: s })),
   ].map(({ label, url }) => ({
     section: "online_presence", subject: ctx.name, claim: `${label}: ${url}`,
     source_name: `${ctx.name} official / team-supplied`, source_url: url, source_date: null,
     tier: 1, verified: true, unverified_reason: null, conflict: null,
   }));
-  // Drop the model's online_presence claims for platforms we already have canonical URLs for; keep the rest.
-  const deduped = claims.filter((c) => !(c.section === "online_presence" && suppliedPlatforms.has(platformOf(`${c.source_url || ""} ${c.claim}`))));
+  // Drop a model online_presence claim ONLY when it duplicates a canonical social platform we supplied, or points
+  // at a website URL we already list. A platform we do not recognise / did not supply is KEPT (the whole point).
+  const deduped = claims.filter((c) => {
+    if (c.section !== "online_presence") return true;
+    const url = normUrl(c.source_url || String(c.claim).match(/https?:\/\/\S+/)?.[0] || "");
+    const plat = platformOf(url || c.claim);
+    if (plat && suppliedSocialPlatforms.has(plat)) return false;
+    if (url && suppliedSiteUrls.has(url)) return false;
+    return true;
+  });
   const allClaims = [...presenceRows, ...deduped];
 
   // Pre-tag facts Gary already kept on a past run, so this run's list shows only what is genuinely new.
