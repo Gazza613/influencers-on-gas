@@ -144,6 +144,7 @@ const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)
   `- NEVER COMMIT TO AN OUTCOME. No guaranteed conversion rates, lead volumes or returns anywhere. The funnel economics and any figure are ILLUSTRATIVE benchmarks, clearly labelled, never a promise.\n` +
   `- AUDIENCE IS THE PROOF OF OUR ABILITY, and it is the most important section. For each persona give ACTUAL, credible platform-level targeting selections on the platforms that genuinely fit them (from Facebook, Instagram, TikTok, Google Display, LinkedIn). Facebook/Instagram: interests, behaviours, demographics, custom + lookalike. TikTok: interests, hashtags, creator adjacencies. Google Display: in-market segments, custom-intent keywords, topics. LinkedIn: job titles, seniority, function, industry, company size. Be specific enough that a media buyer could build these audiences.\n` +
   `- CHANNELS: intelligently SELECT the platforms for this objective and audience and justify each, with a lead/support/test priority. Do not reflexively include every platform, choose where the value is.\n` +
+  `- CHANNEL REALISM (performance-marketing truth, non-negotiable): LinkedIn is a SUPPORT / precision channel, NEVER the lead volume driver, even in B2B. Its targeting is the sharpest (title, function, seniority, industry, company size) but its lead VOLUME is low and its CPMs are high, so it qualifies and supports; the lead volume comes from Meta and Google. Never mark LinkedIn as the 'lead' channel. For a B2B lead objective the lead channel is typically Meta and/or Google (with lead forms, click-to-message, custom-intent search), and LinkedIn plays a support role for precision targeting and credibility.\n` +
   `- Map all EIGHT pods to ${clientName}, each specific to the objective.\n` +
   `- GIVE THE CREATIVE A SPIKE. The Creative pod (Pod IV) must not merely describe producing assets. Its 'for_client' must name a CREATIVE TERRITORY, one ownable, memorable idea or campaign line for ${clientName} (the kind of thought that makes a room lean in), rooted in the strategy's proposition. The document is intelligent throughout; this is the one place it must also make the client FEEL something.\n` +
   `- INVESTMENT: fill it fully. tier_name = "${tier.name}", rate = "${tier.rate}". In 'engine_includes' list 6 to 8 concrete things the SYSTEM delivers at this tier (the pods and what the tier covers, e.g. "Full omnichannel media across the selected platforms", "PSI qualification and the conversion dashboard"). In 'notes' put the honest commercial notes: media budget is the client's and additional to the retainer; the client owns all data, accounts and audiences; we do not quote a guaranteed return.\n` +
@@ -186,8 +187,11 @@ export async function buildProposal(strategyId: string, input: { objective: Obje
     `Write the full proposal via write_proposal. Make the audience and channels world-class and specific.`;
 
   const tool: Anthropic.Tool = { name: "write_proposal", description: "The complete, structured growth proposal.", input_schema: CONTENT_SCHEMA };
+  // max_tokens must clear the FULL proposal: 5 personas with platform-level selections, 8 pods, KPIs, rollout,
+  // compliance AND investment are the LAST fields, so a tight ceiling truncates exactly those (the "blank
+  // investment / rollout / compliance" bug). 32k gives ample headroom for the whole structured object.
   const msg = await withAnthropicRetry(() => client.messages.stream({
-    model: FABLE, max_tokens: 16000, system: SYSTEM(clientName, objective.label, tier),
+    model: FABLE, max_tokens: 32000, system: SYSTEM(clientName, objective.label, tier),
     tools: [tool], tool_choice: { type: "tool", name: "write_proposal" },
     messages: [{ role: "user", content: user }],
   }).finalMessage());

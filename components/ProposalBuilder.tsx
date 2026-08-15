@@ -267,7 +267,7 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
 
           <section className="rounded-xl border border-accent/40 bg-surface-1 p-5">
             <div className="text-base font-semibold uppercase tracking-wide text-accent">The investment</div>
-            <div className="mt-1 text-2xl font-extrabold text-ink">{c.investment?.tier_name} · {c.investment?.rate}</div>
+            <div className="mt-1 text-2xl font-extrabold text-ink">{c.investment?.tier_name || TIERS[tier].name} · {c.investment?.rate || TIERS[tier].rate}</div>
             <ul className="mt-2 grid list-disc gap-1 pl-5 text-lg text-ink-dim sm:grid-cols-2">{arr(c.investment?.engine_includes).map((x, i) => <li key={i}>{x}</li>)}</ul>
             {arr(c.investment?.notes).map((n, i) => <p key={i} className="mt-2 text-base text-ink-faint">{n}</p>)}
           </section>

@@ -1095,6 +1095,20 @@ export async function researchStore(ctx: ResearchCtx, claims: VerifiedClaim[], c
       [ctx.clientId, cname, cweb],
     ).catch(() => {});
   }
+  // ALSO seed the set from the competitor_set CLAIMS the model filed (their subject IS the rival's name). The
+  // structured `competitors` array above can come back empty even when the research clearly profiled rivals, which
+  // left the editable set AND the proposal's competitive map empty (Gary: "how can a competitor graph only have
+  // them on it"). This keeps the set in sync with what was actually researched.
+  for (const c of allClaims) {
+    if (c.section !== "competitor_set") continue;
+    const cname = noDash(String(c.subject || "")).slice(0, 200);
+    if (!cname || have.has(cname.toLowerCase().trim())) continue;
+    have.add(cname.toLowerCase().trim());
+    await db().query(
+      `insert into research_competitors (client_id, name, website, added_by) values ($1,$2,$3,'auto')`,
+      [ctx.clientId, cname, null],
+    ).catch(() => {});
+  }
 
   emit({ t: "done", count: saved.length });
   return { run, claims: saved };
