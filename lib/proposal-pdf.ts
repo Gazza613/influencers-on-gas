@@ -52,7 +52,19 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
   const objectiveLabel = OBJECTIVES.find((o) => o.id === p.objective)?.label || String(p.objective);
   // Gary's rule: the proposal date is ALWAYS the current date (SA time) at generation, never a stored date.
   const dateLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
-  const contacts = [identity.contact_details, identity.address, website].filter(Boolean).map(String);
+  // The sign-off may carry the client's address/email, but NEVER their WhatsApp (Gary, twice): on a GAS proposal
+  // the only WhatsApp is our PSI system, so strip any WhatsApp label/number/link out of the contact block.
+  const stripWhatsApp = (s: string): string =>
+    String(s || "")
+      .replace(/\bwhats\s*app\b[^\d\n]{0,30}?\+?\d[\d\s()\-]{5,}/gi, "")
+      .replace(/\bhttps?:\/\/(?:wa\.me|api\.whatsapp\.com|chat\.whatsapp\.com)\/\S+/gi, "")
+      .replace(/\bwa\.me\/\S+/gi, "")
+      .replace(/\bwhats\s*app\b/gi, "")
+      .replace(/\s*[|,;·]\s*(?=[|,;·]|$)/g, "")
+      .replace(/^\s*[|,;·]\s*|\s*[|,;·]\s*$/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  const contacts = [stripWhatsApp(identity.contact_details || ""), identity.address, website].filter(Boolean).map(String);
 
   const doc = buildProposalDoc(p.content, {
     clientName, objectiveLabel, tierName: tier.name,

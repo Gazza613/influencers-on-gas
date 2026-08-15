@@ -38,7 +38,9 @@ async function fetchText(url: string, ms = 8000): Promise<string> {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), ms);
   try {
-    const r = await fetch(url, { signal: ac.signal, redirect: "follow", headers: { "user-agent": "Mozilla/5.0 GASBrand/1.0" } });
+    // A realistic desktop-Chrome UA: a bot-shaped UA gets a Cloudflare challenge page (no brand colours in it), so
+    // the extractor would fall through to the neutral default even though the real site is reachable.
+    const r = await fetch(url, { signal: ac.signal, redirect: "follow", headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", "accept": "text/html,application/xhtml+xml,text/css,*/*" } });
     if (!r.ok) return "";
     const ct = r.headers.get("content-type") || "";
     if (!/text|css|html/i.test(ct)) return "";
