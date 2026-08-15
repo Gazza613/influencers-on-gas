@@ -100,11 +100,20 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
             ))}
           </div>
         </div>
+        <label className="block">
+          <span className="text-base font-semibold uppercase tracking-wide text-ink-faint">Client brand colour</span>
+          <div className="mt-1 flex items-center gap-2">
+            <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#3a5bd9"} onChange={(e) => setAccent(e.target.value)} aria-label="Client brand colour" className="h-10 w-12 cursor-pointer rounded-lg border border-line bg-surface-2 p-1" />
+            <input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="Auto from site" className="w-36 rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg outline-none focus:border-accent" />
+            {accent && <button type="button" onClick={() => setAccent("")} className="text-base font-semibold text-ink-faint hover:text-ink">Auto</button>}
+          </div>
+        </label>
         <button onClick={build} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
           {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
           {busy ? "Working…" : proposal ? "Rebuild the proposal" : "Build the proposal"}
         </button>
       </div>
+      <p className="mt-2 text-base text-ink-faint">Brand colour: leave blank to read it from the client&apos;s site automatically, or set it once here to lock their exact colour. A locked colour is saved to the client and reused on every future proposal, so you never set it twice.</p>
       {pdfBusy
         ? <div className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-accent"><Working messages={WORKING_PDF} /></div>
         : (busy || gateBusy)

@@ -39,6 +39,9 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
   let palette: { primary: string; dark: string };
   if (accentOverride && /^#[0-9a-fA-F]{6}$/.test(accentOverride)) {
     palette = { primary: accentOverride, dark: cachedPalette?.dark || "#0E1016" };
+    // Human Command: a locked colour persists on the client, so every future proposal for them reuses it and the
+    // team never sets it twice (Gary: "I cannot keep coming back here to adjust").
+    await db().query(`update clients set brand_palette = $2::jsonb where id = $1`, [clientId, JSON.stringify(palette)]).catch(() => {});
   } else if (cachedPalette) {
     palette = { primary: String(cachedPalette.primary), dark: String(cachedPalette.dark || "#0E1016") };
   } else {
