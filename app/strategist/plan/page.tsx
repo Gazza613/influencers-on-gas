@@ -10,7 +10,11 @@ import { db } from "@/lib/db";
 // senior human refines and approves. The Proposal (next) will run from an approved strategy, in this same POD.
 export const dynamic = "force-dynamic";
 
-export default async function StrategistPlanPage() {
+export default async function StrategistPlanPage({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
+  // ?client=<id> carries the client through from the Researcher, so the Strategist opens on the same client you
+  // were just working on rather than the first approved one.
+  const sp = await searchParams;
+  const initialClientId = typeof sp?.client === "string" ? sp.client : "";
   const clients = await listStudioClients().catch(() => []);
   // Which clients have an APPROVED research run - the only ones a strategy can be built from.
   const rows = (await db().query(`select distinct client_id from research_runs where status = 'gate1_approved'`).catch(() => [])) as { client_id: string }[];
@@ -27,7 +31,7 @@ export default async function StrategistPlanPage() {
           defensible strategy, the brief every later step is built from. Every point is traced to a fact. The AI
           drafts and red-teams; you refine and approve at <b className="text-ink">Gate 2</b>.
         </p>
-        <StrategyGate clients={clients} ready={ready} />
+        <StrategyGate clients={clients} ready={ready} initialClientId={initialClientId} />
       </main>
     </div>
   );

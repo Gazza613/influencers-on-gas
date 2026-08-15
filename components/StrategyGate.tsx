@@ -21,8 +21,14 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   draft: { label: "Draft", cls: "border-line bg-surface-2 text-ink-dim" },
 };
 
-export default function StrategyGate({ clients, ready }: { clients: Client[]; ready: string[] }) {
-  const [clientId, setClientId] = useState(clients.find((c) => ready.includes(c.id))?.id || clients[0]?.id || "");
+export default function StrategyGate({ clients, ready, initialClientId = "" }: { clients: Client[]; ready: string[]; initialClientId?: string }) {
+  const [clientId, setClientId] = useState(() => {
+    // Arriving FROM the Researcher ("Go to the Strategist") must land on THAT client, even if its fact base is not
+    // approved yet (the page just shows it as not-ready). Only honour a real client id; otherwise fall back.
+    const fromPod = initialClientId && clients.find((c) => c.id === initialClientId);
+    if (fromPod) return fromPod.id;
+    return clients.find((c) => ready.includes(c.id))?.id || clients[0]?.id || "";
+  });
   const [data, setData] = useState<Latest | null>(null);
   const [objective, setObjective] = useState("");
   const [busy, setBusy] = useState(false);
