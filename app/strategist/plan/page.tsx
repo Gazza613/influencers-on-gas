@@ -25,12 +25,7 @@ export default async function StrategistPlanPage({ searchParams }: { searchParam
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
         <Link href="/dashboard" className="text-lg font-semibold text-ink-dim transition hover:text-ink">← Dashboard</Link>
         <FlowSteps active={3} />
-        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">The Strategist</h1>
-        <p className="mt-2 max-w-3xl text-[22px] leading-relaxed text-ink-dim">
-          It turns the Researcher&apos;s <b className="text-ink">verified fact base</b> into one single-minded,
-          defensible strategy, the brief every later step is built from. Every point is traced to a fact. The AI
-          drafts and red-teams; you refine and approve at <b className="text-ink">Gate 2</b>.
-        </p>
+        {/* Title + description now live in StrategyGate's living hero, the same pattern as the Brain and Researcher. */}
         <StrategyGate clients={clients} ready={ready} initialClientId={initialClientId} />
       </main>
     </div>
