@@ -90,15 +90,28 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       audience_chip: `Prepared for ${name} · ${x.objectiveLabel}`,
     },
 
-    exec: {
-      headline: hl("The case", "in one page"),
-      intro: c.exec_summary?.intro || "",
-      cards: (c.exec_summary?.cards || []).slice(0, 4).map((cd, i) => ({ icon: EXEC_ICONS[i % 4], title: cd.title, body: cd.body })),
-    },
+    exec: (() => {
+      let cards = (c.exec_summary?.cards || []).slice(0, 4).map((cd, i) => ({ icon: EXEC_ICONS[i % 4], title: cd.title, body: cd.body }));
+      // The model occasionally returns an EMPTY exec_summary (the tool is not strict-validated). Page 2 is the
+      // first content page and must NEVER be blank, so synthesise it from the strongest content we do have: the
+      // strategy's winning reasons, else the pods. This makes the executive summary bullet-proof to model variance.
+      if (cards.length < 2) {
+        const fromWins = (c.strategy?.why_it_wins || []).slice(0, 4).map((w, i) => { const tb = splitTitleBody(w); return { icon: EXEC_ICONS[i % 4], title: tb.title, body: tb.body }; });
+        const fromPods = (c.pods || []).slice(0, 4).map((p, i) => ({ icon: EXEC_ICONS[i % 4], title: p.name, body: p.benefit || p.for_client }));
+        cards = fromWins.filter((x) => x.title && x.body).length >= 2 ? fromWins : fromPods;
+      }
+      const intro = (c.exec_summary?.intro || "").trim()
+        || c.subhead
+        || (c.opportunity?.intro || "").split(/(?<=\.)\s+/).slice(0, 2).join(" ")
+        || "";
+      return { headline: hl("The case", "in one page"), intro, cards };
+    })(),
 
     opportunity: {
       headline: hl("The opportunity,", "no competitor has claimed"),
-      paras: [c.opportunity?.intro || "", c.market_intel?.overview || ""].filter(Boolean),
+      // Only the opportunity intro here. The market overview lives on the Market Intelligence page (05); showing
+      // both here made page 3 a wall of text AND duplicated page 5.
+      paras: [c.opportunity?.intro || ""].filter(Boolean),
       stat_cards: (c.market_intel?.stats || []).slice(0, 6).map((s, i) => ({ icon: [IC.trend, IC.bars, IC.target, IC.user, IC.funnel, IC.refresh][i % 6], stat: shortStat(s.stat), body: s.stat, source: s.source })),
       success_body: c.opportunity?.definition_of_success || "",
     },
@@ -116,7 +129,12 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       intro: c.market_intel?.overview || "",
       split: { left_label: "The shrinking play", left_pct: "", left_width: "38%", right_label: "The growth", right_pct: "", right_width: "62%", caption: "Budget follows the growing opportunity" },
       quotes: (c.market_intel?.stats || []).slice(0, 4).map((s) => ({ body: s.stat, source: s.source })),
-      actions: (c.market_intel?.opportunities || []).slice(0, 6).map((o) => ({ title: o.insight, body: o.why })),
+      actions: (c.market_intel?.opportunities || []).slice(0, 6).map((o) => {
+        // A full-sentence insight makes a terrible bold card title and overflows. Split a punchy title from it and
+        // fold the rest into the body with the "why", then bound both so a card can never clip mid-sentence.
+        const tb = splitTitleBody(o.insight || "");
+        return { title: clip(tb.title, 58), body: clip([tb.body, o.why].filter(Boolean).join(" "), 210) };
+      }),
     },
 
     ecosystem_intro: `One closed-loop system that carries a prospect from first impression to a booked outcome, and then compounds: each pod passes sharper intelligence to the next.`,
@@ -275,12 +293,30 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
 // A short numeric/label version of a stat for the big card figure (falls back to the first token).
 // The big accent token on a stat card. A real number wins. If the "stat" is prose with no number, take the first
 // meaningful CONTENT word (never a bare "The" - that was the bug that put "The" as a headline number), else nothing.
-const STAT_STOP = new Set(["the", "a", "an", "of", "to", "in", "on", "and", "for", "with", "their", "its", "this", "that", "every", "essentially", "across", "is", "are", "was", "were", "has", "have"]);
+const STAT_STOP = new Set(["the", "a", "an", "of", "to", "in", "on", "and", "for", "with", "their", "its", "this", "that", "every", "essentially", "across", "is", "are", "was", "were", "has", "have", "at", "least", "about", "around", "over", "nearly", "roughly", "up", "from"]);
+const NUM_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+// The big accent token on a stat card. It must be PUNCHY and CLEAN - a real figure, a counted noun, or a short
+// whole-word label - and must NEVER be a mid-word slice ("Comfort-tr") or a stop-word ("Least", "The") as the old
+// version produced. Whole words only; figures win.
 function shortStat(s: string): string {
-  const m = s.match(/([+-]?\d[\d,.]*\s?(?:%|k|m|bn|x|★|\+)?)/i);
-  if (m) return m[1].trim().slice(0, 10);
-  const word = s.split(/\s+/).map((w) => w.replace(/[^a-z0-9-]/gi, "")).find((w) => w.length >= 4 && !STAT_STOP.has(w.toLowerCase()));
-  return word ? (word[0].toUpperCase() + word.slice(1)).slice(0, 10) : "";
+  s = String(s || "").trim();
+  const cur = s.match(/R\s?\d[\d,]*/);                                           // currency, e.g. R7,999
+  if (cur) return cur[0].replace(/\s+/g, "");
+  const num = s.match(/\b\d[\d,.]*(?:[\s-](?:%|k|m|bn|x|nights?|years?|yr|months?|days?|hours?|stores?|branches?))?\b/i);
+  if (num) return num[0].replace(/\s+/g, " ").trim().slice(0, 14);               // 180 Nights, 10-year, 30%
+  const words = s.split(/\s+/);
+  for (let i = 0; i < words.length; i++) {                                       // number-word -> digit + counted noun
+    const w = words[i].toLowerCase().replace(/[^a-z]/g, "");
+    if (NUM_WORDS[w] != null) {
+      const noun = (words[i + 1] || "").replace(/[^a-z0-9-]/gi, "");
+      return (NUM_WORDS[w] + (noun && !STAT_STOP.has(noun.toLowerCase()) ? " " + noun : "")).slice(0, 14);
+    }
+  }
+  const mean = words.map((w) => w.replace(/[^a-z0-9-]/gi, "")).filter((w) => w.length >= 3 && !STAT_STOP.has(w.toLowerCase()));
+  if (!mean.length) return "";
+  let out = mean[0];                                                             // first 1-2 whole words, never truncated mid-word
+  if (out.length <= 7 && mean[1] && out.length + 1 + mean[1].length <= 16) out += " " + mean[1];
+  return out[0].toUpperCase() + out.slice(1);
 }
 function splitTitleBody(w: string): { title: string; body: string } {
   const m = w.match(/^(.{8,60}?[.:])\s+(.+)$/);
@@ -288,6 +324,8 @@ function splitTitleBody(w: string): { title: string; body: string } {
   const words = w.split(/\s+/);
   return { title: words.slice(0, 6).join(" "), body: words.slice(6).join(" ") || w };
 }
+// Bound a string to n chars on a WORD boundary with an ellipsis, so a fixed-height card never clips mid-sentence.
+const clip = (s: string, n: number): string => { s = String(s || "").trim(); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, "").trimEnd() + "…" : s; };
 const numWord = (n: number) => (["zero", "one", "two", "three", "four", "five", "six"][n] || String(n));
 const shortLabel = (t: string) => t.replace(/^week\s*\d+\s*[·:.-]?\s*/i, "").split(/[,·]/)[0].trim().slice(0, 22) || t.slice(0, 22);
 

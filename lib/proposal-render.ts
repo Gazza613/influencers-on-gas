@@ -288,28 +288,21 @@ function strategyPage(d: ProposalDoc, ci: CiTokens): string {
     + flow + footerLight(ci, d.brand_short, 4));
 }
 
-// 05 MARKET INTELLIGENCE (light). intro + split bar + 4 dark sourced quote cards (2x2) + 6 "what we do" cards (2x3).
+// 05 MARKET INTELLIGENCE (light). intro + the "what we do about it" recommendation cards. The sourced stat cards
+// live on page 3 (the Opportunity), so they are NOT repeated here (that duplication, plus a meaningless empty
+// shrinking/growth split bar, is what overloaded and clipped this page). This page is now the recommendations.
 function marketPage(d: ProposalDoc, ci: CiTokens): string {
-  const s = d.market.split;
-  const splitBar = `<div style="margin-top:10px;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:10px;"><div style="width:34%;text-align:right;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${ci.muted};">${esc(s.left_label)}</div>`
-    +   `<div style="flex:1;display:flex;align-items:center;"><div style="width:${s.left_width};height:16px;background:#D9D2E5;border-radius:8px 3px 3px 8px;margin-left:auto;"></div><div style="width:2px;height:26px;background:#1A1030;margin:0 6px;border-radius:2px;"></div><div style="width:${s.right_width};height:16px;background:linear-gradient(90deg,${ci.accent} 0%,${ci.accentDeep} 100%);border-radius:3px 8px 8px 3px;"></div></div>`
-    +   `<div style="width:12%;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${ci.accentDeep};">${esc(s.right_label)}</div></div>`
-    + `<div style="display:flex;align-items:center;gap:10px;margin-top:5px;"><div style="width:34%;text-align:right;font-size:14px;font-weight:800;color:#8A8496;">${esc(s.left_pct)}</div><div style="flex:1;text-align:center;font-size:8px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};">${esc(s.caption)}</div><div style="width:12%;font-size:14px;font-weight:800;color:${ci.accentDeep};">${esc(s.right_pct)}</div></div></div>`;
-  const quotes = d.market.quotes.slice(0, 4).map((q) => quoteCard(ci, q.body, q.source)).join("");
   const actions = d.market.actions.slice(0, 6).map((a) => proofCard(ci, a.title, a.body)).join("");
   return section(pageLight("48px 60px 36px"),
     eyebrow(ci, "04 · Market Intelligence") + headline(ci, d.market.headline)
-    + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(d.market.intro)}</p>`
-    + splitBar
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px;">${quotes}</div>`
-    + miniEyebrow(ci, "What we do about it", "12px")
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:8px;">${actions}</div>`
+    + `<p style="font-size:11px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.market.intro)}</p>`
+    + miniEyebrow(ci, "What we do about it", "16px")
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">${actions}</div>`
     + footerLight(ci, d.brand_short, 5));
 }
 
 // 06 CORE PHILOSOPHY (dark). Fixed agency doctrine (Gary: fixed template). AI does / Humans do / Together + chips.
-const PHIL_INTRO = "Technology is the engine; human connection remains the steering wheel. AI is deployed to remove repetitive work, respond instantly and qualify at scale, so your people spend their time where only humans add value. This is the specific combination that outperforms either alone.";
+const PHIL_INTRO = "Technology does the heavy lifting; human connection remains the steering wheel. AI is deployed to remove repetitive work, respond instantly and qualify at scale, so your people spend their time where only humans add value. This is the specific combination that outperforms either alone.";
 const PHIL_AI = "Data processing, research at scale, creative volume, real-time intent scoring, WhatsApp qualification, retargeting workflows and continuous budget optimisation.";
 const PHIL_HUMAN = "Strategy, empathy, StorySelling nuance, judgement, compliance sensitivity, the final decision and the client relationship. Your people stay at the heart of every relationship.";
 const PHIL_TOGETHER = "Deeper partnerships built on transparency, accountability and shared success, at a speed and scale neither could reach alone. It is the specific combination that outperforms either alone.";
@@ -405,10 +398,10 @@ function pods12Page(d: ProposalDoc, ci: CiTokens): string {
     +   podBlock("II", "The Strategist", "Intelligence converted into a commercial plan and KPIs", d.pods12.strategist_para, d.pods12.strategist_chip)
     + `</div>`
     + `<div style="margin-top:12px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
-    +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:8px;">${esc(m.title)}</div>`
-    +   `<div style="position:relative;height:130px;border-left:2px solid #E4DEEF;border-bottom:2px solid #E4DEEF;margin:0 10px 18px 10px;">`
-    +     axisLbl("left:-8px;top:-14px", m.y_top) + axisLbl("left:-8px;bottom:-16px", m.y_bottom)
-    +     axisLbl("right:0;bottom:-16px", m.x_right) + axisLbl("left:14%;bottom:-16px", m.x_left)
+    +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:20px;">${esc(m.title)}</div>`
+    +   `<div style="position:relative;height:150px;border-left:2px solid #E4DEEF;border-bottom:2px solid #E4DEEF;margin:0 12px 20px 12px;">`
+    +     axisLbl("left:-10px;top:-15px", m.y_top) + axisLbl("left:-10px;bottom:-16px", m.y_bottom)
+    +     axisLbl("right:0;bottom:-16px", m.x_right) + axisLbl("left:16%;bottom:-16px", m.x_left)
     +     m.competitors.map(dot).join("") + clientDot
     +   `</div></div>`
     + footerLight(ci, d.brand_short, 9));
@@ -473,13 +466,17 @@ function podHeader(ci: CiTokens, icon: string, eb: string, line1: string, grad2:
   const ebColor = onDark ? ci.accentOnDark : ci.accentDeep;
   const gradTextColor = onDark ? ci.accentOnDark : ci.accent;
   const glow = onDark ? "box-shadow:0 0 20px rgba(155,79,201,0.4);" : "";
-  return `<div style="display:flex;align-items:center;gap:14px;"><div style="width:44px;height:44px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;${glow}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>`
+  // position:relative + z-index keeps the header ABOVE the absolute ghost numeral (an absolute sibling otherwise
+  // paints over static text regardless of DOM order - that was the "IV/VI crosses the title" bug). max-width keeps
+  // a long two-line title from running under the numeral.
+  return `<div style="position:relative;z-index:1;display:flex;align-items:center;gap:14px;max-width:76%;"><div style="width:44px;height:44px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;flex-shrink:0;${glow}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>`
     + `<div><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ebColor};">${esc(eb)}</div>`
     + `<div style="font-size:24px;font-weight:800;text-transform:uppercase;line-height:1.1;">${esc(line1)}<br><span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${gradTextColor};">${esc(grad2)}</span></div></div></div>`;
 }
-// The oversized ghost roman numeral top-right on pod pages.
+// The oversized ghost roman numeral, top-right on pod pages. z-index:0 keeps it BEHIND the header/content (which
+// carry z-index:1); it sits high in the corner so it reads as a watermark, never over the title.
 const ghostNumeral = (ci: CiTokens, roman: string, onDark: boolean) =>
-  `<div style="position:absolute;right:28px;top:-30px;font-size:190px;font-weight:800;line-height:1;letter-spacing:-0.02em;color:${onDark ? ci.ghostDark : ci.ghostLight};pointer-events:none;">${roman}</div>`;
+  `<div style="position:absolute;right:24px;top:-44px;z-index:0;font-size:170px;font-weight:800;line-height:1;letter-spacing:-0.02em;color:${onDark ? ci.ghostDark : ci.ghostLight};pointer-events:none;">${roman}</div>`;
 
 // 12 POD IV CREATIVE (light, ghost IV). Header + intro + dark for-client box + 4 fixed capability cards + 2 benefit
 // cards + the launch asset system (4 mini format frames). Capability cards are fixed doctrine; only copy varies.
