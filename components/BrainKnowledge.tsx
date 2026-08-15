@@ -61,6 +61,10 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
   }, [brainId]);
 
   useEffect(() => { if (open && chunks.length === 0) load(0, ""); }, [open, chunks.length, load]);
+  // Keep the count in step with the live total from the parent while closed (the crawl finishes AFTER the page
+  // server-rendered, so a static prop would leave the header reading "0 passages" until opened). Once open, the
+  // API's own count (with any active search term) takes over.
+  useEffect(() => { if (!open && !term) setCount(total); }, [total, open, term]);
 
   async function remove(c: Chunk) {
     const preview = c.content.slice(0, 180) + (c.content.length > 180 ? "…" : "");

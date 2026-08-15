@@ -14,7 +14,11 @@ import { researchableClientIds } from "@/lib/intel";
 // on the next load, not after a deploy. Without this the route can be cached and a new client never shows.
 export const dynamic = "force-dynamic";
 
-export default async function ResearcherPage() {
+export default async function ResearcherPage({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
+  // ?client=<id> arrives when the team clicks through from a specific brain, so the dropdown defaults to the brain
+  // they were just working on rather than the cold-visit default.
+  const sp = await searchParams;
+  const initialClientId = typeof sp?.client === "string" ? sp.client : "";
   const clients = await listStudioClients().catch(() => []);
   // Researchable = an explicit Researcher remit OR any crawled knowledge. A freshly-crawled brain is immediately
   // researchable; the collector derives its scope from its own material and the ground-truth website.
@@ -45,7 +49,7 @@ export default async function ResearcherPage() {
           tier</b>, so what you approve at Gate 1 is checkable at a glance. The analysis comes next, from the
           Strategist. Approve the facts, rerun with notes, or reject, right here.
         </p>
-        <ResearchGate clients={clients} configured={configured} />
+        <ResearchGate clients={clients} configured={configured} initialClientId={initialClientId} />
       </main>
     </div>
   );

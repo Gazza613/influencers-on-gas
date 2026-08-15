@@ -99,9 +99,13 @@ function fmtElapsed(s: number): string {
   return `${h}h ${m % 60}m`;
 }
 
-export default function ResearchGate({ clients, configured = [] }: { clients: Client[]; configured?: string[] }) {
+export default function ResearchGate({ clients, configured = [], initialClientId = "" }: { clients: Client[]; configured?: string[]; initialClientId?: string }) {
   const router = useRouter();
   const [clientId, setClientId] = useState(() => {
+    // Arriving FROM a specific brain (e.g. "Go to the Researcher" on the Brain page) must land on THAT brain, not
+    // the cold-visit MoMo default. Only honour it if it is a real client in the list.
+    const fromBrain = initialClientId && clients.find((c) => c.id === initialClientId);
+    if (fromBrain) return fromBrain.id;
     const momo = clients.find((c) => /mo\s*mo|mtn/i.test(c.name));
     const briefed = clients.find((c) => configured.includes(c.id));
     return (momo || briefed || clients[0])?.id || "";

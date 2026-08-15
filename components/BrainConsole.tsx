@@ -7,6 +7,7 @@ import { flex } from "@/lib/flex";
 import BrainKnowledge from "@/components/BrainKnowledge";
 import BrainLibrary from "@/components/BrainLibrary";
 import LivingBrain from "@/components/LivingBrain";
+import WorkingPanel from "@/components/WorkingPanel";
 
 type Source = { id: string; type: string; uri: string; status: string; chunk_count?: number; error?: string | null; last_synced_at?: string | null };
 
@@ -70,6 +71,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const [addErr, setAddErr] = useState("");
 
   const [reindexing, setReindexing] = useState(false);
+  // A crawl that JUST finished, so the team gets a clear "done, what next?" step instead of guessing (Gary).
+  const [justCompleted, setJustCompleted] = useState<{ count: number } | null>(null);
 
   // BRAIN READINESS (world-class UX): the one thing the team needs to know before building on a brain is "is it
   // strong enough?". We derive a live checklist + score from what the brain actually holds, so the page guides
@@ -117,6 +120,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       // Number() is load-bearing: a count from Postgres can arrive as a string, and `0 + "5" + "10"` would
       // concatenate to "0510" rather than sum to 15 (the old "01372" bug). Coerce every term.
       const total = next.filter((s) => newlyDone.includes(s.id)).reduce((a, s) => a + Number(s.chunk_count ?? 0), 0);
+      setJustCompleted({ count: total });   // drives the "done, what next?" step card below
       flex(`✓ Brain ready. ${total} passage${total === 1 ? "" : "s"} indexed and retrievable.`);
       setTimeout(() => setFlashDone((cur) => { const n = new Set(cur); newlyDone.forEach((id) => n.delete(id)); return n; }), 15000);
     }
@@ -139,7 +143,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     const list = sites.map((s) => s.trim()).filter((s) => /^https?:\/\//i.test(s));
     if (!list.length) { setAddErr("Enter at least one website URL (https://…)."); return; }
     if (adding) return;
-    setAdding(true); setAddErr("");
+    setAdding(true); setAddErr(""); setJustCompleted(null);
     const failed: string[] = [];
     for (const site of list) {
       const r = await fetch(`/api/brains/${brainId}/sources`, {
@@ -235,6 +239,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // RE-CRAWL one website source in place (a site changed). Clears its passages, sets it re-reading, re-fires the
   // ingest - then the existing poll picks up the "pending" status and shows it indexing through to a fresh Ready.
   async function recrawl(s: Source) {
+    setJustCompleted(null);
     setSources((list) => list.map((x) => x.id === s.id ? { ...x, status: "pending", chunk_count: 0 } : x));
     const r = await fetch(`/api/brains/${brainId}/sources/recrawl`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceId: s.id }),
@@ -342,13 +347,54 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                   ))}
                 </div>
                 {ready && (
-                  <a href="/researcher" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-[18px] font-bold text-black transition hover:opacity-90">Commission the Researcher →</a>
+                  <a href={`/researcher?client=${brainId}`} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-[18px] font-bold text-black transition hover:opacity-90">Commission the Researcher →</a>
                 )}
               </>
             )}
           </div>
         </div>
       </div>
+
+      {/* IT IS WORKING - the unmissable live state (Gary: indexing + spinner were too subtle, the team could not
+          tell it was running and re-ran by mistake). The platform's standard crew panel: a pulsing orb, a
+          counting-up clock + LIVE pill, rotating narration of what it is doing, and a moving bar. */}
+      {crawling && (
+        <WorkingPanel
+          title="Building the brain"
+          lines={[
+            "Reading every page it can reach…",
+            "Chunking the copy into clean passages…",
+            "Embedding each passage into this brain…",
+            "Indexing so every pod can retrieve it…",
+          ]}
+          note="Runs in the background, so it is safe to close the tab. It keeps going, and there is no need to run it again."
+          eta="a few minutes"
+          estimateSeconds={300}
+          sub={`${liveChunks.toLocaleString("en-ZA")} passage${liveChunks === 1 ? "" : "s"} in so far`}
+        />
+      )}
+
+      {/* DONE - WHAT NEXT? A clear step, not just a toast (Gary): once a scrape finishes, the team is told the
+          brain is updated and given the two real moves - go to the Researcher, or add more data first. */}
+      {!crawling && justCompleted && (
+        <div className="gas-rise relative overflow-hidden rounded-2xl border border-[#4ade80]/45 bg-[#4ade80]/[0.06] p-6">
+          <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full blur-[80px]" style={{ background: "radial-gradient(circle, rgba(74,222,128,0.18), transparent 70%)" }} />
+          <div className="relative flex items-start gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#4ade80]/20 text-[22px] text-[#86efac]">✓</span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[22px] font-extrabold tracking-tight text-ink">Brain updated</h3>
+              <p className="mt-1 text-[17px] leading-relaxed text-ink-dim">
+                <b className="tabular text-ink">{justCompleted.count.toLocaleString("en-ZA")}</b> new passage{justCompleted.count === 1 ? "" : "s"} indexed and retrievable by every pod. You can move on now, or add more data first.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                <a href={`/researcher?client=${brainId}`} className="inline-flex items-center gap-2 rounded-lg bg-[#4ade80] px-4 py-2 text-[17px] font-bold text-black transition hover:opacity-90">Go to the Researcher →</a>
+                <button onClick={() => { setJustCompleted(null); goto("website"); }} className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-[17px] font-semibold text-ink-dim transition hover:border-[#a855f7]/50 hover:text-ink">＋ Add more data</button>
+                <button onClick={() => setJustCompleted(null)} className="ml-auto inline-flex items-center rounded-lg px-3 py-2 text-[15px] text-ink-faint transition hover:text-ink-dim">Dismiss</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add knowledge */}
       <div ref={feedRef} className="overflow-hidden rounded-2xl border border-[#a855f7]/25 bg-surface-1 p-6">
@@ -563,7 +609,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
         </div>
       )}
 
-      <BrainKnowledge brainId={brainId} total={chunkCount} />
+      <BrainKnowledge brainId={brainId} total={liveChunks} />
       <div id="brand-library"><BrainLibrary brainId={brainId} /></div>
 
       {/* DANGER ZONE - both destructive actions live here, tucked at the very bottom out of eye-line (they used to
