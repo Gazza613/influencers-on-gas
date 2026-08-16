@@ -160,7 +160,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       headline: hl("Pod III ·", `The audience, ${numWord(personas.length)} personas`),
       intro: c.audience?.overview || "",
       personas: personas.map((p, i) => ({ icon: PERSONA_ICONS[i % 4], name: p.label, geo: p.propensity || p.who || "", quote: `"${p.angle}"` })),
-      discipline_note: `Every rand of this engagement works the ${x.objectiveLabel} objective. Enquiries outside scope are routed away and never counted, so reporting is never flattered.`,
+      discipline_note: `We do not target businesses in the abstract. We target the moment a buyer is forced to act, a new opening, a refurb, an intake, an audit, with hyper-targeted paid ads. Every ad's call to action is one WhatsApp conversation with PSI, and only sales-ready leads reach ${name}'s team.`,
       blueprint_note: `A media buyer's blueprint that sharpens weekly, so spend concentrates on the people most likely to become PSI-qualified.`,
       geo_label: "Priority", geo_chips: [{ label: "High-value segments first", accent: true }],
       budget: [

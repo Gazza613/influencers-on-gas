@@ -444,12 +444,16 @@ function pods12Page(d: ProposalDoc, ci: CiTokens): string {
 // 10 POD III + PERSONAS (light). intro + 4 persona cards (+ discipline note) + blueprint chip + geo chips + budget bar.
 function audiencePage(d: ProposalDoc, ci: CiTokens): string {
   const a = d.audience;
+  // Dark ink icon disc (Gary: keep the icon blocks black, not the brand CI), the icon top-aligned with the name so a
+  // two-line name never knocks it out of line, and the descriptor in readable case, not a shouty caps block.
+  const personaDisc = (icon: string) => `<div style="width:30px;height:30px;border-radius:50%;background:${ci.ink};display:flex;align-items:center;justify-content:center;line-height:0;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">${icon}</svg></div>`;
   const personaCard = (p: { icon: string; name: string; geo: string; quote: string }) =>
-    `<div style="background:#FFFFFF;border-radius:12px;padding:11px 14px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:8px;">${disc(ci, 24, p.icon)}<div style="font-size:10.5px;font-weight:700;">${esc(p.name)}</div></div>`
-    + `<div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};margin-top:2px;">${esc(p.geo)}</div>`
-    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:5px;font-style:italic;">${esc(p.quote)}</div></div>`;
-  const disciplineCard = `<div style="background:${ci.tint};border-radius:12px;padding:11px 14px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentDeep};">Trade-only discipline</div><div style="font-size:9.5px;line-height:1.5;color:${ci.body};margin-top:4px;">${esc(a.discipline_note)}</div></div>`;
+    `<div style="background:#FFFFFF;border-radius:12px;padding:13px 15px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:flex-start;gap:9px;">${personaDisc(p.icon)}<div style="font-size:11px;font-weight:800;line-height:1.2;color:${ci.ink};">${esc(p.name)}</div></div>`
+    + `<div style="font-size:9px;line-height:1.55;color:${ci.body};margin-top:8px;">${esc(p.geo)}</div>`
+    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.accentDeep};margin-top:7px;font-style:italic;">${esc(p.quote)}</div></div>`;
+  // How we reach them: the trigger-moment model (Gary), replacing the weak "trade-only discipline" note.
+  const disciplineCard = `<div style="background:${ci.darkCard};border-radius:12px;padding:13px 15px;color:#FFFFFF;"><div style="font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentOnDark};">How we reach them</div><div style="font-size:9.5px;line-height:1.55;color:rgba(255,255,255,0.85);margin-top:5px;">${esc(a.discipline_note)}</div></div>`;
   const geoChip = (c: { label: string; accent: boolean }) => c.accent
     ? `<div style="background:${ci.accentGrad};color:#FFFFFF;border-radius:999px;padding:5px 13px;font-size:8.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;white-space:nowrap;">${esc(c.label)}</div>`
     : `<div style="background:#FFFFFF;border-radius:999px;padding:5px 13px;font-size:8.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;box-shadow:0 4px 12px ${ci.shadow};white-space:nowrap;">${esc(c.label)}</div>`;
