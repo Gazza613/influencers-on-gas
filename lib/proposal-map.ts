@@ -171,11 +171,13 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     },
 
     targeting: {
-      headline: hl("Platform-level", "targeting, buildable today"),
+      headline: hl("Your perfect target audience", "found"),
+      // Cap platforms (3) and each block's text so four persona rows + the matrix always fit one page (Gary: the
+      // page was cut off by the last persona). The selections are the value; the approach is trimmed to fit.
       rows: personas.map((p) => ({
         name: p.label,
-        platforms: (p.platforms || []).map((pl) => pl.platform).join(" · "),
-        segments: (p.platforms || []).map((pl) => ({ label: pl.platform, text: `${pl.selections.join(", ")}. ${pl.approach}` })),
+        platforms: (p.platforms || []).slice(0, 3).map((pl) => pl.platform).join(" · "),
+        segments: (p.platforms || []).slice(0, 3).map((pl) => ({ label: pl.platform, text: clip(`${pl.selections.slice(0, 9).join(", ")}. ${pl.approach}`, 165) })),
       })),
       matrix: channelMatrix(personas),
     },

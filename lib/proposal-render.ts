@@ -490,7 +490,7 @@ function targetingPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="padding:6px 12px;border-top:1px solid #EEE8F5;font-weight:700;color:${ci.body};font-size:10px;display:flex;align-items:center;">${esc(mr.persona)}</div>`
     + `<div style="border-top:1px solid #EEE8F5;display:grid;grid-template-columns:repeat(${t.matrix.channels.length},1fr);align-items:center;">${mr.cells.map((c) => `<div style="display:flex;align-items:center;justify-content:center;">${dotFor(c)}</div>`).join("")}</div>`).join("");
   return section(pageLight("48px 60px 36px"),
-    eyebrow(ci, "Pod III · Applied") + headline28(ci, t.headline)
+    eyebrow(ci, "Pod III · Platform-level targeting") + headline28(ci, t.headline)
     + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:12px;font-size:10.5px;line-height:1.55;">${t.rows.slice(0, 4).map(row).join("")}</div>`
     + `<div style="margin-top:10px;background:#FFFFFF;border-radius:14px;padding:12px 16px 10px;box-shadow:0 6px 18px ${ci.shadow};">`
     +   `<div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">Persona to channel map</div>${legend}</div>`
