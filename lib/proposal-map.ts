@@ -203,12 +203,12 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     },
 
     psi: {
-      intro: `PSI is our proprietary lead-qualification system and the ecosystem's most defensible asset. AI data-driven scorecarding across social lead forms and interactive WhatsApp funnels qualifies every prospect in real time, before a human ever picks up the phone.`,
+      intro: `PSI is our Pre-Sales Intelligence system, the AI qualification layer that sits between your marketing and your sales team. Every ad click becomes a WhatsApp conversation, every conversation becomes a live intent score, and only sales-ready leads reach your people. The AI does the qualifying. Your team does the closing.`,
       for_client: pod(5).for_client,
       tiles: [
-        { level: "HIGH", caption: "Routed to your team", kind: "high" },
-        { level: "MEDIUM", caption: "Nurtured until ready", kind: "medium" },
-        { level: "LOW", caption: "Filtered out by design", kind: "low" },
+        { level: "HOT", caption: "Routed to sales now, context attached", kind: "high" },
+        { level: "WARM", caption: "Nurtured until the timing is right", kind: "medium" },
+        { level: "COLD", caption: "Filtered out cleanly, logged", kind: "low" },
       ],
       chat: c.psi_chat && Array.isArray(c.psi_chat.conversation) && c.psi_chat.conversation.length >= 3
         ? { assistant: `${shortBrand(name)} assistant`, bubbles: c.psi_chat.conversation.slice(0, 6).map((b) => ({ role: b.role === "out" ? "out" as const : "in" as const, text: b.text })), closing: c.psi_chat.outcome || "High intent · routed to sales" }
@@ -223,15 +223,15 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
             { role: "out" as const, text: "A decent volume, and it is my call." },
             { role: "in" as const, text: `That puts you in our priority band. I am handing you to the right ${shortBrand(name)} person now, with everything you have told me, so you skip the back and forth.` },
           ],
-          closing: "High intent · routed to sales",
+          closing: "High intent · routed to sales, context attached",
         },
       side_cards: [
-        { title: "Conversational qualification", body: `WhatsApp funnels ask intelligent, ${shortBrand(name)}-specific questions.` },
-        { title: "Warm hand-off", body: "Each qualified lead arrives with context, so the conversation starts warm." },
-        { title: "Real-time alerts", body: "The moment intent scores high, the right person knows." },
+        { title: "Scored live, per message", body: `Timeline, fit, budget-readiness and urgency each move an intent score, in real time, in ${shortBrand(name)}'s own language.` },
+        { title: "Routed by tier", body: "Hot goes to sales with the full conversation attached, warm enters nurture, cold is filtered out. Disqualification is not failure, it is performance." },
+        { title: "Feeds back to media", body: "Qualified events flow to your ad platforms, so campaigns learn to buy intent, not just clicks." },
       ],
-      benefit_client: "Your team focuses only on high-propensity leads, lifting conversion without adding headcount.",
-      benefit_forward: "Hands scored leads into the PSI Conversion Dashboard.",
+      benefit_client: "Your team works only the hot list, and every lead arrives with the full conversation, so no call ever starts from zero.",
+      benefit_forward: "Scored leads flow into the PSI dashboard and qualified intent back to media, so the whole system compounds.",
     },
 
     pods78: {
@@ -252,8 +252,8 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     },
 
     rollout: {
-      headline: hl("Your rollout", "gated week by week"),
-      intro: `The rollout mirrors the system. Each stage ends at a sign-off gate: nothing proceeds until the previous stage is proven.`,
+      headline: hl("Your 31-day", "build to go-live"),
+      intro: `A focused 31-day build. Each stage is proven before the next begins, and the campaign goes live on day 31.`,
       rail: (c.rollout || []).slice(0, 4).map((r, i) => ({ badge: `W${i + 1}`, label: shortLabel(r.title) })),
       weeks: (c.rollout || []).slice(0, 4).map((r, i) => ({ icon: WEEK_ICONS[i % 4], title: r.title, pods: r.pods, bullets: r.points || [], gate: r.gate })),
     },
@@ -359,7 +359,11 @@ const clipSentence = (s: string, n: number): string => {
   return stop > n * 0.45 ? cut.slice(0, stop + 1).trim() : clip(s, n);
 };
 const numWord = (n: number) => (["zero", "one", "two", "three", "four", "five", "six"][n] || String(n));
-const shortLabel = (t: string) => t.replace(/^week\s*\d+\s*[·:.-]?\s*/i, "").split(/[,·]/)[0].trim().slice(0, 22) || t.slice(0, 22);
+// 1 to 2 words for the timeline rail under each badge (Gary: labels were cut off; keep them short).
+const shortLabel = (t: string) => {
+  const s = String(t || "").replace(/^week\s*\d+\s*[·:.\-]?\s*/i, "").replace(/^(live|go[- ]?live)\s*[:·\-]?\s*/i, "").split(/[,·:]/)[0].trim();
+  return s.split(/\s+/).slice(0, 2).join(" ") || s.slice(0, 16);
+};
 
 function competitiveMap(name: string, competitors: string[]) {
   const pos = [{ left: "30%", top: "30%" }, { left: "22%", top: "50%" }, { left: "12%", top: "66%" }];
@@ -400,8 +404,8 @@ function agreementClauses(name: string, tierName: string, rate: string): { title
     { title: "Engagement", body: `GAS Marketing Automation is appointed as ${name}'s integrated growth partner on a three-month proof of concept, on the ${tierName} tier at ${rate}. The engagement covers all eight pods of the ecosystem and commences on signature, with the rollout plan starting immediately.` },
     { title: "Payment", body: `The monthly retainer is payable upfront, in advance, on presentation of invoice. No credit terms apply; this is the same basis on which every GAS client operates. Invoices and all billing queries are handled by our accountant, Cherice Len (cherice@gasmarketing.co.za).` },
     { title: "Media spend", body: `Media budget is decided and owned by ${name} following this proposal, and is additional to the retainer. Every rand is paid at pure platform cost with full transparency. GAS makes no profit, markup, rebate or commission on media whatsoever, our only income is the retainer.` },
-    { title: "Ownership", body: `Everything built under this engagement belongs to ${name} from day one: ad accounts, audiences, creative assets, the PSI knowledge base, conversation histories and all performance data. Nothing is held hostage, during or after the term.` },
+    { title: "Ownership", body: `Your data is yours from day one: your ad accounts, audiences, creative assets, conversation histories and all performance data, handed back in full whenever you ask. The PSI system and its scorecard are GAS's own technology. We build, run and retain them as the engine behind your results, so they stay with us and are not transferable, while the data they produce for you is always yours.` },
     { title: "Confidentiality and data", body: `Both parties keep each other's commercial information strictly confidential. All consumer personal information is collected with consent and processed under POPIA, and consumer-facing scripts and creative are submitted for your compliance approval before launch.` },
-    { title: "Exit", body: `After the three-month proof of concept, the engagement continues month to month, no lock-in. Either party may exit on 30 days' written notice. On exit, GAS provides a full, orderly handover of accounts, assets, data and documentation at no additional cost.` },
+    { title: "Exit", body: `After the three-month proof of concept, the engagement continues month to month, with no lock-in. Either party may exit on 30 days' written notice. On exit, we hand back your data, accounts and creative assets in full, with an orderly handover at no extra cost. The PSI system and scorecard, being our own technology, stay with GAS.` },
   ];
 }

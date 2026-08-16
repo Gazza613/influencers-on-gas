@@ -667,7 +667,7 @@ function rolloutPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="display:flex;align-items:center;gap:8px;">${disc(ci, 24, w.icon)}<div style="font-size:11px;font-weight:700;">${esc(w.title)}</div></div>`
     + `<div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};margin-top:2px;">${esc(w.pods)}</div>`
     + `<ul style="margin:7px 0 0;padding-left:14px;font-size:9.3px;line-height:1.5;color:${ci.muted};flex:1;">${w.bullets.map((b) => `<li style="margin-top:2px;">${esc(b)}</li>`).join("")}</ul>`
-    + `<div style="margin-top:9px;background:${ci.accentGrad};border-radius:999px;padding:5px 12px;font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;align-self:flex-start;">${esc(w.gate)}</div></div>`;
+    + `<div style="margin-top:9px;background:${ci.accentGrad};border-radius:10px;padding:6px 12px;font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;text-align:center;">${esc(w.gate)}</div></div>`;
   return section(pageLight("48px 60px 36px"),
     eyebrow(ci, "08 · Your Rollout") + headline28(ci, r.headline)
     + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(r.intro)}</p>`
@@ -699,20 +699,41 @@ const SHIELD = `<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5
 function governancePage(d: ProposalDoc, ci: CiTokens): string {
   const card = (title: string, body: string) =>
     `<div style="background:#FFFFFF;border-radius:14px;padding:13px 17px;box-shadow:0 6px 18px ${ci.shadow};display:flex;gap:10px;align-items:flex-start;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${ci.accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6 9 17l-5-5"></path></svg><div><div style="font-size:11px;font-weight:700;">${esc(title)}</div><div style="font-size:10px;line-height:1.55;color:${ci.muted};margin-top:3px;">${esc(body)}</div></div></div>`;
+  // Pills in the BRAND accent (Gary, many times), white copy.
   const pill = (t: string) =>
-    `<div style="display:flex;align-items:center;gap:7px;background:${ci.darkCard};border-radius:999px;padding:6px 11px;color:#FFFFFF;white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${SHIELD}</svg><span style="font-size:7.8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${t}</span></div>`;
-  return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "10 · Governance") + headline(ci, { lead: "Trusted with data,", gradient: "by design." })
-    + `<p style="font-size:11.5px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.governance.intro)}</p>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">${d.governance.commitments.slice(0, 8).map((c) => card(c.title, c.body)).join("")}</div>`
-    + `<div style="margin-top:12px;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:10px;justify-content:space-between;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">Compliance stack</div><div style="display:flex;gap:8px;flex-wrap:nowrap;">${["POPIA", "GDPR-aligned", "Platform policies", "Verified-claims register"].map(pill).join("")}</div></div>`
-    + footerLight(ci, d.brand_short, 19));
+    `<div style="display:flex;align-items:center;gap:7px;background:${ci.accent};border-radius:999px;padding:6px 12px;color:#FFFFFF;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,0.18);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${SHIELD}</svg><span style="font-size:7.8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${t}</span></div>`;
+  // The two compliance pillars a client wants to see, with real POPIA + GDPR hooks (Gary: these are the two main
+  // drivers, make them comfortable). Fills the page and does the heavy lifting on trust.
+  const pillar = (tag: string, title: string, points: string[]) =>
+    `<div style="background:${ci.darkCard};border-radius:16px;padding:16px 18px;color:#FFFFFF;">`
+    + `<div style="display:flex;align-items:center;gap:8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${SHIELD}</svg><span style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};">${tag}</span></div>`
+    + `<div style="font-size:12px;font-weight:800;margin-top:6px;">${esc(title)}</div>`
+    + `<ul style="margin:7px 0 0;padding-left:14px;font-size:9.3px;line-height:1.5;color:rgba(255,255,255,0.82);">${points.map((pt) => `<li style="margin-top:3px;">${esc(pt)}</li>`).join("")}</ul></div>`;
+  const popia = pillar("POPIA · South Africa", "Compliant with the Protection of Personal Information Act", [
+    "We process personal information lawfully under POPIA's eight conditions: consent, purpose limitation, data minimisation and security safeguards.",
+    "Full data-subject rights honoured: access, correction, objection and deletion.",
+    "As your operator we process only on your authority, and any security compromise is reported to you and the Information Regulator.",
+    "Electronic direct marketing runs on consent, with a clear opt-out on every message.",
+  ]);
+  const gdpr = pillar("GDPR · International", "Aligned with the EU General Data Protection Regulation", [
+    "A lawful basis for every processing activity, and consent that is freely given, specific and informed.",
+    "The full rights, including erasure (right to be forgotten) and data portability.",
+    "Personal-data breaches notified within 72 hours, and privacy by design and by default.",
+    "Any cross-border transfer covered by Standard Contractual Clauses.",
+  ]);
+  return section(pageLight("48px 60px 34px"),
+    eyebrow(ci, "09 · Governance") + headline(ci, { lead: "Trusted with data,", gradient: "by design." })
+    + `<p style="font-size:11px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(d.governance.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;">${popia}${gdpr}</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:12px;">${d.governance.commitments.slice(0, 6).map((c) => card(c.title, c.body)).join("")}</div>`
+    + `<div style="margin-top:auto;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:10px;justify-content:space-between;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">Compliance stack</div><div style="display:flex;gap:8px;flex-wrap:nowrap;">${["POPIA", "GDPR-aligned", "Platform policies", "Verified-claims register"].map(pill).join("")}</div></div>`
+    + footerLight(ci, d.brand_short, 18));
 }
 
 // 20 "NO FINE PRINT" DIVIDER (dark). Fixed giant type + subhead + 4 chips; one client line.
 function dealDividerPage(d: ProposalDoc, ci: CiTokens): string {
   const chips = ["Rate card", "Commercial terms", "One-page agreement", "Sign-off"]
-    .map((t) => `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);border-radius:999px;padding:7px 16px;font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;">${t}</div>`).join("");
+    .map((t) => `<div style="background:${ci.accent};color:#FFFFFF;border-radius:999px;padding:7px 16px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;box-shadow:0 3px 10px rgba(0,0,0,0.28);">${t}</div>`).join("");
   return section(pageDark(ci, "56px 64px 44px", "position:relative;overflow:hidden;background:" + ci.darkCard + ";"),
     `<div style="position:absolute;right:-160px;top:-160px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,rgba(199,125,232,0) 70%);"></div>`
     + `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};position:relative;">The Commercials</div>`
@@ -722,7 +743,7 @@ function dealDividerPage(d: ProposalDoc, ci: CiTokens): string {
     +   `<p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.68);margin:16px 0 0;max-width:500px;">${esc(d.deal_divider)}</p>`
     + `</div>`
     + `<div style="display:flex;flex-wrap:wrap;gap:8px;position:relative;">${chips}</div>`
-    + footerDark(d.brand_short, 20, "28px"));
+    + footerDark(d.brand_short, 19, "28px"));
 }
 
 // 21 INVESTMENT (light). The flat-retainer tier card (Dominate / Launch) - dark hero + 8 inclusion tiles + 3
@@ -734,7 +755,7 @@ function investmentPage(d: ProposalDoc, ci: CiTokens): string {
   const foot = (f: { label: string; body: string }) =>
     `<div style="background:${ci.tint};border-radius:14px;padding:12px 16px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentDeep};">${esc(f.label)}</div><div style="font-size:10.5px;line-height:1.55;color:${ci.body};margin-top:4px;">${esc(f.body)}</div></div>`;
   return section(pageLight("48px 60px 40px"),
-    eyebrow(ci, "11 · Investment") + headline(ci, { lead: "The investment ·", gradient: `the ${iv.tier_name} system` })
+    eyebrow(ci, "10 · Investment") + headline(ci, { lead: "The investment ·", gradient: `the ${iv.tier_name} system` })
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(iv.intro)}</p>`
     + `<div style="margin-top:16px;background:${ci.darkPage};border-radius:18px;padding:22px 26px;color:#FFFFFF;position:relative;box-shadow:0 12px 30px rgba(46,26,74,0.28);">`
     +   `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><div><div style="font-size:20px;font-weight:800;text-transform:uppercase;">${esc(iv.tier_name)}</div><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:2px;">${esc(iv.tagline)}</div></div><div style="background:${ci.accentGrad};border-radius:999px;padding:6px 14px;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap;align-self:flex-start;">${esc(iv.poc_chip)}</div></div>`
@@ -744,7 +765,7 @@ function investmentPage(d: ProposalDoc, ci: CiTokens): string {
     + `</div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px;">${iv.footnotes.slice(0, 3).map(foot).join("")}</div>`
     + `<p style="font-size:10px;line-height:1.6;color:${ci.muted};margin:12px 0 0;">${esc(iv.honest_para)}</p>`
-    + footerLight(ci, d.brand_short, 21));
+    + footerLight(ci, d.brand_short, 20));
 }
 
 // 22 TERMS AND CLOSING (dark). 4 term cards + PoC-proves callout + 3 chips + logo footer.
@@ -759,7 +780,7 @@ function termsPage(d: ProposalDoc, ci: CiTokens): string {
     ? `<img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" width="126" height="44" style="width:126px;height:44px;">`
     : `<span style="font-size:12px;font-weight:700;color:#FFFFFF;">${esc(d.client_name)}</span>`;
   return section(pageDark(ci, "52px 60px 44px"),
-    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">12 · Commercial Terms and Next Steps</div>`
+    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">11 · Commercial Terms and Next Steps</div>`
     + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;">${glass("Validity", t.validity)}${glass("Engagement", t.engagement)}${glass("Media budget", t.media)}${glass("Ownership", t.ownership)}</div>`
     + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:18px 22px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the proof of concept proves</div><p style="font-size:12px;line-height:1.7;color:rgba(255,255,255,0.85);margin:8px 0 0;">${esc(t.poc_proves)}</p></div>`
@@ -774,7 +795,7 @@ function agreementPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accent};">${esc(title)}</div><div style="font-size:11px;line-height:1.6;color:${ci.body};margin-top:6px;">${esc(body)}</div></div>`;
   const cards = d.agreement.clauses.slice(0, 6).map((c, i) => clause(CLAUSE_TITLES[i] || c.title, c.body)).join("");
   return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "13 · Agency Agreement") + headline(ci, { lead: "Simple terms,", gradient: "in plain language." })
+    eyebrow(ci, "12 · Agency Agreement") + headline(ci, { lead: "Simple terms,", gradient: "in plain language." })
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.muted};margin:12px 0 0;">${esc(d.agreement.intro)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;flex:1;">${cards}</div>`
     + `<div style="margin-top:14px;background:${ci.darkPage};border-radius:16px;padding:16px 24px;color:#FFFFFF;display:flex;align-items:center;gap:16px;"><div style="width:34px;height:34px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></div><div style="font-size:11.5px;line-height:1.6;color:rgba(255,255,255,0.85);">That is the whole agreement: six clauses, one page. Deliberately simple, binding on signature, and written so a decision can be made in the room.</div></div>`);
@@ -793,7 +814,7 @@ function signoffPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the client</div>`
     + `<div style="font-size:16px;font-weight:800;text-transform:uppercase;margin-top:6px;">${esc(d.client_name)}</div>`
     + `<div style="margin-top:14px;"><div style="font-size:13px;font-weight:700;">Authorised Signatory</div><div style="font-size:11px;color:${ci.muted};margin-top:2px;">${esc(s.client.signatory_label)}</div></div>`
-    + `<div style="font-size:10.5px;line-height:1.8;color:${ci.muted};margin-top:10px;">${s.client.contacts.map((c) => `<div>${esc(c)}</div>`).join("")}</div>`
+    + `<div style="font-size:10.5px;line-height:1.8;color:${ci.muted};margin-top:10px;min-height:76px;">${s.client.contacts.map((c) => `<div>${esc(c)}</div>`).join("")}</div>`
     + sigRule
     + `<div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;">${clientMark}<div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};">${esc(s.client.tagline)}</div></div></div>`;
   const agencyCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;color:#1A1030;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
@@ -807,7 +828,7 @@ function signoffPage(d: ProposalDoc, ci: CiTokens): string {
     eyebrow(ci, "14 · Acceptance and Sign-off") + headline(ci, { lead: "Agreement", gradient: "and sign-off" })
     + `<p style="font-size:12px;line-height:1.7;color:${ci.body};margin:14px 0 0;">${esc(s.intro)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;align-items:stretch;">${clientCard}${agencyCard}</div>`
-    + footerLight(ci, d.brand_short, 24));
+    + footerLight(ci, d.brand_short, 23));
 }
 
 // ── document shell ────────────────────────────────────────────────────────────────────────────────────────────
@@ -819,7 +840,7 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
     philosophyPage(d, ci), ecosystemPage(d, ci), dividerPage(d, ci),
     pods12Page(d, ci), audiencePage(d, ci), targetingPage(d, ci),
     creativePage(d, ci), channelsPage(d, ci), psiPage(d, ci), pods78Page(d, ci),
-    closedLoopPage(d, ci), rolloutPage(d, ci), funnelPage(d, ci), governancePage(d, ci), dealDividerPage(d, ci),
+    closedLoopPage(d, ci), rolloutPage(d, ci), governancePage(d, ci), dealDividerPage(d, ci),
     investmentPage(d, ci), termsPage(d, ci), agreementPage(d, ci), signoffPage(d, ci),
   ].join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`

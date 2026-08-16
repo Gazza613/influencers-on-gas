@@ -76,13 +76,19 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
       .replace(/^\s*[|,;·]\s*|\s*[|,;·]\s*$/g, "")
       .replace(/\s{2,}/g, " ")
       .trim();
-  const contacts = [stripWhatsApp(identity.contact_details || ""), identity.address, website].filter(Boolean).map(String);
+  // The sign-off contacts: email/phone + physical address only, NEVER the website (Gary). WhatsApp already stripped.
+  const contacts = [stripWhatsApp(identity.contact_details || ""), identity.address].filter(Boolean).map(String);
+  // The client's logo for the sign-off circle (like GAS's mark), from their brand kit if on file. A public blob URL
+  // the PDF's Chromium can load; falls back to a monogram in the renderer when there is no logo.
+  const logoRow = (await db().query(`select logos from studio_brand_kits where client_id = $1`, [clientId]).catch(() => [])) as { logos: { url?: string }[] | null }[];
+  const logoUrl = Array.isArray(logoRow[0]?.logos) ? (logoRow[0]!.logos!.find((l) => l?.url)?.url || "") : "";
+  const clientLogo = /^https?:\/\//i.test(logoUrl) ? { src: logoUrl, w: 32, h: 32 } : null;
 
   const doc = buildProposalDoc(p.content, {
     clientName, objectiveLabel, tierName: tier.name,
     price: tier.id === "launch" ? "R100k" : "R150k", priceUnit: "per month excl VAT", rate: tier.rate,
     dateLabel, validityLabel: "Valid 14 days",
-    clientLogo: null, competitors: comps.map((c) => c.name), clientContacts: contacts, clientTagline: "",
+    clientLogo, competitors: comps.map((c) => c.name), clientContacts: contacts, clientTagline: "",
   });
   const html = renderProposalHtml(doc, deriveCiTokens(palette.primary, palette.dark));
   const pdf = await renderPdf(html, { marginMm: 0 });
