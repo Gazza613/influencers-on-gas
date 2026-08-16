@@ -678,7 +678,7 @@ function rolloutPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="display:flex;align-items:center;gap:8px;">${disc(ci, 24, w.icon)}<div style="font-size:11px;font-weight:700;">${esc(w.title)}</div></div>`
     + `<div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};margin-top:2px;">${esc(w.pods)}</div>`
     + `<ul style="margin:7px 0 0;padding-left:14px;font-size:9.3px;line-height:1.5;color:${ci.muted};flex:1;">${w.bullets.map((b) => `<li style="margin-top:2px;">${esc(b)}</li>`).join("")}</ul>`
-    + `<div style="margin-top:9px;background:${ci.accentGrad};border-radius:10px;padding:6px 12px;font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;text-align:center;">${esc(w.gate)}</div></div>`;
+    + `<div style="margin-top:9px;min-height:34px;background:${ci.accentGrad};border-radius:10px;padding:6px 12px;font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;text-align:center;line-height:1.4;display:flex;align-items:center;justify-content:center;">${esc(w.gate)}</div></div>`;
   return section(pageLight("48px 60px 36px"),
     eyebrow(ci, "08 · Your Rollout") + headline28(ci, r.headline)
     + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(r.intro)}</p>`
@@ -787,9 +787,9 @@ function termsPage(d: ProposalDoc, ci: CiTokens): string {
   const chip = (t2: string, accent: boolean) => accent
     ? `<div style="background:${ci.accentGrad};border-radius:999px;padding:9px 20px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(t2)}</div>`
     : `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.22);border-radius:999px;padding:9px 20px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(t2)}</div>`;
-  const clientMark = d.client_logo
-    ? `<img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" width="126" height="44" style="width:126px;height:44px;">`
-    : `<span style="font-size:12px;font-weight:700;color:#FFFFFF;">${esc(d.client_name)}</span>`;
+  // Always the clean white wordmark on the dark ground, never the raster logo (a boxed logo reads poorly, Gary). The
+  // real logo appears only in the sign-off circle (page 24), on a white disc.
+  const clientMark = `<span style="font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#FFFFFF;">${esc(d.client_name)}</span>`;
   return section(pageDark(ci, "52px 60px 44px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">11 · Commercial Terms and Next Steps</div>`
     + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
@@ -815,11 +815,11 @@ function agreementPage(d: ProposalDoc, ci: CiTokens): string {
 // 24 SIGN-OFF (light). Two signature cards: client (data) + agency (fixed GAS/Gary Berman).
 function signoffPage(d: ProposalDoc, ci: CiTokens): string {
   const s = d.signoff;
-  // The client mark: their logo when on file, else a clean monogram of the client name (never an empty disc).
-  const clientInitial = (d.client_name.trim()[0] || "•").toUpperCase();
-  const clientMark = d.client_logo
-    ? `<img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" style="width:32px;height:32px;border-radius:50%;object-fit:contain;background:#FFFFFF;">`
-    : `<div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:13px;">${esc(clientInitial)}</div>`;
+  // The client mark: a clean accent MONOGRAM circle exactly like the GAS circle beside it (this is how Boston City
+  // Campus was done, Gary's reference). A raster logo letterboxes into a rectangle inside the disc and reads poorly,
+  // so we always use the monogram: the initial of the first significant word (skipping a leading "The"/"A"/"An").
+  const clientInitial = ((d.client_name.trim().replace(/^(the|a|an)\s+/i, "")[0] || d.client_name.trim()[0] || "•")).toUpperCase();
+  const clientMark = `<div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:13px;">${esc(clientInitial)}</div>`;
   const sigRule = `<div style="margin-top:26px;"><div style="border-bottom:1.5px solid rgba(26,16,48,0.35);height:34px;"></div><div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};margin-top:6px;"><span>Signature</span><span>Date</span></div></div>`;
   const clientCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
     + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the client</div>`

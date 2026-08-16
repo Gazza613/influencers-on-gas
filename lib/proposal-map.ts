@@ -211,7 +211,9 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
         { level: "COLD", caption: "Filtered out cleanly, logged", kind: "low" },
       ],
       chat: c.psi_chat && Array.isArray(c.psi_chat.conversation) && c.psi_chat.conversation.length >= 3
-        ? { assistant: `${shortBrand(name)} assistant`, bubbles: c.psi_chat.conversation.slice(0, 6).map((b) => ({ role: b.role === "out" ? "out" as const : "in" as const, text: b.text })), closing: c.psi_chat.outcome || "High intent · routed to sales" }
+        // Cap to 5 exchanges and keep each bubble short so the chat always fits the page (Gary: the mock-up ran off
+        // the bottom). clipSentence trims a long message to whole sentences, never mid-thought.
+        ? { assistant: `${shortBrand(name)} assistant`, bubbles: c.psi_chat.conversation.slice(0, 5).map((b) => ({ role: b.role === "out" ? "out" as const : "in" as const, text: clipSentence(b.text, 150) })), closing: clip(c.psi_chat.outcome || "High intent · routed to sales", 52) }
         : {
           // A stronger DEFAULT that actually shows the qualification (intent, timing, scale, sign-off), then scores
           // and routes. A rebuild replaces this with a client-specific conversation from the model.
@@ -255,7 +257,8 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       headline: hl("Your 31-day", "build to go-live"),
       intro: `A focused 31-day build. Each stage is proven before the next begins, and the campaign goes live on day 31.`,
       rail: (c.rollout || []).slice(0, 4).map((r, i) => ({ badge: `W${i + 1}`, label: shortLabel(r.title) })),
-      weeks: (c.rollout || []).slice(0, 4).map((r, i) => ({ icon: WEEK_ICONS[i % 4], title: r.title, pods: r.pods, bullets: r.points || [], gate: r.gate })),
+      // Clip the milestone so it never runs past two lines, so all four milestone pills stay the same height (Gary).
+      weeks: (c.rollout || []).slice(0, 4).map((r, i) => ({ icon: WEEK_ICONS[i % 4], title: r.title, pods: r.pods, bullets: r.points || [], gate: clip(r.gate, 72) })),
     },
 
     funnel: {
