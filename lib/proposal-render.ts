@@ -135,8 +135,11 @@ const eyebrow = (ci: CiTokens, t: string) =>
 
 // Section headline with one gradient phrase (background-clip:text). size defaults to the 30px content-page headline.
 function headline(ci: CiTokens, h: Headline, size = 30): string {
+  // box-decoration-break:clone makes the gradient re-apply PER wrapped line, killing the stray vertical gradient
+  // sliver Chromium leaves at a background-clip:text line break, and stopping the second line rendering near-black
+  // (it otherwise inherits the deep end of the gradient). (Gary: "weird line".)
   return `<div style="font-size:${size}px;font-weight:800;text-transform:uppercase;line-height:1.02;margin-top:10px;">${esc(h.lead)} `
-    + `<span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accent};">${esc(h.gradient)}</span></div>`;
+    + `<span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accent};">${esc(h.gradient)}</span></div>`;
 }
 
 // The light-page footer rule: constant left, "Client · NN" right (NN zero-padded, regenerated on add/remove).
@@ -247,8 +250,11 @@ const JOURNEY: { icon: string; label: string; sub: string }[] = [
 ];
 function journeyStrip(ci: CiTokens): string {
   const arrow = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${ci.arrow}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`;
+  // Every node shares one grid: icon top-aligned, headline in a fixed two-line box, sub-label starting on the same
+  // line across all four, so a one-line headline (Paid ad) and a two-line one (PSI intent score) still align cleanly
+  // for the eye (Gary). flex:1 gives the four nodes equal width.
   const nodes = JOURNEY.map((s) =>
-    `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 32, s.icon)}<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;line-height:1.1;">${esc(s.label)}</div><div style="font-size:8.5px;color:${ci.muted};line-height:1.35;margin-top:1px;">${esc(s.sub)}</div></div></div>`
+    `<div style="display:flex;align-items:flex-start;gap:9px;flex:1;min-width:0;">${disc(ci, 32, s.icon)}<div style="min-width:0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;line-height:1.15;min-height:23px;">${esc(s.label)}</div><div style="font-size:8.5px;color:${ci.muted};line-height:1.35;margin-top:2px;">${esc(s.sub)}</div></div></div>`
   ).join(arrow);
   return `<div style="margin-top:14px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
     + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">The journey, deliberately short</div>`

@@ -25,6 +25,7 @@ AVOID:
 - Ending sections with generic inspirational statements. Filler transition sentences. Explaining obvious implications. Sounding overly complete, exhaustive, balanced or sanitised.
 - JARGON a client would not use in conversation. If a concept needs a name, use plain words: say "businesses that buy beds in bulk", never "the contract buyer"; never words like "afresh" or "uncontested". Write it as you would say it out loud to the client.
 - "CONTRACT" jargon. When you mean selling to businesses rather than households, say "B2B" or plain words ("businesses buying in bulk", "the B2B space"), never "contract space", "contract buyer", "contract spec sheet". Avoid trade jargon like "spec sheet", "supplier consolidation", "multi-tier operators", "SKU architecture"; say it plainly.
+- MARKETING jargon for a promotion. Call a promotion, guarantee or hook what it plainly is: an "offer" (or "guarantee", "promise"), never a "marketing device", "lead device", "mechanic" or "vehicle" ("the 180 Nights Comfort Exchange is the brand's current lead OFFER", never "lead marketing device").
 - FORWARD SLASHES in a heading or title. Write "size and firmness", never "size/firmness/length". A slash reads as a list crammed into a label.
 - SOFT, GENERIC HEADINGS. Every card headline and section hook is a short, concrete, engaging line that makes the reader want to read on, not a flat noun label.
 
