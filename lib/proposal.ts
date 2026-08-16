@@ -32,7 +32,7 @@ export type ProposalContent = {
   strategy: { proposition: string; angle: string; why_it_wins: string[] };
   // A market deep-dive that proves industry expertise: recent dated stats + opportunities the client should
   // consider, INCLUDING non-digital ones (flagged as strategic considerations beyond our pods, not deliverables).
-  market_intel: { overview: string; stats: { stat: string; source: string; label?: string }[]; opportunities: { insight: string; why: string; digital: boolean }[] };
+  market_intel: { overview: string; stats: { stat: string; source: string; label?: string }[]; opportunities: { headline?: string; insight: string; why: string; digital: boolean }[] };
   channels: { rationale: string; plan: { platform: string; priority: string; role: string; why: string }[] };   // intelligent selection
   pods: { name: string; for_client: string; benefit: string }[];                  // the 8 pods mapped to the client
   funnel: { disclaimer: string; stages: { stage: string; note: string }[] };      // ILLUSTRATIVE only
@@ -85,7 +85,7 @@ const CONTENT_SCHEMA = {
       properties: {
         overview: { type: "string", description: "The current state of the client's market, in a short paragraph, using recent facts." },
         stats: { type: "array", items: { type: "object", additionalProperties: false, properties: { stat: { type: "string", description: "the figure or finding, one tight sentence" }, source: { type: "string", description: "source and date/year" }, label: { type: "string", description: "a PUNCHY 1 to 3 word headline for this stat's card, engaging and impactful, not a soft label. A real figure where there is one (e.g. 'R1,399', '8 rivals', '180 nights'), else a sharp phrase ('One factory', 'Zero contenders'). This is the big word on the card, so make it land." } }, required: ["stat", "source", "label"] }, description: "3 to 6 recent, dated, relevant market statistics." },
-        opportunities: { type: "array", items: { type: "object", additionalProperties: false, properties: { insight: { type: "string" }, why: { type: "string" }, digital: { type: "boolean", description: "true if within our pods; false if a broader strategic consideration for the client, beyond our digital scope." } }, required: ["insight", "why", "digital"] }, description: "Opportunities the client should consider, including non-digital ones flagged digital:false as strategic considerations, not deliverables." },
+        opportunities: { type: "array", items: { type: "object", additionalProperties: false, properties: { headline: { type: "string", description: "A short, COMPLETE, engaging headline for this move (a finished statement, never a mid-sentence fragment, no forward slashes, 3 to 7 words). This is the card title." }, insight: { type: "string", description: "the move, in one or two plain sentences" }, why: { type: "string", description: "why it matters, in one or two plain sentences" }, digital: { type: "boolean", description: "true if within our pods; false if a broader strategic consideration for the client, beyond our digital scope." } }, required: ["headline", "insight", "why", "digital"] }, description: "Opportunities the client should consider, including non-digital ones flagged digital:false as strategic considerations, not deliverables." },
       },
       required: ["overview", "stats", "opportunities"],
     },

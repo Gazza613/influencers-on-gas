@@ -129,14 +129,20 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
 
     market: {
       headline: hl("The evidence", "behind every decision"),
-      intro: c.market_intel?.overview || "",
+      intro: clip(c.market_intel?.overview || "", 560),
       split: { left_label: "The shrinking play", left_pct: "", left_width: "38%", right_label: "The growth", right_pct: "", right_width: "62%", caption: "Budget follows the growing opportunity" },
       quotes: (c.market_intel?.stats || []).slice(0, 4).map((s) => ({ body: s.stat, source: s.source })),
+      // Title = the model's proper headline (a complete, punchy line, never a mid-sentence fragment). Body = the
+      // insight + why, clipped at a full SENTENCE so a card never ends mid-thought with "..." (Gary). Roomier than
+      // before so the cards fill the page.
       actions: (c.market_intel?.opportunities || []).slice(0, 6).map((o) => {
-        // A full-sentence insight makes a terrible bold card title and overflows. Split a punchy title from it and
-        // fold the rest into the body with the "why", then bound both so a card can never clip mid-sentence.
+        const hasHeadline = !!(o.headline && o.headline.trim());
         const tb = splitTitleBody(o.insight || "");
-        return { title: clip(tb.title, 58), body: clip([tb.body, o.why].filter(Boolean).join(" "), 210) };
+        return {
+          title: deSlashTitle(hasHeadline ? o.headline! : tb.title),
+          // headline path: whole insight + why. fallback path: the rest of the insight after its first sentence + why.
+          body: clipSentence([hasHeadline ? o.insight : tb.body, o.why].filter(Boolean).join(" "), 340),
+        };
       }),
     },
 
@@ -324,14 +330,26 @@ function shortStat(s: string): string {
 // A slash in a card title reads as a crammed list (Gary), so turn "size/firmness/length" into "size and firmness
 // and length" for any title we surface.
 const deSlashTitle = (t: string): string => t.replace(/\s*\/\s*/g, " and ");
+// Split into a COMPLETE title + body: take the first full sentence (any length) or a leading "Title:" as the
+// title, the rest as the body. Never a mid-sentence fragment (Gary: "a headline should never be part of a
+// sentence... it ends mid sentence, I do not want that").
 function splitTitleBody(w: string): { title: string; body: string } {
-  const m = w.match(/^(.{8,60}?[.:])\s+(.+)$/);
-  if (m) return { title: deSlashTitle(m[1].replace(/[.:]$/, "")), body: m[2] };
-  const words = w.split(/\s+/);
-  return { title: deSlashTitle(words.slice(0, 6).join(" ")), body: words.slice(6).join(" ") || w };
+  w = String(w || "").trim();
+  const m = w.match(/^([\s\S]+?[.:!?])\s+([\s\S]+)$/);
+  if (m && m[1].replace(/[.:!?]$/, "").trim().length >= 6) return { title: deSlashTitle(m[1].replace(/[.:!?]$/, "").trim()), body: m[2].trim() };
+  return { title: deSlashTitle(w), body: "" };
 }
 // Bound a string to n chars on a WORD boundary with an ellipsis, so a fixed-height card never clips mid-sentence.
 const clip = (s: string, n: number): string => { s = String(s || "").trim(); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, "").trimEnd() + "…" : s; };
+// Clip to the last COMPLETE sentence at or under n chars, so a card never ends mid-sentence with an ellipsis
+// (Gary). If no sentence break sits reasonably within the limit, fall back to a word-boundary clip.
+const clipSentence = (s: string, n: number): string => {
+  s = String(s || "").trim();
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n);
+  const stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  return stop > n * 0.45 ? cut.slice(0, stop + 1).trim() : clip(s, n);
+};
 const numWord = (n: number) => (["zero", "one", "two", "three", "four", "five", "six"][n] || String(n));
 const shortLabel = (t: string) => t.replace(/^week\s*\d+\s*[·:.-]?\s*/i, "").split(/[,·]/)[0].trim().slice(0, 22) || t.slice(0, 22);
 
