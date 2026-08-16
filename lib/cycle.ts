@@ -17,7 +17,7 @@ import { db } from "./db";
 export type CycleMode = "foundation" | "optimise" | "pivot" | "refresh";
 export type RunMode = "foundation" | "delta";
 export type StrategyLevel = "engagement" | "campaign";
-export type StrategyStatus = "draft" | "awaiting_approval" | "approved" | "superseded";
+export type StrategyStatus = "draft" | "building" | "awaiting_approval" | "approved" | "superseded" | "failed";
 export type SignalLever = "audience" | "creative" | "channel" | "offer" | "message";
 export type SignalSource = "psi" | "media" | "lead_mgmt" | "manual";
 
@@ -139,6 +139,7 @@ export type Strategy = {
   id: string; engagement_id: string; campaign_id: string | null; cycle_id: string | null;
   level: StrategyLevel; mode: string; version: number; status: StrategyStatus;
   content: StrategyContent | null; approved_by: string | null; approved_at: string | null; created_at: string;
+  progress?: { label: string; error?: string } | null;   // set while status='building' (durable background build)
 };
 export type PerformanceSignal = {
   id: string; engagement_id: string; campaign_id: string | null; source: SignalSource;
@@ -203,12 +204,14 @@ async function nextStrategyVersion(engagementId: string, level: StrategyLevel, c
   return Number(rows[0]?.v) || 1;
 }
 
-export async function createStrategyDraft(input: { engagementId: string; campaignId: string | null; cycleId: string | null; level: StrategyLevel; mode: string; content: StrategyContent }): Promise<Strategy> {
+export async function createStrategyDraft(input: { engagementId: string; campaignId: string | null; cycleId: string | null; level: StrategyLevel; mode: string; content: StrategyContent; status?: string; progress?: unknown }): Promise<Strategy> {
   const version = await nextStrategyVersion(input.engagementId, input.level, input.campaignId);
+  // status defaults to awaiting_approval (a completed draft); the durable build creates the row as 'building' with
+  // empty content + a progress label, then fills it from the background job.
   const rows = (await db().query(
-    `insert into strategies (engagement_id, campaign_id, cycle_id, level, mode, version, status, content)
-     values ($1,$2,$3,$4,$5,$6,'awaiting_approval',$7) returning *`,
-    [input.engagementId, input.campaignId, input.cycleId, input.level, input.mode, version, JSON.stringify(input.content)],
+    `insert into strategies (engagement_id, campaign_id, cycle_id, level, mode, version, status, content, progress)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+    [input.engagementId, input.campaignId, input.cycleId, input.level, input.mode, version, input.status || "awaiting_approval", JSON.stringify(input.content), input.progress != null ? JSON.stringify(input.progress) : null],
   )) as Strategy[];
   return rows[0];
 }

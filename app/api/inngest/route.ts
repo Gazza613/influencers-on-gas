@@ -2,6 +2,7 @@ import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
 import { generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, generateAudio, assembleVideo, reshootShot, videoSpike } from "@/inngest/functions";
 import { runResearchCollect, buildResearchDocumentJob, onResearchApproved, weeklyResearch } from "@/inngest/research";
+import { strategyBuildJob } from "@/inngest/strategy";
 import { APP_URL } from "@/lib/app-url";
 
 // Image/video generation + polling can run several minutes; give the invocation headroom so a
@@ -16,7 +17,7 @@ export const maxDuration = 800;
 // build-time INNGEST_SIGNING_KEY points at the wrong Inngest environment.
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, generateAudio, assembleVideo, reshootShot, videoSpike, runResearchCollect, buildResearchDocumentJob, onResearchApproved, weeklyResearch],
+  functions: [generateCandidates, buildIdentity, createPresenter, trainSoulJob, ingestSource, generateCreatives, upscaleCreative, generateAroll, generateShots, generateClips, generateAudio, assembleVideo, reshootShot, videoSpike, runResearchCollect, buildResearchDocumentJob, onResearchApproved, weeklyResearch, strategyBuildJob],
   // The address Inngest calls BACK on - not a display link. Moving it requires re-syncing the functions
   // (PUT /api/inngest), otherwise events fire into the void against the old registration.
   serveOrigin: APP_URL,

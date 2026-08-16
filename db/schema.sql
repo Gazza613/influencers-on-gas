@@ -893,6 +893,10 @@ create table if not exists strategies (
 );
 create index if not exists idx_strategies_engagement on strategies(engagement_id, version desc);
 create index if not exists idx_strategies_campaign on strategies(campaign_id);
+-- Durable strategy build (like the Researcher): status can be 'building' while the two Opus passes run as a
+-- background Inngest job, and 'progress' holds {label, error} so a returning user sees it running/complete and it
+-- survives navigation. Flips to 'awaiting_approval' on success, 'failed' on error.
+alter table strategies add column if not exists progress jsonb;
 
 -- Normalised feedback from the downstream pillars (PSI VI, Optimisation VIII, Lead Mgmt VII) - or entered by hand
 -- now, before those pillars exist. The Strategist reads unconsumed signals at the start of an OPTIMISE cycle to

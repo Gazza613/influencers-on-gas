@@ -7,6 +7,7 @@ import {
   ensureEngagement, createCampaign, openCycle, setCycleStatus, createStrategyDraft,
   STRATEGY_CONTENT_SCHEMA, type StrategyContent, type Strategy,
 } from "./cycle";
+import { inngest } from "./inngest";
 
 // THE STRATEGIST ENGINE (Pillar II) - Phase C (thin). It receives the Researcher's VERIFIED fact base and turns it
 // into a single-minded, defensible commercial strategy: the structured brief every downstream pillar inherits.
@@ -136,55 +137,144 @@ function resolveFactIds(content: StrategyContent, claims: ClaimLite[]): Strategy
   return { ...content, rationale, market_opportunities, audience };
 }
 
-// Generate (or refine) strategy content from the approved fact base. `notes` folds in the team's edit direction;
-// `prior` is the current strategy being refined (so the model improves it rather than starting cold).
-async function generateStrategyContent(
-  clientId: string, objective: string, opts: { notes?: string; prior?: StrategyContent | null; userEmail?: string | null } = {},
-): Promise<{ content: StrategyContent; runId: string; clientName: string }> {
+// The two Opus passes are split into serializable pieces so a DURABLE background job can run each as its own
+// Inngest step (its own function invocation), instead of one long request that can hit the ~13-min ceiling and die.
+type StrategyInputs = { clientId: string; runId: string; clientName: string; legend: string; user: string; claims: ClaimLite[] };
+
+async function anthropicClient(): Promise<Anthropic> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected.");
+  return new Anthropic({ apiKey: key });
+}
+const strategyTool = (): Anthropic.Tool => ({ name: "write_strategy", description: "The single, structured commercial strategy.", input_schema: STRATEGY_CONTENT_SCHEMA as unknown as Anthropic.Tool["input_schema"] });
+
+// Load the fact base + build the prompt. `prior` (on a refine) makes the model improve the current strategy.
+async function prepareStrategyInputs(clientId: string, objective: string, opts: { notes?: string | null; prior?: StrategyContent | null } = {}): Promise<StrategyInputs> {
   const { runId, claims, clientName } = await latestApprovedFacts(clientId);
   if (!runId || !claims.length) throw new Error("No approved research yet. Run the Researcher and approve it at Gate 1 first.");
-  const client = new Anthropic({ apiKey: key });
-
   const legend = claims.map((c, i) => `F${i + 1} [${c.section}${c.subject ? `/${c.subject}` : ""}] ${c.claim}${c.source_url ? " (sourced)" : ""}`).join("\n");
   const priorBlock = opts.prior ? `\n\nCURRENT STRATEGY (improve this, do not start from scratch):\n${JSON.stringify(opts.prior)}` : "";
   const notesBlock = opts.notes?.trim() ? `\n\nTEAM DIRECTION (apply precisely, and record each material change in 'changes_from_last'):\n${opts.notes.trim().slice(0, 2000)}` : "";
-  const user =
-    `OBJECTIVE FOR THIS STRATEGY: ${objective}\n\n` +
-    `THE VERIFIED FACT BASE (cite facts as their Fn tag in every rationale point):\n${legend}${priorBlock}${notesBlock}`;
+  const user = `OBJECTIVE FOR THIS STRATEGY: ${objective}\n\nTHE VERIFIED FACT BASE (cite facts as their Fn tag in every rationale point):\n${legend}${priorBlock}${notesBlock}`;
+  return { clientId, runId, clientName, legend, user, claims };
+}
 
-  const SCHEMA = STRATEGY_CONTENT_SCHEMA as unknown as Anthropic.Tool["input_schema"];
-  const tool: Anthropic.Tool = { name: "write_strategy", description: "The single, structured commercial strategy.", input_schema: SCHEMA };
-
-  // 1) DRAFT. Retried on a transient Anthropic overload (529) / rate limit.
-  const draftMsg = await withAnthropicRetry(() => client.messages.stream({
+// Pass 1: the draft (top-1% strategist persona).
+async function strategyDraftPass(user: string, clientName: string, meter: { clientId: string; userEmail?: string | null }): Promise<StrategyContent> {
+  const client = await anthropicClient();
+  const msg = await withAnthropicRetry(() => client.messages.stream({
     model: OPUS5, max_tokens: 12000, system: STRATEGIST_SYSTEM(clientName),
-    tools: [tool], tool_choice: { type: "tool", name: "write_strategy" },
+    tools: [strategyTool()], tool_choice: { type: "tool", name: "write_strategy" },
     messages: [{ role: "user", content: user }],
   }).finalMessage());
-  await meterClaude(draftMsg, { clientId, userEmail: opts.userEmail ?? null, model: OPUS5, action: "strategy-build" }).catch(() => {});
-  let content = extractContent(draftMsg);
+  await meterClaude(msg, { clientId: meter.clientId, userEmail: meter.userEmail ?? null, model: OPUS5, action: "strategy-build" }).catch(() => {});
+  const content = extractContent(msg);
   if (!content) throw new Error("The Strategist returned nothing. Try again.");
+  return content;
+}
 
-  // 2) ADVERSARIAL RED-TEAM. A ruthless strategy director kills any point not grounded in a cited fact, forces a
-  //    single proposition, and hardens the KPIs and pre-mortem. This is what turns "plausible" into "defensible".
+// Pass 2: the adversarial red-team (best-effort; the draft stands if it fails).
+async function strategyRedTeamPass(legend: string, clientName: string, draft: StrategyContent, meter: { clientId: string; userEmail?: string | null }): Promise<StrategyContent> {
   try {
-    const advMsg = await withAnthropicRetry(() => client.messages.stream({
+    const client = await anthropicClient();
+    const msg = await withAnthropicRetry(() => client.messages.stream({
       model: OPUS5, max_tokens: 12000,
       system: `You are a ruthless Strategy Director (top 1% performance marketing) red-teaming a draft strategy for ${clientName} before it reaches the board. Your job is to find every JUNIOR tell and fix it. ` +
         `Test it hard: Is there a REAL, non-obvious insight, or is it restating facts and generic best practice? Does every move have a MECHANISM (how it lowers acquisition cost / raises intent / lifts order value / compounds), or just adjectives? Does it show CATEGORY and COMMERCIAL fluency (margin, pricing power, the real objection, seasonality), or read like an ad-account tactic? Is PRICE used as a lead strategic lever where the cost structure supports it, never hidden as "the closer"? ` +
         `Kill any claim not grounded in a cited Fn fact. Force ONE single-minded proposition. Make it decision-forcing, not a survey. Ensure every KPI has a baseline and the pre-mortem names the real ways it could fail. Do NOT invent facts. Cut hedging and buzzwords. ` +
         `Return the SHARPER, more expert strategy via write_strategy. UK English, no em dashes.`,
-      tools: [tool], tool_choice: { type: "tool", name: "write_strategy" },
-      messages: [{ role: "user", content: `Fact base:\n${legend}\n\nDraft strategy to red-team and improve:\n${JSON.stringify(content)}` }],
+      tools: [strategyTool()], tool_choice: { type: "tool", name: "write_strategy" },
+      messages: [{ role: "user", content: `Fact base:\n${legend}\n\nDraft strategy to red-team and improve:\n${JSON.stringify(draft)}` }],
     }).finalMessage());
-    await meterClaude(advMsg, { clientId, userEmail: opts.userEmail ?? null, model: OPUS5, action: "strategy-refine" }).catch(() => {});
-    content = extractContent(advMsg) || content;
-  } catch { /* red-team is best-effort; the draft still stands */ }
+    await meterClaude(msg, { clientId: meter.clientId, userEmail: meter.userEmail ?? null, model: OPUS5, action: "strategy-refine" }).catch(() => {});
+    return extractContent(msg) || draft;
+  } catch { return draft; }
+}
 
-  // Normalise to the schema BEFORE storing (kills the malformed-field crash at the source), then resolve fact ids.
-  return { content: resolveFactIds(normalizeStrategyContent(content), claims), runId, clientName };
+const finalizeStrategyContent = (raw: StrategyContent, claims: ClaimLite[]): StrategyContent => resolveFactIds(normalizeStrategyContent(raw), claims);
+
+// The composing (synchronous) generator, kept for any non-durable caller.
+async function generateStrategyContent(
+  clientId: string, objective: string, opts: { notes?: string; prior?: StrategyContent | null; userEmail?: string | null } = {},
+): Promise<{ content: StrategyContent; runId: string; clientName: string }> {
+  const inp = await prepareStrategyInputs(clientId, objective, opts);
+  const draft = await strategyDraftPass(inp.user, inp.clientName, { clientId, userEmail: opts.userEmail });
+  const improved = await strategyRedTeamPass(inp.legend, inp.clientName, draft, { clientId, userEmail: opts.userEmail });
+  return { content: finalizeStrategyContent(improved, inp.claims), runId: inp.runId, clientName: inp.clientName };
+}
+
+// ── DURABLE STRATEGY BUILD ──────────────────────────────────────────────────────────────────────────────────
+// A "building" strategy row is created up front, then a background Inngest job fills it, writing a progress label
+// at each phase (like the Researcher). The UI polls the row's status/progress, so "is it working?" is always
+// answerable and survives navigation, and a long Opus pass can never die on the request ceiling.
+
+export type StrategyProgress = { label: string; error?: string };
+
+async function setStrategyProgress(strategyId: string, progress: StrategyProgress, status?: string): Promise<void> {
+  if (status) await db().query(`update strategies set progress = $2::jsonb, status = $3 where id = $1`, [strategyId, JSON.stringify(progress), status]);
+  else await db().query(`update strategies set progress = $2::jsonb where id = $1`, [strategyId, JSON.stringify(progress)]);
+}
+
+// The strategy's client + objective + prior content, for the background job.
+async function loadStrategyForBuild(strategyId: string): Promise<{ clientId: string; objective: string; prior: StrategyContent | null; cycleId: string | null }> {
+  const rows = (await db().query(
+    `select s.content, s.cycle_id, e.client_id, c.objective from strategies s join engagements e on e.id = s.engagement_id left join campaigns c on c.id = s.campaign_id where s.id = $1`,
+    [strategyId],
+  )) as { content: StrategyContent | null; cycle_id: string | null; client_id: string; objective: string | null }[];
+  const s = rows[0];
+  if (!s) throw new Error("That strategy was not found.");
+  const prior = s.content && typeof s.content === "object" && Object.keys(s.content).length ? s.content : null;
+  return { clientId: s.client_id, objective: s.objective || "", prior, cycleId: s.cycle_id };
+}
+
+// The durable steps, each called from one Inngest step.run(). `inp` is cached + replayed between steps.
+export async function strategyStepPrepare(strategyId: string, mode: "build" | "refine", notes: string | null): Promise<StrategyInputs> {
+  await setStrategyProgress(strategyId, { label: "Reading the approved fact base…" });
+  const { clientId, objective, prior } = await loadStrategyForBuild(strategyId);
+  return prepareStrategyInputs(clientId, objective, { notes, prior: mode === "refine" ? prior : null });
+}
+export async function strategyStepDraft(strategyId: string, inp: StrategyInputs, userEmail: string | null): Promise<StrategyContent> {
+  await setStrategyProgress(strategyId, { label: "Drafting one single-minded strategy…" });
+  return strategyDraftPass(inp.user, inp.clientName, { clientId: inp.clientId, userEmail });
+}
+export async function strategyStepRedTeam(strategyId: string, inp: StrategyInputs, draft: StrategyContent, userEmail: string | null): Promise<StrategyContent> {
+  await setStrategyProgress(strategyId, { label: "Red-teaming it like a ruthless strategy director…" });
+  return strategyRedTeamPass(inp.legend, inp.clientName, draft, { clientId: inp.clientId, userEmail });
+}
+export async function strategyStepStore(strategyId: string, improved: StrategyContent, claims: ClaimLite[]): Promise<void> {
+  const content = finalizeStrategyContent(improved, claims);
+  await db().query(`update strategies set content = $2, status = 'awaiting_approval', progress = null where id = $1`, [strategyId, JSON.stringify(content)]);
+  const cyc = (await db().query(`select cycle_id from strategies where id = $1`, [strategyId]) as { cycle_id: string | null }[])[0];
+  if (cyc?.cycle_id) await setCycleStatus(cyc.cycle_id, "awaiting_gate", { strategyId }).catch(() => {});
+}
+export async function markStrategyFailed(strategyId: string, message: string): Promise<void> {
+  await setStrategyProgress(strategyId, { label: "The strategy build did not finish.", error: message.slice(0, 300) }, "failed").catch(() => {});
+}
+
+// START a durable BUILD: validate research, create the engagement/campaign/cycle + a 'building' strategy row, fire
+// the background job, and return the row immediately (the UI polls it to awaiting_approval).
+export async function startStrategyBuild(clientId: string, input: { name: string; objective: string; userEmail?: string | null }): Promise<Strategy> {
+  const { runId } = await latestApprovedFacts(clientId);
+  if (!runId) throw new Error("No approved research yet. Run the Researcher and approve it at Gate 1 first.");
+  const eng = await ensureEngagement(clientId);
+  const campaign = await createCampaign(eng.id, input.name || input.objective.slice(0, 80), { objective: input.objective });
+  const cycle = await openCycle(eng.id, "foundation", { campaignId: campaign.id, openedBy: input.userEmail ?? null });
+  await setCycleStatus(cycle.id, "strategising", { researchRunId: runId });
+  const strategy = await createStrategyDraft({ engagementId: eng.id, campaignId: campaign.id, cycleId: cycle.id, level: "campaign", mode: "foundation", content: {} as StrategyContent, status: "building", progress: { label: "Queued…" } });
+  await inngest.send({ name: "studio/strategy.build", data: { strategyId: strategy.id, mode: "build", notes: null, userEmail: input.userEmail ?? null } });
+  return strategy;
+}
+
+// START a durable REFINE: flip the strategy to 'building' (keeping its content as the prior to improve), fire the job.
+export async function startStrategyRefine(strategyId: string, notes: string, userEmail?: string | null): Promise<Strategy> {
+  const rows = (await db().query(`select * from strategies where id = $1`, [strategyId])) as Strategy[];
+  const cur = rows[0];
+  if (!cur) throw new Error("That strategy was not found.");
+  if (cur.status === "approved" || cur.status === "superseded") throw new Error("That strategy is locked. Build a new version instead.");
+  if (cur.status === "building") throw new Error("This strategy is already building. Give it a moment.");
+  await db().query(`update strategies set status = 'building', progress = $2::jsonb where id = $1`, [strategyId, JSON.stringify({ label: "Queued…" })]);
+  await inngest.send({ name: "studio/strategy.build", data: { strategyId, mode: "refine", notes: notes.slice(0, 2000), userEmail: userEmail ?? null } });
+  return { ...cur, status: "building", progress: { label: "Queued…" } } as Strategy;
 }
 
 // BUILD a fresh strategy: spins up the engagement (if first time), a campaign for this objective, a foundation

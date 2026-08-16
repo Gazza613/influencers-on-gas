@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { buildStrategy } from "@/lib/strategist";
+import { startStrategyBuild } from "@/lib/strategist";
 
-// THE STRATEGIST (Pillar II), Phase C. Build a strategy from the client's APPROVED research fact base. This is the
-// demonstrable Research -> Strategy hand-off: it only ever runs from a Gate-1-approved run, and produces the
-// structured brief (awaiting Gate 2). Two Opus 5 passes (draft + adversarial red-team) can take a moment.
-// Two sequential Opus 5 passes (draft + adversarial red-team) at 12k tokens each over a rich fact base can run
-// past 300s and the platform then kills the function - the client saw a non-JSON 504 as "Couldn't build the
-// strategy". 800s (the durable-route ceiling this plan already uses) gives both passes ample room.
-export const maxDuration = 800;
+// THE STRATEGIST (Pillar II), Phase C. Build a strategy from the client's APPROVED research fact base, DURABLY: this
+// creates a 'building' strategy row and fires the background Inngest job (inngest/strategy.ts), then returns
+// immediately. The two Opus 5 passes (draft + red-team) run as separate steps decoupled from this request, so a
+// long pass can never hit the request ceiling and die (the old sync build's "nothing happened" failure). The UI
+// polls the strategist/latest route for the row's status + progress.
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
@@ -21,8 +19,8 @@ export async function POST(req: Request) {
   if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });
   if (!objective) return NextResponse.json({ error: "Give the strategy an objective to work toward." }, { status: 400 });
   try {
-    const out = await buildStrategy(clientId, { name, objective, userEmail: session.user?.email ?? null });
-    return NextResponse.json({ ok: true, strategy: out.strategy, campaignId: out.campaignId });
+    const strategy = await startStrategyBuild(clientId, { name, objective, userEmail: session.user?.email ?? null });
+    return NextResponse.json({ ok: true, strategy, status: "building" });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 400 });
   }

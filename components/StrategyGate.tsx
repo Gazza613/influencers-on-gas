@@ -77,63 +77,61 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
   const content = (strategy?.content || null) as StrategyContent | null;
   const status = strategy ? (STATUS[strategy.status] || STATUS.draft) : null;
   const canGate = strategy?.status === "awaiting_approval";
+  const building = strategy?.status === "building";
+  const failed = strategy?.status === "failed";
+
+  // While the durable background build/refine runs, poll the row so the live progress + the finished strategy land
+  // on their own. Handles a fresh build AND a resume (the page loaded mid-build) - the job survives navigation.
+  useEffect(() => {
+    if (!building) return;
+    let alive = true;
+    const forClient = clientId;
+    const tick = async () => {
+      await new Promise((r) => setTimeout(r, 5000));
+      if (!alive || clientRef.current !== forClient) return;
+      const d = await fetch(`/api/studio/strategist/latest?clientId=${forClient}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (!alive || clientRef.current !== forClient) return;
+      if (d) setData(d);
+      if (d?.strategy?.status === "building") tick();
+    };
+    tick();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [building, strategy?.id, clientId]);
   const litHero = strategy && content ? 0.92 : isReady ? 0.5 : 0.18;   // the living hero glows as the strategy forms
   const toggle = (id: string) => setOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
+  // The build is now DURABLE: this fires the background job (returns instantly with a 'building' row), then loads it
+  // so the poll-while-building effect below drives the live progress. No long request to time out.
   async function build() {
     if (!objective.trim()) { setMsg("Give the strategy an objective."); return; }
-    const priorId = strategy?.id || null;
-    const forClient = clientId;
-    setBusy(true);
-    setMsg("Drafting and red-teaming the strategy. Two expert passes over the full fact base, so this can take a few minutes, safe to wait here.");
-    // We do NOT depend on the build request's HTTP response: two long Opus 5 passes can outlast the gateway, which
-    // returns a 504 even though the work completed and SAVED. So we fire the build and POLL for the new strategy -
-    // a slow build never shows a false "couldn't build". A real error (returned by the request) is still surfaced.
-    let reqError: string | null = null;
-    const req = fetch(`/api/studio/strategist/build`, {
+    setBusy(true); setMsg("");
+    const r = await fetch(`/api/studio/strategist/build`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId: forClient, objective, name: objective.slice(0, 80) }),
+      body: JSON.stringify({ clientId, objective, name: objective.slice(0, 80) }),
     }).then((x) => x.json()).catch(() => null);
-    req.then((r) => { if (r && r.ok === false && r.error) reqError = String(r.error); });
-    for (let i = 0; i < 95; i++) {   // ~14 min, matching the server ceiling
-      await new Promise((res) => setTimeout(res, 9000));
-      if (clientRef.current !== forClient) { setBusy(false); return; }   // user switched client
-      const d = await fetch(`/api/studio/strategist/latest?clientId=${forClient}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-      if (d?.strategy && d.strategy.id !== priorId) { setData(d); setObjective(""); setMsg(""); setBusy(false); return; }   // the new strategy landed
-      if (reqError) { setMsg(reqError); setBusy(false); return; }   // a genuine error came back and nothing was created
-    }
-    setBusy(false); setMsg("The strategy is taking longer than usual and may still be running in the background. Give it a minute, then refresh.");
+    setBusy(false);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't start the strategy build."); return; }
+    setObjective(""); setMsg("");
+    await load(clientId);
   }
 
   // Refine the whole strategy against a note. A section label scopes the change so the team fixes one part in place.
+  // Refine is durable too: fire the background job (flips the row to 'building'), then load so the progress shows.
   async function refine(sectionLabel?: string) {
     if (!strategy || !note.trim()) return;
-    const forClient = clientId;
-    const strategyId = strategy.id;
     const scoped = sectionLabel
       ? `Refine ONLY the "${sectionLabel}" section of the strategy, leaving the rest intact unless a change is needed for coherence. The change: ${note.trim()}`
       : note.trim();
-    // A refine is two long Opus 5 passes that UPDATE the strategy in place, and (like the build) the gateway can
-    // time the response out even though it completed + saved. So we fire it and poll for the CONTENT to change
-    // rather than trusting the response - otherwise a slow refine looks like "nothing happened".
-    const priorSig = JSON.stringify(strategy.content || {});
     setBusy(true); setMsg("");
-    let reqError: string | null = null;
-    const req = fetch(`/api/studio/strategist/refine`, {
+    const r = await fetch(`/api/studio/strategist/refine`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strategyId, notes: scoped }),
+      body: JSON.stringify({ strategyId: strategy.id, notes: scoped }),
     }).then((x) => x.json()).catch(() => null);
-    req.then((r) => { if (r && r.ok === false && r.error) reqError = String(r.error); });
-    for (let i = 0; i < 95; i++) {   // ~14 min
-      await new Promise((res) => setTimeout(res, 9000));
-      if (clientRef.current !== forClient) { setBusy(false); return; }
-      const d = await fetch(`/api/studio/strategist/latest?clientId=${forClient}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
-      if (d?.strategy && d.strategy.id === strategyId && JSON.stringify(d.strategy.content || {}) !== priorSig) {
-        setData(d); setNote(""); setRefineFor(null); setMsg("Refined. The strategy has been updated with your change."); setBusy(false); return;
-      }
-      if (reqError) { setMsg(reqError); setBusy(false); return; }
-    }
-    setBusy(false); setMsg("The refine is taking longer than usual and may still be running. Give it a minute, then refresh.");
+    setBusy(false);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't start the refine."); return; }
+    setNote(""); setRefineFor(null); setMsg("");
+    await load(clientId);
   }
 
   async function approve() {
@@ -253,7 +251,7 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
       <section className="relative overflow-hidden rounded-2xl border border-[#a855f7]/25 bg-surface-1">
         <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full blur-[90px]" style={{ background: "radial-gradient(circle, rgba(168,85,247,0.18), transparent 70%)", opacity: 0.4 + 0.6 * litHero }} />
         <div className="relative flex flex-col items-center gap-5 p-6 sm:flex-row sm:gap-7 sm:p-7">
-          <div className="h-28 w-28 shrink-0 self-center text-ink-faint sm:h-32 sm:w-32"><LivingStrategy lit={litHero} active={busy} /></div>
+          <div className="h-28 w-28 shrink-0 self-center text-ink-faint sm:h-32 sm:w-32"><LivingStrategy lit={litHero} active={busy || building} /></div>
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <h1 className="text-4xl font-black tracking-tight sm:text-[42px]"><span className="brand-grad">The Strategist</span></h1>
             <p className="mt-2 max-w-2xl text-[17px] leading-relaxed text-ink-dim">
@@ -288,18 +286,18 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
           <textarea value={objective} onChange={(e) => setObjective(e.target.value)} rows={2}
             placeholder="The commercial objective for this strategy…"
             className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
-          <button onClick={build} disabled={busy}
+          <button onClick={build} disabled={busy || building}
             className="mt-3 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
-            {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
-            {busy ? "Drafting and red-teaming…" : strategy ? "Build a new strategy" : "Build the strategy"}
+            {(busy || building) && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+            {building ? "Building…" : busy ? "Starting…" : strategy && !failed ? "Build a new strategy" : "Build the strategy"}
           </button>
         </div>
       )}
 
-      {busy ? (
+      {(busy || building) ? (
         <div className="mt-4">
           <WorkingPanel
-            title="Building the strategy"
+            title={building && strategy?.mode !== "foundation" ? "Refining the strategy" : "Building the strategy"}
             lines={[
               "Reading the verified fact base…",
               "Drafting one single-minded proposition…",
@@ -307,15 +305,20 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
               "Red-teaming it like a ruthless strategy director…",
               "Hardening the KPIs and the pre-mortem…",
             ]}
-            note="Two expert passes, a draft and an adversarial red-team, over the whole fact base. It is safe to wait here, and it keeps running if you navigate away."
+            note={strategy?.progress?.label || "Two expert passes, a draft and an adversarial red-team, over the whole fact base. It runs in the background and keeps going if you navigate away."}
             eta="a few minutes"
             estimateSeconds={240}
           />
         </div>
+      ) : failed ? (
+        <div className="mt-4 rounded-xl border border-[#f87171]/40 bg-[#f87171]/[0.06] p-5">
+          <div className="text-lg font-bold text-[#fca5a5]">The strategy build did not finish</div>
+          <p className="mt-1 text-base text-ink-dim">{strategy?.progress?.error || "Something interrupted it. Nothing was saved."} Build it again when you are ready.</p>
+        </div>
       ) : msg && <p className="mt-3 rounded-lg border border-line bg-surface-1 px-3 py-2.5 text-lg text-ink-dim">{msg}</p>}
 
       {/* THE STRATEGY */}
-      {strategy && content && (
+      {strategy && content && !building && !failed && content.proposition && (
         <div className="mt-8 space-y-5">
           {/* AT A GLANCE - the proposition + the key moves, so the team gets the whole strategy in one look. */}
           <section className="relative overflow-hidden rounded-2xl border border-accent/40 bg-surface-1 p-6">
