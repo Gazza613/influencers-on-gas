@@ -121,11 +121,12 @@ function gasLockup(ci: CiTokens, onDark: boolean): string {
 
 // An icon disc (radial gradient) holding a 2px-stroke white lucide SVG. `inner` is the svg's inner markup.
 function disc(ci: CiTokens, size: number, inner: string): string {
-  const ic = Math.round(size * 0.52);
-  // A hairline inset ring gives the circle a crisp, defined edge in print (a flat gradient disc alone reads soft
-  // and "not a precise circle", Gary). aspect-ratio + fixed box keep it a true circle, never an oval.
-  return `<div style="width:${size}px;height:${size}px;min-width:${size}px;aspect-ratio:1;border-radius:50%;background:${ci.iconDisc};box-shadow:inset 0 0 0 1px rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;">`
-    + `<svg width="${ic}" height="${ic}" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${inner}</svg></div>`;
+  const ic = Math.round(size * 0.5);
+  // A clean, solid accent circle with the icon centred crisply. line-height:0 + overflow:hidden + svg display:block
+  // kill the sub-pixel baseline offset that made the icon sit low and the disc read as "not a precise circle"
+  // (Gary). A soft outer shadow defines the edge without the double-line look of an inset ring.
+  return `<div style="width:${size}px;height:${size}px;min-width:${size}px;min-height:${size}px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 1px 3px rgba(0,0,0,0.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:0;overflow:hidden;">`
+    + `<svg width="${ic}" height="${ic}" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">${inner}</svg></div>`;
 }
 
 const eyebrow = (ci: CiTokens, t: string) =>

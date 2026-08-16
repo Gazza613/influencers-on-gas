@@ -321,11 +321,14 @@ function shortStat(s: string): string {
   if (out.length <= 7 && mean[1] && out.length + 1 + mean[1].length <= 16) out += " " + mean[1];
   return out[0].toUpperCase() + out.slice(1);
 }
+// A slash in a card title reads as a crammed list (Gary), so turn "size/firmness/length" into "size and firmness
+// and length" for any title we surface.
+const deSlashTitle = (t: string): string => t.replace(/\s*\/\s*/g, " and ");
 function splitTitleBody(w: string): { title: string; body: string } {
   const m = w.match(/^(.{8,60}?[.:])\s+(.+)$/);
-  if (m) return { title: m[1].replace(/[.:]$/, ""), body: m[2] };
+  if (m) return { title: deSlashTitle(m[1].replace(/[.:]$/, "")), body: m[2] };
   const words = w.split(/\s+/);
-  return { title: words.slice(0, 6).join(" "), body: words.slice(6).join(" ") || w };
+  return { title: deSlashTitle(words.slice(0, 6).join(" ")), body: words.slice(6).join(" ") || w };
 }
 // Bound a string to n chars on a WORD boundary with an ellipsis, so a fixed-height card never clips mid-sentence.
 const clip = (s: string, n: number): string => { s = String(s || "").trim(); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, "").trimEnd() + "…" : s; };
