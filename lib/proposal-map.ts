@@ -360,6 +360,7 @@ function competitiveMap(name: string, competitors: string[]) {
     y_top: "Owned value", y_bottom: "Commodity", x_left: "Slower to respond", x_right: "Speed and qualification",
     competitors: competitors.slice(0, 3).map((cName, i) => ({ name: cName, note: "monitored continually", left: pos[i].left, top: pos[i].top })),
     client: { name, note: "the system's edge", left: "52%", top: "12%" },
+    set: competitors.slice(0, 8),
   };
 }
 

@@ -32,9 +32,9 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
   // The competitive-map competitors come from the editable research set. If that table is empty (the structured
   // competitor list can come back empty even when the research clearly found rivals), fall back to the
   // competitor_set CLAIMS - their subject IS the rival's name - so the map is never just the client alone.
-  let comps = (await db().query(`select name from research_competitors where client_id = $1 order by created_at asc limit 3`, [clientId]).catch(() => [])) as { name: string }[];
+  let comps = (await db().query(`select name from research_competitors where client_id = $1 order by created_at asc limit 12`, [clientId]).catch(() => [])) as { name: string }[];
   if (!comps.length) {
-    comps = (await db().query(`select distinct subject as name from research_claims where client_id = $1 and section = 'competitor_set' and coalesce(subject,'') <> '' order by subject limit 3`, [clientId]).catch(() => [])) as { name: string }[];
+    comps = (await db().query(`select distinct subject as name from research_claims where client_id = $1 and section = 'competitor_set' and coalesce(subject,'') <> '' order by subject limit 12`, [clientId]).catch(() => [])) as { name: string }[];
   }
 
   // Client CI: the proposal wears the CLIENT's real brand colours. Priority: a manual accent override (Human

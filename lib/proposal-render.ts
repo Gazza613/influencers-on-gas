@@ -49,6 +49,7 @@ export type ProposalDoc = {
       title: string; y_top: string; y_bottom: string; x_left: string; x_right: string;
       competitors: { name: string; note: string; left: string; top: string }[];   // muted dots
       client: { name: string; note: string; left: string; top: string };            // glowing dot
+      set: string[];                                                                // the full named competitor set, for the summary
     };
   };
   audience: {
@@ -407,9 +408,13 @@ const podDisc = (ci: CiTokens, roman: string, size = 34) =>
 // 09 PODS I-II (light). Two pod blocks (disc + name + subtitle + para + tint chip) + the competitive positioning map.
 function pods12Page(d: ProposalDoc, ci: CiTokens): string {
   const m = d.pods12.map;
-  const podBlock = (roman: string, name: string, subtitle: string, para: string, chip: string) =>
+  // Themed pod icons (a scope for the Researcher, a compass for the Strategist), not a plain numeral (Gary: the
+  // icons were not creative enough). The pod number rides along as a small tag next to the name.
+  const RESEARCHER_ICON = `<circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path><path d="M11 8v6"></path><path d="M8 11h6"></path>`;
+  const STRATEGIST_ICON = `<circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>`;
+  const podBlock = (icon: string, roman: string, name: string, subtitle: string, para: string, chip: string) =>
     `<div style="background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:10px;">${podDisc(ci, roman)}<div><div style="font-size:14px;font-weight:800;text-transform:uppercase;">${esc(name)}</div><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accent};">${esc(subtitle)}</div></div></div>`
+    + `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 40, icon)}<div><div style="display:flex;align-items:baseline;gap:8px;"><span style="font-size:14px;font-weight:800;text-transform:uppercase;">${esc(name)}</span><span style="font-size:8px;font-weight:700;letter-spacing:0.16em;color:${ci.accent};">POD ${roman}</span></div><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};">${esc(subtitle)}</div></div></div>`
     + `<p style="font-size:10.5px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(para)}</p>${tintChip(ci, chip)}</div>`;
   const dot = (c: { name: string; note: string; left: string; top: string }) =>
     `<div style="position:absolute;left:${c.left};top:${c.top};display:flex;align-items:center;gap:5px;"><div style="width:11px;height:11px;border-radius:50%;background:#B7AECB;"></div><div style="font-size:9px;font-weight:700;color:${ci.muted};">${esc(c.name)} <span style="font-weight:400;">· ${esc(c.note)}</span></div></div>`;
@@ -418,16 +423,21 @@ function pods12Page(d: ProposalDoc, ci: CiTokens): string {
   return section(pageLight("48px 60px 36px"),
     eyebrow(ci, "The System · Intelligence Layer") + headline28(ci, d.pods12.headline)
     + `<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">`
-    +   podBlock("I", "The Researcher", "The business brain: market, competitors, customer", d.pods12.researcher_para, d.pods12.researcher_chip)
-    +   podBlock("II", "The Strategist", "Intelligence converted into a commercial plan and KPIs", d.pods12.strategist_para, d.pods12.strategist_chip)
+    +   podBlock(RESEARCHER_ICON, "I", "The Researcher", "The business brain: market, competitors, customer", d.pods12.researcher_para, d.pods12.researcher_chip)
+    +   podBlock(STRATEGIST_ICON, "II", "The Strategist", "Intelligence converted into a commercial plan and KPIs", d.pods12.strategist_para, d.pods12.strategist_chip)
     + `</div>`
     + `<div style="margin-top:12px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
     +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:20px;">${esc(m.title)}</div>`
-    +   `<div style="position:relative;height:150px;border-left:2px solid #E4DEEF;border-bottom:2px solid #E4DEEF;margin:0 12px 20px 12px;">`
+    +   `<div style="position:relative;height:158px;border-left:2px solid #E4DEEF;border-bottom:2px solid #E4DEEF;margin:0 12px 20px 12px;">`
     +     axisLbl("left:-10px;top:-15px", m.y_top) + axisLbl("left:-10px;bottom:-16px", m.y_bottom)
     +     axisLbl("right:0;bottom:-16px", m.x_right) + axisLbl("left:16%;bottom:-16px", m.x_left)
     +     m.competitors.map(dot).join("") + clientDot
     +   `</div></div>`
+    // A summary of the whole named competitor set under the graph (Gary: fills the dead space and adds value).
+    + (m.set && m.set.length ? `<div style="margin-top:10px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
+        + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">The named competitor set</div>`
+        + `<div style="display:flex;flex-wrap:wrap;gap:6px;">${m.set.map((n) => `<span style="background:${ci.tint};border-radius:999px;padding:4px 12px;font-size:9.5px;font-weight:600;color:${ci.accentDeep};">${esc(n)}</span>`).join("")}</div>`
+        + `<div style="font-size:10px;line-height:1.55;color:${ci.body};margin-top:10px;">The direct and adjacent rivals the Researcher tracks. Every targeting and message decision is checked against this set, so ${esc(d.client_name)} moves on evidence, not assumption.</div></div>` : "")
     + footerLight(ci, d.brand_short, 9));
 }
 
