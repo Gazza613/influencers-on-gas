@@ -70,7 +70,7 @@ export type ProposalDoc = {
   };
   channels5: {
     intro: string;
-    rows: { icon: string; name: string; role: string; kind: "lead" | "support" | "test"; what: string; why: string }[];  // up to 5
+    rows: { icon: string; name: string; role: string; kind: "lead" | "support" | "test"; what: string; why: string; reach?: string }[];  // up to 5
   };
   psi: {
     intro: string; for_client: string;
@@ -546,9 +546,11 @@ function creativePage(d: ProposalDoc, ci: CiTokens): string {
 // 13 POD V CHANNELS (light). intro + up to 5 channel rows (icon + name + role chip + what + why-italic).
 function channelsPage(d: ProposalDoc, ci: CiTokens): string {
   const roleBg = (k: "lead" | "support" | "test") => k === "lead" ? ci.accentGrad : k === "support" ? ci.accentDeep : ci.accent;
+  // The reach hook sits on the right of each row (Gary: bring in social reach as hooks, and fill the page).
+  const reachTag = (r: string) => r ? `<div style="margin-left:auto;text-align:right;flex-shrink:0;"><div style="font-size:13px;font-weight:800;color:${ci.accent};line-height:1;">${esc(r)}</div><div style="font-size:7px;letter-spacing:0.14em;text-transform:uppercase;color:${ci.muted};margin-top:2px;">reach in market</div></div>` : "";
   const row = (r: (typeof d.channels5.rows)[number]) =>
     `<div style="background:#FFFFFF;border-radius:12px;padding:12px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 26, r.icon)}<div style="font-size:11.5px;font-weight:700;">${esc(r.name)}</div><div style="background:${roleBg(r.kind)};border-radius:999px;padding:3px 10px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#FFFFFF;">${esc(r.role)}</div></div>`
+    + `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 26, r.icon)}<div style="font-size:11.5px;font-weight:700;">${esc(r.name)}</div><div style="background:${roleBg(r.kind)};border-radius:999px;padding:3px 10px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#FFFFFF;">${esc(r.role)}</div>${reachTag(r.reach || "")}</div>`
     + `<div style="font-size:9.8px;line-height:1.55;color:${ci.body};margin-top:5px;">${esc(r.what)}</div>`
     + `<div style="font-size:9.3px;line-height:1.5;color:${ci.muted};margin-top:4px;font-style:italic;">${esc(r.why)}</div></div>`;
   return section(pageLight("48px 60px 36px"),

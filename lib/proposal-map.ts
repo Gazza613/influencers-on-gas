@@ -198,7 +198,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       rows: (c.channels?.plan || []).slice(0, 5).map((ch) => ({
         icon: PLATFORM_ICON[ch.platform] || IC.target,
         name: ch.platform, role: roleLabel(ch.priority), kind: roleKind(ch.priority),
-        what: ch.role, why: ch.why,
+        what: ch.role, why: ch.why, reach: (ch.reach || "").trim(),
       })),
     },
 

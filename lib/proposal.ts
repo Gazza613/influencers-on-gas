@@ -33,7 +33,7 @@ export type ProposalContent = {
   // A market deep-dive that proves industry expertise: recent dated stats + opportunities the client should
   // consider, INCLUDING non-digital ones (flagged as strategic considerations beyond our pods, not deliverables).
   market_intel: { overview: string; stats: { stat: string; source: string; label?: string }[]; opportunities: { headline?: string; insight: string; why: string; digital: boolean }[] };
-  channels: { rationale: string; plan: { platform: string; priority: string; role: string; why: string }[] };   // intelligent selection
+  channels: { rationale: string; plan: { platform: string; priority: string; role: string; why: string; reach?: string }[] };   // intelligent selection
   pods: { name: string; for_client: string; benefit: string }[];                  // the 8 pods mapped to the client
   funnel: { disclaimer: string; stages: { stage: string; note: string }[] };      // ILLUSTRATIVE only
   kpis: { metric: string; why: string; baseline: string }[];
@@ -98,7 +98,8 @@ const CONTENT_SCHEMA = {
           platform: { type: "string", enum: PLATFORMS as unknown as string[] },
           priority: { type: "string", enum: ["lead", "support", "test"], description: "lead = primary budget; support = secondary; test = probe." },
           role: { type: "string" }, why: { type: "string", description: "why this platform fits the objective and audience" },
-        }, required: ["platform", "priority", "role", "why"] } },
+          reach: { type: "string", description: "A short reach/scale HOOK for this platform in the client's market as an approximate figure, e.g. 'about 26 million South Africans' or 'roughly 10 million SA users'. Approximate and clearly rounded, a hook not a guarantee. Keep it to a few words." },
+        }, required: ["platform", "priority", "role", "why", "reach"] } },
       },
       required: ["rationale", "plan"],
     },
