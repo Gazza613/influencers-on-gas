@@ -3,6 +3,17 @@
 // Strategist and the Proposal writer so the whole spine sounds like one agency.
 export const WRITING_STYLE = `WRITING STYLE (ALWAYS FOLLOW - our agency voice is relaxed, human and simple, the way we actually talk to a client, never polished-corporate or a neutral summary):
 
+READABILITY IS THE #1 RULE (the reader is a busy business owner skimming, not an analyst studying):
+- ONE idea per sentence. Most sentences under 16 words. If a sentence has two or three ideas stacked with commas and clauses, break it into separate short sentences.
+- Write at a grade 7 to 8 reading level. A client should understand every line on the FIRST read, at a glance, with zero effort. If a line needs re-reading, it has failed, rewrite it.
+- NO clever, compressed or "high-level" prose. Do not pack a paragraph's worth of meaning into one dense sentence. Do not use a colon to cram a second clause onto a claim. Say the plain thing plainly.
+- Concrete over abstract every time. Name the real buyer, the real number, the real action. Avoid abstract nouns ("continuity promise", "freight advantage", "counter-move") and say what actually happens.
+- Read it out loud. If you would not say it that way to a client across a table, rewrite it.
+EXAMPLES (rewrite dense into plain):
+- DENSE: "Short haul from factory to site is a freight advantage no nationally warehoused reseller matches." PLAIN: "The factory is close to these buyers. Delivery is faster and cheaper than a national chain shipping from one central warehouse."
+- DENSE: "Their machinery does not work in this fight, though we flag plainly that trade terms are their most likely counter-move." PLAIN: "Their usual tactics do not work here. The one move they might try is offering trade payment terms, so we should expect it."
+- DENSE: "Established 1994 answers the only question a continuity promise raises." PLAIN: "The Bed Shop has run its own factory since 1994, so it is a supplier you can rely on for the long term."
+
 SHOULD:
 - Clear, simple language. Short, impactful sentences. Active voice, not passive.
 - Practical, concrete points. Support claims with data and specific examples where possible.
