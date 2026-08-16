@@ -135,13 +135,12 @@ function disc(ci: CiTokens, size: number, inner: string): string {
 const eyebrow = (ci: CiTokens, t: string) =>
   `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accent};">${esc(t)}</div>`;
 
-// Section headline with one gradient phrase (background-clip:text). size defaults to the 30px content-page headline.
+// Section headline: dark lead + one phrase in SOLID accent. size defaults to the 30px content-page headline. We do
+// NOT use background-clip:text: Chromium paints a stray vertical gradient sliver at the clipped-text edge in the PDF
+// (Gary's recurring "weird line"), and box-decoration-break did not cure it, so a solid accent colour is the fix.
 function headline(ci: CiTokens, h: Headline, size = 30): string {
-  // box-decoration-break:clone makes the gradient re-apply PER wrapped line, killing the stray vertical gradient
-  // sliver Chromium leaves at a background-clip:text line break, and stopping the second line rendering near-black
-  // (it otherwise inherits the deep end of the gradient). (Gary: "weird line".)
   return `<div style="font-size:${size}px;font-weight:800;text-transform:uppercase;line-height:1.02;margin-top:10px;">${esc(h.lead)} `
-    + `<span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accent};">${esc(h.gradient)}</span></div>`;
+    + `<span style="color:${ci.accent};">${esc(h.gradient)}</span></div>`;
 }
 
 // The light-page footer rule: constant left, "Client · NN" right (NN zero-padded, regenerated on add/remove).
@@ -217,7 +216,7 @@ function coverPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
     +   `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;color:${ci.accentOnDark};text-transform:uppercase;margin-bottom:18px;">Growth Proposal · Strictly Confidential</div>`
     +   `<div style="font-size:46px;font-weight:800;line-height:1.0;text-transform:uppercase;letter-spacing:-0.01em;max-width:660px;">${esc(d.cover.headline.lead)} `
-    +     `<span style="background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">${esc(d.cover.headline.gradient)}</span></div>`
+    +     `<span style="color:${ci.accentOnDark};">${esc(d.cover.headline.gradient)}</span></div>`
     +   `<p style="margin:22px 0 0;font-size:15px;line-height:1.65;color:rgba(255,255,255,0.72);max-width:560px;">${esc(d.cover.summary)}</p>`
     + `</div>`
     + `<div style="display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:nowrap;position:relative;">`
@@ -343,7 +342,7 @@ function philosophyPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="text-align:center;font-size:8px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:10px;">Every result feeds the next</div></div>`;
   return section(pageDark(ci, "52px 60px 40px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">05 · Core Philosophy</div>`
-    + `<div style="font-size:34px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">Human Command. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">AI Execution.</span></div>`
+    + `<div style="font-size:34px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">Human Command. <span style="color:${ci.accentOnDark};">AI Execution.</span></div>`
     + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(PHIL_INTRO)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;">${glassCard(aiPill, PHIL_AI)}${glassCard(humanPill, PHIL_HUMAN)}</div>`
     + collab
@@ -398,7 +397,7 @@ function dividerPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="position:absolute;left:-140px;bottom:-140px;width:480px;height:480px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,rgba(199,125,232,0) 70%);"></div>`
     + `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};position:relative;">The Ecosystem, Pod by Pod</div>`
     + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
-    +   `<div style="align-self:flex-start;font-size:170px;font-weight:800;line-height:0.9;letter-spacing:-0.02em;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">VIII</div>`
+    +   `<div style="align-self:flex-start;font-size:170px;font-weight:800;line-height:0.9;letter-spacing:-0.02em;color:${ci.accentOnDark};">VIII</div>`
     +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:18px;max-width:660px;">Eight AI Marketing Pods.<br>One accountable partner.</div>`
     +   `<p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.68);margin:16px 0 0;max-width:480px;">${esc(d.divider_line)}</p>`
     + `</div>`
@@ -520,7 +519,7 @@ function podHeader(ci: CiTokens, icon: string, eb: string, line1: string, grad2:
   // a long two-line title from running under the numeral.
   return `<div style="position:relative;z-index:1;display:flex;align-items:center;gap:14px;max-width:76%;"><div style="width:44px;height:44px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;flex-shrink:0;${glow}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>`
     + `<div><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ebColor};">${esc(eb)}</div>`
-    + `<div style="font-size:24px;font-weight:800;text-transform:uppercase;line-height:1.04;">${esc(line1)}<br><span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${gradTextColor};">${esc(grad2)}</span></div></div></div>`;
+    + `<div style="font-size:24px;font-weight:800;text-transform:uppercase;line-height:1.04;">${esc(line1)}<br><span style="color:${gradTextColor};">${esc(grad2)}</span></div></div></div>`;
 }
 // The oversized ghost roman numeral, top-right on pod pages. z-index:0 keeps it BEHIND the header/content (which
 // carry z-index:1); it sits high in the corner so it reads as a watermark, never over the title.
@@ -656,13 +655,13 @@ function closedLoopPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="position:absolute;left:${s.left}px;top:${s.top}px;transform:translate(-50%,-50%);width:172px;background:rgba(28,17,64,0.85);border:1px solid rgba(199,125,232,0.4);border-radius:14px;padding:10px 12px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.35);"><div style="font-size:9px;font-weight:600;letter-spacing:0.18em;color:${ci.accentOnDark};">STEP ${i + 1}</div><div style="font-size:12px;font-weight:700;margin-top:2px;line-height:1.3;">${esc(s.title)}</div><div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.4;margin-top:2px;">${esc(i === 4 && d.closedloop.step5_sub ? d.closedloop.step5_sub : s.sub)}</div></div>`;
   return section(pageDark(ci, "52px 60px 40px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">07 · Ecosystem Integration</div>`
-    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">One closed-loop <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">growth system</span></div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">One closed-loop <span style="color:${ci.accentOnDark};">growth system</span></div>`
     + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(d.closedloop.intro)}</p>`
     + `<div style="flex:1;display:flex;align-items:center;justify-content:center;margin-top:6px;"><div style="position:relative;width:620px;height:620px;">`
     +   `<svg width="620" height="620" viewBox="0 0 620 620" style="position:absolute;inset:0;"><circle cx="310" cy="310" r="225" fill="none" stroke="rgba(199,125,232,0.35)" stroke-width="2" stroke-dasharray="3 7"></circle></svg>`
     +   LOOP_ARROWS.map(arrow).join("") + LOOP_STEPS.map(stepCard).join("")
     +   `<div style="position:absolute;left:310px;top:310px;transform:translate(-50%,-50%);width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,rgba(155,79,201,0.35) 0%,rgba(155,79,201,0) 70%);"></div>`
-    +   `<div style="position:absolute;left:310px;top:310px;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;text-align:center;"><div style="width:89px;height:89px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:25px;color:#FFFFFF;box-shadow:0 0 44px rgba(155,79,201,0.75),0 0 0 6px rgba(255,255,255,0.08);">GAS</div><div style="font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-top:12px;">The Agency of NOW</div><div style="font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;margin-top:4px;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">From Interest to Intent</div></div>`
+    +   `<div style="position:absolute;left:310px;top:310px;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;text-align:center;"><div style="width:89px;height:89px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:25px;color:#FFFFFF;box-shadow:0 0 44px rgba(155,79,201,0.75),0 0 0 6px rgba(255,255,255,0.08);">GAS</div><div style="font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-top:12px;">The Agency of NOW</div><div style="font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;margin-top:4px;color:${ci.accentOnDark};">From Interest to Intent</div></div>`
     + `</div></div>`
     + `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:14px 20px;margin-bottom:22px;"><p style="font-size:11px;line-height:1.65;margin:0;color:rgba(255,255,255,0.82);"><strong style="color:${ci.accentOnDark};">The compounding mechanism.</strong> ${esc(d.closedloop.compounding)}</p></div>`
     + footerDark(d.brand_short, 16));
@@ -749,7 +748,7 @@ function dealDividerPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="position:absolute;right:-160px;top:-160px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,rgba(199,125,232,0) 70%);"></div>`
     + `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};position:relative;">The Commercials</div>`
     + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
-    +   `<div style="font-size:84px;font-weight:800;line-height:0.98;letter-spacing:-0.02em;text-transform:uppercase;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">No Fine Print</div>`
+    +   `<div style="font-size:84px;font-weight:800;line-height:0.98;letter-spacing:-0.02em;text-transform:uppercase;color:${ci.accentOnDark};">No Fine Print</div>`
     +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:18px;max-width:660px;">One tier. One page of terms.</div>`
     +   `<p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.68);margin:16px 0 0;max-width:500px;">${esc(d.deal_divider)}</p>`
     + `</div>`
@@ -770,7 +769,7 @@ function investmentPage(d: ProposalDoc, ci: CiTokens): string {
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(iv.intro)}</p>`
     + `<div style="margin-top:16px;background:${ci.darkPage};border-radius:18px;padding:22px 26px;color:#FFFFFF;position:relative;box-shadow:0 12px 30px rgba(46,26,74,0.28);">`
     +   `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><div><div style="font-size:20px;font-weight:800;text-transform:uppercase;">${esc(iv.tier_name)}</div><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:2px;">${esc(iv.tagline)}</div></div><div style="background:${ci.accentGrad};border-radius:999px;padding:6px 14px;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap;align-self:flex-start;">${esc(iv.poc_chip)}</div></div>`
-    +   `<div style="display:flex;align-items:baseline;gap:14px;margin-top:8px;"><div style="font-size:58px;font-weight:800;letter-spacing:-0.02em;line-height:1;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">${esc(iv.price)}</div><div style="font-size:12px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.65);line-height:1.5;">${esc(iv.price_unit).replace(/&lt;br\s*\/?&gt;/gi, "<br>")}</div></div>`
+    +   `<div style="display:flex;align-items:baseline;gap:14px;margin-top:8px;"><div style="font-size:58px;font-weight:800;letter-spacing:-0.02em;line-height:1;color:${ci.accentOnDark};">${esc(iv.price)}</div><div style="font-size:12px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.65);line-height:1.5;">${esc(iv.price_unit).replace(/&lt;br\s*\/?&gt;/gi, "<br>")}</div></div>`
     +   `<p style="font-size:11px;line-height:1.65;color:rgba(255,255,255,0.75);margin:10px 0 0;">${esc(iv.body)}</p>`
     +   `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">${iv.inclusions.slice(0, 8).map(incl).join("")}</div>`
     + `</div>`
@@ -792,7 +791,7 @@ function termsPage(d: ProposalDoc, ci: CiTokens): string {
   const clientMark = `<span style="font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#FFFFFF;">${esc(d.client_name)}</span>`;
   return section(pageDark(ci, "52px 60px 44px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">11 · Commercial Terms and Next Steps</div>`
-    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;">${glass("Validity", t.validity)}${glass("Engagement", t.engagement)}${glass("Media budget", t.media)}${glass("Ownership", t.ownership)}</div>`
     + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:18px 22px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the proof of concept proves</div><p style="font-size:12px;line-height:1.7;color:rgba(255,255,255,0.85);margin:8px 0 0;">${esc(t.poc_proves)}</p></div>`
     + `<div style="display:flex;gap:10px;margin-top:auto;padding-top:20px;flex-wrap:nowrap;">${chip("Human Command. AI Execution.", true)}${chip("Eight integrated pods", false)}${chip("One closed-loop system", false)}</div>`
@@ -815,11 +814,13 @@ function agreementPage(d: ProposalDoc, ci: CiTokens): string {
 // 24 SIGN-OFF (light). Two signature cards: client (data) + agency (fixed GAS/Gary Berman).
 function signoffPage(d: ProposalDoc, ci: CiTokens): string {
   const s = d.signoff;
-  // The client mark: a clean accent MONOGRAM circle exactly like the GAS circle beside it (this is how Boston City
-  // Campus was done, Gary's reference). A raster logo letterboxes into a rectangle inside the disc and reads poorly,
-  // so we always use the monogram: the initial of the first significant word (skipping a leading "The"/"A"/"An").
+  // The client mark: their ACTUAL logo in the circle (Gary), rendered as a clean circular badge, a white disc with
+  // the logo CONTAINED and padded so it sits neatly inside the circle instead of letterboxing into a strip. Only when
+  // there is no logo do we fall back to a monogram circle (the initial of the first significant word, skipping "The").
   const clientInitial = ((d.client_name.trim().replace(/^(the|a|an)\s+/i, "")[0] || d.client_name.trim()[0] || "•")).toUpperCase();
-  const clientMark = `<div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:13px;">${esc(clientInitial)}</div>`;
+  const clientMark = d.client_logo
+    ? `<div style="width:36px;height:36px;border-radius:50%;background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(26,16,48,0.12);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;"><img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" style="max-width:76%;max-height:76%;object-fit:contain;display:block;"></div>`
+    : `<div style="width:36px;height:36px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:14px;flex-shrink:0;">${esc(clientInitial)}</div>`;
   const sigRule = `<div style="margin-top:26px;"><div style="border-bottom:1.5px solid rgba(26,16,48,0.35);height:34px;"></div><div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};margin-top:6px;"><span>Signature</span><span>Date</span></div></div>`;
   const clientCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
     + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the client</div>`
