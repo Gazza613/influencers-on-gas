@@ -80,11 +80,8 @@ export async function extractBrandColour(website: string | null | undefined): Pr
     .filter((c) => c.s >= 0.25 && c.l >= 0.15 && c.l <= 0.72)
     .sort((a, b) => b.n - a.n);
   const primary = ranked[0]?.hex || FALLBACK.primary;
-
-  // Cover panel: the darkest frequent colour, else a near-black tinted toward the primary.
-  const darks = [...tally.entries()].map(([hex]) => ({ hex, ...toHsl(hex) })).filter((c) => c.l <= 0.16).sort((a, b) => a.l - b.l);
-  const dark = darks[0]?.hex || FALLBACK.dark;
-  return { primary, dark };
+  // Dark/background pages always default to near-black (Gary); only the accent is auto-detected.
+  return { primary, dark: FALLBACK.dark };
 }
 
 // THE INTELLIGENT EXTRACTOR (Gary: "look at the pantones of the website and intelligently use them"). Screenshots
@@ -99,7 +96,9 @@ export async function extractBrandPalette(website: string | null | undefined, cl
     const shot = await screenshotUrl(base).catch(() => null);
     if (shot && shot.length > 2000) {
       const pal = await brandPaletteFromImage(shot.toString("base64"), clientName || "the client", meter).catch(() => null);
-      if (pal?.primary) return { primary: pal.primary, dark: pal.dark || FALLBACK.dark };
+      // Only the ACCENT is auto-detected. The dark/background pages default to near-black (Gary: never the grey the
+      // vision model sometimes returns as "dark"); the team sets a dark hex manually if they want a branded one.
+      if (pal?.primary) return { primary: pal.primary, dark: FALLBACK.dark };
     }
   }
   // Vision unavailable or the site could not be shot: fall back to the HTML/stylesheet scrape (which itself

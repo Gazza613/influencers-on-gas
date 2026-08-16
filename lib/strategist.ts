@@ -8,6 +8,7 @@ import {
   STRATEGY_CONTENT_SCHEMA, type StrategyContent, type Strategy,
 } from "./cycle";
 import { inngest } from "./inngest";
+import { WRITING_STYLE } from "./writing-style";
 
 // THE STRATEGIST ENGINE (Pillar II) - Phase C (thin). It receives the Researcher's VERIFIED fact base and turns it
 // into a single-minded, defensible commercial strategy: the structured brief every downstream pillar inherits.
@@ -74,7 +75,8 @@ const STRATEGIST_SYSTEM = (clientName: string) =>
   `anywhere. 'scale' and any figure are INDICATIVE only and must read as illustrative. We define who and how we ` +
   `reach and how we measure, never what we guarantee.\n` +
   `- Fill 'changes_from_last' ONLY when refining an existing strategy; otherwise return an empty array.\n` +
-  `- UK British English. Never use an em dash or en dash: use a comma, a full stop or a plain hyphen.`;
+  `- Every word the team and the client reads must follow the writing style below.\n\n` +
+  WRITING_STYLE;
 
 function extractContent(msg: Anthropic.Message): StrategyContent | null {
   const b = msg.content.find((x) => x.type === "tool_use");

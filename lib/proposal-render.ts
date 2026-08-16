@@ -133,7 +133,7 @@ const eyebrow = (ci: CiTokens, t: string) =>
 
 // Section headline with one gradient phrase (background-clip:text). size defaults to the 30px content-page headline.
 function headline(ci: CiTokens, h: Headline, size = 30): string {
-  return `<div style="font-size:${size}px;font-weight:800;text-transform:uppercase;line-height:1.1;margin-top:10px;">${esc(h.lead)} `
+  return `<div style="font-size:${size}px;font-weight:800;text-transform:uppercase;line-height:1.02;margin-top:10px;">${esc(h.lead)} `
     + `<span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accent};">${esc(h.gradient)}</span></div>`;
 }
 
@@ -209,7 +209,7 @@ function coverPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="display:flex;align-items:center;gap:14px;position:relative;">${gasLockup(ci, true)}${logo}</div>`
     + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
     +   `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;color:${ci.accentOnDark};text-transform:uppercase;margin-bottom:18px;">Growth Proposal · Strictly Confidential</div>`
-    +   `<div style="font-size:46px;font-weight:800;line-height:1.08;text-transform:uppercase;letter-spacing:-0.01em;max-width:660px;">${esc(d.cover.headline.lead)} `
+    +   `<div style="font-size:46px;font-weight:800;line-height:1.0;text-transform:uppercase;letter-spacing:-0.01em;max-width:660px;">${esc(d.cover.headline.lead)} `
     +     `<span style="background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">${esc(d.cover.headline.gradient)}</span></div>`
     +   `<p style="margin:22px 0 0;font-size:15px;line-height:1.65;color:rgba(255,255,255,0.72);max-width:560px;">${esc(d.cover.summary)}</p>`
     + `</div>`
@@ -246,7 +246,7 @@ const JOURNEY: { icon: string; label: string; sub: string }[] = [
 function journeyStrip(ci: CiTokens): string {
   const arrow = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${ci.arrow}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`;
   const nodes = JOURNEY.map((s) =>
-    `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 32, s.icon)}<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">${esc(s.label)}</div><div style="font-size:8.5px;color:${ci.muted};line-height:1.4;">${esc(s.sub)}</div></div></div>`
+    `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 32, s.icon)}<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;line-height:1.1;">${esc(s.label)}</div><div style="font-size:8.5px;color:${ci.muted};line-height:1.35;margin-top:1px;">${esc(s.sub)}</div></div></div>`
   ).join(arrow);
   return `<div style="margin-top:14px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
     + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">The journey, deliberately short</div>`
@@ -316,7 +316,7 @@ function philosophyPage(d: ProposalDoc, ci: CiTokens): string {
   const humanPill = `<div style="background:#FFFFFF;color:#1A1030;border-radius:999px;padding:5px 14px;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A1030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${HEART}</svg>Humans do</div>`;
   return section(pageDark(ci, "52px 60px 40px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">05 · Core Philosophy</div>`
-    + `<div style="font-size:34px;font-weight:800;text-transform:uppercase;line-height:1.1;margin-top:10px;">Human Command. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">AI Execution.</span></div>`
+    + `<div style="font-size:34px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">Human Command. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">AI Execution.</span></div>`
     + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(PHIL_INTRO)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px;">${glassCard(aiPill, PHIL_AI)}${glassCard(humanPill, PHIL_HUMAN)}</div>`
     + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:18px;padding:20px 24px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">Together</div><p style="font-size:13px;font-weight:600;line-height:1.6;margin:8px 0 0;color:rgba(255,255,255,0.9);">${esc(PHIL_TOGETHER)}</p></div>`
@@ -364,7 +364,7 @@ function dividerPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};position:relative;">The Ecosystem, Pod by Pod</div>`
     + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
     +   `<div style="font-size:170px;font-weight:800;line-height:0.9;letter-spacing:-0.02em;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">VIII</div>`
-    +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.12;margin-top:18px;max-width:660px;">Eight AI Marketing Pods.<br>One accountable partner.</div>`
+    +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:18px;max-width:660px;">Eight AI Marketing Pods.<br>One accountable partner.</div>`
     +   `<p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.68);margin:16px 0 0;max-width:480px;">${esc(d.divider_line)}</p>`
     + `</div>`
     + `<div style="display:flex;flex-wrap:wrap;gap:8px;position:relative;">${chips}</div>`
@@ -471,7 +471,7 @@ function podHeader(ci: CiTokens, icon: string, eb: string, line1: string, grad2:
   // a long two-line title from running under the numeral.
   return `<div style="position:relative;z-index:1;display:flex;align-items:center;gap:14px;max-width:76%;"><div style="width:44px;height:44px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;flex-shrink:0;${glow}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>`
     + `<div><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ebColor};">${esc(eb)}</div>`
-    + `<div style="font-size:24px;font-weight:800;text-transform:uppercase;line-height:1.1;">${esc(line1)}<br><span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${gradTextColor};">${esc(grad2)}</span></div></div></div>`;
+    + `<div style="font-size:24px;font-weight:800;text-transform:uppercase;line-height:1.04;">${esc(line1)}<br><span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${gradTextColor};">${esc(grad2)}</span></div></div></div>`;
 }
 // The oversized ghost roman numeral, top-right on pod pages. z-index:0 keeps it BEHIND the header/content (which
 // carry z-index:1); it sits high in the corner so it reads as a watermark, never over the title.
@@ -599,7 +599,7 @@ function closedLoopPage(d: ProposalDoc, ci: CiTokens): string {
     `<div style="position:absolute;left:${s.left}px;top:${s.top}px;transform:translate(-50%,-50%);width:172px;background:rgba(28,17,64,0.85);border:1px solid rgba(199,125,232,0.4);border-radius:14px;padding:10px 12px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.35);"><div style="font-size:9px;font-weight:600;letter-spacing:0.18em;color:${ci.accentOnDark};">STEP ${i + 1}</div><div style="font-size:12px;font-weight:700;margin-top:2px;line-height:1.3;">${esc(s.title)}</div><div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.4;margin-top:2px;">${esc(i === 4 && d.closedloop.step5_sub ? d.closedloop.step5_sub : s.sub)}</div></div>`;
   return section(pageDark(ci, "52px 60px 40px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">07 · Ecosystem Integration</div>`
-    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.1;margin-top:10px;">One closed-loop <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">growth system</span></div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">One closed-loop <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">growth system</span></div>`
     + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(d.closedloop.intro)}</p>`
     + `<div style="flex:1;display:flex;align-items:center;justify-content:center;margin-top:6px;"><div style="position:relative;width:620px;height:620px;">`
     +   `<svg width="620" height="620" viewBox="0 0 620 620" style="position:absolute;inset:0;"><circle cx="310" cy="310" r="225" fill="none" stroke="rgba(199,125,232,0.35)" stroke-width="2" stroke-dasharray="3 7"></circle></svg>`
@@ -672,7 +672,7 @@ function dealDividerPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};position:relative;">The Commercials</div>`
     + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
     +   `<div style="font-size:84px;font-weight:800;line-height:0.98;letter-spacing:-0.02em;text-transform:uppercase;background:${ci.coverTextGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">No Fine Print</div>`
-    +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.12;margin-top:18px;max-width:660px;">One tier. One page of terms.</div>`
+    +   `<div style="font-size:36px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:18px;max-width:660px;">One tier. One page of terms.</div>`
     +   `<p style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.68);margin:16px 0 0;max-width:500px;">${esc(d.deal_divider)}</p>`
     + `</div>`
     + `<div style="display:flex;flex-wrap:wrap;gap:8px;position:relative;">${chips}</div>`
@@ -714,7 +714,7 @@ function termsPage(d: ProposalDoc, ci: CiTokens): string {
     : `<span style="font-size:12px;font-weight:700;color:#FFFFFF;">${esc(d.client_name)}</span>`;
   return section(pageDark(ci, "52px 60px 44px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">12 · Commercial Terms and Next Steps</div>`
-    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.12;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:12px;">We are not keeping pace with the future of marketing. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">We are writing its rulebook.</span></div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;">${glass("Validity", t.validity)}${glass("Engagement", t.engagement)}${glass("Media budget", t.media)}${glass("Ownership", t.ownership)}</div>`
     + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:18px 22px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the proof of concept proves</div><p style="font-size:12px;line-height:1.7;color:rgba(255,255,255,0.85);margin:8px 0 0;">${esc(t.poc_proves)}</p></div>`
     + `<div style="display:flex;gap:10px;margin-top:auto;padding-top:20px;flex-wrap:nowrap;">${chip("Human Command. AI Execution.", true)}${chip("Eight integrated pods", false)}${chip("One closed-loop system", false)}</div>`

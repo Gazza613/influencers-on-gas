@@ -24,6 +24,7 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [accent, setAccent] = useState("");   // optional client-colour override (auto-detected from their site if blank)
+  const [dark, setDark] = useState("");        // optional DARK/background-page colour (near-black if blank)
   const [pdfBusy, setPdfBusy] = useState(false);
   const [comments, setComments] = useState("");
   const [gateBusy, setGateBusy] = useState(false);
@@ -50,7 +51,7 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     setPdfBusy(true); setMsg("Rendering the branded PDF, this takes a moment…");
     const r = await fetch(`/api/studio/proposal/pdf`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ proposalId: proposal.id, accent: accent.trim() || undefined }),
+      body: JSON.stringify({ proposalId: proposal.id, accent: accent.trim() || undefined, dark: dark.trim() || undefined }),
     }).then((x) => x.json()).catch(() => null);
     setPdfBusy(false);
     if (!r?.ok) { setMsg(r?.error || "Couldn't render the PDF."); return; }
@@ -302,12 +303,17 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
                 <div className="text-lg font-bold text-[#86efac]">Approved ✓ · the final cut</div>
                 <button onClick={() => gate("reopen")} disabled={gateBusy} className="text-base font-semibold text-ink-faint hover:text-ink">Reopen to edit</button>
               </div>
-              <p className="mt-1 text-lg text-ink-dim">Render the client-branded PDF for sign-off. The client&apos;s accent colour is detected from their website; override it if needed.</p>
+              <p className="mt-1 text-lg text-ink-dim">Render the client-branded PDF for sign-off. The accent colour is detected from their website (override if needed); the dark pages default to black, set a hex if you want a branded dark. The white pages stay white.</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-base text-ink-dim">
-                  Client colour
-                  <input type="color" value={accent || "#3a5bd9"} onChange={(e) => setAccent(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-line bg-surface-2" />
+                  Accent colour
+                  <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#3a5bd9"} onChange={(e) => setAccent(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-line bg-surface-2" />
                   {accent && <button onClick={() => setAccent("")} className="text-sm text-ink-faint hover:text-ink">auto-detect</button>}
+                </label>
+                <label className="flex items-center gap-2 text-base text-ink-dim">
+                  Dark pages
+                  <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(dark) ? dark : "#0e1016"} onChange={(e) => setDark(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-line bg-surface-2" />
+                  {dark && <button onClick={() => setDark("")} className="text-sm text-ink-faint hover:text-ink">black</button>}
                 </label>
                 <button onClick={makePdf} disabled={pdfBusy} className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
                   {pdfBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}

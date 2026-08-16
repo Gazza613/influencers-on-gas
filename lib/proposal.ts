@@ -5,6 +5,7 @@ import { FABLE, withAnthropicRetry } from "./vendors/anthropic";
 import { meterClaude } from "./usage";
 import type { Strategy, StrategyContent } from "./cycle";
 import { OBJECTIVES, TIERS, PLATFORMS, type ObjectiveId, type TierId } from "./proposal-config";
+import { WRITING_STYLE } from "./writing-style";
 export { OBJECTIVES, TIERS, PLATFORMS };
 export type { ObjectiveId, TierId };
 
@@ -148,7 +149,8 @@ const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)
   `- Map all EIGHT pods to ${clientName}, each specific to the objective.\n` +
   `- GIVE THE CREATIVE A SPIKE. The Creative pod (Pod IV) must not merely describe producing assets. Its 'for_client' must name a CREATIVE TERRITORY, one ownable, memorable idea or campaign line for ${clientName} (the kind of thought that makes a room lean in), rooted in the strategy's proposition. The document is intelligent throughout; this is the one place it must also make the client FEEL something.\n` +
   `- INVESTMENT: fill it fully. tier_name = "${tier.name}", rate = "${tier.rate}". In 'engine_includes' list 6 to 8 concrete things the SYSTEM delivers at this tier (the pods and what the tier covers, e.g. "Full omnichannel media across the selected platforms", "PSI qualification and the conversion dashboard"). In 'notes' put the honest commercial notes: media budget is the client's and additional to the retainer; the client owns all data, accounts and audiences; we do not quote a guaranteed return.\n` +
-  `- Write in UK British English. Never use an em dash or en dash. Never use the word "manifesto". Confident, premium, concrete, no filler.`;
+  `- Never use the word "manifesto". Confident, premium, concrete, no filler.\n\n` +
+  WRITING_STYLE;
 
 // Build the proposal content for an approved strategy, on the chosen objective + tier. Fable 5, retried on overload.
 // notes/prior fold in a strategist's review comments so a rework improves the draft rather than starting cold.

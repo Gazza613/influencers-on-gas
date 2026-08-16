@@ -14,7 +14,7 @@ import { buildProposalDoc } from "./proposal-map";
 // ProposalDoc: content-driven pages from the strategy, fixed-doctrine pages with the client's specifics swapped in.
 // The document date is ALWAYS today (Gary's rule); figures stay illustrative; the word "manifesto" never appears.
 
-export async function buildProposalPdf(proposalId: string, accentOverride?: string | null): Promise<string> {
+export async function buildProposalPdf(proposalId: string, accentOverride?: string | null, darkOverride?: string | null): Promise<string> {
   const prows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
   const p = prows[0];
   if (!p || !p.content) throw new Error("That proposal was not found, or has no content.");
@@ -41,17 +41,21 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
   // Command) -> the cached palette we read from their site before -> read it now (homepage screenshot + vision,
   // the intelligent extractor). Read-once is cached on the client so every render uses the SAME colours and we do
   // not re-spend on each PDF. Always yields a usable palette, so a colour read can never block the render.
+  // primary = the accent (auto from their site, or manual). dark = the DARK/coloured-background pages, which default
+  // to near-black (Gary: never the grey the extractor sometimes picks) and are separately overridable by hex. A
+  // manual choice on either persists on the client so every future proposal reuses it.
+  const hex = (v: string | null | undefined) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : null);
   let palette: { primary: string; dark: string };
-  if (accentOverride && /^#[0-9a-fA-F]{6}$/.test(accentOverride)) {
-    palette = { primary: accentOverride, dark: cachedPalette?.dark || "#0E1016" };
-    // Human Command: a locked colour persists on the client, so every future proposal for them reuses it and the
-    // team never sets it twice (Gary: "I cannot keep coming back here to adjust").
+  if (hex(accentOverride) || hex(darkOverride)) {
+    palette = {
+      primary: hex(accentOverride) || (cachedPalette?.primary ? String(cachedPalette.primary) : "#3A5BD9"),
+      dark: hex(darkOverride) || (cachedPalette?.dark ? String(cachedPalette.dark) : "#0E1016"),
+    };
     await db().query(`update clients set brand_palette = $2::jsonb where id = $1`, [clientId, JSON.stringify(palette)]).catch(() => {});
   } else if (cachedPalette) {
     palette = { primary: String(cachedPalette.primary), dark: String(cachedPalette.dark || "#0E1016") };
   } else {
     palette = await extractBrandPalette(website, clientName, { clientId }).catch(() => ({ primary: "#3A5BD9", dark: "#0E1016" }));
-    // Cache it on the client so the next render is instant and identical (only if we got a real read, not the default).
     if (palette.primary && palette.primary.toLowerCase() !== "#3a5bd9") {
       await db().query(`update clients set brand_palette = $2::jsonb where id = $1`, [clientId, JSON.stringify(palette)]).catch(() => {});
     }
