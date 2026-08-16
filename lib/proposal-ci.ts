@@ -88,7 +88,10 @@ export function deriveCiTokens(accent?: string | null, dark?: string | null): Ci
   // dark page/card gradients derive from D alone. D is the client's dark colour if given, else a deep near-neutral
   // carrying just a whisper of the accent hue (so a mono-brand still reads on-brand without going garish).
   const D = isHex(dark) ? hexToRgb(dark) : mix({ r: 14, g: 16, b: 30 }, A, 0.16);
-  const dp2 = mix(D, WHITE, 0.09), dp3 = mix(D, WHITE, 0.20);   // dark-page stops, staying in D's family
+  // Dark-page gradient stops. The lift is deliberately TINY: when Gary picks black he wants the page to READ as
+  // black, not a grey gradient (a 20% white lift turned his black ground into mid-grey at the far corner). Just a
+  // whisper of depth, so a near-black ground stays near-black. Cards keep their own (larger) lift so they separate.
+  const dp2 = mix(D, WHITE, 0.035), dp3 = mix(D, WHITE, 0.075);   // dark-page stops, staying in D's family
   const dc1 = mix(D, WHITE, 0.05), dc2 = mix(D, WHITE, 0.12), dc3 = mix(D, WHITE, 0.22);   // dark-card stops
 
   const accentDeep = darken(A, 0.28);

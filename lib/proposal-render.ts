@@ -115,7 +115,7 @@ function gasLockup(ci: CiTokens, onDark: boolean): string {
   const sub = onDark ? ci.accentOnDark : ci.accent;
   const word = onDark ? "#FFFFFF" : ci.ink;
   return `<div style="display:flex;align-items:center;gap:14px;">`
-    + `<div style="width:52px;height:52px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#FFFFFF;box-shadow:0 0 24px rgba(155,79,201,0.45);">GAS</div>`
+    + `<div style="width:52px;height:52px;min-width:52px;min-height:52px;flex-shrink:0;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#FFFFFF;box-shadow:0 2px 10px rgba(0,0,0,0.28);">GAS</div>`
     + `<div><div style="font-weight:700;font-size:14px;letter-spacing:0.06em;color:${word};">GAS MARKETING AUTOMATION</div>`
     + `<div style="font-size:10px;letter-spacing:0.28em;color:${sub};font-weight:600;">THE AGENCY OF NOW</div></div></div>`;
 }
@@ -203,9 +203,9 @@ const quoteCard = (ci: CiTokens, body: string, source: string) =>
 
 // 01 COVER (dark). GAS lockup + client logo, eyebrow, wedge headline (46px, gradient phrase), summary, two chips.
 function coverPage(d: ProposalDoc, ci: CiTokens): string {
-  const logo = d.client_logo
-    ? `<img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" width="${d.client_logo.w}" height="${d.client_logo.h}" style="width:${d.client_logo.w}px;height:${d.client_logo.h}px;margin-left:auto;">`
-    : `<div style="margin-left:auto;font-weight:700;font-size:18px;letter-spacing:0.02em;color:#FFFFFF;">${esc(d.client_name)}</div>`;
+  // The client mark on the cover is ALWAYS a clean white wordmark, never their raster logo: a boxed logo on the dark
+  // ground reads poorly (Gary). The real logo is used only in the sign-off circle (page 24), on a white disc.
+  const logo = `<div style="margin-left:auto;font-weight:800;font-size:19px;letter-spacing:0.08em;text-transform:uppercase;color:#FFFFFF;">${esc(d.client_name)}</div>`;
   return `<section class="page" style="${pageDark(ci, "56px 64px 44px", "position:relative;overflow:hidden;")}">`
     + `<div style="position:absolute;right:-180px;top:-180px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,rgba(199,125,232,0) 70%);"></div>`
     + `<div style="display:flex;align-items:center;gap:14px;position:relative;">${gasLockup(ci, true)}${logo}</div>`
@@ -216,10 +216,10 @@ function coverPage(d: ProposalDoc, ci: CiTokens): string {
     +   `<p style="margin:22px 0 0;font-size:15px;line-height:1.65;color:rgba(255,255,255,0.72);max-width:560px;">${esc(d.cover.summary)}</p>`
     + `</div>`
     + `<div style="display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:nowrap;position:relative;">`
-    +   `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.22);border-radius:999px;padding:8px 18px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(d.cover.audience_chip)}</div>`
-    +   `<div style="background:${ci.accentGrad};border:1px solid transparent;border-radius:999px;padding:8px 18px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(d.date_label)} · ${esc(d.validity_label)}</div>`
+    +   `<div style="box-sizing:border-box;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.20);border-radius:999px;padding:9px 20px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(d.cover.audience_chip)}</div>`
+    +   `<div style="box-sizing:border-box;background:${ci.accentGrad};border-radius:999px;padding:9px 20px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(d.date_label)} · ${esc(d.validity_label)}</div>`
     + `</div>`
-    + `<div style="margin-top:32px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);"><span>www.gasmarketing.co.za</span><span>Human Command. AI Execution.</span></div>`
+    + `<div style="margin-top:32px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);"><span>GAS Marketing Automation · The Agency of Now</span><span>Human Command. AI Execution.</span></div>`
     + `</section>`;
 }
 
