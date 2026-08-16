@@ -108,11 +108,14 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     })(),
 
     opportunity: {
-      headline: hl("The opportunity,", "no competitor has claimed"),
-      // Only the opportunity intro here. The market overview lives on the Market Intelligence page (05); showing
-      // both here made page 3 a wall of text AND duplicated page 5.
-      paras: [c.opportunity?.intro || ""].filter(Boolean),
-      stat_cards: (c.market_intel?.stats || []).slice(0, 6).map((s, i) => ({ icon: [IC.trend, IC.bars, IC.target, IC.user, IC.funnel, IC.refresh][i % 6], stat: shortStat(s.stat), body: s.stat, source: s.source })),
+      // No dangling comma on the headline (Gary): a clean noun phrase reads as one line or two, either way finished.
+      headline: hl("The opportunity", "no competitor has claimed"),
+      // Only the opportunity intro here (the market overview lives on page 05). Capped so a long intro cannot push
+      // the definition-of-success box + footer off the page (Gary saw page 3 cut off). A rebuild writes it tight.
+      paras: [clip(c.opportunity?.intro || "", 520)].filter(Boolean),
+      // stat headline = the model's punchy label if it gave one, else a clean auto-extract. Body is bounded so the
+      // cards stay compact and equal enough to sit their sources on one line.
+      stat_cards: (c.market_intel?.stats || []).slice(0, 6).map((s, i) => ({ icon: [IC.trend, IC.bars, IC.target, IC.user, IC.funnel, IC.refresh][i % 6], stat: (s.label && s.label.trim()) || shortStat(s.stat), body: clip(s.stat, 150), source: s.source })),
       success_body: c.opportunity?.definition_of_success || "",
     },
 
@@ -235,7 +238,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     },
 
     rollout: {
-      headline: hl("Your rollout,", "gated week by week"),
+      headline: hl("Your rollout", "gated week by week"),
       intro: `The rollout mirrors the system. Each stage ends at a sign-off gate: nothing proceeds until the previous stage is proven.`,
       rail: (c.rollout || []).slice(0, 4).map((r, i) => ({ badge: `W${i + 1}`, label: shortLabel(r.title) })),
       weeks: (c.rollout || []).slice(0, 4).map((r, i) => ({ icon: WEEK_ICONS[i % 4], title: r.title, pods: r.pods, bullets: r.points || [], gate: r.gate })),

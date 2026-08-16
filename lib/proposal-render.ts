@@ -257,13 +257,16 @@ function journeyStrip(ci: CiTokens): string {
 function opportunityPage(d: ProposalDoc, ci: CiTokens): string {
   const paras = d.opportunity.paras.map((p, i) =>
     `<p style="font-size:11.5px;line-height:1.7;color:${ci.body};margin:${i === 0 ? "12px" : "10px"} 0 0;">${esc(p)}</p>`).join("");
-  const stats = d.opportunity.stat_cards.slice(0, 6).map((s) => card(ci, "16px 20px",
-    `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 26, s.icon)}<div style="font-size:24px;font-weight:800;color:${ci.accent};">${esc(s.stat)}</div></div>`
-    + `<div style="font-size:10.5px;line-height:1.55;color:${ci.muted};margin-top:4px;">${esc(s.body)}</div>`
-    + `<div style="font-size:8.5px;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accent};margin-top:6px;">${esc(s.source)}</div>`)).join("");
+  // Equal-height cards (the grid stretches them), the icon top-aligned with the punchy headline, and the source
+  // pinned to the BOTTOM of every card (margin-top:auto) so all sources sit on the same line (Gary).
+  const stats = d.opportunity.stat_cards.slice(0, 6).map((s) =>
+    `<div style="background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};height:100%;display:flex;flex-direction:column;">`
+    + `<div style="display:flex;align-items:flex-start;gap:9px;">${disc(ci, 26, s.icon)}<div style="font-size:19px;font-weight:800;line-height:1.05;color:${ci.accent};">${esc(s.stat)}</div></div>`
+    + `<div style="font-size:10px;line-height:1.5;color:${ci.muted};margin-top:7px;">${esc(s.body)}</div>`
+    + `<div style="margin-top:auto;padding-top:9px;font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(s.source)}</div></div>`).join("");
   return `<section class="page" style="${pageLight("52px 60px 40px")}">`
     + eyebrow(ci, "02 · The Opportunity") + headline(ci, d.opportunity.headline) + paras
-    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;">${stats}</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;align-items:stretch;">${stats}</div>`
     + `<div style="margin-top:auto;margin-bottom:14px;background:${ci.darkCard};border-radius:16px;padding:18px 24px;color:#FFFFFF;">`
     +   `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">The definition of success</div>`
     +   `<div style="font-size:12px;font-weight:400;line-height:1.65;margin-top:6px;color:rgba(255,255,255,0.9);">${esc(d.opportunity.success_body)}</div></div>`
