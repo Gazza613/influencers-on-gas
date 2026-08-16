@@ -577,7 +577,7 @@ function psiPage(d: ProposalDoc, ci: CiTokens): string {
   const chatHeader = `<div style="display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.14);"><div style="width:24px;height:24px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${WHATSAPP}</svg></div><div><div style="font-size:10px;font-weight:700;">${esc(p.chat.assistant)}</div><div style="font-size:8px;font-weight:600;color:${ci.success};letter-spacing:0.12em;">ONLINE · WHATSAPP</div></div></div>`;
   return section(pageDark(ci, "52px 60px 40px", "position:relative;overflow:hidden;"),
     ghostNumeral(ci, "VI", true)
-    + podHeader(ci, WHATSAPP, "Pod VI of VIII · The Conversion Layer · Proprietary", "PSI · Pre-Sales Intelligence", "Interest into Intent", true)
+    + podHeader(ci, WHATSAPP, "Pod VI of VIII · The Conversion Layer · Proprietary", "PSI · Pre-Sales Intelligence", "Turning interest into intent", true)
     + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.8);margin:16px 0 0;">${esc(p.intro)}</p>`
     + `<div style="margin-top:16px;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.22);border-radius:16px;padding:18px 22px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">For ${esc(d.client_name)}</div><p style="font-size:12px;line-height:1.7;margin:8px 0 0;color:rgba(255,255,255,0.88);">${esc(p.for_client)}</p></div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px;">${p.tiles.slice(0, 3).map(tile).join("")}</div>`
@@ -600,22 +600,27 @@ function sparkline(ci: CiTokens, kind: "line-down" | "bars" | "line-up" | "gauge
 }
 function pods78Page(d: ProposalDoc, ci: CiTokens): string {
   const p = d.pods78;
-  const podBlock = (roman: string, name: string, subtitle: string, para: string, chip: string) =>
+  const DASHBOARD_ICON = `<rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18"></path><path d="M9 21V9"></path>`;
+  const MEDIA_ICON = `<path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path>`;
+  const podBlock = (icon: string, roman: string, name: string, subtitle: string, para: string, chip: string) =>
     `<div style="background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:10px;">${podDisc(ci, roman)}<div><div style="font-size:14px;font-weight:800;text-transform:uppercase;">${esc(name)}</div><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accent};">${esc(subtitle)}</div></div></div>`
+    + `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 40, icon)}<div><div style="display:flex;align-items:baseline;gap:8px;"><span style="font-size:14px;font-weight:800;text-transform:uppercase;">${esc(name)}</span><span style="font-size:8px;font-weight:700;letter-spacing:0.16em;color:${ci.accent};">POD ${roman}</span></div><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};">${esc(subtitle)}</div></div></div>`
     + `<p style="font-size:10px;line-height:1.55;color:${ci.body};margin:8px 0 0;">${esc(para)}</p>${tintChip(ci, chip)}</div>`;
+  // The fortnightly loop, to fill the page and land the compounding message (Gary: fuller page).
+  const loopStep = (t: string, b: string) => `<div style="flex:1;background:${ci.tint};border-radius:12px;padding:11px 14px;"><div style="font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentDeep};">${t}</div><div style="font-size:9.5px;line-height:1.5;color:${ci.body};margin-top:4px;">${b}</div></div>`;
   const kpiTile = (t: { label: string; spark: "line-down" | "bars" | "line-up" | "gauge"; caption: string }) =>
     `<div style="background:${ci.darkCard};border-radius:14px;padding:14px 18px;color:#FFFFFF;"><div style="font-size:9px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(t.label)}</div><div style="margin-top:6px;">${sparkline(ci, t.spark)}</div><div style="font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-top:7px;">${esc(t.caption)}</div></div>`;
   return section(pageLight("48px 60px 36px"),
     eyebrow(ci, "The System · Conversion and Learning Layers") + headline28(ci, p.headline)
     + `<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">`
-    +   podBlock("VII", "PSI Conversion Dashboard", "The bridge from marketing to your team", p.dashboard_para, p.dashboard_chip)
-    +   podBlock("VIII", "Media on GAS", "Learns, reallocates and scales winners", p.media_para, p.media_chip)
+    +   podBlock(DASHBOARD_ICON, "VII", "PSI Conversion Dashboard", "The bridge from marketing to your team", p.dashboard_para, p.dashboard_chip)
+    +   podBlock(MEDIA_ICON, "VIII", "Media on GAS", "Learns, reallocates and scales winners", p.media_para, p.media_chip)
     + `</div>`
     + `<div style="margin-top:12px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};">`
     +   `<div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">The one screen the bi-weekly review argues from</div><div style="font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8496;">Illustrative preview · real baselines from week one</div></div>`
     +   `<div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:10px;">${p.tiles.slice(0, 4).map(kpiTile).join("")}</div>`
     + `</div>`
+    + `<div style="margin-top:12px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};margin-bottom:8px;">The fortnightly loop that compounds</div><div style="display:flex;gap:10px;">${loopStep("Review", "Cost per qualified lead by persona and channel, on one screen.")}${loopStep("Reallocate", "Budget shifts to the winning personas, triggers and creative, on evidence.")}${loopStep("Compound", "Each fortnight is sharper and cheaper than the last, never a reset.")}</div></div>`
     + footerLight(ci, d.brand_short, 15));
 }
 
@@ -626,7 +631,7 @@ const LOOP_STEPS: { left: number; top: number; title: string; sub: string }[] = 
   { left: 505, top: 197, title: "Target the audience", sub: "Precision over reach" },
   { left: 505, top: 423, title: "Create and deploy", sub: "StorySelling at machine speed" },
   { left: 310, top: 535, title: "Qualify with PSI", sub: "Interest scored into intent" },
-  { left: 115, top: 423, title: "Manage and convert", sub: "Your team works warm leads" },
+  { left: 115, top: 423, title: "Manage and convert", sub: "Your team works high-intent leads" },
   { left: 115, top: 197, title: "Optimise and learn", sub: "Every result sharpens the next" },
 ];
 const LOOP_ARROWS: { left: number; top: number; rot: number }[] = [

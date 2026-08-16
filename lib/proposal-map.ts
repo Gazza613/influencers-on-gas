@@ -210,15 +210,21 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
         { level: "MEDIUM", caption: "Nurtured until ready", kind: "medium" },
         { level: "LOW", caption: "Filtered out by design", kind: "low" },
       ],
-      chat: {
-        assistant: `${shortBrand(name)} assistant`,
-        bubbles: [
-          { role: "in", text: `Hi, welcome to ${name}. Tell me what you're looking for and I can check the details for you right now.` },
-          { role: "out", text: "I'm interested but not sure it's the right fit for me." },
-          { role: "in", text: "Great question. Based on what you've told me you're a strong fit, and I can book you in with the right person this week. Shall I set that up?" },
-        ],
-        closing: "High intent · Booked",
-      },
+      chat: c.psi_chat && Array.isArray(c.psi_chat.conversation) && c.psi_chat.conversation.length >= 3
+        ? { assistant: `${shortBrand(name)} assistant`, bubbles: c.psi_chat.conversation.slice(0, 6).map((b) => ({ role: b.role === "out" ? "out" as const : "in" as const, text: b.text })), closing: c.psi_chat.outcome || "High intent · routed to sales" }
+        : {
+          // A stronger DEFAULT that actually shows the qualification (intent, timing, scale, sign-off), then scores
+          // and routes. A rebuild replaces this with a client-specific conversation from the model.
+          assistant: `${shortBrand(name)} assistant`,
+          bubbles: [
+            { role: "in" as const, text: `Hi, thanks for your interest in ${name}. So I send you to the right person, what are you looking to do, and roughly when?` },
+            { role: "out" as const, text: "Weighing up options for a project starting next quarter." },
+            { role: "in" as const, text: "Good timing. Roughly what scale are we talking, and do you sign off the decision or does someone else?" },
+            { role: "out" as const, text: "A decent volume, and it is my call." },
+            { role: "in" as const, text: `That puts you in our priority band. I am handing you to the right ${shortBrand(name)} person now, with everything you have told me, so you skip the back and forth.` },
+          ],
+          closing: "High intent · routed to sales",
+        },
       side_cards: [
         { title: "Conversational qualification", body: `WhatsApp funnels ask intelligent, ${shortBrand(name)}-specific questions.` },
         { title: "Warm hand-off", body: "Each qualified lead arrives with context, so the conversation starts warm." },

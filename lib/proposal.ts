@@ -40,6 +40,7 @@ export type ProposalContent = {
   rollout: { week: string; title: string; pods: string; points: string[]; gate: string }[];
   compliance: { intro: string; points: string[] };
   investment: { tier_name: string; rate: string; engine_includes: string[]; notes: string[] };
+  psi_chat?: { conversation: { role: string; text: string }[]; outcome: string };
 };
 
 const P = (arr: readonly string[]) => arr.join(", ");
@@ -114,8 +115,9 @@ const CONTENT_SCHEMA = {
     rollout: { type: "array", description: "The 31-day rollout, 4 weeks.", items: { type: "object", additionalProperties: false, properties: { week: { type: "string" }, title: { type: "string" }, pods: { type: "string" }, points: { type: "array", items: { type: "string" } }, gate: { type: "string" } }, required: ["week", "title", "pods", "points", "gate"] } },
     compliance: { type: "object", additionalProperties: false, properties: { intro: { type: "string" }, points: { type: "array", items: { type: "string" } } }, required: ["intro", "points"] },
     investment: { type: "object", additionalProperties: false, properties: { tier_name: { type: "string" }, rate: { type: "string" }, engine_includes: { type: "array", items: { type: "string" } }, notes: { type: "array", items: { type: "string" } } }, required: ["tier_name", "rate", "engine_includes", "notes"] },
+    psi_chat: { type: "object", additionalProperties: false, description: "A realistic PSI WhatsApp qualification chat for THIS client's actual buyer, shown on the PSI page. It must DEMONSTRATE the power: PSI asks intelligent, specific questions (the real use case, the volume or spec, the timing, the budget or sign-off), the prospect answers naturally, PSI scores them and routes a high-intent lead to the sales team. Sound like a real enquiry for this client, never generic. 4 to 6 messages.", properties: { conversation: { type: "array", items: { type: "object", additionalProperties: false, properties: { role: { type: "string", enum: ["in", "out"], description: "in = the PSI assistant, out = the prospect" }, text: { type: "string" } }, required: ["role", "text"] }, description: "4 to 6 alternating messages, starting and ending with PSI (in)." }, outcome: { type: "string", description: "the closing tag, e.g. 'High intent, routed to sales'" } }, required: ["conversation", "outcome"] },
   },
-  required: ["headline", "subhead", "exec_summary", "opportunity", "audience", "strategy", "market_intel", "channels", "pods", "funnel", "kpis", "rollout", "compliance", "investment"],
+  required: ["headline", "subhead", "exec_summary", "opportunity", "audience", "strategy", "market_intel", "channels", "pods", "funnel", "kpis", "rollout", "compliance", "investment", "psi_chat"],
 } as unknown as Anthropic.Tool["input_schema"];
 
 function extract(msg: Anthropic.Message): ProposalContent | null {
