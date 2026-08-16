@@ -6,7 +6,7 @@ export const WRITING_STYLE = `WRITING STYLE (ALWAYS FOLLOW - our agency voice is
 SHOULD:
 - Clear, simple language. Short, impactful sentences. Active voice, not passive.
 - Practical, concrete points. Support claims with data and specific examples where possible.
-- Address the reader as "you" and "your". Vary sentence length and structure naturally.
+- Address the reader as "you" and "your". Say "your team", never "your people". Vary sentence length and structure naturally.
 - Prefer specific nouns, numbers, examples and actions over abstract language.
 - Sound like a person with a point of view.
 

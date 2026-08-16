@@ -306,24 +306,37 @@ function marketPage(d: ProposalDoc, ci: CiTokens): string {
 }
 
 // 06 CORE PHILOSOPHY (dark). Fixed agency doctrine (Gary: fixed template). AI does / Humans do / Together + chips.
-const PHIL_INTRO = "Technology does the heavy lifting; human connection remains the steering wheel. AI is deployed to remove repetitive work, respond instantly and qualify at scale, so your people spend their time where only humans add value. This is the specific combination that outperforms either alone.";
+const PHIL_INTRO = "We pair AI and people on purpose, and the way we combine the two is our moat. AI does the heavy lifting. It clears the repetitive work, replies in seconds and qualifies leads at scale. That frees your team for the work only people do well, the judgement, the relationships and the close. One side without the other is average. Together they beat either alone.";
 const PHIL_AI = "Data processing, research at scale, creative volume, real-time intent scoring, WhatsApp qualification, retargeting workflows and continuous budget optimisation.";
-const PHIL_HUMAN = "Strategy, empathy, StorySelling nuance, judgement, compliance sensitivity, the final decision and the client relationship. Your people stay at the heart of every relationship.";
-const PHIL_TOGETHER = "Deeper partnerships built on transparency, accountability and shared success, at a speed and scale neither could reach alone. It is the specific combination that outperforms either alone.";
+const PHIL_HUMAN = "Strategy, empathy, StorySelling nuance, judgement, compliance sensitivity, the final decision and the client relationship. Your team stays at the heart of every relationship.";
+const PHIL_TOGETHER = "Deeper partnerships, built on transparency, accountability and shared results, at a speed and scale neither side reaches alone. This is how we build a lasting advantage for your brand.";
 function philosophyPage(d: ProposalDoc, ci: CiTokens): string {
-  const chip = (t: string) => `<div style="flex:1;text-align:center;background:rgba(255,255,255,0.10);border-radius:999px;padding:9px 16px;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;white-space:nowrap;">${t}</div>`;
+  // Chips in the BRAND accent so they stand out and read as ours (Gary), not a faint translucent grey.
+  const chip = (t: string) => `<div style="flex:1;text-align:center;background:${ci.accent};color:#FFFFFF;border-radius:999px;padding:9px 16px;font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,0.28);">${t}</div>`;
   const CPU = `<rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path>`;
   const HEART = `<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>`;
   const glassCard = (pill: string, body: string) =>
     `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:18px;padding:20px 22px;">${pill}<p style="font-size:12px;line-height:1.7;color:rgba(255,255,255,0.8);margin:12px 0 0;">${esc(body)}</p></div>`;
   const aiPill = `<div style="background:${ci.accentGrad};border-radius:999px;padding:5px 14px;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CPU}</svg>AI does</div>`;
   const humanPill = `<div style="background:#FFFFFF;color:#1A1030;border-radius:999px;padding:5px 14px;font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A1030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${HEART}</svg>Humans do</div>`;
+  // The collaboration visual (fills the dead space, Gary): AI executes and Humans command, wired into a loop where
+  // every result feeds the next. The two arrows show the cycle, in the brand accent + white.
+  const orbCPU = `<div style="width:56px;height:56px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;line-height:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">${CPU}</svg></div>`;
+  const orbHeart = `<div style="width:56px;height:56px;border-radius:50%;background:#FFFFFF;display:flex;align-items:center;justify-content:center;line-height:0;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A1030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">${HEART}</svg></div>`;
+  const loop = `<svg width="170" height="58" viewBox="0 0 170 58" fill="none" stroke-linecap="round" stroke-linejoin="round">`
+    + `<path d="M20 22 C 62 6, 108 6, 150 22" stroke="${ci.accentOnDark}" stroke-width="2.2"/><path d="M150 22 l -9 -1 M150 22 l -3 8" stroke="${ci.accentOnDark}" stroke-width="2.2"/>`
+    + `<path d="M150 36 C 108 52, 62 52, 20 36" stroke="rgba(255,255,255,0.7)" stroke-width="2.2"/><path d="M20 36 l 9 1 M20 36 l 3 -8" stroke="rgba(255,255,255,0.7)" stroke-width="2.2"/></svg>`;
+  const collab = `<div style="margin-top:24px;display:flex;align-items:center;justify-content:center;gap:14px;">`
+    + `<div style="text-align:center;">${orbCPU}<div style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentOnDark};font-weight:700;margin-top:7px;">AI executes</div></div>`
+    + `<div style="text-align:center;">${loop}<div style="font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:1px;">every result feeds the next</div></div>`
+    + `<div style="text-align:center;">${orbHeart}<div style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:#FFFFFF;font-weight:700;margin-top:7px;">Humans command</div></div></div>`;
   return section(pageDark(ci, "52px 60px 40px"),
     `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">05 · Core Philosophy</div>`
     + `<div style="font-size:34px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">Human Command. <span style="background:${ci.accentGrad};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${ci.accentOnDark};">AI Execution.</span></div>`
     + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(PHIL_INTRO)}</p>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px;">${glassCard(aiPill, PHIL_AI)}${glassCard(humanPill, PHIL_HUMAN)}</div>`
-    + `<div style="margin-top:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:18px;padding:20px 24px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">Together</div><p style="font-size:13px;font-weight:600;line-height:1.6;margin:8px 0 0;color:rgba(255,255,255,0.9);">${esc(PHIL_TOGETHER)}</p></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;">${glassCard(aiPill, PHIL_AI)}${glassCard(humanPill, PHIL_HUMAN)}</div>`
+    + collab
+    + `<div style="margin-top:22px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:18px;padding:20px 24px;"><div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">Together</div><p style="font-size:13px;font-weight:600;line-height:1.6;margin:8px 0 0;color:rgba(255,255,255,0.9);">${esc(PHIL_TOGETHER)}</p></div>`
     + `<div style="display:flex;gap:10px;margin-top:auto;padding-top:20px;flex-wrap:nowrap;">${chip("Accountability over activity")}${chip("Truth over comfort")}${chip("Speed with judgement")}</div>`
     + footerDark(d.brand_short, 6));
 }
