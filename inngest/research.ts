@@ -41,8 +41,8 @@ export const runResearchCollect = inngest.createFunction(
     },
   },
   async ({ event, step }) => {
-    const d = event.data as { clientId: string; runId: string; version: number; today: string; userEmail: string | null; notes: string | null; focus: string | null };
-    const opts = { userEmail: d.userEmail, notes: d.notes, focus: d.focus };
+    const d = event.data as { clientId: string; runId: string; version: number; today: string; userEmail: string | null; notes: string | null; focus: string | null; plan?: Record<string, unknown> | null };
+    const opts = { userEmail: d.userEmail, notes: d.notes, focus: d.focus, plan: d.plan ?? null };
     // Each step is memoized on success, so a retry resumes at the failed phase rather than re-spending on the ones
     // that already landed. Progress is written to the run's `progress` column from inside each phase (best-effort).
     const ctx = await step.run("prepare", () => prepareResearch(d.clientId, d.runId, d.version, d.today, opts));

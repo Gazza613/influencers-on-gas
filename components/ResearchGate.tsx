@@ -6,6 +6,8 @@ import { flex } from "@/lib/flex";
 import Working, { WORKING_NEWSLETTER } from "@/components/Working";
 import { askConfirm } from "@/lib/confirm";
 import LivingResearch from "@/components/LivingResearch";
+import StructuredEditor from "@/components/StructuredEditor";
+import type { ResearchPlan } from "@/lib/research-plan";
 
 // A CONSISTENT SECTION MARKER, the same treatment the Brain page uses so the two steps read as one system: a
 // rounded violet tile holding a 2px line icon. `d` is a constant SVG path string, never user text.
@@ -119,7 +121,9 @@ export default function ResearchGate({ clients, configured = [], initialClientId
   const [note, setNote] = useState("");
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState("");
-  const [focus, setFocus] = useState("");   // optional up-front steer for this run (e.g. specific suburbs)
+  const [focus, setFocus] = useState("");   // optional up-front steer / brief for this run (e.g. specific suburbs)
+  const [plan, setPlan] = useState<ResearchPlan | null>(null);   // the previewed, editable research plan (align before running)
+  const [planBusy, setPlanBusy] = useState(false);
   const [newComp, setNewComp] = useState({ name: "", website: "" });
   const [progress, setProgress] = useState<null | { label: string; searches: string[]; sources: number; filed: number }>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -340,15 +344,29 @@ export default function ResearchGate({ clients, configured = [], initialClientId
   // Commission a collect. withNotes runs a "Rerun with notes" - a fresh VERSION addressing corrections, never an
   // overwrite. The collect fires a DURABLE, phase-stepped Inngest job and returns immediately; we then POLL the run
   // to completion (it runs server-side regardless of this tab, so closing it no longer loses the work or the spend).
-  async function runCollect(withNotes?: string) {
-    setRunning(true); setNote(""); setShowNotes(false); setJustDone(false);
+  // PLAN PREVIEW (pre-run alignment gate, Gary): draft a cheap, facts-only research plan for the brief so the team can
+  // read and align on it before the expensive deep run. No run is created; no web search is spent.
+  async function previewPlan() {
+    if (!isConfigured) return;
+    setPlanBusy(true); setNote("");
+    const r = await fetch(`/api/studio/researcher/plan`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, focus: focus.trim() }),
+    }).then((x) => x.json()).catch(() => null);
+    setPlanBusy(false);
+    if (!r?.ok) { const m = r?.error || "Couldn't draft the plan."; setNote(m); flex(m); return; }
+    setPlan(r.plan);
+  }
+
+  async function runCollect(withNotes?: string, withPlan?: ResearchPlan | null) {
+    setRunning(true); setNote(""); setShowNotes(false); setJustDone(false); setPlan(null);
     startedRef.current = Date.now(); setElapsed(0);
     setProgress({ label: `Collecting facts on ${clientName}`, searches: [], sources: 0, filed: 0 });
     let runId = "";
     try {
       const resp = await fetch(`/api/studio/researcher/collect`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, notes: withNotes || "", focus: focus.trim() }),
+        body: JSON.stringify({ clientId, notes: withNotes || "", focus: focus.trim(), plan: withPlan ?? undefined }),
       });
       const d = await resp.json().catch(() => null);
       if (!resp.ok) throw new Error(d?.error || `The Researcher could not start (${resp.status}).`);
@@ -550,7 +568,7 @@ export default function ResearchGate({ clients, configured = [], initialClientId
             </div>
             <p className="mt-1.5 text-[18px] leading-relaxed text-ink-dim">{heroLine}</p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
-              <button onClick={() => runCollect()} disabled={running || collecting || !isConfigured}
+              <button onClick={() => previewPlan()} disabled={running || collecting || planBusy || !isConfigured}
                 className={`rounded-lg px-5 py-2.5 text-[18px] font-bold transition ${
                   running || collecting ? "bg-accent text-black glow-accent"
                   : justDone ? "next-pulse"
@@ -559,9 +577,13 @@ export default function ResearchGate({ clients, configured = [], initialClientId
                 {running
                   ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Collecting… <span className="tabular font-semibold opacity-80">{fmtElapsed(elapsed)}</span></span>
                   : collecting ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Researching…</span>
+                  : planBusy ? <span className="inline-flex items-center gap-2"><span className="spinner-ring spinner-ring--solid" style={{ fontSize: "1.05em" }} /> Drafting the plan…</span>
                   : justDone ? "✓ Research complete"
-                  : run ? "Collect again (new version)" : "Run the Researcher"}
+                  : run ? "Preview a new plan" : "Preview the research plan"}
               </button>
+              {!running && !collecting && !planBusy && isConfigured && !plan && (
+                <button onClick={() => runCollect()} className="text-[15px] font-semibold text-ink-faint underline-offset-2 hover:text-ink hover:underline">or run without a plan</button>
+              )}
               {run && !collecting && (
                 <span className="text-[16px] text-ink-faint">
                   {factCount} fact{factCount === 1 ? "" : "s"}{gapClaims.length > 0 && <> · <span className="text-[#fcd34d]">{gapClaims.length} gap{gapClaims.length === 1 ? "" : "s"}</span></>} · collected {ukDate(run.created_at)}
@@ -569,6 +591,24 @@ export default function ResearchGate({ clients, configured = [], initialClientId
                 </span>
               )}
             </div>
+            {/* THE RESEARCH PLAN, previewed for alignment BEFORE the expensive run (Gary). Read and edit it (the passes,
+                sources, what we verify, and the gaps for the client to confirm), then run the deep research steered by
+                it. Facts-only: no analysis here, that is the Strategist's job downstream. */}
+            {plan && !running && !collecting && (
+              <div className="mt-5 rounded-xl border border-accent/40 bg-surface-1 p-5 text-left">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-lg font-bold text-accent">The research plan · align before we run</div>
+                  <button onClick={() => setPlan(null)} className="text-base font-semibold text-ink-faint hover:text-ink">Discard</button>
+                </div>
+                <p className="mt-1 text-base text-ink-dim">Read and edit the plan: the passes, the sources, what we verify, and the gaps for the client to confirm. When you are happy, run the deep research steered by it. Facts only, no analysis (the Strategist does that from the facts).</p>
+                <div className="mt-3"><StructuredEditor value={plan as unknown as Record<string, unknown>} onChange={(v) => setPlan(v as unknown as ResearchPlan)} /></div>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button onClick={() => runCollect(undefined, plan)} disabled={running || collecting}
+                    className="rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">Run this research →</button>
+                  <button onClick={() => previewPlan()} disabled={planBusy} className="text-base font-semibold text-ink-faint hover:text-ink">{planBusy ? "Re-drafting…" : "Re-draft the plan"}</button>
+                </div>
+              </div>
+            )}
             {/* The tier legend, tying the radar's coloured points to the grades in the fact base below. */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[14px] text-ink-faint sm:justify-start">
               <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#4ade80]" />Tier 1 · load-bearing</span>

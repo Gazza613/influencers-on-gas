@@ -26,10 +26,13 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; notes?: string; focus?: string };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; notes?: string; focus?: string; plan?: unknown };
   const clientId = String(b.clientId || "").trim();
   const notes = String(b.notes || "").trim().slice(0, 2000);
   const focus = String(b.focus || "").trim().slice(0, 1000);
+  // The AGREED research plan (previewed + aligned by a human before this run). Optional: a direct run or a weekly
+  // auto-run has no plan. When present it is stored on the run and steers the gather (facts-scoping only).
+  const plan = (b.plan && typeof b.plan === "object") ? (b.plan as Record<string, unknown>) : null;
   if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -38,10 +41,10 @@ export async function POST(req: Request) {
   // already in flight, or a run id to poll), then fire the durable phase-stepped job and return. The heavy work runs
   // in Inngest, decoupled from this request, so it can take as long as it needs.
   try {
-    const { runId, version } = await startResearchRun(clientId, { userEmail: session.user?.email ?? null, notes: notes || null });
+    const { runId, version } = await startResearchRun(clientId, { userEmail: session.user?.email ?? null, notes: notes || null, plan });
     await inngest.send({
       name: "research/collect",
-      data: { clientId, runId, version, today, userEmail: session.user?.email ?? null, notes: notes || null, focus: focus || null },
+      data: { clientId, runId, version, today, userEmail: session.user?.email ?? null, notes: notes || null, focus: focus || null, plan },
     });
     return NextResponse.json({ ok: true, runId, version, status: "collecting" });
   } catch (e) {

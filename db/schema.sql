@@ -809,6 +809,7 @@ alter table research_claims add column if not exists in_brain boolean not null d
 alter table research_claims add column if not exists in_brain_by text;
 alter table research_runs add column if not exists progress jsonb;  -- live {label, sources, filed} while status='collecting', so a returning user sees progress (durable run survives navigation)
 alter table research_runs add column if not exists error text;      -- failure reason if a run ends in status='failed'
+alter table research_runs add column if not exists plan jsonb;      -- the AGREED research plan {summary, passes[], confirm[]}: previewed + aligned by a human before the run, and steers the gather (facts-scoping only)
 
 -- ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 -- THE INTELLIGENCE LAYER CYCLE (Agency of NOW · Pillars I + II). Phase A: the spine + contracts.

@@ -585,7 +585,7 @@ async function fileFromSite(client: Anthropic, ctx: ResearchCtx): Promise<RawCla
  * if a run is already in flight, or a new run row to poll. Returns the runId + version; the heavy work then runs as a
  * durable Inngest job. Kept fast - only the concurrency check, the version, and the row insert.
  */
-export async function startResearchRun(clientId: string, opts: { userEmail?: string | null; notes?: string | null } = {}): Promise<{ runId: string; version: number }> {
+export async function startResearchRun(clientId: string, opts: { userEmail?: string | null; notes?: string | null; plan?: Record<string, unknown> | null } = {}): Promise<{ runId: string; version: number }> {
   const derived = await deriveResearchBrief(clientId);
   if (!derived) throw new Error("This brain has nothing to research yet. Add the client and crawl their site into the brain first.");
   // CONCURRENCY GUARD: refuse a second start if a collect for this client is genuinely in flight. A run spans many
@@ -603,15 +603,15 @@ export async function startResearchRun(clientId: string, opts: { userEmail?: str
   const verRow0 = (await db().query(`select coalesce(max(version),0)+1 as v from research_runs where client_id = $1`, [clientId])) as { v: number }[];
   const version = Number(verRow0[0]?.v) || 1;
   const startRows = (await db().query(
-    `insert into research_runs (client_id, version, status, website, notes, user_email)
-     values ($1,$2,'collecting',$3,$4,$5) returning id`,
-    [clientId, version, website, opts.notes?.trim()?.slice(0, 2000) || null, opts.userEmail || null],
+    `insert into research_runs (client_id, version, status, website, notes, user_email, plan)
+     values ($1,$2,'collecting',$3,$4,$5,$6) returning id`,
+    [clientId, version, website, opts.notes?.trim()?.slice(0, 2000) || null, opts.userEmail || null, opts.plan ? JSON.stringify(opts.plan) : null],
   )) as { id: string }[];
   return { runId: startRows[0].id, version };
 }
 
 /** PHASE: prepare. Build the full research context (locks, prompts, the client's own site read for real). */
-export async function prepareResearch(clientId: string, runId: string, version: number, today: string, opts: { userEmail?: string | null; notes?: string | null; focus?: string | null } = {}): Promise<ResearchCtx> {
+export async function prepareResearch(clientId: string, runId: string, version: number, today: string, opts: { userEmail?: string | null; notes?: string | null; focus?: string | null; plan?: Record<string, unknown> | null } = {}): Promise<ResearchCtx> {
   const { userEmail, notes, focus } = opts;
 
   // Identity + ground-truth anchor. A name is the minimum; the website is what stops us researching a same-named but
@@ -676,6 +676,17 @@ export async function prepareResearch(clientId: string, runId: string, version: 
       `Either way it never loosens the rules: only real, sourced facts, never anything invented to satisfy the focus.`
     : "";
 
+  // AGREED PLAN (Gary): when a human previewed and aligned on a research plan before the run, follow it as the spine
+  // of the gather. It PRIORITISES and STRUCTURES what to collect (facts-only) but never loosens a rule or narrows the
+  // always-collect items, and the client-confirmation gaps are NEVER invented - they are left for the client.
+  const plan = opts.plan as { summary?: string; passes?: { title?: string; gather?: string; sources?: string; verify?: string }[]; confirm?: string[] } | null | undefined;
+  const planBlock = plan && Array.isArray(plan.passes) && plan.passes.length
+    ? `\n\nTHE AGREED RESEARCH PLAN (a senior human reviewed and aligned on this before the run - follow it as the spine of this gather; it structures and prioritises what to collect, it does NOT loosen any rule or narrow the always-collect items):\n` +
+      (plan.summary ? `Goal: ${plan.summary}\n` : "") +
+      plan.passes.map((p, i) => `${i + 1}. ${(p.title || "").trim()} - GATHER: ${(p.gather || "").trim()} | SOURCES: ${(p.sources || "").trim()} | VERIFY: ${(p.verify || "").trim()}`).join("\n") +
+      (Array.isArray(plan.confirm) && plan.confirm.length ? `\nGAPS FOR THE CLIENT TO CONFIRM (do NOT invent these; if you find genuinely sourced facts you may file them, otherwise leave them for the client, they are not failures): ${plan.confirm.join("; ")}` : "")
+    : "";
+
   // DO NOT REFERENCE (Gary): facts the team REJECTED in any past review are a permanent block-list for this client.
   // We tell the model never to surface them again AND filter them out in code (the review phase), so a rejected
   // fact can never come back on a rerun.
@@ -694,7 +705,7 @@ export async function prepareResearch(clientId: string, runId: string, version: 
 
   const scope = `SCOPE LOCK. You are collecting facts about ${name}, and ONLY ${name}. ${name} is the SUBJECT; any other company appears only as a competitor, as market context, OR as ${name}'s named owner/parent (see OWNER/PARENT CONTEXT, which IS in scope as context).${anchor}${ceoLock}${deprecatedLock}${rejectBlock}`;
 
-  const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${focusBlock}${socialBlock}${ownerBlock}${knownList}${notesBlock}\n\n` +
+  const brief = `Today is ${today}. Collect a verified fact base on ${name} for a marketing research brief.${focusBlock}${planBlock}${socialBlock}${ownerBlock}${knownList}${notesBlock}\n\n` +
     `Cover every angle a marketing strategist needs: who they are and what they sell (snapshot), history/ownership/structure (foundations), the leadership and management team (leadership), products/pricing and the commercial model - how they make money and how they sell (products), the market and category (market), how THEY position themselves - promise, USPs, tone (positioning), who they serve and their audience (audience), website/SEO/social (digital), their OWN current marketing and advertising (marketing), the competitor intelligence below, a one-line profile of each competitor (competitor_set), dated developments in the last 90 days on/after ${cutoffStr} (activity), press and media (press), and reviews/sentiment incl. SA platforms like HelloPeter and Google (customer_voice).\n\n` +
     `Also set the tool fields 'vertical' (the client's marketing category) and 'regulated' (whether they are in a licensed/regulated sector).\n\n` +
     `ALWAYS COLLECT, EVERY RUN, WITHOUT EXCEPTION (check the site footer, and the contact, about, team and help pages):\n` +
