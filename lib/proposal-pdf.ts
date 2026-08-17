@@ -8,6 +8,21 @@ import { renderProposalHtml } from "./proposal-render";
 import { deriveCiTokens } from "./proposal-ci";
 import { buildProposalDoc } from "./proposal-map";
 
+// A short price badge (the big "R75k" on the deal + investment pages) derived from the rate string, so it always
+// matches the edited rate. Handles "R75,000 / month", "R75k", "R1,500,000" and "R1.5m".
+function shortPrice(rate: string): string | null {
+  const s = String(rate || "").toLowerCase().replace(/\s/g, "");
+  let m = s.match(/r?(\d+(?:\.\d+)?)(k|m)\b/);
+  if (m) return `R${m[1]}${m[2]}`;
+  m = s.replace(/,/g, "").match(/r?(\d{3,})/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!n) return null;
+  if (n >= 1_000_000) return `R${+(n / 1_000_000).toFixed(1)}m`;
+  if (n >= 1000) return `R${Math.round(n / 1000)}k`;
+  return `R${n}`;
+}
+
 // THE BRANDED PROPOSAL PDF. Renders the Fable-written proposal content into the approved 24-page GAS proposal
 // template (lib/proposal-render.ts), recoloured to the client's CI (their website accent + a dark ground), and
 // stores it. buildProposalDoc (lib/proposal-map.ts) maps the model output + context into the renderer's
@@ -84,9 +99,16 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
   const logoUrl = Array.isArray(logoRow[0]?.logos) ? (logoRow[0]!.logos!.find((l) => l?.url)?.url || "") : "";
   const clientLogo = /^https?:\/\//i.test(logoUrl) ? { src: logoUrl, w: 32, h: 32 } : null;
 
+  // The price shown across the PDF (deal, investment, agreement, sign-off pages) FOLLOWS the editable investment
+  // section, so a hand-edited rate or tier name flows through to every price (Gary: editing to R75k still showed
+  // R100k). Falls back to the tier's rate/name when the section has not overridden them.
+  const inv = p.content.investment;
+  const rate = (inv?.rate && String(inv.rate).trim()) || tier.rate;
+  const tierName = (inv?.tier_name && String(inv.tier_name).trim()) || tier.name;
+  const price = shortPrice(rate) || (tier.id === "launch" ? "R100k" : "R150k");
   const doc = buildProposalDoc(p.content, {
-    clientName, objectiveLabel, tierName: tier.name,
-    price: tier.id === "launch" ? "R100k" : "R150k", priceUnit: "per month excl VAT", rate: tier.rate,
+    clientName, objectiveLabel, tierName,
+    price, priceUnit: "per month excl VAT", rate,
     dateLabel, validityLabel: "Valid 14 days",
     clientLogo, competitors: comps.map((c) => c.name), clientContacts: contacts, clientTagline: "",
   });
