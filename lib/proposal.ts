@@ -164,11 +164,11 @@ const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)
   `- Never use the word "manifesto". Confident, premium, concrete, no filler.\n\n` +
   WRITING_STYLE;
 
-// Build the proposal content for an approved strategy, on the chosen objective + tier. Fable 5, retried on overload.
-// notes/prior fold in a strategist's review comments so a rework improves the draft rather than starting cold.
-export async function buildProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null; notes?: string; prior?: ProposalContent | null }): Promise<{ content: ProposalContent; clientId: string; engagementId: string; campaignId: string | null }> {
-  const key = await getSecret("anthropic");
-  if (!key) throw new Error("Claude isn't connected.");
+// Load the shared CONTEXT a proposal (or a single section) is written from: the approved strategy, the client, and
+// the verified research facts. Extracted so the whole-proposal build and the per-section refine draw on the exact
+// same grounding. We sell OUR PSI WhatsApp system, so the client's own contact channels (WhatsApp number, phone,
+// forms, store locator, socials) are NEVER shown to the model: we drop the contact + online_presence facts entirely.
+async function loadProposalContext(strategyId: string): Promise<{ clientId: string; clientName: string; strat: StrategyContent | null; factBlock: string; engagementId: string; campaignId: string | null }> {
   const srows = (await db().query(`select * from strategies where id = $1`, [strategyId])) as Strategy[];
   const strategy = srows[0];
   if (!strategy) throw new Error("That strategy was not found.");
@@ -180,18 +180,21 @@ export async function buildProposal(strategyId: string, input: { objective: Obje
   const facts = run[0]
     ? (await db().query(`select section, subject, claim from research_claims where run_id = $1 and rejected = false and section <> 'unverified' and claim <> '' order by (tier is null), tier asc`, [run[0].id])) as { section: string; subject: string | null; claim: string }[]
     : [];
+  const PROPOSAL_FACT_EXCLUDE = new Set(["contact", "online_presence"]);
+  const factBlock = facts.filter((f) => !PROPOSAL_FACT_EXCLUDE.has(f.section)).slice(0, 160).map((f) => `- [${f.section}${f.subject ? `/${f.subject}` : ""}] ${f.claim}`).join("\n");
+  return { clientId, clientName, strat: strategy.content as StrategyContent | null, factBlock, engagementId: strategy.engagement_id, campaignId: strategy.campaign_id };
+}
+
+// Build the proposal content for an approved strategy, on the chosen objective + tier. Fable 5, retried on overload.
+// notes/prior fold in a strategist's review comments so a rework improves the draft rather than starting cold.
+export async function buildProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null; notes?: string; prior?: ProposalContent | null }): Promise<{ content: ProposalContent; clientId: string; engagementId: string; campaignId: string | null }> {
+  const key = await getSecret("anthropic");
+  if (!key) throw new Error("Claude isn't connected.");
+  const { clientId, clientName, strat, factBlock, engagementId, campaignId } = await loadProposalContext(strategyId);
 
   const objective = OBJECTIVES.find((o) => o.id === input.objective) || OBJECTIVES[0];
   const tier = TIERS[input.tier] || TIERS.dominate;
   const client = new Anthropic({ apiKey: key });
-
-  // We sell OUR PSI WhatsApp system, so the proposal must NEVER cite the client's own contact channels (their
-  // WhatsApp number, phone, forms, store locator, socials). The cleanest guarantee is to never show them to the
-  // model: drop the contact + online_presence facts entirely. The sign-off contact block is built separately, from
-  // the approved identity (and is itself stripped of the client's WhatsApp in proposal-pdf.ts).
-  const PROPOSAL_FACT_EXCLUDE = new Set(["contact", "online_presence"]);
-  const factBlock = facts.filter((f) => !PROPOSAL_FACT_EXCLUDE.has(f.section)).slice(0, 160).map((f) => `- [${f.section}${f.subject ? `/${f.subject}` : ""}] ${f.claim}`).join("\n");
-  const strat = strategy.content as StrategyContent | null;
   const priorBlock = input.prior ? `\n\nCURRENT DRAFT (improve this, do not start from scratch):\n${JSON.stringify(input.prior)}` : "";
   const notesBlock = input.notes?.trim() ? `\n\nSTRATEGIST REVIEW COMMENTS (a senior human, apply each precisely - this is the human gate):\n${input.notes.trim().slice(0, 3000)}` : "";
   const user =
@@ -212,15 +215,36 @@ export async function buildProposal(strategyId: string, input: { objective: Obje
   await meterClaude(msg, { clientId, userEmail: input.userEmail ?? null, model: FABLE, action: "proposal-build" }).catch(() => {});
   const content = extract(msg);
   if (!content) throw new Error("The proposal draft came back empty. Try again.");
-  return { content, clientId, engagementId: strategy.engagement_id, campaignId: strategy.campaign_id };
+  return { content, clientId, engagementId, campaignId };
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────────────────────────────────────
 export type Proposal = {
   id: string; engagement_id: string; campaign_id: string | null; strategy_id: string | null;
   objective: string; tier: string; status: string; content: ProposalContent | null;
-  pdf_url: string | null; approved_by: string | null; approved_at: string | null; created_at: string;
+  pdf_url: string | null; section_review: Record<string, string> | null;
+  approved_by: string | null; approved_at: string | null; created_at: string;
 };
+
+// THE REVIEWABLE SECTIONS (the per-section human gate). Each maps to one or more top-level content fields, so a
+// section refine returns ONLY those fields and merges back, leaving the rest of the proposal untouched. `key` is the
+// gate key stored in proposals.section_review; `fields` are the content keys the model rewrites for that section.
+export const PROPOSAL_SECTIONS: { key: string; label: string; fields: (keyof ProposalContent)[] }[] = [
+  { key: "cover", label: "Cover", fields: ["headline", "subhead"] },
+  { key: "exec_summary", label: "Executive summary", fields: ["exec_summary"] },
+  { key: "opportunity", label: "The opportunity", fields: ["opportunity"] },
+  { key: "audience", label: "The audience", fields: ["audience"] },
+  { key: "strategy", label: "Strategic recommendation", fields: ["strategy"] },
+  { key: "market_intel", label: "Market intelligence", fields: ["market_intel"] },
+  { key: "channels", label: "Channel plan", fields: ["channels"] },
+  { key: "pods", label: "The eight pods", fields: ["pods"] },
+  { key: "funnel", label: "Funnel economics", fields: ["funnel"] },
+  { key: "kpis", label: "KPIs", fields: ["kpis"] },
+  { key: "rollout", label: "31-day rollout", fields: ["rollout"] },
+  { key: "compliance", label: "Compliance", fields: ["compliance"] },
+  { key: "investment", label: "The investment", fields: ["investment"] },
+  { key: "psi_chat", label: "PSI conversation", fields: ["psi_chat"] },
+];
 
 // Build + save a fresh proposal draft for an approved strategy.
 export async function buildAndSaveProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null }): Promise<Proposal> {
@@ -270,4 +294,75 @@ export async function approveProposal(proposalId: string, approvedBy: string): P
 // Reopen an approved proposal for further edits.
 export async function reopenProposal(proposalId: string): Promise<void> {
   await db().query(`update proposals set status = 'awaiting_approval', approved_by = null, approved_at = null where id = $1`, [proposalId]);
+}
+
+// ── Per-section human-in-the-loop review ─────────────────────────────────────────────────────────────────────
+const CONTENT_PROPS = (CONTENT_SCHEMA as { properties: Record<string, unknown> }).properties;
+
+// REFINE ONE SECTION (Human Command). A senior human reads a section and steers it with a plain-English instruction;
+// Fable rewrites ONLY that section, grounded in the same strategy + facts, and it merges back into the proposal so
+// the approved sections around it are untouched. The edited section returns to 'draft' (needs re-approval) and any
+// rendered PDF is invalidated.
+export async function refineProposalSection(proposalId: string, section: string, instruction: string, userEmail?: string | null): Promise<Proposal> {
+  const rows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
+  const cur = rows[0];
+  if (!cur) throw new Error("That proposal was not found.");
+  if (cur.status === "approved") throw new Error("That proposal is approved. Reopen it to edit a section.");
+  if (!cur.strategy_id || !cur.content) throw new Error("This proposal has no strategy or content to refine from.");
+  const def = PROPOSAL_SECTIONS.find((s) => s.key === section);
+  if (!def) throw new Error("Unknown section.");
+  const key = await getSecret("anthropic");
+  if (!key) throw new Error("Claude isn't connected.");
+  const { clientId, clientName, strat, factBlock } = await loadProposalContext(cur.strategy_id);
+  const objective = OBJECTIVES.find((o) => o.id === (cur.objective as ObjectiveId)) || OBJECTIVES[0];
+  const tier = TIERS[cur.tier as TierId] || TIERS.dominate;
+
+  // A tool whose schema is JUST this section's fields, so the model can only return those, matching the exact shape.
+  const props: Record<string, unknown> = {};
+  for (const f of def.fields) props[f] = CONTENT_PROPS[f as string];
+  const sectionSchema = { type: "object", additionalProperties: false, properties: props, required: def.fields } as unknown as Anthropic.Tool["input_schema"];
+  const tool: Anthropic.Tool = { name: "write_section", description: `The revised "${def.label}" section only.`, input_schema: sectionSchema };
+  const curSection: Record<string, unknown> = {};
+  for (const f of def.fields) curSection[f] = (cur.content as unknown as Record<string, unknown>)[f as string];
+
+  const user =
+    `CLIENT: ${clientName}\nOBJECTIVE: ${objective.label} (${objective.note})\nTIER: ${tier.name} at ${tier.rate}\n\n` +
+    `You are refining ONE section of an existing, otherwise-final proposal: "${def.label}". Everything else in the proposal stays exactly as it is. Return ONLY this section, revised, in the same structure.\n\n` +
+    `THE APPROVED STRATEGY (context, the spine of the whole proposal):\n${JSON.stringify(strat)}\n\n` +
+    `THE VERIFIED RESEARCH FACTS (context, ground everything in these):\n${factBlock}\n\n` +
+    `THE CURRENT "${def.label}" SECTION:\n${JSON.stringify(curSection)}\n\n` +
+    `THE INSTRUCTION (a senior human, apply it precisely, this is the human gate):\n${instruction.trim().slice(0, 3000)}\n\n` +
+    `Rewrite the section via write_section. Keep every doctrine and writing rule, keep it consistent with the rest of the proposal, and change only what the instruction asks for.`;
+
+  const client = new Anthropic({ apiKey: key });
+  const msg = await withAnthropicRetry(() => client.messages.stream({
+    model: FABLE, max_tokens: 12000, system: SYSTEM(clientName, objective.label, tier),
+    tools: [tool], tool_choice: { type: "tool", name: "write_section" },
+    messages: [{ role: "user", content: user }],
+  }).finalMessage());
+  await meterClaude(msg, { clientId, userEmail: userEmail ?? null, model: FABLE, action: "proposal-section" }).catch(() => {});
+  const b = msg.content.find((x) => x.type === "tool_use");
+  const revised = b && b.type === "tool_use" ? (b.input as Record<string, unknown>) : null;
+  if (!revised) throw new Error("The section came back empty. Try again.");
+
+  // Merge ONLY this section's fields back into the full content, leaving everything else intact.
+  const content = { ...(cur.content as unknown as Record<string, unknown>) };
+  for (const f of def.fields) if (f in revised) content[f as string] = revised[f as string];
+  const review = { ...(cur.section_review || {}) };
+  review[section] = "draft";   // a refined section must be re-read and re-approved
+  const upd = (await db().query(
+    `update proposals set content = $2, section_review = $3::jsonb, pdf_url = null where id = $1 returning *`,
+    [proposalId, JSON.stringify(content), JSON.stringify(review)],
+  )) as Proposal[];
+  return upd[0];
+}
+
+// Set a section's human-gate state (approve, or reopen to draft). Approving all sections unlocks the final PDF.
+export async function setProposalSectionReview(proposalId: string, section: string, state: "approved" | "draft"): Promise<Proposal> {
+  const rows = (await db().query(`select section_review from proposals where id = $1`, [proposalId])) as { section_review: Record<string, string> | null }[];
+  if (!rows[0]) throw new Error("That proposal was not found.");
+  const review = { ...(rows[0].section_review || {}) };
+  review[section] = state;
+  const upd = (await db().query(`update proposals set section_review = $2::jsonb where id = $1 returning *`, [proposalId, JSON.stringify(review)])) as Proposal[];
+  return upd[0];
 }

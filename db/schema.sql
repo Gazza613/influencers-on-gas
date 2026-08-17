@@ -952,8 +952,10 @@ create table if not exists proposals (
   status text not null default 'draft',              -- draft | awaiting_approval | approved
   content jsonb,
   pdf_url text,
+  section_review jsonb not null default '{}'::jsonb,   -- per-section human gate: { <section_key>: 'approved' | 'draft' }
   approved_by text, approved_at timestamptz,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_proposals_strategy on proposals(strategy_id, created_at desc);
 create index if not exists idx_proposals_engagement on proposals(engagement_id, created_at desc);
+alter table proposals add column if not exists section_review jsonb not null default '{}'::jsonb;

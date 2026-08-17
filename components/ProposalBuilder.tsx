@@ -1,14 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { OBJECTIVES, TIERS, type ObjectiveId, type TierId } from "@/lib/proposal-config";
-import type { Proposal, ProposalContent } from "@/lib/proposal";
+import { PROPOSAL_SECTIONS, type Proposal, type ProposalContent } from "@/lib/proposal";
 import Working, { WORKING_PROPOSAL, WORKING_PDF } from "@/components/Working";
 
-// THE PROPOSAL BUILDER (in the Strategist POD). Runs from an approved strategy: pick the objective and tier, build
-// the client-facing growth proposal (Fable 5), review it. The branded PDF is the next increment. Never commits an
-// outcome; figures are illustrative.
-// A malformed field (the model sometimes returns a string where an array is expected) must never crash the page:
-// coerce anything non-array to [] before mapping. Same guard as StrategyGate.
+// THE PROPOSAL BUILDER (Step 4). Runs from an approved strategy: pick the objective + tier, build the client-facing
+// growth proposal (Fable 5), then READ and GATE it section by section (Gary): approve each section, or edit it by
+// prompt and "refine and rewrite" (Fable rewrites only that section). The branded PDF cuts once every section is
+// approved. Human Command, AI Execution: the AI drafts, a senior human reads, steers and approves.
 function arr<T>(v: T[] | null | undefined): T[] { return Array.isArray(v) ? v : []; }
 
 const PRIORITY: Record<string, { label: string; cls: string }> = {
@@ -16,6 +15,12 @@ const PRIORITY: Record<string, { label: string; cls: string }> = {
   support: { label: "Support", cls: "bg-[#60a5fa]/15 text-[#93c5fd]" },
   test: { label: "Test", cls: "bg-[#fbbf24]/15 text-[#fcd34d]" },
 };
+
+// Is this reviewable section actually present in the content (so we only gate on sections that render)?
+function present(c: ProposalContent, key: string): boolean {
+  const def = PROPOSAL_SECTIONS.find((s) => s.key === key);
+  return !!def && def.fields.some((f) => (c as unknown as Record<string, unknown>)[f as string] != null);
+}
 
 export default function ProposalBuilder({ strategyId }: { strategyId: string }) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
@@ -26,8 +31,11 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
   const [accent, setAccent] = useState("");   // optional client-colour override (auto-detected from their site if blank)
   const [dark, setDark] = useState("");        // optional DARK/background-page colour (near-black if blank)
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [comments, setComments] = useState("");
   const [gateBusy, setGateBusy] = useState(false);
+  // Per-section review state.
+  const [editKey, setEditKey] = useState<string | null>(null);   // which section is open for a prompt edit
+  const [prompt, setPrompt] = useState("");                       // the section edit instruction
+  const [sectionBusy, setSectionBusy] = useState<string | null>(null);   // which section is mid-refine/approve
 
   const load = useCallback(async () => {
     const d = await fetch(`/api/studio/proposal/latest?strategyId=${strategyId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
@@ -43,7 +51,7 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (!r?.ok) { setMsg(r?.error || "Couldn't build the proposal."); return; }
-    setMsg(""); setProposal(r.proposal);
+    setMsg(""); setProposal(r.proposal); setEditKey(null); setPrompt("");
   }
 
   async function makePdf() {
@@ -58,28 +66,97 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     setMsg(""); setProposal((p) => (p ? { ...p, pdf_url: r.url } : p));
   }
 
-  async function gate(action: "refine" | "approve" | "reopen") {
+  // The whole-proposal gate: approve (only when every section is approved), reopen an approved proposal.
+  async function gate(action: "approve" | "reopen") {
     if (!proposal) return;
-    if (action === "refine" && !comments.trim()) { setMsg("Add your comments to send it back."); return; }
     setGateBusy(true);
-    if (action === "refine") setMsg("Reworking the proposal against your comments on Fable 5…");
     const r = await fetch(`/api/studio/proposal/gate`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ proposalId: proposal.id, action, comments: comments.trim() }),
+      body: JSON.stringify({ proposalId: proposal.id, action }),
     }).then((x) => x.json()).catch(() => null);
     setGateBusy(false);
     if (!r?.ok) { setMsg(r?.error || "Couldn't complete that."); return; }
-    setMsg(""); setComments("");
+    setMsg("");
     if (r.proposal) setProposal(r.proposal); else await load();
   }
 
+  // The per-section gate: refine by prompt (Fable rewrites only this section), approve, or reopen.
+  async function sectionAct(skey: string, action: "refine" | "approve" | "reopen", instruction?: string) {
+    if (!proposal) return;
+    setSectionBusy(skey);
+    if (action === "refine") setMsg("");
+    const r = await fetch(`/api/studio/proposal/section`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposalId: proposal.id, section: skey, action, instruction }),
+    }).then((x) => x.json()).catch(() => null);
+    setSectionBusy(null);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't do that."); return; }
+    if (action === "refine") { setEditKey(null); setPrompt(""); }
+    if (r.proposal) setProposal(r.proposal);
+  }
+
   const c = (proposal?.content || null) as ProposalContent | null;
-  const approved = proposal?.status === "approved";
+  const locked = proposal?.status === "approved";
+  const review = proposal?.section_review || {};
+  const activeSections = c ? PROPOSAL_SECTIONS.filter((s) => present(c, s.key)) : [];
+  const approvedCount = activeSections.filter((s) => review[s.key] === "approved").length;
+  const allApproved = activeSections.length > 0 && approvedCount === activeSections.length;
+
+  // A reviewable section: its content body + the human gate (approve, or edit-by-prompt then refine and rewrite).
+  function section(skey: string, label: string, body: React.ReactNode) {
+    const approved = review[skey] === "approved";
+    const editing = editKey === skey;
+    const busyHere = sectionBusy === skey;
+    return (
+      <section key={skey} className={`rounded-xl border ${approved ? "border-[#4ade80]/40" : "border-line"} bg-surface-1 p-5`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-base font-semibold uppercase tracking-wide text-ink-faint">{label}</div>
+          {approved
+            ? <span className="rounded-full bg-[#4ade80]/15 px-2.5 py-0.5 text-sm font-bold text-[#86efac]">✓ Approved</span>
+            : <span className="rounded-full bg-[#fbbf24]/15 px-2.5 py-0.5 text-sm font-bold text-[#fcd34d]">Needs review</span>}
+        </div>
+        <div className="mt-2">{body}</div>
+        {!locked && (
+          <div className="mt-3 border-t border-line pt-3">
+            {editing ? (
+              <div>
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={2} autoFocus
+                  placeholder={`How should the ${label.toLowerCase()} change? e.g. "lead with the price", "make it plainer", "shorten it"…`}
+                  className="w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-[15px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button onClick={() => sectionAct(skey, "refine", prompt.trim())} disabled={busyHere || !prompt.trim()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-1.5 text-[15px] font-bold text-black disabled:opacity-50">
+                    {busyHere && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+                    {busyHere ? "Rewriting…" : "Refine and rewrite now"}
+                  </button>
+                  <button onClick={() => { setEditKey(null); setPrompt(""); }} className="text-[15px] font-semibold text-ink-faint hover:text-ink">Cancel</button>
+                  <span className="text-[13px] text-ink-faint">Rewrites only this section, on Fable 5.</span>
+                </div>
+                {busyHere && <div className="mt-2 text-base text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {!approved && (
+                  <button onClick={() => sectionAct(skey, "approve")} disabled={busyHere}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-3.5 py-1.5 text-[15px] font-bold text-black disabled:opacity-50">
+                    {busyHere && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" />}✓ Approve section
+                  </button>
+                )}
+                <button onClick={() => { setEditKey(skey); setPrompt(""); }} disabled={busyHere}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">✎ Edit by prompt</button>
+                {approved && <button onClick={() => sectionAct(skey, "reopen")} disabled={busyHere} className="text-[15px] font-semibold text-ink-faint hover:text-ink">Reopen</button>}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-xl border border-[#4ade80]/30 bg-surface-1 p-5">
       <div className="text-lg font-bold text-[#86efac]">The Proposal</div>
-      <p className="mt-1 text-lg text-ink-dim">Build the client-facing growth proposal from this approved strategy. Written on Fable 5, specific to the objective, with platform-level audience selections and an intelligent channel plan. Figures are illustrative, never a guarantee.</p>
+      <p className="mt-1 text-lg text-ink-dim">Build the client-facing growth proposal from this approved strategy, then read it section by section: approve each one, or edit it by prompt and refine. The branded PDF cuts once every section is approved. Figures are illustrative, never a guarantee.</p>
 
       {/* CONFIG */}
       <div className="mt-4 flex flex-wrap items-end gap-4">
@@ -111,79 +188,85 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
         </label>
         <button onClick={build} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
           {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
-          {busy ? "Working…" : proposal ? "Rebuild the proposal" : "Build the proposal"}
+          {busy ? "Working…" : proposal ? "Rebuild the whole proposal" : "Build the proposal"}
         </button>
       </div>
-      <p className="mt-2 text-base text-ink-faint">Brand colour: leave blank to read it from the client&apos;s site automatically, or set it once here to lock their exact colour. A locked colour is saved to the client and reused on every future proposal, so you never set it twice.</p>
+      <p className="mt-2 text-base text-ink-faint">Rebuild writes the whole proposal fresh (and clears your section approvals). To change one part, edit that section below instead. Brand colour: leave blank to read it from the client&apos;s site, or set it once to lock their exact colour.</p>
       {pdfBusy
         ? <div className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-accent"><Working messages={WORKING_PDF} /></div>
-        : (busy || gateBusy)
+        : busy
           ? <div className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-accent"><Working messages={WORKING_PROPOSAL} /></div>
           : msg && <p className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-lg text-ink-dim">{msg}</p>}
 
-      {/* THE PROPOSAL DRAFT */}
+      {/* THE PROPOSAL DRAFT, section by section */}
       {c && (
         <div className="mt-6 space-y-6">
-          <div>
-            <h3 className="text-2xl font-extrabold text-ink">{c.headline}</h3>
-            <p className="mt-1 text-lg text-ink-dim">{c.subhead}</p>
-          </div>
-
-          <Blk title="Executive summary">
-            <p className="text-lg text-ink-dim">{c.exec_summary?.intro}</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {arr(c.exec_summary?.cards).map((x, i) => (
-                <div key={i} className="rounded-lg border border-line bg-surface-2 p-3">
-                  <div className="text-lg font-bold text-ink">{x.title}</div>
-                  <div className="mt-0.5 text-base text-ink-dim">{x.body}</div>
-                </div>
-              ))}
+          {section("cover", "Cover", (
+            <div>
+              <h3 className="text-2xl font-extrabold text-ink">{c.headline}</h3>
+              <p className="mt-1 text-lg text-ink-dim">{c.subhead}</p>
             </div>
-          </Blk>
+          ))}
 
-          <Blk title="The opportunity">
-            <p className="text-lg text-ink-dim">{c.opportunity?.intro}</p>
-            <p className="mt-2 rounded-lg border border-accent/30 bg-surface-2 p-3 text-lg font-semibold text-ink">Definition of success · {c.opportunity?.definition_of_success}</p>
-          </Blk>
-
-          {/* AUDIENCE - the star: platform-level targeting */}
-          <section className="rounded-xl border border-accent/50 bg-surface-1 p-5">
-            <div className="text-base font-semibold uppercase tracking-wide text-accent">The target audience · platform-level targeting</div>
-            {c.audience?.overview && <p className="mt-2 text-lg text-ink-dim">{c.audience.overview}</p>}
-            <div className="mt-4 space-y-4">
-              {arr(c.audience?.personas).map((p, i) => (
-                <div key={i} className="rounded-lg border border-line bg-surface-2 p-4">
-                  <div className="text-lg font-bold text-ink">{p.label}</div>
-                  <p className="mt-1 text-base text-ink-faint"><b className="text-ink-dim">Trigger</b> · {p.trigger} &nbsp;·&nbsp; <b className="text-ink-dim">Need</b> · {p.need}</p>
-                  <p className="mt-0.5 text-base text-ink-faint"><b className="text-ink-dim">Who</b> · {p.who}</p>
-                  <p className="mt-0.5 text-base text-ink-dim"><b className="text-ink">Angle</b> · {p.angle}</p>
-                  <div className="mt-3 space-y-2">
-                    {arr(p.platforms).map((pl, j) => (
-                      <div key={j} className="rounded-md border border-line/70 bg-surface-1 p-2.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded bg-accent/15 px-2 py-0.5 text-base font-bold text-accent">{pl.platform}</span>
-                          <span className="text-base text-ink-faint">{pl.approach}</span>
-                        </div>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">{arr(pl.selections).map((s, k) => <span key={k} className="rounded-full border border-line px-2 py-0.5 text-sm text-ink-dim">{s}</span>)}</div>
-                      </div>
-                    ))}
+          {section("exec_summary", "Executive summary", (
+            <div>
+              <p className="text-lg text-ink-dim">{c.exec_summary?.intro}</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {arr(c.exec_summary?.cards).map((x, i) => (
+                  <div key={i} className="rounded-lg border border-line bg-surface-2 p-3">
+                    <div className="text-lg font-bold text-ink">{x.title}</div>
+                    <div className="mt-0.5 text-base text-ink-dim">{x.body}</div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </section>
+          ))}
 
-          <Blk title="Strategic recommendation">
-            <p className="text-lg font-bold text-ink">{c.strategy?.proposition}</p>
-            <p className="mt-1 text-lg text-ink-dim">{c.strategy?.angle}</p>
-            <ul className="mt-2 list-disc pl-5 text-lg text-ink-dim">{arr(c.strategy?.why_it_wins).map((w, i) => <li key={i}>{w}</li>)}</ul>
-          </Blk>
+          {section("opportunity", "The opportunity", (
+            <div>
+              <p className="text-lg text-ink-dim">{c.opportunity?.intro}</p>
+              <p className="mt-2 rounded-lg border border-accent/30 bg-surface-2 p-3 text-lg font-semibold text-ink">Definition of success · {c.opportunity?.definition_of_success}</p>
+            </div>
+          ))}
 
-          {/* MARKET INTELLIGENCE - proves industry expertise, incl. non-digital opportunities */}
-          {c.market_intel && (
-            <section className="rounded-xl border border-[#60a5fa]/40 bg-surface-1 p-5">
-              <div className="text-base font-semibold uppercase tracking-wide text-[#93c5fd]">Market intelligence & opportunities</div>
-              {c.market_intel.overview && <p className="mt-2 text-lg text-ink-dim">{c.market_intel.overview}</p>}
+          {section("audience", "The audience · platform-level targeting", (
+            <div>
+              {c.audience?.overview && <p className="text-lg text-ink-dim">{c.audience.overview}</p>}
+              <div className="mt-4 space-y-4">
+                {arr(c.audience?.personas).map((p, i) => (
+                  <div key={i} className="rounded-lg border border-line bg-surface-2 p-4">
+                    <div className="text-lg font-bold text-ink">{p.label}</div>
+                    <p className="mt-1 text-base text-ink-faint"><b className="text-ink-dim">Trigger</b> · {p.trigger} &nbsp;·&nbsp; <b className="text-ink-dim">Need</b> · {p.need}</p>
+                    <p className="mt-0.5 text-base text-ink-faint"><b className="text-ink-dim">Who</b> · {p.who}</p>
+                    <p className="mt-0.5 text-base text-ink-dim"><b className="text-ink">Angle</b> · {p.angle}</p>
+                    <div className="mt-3 space-y-2">
+                      {arr(p.platforms).map((pl, j) => (
+                        <div key={j} className="rounded-md border border-line/70 bg-surface-1 p-2.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded bg-accent/15 px-2 py-0.5 text-base font-bold text-accent">{pl.platform}</span>
+                            <span className="text-base text-ink-faint">{pl.approach}</span>
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">{arr(pl.selections).map((s, k) => <span key={k} className="rounded-full border border-line px-2 py-0.5 text-sm text-ink-dim">{s}</span>)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {section("strategy", "Strategic recommendation", (
+            <div>
+              <p className="text-lg font-bold text-ink">{c.strategy?.proposition}</p>
+              <p className="mt-1 text-lg text-ink-dim">{c.strategy?.angle}</p>
+              <ul className="mt-2 list-disc pl-5 text-lg text-ink-dim">{arr(c.strategy?.why_it_wins).map((w, i) => <li key={i}>{w}</li>)}</ul>
+            </div>
+          ))}
+
+          {c.market_intel && section("market_intel", "Market intelligence & opportunities", (
+            <div>
+              {c.market_intel.overview && <p className="text-lg text-ink-dim">{c.market_intel.overview}</p>}
               {arr(c.market_intel?.stats).length > 0 && (
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {c.market_intel.stats.map((s, i) => (
@@ -205,25 +288,26 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
                   </li>
                 ))}</ul>
               )}
-            </section>
-          )}
-
-          {/* CHANNELS - intelligent selection */}
-          <Blk title="Channel plan · intelligently selected">
-            <p className="text-lg text-ink-dim">{c.channels?.rationale}</p>
-            <div className="mt-3 space-y-2">
-              {arr(c.channels?.plan).map((ch, i) => (
-                <div key={i} className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-2 p-3">
-                  <span className="rounded bg-accent/15 px-2 py-0.5 text-base font-bold text-accent">{ch.platform}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-sm font-bold ${(PRIORITY[ch.priority] || PRIORITY.support).cls}`}>{(PRIORITY[ch.priority] || PRIORITY.support).label}</span>
-                  <span className="text-base text-ink"><b>{ch.role}</b></span>
-                  <span className="w-full text-base text-ink-faint">{ch.why}</span>
-                </div>
-              ))}
             </div>
-          </Blk>
+          ))}
 
-          <Blk title="The eight pods, mapped to the client">
+          {section("channels", "Channel plan · intelligently selected", (
+            <div>
+              <p className="text-lg text-ink-dim">{c.channels?.rationale}</p>
+              <div className="mt-3 space-y-2">
+                {arr(c.channels?.plan).map((ch, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-2 p-3">
+                    <span className="rounded bg-accent/15 px-2 py-0.5 text-base font-bold text-accent">{ch.platform}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-sm font-bold ${(PRIORITY[ch.priority] || PRIORITY.support).cls}`}>{(PRIORITY[ch.priority] || PRIORITY.support).label}</span>
+                    <span className="text-base text-ink"><b>{ch.role}</b></span>
+                    <span className="w-full text-base text-ink-faint">{ch.why}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {section("pods", "The eight pods, mapped to the client", (
             <div className="grid gap-3 sm:grid-cols-2">
               {arr(c.pods).map((pod, i) => (
                 <div key={i} className="rounded-lg border border-line bg-surface-2 p-3">
@@ -233,68 +317,75 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
                 </div>
               ))}
             </div>
-          </Blk>
+          ))}
 
-          <Blk title="Illustrative funnel economics">
-            <p className="text-base italic text-ink-faint">{c.funnel?.disclaimer}</p>
-            <div className="mt-2 space-y-1.5">{arr(c.funnel?.stages).map((s, i) => (
-              <div key={i} className="flex items-start gap-2 text-lg text-ink-dim"><span className="font-bold text-ink">{s.stage}</span> · {s.note}</div>
-            ))}</div>
-          </Blk>
+          {c.psi_chat && section("psi_chat", "PSI conversation", (
+            <div>
+              <div className="space-y-1.5">
+                {arr(c.psi_chat.conversation).map((b, i) => (
+                  <div key={i} className={`max-w-[85%] rounded-lg px-3 py-2 text-base ${b.role === "out" ? "ml-auto bg-accent/15 text-ink" : "bg-surface-2 text-ink-dim"}`}>{b.text}</div>
+                ))}
+              </div>
+              <div className="mt-2 text-base font-semibold text-[#86efac]">{c.psi_chat.outcome}</div>
+            </div>
+          ))}
 
-          <Blk title="KPIs">
+          {section("funnel", "Illustrative funnel economics", (
+            <div>
+              <p className="text-base italic text-ink-faint">{c.funnel?.disclaimer}</p>
+              <div className="mt-2 space-y-1.5">{arr(c.funnel?.stages).map((s, i) => (
+                <div key={i} className="flex items-start gap-2 text-lg text-ink-dim"><span className="font-bold text-ink">{s.stage}</span> · {s.note}</div>
+              ))}</div>
+            </div>
+          ))}
+
+          {section("kpis", "KPIs", (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-lg">
                 <thead><tr className="border-b border-line text-base uppercase tracking-wide text-ink-faint"><th className="py-1.5 pr-3 font-semibold">Metric</th><th className="py-1.5 pr-3 font-semibold">Why</th><th className="py-1.5 font-semibold">Baseline</th></tr></thead>
                 <tbody>{arr(c.kpis).map((k, i) => <tr key={i} className="border-b border-line/50 last:border-0"><td className="py-1.5 pr-3 text-ink">{k.metric}</td><td className="py-1.5 pr-3 text-ink-dim">{k.why}</td><td className="py-1.5 text-ink-faint">{k.baseline}</td></tr>)}</tbody>
               </table>
             </div>
-          </Blk>
+          ))}
 
-          <Blk title="31-day rollout">
+          {section("rollout", "31-day rollout", (
             <div className="space-y-3">{arr(c.rollout).map((w, i) => (
               <div key={i} className="rounded-lg border border-line bg-surface-2 p-3">
                 <div className="text-lg font-bold text-ink">{w.week} · {w.title} <span className="text-base font-normal text-ink-faint">· {w.pods}</span></div>
                 <ul className="mt-1 list-disc pl-5 text-base text-ink-dim">{arr(w.points).map((pt, j) => <li key={j}>{pt}</li>)}</ul>
-                <div className="mt-1 text-base font-semibold text-accent">Gate · {w.gate}</div>
+                <div className="mt-1 text-base font-semibold text-accent">Milestone · {w.gate}</div>
               </div>
             ))}</div>
-          </Blk>
+          ))}
 
-          <Blk title="Compliance">
-            <p className="text-lg text-ink-dim">{c.compliance?.intro}</p>
-            <ul className="mt-1.5 list-disc pl-5 text-lg text-ink-dim">{arr(c.compliance?.points).map((p, i) => <li key={i}>{p}</li>)}</ul>
-          </Blk>
+          {section("compliance", "Compliance", (
+            <div>
+              <p className="text-lg text-ink-dim">{c.compliance?.intro}</p>
+              <ul className="mt-1.5 list-disc pl-5 text-lg text-ink-dim">{arr(c.compliance?.points).map((p, i) => <li key={i}>{p}</li>)}</ul>
+            </div>
+          ))}
 
-          <section className="rounded-xl border border-accent/40 bg-surface-1 p-5">
-            <div className="text-base font-semibold uppercase tracking-wide text-accent">The investment</div>
-            <div className="mt-1 text-2xl font-extrabold text-ink">{c.investment?.tier_name || TIERS[tier].name} · {c.investment?.rate || TIERS[tier].rate}</div>
-            <ul className="mt-2 grid list-disc gap-1 pl-5 text-lg text-ink-dim sm:grid-cols-2">{arr(c.investment?.engine_includes).map((x, i) => <li key={i}>{x}</li>)}</ul>
-            {arr(c.investment?.notes).map((n, i) => <p key={i} className="mt-2 text-base text-ink-faint">{n}</p>)}
-          </section>
+          {section("investment", "The investment", (
+            <div>
+              <div className="text-2xl font-extrabold text-ink">{c.investment?.tier_name || TIERS[tier].name} · {c.investment?.rate || TIERS[tier].rate}</div>
+              <ul className="mt-2 grid list-disc gap-1 pl-5 text-lg text-ink-dim sm:grid-cols-2">{arr(c.investment?.engine_includes).map((x, i) => <li key={i}>{x}</li>)}</ul>
+              {arr(c.investment?.notes).map((n, i) => <p key={i} className="mt-2 text-base text-ink-faint">{n}</p>)}
+            </div>
+          ))}
 
-          {/* STRATEGIST GATE (Human Command). Review the draft: send it back with comments, or approve for the
-              final cut. The PDF only cuts after a human approves. */}
-          {!approved ? (
+          {/* THE FINAL GATE. The PDF only cuts after every section is approved. */}
+          {!locked ? (
             <div className="rounded-xl border border-[#fbbf24]/40 bg-surface-1 p-5">
-              <div className="text-lg font-bold text-[#fcd34d]">Strategist review · your gate</div>
-              <p className="mt-1 text-lg text-ink-dim">You have read the full proposal above. Add any comments to rework it, or approve it as is for the final cut. Nothing is client-ready until you approve.</p>
-              <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={4}
-                placeholder="Comments to rework (leave blank to accept as is). e.g. 'Lead the audience on the LinkedIn segment for the business-owner persona. Test TikTok, do not lead with it. Tighten the funnel note.'"
-                className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
+              <div className="text-lg font-bold text-[#fcd34d]">Your review · {approvedCount} of {activeSections.length} sections approved</div>
+              <p className="mt-1 text-lg text-ink-dim">Read each section above and approve it, or edit it by prompt and refine. Once every section is approved, the proposal is ready for the branded PDF. Nothing is client-ready until you approve.</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button onClick={() => gate("refine")} disabled={gateBusy || !comments.trim()} className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                <button onClick={() => gate("approve")} disabled={gateBusy || !allApproved}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
                   {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
-                  {gateBusy ? "Reworking…" : "Rework with my comments"}
+                  Approve the proposal →
                 </button>
-                <button onClick={() => gate("approve")} disabled={gateBusy} className="inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
-                  {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
-                  Approve as is →
-                </button>
+                {!allApproved && <span className="text-base text-ink-faint">Approve all {activeSections.length} sections to unlock the PDF.</span>}
               </div>
-              {/* The rework runs a full Fable-5 pass and can take a minute; show it right here, where the click was,
-                  not only in the status line far above (Gary: no visible spinner near the button). */}
-              {gateBusy && <div className="mt-3 text-lg text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
             </div>
           ) : (
             /* APPROVED -> the branded PDF (final cut). Client colours auto-detected, override if needed. */
@@ -326,15 +417,6 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
           )}
         </div>
       )}
-    </section>
-  );
-}
-
-function Blk({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl border border-line bg-surface-1 p-5">
-      <div className="text-base font-semibold uppercase tracking-wide text-ink-faint">{title}</div>
-      <div className="mt-2">{children}</div>
     </section>
   );
 }
