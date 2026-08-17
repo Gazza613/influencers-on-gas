@@ -49,8 +49,11 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
   // competitor_set CLAIMS - their subject IS the rival's name - so the map is never just the client alone.
   let comps = (await db().query(`select name from research_competitors where client_id = $1 order by created_at asc limit 12`, [clientId]).catch(() => [])) as { name: string }[];
   if (!comps.length) {
-    comps = (await db().query(`select distinct subject as name from research_claims where client_id = $1 and section = 'competitor_set' and coalesce(subject,'') <> '' order by subject limit 12`, [clientId]).catch(() => [])) as { name: string }[];
+    comps = (await db().query(`select distinct subject as name from research_claims where client_id = $1 and section in ('competitor_set','competitor') and coalesce(subject,'') <> '' order by subject limit 12`, [clientId]).catch(() => [])) as { name: string }[];
   }
+  // NEVER show the client as its own competitor (a research mis-file sometimes files the subject under 'competitor').
+  const clientKey = clientName.toLowerCase().replace(/^(the|a|an)\s+/, "").trim();
+  comps = comps.filter((c) => c.name && c.name.toLowerCase().replace(/^(the|a|an)\s+/, "").trim() !== clientKey);
 
   // Client CI: the proposal wears the CLIENT's real brand colours. Priority: a manual accent override (Human
   // Command) -> the cached palette we read from their site before -> read it now (homepage screenshot + vision,

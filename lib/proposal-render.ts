@@ -381,13 +381,13 @@ function ecosystemPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="margin-top:16px;">${layerLabel("Execution Layer")}<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">${ecoLight(ci, "POD III", "Audience Intelligence", "The right people, not the most people")}${ecoLight(ci, "POD IV", "Creative Studio", "Emotive StorySelling, tested at volume")}${ecoLight(ci, "POD V", "Channel Management", "Omnichannel media, tuned daily")}</div></div>`
     + `<div style="margin-top:16px;">${layerLabel("Conversion and Learning Layers")}<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">${ecoDark(ci, "POD VI", "PSI · Pre-Sales Intelligence", "Every enquiry scored for intent, in real time")}${ecoDark(ci, "POD VII", "PSI Conversion Dashboard", "The bridge from marketing to your team")}${ecoDark(ci, "POD VIII", "Media on GAS", "Identifies the metrics that matter. Learns and scales winners.")}</div></div>`
     // The flow AND the feedback loop as ONE block (the loop was a separate pill that floated in the page): the eight
-    // stages in sequence, then the loop-back that closes the system, so the closed loop reads at a glance.
-    + `<div style="margin-top:18px;background:#FFFFFF;border-radius:16px;padding:16px 20px 14px;box-shadow:0 6px 18px ${ci.shadow};">`
+    // stages in sequence, then the loop-back that closes the system, so the closed loop reads at a glance. margin-top:
+    // auto drops this box to the foot of the page so it closes on the footer (Gary: the lone tagline below it read as
+    // lost) with no floating single line beneath it.
+    + `<div style="margin-top:auto;background:#FFFFFF;border-radius:16px;padding:16px 20px 14px;box-shadow:0 6px 18px ${ci.shadow};">`
     +   `<div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};text-align:center;">How intelligence flows, then loops back to compound</div>`
     +   `<div style="display:flex;align-items:flex-start;justify-content:center;gap:5px;margin-top:12px;">${flow}</div>`
     +   `<div style="margin-top:14px;padding-top:12px;border-top:1px solid #EEE8F5;display:flex;align-items:center;justify-content:center;gap:10px;"><span style="width:22px;height:22px;border-radius:50%;background:${ci.accentGrad};display:inline-flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:13px;">&#8635;</span><span style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accentDeep};">Every outcome feeds back to sharpen the whole system</span></div></div>`
-    // The model in one line, pinned near the footer so the page closes strong instead of leaving dead space.
-    + `<div style="margin-top:auto;padding-top:16px;text-align:center;font-size:11px;line-height:1.6;color:${ci.body};"><b style="color:${ci.ink};">Human command, AI execution</b>, across all eight pods, on one loop that gets sharper every cycle.</div>`
     + footerLight(ci, d.brand_short, 7));
 }
 

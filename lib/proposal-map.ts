@@ -348,29 +348,31 @@ const deSlashTitle = (t: string): string => t.replace(/\s*\/\s*/g, " and ");
 // Split into a COMPLETE title + body: take the first full sentence (any length) or a leading "Title:" as the
 // title, the rest as the body. Never a mid-sentence fragment (Gary: "a headline should never be part of a
 // sentence... it ends mid sentence, I do not want that").
-// The proof-card TITLE must sit on ONE line so a grid of cards reads neatly (Gary). The card title column is narrow,
-// so we cap the title at ~50 chars: take the leading sentence when it is short enough, otherwise break at the first
-// natural clause break (comma/colon/semicolon/dash) within the cap, else a word boundary. Whatever is trimmed off is
-// folded to the FRONT of the body (capitalised, leading punctuation stripped) so no content is ever lost.
-const TITLE_MAX = 50;
+// The proof-card TITLE is the headline; the body starts with a COMPLETE sentence. Take the first full sentence as the
+// title and the rest as the body. Only clamp a genuinely long headline, and NEVER orphan a tiny fragment (e.g. a
+// trailing "it") into the body start as "It." (Gary): if clamping would leave a short remainder, keep the whole
+// sentence as the headline instead. A slightly longer, complete headline beats a body that opens on a fragment.
+const TITLE_MAX = 62;
 const capFirst = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 function splitTitleBody(w: string): { title: string; body: string } {
   w = String(w || "").trim();
   const m = w.match(/^([\s\S]+?[.:!?])\s+([\s\S]+)$/);
   let title = w, body = "";
   if (m && m[1].replace(/[.:!?]$/, "").trim().length >= 6) { title = m[1].replace(/[.:!?]$/, "").trim(); body = m[2].trim(); }
-  // Title still too long for one line: clamp it and push the overflow into the body.
+  // Only clamp a genuinely long headline, and only when the overflow is a substantial chunk (>= 18 chars). A tiny
+  // remainder would open the body on an orphaned fragment, which reads worse than a slightly longer headline.
   if (title.length > TITLE_MAX) {
     const head = title.slice(0, TITLE_MAX);
     const brk = Math.max(head.lastIndexOf(", "), head.lastIndexOf("; "), head.lastIndexOf(": "), head.lastIndexOf(" - "), head.lastIndexOf(" — "));
-    const cut = brk > 14 ? brk : (head.replace(/\s+\S*$/, "").length || TITLE_MAX);
+    const cut = brk > 20 ? brk : (head.replace(/\s+\S*$/, "").length || TITLE_MAX);
     const overflow = title.slice(cut).replace(/^[\s,;:.\-–—]+/, "").trim();
-    title = title.slice(0, cut).trim();
-    body = overflow ? capFirst(overflow) + (body ? ". " + body : "") : body;
+    if (overflow.length >= 18) {
+      title = title.slice(0, cut).trim();
+      body = capFirst(overflow) + (body ? ". " + body : "");
+    }
   }
   return { title: deSlashTitle(title), body };
 }
-// Bound a string to n chars on a WORD boundary with an ellipsis, so a fixed-height card never clips mid-sentence.
 // Bound a string to n chars on a WORD boundary. NO ellipsis (Gary: "…" reads as a cut-off sentence and should never
 // appear). A clean word-boundary trim is used only as a last resort; prefer clipSentence for prose.
 const clip = (s: string, n: number): string => { s = String(s || "").trim(); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, "").trimEnd() : s; };
