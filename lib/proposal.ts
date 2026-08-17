@@ -385,7 +385,7 @@ export async function sharpenProposal(proposalId: string, userEmail?: string | n
   const rows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
   const cur = rows[0];
   if (!cur) throw new Error("That proposal was not found.");
-  if (cur.status === "approved") throw new Error("That proposal is approved. Reopen it to sharpen.");
+  // Sharpen works from any state; an approved proposal is simply reopened (the update below sets awaiting_approval).
   if (!cur.content || !cur.strategy_id) throw new Error("This proposal has no content to sharpen.");
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected.");
@@ -410,7 +410,7 @@ export async function sharpenProposal(proposalId: string, userEmail?: string | n
   if (!content) throw new Error("The sharpen pass came back empty. Try again.");
   content = repairLeakedContent(content);
   const upd = (await db().query(
-    `update proposals set content = $2, status = 'awaiting_approval', pdf_url = null, section_review = '{}'::jsonb where id = $1 returning *`,
+    `update proposals set content = $2, status = 'awaiting_approval', approved_by = null, approved_at = null, pdf_url = null, section_review = '{}'::jsonb where id = $1 returning *`,
     [proposalId, JSON.stringify(content)],
   )) as Proposal[];
   return upd[0];

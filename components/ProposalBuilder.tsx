@@ -260,23 +260,22 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
       {c && (
         <div className="mt-6 space-y-6">
           {/* SHARPEN: a dedicated pass that makes the whole proposal read short, plain and sharp in the PSI funnel
-              voice, keeping every fact and the structure (Gary: too high-level, hard to read). */}
-          {!locked && (
-            <div className="rounded-xl border border-[#4ade80]/40 bg-surface-1 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-lg font-bold text-[#86efac]">✦ Sharpen the whole proposal</div>
-                  <p className="mt-0.5 text-base text-ink-dim">One pass that rewrites every section shorter, plainer and sharper in our PSI funnel voice, keeping every fact, figure and the structure. Fixes the &quot;too high-level, hard to read&quot; feel in one go.</p>
-                </div>
-                <button onClick={sharpen} disabled={gateBusy}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
-                  {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
-                  {gateBusy ? "Sharpening…" : "Sharpen it"}
-                </button>
+              voice, keeping every fact and the structure (Gary: too high-level, hard to read). Always available: on an
+              approved proposal it simply reopens it for review. */}
+          <div className="rounded-xl border border-[#4ade80]/40 bg-surface-1 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-lg font-bold text-[#86efac]">✦ Sharpen the whole proposal</div>
+                <p className="mt-0.5 text-base text-ink-dim">One pass that rewrites every section shorter, plainer and sharper in our PSI funnel voice, keeping every fact, figure and the structure. Fixes the &quot;too high-level, hard to read&quot; feel in one go.{locked ? " This reopens the proposal for review." : ""}</p>
               </div>
-              {gateBusy && <div className="mt-3 text-base text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
+              <button onClick={sharpen} disabled={gateBusy}
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+                {gateBusy ? "Sharpening…" : "Sharpen it"}
+              </button>
             </div>
-          )}
+            {gateBusy && <div className="mt-3 text-base text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
+          </div>
 
           {/* DOCUMENT-LEVEL change: one instruction applied across every section (Gary: don't make me repeat a global
               change in each section). Reworks the whole draft from the current content, keeping it consistent. */}
