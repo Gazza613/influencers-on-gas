@@ -207,23 +207,59 @@ export async function buildProposal(strategyId: string, input: { objective: Obje
     `THE VERIFIED RESEARCH FACTS (ground the opportunity, audience and pods in these):\n${factBlock}${priorBlock}${notesBlock}\n\n` +
     `Write the full proposal via write_proposal. Make the audience and channels world-class and specific.`;
 
-  // strict:true is REQUIRED on Fable 5: without it, Fable leaks the textual tool-call format (nested object fields
-  // come back as strings containing <parameter name="...">) instead of proper nested JSON. Strict tool use guarantees
-  // the tool input validates exactly against the schema, so every nested section is a real object. Our schema is
-  // strict-compatible (additionalProperties:false + full required lists, enum-only constraints).
-  const tool: Anthropic.Tool = { name: "write_proposal", description: "The complete, structured growth proposal.", input_schema: CONTENT_SCHEMA, strict: true };
+  // Fable 5 occasionally leaks the textual tool-call format into nested fields (whole sections come back as strings
+  // containing <parameter name="...">) instead of proper nested JSON. strict:true fixes it but 400s here ("compiled
+  // grammar too large") because the full 14-section schema is too big to compile a strict grammar. So instead: DETECT
+  // the leak and RETRY once (the failure is intermittent), then best-effort repair any residual leaked section.
+  const tool: Anthropic.Tool = { name: "write_proposal", description: "The complete, structured growth proposal.", input_schema: CONTENT_SCHEMA };
   // max_tokens must clear the FULL proposal: 5 personas with platform-level selections, 8 pods, KPIs, rollout,
   // compliance AND investment are the LAST fields, so a tight ceiling truncates exactly those (the "blank
   // investment / rollout / compliance" bug). 32k gives ample headroom for the whole structured object.
-  const msg = await withAnthropicRetry(() => client.messages.stream({
-    model: FABLE, max_tokens: 32000, system: SYSTEM(clientName, objective.label, tier),
-    tools: [tool], tool_choice: { type: "tool", name: "write_proposal" },
-    messages: [{ role: "user", content: user }],
-  }).finalMessage());
-  await meterClaude(msg, { clientId, userEmail: input.userEmail ?? null, model: FABLE, action: "proposal-build" }).catch(() => {});
-  const content = extract(msg);
+  const runOnce = async (action: string): Promise<ProposalContent | null> => {
+    const msg = await withAnthropicRetry(() => client.messages.stream({
+      model: FABLE, max_tokens: 32000, system: SYSTEM(clientName, objective.label, tier),
+      tools: [tool], tool_choice: { type: "tool", name: "write_proposal" },
+      messages: [{ role: "user", content: user }],
+    }).finalMessage());
+    await meterClaude(msg, { clientId, userEmail: input.userEmail ?? null, model: FABLE, action }).catch(() => {});
+    return extract(msg);
+  };
+  let content = await runOnce("proposal-build");
+  // If Fable leaked the tool-call format into the sections, run it once more (it is intermittent), then repair.
+  if (content && leakedContent(content)) content = (await runOnce("proposal-build-retry")) || content;
   if (!content) throw new Error("The proposal draft came back empty. Try again.");
+  content = repairLeakedContent(content);
   return { content, clientId, engagementId, campaignId };
+}
+
+// ── Fable tool-call-leak detection + best-effort repair ──────────────────────────────────────────────────────
+// The top-level content sections that are OBJECTS (not arrays/strings); these are the ones Fable can return as a
+// <parameter>-laced string instead of a nested object.
+const PROPOSAL_OBJECT_SECTIONS: (keyof ProposalContent)[] = ["exec_summary", "opportunity", "audience", "strategy", "market_intel", "channels", "funnel", "compliance", "investment", "psi_chat"];
+function leakedContent(c: ProposalContent): boolean {
+  try { return JSON.stringify(c).includes("<parameter name="); } catch { return false; }
+}
+// Parse a leaked "<parameter name="X">value<parameter name="Y">value" string back into an object, best-effort.
+function parseParamString(s: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const re = /<parameter name="([^"]+)">([\s\S]*?)(?=<parameter name="|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) out[m[1].trim()] = m[2].trim();
+  return out;
+}
+// Recover any section Fable returned as a leaked string, and strip stray tags from the top-level strings. Missing
+// sub-fields stay absent and are filled by the map's per-section fallbacks (e.g. the exec-summary cards synthesiser).
+function repairLeakedContent(c: ProposalContent): ProposalContent {
+  const rec = c as unknown as Record<string, unknown>;
+  for (const k of PROPOSAL_OBJECT_SECTIONS) {
+    const v = rec[k as string];
+    if (typeof v === "string" && v.includes("<parameter name=")) rec[k as string] = parseParamString(v);
+  }
+  for (const k of ["headline", "subhead"]) {
+    const v = rec[k];
+    if (typeof v === "string" && v.includes("<parameter name=")) rec[k] = v.replace(/<parameter name="[^"]*">/g, " ").replace(/\s{2,}/g, " ").trim();
+  }
+  return c;
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -329,7 +365,7 @@ export async function refineProposalSection(proposalId: string, section: string,
   const props: Record<string, unknown> = {};
   for (const f of def.fields) props[f] = CONTENT_PROPS[f as string];
   const sectionSchema = { type: "object", additionalProperties: false, properties: props, required: def.fields } as unknown as Anthropic.Tool["input_schema"];
-  const tool: Anthropic.Tool = { name: "write_section", description: `The revised "${def.label}" section only.`, input_schema: sectionSchema, strict: true };
+  const tool: Anthropic.Tool = { name: "write_section", description: `The revised "${def.label}" section only.`, input_schema: sectionSchema };
   const curSection: Record<string, unknown> = {};
   for (const f of def.fields) curSection[f] = (cur.content as unknown as Record<string, unknown>)[f as string];
 
@@ -343,15 +379,23 @@ export async function refineProposalSection(proposalId: string, section: string,
     `Rewrite the section via write_section. Keep every doctrine and writing rule, keep it consistent with the rest of the proposal, and change only what the instruction asks for.`;
 
   const client = new Anthropic({ apiKey: key });
-  const msg = await withAnthropicRetry(() => client.messages.stream({
-    model: FABLE, max_tokens: 12000, system: SYSTEM(clientName, objective.label, tier),
-    tools: [tool], tool_choice: { type: "tool", name: "write_section" },
-    messages: [{ role: "user", content: user }],
-  }).finalMessage());
-  await meterClaude(msg, { clientId, userEmail: userEmail ?? null, model: FABLE, action: "proposal-section" }).catch(() => {});
-  const b = msg.content.find((x) => x.type === "tool_use");
-  const revised = b && b.type === "tool_use" ? (b.input as Record<string, unknown>) : null;
+  // Same Fable leak guard as the full build (strict would 400 on a big section's grammar): detect + retry once.
+  const runSection = async (action: string): Promise<Record<string, unknown> | null> => {
+    const msg = await withAnthropicRetry(() => client.messages.stream({
+      model: FABLE, max_tokens: 12000, system: SYSTEM(clientName, objective.label, tier),
+      tools: [tool], tool_choice: { type: "tool", name: "write_section" },
+      messages: [{ role: "user", content: user }],
+    }).finalMessage());
+    await meterClaude(msg, { clientId, userEmail: userEmail ?? null, model: FABLE, action }).catch(() => {});
+    const b = msg.content.find((x) => x.type === "tool_use");
+    return b && b.type === "tool_use" ? (b.input as Record<string, unknown>) : null;
+  };
+  const sectionLeaked = (o: Record<string, unknown> | null) => { try { return !!o && JSON.stringify(o).includes("<parameter name="); } catch { return false; } };
+  let revised = await runSection("proposal-section");
+  if (sectionLeaked(revised)) revised = (await runSection("proposal-section-retry")) || revised;
   if (!revised) throw new Error("The section came back empty. Try again.");
+  // Repair any field this section returned as a leaked <parameter> string.
+  for (const f of def.fields) { const v = revised[f as string]; if (typeof v === "string" && v.includes("<parameter name=")) revised[f as string] = parseParamString(v); }
 
   // Merge ONLY this section's fields back into the full content, leaving everything else intact.
   const content = { ...(cur.content as unknown as Record<string, unknown>) };
