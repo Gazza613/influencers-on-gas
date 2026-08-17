@@ -904,6 +904,12 @@ const signalBar = (ci: CiTokens, label: string, pct: number) =>
   `<div style="margin-top:9px;"><div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.8);margin-bottom:3px;"><span>${esc(label)}</span><span style="color:${ci.accentOnDark};font-weight:700;">${pct}</span></div>`
   + `<div style="height:6px;border-radius:999px;background:rgba(255,255,255,0.12);overflow:hidden;"><div style="height:6px;width:${pct}%;border-radius:999px;background:${ci.accentGrad};"></div></div></div>`;
 
+// Sharp-deck footers: the brand line only, no page number (cleaner for a creative deck; no renumber churn on reorder).
+const sFootLight = (ci: CiTokens, brand: string) =>
+  `<div style="margin-top:auto;padding-top:14px;border-top:1px solid rgba(26,16,48,0.12);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};"><span>GAS Marketing Automation · The Agency of NOW</span><span>${esc(brand)}</span></div>`;
+const sFootDark = (brand: string, mt = "14px") =>
+  `<div style="margin-top:${mt};padding-top:14px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);"><span>GAS Marketing Automation · The Agency of NOW</span><span>${esc(brand)}</span></div>`;
+
 // ── S01 COVER (dark) — same wedge cover, sequential footer ────────────────────────────────────────────────────
 function sCoverPage(d: ProposalDoc, ci: CiTokens): string {
   const logo = `<div style="margin-left:auto;font-weight:800;font-size:19px;letter-spacing:0.08em;text-transform:uppercase;color:#FFFFFF;">${esc(d.client_name)}</div>`;
@@ -923,33 +929,72 @@ function sCoverPage(d: ProposalDoc, ci: CiTokens): string {
     + `</section>`;
 }
 
-// ── S02 THE OPPORTUNITY (light) — big-number stats + a proportional funnel + definition of success ─────────────
-const SHARP_FUNNEL_W = ["100%", "84%", "68%", "52%", "38%", "26%"];
+// ── S03 THE OPPORTUNITY (light) — six sourced big-number stat cards + the definition of success ────────────────
 function sOpportunityPage(d: ProposalDoc, ci: CiTokens): string {
-  const stats = d.opportunity.stat_cards.slice(0, 3).map((s) =>
-    `<div style="flex:1;background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="font-size:30px;font-weight:800;line-height:1;color:${ci.accent};">${esc(s.stat)}</div>`
-    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:7px;">${esc(s.body)}</div></div>`).join("");
-  const bar = (label: string, i: number) =>
-    `<div style="display:flex;justify-content:center;"><div style="width:${SHARP_FUNNEL_W[i] || "26%"};min-width:120px;background:${ci.darkCard};border-radius:9px;padding:8px 14px;color:#FFFFFF;font-size:10px;font-weight:600;text-align:center;">${esc(label)}</div></div>`;
+  const stats = d.opportunity.stat_cards.slice(0, 6).map((s) =>
+    `<div style="background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};height:100%;display:flex;flex-direction:column;">`
+    + `<div style="display:flex;align-items:flex-start;gap:9px;">${disc(ci, 26, s.icon)}<div style="font-size:22px;font-weight:800;line-height:1.02;color:${ci.accent};">${esc(s.stat)}</div></div>`
+    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:7px;">${esc(s.body)}</div>`
+    + `<div style="margin-top:auto;padding-top:9px;font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(s.source)}</div></div>`).join("");
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "The Opportunity") + headline(ci, d.opportunity.headline)
     + `<p style="font-size:12px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.opportunity.paras[0] || "")}</p>`
-    + `<div style="display:flex;gap:12px;margin-top:16px;">${stats}</div>`
-    + `<div style="margin-top:20px;background:#FFFFFF;border-radius:18px;padding:18px 22px;box-shadow:0 6px 18px ${ci.shadow};">`
-    +   `<div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};text-align:center;margin-bottom:12px;">Interest, narrowed to intent</div>`
-    +   `<div style="display:flex;flex-direction:column;gap:7px;">${d.funnel.bars.slice(0, 6).map(bar).join("")}</div>`
-    +   `<div style="font-size:8.5px;line-height:1.5;color:${ci.muted};margin-top:12px;text-align:center;font-style:italic;">${esc(d.funnel.disclaimer)}</div>`
-    + `</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;align-items:stretch;">${stats}</div>`
     + `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:18px 24px;color:#FFFFFF;">`
     +   `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">The definition of success</div>`
     +   `<div style="font-size:12px;line-height:1.65;margin-top:6px;color:rgba(255,255,255,0.9);">${esc(d.opportunity.success_body)}</div></div>`
-    + footerLight(ci, d.brand_short, 2));
+    + sFootLight(ci, d.brand_short));
+}
+
+// ── S02 EXECUTIVE SUMMARY (light) — intro + 4 cards + the fixed journey strip ──────────────────────────────────
+function sExecPage(d: ProposalDoc, ci: CiTokens): string {
+  const cards = d.exec.cards.slice(0, 4).map((c) => card(ci, "15px 18px",
+    `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 34, c.icon)}<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${esc(c.title)}</div></div>`
+    + `<p style="font-size:10.5px;line-height:1.6;color:${ci.muted};margin:6px 0 0;">${esc(c.body)}</p>`)).join("");
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Executive Summary") + headline(ci, d.exec.headline)
+    + `<p style="font-size:11.5px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.exec.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;flex:1;">${cards}</div>`
+    + journeyStrip(ci) + sFootLight(ci, d.brand_short));
+}
+
+// ── S04 MARKET INTELLIGENCE (light) — intro + six "what we do about it" recommendation cards ───────────────────
+function sMarketPage(d: ProposalDoc, ci: CiTokens): string {
+  const actions = d.market.actions.slice(0, 6).map((a) => proofCard(ci, a.title, a.body)).join("");
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Market Intelligence") + headline(ci, d.market.headline)
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.market.intro)}</p>`
+    + miniEyebrow(ci, "What we do about it", "16px")
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">${actions}</div>`
+    + sFootLight(ci, d.brand_short));
+}
+
+// ── S05 COMPETITIVE POSITIONING (light) — the positioning map + the named competitor set ──────────────────────
+function sCompetitorsPage(d: ProposalDoc, ci: CiTokens): string {
+  const m = d.pods12.map;
+  const dot = (c: { name: string; note: string; left: string; top: string }) =>
+    `<div style="position:absolute;left:${c.left};top:${c.top};display:flex;align-items:center;gap:5px;"><div style="width:11px;height:11px;border-radius:50%;background:#B7AECB;"></div><div style="font-size:9px;font-weight:700;color:${ci.muted};">${esc(c.name)} <span style="font-weight:400;">· ${esc(c.note)}</span></div></div>`;
+  const clientDot = `<div style="position:absolute;left:${m.client.left};top:${m.client.top};display:flex;align-items:center;gap:6px;"><div style="width:15px;height:15px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 12px ${ci.glow};"></div><div style="font-size:10px;font-weight:800;color:${ci.accentDeep};">${esc(m.client.name)} <span style="font-weight:400;color:${ci.muted};">· ${esc(m.client.note)}</span></div></div>`;
+  const axisLbl = (pos: string, t: string) => `<div style="position:absolute;${pos};font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8496;">${esc(t)}</div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Competitive Positioning") + headline(ci, { lead: "Where you win,", gradient: "and who you beat" })
+    + `<div style="margin-top:16px;background:#FFFFFF;border-radius:16px;padding:16px 22px;box-shadow:0 6px 18px ${ci.shadow};">`
+    +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:22px;">${esc(m.title)}</div>`
+    +   `<div style="position:relative;height:220px;border-left:2px solid #E4DEEF;border-bottom:2px solid #E4DEEF;margin:0 16px 22px 16px;">`
+    +     axisLbl("left:-12px;top:-16px", m.y_top) + axisLbl("left:-12px;bottom:-16px", m.y_bottom)
+    +     axisLbl("right:0;bottom:-16px", m.x_right) + axisLbl("left:16%;bottom:-16px", m.x_left)
+    +     m.competitors.map(dot).join("") + clientDot
+    +   `</div></div>`
+    + (m.set && m.set.length ? `<div style="margin-top:14px;background:#FFFFFF;border-radius:16px;padding:16px 22px;box-shadow:0 6px 18px ${ci.shadow};">`
+        + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:10px;">The named competitor set</div>`
+        + `<div style="display:flex;flex-wrap:wrap;gap:7px;">${m.set.map((n) => `<span style="background:${ci.tint};border-radius:999px;padding:5px 14px;font-size:10px;font-weight:600;color:${ci.accentDeep};">${esc(n)}</span>`).join("")}</div>`
+        + `<div style="font-size:10px;line-height:1.6;color:${ci.body};margin-top:12px;">The direct and adjacent rivals the Researcher tracks. Every targeting and message decision is checked against this set, so ${esc(d.client_name)} moves on evidence, not assumption.</div></div>` : "")
+    + sFootLight(ci, d.brand_short));
 }
 
 // ── S03 WHY WE WIN (light) — the wedge + argument + 4 proofs + the belief→buy→outcome flow ─────────────────────
 function sEdgePage(d: ProposalDoc, ci: CiTokens): string {
-  const proofs = d.strategy.proof_cards.slice(0, 4).map((c) => proofCard(ci, c.title, c.body)).join("");
+  const proofs = d.strategy.proof_cards.slice(0, 6).map((c) => proofCard(ci, c.title, c.body)).join("");
   const node = (icon: string, label: string, sub: string) =>
     `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 30, icon)}<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">${esc(label)}</div><div style="font-size:8.5px;color:${ci.muted};line-height:1.4;">${esc(sub)}</div></div></div>`;
   const flow = stripCard(ci, "How the argument lands",
@@ -962,7 +1007,7 @@ function sEdgePage(d: ProposalDoc, ci: CiTokens): string {
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:14px 0 0;">${esc(d.strategy.argument)}</p>`
     + miniEyebrow(ci, "Why this wedge wins", "16px")
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">${proofs}</div>`
-    + flow + footerLight(ci, d.brand_short, 3));
+    + flow + sFootLight(ci, d.brand_short));
 }
 
 // ── S04 ONE CLOSED-LOOP SYSTEM (dark) — the six-step wheel (shared loop constants) ─────────────────────────────
@@ -983,7 +1028,7 @@ function sSystemPage(d: ProposalDoc, ci: CiTokens): string {
     +   `<div style="position:absolute;left:310px;top:346px;transform:translateX(-50%);width:220px;text-align:center;"><div style="font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">The Agency of NOW</div><div style="font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;margin-top:4px;color:${ci.accentOnDark};">From Interest to Intent</div></div>`
     + `</div></div>`
     + `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:14px 20px;margin-bottom:22px;"><p style="font-size:11px;line-height:1.65;margin:0;color:rgba(255,255,255,0.82);"><strong style="color:${ci.accentOnDark};">The compounding mechanism.</strong> ${esc(d.closedloop.compounding)}</p></div>`
-    + footerDark(d.brand_short, 4));
+    + sFootDark(d.brand_short));
 }
 
 // ── S05 THE AUDIENCE (light) — 4 personas + geo + the targeting matrix ────────────────────────────────────────
@@ -994,26 +1039,39 @@ function sAudiencePage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:7px;font-style:italic;">&ldquo;${esc(p.quote)}&rdquo;</div></div>`;
   const geoChip = (c: { label: string; accent: boolean }) =>
     `<span style="background:${c.accent ? ci.accent : ci.tint};color:${c.accent ? "#FFFFFF" : ci.accentDeep};border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(c.label)}</span>`;
+  const budget = (b: { label: string; body: string; flex: number }) =>
+    `<div style="flex:${b.flex || 1};background:${ci.tint};border-radius:12px;padding:11px 14px;"><div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accentDeep};">${esc(b.label)}</div><div style="font-size:9.5px;line-height:1.5;color:${ci.body};margin-top:4px;">${esc(b.body)}</div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "The Audience") + headline(ci, d.audience.headline)
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.audience.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">${d.audience.personas.slice(0, 4).map(persona).join("")}</div>`
+    + `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;align-items:center;"><span style="font-size:8.5px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};margin-right:4px;">${esc(d.audience.geo_label)}</span>${d.audience.geo_chips.map(geoChip).join("")}</div>`
+    + (d.audience.budget && d.audience.budget.length ? `<div style="margin-top:auto;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:8px;">Where the budget leans</div><div style="display:flex;gap:10px;">${d.audience.budget.slice(0, 3).map(budget).join("")}</div></div>` : "")
+    + sFootLight(ci, d.brand_short));
+}
+
+// ── S10 TARGETING (light) — the segment rows + the who-leads-on-which-channel matrix ──────────────────────────
+function sTargetingPage(d: ProposalDoc, ci: CiTokens): string {
+  const t = d.targeting;
+  const segRow = (r: { name: string; platforms: string; segments: { label: string; text: string }[] }) =>
+    `<div style="background:#FFFFFF;border-radius:12px;padding:12px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-size:11.5px;font-weight:800;">${esc(r.name)}</div><div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(r.platforms)}</div></div>`
+    + `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;">${r.segments.slice(0, 6).map((s) => `<span style="background:${ci.tint};border-radius:8px;padding:4px 10px;font-size:8.5px;color:${ci.accentDeep};"><strong>${esc(s.label)}:</strong> ${esc(s.text)}</span>`).join("")}</div></div>`;
   const cell = (k: "lead" | "support" | "test") => {
     const map = { lead: [ci.accentGrad, "#FFFFFF", "Lead"], support: [ci.accentDeep, "#FFFFFF", "Support"], test: [ci.tint, ci.accentDeep, "Test"] } as const;
     const [bg, fg, lb] = map[k];
     return `<div style="text-align:center;padding:5px 2px;"><span style="display:inline-block;background:${bg};color:${fg};border-radius:999px;padding:2px 9px;font-size:7.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${lb}</span></div>`;
   };
-  const mx = d.targeting.matrix;
+  const mx = t.matrix;
   const cols = `130px repeat(${mx.channels.length}, 1fr)`;
-  const head = `<div style="display:grid;grid-template-columns:${cols};align-items:end;gap:2px;">`
-    + `<div></div>` + mx.channels.map((c) => `<div style="text-align:center;font-size:7.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${ci.accent};">${esc(c)}</div>`).join("") + `</div>`;
+  const head = `<div style="display:grid;grid-template-columns:${cols};align-items:end;gap:2px;"><div></div>${mx.channels.map((c) => `<div style="text-align:center;font-size:7.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${ci.accent};">${esc(c)}</div>`).join("")}</div>`;
   const rows = mx.rows.map((r) =>
-    `<div style="display:grid;grid-template-columns:${cols};align-items:center;gap:2px;border-top:1px solid #EEE8F5;">`
-    + `<div style="font-size:9px;font-weight:700;color:${ci.body};padding:5px 0;">${esc(r.persona)}</div>`
-    + r.cells.slice(0, mx.channels.length).map(cell).join("") + `</div>`).join("");
+    `<div style="display:grid;grid-template-columns:${cols};align-items:center;gap:2px;border-top:1px solid #EEE8F5;"><div style="font-size:9px;font-weight:700;color:${ci.body};padding:5px 0;">${esc(r.persona)}</div>${r.cells.slice(0, mx.channels.length).map(cell).join("")}</div>`).join("");
   return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "The Audience") + headline(ci, d.audience.headline)
-    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.audience.intro)}</p>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">${d.audience.personas.slice(0, 4).map(persona).join("")}</div>`
-    + `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;align-items:center;"><span style="font-size:8.5px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};margin-right:4px;">${esc(d.audience.geo_label)}</span>${d.audience.geo_chips.map(geoChip).join("")}</div>`
+    eyebrow(ci, "Targeting") + headline(ci, t.headline)
+    + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:16px;">${t.rows.slice(0, 4).map(segRow).join("")}</div>`
     + `<div style="margin-top:auto;background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:10px;">Who leads on which channel</div>${head}${rows}</div>`
-    + footerLight(ci, d.brand_short, 5));
+    + sFootLight(ci, d.brand_short));
 }
 
 // ── S06 THE CREATIVE (light) — StorySelling + a live FB ad mock + the channel plan ────────────────────────────
@@ -1037,8 +1095,45 @@ function sCreativePage(d: ProposalDoc, ci: CiTokens): string {
     +   `<div>${fbAd}</div>`
     +   `<div><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">Built for every placement</div><div style="display:flex;flex-direction:column;gap:8px;">${d.creative.asset_formats.slice(0, 4).map(fmt).join("")}</div></div>`
     + `</div>`
-    + `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:14px 20px;color:#FFFFFF;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:8px;">The channel plan</div><div style="display:flex;flex-wrap:wrap;gap:7px;">${d.channels5.rows.slice(0, 5).map((r) => `<span style="background:rgba(255,255,255,0.1);border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(r.name)} <span style="color:${ci.accentOnDark};font-weight:700;">· ${esc(r.role)}</span></span>`).join("")}</div></div>`
-    + footerLight(ci, d.brand_short, 6));
+    + `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:14px 20px;color:#FFFFFF;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:8px;">The channel plan, at a glance</div><div style="display:flex;flex-wrap:wrap;gap:7px;">${d.channels5.rows.slice(0, 5).map((r) => `<span style="background:rgba(255,255,255,0.1);border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(r.name)} <span style="color:${ci.accentOnDark};font-weight:700;">· ${esc(r.role)}</span></span>`).join("")}</div></div>`
+    + sFootLight(ci, d.brand_short));
+}
+
+// ── S12 THE CHANNEL PLAN (light) — the five channels, each with role, what and why + reach hook ────────────────
+function sChannelsPage(d: ProposalDoc, ci: CiTokens): string {
+  const roleBg = (k: "lead" | "support" | "test") => k === "lead" ? ci.accentGrad : k === "support" ? ci.accentDeep : ci.accent;
+  const reachTag = (r: string) => r ? `<div style="margin-left:auto;text-align:right;flex-shrink:0;"><div style="font-size:13px;font-weight:800;color:${ci.accent};line-height:1;">${esc(r)}</div><div style="font-size:7px;letter-spacing:0.14em;text-transform:uppercase;color:${ci.muted};margin-top:2px;">reach in market</div></div>` : "";
+  const row = (r: (typeof d.channels5.rows)[number]) =>
+    `<div style="background:#FFFFFF;border-radius:12px;padding:12px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 26, r.icon)}<div style="font-size:11.5px;font-weight:700;">${esc(r.name)}</div><div style="background:${roleBg(r.kind)};border-radius:999px;padding:3px 10px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#FFFFFF;">${esc(r.role)}</div>${reachTag(r.reach || "")}</div>`
+    + `<div style="font-size:9.8px;line-height:1.55;color:${ci.body};margin-top:5px;">${esc(r.what)}</div>`
+    + `<div style="font-size:9.3px;line-height:1.5;color:${ci.muted};margin-top:4px;font-style:italic;">${esc(r.why)}</div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "The Channel Plan") + headline(ci, { lead: "Omnichannel media,", gradient: "tuned daily" })
+    + `<p style="font-size:11px;line-height:1.6;color:${ci.body};margin:12px 0 0;">${esc(d.channels5.intro)}</p>`
+    + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:14px;">${d.channels5.rows.slice(0, 5).map(row).join("")}</div>`
+    + sFootLight(ci, d.brand_short));
+}
+
+// ── S13 MEDIA & PLACEMENTS (light) — where the work runs: the asset formats/placements + the flighting logic ───
+function sMediaPage(d: ProposalDoc, ci: CiTokens): string {
+  const fmt = (a: { ratio: string; icon: string; title: string; caption: string }) =>
+    `<div style="background:#FFFFFF;border-radius:14px;padding:14px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 28, a.icon)}<div><div style="font-size:11px;font-weight:700;">${esc(a.title)}</div><div style="font-size:8.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accent};">${esc(a.ratio)}</div></div></div>`
+    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:8px;">${esc(a.caption)}</div></div>`;
+  const flight = (label: string, body: string) =>
+    `<div style="flex:1;background:${ci.darkCard};border-radius:12px;padding:12px 15px;color:#FFFFFF;"><div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accentOnDark};">${label}</div><div style="font-size:9.5px;line-height:1.5;color:rgba(255,255,255,0.82);margin-top:4px;">${body}</div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Media and Placements") + headline(ci, { lead: "Right placement,", gradient: "right moment" })
+    + `<p style="font-size:11px;line-height:1.6;color:${ci.body};margin:12px 0 0;">${esc(d.creative.for_client || d.creative.intro)}</p>`
+    + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin:16px 0 9px;">Built for every placement</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${d.creative.asset_formats.slice(0, 4).map(fmt).join("")}</div>`
+    + `<div style="margin-top:auto;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:8px;">How we flight the media</div><div style="display:flex;gap:10px;">`
+    +   flight("Test", "Multiple hooks and audiences run small, side by side, from day one.")
+    +   flight("Concentrate", "Budget moves to the winning placements and creative, on evidence.")
+    +   flight("Scale", "Winners scale; fatigued creative is refreshed before it costs you.")
+    + `</div></div>`
+    + sFootLight(ci, d.brand_short));
 }
 
 // A ring donut of intent distribution (HOT/WARM/COLD), matching the funnel's live distribution chart.
@@ -1093,7 +1188,27 @@ function sPsiPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;position:relative;">${leadCard}${distCard}</div>`
     + `<div style="margin-top:20px;position:relative;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:9px;">The score routes itself</div><div style="display:flex;flex-direction:column;gap:8px;">${bands.map(routeRow).join("")}</div></div>`
     + `<div style="margin-top:auto;padding-top:20px;position:relative;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;"><div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:12px 16px;"><div style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);">The old way</div><div style="font-size:10.5px;line-height:1.5;color:rgba(255,255,255,0.7);margin-top:4px;">Chase every lead. Burn the team on tyre-kickers who were never going to buy.</div></div><div style="background:${ci.accentGrad};border-radius:12px;padding:12px 16px;"><div style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.85);">The PSI way</div><div style="font-size:10.5px;line-height:1.5;color:#FFFFFF;font-weight:600;margin-top:4px;">Your team only ever speaks to the ones ready to buy.</div></div></div></div>`
-    + footerDark(d.brand_short, 7));
+    + sFootDark(d.brand_short));
+}
+
+// ── S15 FUNNEL ECONOMICS & KPIs (light) — the six stages as EQUAL measured cards (no step-down) + KPI table ────
+function sFunnelPage(d: ProposalDoc, ci: CiTokens): string {
+  const stageCard = (label: string, i: number) =>
+    `<div style="display:flex;align-items:center;gap:12px;background:#FFFFFF;border-radius:12px;padding:11px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="width:26px;height:26px;border-radius:50%;background:${ci.iconDisc};color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0;">${i + 1}</div>`
+    + `<div style="flex:1;font-size:10.5px;font-weight:600;color:${ci.body};line-height:1.4;">${esc(label)}</div>`
+    + (i < 5 ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${ci.arrow}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg>` : `<span style="font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};flex-shrink:0;">Enrolled</span>`)
+    + `</div>`;
+  const th = (t: string) => `<div style="padding:7px 12px;background:${ci.darkCard};color:#FFFFFF;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;font-size:8.5px;">${t}</div>`;
+  const td = (t: string, bold: boolean) => `<div style="padding:7px 12px;border-top:1px solid #EEE8F5;color:${bold ? ci.body : ci.muted};${bold ? "font-weight:700;" : ""}">${esc(t)}</div>`;
+  const rows = d.funnel.kpis.slice(0, 5).map((k) => td(k.metric, true) + td(k.why, false) + td(k.baseline, false)).join("");
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Funnel Economics and KPIs") + headline(ci, { lead: "A precision funnel,", gradient: "measured against reality" })
+    + `<p style="font-size:9.5px;line-height:1.55;color:${ci.muted};margin:10px 0 0;font-style:italic;">${esc(d.funnel.disclaimer)}</p>`
+    + `<div style="display:flex;flex-direction:column;gap:7px;margin-top:12px;">${d.funnel.bars.slice(0, 6).map(stageCard).join("")}</div>`
+    + miniEyebrow(ci, "KPIs, agreed up front", "16px")
+    + `<div style="display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:0;margin-top:8px;background:#FFFFFF;border-radius:14px;box-shadow:0 6px 18px ${ci.shadow};overflow:hidden;font-size:9px;line-height:1.45;">${th("Metric")}${th("Why it matters")}${th("Baseline and target")}${rows}</div>`
+    + sFootLight(ci, d.brand_short));
 }
 
 // ── S08 PROOF & DASHBOARD (light) — a live dashboard mock + the KPI table ──────────────────────────────────────
@@ -1104,16 +1219,18 @@ function sDashboardPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.14);"><span style="width:8px;height:8px;border-radius:50%;background:#FF5F57;"></span><span style="width:8px;height:8px;border-radius:50%;background:#FEBC2E;"></span><span style="width:8px;height:8px;border-radius:50%;background:#28C840;"></span><div style="margin-left:8px;flex:1;background:rgba(255,255,255,0.08);border-radius:6px;padding:3px 12px;font-size:8px;color:rgba(255,255,255,0.6);letter-spacing:0.08em;">psi.gasmarketing.co.za/dashboard</div></div>`
     + `<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:12px;"><div><div style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentOnDark};font-weight:600;">PSI Conversion Dashboard</div><div style="font-size:8px;color:rgba(255,255,255,0.55);margin-top:2px;">One screen the bi-weekly review argues from</div></div><span style="display:flex;align-items:center;gap:5px;font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${ci.success};"><span style="width:6px;height:6px;border-radius:50%;background:${ci.success};"></span>Live</span></div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">${d.pods78.tiles.slice(0, 4).map(kpiTile).join("")}</div></div>`;
-  const th = (t: string) => `<div style="padding:7px 12px;background:${ci.darkCard};color:#FFFFFF;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;font-size:8.5px;">${t}</div>`;
-  const td = (t: string, bold: boolean) => `<div style="padding:7px 12px;border-top:1px solid #EEE8F5;color:${bold ? ci.body : ci.muted};${bold ? "font-weight:700;" : ""}">${esc(t)}</div>`;
-  const rows = d.funnel.kpis.slice(0, 5).map((k) => td(k.metric, true) + td(k.why, false) + td(k.baseline, false)).join("");
+  // The fortnightly loop that compounds (the review cadence), instead of repeating the KPI table (now on the Funnel page).
+  const loopStep = (t: string, b: string) => `<div style="flex:1;background:${ci.tint};border-radius:12px;padding:12px 15px;"><div style="font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentDeep};">${t}</div><div style="font-size:9.5px;line-height:1.5;color:${ci.body};margin-top:4px;">${b}</div></div>`;
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "Proof and Measurement") + headline(ci, { lead: "Every rand,", gradient: "accounted for." })
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.pods78.dashboard_para)}</p>`
     + `<div style="margin-top:16px;">${dash}</div>`
-    + miniEyebrow(ci, "KPIs, agreed up front", "18px")
-    + `<div style="display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:0;margin-top:8px;background:#FFFFFF;border-radius:14px;box-shadow:0 6px 18px ${ci.shadow};overflow:hidden;font-size:9px;line-height:1.45;">${th("Metric")}${th("Why it matters")}${th("Baseline and target")}${rows}</div>`
-    + footerLight(ci, d.brand_short, 8));
+    + `<div style="margin-top:auto;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">The fortnightly loop that compounds</div><div style="display:flex;gap:10px;">`
+    +   loopStep("Review", "Cost per qualified lead by persona and channel, on one screen.")
+    +   loopStep("Reallocate", "Budget shifts to the winning personas, triggers and creative, on evidence.")
+    +   loopStep("Compound", "Each fortnight is sharper and cheaper than the last, never a reset.")
+    + `</div></div>`
+    + sFootLight(ci, d.brand_short));
 }
 
 // ── S09 YOUR ROLLOUT (light) — timeline rail + gated week cards ────────────────────────────────────────────────
@@ -1132,7 +1249,7 @@ function sRolloutPage(d: ProposalDoc, ci: CiTokens): string {
     + `<p style="font-size:11px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(r.intro)}</p>`
     + `<div style="margin-top:14px;position:relative;padding:0 30px;"><div style="position:absolute;left:60px;right:60px;top:13px;height:2px;background:linear-gradient(90deg,${ci.accentOnDark} 0%,${ci.accentDeep} 100%);"></div><div style="display:flex;align-items:flex-start;">${r.rail.map((x) => railDisc(x.badge, x.label)).join("")}</div></div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;flex:1;">${r.weeks.map(weekCard).join("")}</div>`
-    + footerLight(ci, d.brand_short, 9));
+    + sFootLight(ci, d.brand_short));
 }
 
 // ── S10 TRUSTED WITH DATA (light) — POPIA/GDPR pillars + commitments ──────────────────────────────────────────
@@ -1147,7 +1264,7 @@ function sGovernancePage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="display:flex;gap:12px;margin-top:16px;">${pillar("POPIA · South Africa", "Compliant with the Protection of Personal Information Act")}${pillar("GDPR · International", "Aligned with the EU General Data Protection Regulation")}</div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">${d.governance.commitments.slice(0, 6).map((c) => commit(c.title, c.body)).join("")}</div>`
     + `<div style="margin-top:auto;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:10px;justify-content:space-between;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">Compliance stack</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${["POPIA", "GDPR-aligned", "Platform policies", "Verified-claims register"].map((t) => `<span style="background:${ci.accent};color:#FFFFFF;border-radius:999px;padding:5px 12px;font-size:8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${t}</span>`).join("")}</div></div>`
-    + footerLight(ci, d.brand_short, 10));
+    + sFootLight(ci, d.brand_short));
 }
 
 // ── S11 THE INVESTMENT (light) — tier hero + inclusions + footnotes ───────────────────────────────────────────
@@ -1167,7 +1284,7 @@ function sInvestmentPage(d: ProposalDoc, ci: CiTokens): string {
     +   `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">${iv.inclusions.slice(0, 8).map(incl).join("")}</div>`
     + `</div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:14px;">${iv.footnotes.slice(0, 3).map(foot).join("")}</div>`
-    + footerLight(ci, d.brand_short, 11));
+    + sFootLight(ci, d.brand_short));
 }
 
 // ── S12 THE TERMS (dark) — 4 term cards + PoC callout + condensed clauses ──────────────────────────────────────
@@ -1185,7 +1302,7 @@ function sTermsPage(d: ProposalDoc, ci: CiTokens): string {
     + `<div style="margin-top:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:13px 18px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the proof of concept proves</div><p style="font-size:11px;line-height:1.6;color:rgba(255,255,255,0.85);margin:6px 0 0;">${esc(t.poc_proves)}</p></div>`
     + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin:16px 0 8px;">The agreement · six clauses</div>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;">${clauses}</div>`
-    + footerDark(d.brand_short, 12));
+    + sFootDark(d.brand_short));
 }
 
 // ── S13 SIGN-OFF (light) — client + agency signature cards ────────────────────────────────────────────────────
@@ -1214,15 +1331,18 @@ function sSignoffPage(d: ProposalDoc, ci: CiTokens): string {
     eyebrow(ci, "Acceptance and Sign-off") + headline(ci, { lead: "Agreement", gradient: "and sign-off" })
     + `<p style="font-size:12px;line-height:1.7;color:${ci.body};margin:14px 0 0;">${esc(s.intro)}</p>`
     + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;align-items:stretch;">${clientCard}${agencyCard}</div>`
-    + footerLight(ci, d.brand_short, 13));
+    + sFootLight(ci, d.brand_short));
 }
 
-// The sharpened 13-page deck. Same content model (ProposalDoc), same CI recolour; a shorter, more visual cut.
+// The sharpened 20-page deck (Gary): the full strategy, punchier and more visual than the 23-page reference. Same
+// content model (ProposalDoc), same CI recolour. Restores the pertinent detail (competitors, targeting, channels,
+// media/placements) the 13-page cut left out, and drops the step-down funnel chart.
 export function renderProposalHtmlSharp(d: ProposalDoc, ci: CiTokens = deriveCiTokens()): string {
   const pages = [
-    sCoverPage(d, ci), sOpportunityPage(d, ci), sEdgePage(d, ci), sSystemPage(d, ci), sAudiencePage(d, ci),
-    sCreativePage(d, ci), sPsiPage(d, ci), sDashboardPage(d, ci), sRolloutPage(d, ci), sGovernancePage(d, ci),
-    sInvestmentPage(d, ci), sTermsPage(d, ci), sSignoffPage(d, ci),
+    sCoverPage(d, ci), sExecPage(d, ci), sOpportunityPage(d, ci), sMarketPage(d, ci), sCompetitorsPage(d, ci),
+    sEdgePage(d, ci), sSystemPage(d, ci), sAudiencePage(d, ci), sTargetingPage(d, ci), sCreativePage(d, ci),
+    sChannelsPage(d, ci), sMediaPage(d, ci), sPsiPage(d, ci), sFunnelPage(d, ci), sDashboardPage(d, ci),
+    sRolloutPage(d, ci), sGovernancePage(d, ci), sInvestmentPage(d, ci), sTermsPage(d, ci), sSignoffPage(d, ci),
   ].join("\n");
   return docShell(pages);
 }
