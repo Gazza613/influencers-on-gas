@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { renderProposalHtml } from "@/lib/proposal-render";
+import { renderProposalHtml, renderProposalHtmlSharp } from "@/lib/proposal-render";
 import { deriveCiTokens } from "@/lib/proposal-ci";
 import { SAMPLE_BOSTON } from "@/lib/proposal-sample";
 
@@ -26,7 +26,9 @@ export async function GET(req: Request) {
   // and validity is 14 days from it. Stamp it across every date mention in the sample fixture.
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
   const doc = JSON.parse(JSON.stringify(SAMPLE_BOSTON).split("7 August 2026").join(today)) as typeof SAMPLE_BOSTON;
-  const html = renderProposalHtml(doc, deriveCiTokens(accent, dark));
+  // ?mode=sharp renders the shorter, more visual 13-page "sharpened" deck; default is the full 23-page deck.
+  const ci = deriveCiTokens(accent, dark);
+  const html = url.searchParams.get("mode") === "sharp" ? renderProposalHtmlSharp(doc, ci) : renderProposalHtml(doc, ci);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   });

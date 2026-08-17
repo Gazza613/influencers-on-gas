@@ -859,6 +859,11 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
     closedLoopPage(d, ci), rolloutPage(d, ci), governancePage(d, ci), dealDividerPage(d, ci),
     investmentPage(d, ci), termsPage(d, ci), agreementPage(d, ci), signoffPage(d, ci),
   ].join("\n");
+  return docShell(pages);
+}
+
+// The shared HTML document shell (Poppins, A4 page boxes, print geometry). Both renderers use it.
+function docShell(pages: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">`
     + `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`
     + `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">`
@@ -868,4 +873,323 @@ export function renderProposalHtml(d: ProposalDoc, ci: CiTokens = deriveCiTokens
     + `@page{size:${A4_W}px ${A4_H}px;margin:0}`
     + `@media print{.page{break-after:page;margin:0}}`
     + `</style></head><body>${pages}</body></html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// THE SHARPENED DECK (Gary): a punchy, funnel-styled, ≤15-page cut of the same content. Where the full deck is the
+// comprehensive 23-page reference, this is the short, visual, "reads like our funnel" version — it MERGES pages and
+// leans into signature funnel visuals (intent gauge, proportional funnel, FB ad mock, live dashboard) while keeping
+// the pertinent detail. Eyebrows drop the section numbers (cleaner, funnel-like); footers number sequentially.
+// It reuses every shared primitive + the SAME ProposalDoc, so `content` drives both renderers.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// A semicircular intent-score gauge (the PSI signature). Score is illustrative (marked so). Arc computed with Math.
+function intentGauge(ci: CiTokens, score: number): string {
+  const s = Math.max(0, Math.min(100, score));
+  const cx = 100, cy = 100, r = 78;
+  const theta = Math.PI * (s / 100);
+  const ex = (cx - r * Math.cos(theta)).toFixed(1);
+  const ey = (cy - r * Math.sin(theta)).toFixed(1);
+  return `<div style="position:relative;width:200px;height:116px;margin:0 auto;">`
+    + `<svg width="200" height="116" viewBox="0 0 200 116">`
+    +   `<path d="M22 100 A78 78 0 0 1 178 100" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="13" stroke-linecap="round"></path>`
+    +   `<path d="M22 100 A78 78 0 0 1 ${ex} ${ey}" fill="none" stroke="${ci.accentOnDark}" stroke-width="13" stroke-linecap="round"></path>`
+    + `</svg>`
+    + `<div style="position:absolute;left:0;right:0;top:50px;text-align:center;"><div style="font-size:38px;font-weight:800;line-height:1;color:#FFFFFF;">${s}</div>`
+    +   `<div style="font-size:8px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentOnDark};font-weight:700;margin-top:3px;">Intent score</div></div></div>`;
+}
+
+// A signal bar (what builds the score). pct illustrative.
+const signalBar = (ci: CiTokens, label: string, pct: number) =>
+  `<div style="margin-top:9px;"><div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.8);margin-bottom:3px;"><span>${esc(label)}</span><span style="color:${ci.accentOnDark};font-weight:700;">${pct}</span></div>`
+  + `<div style="height:6px;border-radius:999px;background:rgba(255,255,255,0.12);overflow:hidden;"><div style="height:6px;width:${pct}%;border-radius:999px;background:${ci.accentGrad};"></div></div></div>`;
+
+// ── S01 COVER (dark) — same wedge cover, sequential footer ────────────────────────────────────────────────────
+function sCoverPage(d: ProposalDoc, ci: CiTokens): string {
+  const logo = `<div style="margin-left:auto;font-weight:800;font-size:19px;letter-spacing:0.08em;text-transform:uppercase;color:#FFFFFF;">${esc(d.client_name)}</div>`;
+  return `<section class="page" style="${pageDark(ci, "56px 64px 44px", "position:relative;overflow:hidden;")}">`
+    + `<div style="position:absolute;right:-180px;top:-180px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,transparent 70%);"></div>`
+    + `<div style="display:flex;align-items:center;gap:14px;position:relative;">${gasLockup(ci, true)}${logo}</div>`
+    + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;">`
+    +   `<div style="font-size:11px;font-weight:600;letter-spacing:0.28em;color:${ci.accentOnDark};text-transform:uppercase;margin-bottom:18px;">Growth Proposal · Strictly Confidential</div>`
+    +   `<div style="font-size:46px;font-weight:800;line-height:1.0;text-transform:uppercase;letter-spacing:-0.01em;max-width:660px;">${esc(d.cover.headline.lead)} <span style="color:${ci.accentOnDark};">${esc(d.cover.headline.gradient)}</span></div>`
+    +   `<p style="margin:22px 0 0;font-size:15px;line-height:1.65;color:rgba(255,255,255,0.72);max-width:560px;">${esc(d.cover.summary)}</p>`
+    + `</div>`
+    + `<div style="display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;position:relative;">`
+    +   `<div style="box-sizing:border-box;flex:0 1 auto;min-width:0;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.20);border-radius:16px;padding:8px 16px;font-size:10.5px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;line-height:1.4;">${esc(d.cover.audience_chip)}</div>`
+    +   `<div style="box-sizing:border-box;flex-shrink:0;background:${ci.accentGrad};border-radius:999px;padding:8px 16px;font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;">${esc(d.date_label)} · ${esc(d.validity_label)}</div>`
+    + `</div>`
+    + `<div style="margin-top:32px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);"><span>GAS Marketing Automation · The Agency of Now</span><span>Human Command. AI Execution.</span></div>`
+    + `</section>`;
+}
+
+// ── S02 THE OPPORTUNITY (light) — big-number stats + a proportional funnel + definition of success ─────────────
+const SHARP_FUNNEL_W = ["100%", "84%", "68%", "52%", "38%", "26%"];
+function sOpportunityPage(d: ProposalDoc, ci: CiTokens): string {
+  const stats = d.opportunity.stat_cards.slice(0, 3).map((s) =>
+    `<div style="flex:1;background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="font-size:30px;font-weight:800;line-height:1;color:${ci.accent};">${esc(s.stat)}</div>`
+    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:7px;">${esc(s.body)}</div></div>`).join("");
+  const bar = (label: string, i: number) =>
+    `<div style="display:flex;justify-content:center;"><div style="width:${SHARP_FUNNEL_W[i] || "26%"};min-width:120px;background:${ci.darkCard};border-radius:9px;padding:8px 14px;color:#FFFFFF;font-size:10px;font-weight:600;text-align:center;">${esc(label)}</div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "The Opportunity") + headline(ci, d.opportunity.headline)
+    + `<p style="font-size:12px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.opportunity.paras[0] || "")}</p>`
+    + `<div style="display:flex;gap:12px;margin-top:16px;">${stats}</div>`
+    + `<div style="margin-top:20px;background:#FFFFFF;border-radius:18px;padding:18px 22px;box-shadow:0 6px 18px ${ci.shadow};">`
+    +   `<div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};text-align:center;margin-bottom:12px;">Interest, narrowed to intent</div>`
+    +   `<div style="display:flex;flex-direction:column;gap:7px;">${d.funnel.bars.slice(0, 6).map(bar).join("")}</div>`
+    +   `<div style="font-size:8.5px;line-height:1.5;color:${ci.muted};margin-top:12px;text-align:center;font-style:italic;">${esc(d.funnel.disclaimer)}</div>`
+    + `</div>`
+    + `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:18px 24px;color:#FFFFFF;">`
+    +   `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">The definition of success</div>`
+    +   `<div style="font-size:12px;line-height:1.65;margin-top:6px;color:rgba(255,255,255,0.9);">${esc(d.opportunity.success_body)}</div></div>`
+    + footerLight(ci, d.brand_short, 2));
+}
+
+// ── S03 WHY WE WIN (light) — the wedge + argument + 4 proofs + the belief→buy→outcome flow ─────────────────────
+function sEdgePage(d: ProposalDoc, ci: CiTokens): string {
+  const proofs = d.strategy.proof_cards.slice(0, 4).map((c) => proofCard(ci, c.title, c.body)).join("");
+  const node = (icon: string, label: string, sub: string) =>
+    `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 30, icon)}<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">${esc(label)}</div><div style="font-size:8.5px;color:${ci.muted};line-height:1.4;">${esc(sub)}</div></div></div>`;
+  const flow = stripCard(ci, "How the argument lands",
+    node(MIC, "Reason to believe", d.strategy.flow.believe) + flowArrow(ci, 15)
+    + node(CHECK, "Reason to buy", d.strategy.flow.buy) + flowArrow(ci, 15)
+    + node(CIRCLE_DOLLAR, "Commercial outcome", d.strategy.flow.outcome), "14px");
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Why We Win") + headline(ci, d.strategy.headline)
+    + darkBox(ci, "The single-minded wedge", d.strategy.wedge_body)
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:14px 0 0;">${esc(d.strategy.argument)}</p>`
+    + miniEyebrow(ci, "Why this wedge wins", "16px")
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">${proofs}</div>`
+    + flow + footerLight(ci, d.brand_short, 3));
+}
+
+// ── S04 ONE CLOSED-LOOP SYSTEM (dark) — the six-step wheel (shared loop constants) ─────────────────────────────
+function sSystemPage(d: ProposalDoc, ci: CiTokens): string {
+  const arrow = (a: { left: number; top: number; rot: number }) =>
+    `<div style="position:absolute;left:${a.left}px;top:${a.top}px;transform:translate(-50%,-50%) rotate(${a.rot}deg);width:26px;height:26px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px ${ci.glow};"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div>`;
+  const stepCard = (s: { left: number; top: number; title: string; sub: string }, i: number) =>
+    `<div style="position:absolute;left:${s.left}px;top:${s.top}px;transform:translate(-50%,-50%);width:172px;background:${ci.darkCard};border:1px solid ${ci.glow};border-radius:14px;padding:10px 12px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.35);"><div style="font-size:9px;font-weight:600;letter-spacing:0.18em;color:${ci.accentOnDark};">STEP ${i + 1}</div><div style="font-size:12px;font-weight:700;margin-top:2px;line-height:1.3;">${esc(s.title)}</div><div style="font-size:9.5px;color:rgba(255,255,255,0.65);line-height:1.4;margin-top:2px;">${esc(i === 4 && d.closedloop.step5_sub ? d.closedloop.step5_sub : s.sub)}</div></div>`;
+  return section(pageDark(ci, "52px 60px 40px"),
+    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">The System</div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">One closed-loop <span style="color:${ci.accentOnDark};">growth system</span></div>`
+    + `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.75);margin:14px 0 0;">${esc(d.closedloop.intro)}</p>`
+    + `<div style="flex:1;display:flex;align-items:center;justify-content:center;margin-top:6px;"><div style="position:relative;width:620px;height:620px;">`
+    +   `<svg width="620" height="620" viewBox="0 0 620 620" style="position:absolute;inset:0;"><circle cx="310" cy="310" r="225" fill="none" stroke="${ci.glow}" stroke-width="2" stroke-dasharray="3 7"></circle></svg>`
+    +   LOOP_ARROWS.map(arrow).join("") + LOOP_STEPS.map(stepCard).join("")
+    +   `<div style="position:absolute;left:310px;top:284px;transform:translate(-50%,-50%);width:236px;height:236px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,transparent 70%);"></div>`
+    +   `<div style="position:absolute;left:310px;top:284px;transform:translate(-50%,-50%);width:89px;height:89px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:25px;color:#FFFFFF;box-shadow:0 0 44px ${ci.glow},0 0 0 6px rgba(255,255,255,0.08);">GAS</div>`
+    +   `<div style="position:absolute;left:310px;top:346px;transform:translateX(-50%);width:220px;text-align:center;"><div style="font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">The Agency of NOW</div><div style="font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;margin-top:4px;color:${ci.accentOnDark};">From Interest to Intent</div></div>`
+    + `</div></div>`
+    + `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:14px 20px;margin-bottom:22px;"><p style="font-size:11px;line-height:1.65;margin:0;color:rgba(255,255,255,0.82);"><strong style="color:${ci.accentOnDark};">The compounding mechanism.</strong> ${esc(d.closedloop.compounding)}</p></div>`
+    + footerDark(d.brand_short, 4));
+}
+
+// ── S05 THE AUDIENCE (light) — 4 personas + geo + the targeting matrix ────────────────────────────────────────
+function sAudiencePage(d: ProposalDoc, ci: CiTokens): string {
+  const persona = (p: { icon: string; name: string; geo: string; quote: string }) =>
+    `<div style="background:#FFFFFF;border-radius:14px;padding:13px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 30, p.icon)}<div><div style="font-size:12px;font-weight:800;">${esc(p.name)}</div><div style="font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accent};">${esc(p.geo)}</div></div></div>`
+    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:7px;font-style:italic;">&ldquo;${esc(p.quote)}&rdquo;</div></div>`;
+  const geoChip = (c: { label: string; accent: boolean }) =>
+    `<span style="background:${c.accent ? ci.accent : ci.tint};color:${c.accent ? "#FFFFFF" : ci.accentDeep};border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(c.label)}</span>`;
+  const cell = (k: "lead" | "support" | "test") => {
+    const map = { lead: [ci.accentGrad, "#FFFFFF", "Lead"], support: [ci.accentDeep, "#FFFFFF", "Support"], test: [ci.tint, ci.accentDeep, "Test"] } as const;
+    const [bg, fg, lb] = map[k];
+    return `<div style="text-align:center;padding:5px 2px;"><span style="display:inline-block;background:${bg};color:${fg};border-radius:999px;padding:2px 9px;font-size:7.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${lb}</span></div>`;
+  };
+  const mx = d.targeting.matrix;
+  const cols = `130px repeat(${mx.channels.length}, 1fr)`;
+  const head = `<div style="display:grid;grid-template-columns:${cols};align-items:end;gap:2px;">`
+    + `<div></div>` + mx.channels.map((c) => `<div style="text-align:center;font-size:7.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${ci.accent};">${esc(c)}</div>`).join("") + `</div>`;
+  const rows = mx.rows.map((r) =>
+    `<div style="display:grid;grid-template-columns:${cols};align-items:center;gap:2px;border-top:1px solid #EEE8F5;">`
+    + `<div style="font-size:9px;font-weight:700;color:${ci.body};padding:5px 0;">${esc(r.persona)}</div>`
+    + r.cells.slice(0, mx.channels.length).map(cell).join("") + `</div>`).join("");
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "The Audience") + headline(ci, d.audience.headline)
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.audience.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">${d.audience.personas.slice(0, 4).map(persona).join("")}</div>`
+    + `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;align-items:center;"><span style="font-size:8.5px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};margin-right:4px;">${esc(d.audience.geo_label)}</span>${d.audience.geo_chips.map(geoChip).join("")}</div>`
+    + `<div style="margin-top:auto;background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:10px;">Who leads on which channel</div>${head}${rows}</div>`
+    + footerLight(ci, d.brand_short, 5));
+}
+
+// ── S06 THE CREATIVE (light) — StorySelling + a live FB ad mock + the channel plan ────────────────────────────
+function sCreativePage(d: ProposalDoc, ci: CiTokens): string {
+  const clientInitial = ((d.client_name.trim().replace(/^(the|a|an)\s+/i, "")[0] || d.client_name.trim()[0] || "•")).toUpperCase();
+  const avatar = d.client_logo
+    ? `<div style="width:34px;height:34px;border-radius:50%;background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;"><img src="${esc(d.client_logo.src)}" style="max-width:78%;max-height:78%;object-fit:contain;"></div>`
+    : `<div style="width:34px;height:34px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:13px;flex-shrink:0;">${esc(clientInitial)}</div>`;
+  const fbAd = `<div style="background:#FFFFFF;border-radius:14px;box-shadow:0 6px 18px ${ci.shadow};overflow:hidden;">`
+    + `<div style="display:flex;align-items:center;gap:9px;padding:12px 14px;">${avatar}<div><div style="font-size:11px;font-weight:700;color:#1A1030;">${esc(d.client_name)}</div><div style="font-size:8px;color:#8A8496;">Sponsored · &#127760;</div></div></div>`
+    + `<div style="font-size:10px;line-height:1.5;color:#1A1030;padding:0 14px 10px;">${esc((d.creative.for_client || d.creative.intro || "").slice(0, 120))}</div>`
+    + `<div style="height:150px;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;padding:0 22px;"><div style="font-size:19px;font-weight:800;text-transform:uppercase;line-height:1.1;color:#FFFFFF;text-align:center;">${esc(d.cover.headline.gradient)}</div></div>`
+    + `<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:#F2EEF7;"><div style="flex:1;min-width:0;"><div style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:#8A8496;">gasmarketing.co.za</div><div style="font-size:10.5px;font-weight:700;color:#1A1030;">${esc(d.cover.headline.lead)}</div></div><div style="background:${ci.accent};color:#FFFFFF;border-radius:8px;padding:8px 14px;font-size:9px;font-weight:700;white-space:nowrap;">Message us</div></div>`
+    + `<div style="display:flex;gap:16px;padding:9px 14px;font-size:8.5px;color:#8A8496;"><span>&#128077; 128</span><span>24 comments</span><span>12 shares</span></div></div>`;
+  const fmt = (a: { ratio: string; icon: string; title: string; caption: string }) =>
+    `<div style="background:#FFFFFF;border-radius:12px;padding:11px 14px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:flex-start;gap:9px;">${disc(ci, 24, a.icon)}<div><div style="font-size:10px;font-weight:700;">${esc(a.title)} <span style="font-weight:600;color:${ci.accent};">${esc(a.ratio)}</span></div><div style="font-size:9px;line-height:1.45;color:${ci.muted};margin-top:2px;">${esc(a.caption)}</div></div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "The Creative") + headline(ci, { lead: "StorySelling,", gradient: "at machine speed" })
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.creative.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;align-items:start;">`
+    +   `<div>${fbAd}</div>`
+    +   `<div><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">Built for every placement</div><div style="display:flex;flex-direction:column;gap:8px;">${d.creative.asset_formats.slice(0, 4).map(fmt).join("")}</div></div>`
+    + `</div>`
+    + `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:14px 20px;color:#FFFFFF;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:8px;">The channel plan</div><div style="display:flex;flex-wrap:wrap;gap:7px;">${d.channels5.rows.slice(0, 5).map((r) => `<span style="background:rgba(255,255,255,0.1);border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(r.name)} <span style="color:${ci.accentOnDark};font-weight:700;">· ${esc(r.role)}</span></span>`).join("")}</div></div>`
+    + footerLight(ci, d.brand_short, 6));
+}
+
+// ── S07 PSI · THE INTENT ENGINE (dark, HERO) — gauge + scoring signals + tier routing + WhatsApp mock ──────────
+function sPsiPage(d: ProposalDoc, ci: CiTokens): string {
+  const p = d.psi;
+  const tileColor = (k: "high" | "medium" | "low") => k === "high" ? ci.accentOnDark : k === "medium" ? "#FFFFFF" : "rgba(255,255,255,0.6)";
+  const tile = (t: { level: string; caption: string; kind: "high" | "medium" | "low" }) =>
+    `<div style="flex:1;background:rgba(255,255,255,0.10);border-radius:14px;padding:12px 14px;text-align:center;"><div style="font-size:17px;font-weight:800;color:${tileColor(t.kind)};">${esc(t.level)}</div><div style="font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.75);margin-top:4px;">${esc(t.caption)}</div></div>`;
+  const bubble = (b: { role: "in" | "out"; text: string }) => b.role === "in"
+    ? `<div style="margin-top:7px;background:rgba(255,255,255,0.12);border-radius:12px 12px 12px 3px;padding:7px 11px;font-size:9.5px;line-height:1.5;max-width:85%;color:rgba(255,255,255,0.92);">${esc(b.text)}</div>`
+    : `<div style="margin-top:7px;background:${ci.accentGrad};border-radius:12px 12px 3px 12px;padding:7px 11px;font-size:9.5px;line-height:1.5;max-width:74%;margin-left:auto;">${esc(b.text)}</div>`;
+  const chatHeader = `<div style="display:flex;align-items:center;gap:8px;padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.14);"><div style="width:22px;height:22px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${WHATSAPP}</svg></div><div><div style="font-size:9.5px;font-weight:700;">${esc(p.chat.assistant)}</div><div style="font-size:7.5px;font-weight:600;color:${ci.success};letter-spacing:0.12em;">ONLINE · WHATSAPP</div></div></div>`;
+  return section(pageDark(ci, "52px 60px 40px", "position:relative;overflow:hidden;"),
+    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">The Conversion Layer · Proprietary</div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">PSI · <span style="color:${ci.accentOnDark};">the intent engine</span></div>`
+    + `<p style="font-size:11.5px;line-height:1.65;color:rgba(255,255,255,0.8);margin:12px 0 0;">${esc(p.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1.1fr 1fr;gap:12px;margin-top:16px;align-items:start;">`
+    +   `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:13px 15px;">${chatHeader}${p.chat.bubbles.slice(0, 5).map(bubble).join("")}<div style="margin-top:9px;display:flex;justify-content:flex-end;"><div style="background:rgba(124,227,139,0.15);border:1px solid rgba(124,227,139,0.4);color:${ci.success};border-radius:999px;padding:4px 12px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">${esc(p.chat.closing)}</div></div></div>`
+    +   `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:16px;padding:14px 16px;">${intentGauge(ci, 87)}<div style="text-align:center;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:${ci.success};font-weight:700;margin-top:2px;">High intent · route to sales now</div><div style="margin-top:10px;">${signalBar(ci, "Budget fit", 90)}${signalBar(ci, "Timeline", 82)}${signalBar(ci, "Product match", 88)}${signalBar(ci, "Engagement", 76)}</div><div style="font-size:7.5px;color:rgba(255,255,255,0.5);text-align:center;margin-top:8px;font-style:italic;">Illustrative score · real signals from week one</div></div>`
+    + `</div>`
+    + `<div style="margin-top:14px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:8px;">How the score routes</div><div style="display:flex;gap:10px;">${p.tiles.slice(0, 3).map(tile).join("")}</div></div>`
+    + footerDark(d.brand_short, 7));
+}
+
+// ── S08 PROOF & DASHBOARD (light) — a live dashboard mock + the KPI table ──────────────────────────────────────
+function sDashboardPage(d: ProposalDoc, ci: CiTokens): string {
+  const kpiTile = (t: { label: string; spark: "line-down" | "bars" | "line-up" | "gauge"; caption: string }) =>
+    `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:12px 14px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(t.label)}</div><div style="margin-top:6px;">${sparkline(ci, t.spark)}</div><div style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-top:6px;">${esc(t.caption)}</div></div>`;
+  const dash = `<div style="background:${ci.darkPage};border-radius:16px;padding:16px 18px;box-shadow:0 10px 26px rgba(46,26,74,0.3);">`
+    + `<div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.14);"><span style="width:8px;height:8px;border-radius:50%;background:#FF5F57;"></span><span style="width:8px;height:8px;border-radius:50%;background:#FEBC2E;"></span><span style="width:8px;height:8px;border-radius:50%;background:#28C840;"></span><div style="margin-left:8px;flex:1;background:rgba(255,255,255,0.08);border-radius:6px;padding:3px 12px;font-size:8px;color:rgba(255,255,255,0.6);letter-spacing:0.08em;">psi.gasmarketing.co.za/dashboard</div></div>`
+    + `<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:12px;"><div><div style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.accentOnDark};font-weight:600;">PSI Conversion Dashboard</div><div style="font-size:8px;color:rgba(255,255,255,0.55);margin-top:2px;">One screen the bi-weekly review argues from</div></div><span style="display:flex;align-items:center;gap:5px;font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${ci.success};"><span style="width:6px;height:6px;border-radius:50%;background:${ci.success};"></span>Live</span></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">${d.pods78.tiles.slice(0, 4).map(kpiTile).join("")}</div></div>`;
+  const th = (t: string) => `<div style="padding:7px 12px;background:${ci.darkCard};color:#FFFFFF;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;font-size:8.5px;">${t}</div>`;
+  const td = (t: string, bold: boolean) => `<div style="padding:7px 12px;border-top:1px solid #EEE8F5;color:${bold ? ci.body : ci.muted};${bold ? "font-weight:700;" : ""}">${esc(t)}</div>`;
+  const rows = d.funnel.kpis.slice(0, 5).map((k) => td(k.metric, true) + td(k.why, false) + td(k.baseline, false)).join("");
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Proof and Measurement") + headline(ci, { lead: "Every rand,", gradient: "accounted for." })
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.pods78.dashboard_para)}</p>`
+    + `<div style="margin-top:16px;">${dash}</div>`
+    + miniEyebrow(ci, "KPIs, agreed up front", "18px")
+    + `<div style="display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:0;margin-top:8px;background:#FFFFFF;border-radius:14px;box-shadow:0 6px 18px ${ci.shadow};overflow:hidden;font-size:9px;line-height:1.45;">${th("Metric")}${th("Why it matters")}${th("Baseline and target")}${rows}</div>`
+    + footerLight(ci, d.brand_short, 8));
+}
+
+// ── S09 YOUR ROLLOUT (light) — timeline rail + gated week cards ────────────────────────────────────────────────
+function sRolloutPage(d: ProposalDoc, ci: CiTokens): string {
+  const r = d.rollout;
+  const railDisc = (badge: string, label: string) =>
+    `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;"><div style="min-width:26px;height:26px;padding:0 6px;border-radius:999px;background:${ci.iconDisc};color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:9.5px;white-space:nowrap;position:relative;z-index:1;box-shadow:0 0 0 4px #FAF8FC;">${esc(badge)}</div><div style="font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accentDeep};text-align:center;">${esc(label)}</div></div>`;
+  const weekCard = (w: (typeof r.weeks)[number]) =>
+    `<div style="background:#FFFFFF;border-radius:14px;padding:13px 16px;box-shadow:0 6px 18px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="display:flex;align-items:center;gap:8px;">${disc(ci, 24, w.icon)}<div style="font-size:11px;font-weight:700;">${esc(w.title)}</div></div>`
+    + `<div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};margin-top:2px;">${esc(w.pods)}</div>`
+    + `<ul style="margin:7px 0 0;padding-left:14px;font-size:9.3px;line-height:1.5;color:${ci.muted};flex:1;">${w.bullets.map((b) => `<li style="margin-top:2px;">${esc(b)}</li>`).join("")}</ul>`
+    + `<div style="margin-top:9px;min-height:34px;background:${ci.accentGrad};border-radius:10px;padding:6px 12px;font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;text-align:center;line-height:1.4;display:flex;align-items:center;justify-content:center;">${esc(w.gate)}</div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Your Rollout") + headline(ci, r.headline)
+    + `<p style="font-size:11px;line-height:1.6;color:${ci.body};margin:10px 0 0;">${esc(r.intro)}</p>`
+    + `<div style="margin-top:14px;position:relative;padding:0 30px;"><div style="position:absolute;left:60px;right:60px;top:13px;height:2px;background:linear-gradient(90deg,${ci.accentOnDark} 0%,${ci.accentDeep} 100%);"></div><div style="display:flex;align-items:flex-start;">${r.rail.map((x) => railDisc(x.badge, x.label)).join("")}</div></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;flex:1;">${r.weeks.map(weekCard).join("")}</div>`
+    + footerLight(ci, d.brand_short, 9));
+}
+
+// ── S10 TRUSTED WITH DATA (light) — POPIA/GDPR pillars + commitments ──────────────────────────────────────────
+function sGovernancePage(d: ProposalDoc, ci: CiTokens): string {
+  const commit = (title: string, body: string) =>
+    `<div style="background:#FFFFFF;border-radius:14px;padding:12px 15px;box-shadow:0 6px 18px ${ci.shadow};display:flex;gap:9px;align-items:flex-start;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${ci.accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6 9 17l-5-5"></path></svg><div><div style="font-size:10.5px;font-weight:700;">${esc(title)}</div><div style="font-size:9px;line-height:1.5;color:${ci.muted};margin-top:2px;">${esc(body)}</div></div></div>`;
+  const pillar = (tag: string, title: string) =>
+    `<div style="background:${ci.darkCard};border-radius:16px;padding:15px 18px;color:#FFFFFF;flex:1;"><div style="display:flex;align-items:center;gap:8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${SHIELD}</svg><span style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};">${tag}</span></div><div style="font-size:11.5px;font-weight:800;margin-top:6px;line-height:1.3;">${esc(title)}</div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Governance") + headline(ci, { lead: "Trusted with data,", gradient: "by design." })
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.governance.intro)}</p>`
+    + `<div style="display:flex;gap:12px;margin-top:16px;">${pillar("POPIA · South Africa", "Compliant with the Protection of Personal Information Act")}${pillar("GDPR · International", "Aligned with the EU General Data Protection Regulation")}</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">${d.governance.commitments.slice(0, 6).map((c) => commit(c.title, c.body)).join("")}</div>`
+    + `<div style="margin-top:auto;background:#FFFFFF;border-radius:14px;padding:12px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:10px;justify-content:space-between;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">Compliance stack</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${["POPIA", "GDPR-aligned", "Platform policies", "Verified-claims register"].map((t) => `<span style="background:${ci.accent};color:#FFFFFF;border-radius:999px;padding:5px 12px;font-size:8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${t}</span>`).join("")}</div></div>`
+    + footerLight(ci, d.brand_short, 10));
+}
+
+// ── S11 THE INVESTMENT (light) — tier hero + inclusions + footnotes ───────────────────────────────────────────
+function sInvestmentPage(d: ProposalDoc, ci: CiTokens): string {
+  const iv = d.investment;
+  const incl = (t: { title: string; pod_tag: string }) =>
+    `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:9px 13px;display:flex;align-items:flex-start;gap:9px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6 9 17l-5-5"></path></svg><div><div style="font-size:10.5px;font-weight:700;">${esc(t.title)}</div><div style="font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-top:2px;">${esc(t.pod_tag)}</div></div></div>`;
+  const foot = (f: { label: string; body: string }) =>
+    `<div style="background:${ci.tint};border-radius:14px;padding:11px 15px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentDeep};">${esc(f.label)}</div><div style="font-size:10px;line-height:1.5;color:${ci.body};margin-top:4px;">${esc(f.body)}</div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "The Investment") + headline(ci, { lead: "The investment ·", gradient: `the ${iv.tier_name} system` })
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(iv.intro)}</p>`
+    + `<div style="margin-top:16px;background:${ci.darkPage};border-radius:18px;padding:20px 24px;color:#FFFFFF;box-shadow:0 12px 30px rgba(46,26,74,0.28);">`
+    +   `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><div><div style="font-size:20px;font-weight:800;text-transform:uppercase;">${esc(iv.tier_name)}</div><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:2px;">${esc(iv.tagline)}</div></div><div style="background:${ci.accentGrad};border-radius:999px;padding:6px 14px;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap;align-self:flex-start;">${esc(iv.poc_chip)}</div></div>`
+    +   `<div style="display:flex;align-items:baseline;gap:14px;margin-top:8px;"><div style="font-size:54px;font-weight:800;letter-spacing:-0.02em;line-height:1;color:${ci.accentOnDark};">${esc(iv.price)}</div><div style="font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.65);line-height:1.5;">${esc(iv.price_unit).replace(/&lt;br\s*\/?&gt;/gi, "<br>")}</div></div>`
+    +   `<p style="font-size:10.5px;line-height:1.6;color:rgba(255,255,255,0.75);margin:10px 0 0;">${esc(iv.body)}</p>`
+    +   `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">${iv.inclusions.slice(0, 8).map(incl).join("")}</div>`
+    + `</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:14px;">${iv.footnotes.slice(0, 3).map(foot).join("")}</div>`
+    + footerLight(ci, d.brand_short, 11));
+}
+
+// ── S12 THE TERMS (dark) — 4 term cards + PoC callout + condensed clauses ──────────────────────────────────────
+function sTermsPage(d: ProposalDoc, ci: CiTokens): string {
+  const t = d.terms;
+  const glass = (label: string, body: string) =>
+    `<div style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.20);border-radius:14px;padding:13px 16px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(label)}</div><p style="font-size:10.5px;line-height:1.55;color:rgba(255,255,255,0.85);margin:5px 0 0;">${esc(body)}</p></div>`;
+  const clause = (title: string, body: string) =>
+    `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:11px 14px;"><div style="font-size:8.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accentOnDark};">${esc(title)}</div><div style="font-size:9.5px;line-height:1.5;color:rgba(255,255,255,0.8);margin-top:4px;">${esc(body)}</div></div>`;
+  const clauses = d.agreement.clauses.slice(0, 6).map((c, i) => clause(CLAUSE_TITLES[i] || c.title, c.body)).join("");
+  return section(pageDark(ci, "52px 60px 40px"),
+    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">Commercial Terms</div>`
+    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">No fine print. <span style="color:${ci.accentOnDark};">One page of terms.</span></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">${glass("Validity", t.validity)}${glass("Engagement", t.engagement)}${glass("Media budget", t.media)}${glass("Ownership", t.ownership)}</div>`
+    + `<div style="margin-top:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:13px 18px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the proof of concept proves</div><p style="font-size:11px;line-height:1.6;color:rgba(255,255,255,0.85);margin:6px 0 0;">${esc(t.poc_proves)}</p></div>`
+    + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin:16px 0 8px;">The agreement · six clauses</div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;">${clauses}</div>`
+    + footerDark(d.brand_short, 12));
+}
+
+// ── S13 SIGN-OFF (light) — client + agency signature cards ────────────────────────────────────────────────────
+function sSignoffPage(d: ProposalDoc, ci: CiTokens): string {
+  const s = d.signoff;
+  const clientInitial = ((d.client_name.trim().replace(/^(the|a|an)\s+/i, "")[0] || d.client_name.trim()[0] || "•")).toUpperCase();
+  const clientMark = d.client_logo
+    ? `<div style="width:36px;height:36px;border-radius:50%;background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(26,16,48,0.12);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;"><img src="${esc(d.client_logo.src)}" alt="${esc(d.client_name)}" style="max-width:76%;max-height:76%;object-fit:contain;display:block;"></div>`
+    : `<div style="width:36px;height:36px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:14px;flex-shrink:0;">${esc(clientInitial)}</div>`;
+  const sigRule = `<div style="margin-top:26px;"><div style="border-bottom:1.5px solid rgba(26,16,48,0.35);height:34px;"></div><div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:${ci.muted};margin-top:6px;"><span>Signature</span><span>Date</span></div></div>`;
+  const clientCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the client</div>`
+    + `<div style="font-size:16px;font-weight:800;text-transform:uppercase;margin-top:6px;">${esc(d.client_name)}</div>`
+    + `<div style="margin-top:14px;"><div style="font-size:13px;font-weight:700;">Authorised Signatory</div><div style="font-size:11px;color:${ci.muted};margin-top:2px;">${esc(s.client.signatory_label)}</div></div>`
+    + `<div style="font-size:10.5px;line-height:1.8;color:${ci.muted};margin-top:10px;min-height:76px;">${s.client.contacts.map((c) => `<div>${esc(c)}</div>`).join("")}</div>`
+    + sigRule
+    + `<div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;">${clientMark}<div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};">${esc(s.client.tagline)}</div></div></div>`;
+  const agencyCard = `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;color:#1A1030;box-shadow:0 8px 22px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentDeep};">For the agency</div>`
+    + `<div style="font-size:16px;font-weight:800;text-transform:uppercase;margin-top:6px;">GAS Marketing Automation</div>`
+    + `<div style="margin-top:14px;"><div style="font-size:13px;font-weight:700;">Gary Berman</div><div style="font-size:11px;color:${ci.muted};margin-top:2px;">Managing Director</div></div>`
+    + `<div style="font-size:10.5px;line-height:1.8;color:${ci.muted};margin-top:10px;min-height:76px;"><div>Cell: 082 566 3708</div><div>Email: gary@gasmarketing.co.za</div><div>www.gasmarketing.co.za</div></div>`
+    + sigRule
+    + `<div style="margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;"><div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;color:#FFFFFF;">GAS</div><div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};">Human Command. AI Execution.</div></div></div>`;
+  return section(pageLight("52px 60px 40px"),
+    eyebrow(ci, "Acceptance and Sign-off") + headline(ci, { lead: "Agreement", gradient: "and sign-off" })
+    + `<p style="font-size:12px;line-height:1.7;color:${ci.body};margin:14px 0 0;">${esc(s.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;align-items:stretch;">${clientCard}${agencyCard}</div>`
+    + footerLight(ci, d.brand_short, 13));
+}
+
+// The sharpened 13-page deck. Same content model (ProposalDoc), same CI recolour; a shorter, more visual cut.
+export function renderProposalHtmlSharp(d: ProposalDoc, ci: CiTokens = deriveCiTokens()): string {
+  const pages = [
+    sCoverPage(d, ci), sOpportunityPage(d, ci), sEdgePage(d, ci), sSystemPage(d, ci), sAudiencePage(d, ci),
+    sCreativePage(d, ci), sPsiPage(d, ci), sDashboardPage(d, ci), sRolloutPage(d, ci), sGovernancePage(d, ci),
+    sInvestmentPage(d, ci), sTermsPage(d, ci), sSignoffPage(d, ci),
+  ].join("\n");
+  return docShell(pages);
 }

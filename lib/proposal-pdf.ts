@@ -4,7 +4,7 @@ import { putBytes } from "./blob";
 import { extractBrandPalette } from "./brand-colours";
 import { TIERS, OBJECTIVES, type TierId } from "./proposal-config";
 import type { Proposal } from "./proposal";
-import { renderProposalHtml } from "./proposal-render";
+import { renderProposalHtml, renderProposalHtmlSharp } from "./proposal-render";
 import { deriveCiTokens } from "./proposal-ci";
 import { buildProposalDoc } from "./proposal-map";
 
@@ -115,7 +115,10 @@ export async function buildProposalPdf(proposalId: string, accentOverride?: stri
     dateLabel, validityLabel: "Valid 14 days",
     clientLogo, competitors: comps.map((c) => c.name), clientContacts: contacts, clientTagline: "",
   });
-  const html = renderProposalHtml(doc, deriveCiTokens(palette.primary, palette.dark));
+  // The SHARPENED version renders the shorter, more visual 13-page deck; the FULL version renders the 23-page deck.
+  // `content` already mirrors the active version, so we only switch which renderer lays it out (Gary: keep both).
+  const ci = deriveCiTokens(palette.primary, palette.dark);
+  const html = p.version_mode === "sharp" ? renderProposalHtmlSharp(doc, ci) : renderProposalHtml(doc, ci);
   const pdf = await renderPdf(html, { marginMm: 0 });
   const url = await putBytes(pdf, `studio/${clientId}/proposal-${proposalId}`, "pdf", "application/pdf");
   await db().query(`update proposals set pdf_url = $2 where id = $1`, [proposalId, url]).catch(() => {});
