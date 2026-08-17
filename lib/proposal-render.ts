@@ -1041,25 +1041,58 @@ function sCreativePage(d: ProposalDoc, ci: CiTokens): string {
     + footerLight(ci, d.brand_short, 6));
 }
 
-// ── S07 PSI · THE INTENT ENGINE (dark, HERO) — gauge + scoring signals + tier routing + WhatsApp mock ──────────
+// A ring donut of intent distribution (HOT/WARM/COLD), matching the funnel's live distribution chart.
+function intentDonut(ci: CiTokens): string {
+  const C = 2 * Math.PI * 45;
+  const segs = [{ pct: 13, color: ci.accentOnDark }, { pct: 27, color: ci.accent }, { pct: 60, color: "rgba(255,255,255,0.22)" }];
+  let acc = 0;
+  const arcs = segs.map((s) => {
+    const len = C * s.pct / 100, off = -C * acc / 100;
+    acc += s.pct;
+    return `<circle cx="60" cy="60" r="45" fill="none" stroke="${s.color}" stroke-width="15" stroke-dasharray="${len.toFixed(1)} ${(C - len).toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"></circle>`;
+  }).join("");
+  return `<svg width="118" height="118" viewBox="0 0 120 120"><g transform="rotate(-90 60 60)">${arcs}</g></svg>`;
+}
+
+// ── S07 PSI · THE INTENT ENGINE (dark, HERO) — the signature funnel page: a live lead card + gauge + tiers ─────
+const USER_ICON = `<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>`;
 function sPsiPage(d: ProposalDoc, ci: CiTokens): string {
   const p = d.psi;
-  const tileColor = (k: "high" | "medium" | "low") => k === "high" ? ci.accentOnDark : k === "medium" ? "#FFFFFF" : "rgba(255,255,255,0.6)";
-  const tile = (t: { level: string; caption: string; kind: "high" | "medium" | "low" }) =>
-    `<div style="flex:1;background:rgba(255,255,255,0.10);border-radius:14px;padding:12px 14px;text-align:center;"><div style="font-size:17px;font-weight:800;color:${tileColor(t.kind)};">${esc(t.level)}</div><div style="font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.75);margin-top:4px;">${esc(t.caption)}</div></div>`;
-  const bubble = (b: { role: "in" | "out"; text: string }) => b.role === "in"
-    ? `<div style="margin-top:7px;background:rgba(255,255,255,0.12);border-radius:12px 12px 12px 3px;padding:7px 11px;font-size:9.5px;line-height:1.5;max-width:85%;color:rgba(255,255,255,0.92);">${esc(b.text)}</div>`
-    : `<div style="margin-top:7px;background:${ci.accentGrad};border-radius:12px 12px 3px 12px;padding:7px 11px;font-size:9.5px;line-height:1.5;max-width:74%;margin-left:auto;">${esc(b.text)}</div>`;
-  const chatHeader = `<div style="display:flex;align-items:center;gap:8px;padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.14);"><div style="width:22px;height:22px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${WHATSAPP}</svg></div><div><div style="font-size:9.5px;font-weight:700;">${esc(p.chat.assistant)}</div><div style="font-size:7.5px;font-weight:600;color:${ci.success};letter-spacing:0.12em;">ONLINE · WHATSAPP</div></div></div>`;
-  return section(pageDark(ci, "52px 60px 40px", "position:relative;overflow:hidden;"),
-    `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">The Conversion Layer · Proprietary</div>`
-    + `<div style="font-size:30px;font-weight:800;text-transform:uppercase;line-height:1.04;margin-top:10px;">PSI · <span style="color:${ci.accentOnDark};">the intent engine</span></div>`
-    + `<p style="font-size:11.5px;line-height:1.65;color:rgba(255,255,255,0.8);margin:12px 0 0;">${esc(p.intro)}</p>`
-    + `<div style="display:grid;grid-template-columns:1.1fr 1fr;gap:12px;margin-top:16px;align-items:start;">`
-    +   `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:13px 15px;">${chatHeader}${p.chat.bubbles.slice(0, 5).map(bubble).join("")}<div style="margin-top:9px;display:flex;justify-content:flex-end;"><div style="background:rgba(124,227,139,0.15);border:1px solid rgba(124,227,139,0.4);color:${ci.success};border-radius:999px;padding:4px 12px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">${esc(p.chat.closing)}</div></div></div>`
-    +   `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:16px;padding:14px 16px;">${intentGauge(ci, 87)}<div style="text-align:center;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:${ci.success};font-weight:700;margin-top:2px;">High intent · route to sales now</div><div style="margin-top:10px;">${signalBar(ci, "Budget fit", 90)}${signalBar(ci, "Timeline", 82)}${signalBar(ci, "Product match", 88)}${signalBar(ci, "Engagement", 76)}</div><div style="font-size:7.5px;color:rgba(255,255,255,0.5);text-align:center;margin-top:8px;font-style:italic;">Illustrative score · real signals from week one</div></div>`
+  // Route ladder in the funnel's own language: HOT / WARM / COLD with 0-100 bands. Uses the model's tile captions
+  // for the routing line where present, with confident defaults otherwise.
+  const bands = [
+    { band: "Hot", range: "67 – 100", color: ci.accentOnDark, action: p.tiles[0]?.caption || "Routed to your sales team to close now." },
+    { band: "Warm", range: "34 – 66", color: ci.accent, action: p.tiles[1]?.caption || "Held in automated nurture until they are ready." },
+    { band: "Cold", range: "0 – 33", color: "rgba(255,255,255,0.45)", action: p.tiles[2]?.caption || "A long-cycle drip, with zero team time spent." },
+  ];
+  const routeRow = (b: typeof bands[number]) =>
+    `<div style="display:flex;align-items:center;gap:14px;padding:11px 16px;background:rgba(255,255,255,0.05);border-radius:12px;border-left:3px solid ${b.color};">`
+    + `<div style="width:70px;flex-shrink:0;"><div style="font-size:14px;font-weight:800;text-transform:uppercase;color:${b.color};">${b.band}</div><div style="font-size:8px;letter-spacing:0.08em;color:rgba(255,255,255,0.5);">${b.range}</div></div>`
+    + `<div style="flex:1;font-size:10.5px;line-height:1.5;color:rgba(255,255,255,0.85);">${esc(b.action)}</div></div>`;
+  const legendRow = (color: string, label: string, pct: string) =>
+    `<div style="display:flex;align-items:center;gap:7px;"><span style="width:9px;height:9px;border-radius:2px;background:${color};flex-shrink:0;"></span><span style="font-size:9px;color:rgba(255,255,255,0.85);flex:1;">${label}</span><span style="font-size:9px;font-weight:700;color:#FFFFFF;">${pct}</span></div>`;
+  // The hero: one live enquiry being scored, exactly as the funnel demos it (source, gauge, tier, the signals behind it).
+  const leadCard = `<div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:18px 20px;">`
+    + `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 34, USER_ICON)}<div style="flex:1;"><div style="font-size:12px;font-weight:800;">New enquiry</div><div style="font-size:8.5px;letter-spacing:0.06em;color:rgba(255,255,255,0.6);">via Meta ad · scored in 90 seconds</div></div><span style="display:flex;align-items:center;gap:5px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.success};"><span style="width:6px;height:6px;border-radius:50%;background:${ci.success};"></span>Live</span></div>`
+    + `<div style="margin-top:14px;">${intentGauge(ci, 87)}</div>`
+    + `<div style="text-align:center;margin-top:2px;"><span style="display:inline-block;background:${ci.accentGrad};border-radius:999px;padding:5px 16px;font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#FFFFFF;">Hot · route to sales now</span></div>`
+    + `<div style="margin-top:16px;">${signalBar(ci, "Budget fit", 90)}${signalBar(ci, "Timeline to buy", 82)}${signalBar(ci, "Product match", 88)}</div>`
+    + `<div style="font-size:7.5px;color:rgba(255,255,255,0.45);text-align:center;margin-top:12px;font-style:italic;">Illustrative lead · real signals from week one</div></div>`;
+  const distCard = `<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:16px 18px;">`
+    + `<div style="font-size:8.5px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentOnDark};">Every enquiry, scored</div>`
+    + `<div style="display:flex;align-items:center;gap:16px;margin-top:12px;"><div style="flex-shrink:0;">${intentDonut(ci)}</div>`
+    +   `<div style="flex:1;display:flex;flex-direction:column;gap:9px;">${legendRow(ci.accentOnDark, "Hot", "13%")}${legendRow(ci.accent, "Warm", "27%")}${legendRow("rgba(255,255,255,0.22)", "Cold", "60%")}</div></div>`
+    + `<div style="font-size:9.5px;line-height:1.55;color:rgba(255,255,255,0.7);margin-top:14px;">Your team stops guessing. They spend their day on the 13% ready to buy, while the rest are nurtured automatically until they are.</div></div>`;
+  return section(pageDark(ci, "56px 60px 44px", "position:relative;overflow:hidden;"),
+    `<div style="position:absolute;right:-160px;top:-160px;width:460px;height:460px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,transparent 70%);"></div>`
+    + `<div style="position:relative;">`
+    +   `<div style="font-size:10px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;color:${ci.accentOnDark};">Proprietary · The Conversion Layer</div>`
+    +   `<div style="font-size:38px;font-weight:800;line-height:1.02;letter-spacing:-0.01em;margin-top:12px;max-width:600px;">Interest is noise.<br><span style="color:${ci.accentOnDark};">Intent is the signal.</span></div>`
+    +   `<p style="font-size:12.5px;line-height:1.7;color:rgba(255,255,255,0.78);margin:16px 0 0;max-width:560px;">${esc(p.intro)}</p>`
     + `</div>`
-    + `<div style="margin-top:14px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:8px;">How the score routes</div><div style="display:flex;gap:10px;">${p.tiles.slice(0, 3).map(tile).join("")}</div></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;position:relative;">${leadCard}${distCard}</div>`
+    + `<div style="margin-top:20px;position:relative;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:9px;">The score routes itself</div><div style="display:flex;flex-direction:column;gap:8px;">${bands.map(routeRow).join("")}</div></div>`
+    + `<div style="margin-top:auto;padding-top:20px;position:relative;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;"><div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:12px 16px;"><div style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);">The old way</div><div style="font-size:10.5px;line-height:1.5;color:rgba(255,255,255,0.7);margin-top:4px;">Chase every lead. Burn the team on tyre-kickers who were never going to buy.</div></div><div style="background:${ci.accentGrad};border-radius:12px;padding:12px 16px;"><div style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.85);">The PSI way</div><div style="font-size:10.5px;line-height:1.5;color:#FFFFFF;font-weight:600;margin-top:4px;">Your team only ever speaks to the ones ready to buy.</div></div></div></div>`
     + footerDark(d.brand_short, 7));
 }
 
