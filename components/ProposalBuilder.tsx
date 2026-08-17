@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OBJECTIVES, TIERS, type ObjectiveId, type TierId } from "@/lib/proposal-config";
 import { PROPOSAL_SECTIONS, type Proposal, type ProposalContent } from "@/lib/proposal";
 import Working, { WORKING_PROPOSAL, WORKING_PDF } from "@/components/Working";
+import StructuredEditor from "@/components/StructuredEditor";
 
 // THE PROPOSAL BUILDER (Step 4). Runs from an approved strategy: pick the objective + tier, build the client-facing
 // growth proposal (Fable 5), then READ and GATE it section by section (Gary): approve each section, or edit it by
@@ -33,9 +34,21 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
   const [pdfBusy, setPdfBusy] = useState(false);
   const [gateBusy, setGateBusy] = useState(false);
   // Per-section review state.
-  const [editKey, setEditKey] = useState<string | null>(null);   // which section is open for a prompt edit
-  const [prompt, setPrompt] = useState("");                       // the section edit instruction
-  const [sectionBusy, setSectionBusy] = useState<string | null>(null);   // which section is mid-refine/approve
+  const [editKey, setEditKey] = useState<string | null>(null);   // which section is open for editing
+  const [editMode, setEditMode] = useState<"prompt" | "text" | null>(null);   // edit by prompt, or edit the text by hand
+  const [prompt, setPrompt] = useState("");                       // the section edit instruction (prompt mode)
+  const [draftValue, setDraftValue] = useState<Record<string, unknown> | null>(null);   // the hand-edited fields (text mode)
+  const [sectionBusy, setSectionBusy] = useState<string | null>(null);   // which section is mid-refine/edit/approve
+
+  function closeEdit() { setEditKey(null); setEditMode(null); setPrompt(""); setDraftValue(null); }
+  // Open the hand-edit for a section: clone its current fields into an editable draft.
+  function openText(skey: string) {
+    if (!c) return;
+    const def = PROPOSAL_SECTIONS.find((s) => s.key === skey);
+    const val: Record<string, unknown> = {};
+    for (const f of def?.fields || []) val[f as string] = JSON.parse(JSON.stringify((c as unknown as Record<string, unknown>)[f as string] ?? null));
+    setEditKey(skey); setEditMode("text"); setPrompt(""); setDraftValue(val);
+  }
 
   const load = useCallback(async () => {
     const d = await fetch(`/api/studio/proposal/latest?strategyId=${strategyId}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null);
@@ -80,18 +93,18 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     if (r.proposal) setProposal(r.proposal); else await load();
   }
 
-  // The per-section gate: refine by prompt (Fable rewrites only this section), approve, or reopen.
-  async function sectionAct(skey: string, action: "refine" | "approve" | "reopen", instruction?: string) {
+  // The per-section gate: refine by prompt (Fable rewrites only this section), edit the text by hand, approve, reopen.
+  async function sectionAct(skey: string, action: "refine" | "edit" | "approve" | "reopen", payload?: { instruction?: string; value?: Record<string, unknown> }) {
     if (!proposal) return;
     setSectionBusy(skey);
-    if (action === "refine") setMsg("");
+    if (action === "refine" || action === "edit") setMsg("");
     const r = await fetch(`/api/studio/proposal/section`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ proposalId: proposal.id, section: skey, action, instruction }),
+      body: JSON.stringify({ proposalId: proposal.id, section: skey, action, instruction: payload?.instruction, value: payload?.value }),
     }).then((x) => x.json()).catch(() => null);
     setSectionBusy(null);
     if (!r?.ok) { setMsg(r?.error || "Couldn't do that."); return; }
-    if (action === "refine") { setEditKey(null); setPrompt(""); }
+    if (action === "refine" || action === "edit") closeEdit();
     if (r.proposal) setProposal(r.proposal);
   }
 
@@ -105,7 +118,8 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
   // A reviewable section: its content body + the human gate (approve, or edit-by-prompt then refine and rewrite).
   function section(skey: string, label: string, body: React.ReactNode) {
     const approved = review[skey] === "approved";
-    const editing = editKey === skey;
+    const editingPrompt = editKey === skey && editMode === "prompt";
+    const editingText = editKey === skey && editMode === "text";
     const busyHere = sectionBusy === skey;
     return (
       <section key={skey} className={`rounded-xl border ${approved ? "border-[#4ade80]/40" : "border-line"} bg-surface-1 p-5`}>
@@ -115,21 +129,31 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
             ? <span className="rounded-full bg-[#4ade80]/15 px-2.5 py-0.5 text-sm font-bold text-[#86efac]">✓ Approved</span>
             : <span className="rounded-full bg-[#fbbf24]/15 px-2.5 py-0.5 text-sm font-bold text-[#fcd34d]">Needs review</span>}
         </div>
-        <div className="mt-2">{body}</div>
+        <div className="mt-2">{editingText && draftValue ? <StructuredEditor value={draftValue} onChange={setDraftValue} /> : body}</div>
         {!locked && (
           <div className="mt-3 border-t border-line pt-3">
-            {editing ? (
+            {editingText ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => sectionAct(skey, "edit", { value: draftValue || {} })} disabled={busyHere}
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-1.5 text-[15px] font-bold text-black disabled:opacity-50">
+                  {busyHere && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+                  {busyHere ? "Saving…" : "Save my edits"}
+                </button>
+                <button onClick={closeEdit} className="text-[15px] font-semibold text-ink-faint hover:text-ink">Cancel</button>
+                <span className="text-[13px] text-ink-faint">Saves your exact text, no AI.</span>
+              </div>
+            ) : editingPrompt ? (
               <div>
                 <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={2} autoFocus
                   placeholder={`How should the ${label.toLowerCase()} change? e.g. "lead with the price", "make it plainer", "shorten it"…`}
                   className="w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-[15px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button onClick={() => sectionAct(skey, "refine", prompt.trim())} disabled={busyHere || !prompt.trim()}
+                  <button onClick={() => sectionAct(skey, "refine", { instruction: prompt.trim() })} disabled={busyHere || !prompt.trim()}
                     className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-1.5 text-[15px] font-bold text-black disabled:opacity-50">
                     {busyHere && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
                     {busyHere ? "Rewriting…" : "Refine and rewrite now"}
                   </button>
-                  <button onClick={() => { setEditKey(null); setPrompt(""); }} className="text-[15px] font-semibold text-ink-faint hover:text-ink">Cancel</button>
+                  <button onClick={closeEdit} className="text-[15px] font-semibold text-ink-faint hover:text-ink">Cancel</button>
                   <span className="text-[13px] text-ink-faint">Rewrites only this section, on Fable 5.</span>
                 </div>
                 {busyHere && <div className="mt-2 text-base text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
@@ -142,8 +166,10 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
                     {busyHere && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" />}✓ Approve section
                   </button>
                 )}
-                <button onClick={() => { setEditKey(skey); setPrompt(""); }} disabled={busyHere}
+                <button onClick={() => { setEditKey(skey); setEditMode("prompt"); setPrompt(""); setDraftValue(null); }} disabled={busyHere}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">✎ Edit by prompt</button>
+                <button onClick={() => openText(skey)} disabled={busyHere}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink disabled:opacity-50">⌨ Edit text</button>
                 {approved && <button onClick={() => sectionAct(skey, "reopen")} disabled={busyHere} className="text-[15px] font-semibold text-ink-faint hover:text-ink">Reopen</button>}
               </div>
             )}

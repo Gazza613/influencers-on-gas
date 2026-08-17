@@ -357,6 +357,28 @@ export async function refineProposalSection(proposalId: string, section: string,
   return upd[0];
 }
 
+// EDIT A SECTION BY HAND (Human Command). The human edits the actual copy of a section's fields and saves; we merge
+// those exact fields back into the proposal, leaving everything else intact. The edited section returns to 'draft'
+// (a change means it should be re-read and re-approved) and any rendered PDF is invalidated. No model call.
+export async function editProposalSection(proposalId: string, section: string, value: Record<string, unknown>): Promise<Proposal> {
+  const rows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
+  const cur = rows[0];
+  if (!cur) throw new Error("That proposal was not found.");
+  if (cur.status === "approved") throw new Error("That proposal is approved. Reopen it to edit a section.");
+  if (!cur.content) throw new Error("This proposal has no content to edit.");
+  const def = PROPOSAL_SECTIONS.find((s) => s.key === section);
+  if (!def) throw new Error("Unknown section.");
+  const content = { ...(cur.content as unknown as Record<string, unknown>) };
+  for (const f of def.fields) if (f in value) content[f as string] = value[f as string];
+  const review = { ...(cur.section_review || {}) };
+  review[section] = "draft";
+  const upd = (await db().query(
+    `update proposals set content = $2, section_review = $3::jsonb, pdf_url = null where id = $1 returning *`,
+    [proposalId, JSON.stringify(content), JSON.stringify(review)],
+  )) as Proposal[];
+  return upd[0];
+}
+
 // Set a section's human-gate state (approve, or reopen to draft). Approving all sections unlocks the final PDF.
 export async function setProposalSectionReview(proposalId: string, section: string, state: "approved" | "draft"): Promise<Proposal> {
   const rows = (await db().query(`select section_review from proposals where id = $1`, [proposalId])) as { section_review: Record<string, string> | null }[];
