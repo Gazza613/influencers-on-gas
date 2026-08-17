@@ -71,6 +71,10 @@ const PLATFORM_ICON: Record<string, string> = {
 const roleLabel = (p: string) => (p === "lead" ? "Lead channel" : p === "support" ? "Support" : "30-day test");
 const roleKind = (p: string): "lead" | "support" | "test" => (p === "lead" ? "lead" : p === "support" ? "support" : "test");
 
+// Lowercase a label for mid-sentence use, but KEEP "PSI" uppercase (Gary: PSI is always uppercase, even in brackets).
+// The objective label "Lead Generation (PSI)" was being lowercased to "(psi)".
+const lowerKeepPSI = (s: string): string => String(s || "").toLowerCase().replace(/psi/g, "PSI");
+
 export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): ProposalDoc {
   const name = x.clientName;
   const pods = (c.pods && c.pods.length ? c.pods : []) as { name: string; for_client: string; benefit: string }[];
@@ -124,7 +128,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       wedge_body: c.strategy?.proposition || "",
       argument: c.strategy?.angle || "",
       proof_cards: (c.strategy?.why_it_wins || []).slice(0, 6).map((w) => splitTitleBody(w)),
-      flow: { believe: "The proof the market already trusts", buy: "The single reason to act now", outcome: `A qualified ${x.objectiveLabel.toLowerCase()} outcome per rand` },
+      flow: { believe: "The proof the market already trusts", buy: "The single reason to act now", outcome: `A qualified ${lowerKeepPSI(x.objectiveLabel)} outcome per rand` },
     },
 
     market: {
@@ -147,7 +151,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
     },
 
     ecosystem_intro: `One closed-loop system that carries a prospect from first impression to a booked outcome, and then compounds: each pod passes sharper intelligence to the next.`,
-    divider_line: `The pages that follow walk through the system pod by pod: what each does, and what it means for ${name}'s ${x.objectiveLabel.toLowerCase()} specifically.`,
+    divider_line: `The pages that follow walk through the system pod by pod: what each does, and what it means for ${name}'s ${lowerKeepPSI(x.objectiveLabel)} specifically.`,
 
     pods12: {
       headline: hl("Pods I and II ·", "Research and Strategy"),
