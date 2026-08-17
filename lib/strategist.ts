@@ -159,7 +159,12 @@ async function prepareStrategyInputs(clientId: string, objective: string, opts: 
   const legend = claims.map((c, i) => `F${i + 1} [${c.section}${c.subject ? `/${c.subject}` : ""}] ${c.claim}${c.source_url ? " (sourced)" : ""}`).join("\n");
   const priorBlock = opts.prior ? `\n\nCURRENT STRATEGY (improve this, do not start from scratch):\n${JSON.stringify(opts.prior)}` : "";
   const notesBlock = opts.notes?.trim() ? `\n\nTEAM DIRECTION (apply precisely, and record each material change in 'changes_from_last'):\n${opts.notes.trim().slice(0, 2000)}` : "";
-  const user = `OBJECTIVE FOR THIS STRATEGY: ${objective}\n\nTHE VERIFIED FACT BASE (cite facts as their Fn tag in every rationale point):\n${legend}${priorBlock}${notesBlock}`;
+  // The team's LOCKED channel selection (chosen on the Strategist) - steer channel_logic to only these, so the
+  // strategy (and the proposal built from it) reflect exactly the channels we intend to run.
+  const chRows = (await db().query(`select channels from clients where id = $1`, [clientId]).catch(() => [])) as { channels: string[] | null }[];
+  const channels = Array.isArray(chRows[0]?.channels) ? chRows[0]!.channels!.filter(Boolean) : [];
+  const channelsBlock = channels.length ? `\n\nSELECTED CHANNELS (the team has locked these media channels for this client, non-negotiable): ${channels.join(", ")}. Your channel_logic and every channel recommendation MUST use ONLY these, and never introduce another. Match each to its real role WITHIN this set (if LinkedIn is listed it supports and qualifies; Meta/Google drive the volume). A channel not on the list is not in this plan.` : "";
+  const user = `OBJECTIVE FOR THIS STRATEGY: ${objective}\n\nTHE VERIFIED FACT BASE (cite facts as their Fn tag in every rationale point):\n${legend}${channelsBlock}${priorBlock}${notesBlock}`;
   return { clientId, runId, clientName, legend, user, claims };
 }
 

@@ -47,6 +47,16 @@ const CLUSTERS = ["The idea", "The audience", "The plan", "The case"] as const;
 type ClusterName = (typeof CLUSTERS)[number];
 type Section = { id: string; cluster: ClusterName; icon: string; title: string; preview: string; body: React.ReactNode };
 
+// The media channels the team can select for a client. `value` MUST match lib/proposal-config PLATFORMS (so it locks
+// the proposal's channel plan + audience targeting); the label is what the team sees ("Google" = Google Display).
+const CHANNEL_OPTIONS: { label: string; value: string }[] = [
+  { label: "Facebook", value: "Facebook" },
+  { label: "Instagram", value: "Instagram" },
+  { label: "TikTok", value: "TikTok" },
+  { label: "LinkedIn", value: "LinkedIn" },
+  { label: "Google", value: "Google Display" },
+];
+
 export default function StrategyGate({ clients, ready, initialClientId = "" }: { clients: Client[]; ready: string[]; initialClientId?: string }) {
   const [clientId, setClientId] = useState(() => {
     const fromPod = initialClientId && clients.find((c) => c.id === initialClientId);
@@ -60,6 +70,7 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
   const [refineFor, setRefineFor] = useState<string | null>(null);   // a section title, or "__gate__" for the sticky bar
   const [open, setOpen] = useState<Set<string>>(new Set());          // which sections are expanded
   const [msg, setMsg] = useState("");
+  const [channels, setChannels] = useState<string[]>([]);            // the media channels the team selects for this client
 
   const clientRef = useRef(clientId);
   useEffect(() => { clientRef.current = clientId; }, [clientId]);
@@ -70,6 +81,18 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
     setData(d || { strategy: null, objective: null, hasApprovedResearch: false });
   }, []);
   useEffect(() => { load(clientId); }, [clientId, load]);
+  // Load this client's selected channels; toggling saves immediately so the strategy + proposal always reflect them.
+  useEffect(() => {
+    if (!clientId) { setChannels([]); return; }
+    let alive = true;
+    fetch(`/api/studio/client-channels?clientId=${clientId}`, { cache: "no-store" }).then((r) => r.json()).then((d) => { if (alive) setChannels(Array.isArray(d?.channels) ? d.channels : []); }).catch(() => {});
+    return () => { alive = false; };
+  }, [clientId]);
+  async function toggleChannel(value: string) {
+    const next = channels.includes(value) ? channels.filter((c) => c !== value) : [...channels, value];
+    setChannels(next);
+    await fetch(`/api/studio/client-channels`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, channels: next }) }).catch(() => {});
+  }
 
   const isReady = ready.includes(clientId);
   const strategy = data?.strategy || null;
@@ -282,6 +305,26 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
         <div className="mt-6 rounded-xl border border-line bg-surface-1 p-5">
           <div className="text-lg font-bold text-ink">{strategy ? "Build a new strategy" : "Build the strategy"}</div>
           <p className="mt-0.5 text-base text-ink-faint">The objective this strategy must achieve, e.g. &quot;acquire high-intent leads for the new product at a lower cost per lead&quot;.</p>
+
+          {/* Channel selection: the team ticks the media channels we intend to run for this client. Steers the strategy
+              and locks the proposal's channel plan + audience targeting to only these (Gary). Saved on toggle. */}
+          <div className="mt-3">
+            <span className="text-base font-semibold uppercase tracking-wide text-ink-faint">Channels for this client</span>
+            <p className="mt-0.5 text-sm text-ink-faint">Tick the channels we intend to run. The strategy and the final proposal will use only these.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {CHANNEL_OPTIONS.map((o) => {
+                const on = channels.includes(o.value);
+                return (
+                  <button key={o.value} type="button" onClick={() => toggleChannel(o.value)}
+                    className={`rounded-lg border px-4 py-1.5 text-base font-semibold transition ${on ? "border-accent bg-accent/15 text-accent" : "border-line text-ink-dim hover:text-ink"}`}>
+                    {on ? "✓ " : ""}{o.label}
+                  </button>
+                );
+              })}
+            </div>
+            {!channels.length && <p className="mt-1.5 text-sm text-ink-faint">None selected: the strategy will choose the channels itself. Tick some to lock them.</p>}
+          </div>
+
           <textarea value={objective} onChange={(e) => setObjective(e.target.value)} rows={2}
             placeholder="The commercial objective for this strategy…"
             className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-lg text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />

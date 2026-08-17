@@ -125,7 +125,7 @@ function extract(msg: Anthropic.Message): ProposalContent | null {
   return b && b.type === "tool_use" ? (b.input as ProposalContent) : null;
 }
 
-const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)[TierId]) =>
+const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)[TierId], channels: string[] = []) =>
   `You are the lead growth strategist and media planner at GAS Marketing Automation, the Agency of NOW, writing a WORLD-CLASS, award-winning growth proposal for ${clientName} to sign off. Discipline: Human Command, AI Execution. This is a professional client-facing document; it must be specific, confident and demonstrably expert on every pod.\n\n` +
   `THE SYSTEM (use these exact pod names, mapped to ${clientName}): Researcher, Strategist, Audience, Creative, Channels, PSI, PSI Conversion Dashboard, Media on GAS. It is one closed-loop SYSTEM: each pod feeds sharper intelligence to the next, and Media on GAS feeds every result back upstream so the system compounds and gets more intelligent over time. Always call it a "system", never an "engine".\n\n` +
   `GAS PRODUCT DOCTRINE (non-negotiable, we sell on OUR strengths):\n` +
@@ -165,36 +165,47 @@ const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)
   `- INVESTMENT: fill it fully. tier_name = "${tier.name}", rate = "${tier.rate}". In 'engine_includes' list 6 to 8 concrete things the SYSTEM delivers at this tier (the pods and what the tier covers, e.g. "PSI qualification and the conversion dashboard"). In 'notes' put the honest commercial notes: media budget is the client's and additional to the retainer; the client owns all data, accounts and audiences; we do not quote a guaranteed return.\n` +
   `- DO NOT COMMIT TO A FIXED SET OF ALL CHANNELS. We choose channels per objective and may not run them all. Never list a locked line like "media across Facebook, Instagram, Google Display and LinkedIn". Say "a selected media channel strategy", "media across the channels that fit this objective", or "full media management across the selected platforms". Keep it flexible.\n` +
   `- ONLY MEASURE WHAT WE CONTROL. Do not promise, commit to, or put in KPIs any metric that sits with the client and outside our control, such as enquiry-to-quote time, sales-response speed, close rate or their internal turnaround. We are accountable for what WE deliver (qualified enquiries, cost per qualified lead, qualification rate), never the client's internal process speed.\n` +
-  `- Never use the word "manifesto". Confident, premium, concrete, no filler.\n\n` +
+  `- Never use the word "manifesto". Confident, premium, concrete, no filler.\n` +
+  channelDirective(channels) +
+  `\n` +
   WRITING_STYLE;
 
 // Load the shared CONTEXT a proposal (or a single section) is written from: the approved strategy, the client, and
 // the verified research facts. Extracted so the whole-proposal build and the per-section refine draw on the exact
 // same grounding. We sell OUR PSI WhatsApp system, so the client's own contact channels (WhatsApp number, phone,
 // forms, store locator, socials) are NEVER shown to the model: we drop the contact + online_presence facts entirely.
-async function loadProposalContext(strategyId: string): Promise<{ clientId: string; clientName: string; strat: StrategyContent | null; factBlock: string; engagementId: string; campaignId: string | null }> {
+async function loadProposalContext(strategyId: string): Promise<{ clientId: string; clientName: string; strat: StrategyContent | null; factBlock: string; channels: string[]; engagementId: string; campaignId: string | null }> {
   const srows = (await db().query(`select * from strategies where id = $1`, [strategyId])) as Strategy[];
   const strategy = srows[0];
   if (!strategy) throw new Error("That strategy was not found.");
   if (strategy.status !== "approved") throw new Error("Approve the strategy at Gate 2 before building the proposal.");
   const eng = (await db().query(`select client_id from engagements where id = $1`, [strategy.engagement_id])) as { client_id: string }[];
   const clientId = eng[0]?.client_id;
-  const clientName = ((await db().query(`select name from clients where id = $1`, [clientId])) as { name: string }[])[0]?.name || "the client";
+  const crow = (await db().query(`select name, channels from clients where id = $1`, [clientId])) as { name: string; channels: string[] | null }[];
+  const clientName = crow[0]?.name || "the client";
+  const channels = Array.isArray(crow[0]?.channels) ? crow[0]!.channels!.filter(Boolean) : [];
   const run = (await db().query(`select id from research_runs where client_id = $1 and status = 'gate1_approved' order by version desc limit 1`, [clientId])) as { id: string }[];
   const facts = run[0]
     ? (await db().query(`select section, subject, claim from research_claims where run_id = $1 and rejected = false and section <> 'unverified' and claim <> '' order by (tier is null), tier asc`, [run[0].id])) as { section: string; subject: string | null; claim: string }[]
     : [];
   const PROPOSAL_FACT_EXCLUDE = new Set(["contact", "online_presence"]);
   const factBlock = facts.filter((f) => !PROPOSAL_FACT_EXCLUDE.has(f.section)).slice(0, 160).map((f) => `- [${f.section}${f.subject ? `/${f.subject}` : ""}] ${f.claim}`).join("\n");
-  return { clientId, clientName, strat: strategy.content as StrategyContent | null, factBlock, engagementId: strategy.engagement_id, campaignId: strategy.campaign_id };
+  return { clientId, clientName, strat: strategy.content as StrategyContent | null, factBlock, channels, engagementId: strategy.engagement_id, campaignId: strategy.campaign_id };
 }
+
+// The team's LOCKED channel selection (from the Strategist) as a hard directive for the proposal: the channel plan
+// and every persona's platform targeting use ONLY these, never an unlisted one. Empty = no restriction.
+const channelDirective = (channels: string[]): string =>
+  channels.length
+    ? `\n- SELECTED CHANNELS (LOCKED by the team, non-negotiable): the ONLY media channels for this proposal are: ${channels.join(", ")}. Use ONLY these everywhere channels appear, the channel plan AND each persona's platform targeting. NEVER introduce a channel that is not on this list (if it is not listed, it is not in this campaign). If a listed channel does not fit a given persona, omit it for that persona, but never add an unlisted one. The channel-realism rules still apply WITHIN this set (e.g. if LinkedIn is listed it supports and qualifies while Meta/Google drive volume).\n`
+    : "";
 
 // Build the proposal content for an approved strategy, on the chosen objective + tier. Fable 5, retried on overload.
 // notes/prior fold in a strategist's review comments so a rework improves the draft rather than starting cold.
 export async function buildProposal(strategyId: string, input: { objective: ObjectiveId; tier: TierId; userEmail?: string | null; notes?: string; prior?: ProposalContent | null }): Promise<{ content: ProposalContent; clientId: string; engagementId: string; campaignId: string | null }> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected.");
-  const { clientId, clientName, strat, factBlock, engagementId, campaignId } = await loadProposalContext(strategyId);
+  const { clientId, clientName, strat, factBlock, channels, engagementId, campaignId } = await loadProposalContext(strategyId);
 
   const objective = OBJECTIVES.find((o) => o.id === input.objective) || OBJECTIVES[0];
   const tier = TIERS[input.tier] || TIERS.dominate;
@@ -217,7 +228,7 @@ export async function buildProposal(strategyId: string, input: { objective: Obje
   // investment / rollout / compliance" bug). 32k gives ample headroom for the whole structured object.
   const runOnce = async (action: string): Promise<ProposalContent | null> => {
     const msg = await withAnthropicRetry(() => client.messages.stream({
-      model: FABLE, max_tokens: 32000, system: SYSTEM(clientName, objective.label, tier),
+      model: FABLE, max_tokens: 32000, system: SYSTEM(clientName, objective.label, tier, channels),
       tools: [tool], tool_choice: { type: "tool", name: "write_proposal" },
       messages: [{ role: "user", content: user }],
     }).finalMessage());
@@ -358,7 +369,7 @@ export async function refineProposalSection(proposalId: string, section: string,
   if (!def) throw new Error("Unknown section.");
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected.");
-  const { clientId, clientName, strat, factBlock } = await loadProposalContext(cur.strategy_id);
+  const { clientId, clientName, strat, factBlock, channels } = await loadProposalContext(cur.strategy_id);
   const objective = OBJECTIVES.find((o) => o.id === (cur.objective as ObjectiveId)) || OBJECTIVES[0];
   const tier = TIERS[cur.tier as TierId] || TIERS.dominate;
 
@@ -383,7 +394,7 @@ export async function refineProposalSection(proposalId: string, section: string,
   // Same Fable leak guard as the full build (strict would 400 on a big section's grammar): detect + retry once.
   const runSection = async (action: string): Promise<Record<string, unknown> | null> => {
     const msg = await withAnthropicRetry(() => client.messages.stream({
-      model: FABLE, max_tokens: 12000, system: SYSTEM(clientName, objective.label, tier),
+      model: FABLE, max_tokens: 12000, system: SYSTEM(clientName, objective.label, tier, channels),
       tools: [tool], tool_choice: { type: "tool", name: "write_section" },
       messages: [{ role: "user", content: user }],
     }).finalMessage());

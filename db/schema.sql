@@ -41,6 +41,7 @@ alter table clients add column if not exists socials jsonb not null default '[]'
 alter table clients add column if not exists research_weekly boolean not null default false;   -- weekly auto-run of the Researcher (Mon 08:30 SAST); OFF by default so no spend happens without opting in
 alter table clients add column if not exists owner_context text;   -- when the subject is a product/brand owned by a parent (e.g. egifts24 owned by StellR): the Researcher researches the parent for context but attributes its people/numbers to the parent
 alter table clients add column if not exists brand_palette jsonb;   -- the client's CI palette {primary,dark} read intelligently from their website (a homepage screenshot -> vision), cached so the proposal wears the same real brand colours every render; refreshed if empty. A manual accent override still wins per render.
+alter table clients add column if not exists channels text[];   -- the media channels the team selects on the Strategist (Facebook/Instagram/TikTok/Google Display/LinkedIn); steers the strategy AND locks the proposal's channel plan + audience targeting to these. NULL/empty = no restriction (model uses judgement).
 
 create table if not exists client_profiles (
   id                  uuid primary key default gen_random_uuid(),
