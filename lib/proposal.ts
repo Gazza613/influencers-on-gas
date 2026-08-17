@@ -207,7 +207,11 @@ export async function buildProposal(strategyId: string, input: { objective: Obje
     `THE VERIFIED RESEARCH FACTS (ground the opportunity, audience and pods in these):\n${factBlock}${priorBlock}${notesBlock}\n\n` +
     `Write the full proposal via write_proposal. Make the audience and channels world-class and specific.`;
 
-  const tool: Anthropic.Tool = { name: "write_proposal", description: "The complete, structured growth proposal.", input_schema: CONTENT_SCHEMA };
+  // strict:true is REQUIRED on Fable 5: without it, Fable leaks the textual tool-call format (nested object fields
+  // come back as strings containing <parameter name="...">) instead of proper nested JSON. Strict tool use guarantees
+  // the tool input validates exactly against the schema, so every nested section is a real object. Our schema is
+  // strict-compatible (additionalProperties:false + full required lists, enum-only constraints).
+  const tool: Anthropic.Tool = { name: "write_proposal", description: "The complete, structured growth proposal.", input_schema: CONTENT_SCHEMA, strict: true };
   // max_tokens must clear the FULL proposal: 5 personas with platform-level selections, 8 pods, KPIs, rollout,
   // compliance AND investment are the LAST fields, so a tight ceiling truncates exactly those (the "blank
   // investment / rollout / compliance" bug). 32k gives ample headroom for the whole structured object.
@@ -325,7 +329,7 @@ export async function refineProposalSection(proposalId: string, section: string,
   const props: Record<string, unknown> = {};
   for (const f of def.fields) props[f] = CONTENT_PROPS[f as string];
   const sectionSchema = { type: "object", additionalProperties: false, properties: props, required: def.fields } as unknown as Anthropic.Tool["input_schema"];
-  const tool: Anthropic.Tool = { name: "write_section", description: `The revised "${def.label}" section only.`, input_schema: sectionSchema };
+  const tool: Anthropic.Tool = { name: "write_section", description: `The revised "${def.label}" section only.`, input_schema: sectionSchema, strict: true };
   const curSection: Record<string, unknown> = {};
   for (const f of def.fields) curSection[f] = (cur.content as unknown as Record<string, unknown>)[f as string];
 

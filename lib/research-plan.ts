@@ -67,7 +67,7 @@ export async function planResearch(clientId: string, focus: string, userEmail?: 
     `\nTHE BRIEF (what the team wants researched, and why):\n${brief || "(no specific brief given) A full, foundational fact base on this client for a marketing strategy: who they are, their market, competitors, audience, positioning, current marketing and recent activity."}\n\n` +
     `Propose the facts-only research plan via write_plan.`;
   const client = new Anthropic({ apiKey: key });
-  const tool: Anthropic.Tool = { name: "write_plan", description: "The facts-only research plan for this brief.", input_schema: PLAN_SCHEMA };
+  const tool: Anthropic.Tool = { name: "write_plan", description: "The facts-only research plan for this brief.", input_schema: PLAN_SCHEMA, strict: true };
   const msg = await withAnthropicRetry(() => client.messages.stream({
     model: OPUS5, max_tokens: 4000, system: SYSTEM,
     tools: [tool], tool_choice: { type: "tool", name: "write_plan" },
