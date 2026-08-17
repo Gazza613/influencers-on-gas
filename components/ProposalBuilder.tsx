@@ -33,6 +33,7 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
   const [dark, setDark] = useState("");        // optional DARK/background-page colour (near-black if blank)
   const [pdfBusy, setPdfBusy] = useState(false);
   const [gateBusy, setGateBusy] = useState(false);
+  const [docPrompt, setDocPrompt] = useState("");   // a global directive applied across every section
   // Per-section review state.
   const [editKey, setEditKey] = useState<string | null>(null);   // which section is open for editing
   const [editMode, setEditMode] = useState<"prompt" | "text" | null>(null);   // edit by prompt, or edit the text by hand
@@ -77,6 +78,22 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     setPdfBusy(false);
     if (!r?.ok) { setMsg(r?.error || "Couldn't render the PDF."); return; }
     setMsg(""); setProposal((p) => (p ? { ...p, pdf_url: r.url } : p));
+  }
+
+  // A DOCUMENT-LEVEL change (Gary): one instruction the AI applies across EVERY section, keeping the whole proposal
+  // consistent (channels, audience, targeting, rollout all move together). Reworks the whole draft from the current
+  // content, so your edits stay as the starting point; all sections return to needs-review afterwards.
+  async function docRefine() {
+    if (!proposal || !docPrompt.trim()) return;
+    setGateBusy(true); setMsg("");
+    const r = await fetch(`/api/studio/proposal/gate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposalId: proposal.id, action: "refine", comments: docPrompt.trim() }),
+    }).then((x) => x.json()).catch(() => null);
+    setGateBusy(false);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't rework the proposal."); return; }
+    setMsg(""); setDocPrompt("");
+    if (r.proposal) setProposal(r.proposal); else await load();
   }
 
   // The whole-proposal gate: approve (only when every section is approved), reopen an approved proposal.
@@ -227,6 +244,27 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
       {/* THE PROPOSAL DRAFT, section by section */}
       {c && (
         <div className="mt-6 space-y-6">
+          {/* DOCUMENT-LEVEL change: one instruction applied across every section (Gary: don't make me repeat a global
+              change in each section). Reworks the whole draft from the current content, keeping it consistent. */}
+          {!locked && (
+            <div className="rounded-xl border border-accent/40 bg-surface-1 p-5">
+              <div className="text-lg font-bold text-accent">Change the whole proposal</div>
+              <p className="mt-1 text-base text-ink-dim">One instruction the AI applies across <b>every</b> section at once, keeping the document consistent, so you do not have to make the same change section by section. It reworks the whole draft from what is here now, so your edits stay as the starting point, then every section returns to needs-review.</p>
+              <textarea value={docPrompt} onChange={(e) => setDocPrompt(e.target.value)} rows={2}
+                placeholder={`e.g. "Facebook and Instagram channels only, no Google or TikTok" · "lead harder on the manufacturer-direct price" · "drop the R6,500 unit examples"`}
+                className="mt-3 w-full resize-y rounded-lg border border-line bg-surface-2 px-3 py-2 text-lg text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none" />
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button onClick={docRefine} disabled={gateBusy || !docPrompt.trim()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
+                  {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+                  {gateBusy ? "Reworking the whole proposal…" : "Apply across the whole proposal"}
+                </button>
+                <span className="text-base text-ink-faint">Rewrites every section, on Fable 5. Takes a moment.</span>
+              </div>
+              {gateBusy && <div className="mt-3 text-base text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
+            </div>
+          )}
+
           {section("cover", "Cover", (
             <div>
               <h3 className="text-2xl font-extrabold text-ink">{c.headline}</h3>

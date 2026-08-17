@@ -319,8 +319,9 @@ export async function refineProposal(proposalId: string, comments: string, userE
     objective: cur.objective as ObjectiveId, tier: cur.tier as TierId,
     userEmail, notes: comments, prior: cur.content,
   });
+  // A whole-document rework changes every section, so all per-section approvals reset to needs-review.
   const upd = (await db().query(
-    `update proposals set content = $2, status = 'awaiting_approval', pdf_url = null where id = $1 returning *`,
+    `update proposals set content = $2, status = 'awaiting_approval', pdf_url = null, section_review = '{}'::jsonb where id = $1 returning *`,
     [proposalId, JSON.stringify(content)],
   )) as Proposal[];
   return upd[0];
