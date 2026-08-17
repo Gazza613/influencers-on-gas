@@ -933,16 +933,42 @@ function sCoverPage(d: ProposalDoc, ci: CiTokens): string {
 
 // ── S03 THE OPPORTUNITY (light) — six sourced big-number stat cards + the definition of success ────────────────
 function sOpportunityPage(d: ProposalDoc, ci: CiTokens): string {
-  const stats = d.opportunity.stat_cards.slice(0, 6).map((s) =>
-    `<div style="background:#FFFFFF;border-radius:16px;padding:14px 18px;box-shadow:0 6px 18px ${ci.shadow};height:100%;display:flex;flex-direction:column;">`
-    + `<div style="display:flex;align-items:flex-start;gap:9px;">${disc(ci, 26, s.icon)}<div style="font-size:22px;font-weight:800;line-height:1.02;color:${ci.accent};">${esc(s.stat)}</div></div>`
-    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:7px;">${esc(s.body)}</div>`
-    + `<div style="margin-top:auto;padding-top:9px;font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(s.source)}</div></div>`).join("");
+  const cards = d.opportunity.stat_cards.slice(0, 6);
+  const heroes = cards.slice(0, 2);
+  const rest = cards.slice(2, 6);
+  // Keep the strategic setup copy: up to two paras lead the page, the rest of the argument lives in the stats.
+  const paras = d.opportunity.paras.slice(0, 2).map((p, i) =>
+    `<p style="font-size:${i === 0 ? "12px" : "11px"};line-height:1.7;color:${ci.body};margin:${i === 0 ? "12px" : "8px"} 0 0;">${esc(p)}</p>`).join("");
+  // The signature: the two headline numbers rendered oversized (46px accent numerals), the icon top-left, the number
+  // and its meaning centred so the card fills its height cleanly, and the source pinned to the card floor.
+  const heroCard = (s: StatCard) =>
+    `<div style="background:#FFFFFF;border-radius:18px;padding:22px 24px;box-shadow:0 6px 18px ${ci.shadow};height:100%;display:flex;flex-direction:column;">`
+    + `<div>${disc(ci, 40, s.icon)}</div>`
+    + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:16px 0;">`
+    +   `<div style="font-size:46px;font-weight:800;line-height:1.0;letter-spacing:-0.01em;color:${ci.accent};">${esc(s.stat)}</div>`
+    +   `<div style="font-size:11px;line-height:1.55;color:${ci.body};margin-top:12px;">${esc(s.body)}</div>`
+    + `</div>`
+    + `<div style="padding-top:12px;border-top:1px solid rgba(26,16,48,0.08);font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(s.source)}</div>`
+    + `</div>`;
+  // The wider signals: the remaining stats as one unified ledger strip (not four floating equal cards), each cell a
+  // 30px accent numeral over its meaning, divided by hairlines, sources flush on the floor via margin-top:auto.
+  const ledgerCell = (s: StatCard, i: number) =>
+    `<div style="padding:2px 18px;${i > 0 ? "border-left:1px solid rgba(26,16,48,0.08);" : ""}display:flex;flex-direction:column;">`
+    + `<div>${disc(ci, 24, s.icon)}</div>`
+    + `<div style="font-size:30px;font-weight:800;line-height:1.0;letter-spacing:-0.01em;color:${ci.accent};margin-top:11px;">${esc(s.stat)}</div>`
+    + `<div style="font-size:9px;line-height:1.5;color:${ci.muted};margin-top:8px;">${esc(s.body)}</div>`
+    + `<div style="margin-top:auto;padding-top:10px;font-size:7.5px;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(s.source)}</div>`
+    + `</div>`;
   return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "The Opportunity") + headline(ci, d.opportunity.headline)
-    + `<p style="font-size:12px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.opportunity.paras[0] || "")}</p>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;align-items:stretch;">${stats}</div>`
-    + `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:18px 24px;color:#FFFFFF;">`
+    eyebrow(ci, "The Opportunity") + headline(ci, d.opportunity.headline) + paras
+    // The hero pair grows to consume slack (flex:1) so the page fills top-to-bottom with the oversized numerals.
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;flex:1;align-items:stretch;">${heroes.map(heroCard).join("")}</div>`
+    + (rest.length
+        ? miniEyebrow(ci, "The wider signals", "16px")
+          + `<div style="background:#FFFFFF;border-radius:16px;padding:16px 6px;box-shadow:0 6px 18px ${ci.shadow};margin-top:9px;display:grid;grid-template-columns:repeat(${rest.length}, 1fr);align-items:stretch;">${rest.map(ledgerCell).join("")}</div>`
+        : "")
+    // The one dark element: the definition of success, bottom-anchored as a closing band.
+    + `<div style="margin-top:14px;background:${ci.darkCard};border-radius:16px;padding:18px 24px;color:#FFFFFF;">`
     +   `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">The definition of success</div>`
     +   `<div style="font-size:12px;line-height:1.65;margin-top:6px;color:rgba(255,255,255,0.9);">${esc(d.opportunity.success_body)}</div></div>`
     + sFootLight(ci, d.brand_short));
@@ -950,48 +976,132 @@ function sOpportunityPage(d: ProposalDoc, ci: CiTokens): string {
 
 // ── S02 EXECUTIVE SUMMARY (light) — intro + 4 cards + the fixed journey strip ──────────────────────────────────
 function sExecPage(d: ProposalDoc, ci: CiTokens): string {
-  const cards = d.exec.cards.slice(0, 4).map((c) => card(ci, "15px 18px",
-    `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 34, c.icon)}<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${esc(c.title)}</div></div>`
-    + `<p style="font-size:10.5px;line-height:1.6;color:${ci.muted};margin:6px 0 0;">${esc(c.body)}</p>`)).join("");
+  // Signature: a numbered VALUE LADDER, not a 2x2 of white cards. Each of the four exec cards becomes a full-width
+  // rung welding a dark numeral plate (the mandated single dark element on a light page) to a white content card.
+  // The four dark plates stack into a vertical dark spine down the left edge, the ladder's rail and the deck's
+  // dark/light rhythm echo in one move. The rung grid takes flex:1 with equal 1fr rows so it consumes all vertical
+  // slack; the white body vertically centres its content so a stretched rung reads as deliberate air, not a void.
+  const rungs = d.exec.cards.slice(0, 4).map((c, i) =>
+    `<div style="display:flex;align-items:stretch;border-radius:16px;overflow:hidden;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="width:64px;flex-shrink:0;background:${ci.darkCard};display:flex;align-items:center;justify-content:center;">`
+    +   `<div style="font-size:30px;font-weight:800;line-height:1;letter-spacing:-0.02em;color:${ci.accentOnDark};">0${i + 1}</div></div>`
+    + `<div style="flex:1;min-width:0;background:#FFFFFF;padding:16px 20px;display:flex;flex-direction:column;justify-content:center;">`
+    +   `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 34, c.icon)}<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;line-height:1.15;">${esc(c.title)}</div></div>`
+    +   `<p style="font-size:10.5px;line-height:1.6;color:${ci.muted};margin:7px 0 0;">${esc(c.body)}</p>`
+    + `</div></div>`).join("");
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "Executive Summary") + headline(ci, d.exec.headline)
     + `<p style="font-size:11.5px;line-height:1.7;color:${ci.body};margin:12px 0 0;">${esc(d.exec.intro)}</p>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;flex:1;">${cards}</div>`
+    + `<div style="display:grid;grid-template-rows:repeat(4,1fr);gap:12px;margin-top:16px;flex:1;">${rungs}</div>`
     + journeyStrip(ci) + sFootLight(ci, d.brand_short));
 }
 
 // ── S04 MARKET INTELLIGENCE (light) — intro + six "what we do about it" recommendation cards ───────────────────
 function sMarketPage(d: ProposalDoc, ci: CiTokens): string {
-  const actions = d.market.actions.slice(0, 6).map((a) => proofCard(ci, a.title, a.body)).join("");
+  const m = d.market;
+  const acts = m.actions.slice(0, 6);
+  const quotes = (m.quotes || []).slice(0, 3);
+
+  // LEFT — the market reality: a headline split-bar comparison + the sourced evidence lines that back it.
+  const bar = (label: string, pct: string, width: string, primary: boolean) =>
+    `<div style="margin-top:${primary ? "0" : "13px"};">`
+    + `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">`
+    +   `<span style="font-size:9px;font-weight:600;letter-spacing:0.06em;color:rgba(255,255,255,0.82);">${esc(label)}</span>`
+    +   `<span style="font-size:19px;font-weight:800;line-height:1;color:${primary ? ci.accentOnDark : "rgba(255,255,255,0.5)"};">${esc(pct)}</span></div>`
+    + `<div style="margin-top:6px;height:8px;border-radius:999px;background:rgba(255,255,255,0.1);overflow:hidden;">`
+    +   `<div style="height:100%;width:${esc(width)};border-radius:999px;background:${primary ? ci.accentGrad : "rgba(255,255,255,0.22)"};"></div></div></div>`;
+  const evidence = (q: { body: string; source: string }, i: number) =>
+    `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:11px 0;${i ? `border-top:1px solid rgba(255,255,255,0.12);` : ""}">`
+    + `<div style="font-size:10px;line-height:1.5;color:rgba(255,255,255,0.85);">${esc(q.body)}</div>`
+    + `<div style="display:flex;align-items:center;gap:6px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:6px;">`
+    +   `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${BOOK}</svg>${esc(q.source)}</div></div>`;
+  const reality = `<div style="background:${ci.darkCard};border-radius:18px;padding:20px 22px;color:#FFFFFF;display:flex;flex-direction:column;height:100%;">`
+    + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">What the market is telling us</div>`
+    + `<div style="margin-top:16px;">${bar(m.split.left_label, m.split.left_pct, m.split.left_width, true)}${bar(m.split.right_label, m.split.right_pct, m.split.right_width, false)}`
+    +   `<div style="font-size:8.5px;line-height:1.5;color:rgba(255,255,255,0.6);margin-top:11px;">${esc(m.split.caption)}</div></div>`
+    + (quotes.length
+        ? `<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.14);flex:1;display:flex;flex-direction:column;">`
+          + `<div style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);">The evidence on record</div>`
+          + `<div style="flex:1;display:flex;flex-direction:column;margin-top:2px;">${quotes.map(evidence).join("")}</div></div>`
+        : "")
+    + `</div>`;
+
+  // RIGHT — our move: the six actions as a numbered ledger, equal flex rows so the column fills flush.
+  const moveRow = (a: { title: string; body: string }, i: number) =>
+    `<div style="flex:1;display:flex;align-items:center;gap:13px;padding:10px 0;${i ? `border-top:1px solid #EEE8F5;` : ""}">`
+    + `<div style="font-size:19px;font-weight:800;line-height:1;color:${ci.accent};width:26px;flex-shrink:0;">${String(i + 1).padStart(2, "0")}</div>`
+    + `<div style="min-width:0;"><div style="font-size:11px;font-weight:700;line-height:1.3;">${esc(a.title)}</div>`
+    +   `<div style="font-size:10px;line-height:1.5;color:${ci.muted};margin-top:2px;">${esc(a.body)}</div></div></div>`;
+  const moves = `<div style="background:#FFFFFF;border-radius:18px;padding:20px 22px;box-shadow:0 6px 18px ${ci.shadow};display:flex;flex-direction:column;height:100%;">`
+    + `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">`
+    +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">What we do about it</div>`
+    +   `<div style="display:flex;align-items:center;gap:6px;font-size:7.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.muted};">${acts.length} plays${flowArrow(ci, 13)}</div></div>`
+    + `<div style="flex:1;display:flex;flex-direction:column;margin-top:4px;">${acts.map(moveRow).join("")}</div></div>`;
+
   return section(pageLight("52px 60px 40px"),
-    eyebrow(ci, "Market Intelligence") + headline(ci, d.market.headline)
-    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.market.intro)}</p>`
-    + miniEyebrow(ci, "What we do about it", "16px")
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">${actions}</div>`
+    eyebrow(ci, "Market Intelligence") + headline(ci, m.headline)
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(m.intro)}</p>`
+    + `<div style="display:grid;grid-template-columns:0.92fr 1.08fr;gap:14px;margin-top:16px;flex:1;align-items:stretch;">${reality}${moves}</div>`
     + sFootLight(ci, d.brand_short));
 }
 
 // ── S05 COMPETITIVE POSITIONING (light) — the positioning map + the named competitor set ──────────────────────
 function sCompetitorsPage(d: ProposalDoc, ci: CiTokens): string {
   const m = d.pods12.map;
-  const dot = (c: { name: string; note: string; left: string; top: string }) =>
-    `<div style="position:absolute;left:${c.left};top:${c.top};display:flex;align-items:center;gap:5px;"><div style="width:11px;height:11px;border-radius:50%;background:#B7AECB;"></div><div style="font-size:9px;font-weight:700;color:${ci.muted};">${esc(c.name)} <span style="font-weight:400;">· ${esc(c.note)}</span></div></div>`;
-  const clientDot = `<div style="position:absolute;left:${m.client.left};top:${m.client.top};display:flex;align-items:center;gap:6px;"><div style="width:15px;height:15px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 12px ${ci.glow};"></div><div style="font-size:10px;font-weight:800;color:${ci.accentDeep};">${esc(m.client.name)} <span style="font-weight:400;color:${ci.muted};">· ${esc(m.client.note)}</span></div></div>`;
-  const axisLbl = (pos: string, t: string) => `<div style="position:absolute;${pos};font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8A8496;">${esc(t)}</div>`;
+  const rivals = m.competitors.length;
+  const setN = m.set ? m.set.length : 0;
+  const axisLbl = (pos: string, t: string) =>
+    `<div style="position:absolute;${pos}font-size:7.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#8A8496;line-height:1.3;">${esc(t)}</div>`;
+  // Muted rival dots (neutral #B7AECB), name + note, vertically centred on their coordinate.
+  const compDot = (c: { name: string; note: string; left: string; top: string }) =>
+    `<div style="position:absolute;left:${c.left};top:${c.top};transform:translateY(-50%);display:flex;align-items:center;gap:6px;">`
+    + `<div style="width:10px;height:10px;border-radius:50%;background:#B7AECB;flex-shrink:0;box-shadow:0 0 0 3px rgba(183,174,203,0.18);"></div>`
+    + `<div style="font-size:9px;font-weight:700;color:${ci.muted};white-space:nowrap;">${esc(c.name)} <span style="font-weight:400;">· ${esc(c.note)}</span></div></div>`;
+  // The client dot GLOWING: iconDisc radial + glow halo + a soft accent ring.
+  const clientDot =
+    `<div style="position:absolute;left:${m.client.left};top:${m.client.top};transform:translateY(-50%);display:flex;align-items:center;gap:8px;z-index:2;">`
+    + `<div style="position:relative;width:16px;height:16px;flex-shrink:0;">`
+    +   `<div style="position:absolute;inset:-7px;border-radius:50%;border:1.5px solid ${ci.accent};opacity:0.35;"></div>`
+    +   `<div style="position:absolute;inset:0;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 14px ${ci.glow};"></div></div>`
+    + `<div style="font-size:10.5px;font-weight:800;color:${ci.accentDeep};white-space:nowrap;">${esc(m.client.name)} <span style="font-weight:500;color:${ci.muted};">· ${esc(m.client.note)}</span></div></div>`;
+
+  const legend =
+    `<div style="display:flex;align-items:center;gap:16px;flex-shrink:0;">`
+    + `<div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#B7AECB;"></span><span style="font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${ci.muted};">${rivals} rivals</span></div>`
+    + `<div style="display:flex;align-items:center;gap:6px;"><span style="width:11px;height:11px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 8px ${ci.glow};"></span><span style="font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accentDeep};">${esc(d.client_name)}</span></div></div>`;
+
+  // The growth block: a proper framed 2x2 quadrant with a soft dashed crosshair. flex:1 consumes page slack.
+  const mapCard =
+    `<div style="margin-top:16px;flex:1;min-height:0;background:#FFFFFF;border-radius:18px;padding:18px 22px;box-shadow:0 6px 18px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;">`
+    +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">${esc(m.title)}</div>${legend}</div>`
+    + `<div style="position:relative;flex:1;min-height:0;margin-top:14px;">`
+    +   axisLbl("top:0;left:64px;right:64px;text-align:center;", m.y_top)
+    +   axisLbl("bottom:0;left:64px;right:64px;text-align:center;", m.y_bottom)
+    +   axisLbl("left:0;top:50%;transform:translateY(-50%);width:58px;text-align:center;", m.x_left)
+    +   axisLbl("right:0;top:50%;transform:translateY(-50%);width:58px;text-align:center;", m.x_right)
+    +   `<div style="position:absolute;top:16px;bottom:16px;left:64px;right:64px;border:1px solid #ECE6F3;border-radius:8px;">`
+    +     `<div style="position:absolute;left:50%;top:0;bottom:0;width:0;border-left:1px dashed #E4DEEF;"></div>`
+    +     `<div style="position:absolute;top:50%;left:0;right:0;height:0;border-top:1px dashed #E4DEEF;"></div>`
+    +     m.competitors.map(compDot).join("") + clientDot
+    +   `</div></div></div>`;
+
+  // The one dark anchor, pinned to the foot: the named set as chips + the strategic evidence line.
+  const chips = (m.set || []).map((n) =>
+    `<span style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;color:#FFFFFF;">${esc(n)}</span>`).join("");
+  const darkStrip =
+    `<div style="margin-top:14px;background:${ci.darkCard};border-radius:16px;padding:16px 22px;color:#FFFFFF;">`
+    + `<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">`
+    +   `<div style="font-size:10px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">The named competitor set</div>`
+    +   (setN ? `<div style="font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);">${setN} tracked</div>` : "")
+    + `</div>`
+    + (setN ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:11px;">${chips}</div>` : "")
+    + `<div style="font-size:10.5px;line-height:1.6;color:rgba(255,255,255,0.82);margin-top:13px;">The direct and adjacent rivals the Researcher tracks. Every targeting and message decision is checked against this set, so ${esc(d.client_name)} moves on evidence, not assumption.</div></div>`;
+
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "Competitive Positioning") + headline(ci, { lead: "Where you win,", gradient: "and who you beat" })
-    + `<div style="margin-top:16px;background:#FFFFFF;border-radius:16px;padding:16px 22px;box-shadow:0 6px 18px ${ci.shadow};">`
-    +   `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:22px;">${esc(m.title)}</div>`
-    +   `<div style="position:relative;height:220px;border-left:2px solid #E4DEEF;border-bottom:2px solid #E4DEEF;margin:0 16px 22px 16px;">`
-    +     axisLbl("left:-12px;top:-16px", m.y_top) + axisLbl("left:-12px;bottom:-16px", m.y_bottom)
-    +     axisLbl("right:0;bottom:-16px", m.x_right) + axisLbl("left:16%;bottom:-16px", m.x_left)
-    +     m.competitors.map(dot).join("") + clientDot
-    +   `</div></div>`
-    + (m.set && m.set.length ? `<div style="margin-top:14px;background:#FFFFFF;border-radius:16px;padding:16px 22px;box-shadow:0 6px 18px ${ci.shadow};">`
-        + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:10px;">The named competitor set</div>`
-        + `<div style="display:flex;flex-wrap:wrap;gap:7px;">${m.set.map((n) => `<span style="background:${ci.tint};border-radius:999px;padding:5px 14px;font-size:10px;font-weight:600;color:${ci.accentDeep};">${esc(n)}</span>`).join("")}</div>`
-        + `<div style="font-size:10px;line-height:1.6;color:${ci.body};margin-top:12px;">The direct and adjacent rivals the Researcher tracks. Every targeting and message decision is checked against this set, so ${esc(d.client_name)} moves on evidence, not assumption.</div></div>` : "")
-    + sFootLight(ci, d.brand_short));
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">We plot every rival on the two axes that decide this category, then place ${esc(d.client_name)} where demand is strongest and the competition is thinnest.</p>`
+    + mapCard + darkStrip + sFootLight(ci, d.brand_short));
 }
 
 // ── S03 WHY WE WIN (light) — the wedge + argument + 4 proofs + the belief→buy→outcome flow ─────────────────────
@@ -1055,24 +1165,52 @@ function sAudiencePage(d: ProposalDoc, ci: CiTokens): string {
 // ── S10 TARGETING (light) — the segment rows + the who-leads-on-which-channel matrix ──────────────────────────
 function sTargetingPage(d: ProposalDoc, ci: CiTokens): string {
   const t = d.targeting;
-  const segRow = (r: { name: string; platforms: string; segments: { label: string; text: string }[] }) =>
-    `<div style="background:#FFFFFF;border-radius:12px;padding:12px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-size:11.5px;font-weight:800;">${esc(r.name)}</div><div style="font-size:8px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};">${esc(r.platforms)}</div></div>`
-    + `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;">${r.segments.slice(0, 6).map((s) => `<span style="background:${ci.tint};border-radius:8px;padding:4px 10px;font-size:8.5px;color:${ci.accentDeep};"><strong>${esc(s.label)}:</strong> ${esc(s.text)}</span>`).join("")}</div></div>`;
-  const cell = (k: "lead" | "support" | "test") => {
-    const map = { lead: [ci.accentGrad, "#FFFFFF", "Lead"], support: [ci.accentDeep, "#FFFFFF", "Support"], test: [ci.tint, ci.accentDeep, "Test"] } as const;
-    const [bg, fg, lb] = map[k];
-    return `<div style="text-align:center;padding:5px 2px;"><span style="display:inline-block;background:${bg};color:${fg};border-radius:999px;padding:2px 9px;font-size:7.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${lb}</span></div>`;
-  };
   const mx = t.matrix;
-  const cols = `130px repeat(${mx.channels.length}, 1fr)`;
-  const head = `<div style="display:grid;grid-template-columns:${cols};align-items:end;gap:2px;"><div></div>${mx.channels.map((c) => `<div style="text-align:center;font-size:7.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${ci.accent};">${esc(c)}</div>`).join("")}</div>`;
-  const rows = mx.rows.map((r) =>
-    `<div style="display:grid;grid-template-columns:${cols};align-items:center;gap:2px;border-top:1px solid #EEE8F5;"><div style="font-size:9px;font-weight:700;color:${ci.body};padding:5px 0;">${esc(r.persona)}</div>${r.cells.slice(0, mx.channels.length).map(cell).join("")}</div>`).join("");
+  const N = Math.max(1, mx.channels.length);
+  const cols = `minmax(96px,1.5fr) repeat(${N}, 1fr)`;
+
+  // The segment rows: who each persona is and where we buy them. Light context cards in a stretched 2-up grid,
+  // pinned to equal height (align-items:stretch + height:100%) so a short and a long persona sit flush.
+  const seg = (r: { name: string; platforms: string; segments: { label: string; text: string }[] }) =>
+    `<div style="background:#FFFFFF;border-radius:14px;padding:13px 16px;box-shadow:0 6px 18px ${ci.shadow};height:100%;display:flex;flex-direction:column;">`
+    + `<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-size:12px;font-weight:800;">${esc(r.name)}</div><div style="font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${ci.accent};margin-left:auto;white-space:nowrap;">${esc(r.platforms)}</div></div>`
+    + `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">${r.segments.slice(0, 6).map((s) => `<span style="background:${ci.tint};border-radius:8px;padding:4px 10px;font-size:8.5px;line-height:1.35;color:${ci.accentDeep};"><strong style="font-weight:700;">${esc(s.label)}</strong> ${esc(s.text)}</span>`).join("")}</div></div>`;
+
+  // Signature device: the persona-by-channel plan rendered as a live DARK planning panel (the single dark anchor on
+  // this light page, echoing the PSI dashboard). Lead dots glow on the dark ground exactly as the PSI score tiles do;
+  // support and test stay neutral grey so the eye reads the home channel first. flex:1 grows it onto the footer.
+  const dot = (k: "lead" | "support" | "test") =>
+    k === "lead"
+      ? `<span style="width:14px;height:14px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 10px ${ci.glow},0 1px 2px rgba(0,0,0,0.28);display:inline-block;flex-shrink:0;"></span>`
+      : k === "support"
+        ? `<span style="width:10px;height:10px;border-radius:50%;background:#B7AECB;display:inline-block;flex-shrink:0;"></span>`
+        : `<span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.30);display:inline-block;flex-shrink:0;"></span>`;
+  const matrixHead = `<div style="display:grid;grid-template-columns:${cols};align-items:end;gap:2px;padding-bottom:11px;border-bottom:1px solid rgba(255,255,255,0.16);">`
+    + `<div style="font-size:8px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);">Persona</div>`
+    + mx.channels.map((c) => `<div style="text-align:center;font-size:8px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${ci.accentOnDark};line-height:1.2;">${esc(c)}</div>`).join("") + `</div>`;
+  const matrixRows = mx.rows.map((r, i) =>
+    `<div style="display:grid;grid-template-columns:${cols};align-items:center;gap:2px;flex:1;${i === 0 ? "" : "border-top:1px solid rgba(255,255,255,0.08);"}">`
+    + `<div style="font-size:10px;font-weight:700;color:#FFFFFF;line-height:1.25;padding-right:6px;">${esc(r.persona)}</div>`
+    + r.cells.slice(0, N).map((c) => `<div style="display:flex;align-items:center;justify-content:center;">${dot(c)}</div>`).join("") + `</div>`).join("");
+  const legendChip = (sw: string, label: string, note: string) =>
+    `<span style="display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:999px;padding:4px 12px 4px 9px;">${sw}`
+    + `<span style="font-size:8px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#FFFFFF;">${label}</span>`
+    + `<span style="font-size:8px;letter-spacing:0.04em;color:rgba(255,255,255,0.55);">${note}</span></span>`;
+  const matrixPanel = `<div style="margin-top:12px;flex:1;display:flex;flex-direction:column;background:${ci.darkCard};border-radius:18px;padding:18px 22px;color:#FFFFFF;box-shadow:0 6px 18px ${ci.shadow};">`
+    + `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;"><div style="font-size:8.5px;font-weight:700;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">Who leads on which channel</div><div style="font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);">The whole plan on one grid</div></div>`
+    + `<div style="margin-top:14px;flex:1;display:flex;flex-direction:column;">${matrixHead}${matrixRows}</div>`
+    + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.16);">`
+    +   legendChip(dot("lead"), "Lead", "home channel")
+    +   legendChip(dot("support"), "Support", "assists reach")
+    +   legendChip(dot("test"), "Test", "proving ground")
+    + `</div></div>`;
+
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "Targeting") + headline(ci, t.headline)
-    + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:16px;">${t.rows.slice(0, 4).map(segRow).join("")}</div>`
-    + `<div style="margin-top:auto;background:#FFFFFF;border-radius:16px;padding:16px 20px;box-shadow:0 6px 18px ${ci.shadow};"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:10px;">Who leads on which channel</div>${head}${rows}</div>`
+    + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">Reach is cheap; precision is the edge. Each persona has a home channel where it converts and a proving ground where we earn the next win, so ${esc(d.client_name)} spends against intent, never against a flat audience.</p>`
+    + miniEyebrow(ci, "The segments we buy, persona by persona", "16px")
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;align-items:stretch;">${t.rows.slice(0, 4).map(seg).join("")}</div>`
+    + matrixPanel
     + sFootLight(ci, d.brand_short));
 }
 
@@ -1080,65 +1218,203 @@ function sTargetingPage(d: ProposalDoc, ci: CiTokens): string {
 function sCreativePage(d: ProposalDoc, ci: CiTokens): string {
   const clientInitial = ((d.client_name.trim().replace(/^(the|a|an)\s+/i, "")[0] || d.client_name.trim()[0] || "•")).toUpperCase();
   const avatar = d.client_logo
-    ? `<div style="width:34px;height:34px;border-radius:50%;background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;"><img src="${esc(d.client_logo.src)}" style="max-width:78%;max-height:78%;object-fit:contain;"></div>`
-    : `<div style="width:34px;height:34px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:13px;flex-shrink:0;">${esc(clientInitial)}</div>`;
-  const fbAd = `<div style="background:#FFFFFF;border-radius:14px;box-shadow:0 6px 18px ${ci.shadow};overflow:hidden;">`
-    + `<div style="display:flex;align-items:center;gap:9px;padding:12px 14px;">${avatar}<div><div style="font-size:11px;font-weight:700;color:#1A1030;">${esc(d.client_name)}</div><div style="font-size:8px;color:#8A8496;">Sponsored · &#127760;</div></div></div>`
-    + `<div style="font-size:10px;line-height:1.5;color:#1A1030;padding:0 14px 10px;">${esc((d.creative.for_client || d.creative.intro || "").slice(0, 120))}</div>`
-    + `<div style="height:150px;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;padding:0 22px;"><div style="font-size:19px;font-weight:800;text-transform:uppercase;line-height:1.1;color:#FFFFFF;text-align:center;">${esc(d.cover.headline.gradient)}</div></div>`
-    + `<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:#F2EEF7;"><div style="flex:1;min-width:0;"><div style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:#8A8496;">gasmarketing.co.za</div><div style="font-size:10.5px;font-weight:700;color:#1A1030;">${esc(d.cover.headline.lead)}</div></div><div style="background:${ci.accent};color:#FFFFFF;border-radius:8px;padding:8px 14px;font-size:9px;font-weight:700;white-space:nowrap;">Message us</div></div>`
-    + `<div style="display:flex;gap:16px;padding:9px 14px;font-size:8.5px;color:#8A8496;"><span>&#128077; 128</span><span>24 comments</span><span>12 shares</span></div></div>`;
-  const fmt = (a: { ratio: string; icon: string; title: string; caption: string }) =>
-    `<div style="background:#FFFFFF;border-radius:12px;padding:11px 14px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:flex-start;gap:9px;">${disc(ci, 24, a.icon)}<div><div style="font-size:10px;font-weight:700;">${esc(a.title)} <span style="font-weight:600;color:${ci.accent};">${esc(a.ratio)}</span></div><div style="font-size:9px;line-height:1.45;color:${ci.muted};margin-top:2px;">${esc(a.caption)}</div></div></div>`;
+    ? `<div style="width:32px;height:32px;border-radius:50%;background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;"><img src="${esc(d.client_logo.src)}" style="max-width:78%;max-height:78%;object-fit:contain;"></div>`
+    : `<div style="width:32px;height:32px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:12px;flex-shrink:0;">${esc(clientInitial)}</div>`;
+
+  // The ad's primary text is the client-specific creative message. Kept whole; only a very long line is trimmed on a
+  // word boundary so the mock can never overflow the feed frame.
+  const cap = d.creative.for_client || d.creative.intro || "";
+  const capText = cap.length > 240 ? cap.slice(0, 236).replace(/\s+\S*$/, "") + "…" : cap;
+
+  // A live Meta feed ad, framed in a phone. The hero image grows (flex:1) so the device fills the column top to bottom.
+  const bar = (h: number) => `<span style="width:2px;height:${h}px;background:#1A1030;border-radius:1px;"></span>`;
+  const statusBar = `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 15px 3px;">`
+    + `<span style="font-size:9px;font-weight:700;color:#1A1030;letter-spacing:0.02em;">9:41</span>`
+    + `<span style="width:34px;height:9px;border-radius:999px;background:#1A1030;"></span>`
+    + `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="display:inline-flex;align-items:flex-end;gap:1.5px;height:9px;">${bar(3)}${bar(5)}${bar(7)}${bar(9)}</span>`
+    +   `<span style="display:inline-flex;align-items:center;"><span style="width:16px;height:9px;border:1px solid #1A1030;border-radius:2px;position:relative;display:inline-block;"><span style="position:absolute;left:1px;top:1px;bottom:1px;width:10px;background:#1A1030;border-radius:1px;"></span></span><span style="width:1.5px;height:4px;background:#1A1030;border-radius:0 1px 1px 0;margin-left:1px;display:inline-block;"></span></span></span>`
+    + `</div>`;
+  const topBar = `<div style="display:flex;align-items:center;gap:9px;padding:7px 13px 9px;border-bottom:1px solid #F0ECF5;">${avatar}`
+    + `<div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:700;color:#1A1030;line-height:1.15;">${esc(d.client_name)}</div><div style="font-size:8px;color:#8A8496;line-height:1.2;">Sponsored &middot; &#127760;</div></div>`
+    + `<div style="font-size:13px;color:#8A8496;font-weight:700;line-height:0.4;">&#8943;</div></div>`;
+  const caption = `<div style="font-size:9.5px;line-height:1.5;color:#1A1030;padding:9px 14px 10px;">${esc(capText)}</div>`;
+  const hero = `<div style="flex:1;min-height:180px;background:${ci.accentGrad};position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;">`
+    + `<div style="font-size:8px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:rgba(255,255,255,0.72);margin-bottom:11px;">StorySelling</div>`
+    + `<div style="font-size:22px;font-weight:800;text-transform:uppercase;line-height:1.08;color:#FFFFFF;text-align:center;">${esc(d.cover.headline.lead)} ${esc(d.cover.headline.gradient)}</div>`
+    + `<div style="position:absolute;left:12px;bottom:12px;background:rgba(0,0,0,0.2);border-radius:5px;padding:3px 8px;font-size:7px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.85);">Scene shot &middot; 15s</div>`
+    + `<div style="position:absolute;right:12px;bottom:12px;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;"><svg width="10" height="10" viewBox="0 0 24 24" fill="#FFFFFF" stroke="none"><path d="M8 5v14l11-7z"></path></svg></div>`
+    + `</div>`;
+  const cta = `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#F4F0FA;border-top:1px solid #EDE7F5;">`
+    + `<div style="flex:1;min-width:0;"><div style="font-size:7.5px;letter-spacing:0.12em;text-transform:uppercase;color:#8A8496;">WhatsApp</div><div style="font-size:10px;font-weight:700;color:#1A1030;line-height:1.2;">Start the conversation</div></div>`
+    + `<div style="background:${ci.accent};color:#FFFFFF;border-radius:8px;padding:8px 15px;font-size:9px;font-weight:700;white-space:nowrap;flex-shrink:0;">Message us</div></div>`;
+  const engagement = `<div style="display:flex;align-items:center;gap:14px;padding:8px 14px 11px;font-size:8.5px;color:#8A8496;"><span>&#128077; 128</span><span>24 comments</span><span>12 shares</span></div>`;
+  const phone = `<div style="height:100%;background:${ci.darkPage};border-radius:34px;padding:9px;box-shadow:0 6px 18px ${ci.shadow};display:flex;flex-direction:column;">`
+    + `<div style="flex:1;background:#FFFFFF;border-radius:26px;overflow:hidden;display:flex;flex-direction:column;">${statusBar}${topBar}${caption}${hero}${cta}${engagement}</div></div>`;
+
+  // Placement-format cards: the little accentGrad thumbnail IS the format's real aspect ratio, drawn to scale.
+  const fmt = (a: { ratio: string; icon: string; title: string; caption: string }) => {
+    const m = a.ratio.match(/(\d+(?:\.\d+)?)\s*[:x×]\s*(\d+(?:\.\d+)?)/i);
+    const rw = m ? parseFloat(m[1]) : 1, rh = m ? parseFloat(m[2]) : 1;
+    const sc = 44 / Math.max(rw, rh);
+    const tw = Math.max(6, Math.round(rw * sc)), th = Math.max(6, Math.round(rh * sc));
+    return `<div style="background:#FFFFFF;border-radius:14px;padding:13px 16px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:12px;flex:1;">`
+      + `${disc(ci, 30, a.icon)}`
+      + `<div style="flex:1;min-width:0;"><div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;"><span style="font-size:11.5px;font-weight:700;color:${ci.ink};">${esc(a.title)}</span><span style="font-size:8.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accent};">${esc(a.ratio)}</span></div>`
+      +   `<div style="font-size:9px;line-height:1.45;color:${ci.muted};margin-top:3px;">${esc(a.caption)}</div></div>`
+      + `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><div style="width:${tw}px;height:${th}px;background:${ci.accentGrad};border-radius:5px;box-shadow:0 2px 6px ${ci.shadow};"></div></div>`
+      + `</div>`;
+  };
+  const right = `<div style="height:100%;display:flex;flex-direction:column;">`
+    + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:10px;">Built for every placement</div>`
+    + `<div style="flex:1;display:flex;flex-direction:column;gap:10px;">${d.creative.asset_formats.slice(0, 4).map(fmt).join("")}</div>`
+    + `</div>`;
+
+  const strip = `<div style="margin-top:14px;background:${ci.darkCard};border-radius:16px;padding:15px 20px;color:#FFFFFF;">`
+    + `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:12px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">The channel plan, at a glance</div><div style="font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);white-space:nowrap;">One story, every placement</div></div>`
+    + `<div style="display:flex;flex-wrap:wrap;gap:7px;">${d.channels5.rows.slice(0, 5).map((r) => `<span style="background:rgba(255,255,255,0.1);border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(r.name)} <span style="color:${ci.accentOnDark};font-weight:700;">&middot; ${esc(r.role)}</span></span>`).join("")}</div>`
+    + `</div>`;
+
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "The Creative") + headline(ci, { lead: "StorySelling,", gradient: "at machine speed" })
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.creative.intro)}</p>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;align-items:start;">`
-    +   `<div>${fbAd}</div>`
-    +   `<div><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:9px;">Built for every placement</div><div style="display:flex;flex-direction:column;gap:8px;">${d.creative.asset_formats.slice(0, 4).map(fmt).join("")}</div></div>`
+    + `<div style="display:grid;grid-template-columns:290px 1fr;gap:16px;margin-top:16px;flex:1;align-items:stretch;">`
+    +   `<div style="height:100%;">${phone}</div>`
+    +   right
     + `</div>`
-    + `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:14px 20px;color:#FFFFFF;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};margin-bottom:8px;">The channel plan, at a glance</div><div style="display:flex;flex-wrap:wrap;gap:7px;">${d.channels5.rows.slice(0, 5).map((r) => `<span style="background:rgba(255,255,255,0.1);border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(r.name)} <span style="color:${ci.accentOnDark};font-weight:700;">· ${esc(r.role)}</span></span>`).join("")}</div></div>`
+    + strip
     + sFootLight(ci, d.brand_short));
 }
 
 // ── S12 THE CHANNEL PLAN (light) — the five channels, each with role, what and why + reach hook ────────────────
 function sChannelsPage(d: ProposalDoc, ci: CiTokens): string {
-  const roleBg = (k: "lead" | "support" | "test") => k === "lead" ? ci.accentGrad : k === "support" ? ci.accentDeep : ci.accent;
-  const reachTag = (r: string) => r ? `<div style="margin-left:auto;text-align:right;flex-shrink:0;"><div style="font-size:13px;font-weight:800;color:${ci.accent};line-height:1;">${esc(r)}</div><div style="font-size:7px;letter-spacing:0.14em;text-transform:uppercase;color:${ci.muted};margin-top:2px;">reach in market</div></div>` : "";
-  const row = (r: (typeof d.channels5.rows)[number]) =>
-    `<div style="background:#FFFFFF;border-radius:12px;padding:12px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 26, r.icon)}<div style="font-size:11.5px;font-weight:700;">${esc(r.name)}</div><div style="background:${roleBg(r.kind)};border-radius:999px;padding:3px 10px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#FFFFFF;">${esc(r.role)}</div>${reachTag(r.reach || "")}</div>`
-    + `<div style="font-size:9.8px;line-height:1.55;color:${ci.body};margin-top:5px;">${esc(r.what)}</div>`
-    + `<div style="font-size:9.3px;line-height:1.5;color:${ci.muted};margin-top:4px;font-style:italic;">${esc(r.why)}</div></div>`;
+  const rows = d.channels5.rows.slice(0, 5);
+  // Parse each reach string ("4.2M", "38 000", "1.2bn") to a comparable number so the bars share one scale and the
+  // reader can weigh the channels against each other. No number => no bar (kept qualitative).
+  const reachVal = (s?: string): number => {
+    if (!s) return 0;
+    const m = s.replace(/,/g, "").replace(/\s/g, "").match(/([\d.]+)(bn|b|m|k)?/i);
+    if (!m) return 0;
+    let v = parseFloat(m[1]);
+    const u = (m[2] || "").toLowerCase();
+    if (u === "bn" || u === "b") v *= 1e9;
+    else if (u === "m") v *= 1e6;
+    else if (u === "k") v *= 1e3;
+    return isFinite(v) ? v : 0;
+  };
+  const maxVal = Math.max(1, ...rows.map((r) => reachVal(r.reach)));
+  // Role is structural colour: lead = the accent gradient (the weight we lean on), support = accentDeep, test = neutral
+  // grey (secondary data stays neutral per the palette). The bar and the numeral read the same datum, so they reinforce.
+  const roleBg = (k: "lead" | "support" | "test") => k === "lead" ? ci.accentGrad : k === "support" ? ci.accentDeep : "#ECE9F1";
+  const roleFg = (k: "lead" | "support" | "test") => k === "test" ? ci.muted : "#FFFFFF";
+  const barFill = (k: "lead" | "support" | "test") => k === "lead" ? ci.accentGrad : k === "support" ? ci.accentDeep : "#D9D5E2";
+  const row = (r: (typeof rows)[number]) => {
+    const v = reachVal(r.reach);
+    const pct = v > 0 ? Math.max(12, Math.round((v / maxVal) * 100)) : 0;
+    const reachTag = r.reach
+      ? `<div style="margin-left:auto;text-align:right;flex-shrink:0;"><div style="font-size:16px;font-weight:800;color:${ci.accent};line-height:1;">${esc(r.reach)}</div><div style="font-size:7px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.muted};margin-top:3px;">reach in market</div></div>`
+      : "";
+    const bar = pct > 0
+      ? `<div style="margin-top:10px;height:7px;border-radius:999px;background:#F1F1F4;overflow:hidden;"><div style="height:7px;width:${pct}%;border-radius:999px;background:${barFill(r.kind)};"></div></div>`
+      : "";
+    return `<div style="background:#FFFFFF;border-radius:14px;padding:13px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;flex-direction:column;justify-content:center;flex:1;">`
+      + `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 30, r.icon)}`
+      +   `<div style="font-size:12px;font-weight:700;line-height:1;">${esc(r.name)}</div>`
+      +   `<div style="background:${roleBg(r.kind)};border-radius:999px;padding:3px 11px;font-size:8px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${roleFg(r.kind)};">${esc(r.role)}</div>`
+      +   reachTag
+      + `</div>`
+      + bar
+      + `<div style="font-size:9.8px;line-height:1.5;color:${ci.body};margin-top:8px;">${esc(r.what)}</div>`
+      + `<div style="font-size:9.3px;line-height:1.45;color:${ci.muted};margin-top:3px;font-style:italic;">${esc(r.why)}</div>`
+      + `</div>`;
+  };
+  // A legend keys the chart: the bar length is audience reach, and the colour is the channel's job in the mix.
+  const key = (bg: string, label: string) =>
+    `<span style="display:flex;align-items:center;gap:6px;"><span style="width:16px;height:7px;border-radius:999px;background:${bg};display:inline-block;flex-shrink:0;"></span>${label}</span>`;
+  const legend = `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:7.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.muted};">`
+    + `<span>Bar length = audience reach</span>`
+    + key(ci.accentGrad, "Lead") + key(ci.accentDeep, "Support") + key("#D9D5E2", "Test") + `</div>`;
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "The Channel Plan") + headline(ci, { lead: "Omnichannel media,", gradient: "tuned daily" })
     + `<p style="font-size:11px;line-height:1.6;color:${ci.body};margin:12px 0 0;">${esc(d.channels5.intro)}</p>`
-    + `<div style="display:flex;flex-direction:column;gap:9px;margin-top:14px;">${d.channels5.rows.slice(0, 5).map(row).join("")}</div>`
+    + legend
+    + `<div style="flex:1;display:flex;flex-direction:column;gap:9px;margin-top:12px;">${rows.map(row).join("")}</div>`
+    + darkBox(ci, "How the mix stays sharp", "Nothing is set and forgotten. Every week the budget moves to the channels proving the lowest cost per qualified lead, so the plan compounds on evidence rather than guesswork.", "16px")
     + sFootLight(ci, d.brand_short));
 }
 
 // ── S13 MEDIA & PLACEMENTS (light) — where the work runs: the asset formats/placements + the flighting logic ───
 function sMediaPage(d: ProposalDoc, ci: CiTokens): string {
+  // The client mark for the feed post: the real logo on a white disc, else the initial in an accent disc (as Creative).
+  const clientInitial = ((d.client_name.trim().replace(/^(the|a|an)\s+/i, "")[0] || d.client_name.trim()[0] || "•")).toUpperCase();
+  const avatar = d.client_logo
+    ? `<div style="width:30px;height:30px;border-radius:50%;background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;"><img src="${esc(d.client_logo.src)}" style="max-width:78%;max-height:78%;object-fit:contain;"></div>`
+    : `<div style="width:30px;height:30px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-weight:800;font-size:12px;flex-shrink:0;">${esc(clientInitial)}</div>`;
+
+  // Signature device 1 — the ad LIVE in a phone feed: the primary placement, shown running, not described.
+  const phone = `<div style="width:212px;margin:auto;background:${ci.darkCard};border-radius:34px;padding:9px;box-shadow:0 12px 32px rgba(26,16,48,0.20);">`
+    + `<div style="background:#FFFFFF;border-radius:26px;overflow:hidden;">`
+    +   `<div style="height:22px;display:flex;align-items:center;justify-content:center;"><div style="width:44px;height:5px;border-radius:999px;background:${ci.darkCard};"></div></div>`
+    +   `<div style="display:flex;align-items:center;gap:8px;padding:2px 13px 10px;">${avatar}<div style="min-width:0;"><div style="font-size:10px;font-weight:700;color:#1A1030;line-height:1.2;">${esc(d.client_name)}</div><div style="font-size:7.5px;color:#8A8496;">Sponsored &middot; &#127760;</div></div></div>`
+    +   `<div style="font-size:9px;line-height:1.5;color:#1A1030;padding:0 13px 9px;">${esc((d.creative.for_client || d.creative.intro || "").slice(0, 96))}</div>`
+    +   `<div style="height:132px;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;padding:0 20px;"><div style="font-size:16px;font-weight:800;text-transform:uppercase;line-height:1.1;color:#FFFFFF;text-align:center;letter-spacing:-0.01em;">${esc(d.cover.headline.gradient)}</div></div>`
+    +   `<div style="display:flex;align-items:center;gap:9px;padding:10px 13px;background:#F2EEF7;"><div style="flex:1;min-width:0;"><div style="font-size:7.5px;letter-spacing:0.1em;text-transform:uppercase;color:#8A8496;">gasmarketing.co.za</div><div style="font-size:9.5px;font-weight:700;color:#1A1030;line-height:1.2;">${esc(d.cover.headline.lead)}</div></div><div style="background:${ci.accent};color:#FFFFFF;border-radius:8px;padding:7px 12px;font-size:8.5px;font-weight:700;white-space:nowrap;flex-shrink:0;">Message us</div></div>`
+    +   `<div style="display:flex;gap:14px;padding:8px 13px;font-size:8px;color:#8A8496;"><span>&#128077; 128</span><span>24 comments</span><span>12 shares</span></div>`
+    + `</div></div>`;
+  const phoneCard = `<div style="background:#FFFFFF;border-radius:18px;box-shadow:0 6px 18px ${ci.shadow};padding:18px;height:100%;display:flex;flex-direction:column;">`
+    + `<div style="display:flex;align-items:center;gap:6px;"><span style="width:6px;height:6px;border-radius:50%;background:${ci.iconDisc};box-shadow:0 0 8px ${ci.glow};flex-shrink:0;"></span><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">Live in feed</div></div>`
+    + `<div style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px 0;">${phone}</div></div>`;
+
+  // Signature device 2 — each placement drawn at its TRUE aspect ratio (a tall story, a square post, a wide feed),
+  // filled with the accent creative gradient and labelled with its ratio. The shape IS the point.
+  const swatch = (ratio: string) => {
+    const m = ratio.match(/(\d+(?:\.\d+)?)\s*[:x×]\s*(\d+(?:\.\d+)?)/i);
+    const w0 = m ? parseFloat(m[1]) : 1, h0 = m ? parseFloat(m[2]) : 1;
+    const ar = (w0 > 0 && h0 > 0) ? w0 / h0 : 1;
+    const MAX = 50;
+    const fw = ar >= 1 ? MAX : Math.round(MAX * ar);
+    const fh = ar >= 1 ? Math.round(MAX / ar) : MAX;
+    return `<div style="width:60px;height:60px;flex-shrink:0;border-radius:10px;background:${ci.tint};display:flex;align-items:center;justify-content:center;">`
+      + `<div style="width:${fw}px;height:${fh}px;border-radius:5px;background:${ci.accentGrad};box-shadow:0 2px 6px ${ci.shadow};position:relative;overflow:hidden;">`
+      +   `<div style="position:absolute;left:5px;right:5px;top:5px;height:2px;border-radius:2px;background:rgba(255,255,255,0.55);"></div>`
+      +   `<div style="position:absolute;left:5px;bottom:5px;width:${Math.max(9, Math.round(fw * 0.5))}px;height:2px;border-radius:2px;background:rgba(255,255,255,0.35);"></div>`
+      + `</div></div>`;
+  };
   const fmt = (a: { ratio: string; icon: string; title: string; caption: string }) =>
-    `<div style="background:#FFFFFF;border-radius:14px;padding:14px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:9px;">${disc(ci, 28, a.icon)}<div><div style="font-size:11px;font-weight:700;">${esc(a.title)}</div><div style="font-size:8.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accent};">${esc(a.ratio)}</div></div></div>`
-    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:8px;">${esc(a.caption)}</div></div>`;
-  const flight = (label: string, body: string) =>
-    `<div style="flex:1;background:${ci.darkCard};border-radius:12px;padding:12px 15px;color:#FFFFFF;"><div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accentOnDark};">${label}</div><div style="font-size:9.5px;line-height:1.5;color:rgba(255,255,255,0.82);margin-top:4px;">${body}</div></div>`;
+    `<div style="flex:1;background:#FFFFFF;border-radius:14px;padding:11px 14px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:12px;">`
+    + swatch(a.ratio)
+    + `<div style="flex:1;min-width:0;"><div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;"><div style="font-size:11px;font-weight:700;line-height:1.2;">${esc(a.title)}</div><span style="font-size:8px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accent};white-space:nowrap;">${esc(a.ratio)}</span></div>`
+    + `<div style="font-size:9px;line-height:1.45;color:${ci.muted};margin-top:4px;">${esc(a.caption)}</div></div></div>`;
+  const formatsCol = `<div style="display:flex;flex-direction:column;gap:10px;height:100%;">`
+    + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">Built for every placement</div>`
+    + d.creative.asset_formats.slice(0, 4).map(fmt).join("") + `</div>`;
+
+  // Signature device 3 — the flighting strip: budget bars widen Test -> Concentrate -> Scale, the money concentrating
+  // onto proven winners. The single dark anchor on the page, echoing the PSI dashboard.
+  const darkArrow = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;align-self:center;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`;
+  const stages = [
+    { n: 1, label: "Test", pct: 34, body: "Multiple hooks and audiences run small, side by side, from day one." },
+    { n: 2, label: "Concentrate", pct: 66, body: "Budget moves to the winning placements and creative, on evidence." },
+    { n: 3, label: "Scale", pct: 100, body: "Winners scale; fatigued creative is refreshed before it costs you." },
+  ];
+  const stage = (s: typeof stages[number]) =>
+    `<div style="flex:1;">`
+    + `<div style="display:flex;align-items:center;gap:8px;"><div style="width:20px;height:20px;border-radius:50%;background:${ci.iconDisc};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#FFFFFF;flex-shrink:0;box-shadow:0 0 10px ${ci.glow};">${s.n}</div>`
+    + `<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#FFFFFF;">${esc(s.label)}</div>`
+    + `<div style="margin-left:auto;font-size:8px;font-weight:700;color:${ci.accentOnDark};" class="tabular">${s.pct}%</div></div>`
+    + `<div style="height:7px;border-radius:999px;background:rgba(255,255,255,0.12);overflow:hidden;margin-top:8px;"><div style="height:7px;width:${s.pct}%;border-radius:999px;background:${ci.accentGrad};"></div></div>`
+    + `<div style="font-size:9px;line-height:1.5;color:rgba(255,255,255,0.78);margin-top:8px;">${esc(s.body)}</div></div>`;
+  const flightStrip = `<div style="margin-top:auto;background:${ci.darkCard};border-radius:16px;padding:16px 22px;color:#FFFFFF;">`
+    + `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">How we flight the media</div><div style="font-size:7.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);">Share of budget on winners</div></div>`
+    + `<div style="display:flex;align-items:stretch;gap:14px;margin-top:14px;">${stage(stages[0])}${darkArrow}${stage(stages[1])}${darkArrow}${stage(stages[2])}</div></div>`;
+
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "Media and Placements") + headline(ci, { lead: "Right placement,", gradient: "right moment" })
     + `<p style="font-size:11px;line-height:1.6;color:${ci.body};margin:12px 0 0;">${esc(d.creative.for_client || d.creative.intro)}</p>`
-    + `<div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin:16px 0 9px;">Built for every placement</div>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${d.creative.asset_formats.slice(0, 4).map(fmt).join("")}</div>`
-    + `<div style="margin-top:auto;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:8px;">How we flight the media</div><div style="display:flex;gap:10px;">`
-    +   flight("Test", "Multiple hooks and audiences run small, side by side, from day one.")
-    +   flight("Concentrate", "Budget moves to the winning placements and creative, on evidence.")
-    +   flight("Scale", "Winners scale; fatigued creative is refreshed before it costs you.")
-    + `</div></div>`
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;flex:1;align-items:stretch;">${phoneCard}${formatsCol}</div>`
+    + flightStrip
     + sFootLight(ci, d.brand_short));
 }
 
-// A ring donut of intent distribution (HOT/WARM/COLD), matching the funnel's live distribution chart.
 function intentDonut(ci: CiTokens): string {
   const C = 2 * Math.PI * 45;
   const segs = [{ pct: 13, color: ci.accentOnDark }, { pct: 27, color: ci.accent }, { pct: 60, color: "rgba(255,255,255,0.22)" }];
@@ -1272,20 +1548,56 @@ function sGovernancePage(d: ProposalDoc, ci: CiTokens): string {
 // ── S11 THE INVESTMENT (light) — tier hero + inclusions + footnotes ───────────────────────────────────────────
 function sInvestmentPage(d: ProposalDoc, ci: CiTokens): string {
   const iv = d.investment;
-  const incl = (t: { title: string; pod_tag: string }) =>
-    `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:9px 13px;display:flex;align-items:flex-start;gap:9px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6 9 17l-5-5"></path></svg><div><div style="font-size:10.5px;font-weight:700;">${esc(t.title)}</div><div style="font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-top:2px;">${esc(t.pod_tag)}</div></div></div>`;
+  // Price + unit are shown EXACTLY as edited; price_unit carries an intentional <br> we must un-escape (as the old code did).
+  const priceUnit = esc(iv.price_unit).replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+  const check = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${ci.accentOnDark}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${CHECK}</svg>`;
+
+  // The confident checklist: 8 inclusions as an edge-to-edge ledger, each row flex:1 so they distribute evenly down the
+  // tall hero column, hairline-divided like a premium price list.
+  const inclRow = (t: { title: string; pod_tag: string }, i: number) =>
+    `<div style="display:flex;align-items:center;gap:11px;flex:1;${i > 0 ? "border-top:1px solid rgba(255,255,255,0.12);" : ""}">`
+    + check
+    + `<div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:700;line-height:1.25;">${esc(t.title)}</div>`
+    + `<div style="font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:2px;">${esc(t.pod_tag)}</div></div></div>`;
+
   const foot = (f: { label: string; body: string }) =>
-    `<div style="background:${ci.tint};border-radius:14px;padding:11px 15px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentDeep};">${esc(f.label)}</div><div style="font-size:10px;line-height:1.5;color:${ci.body};margin-top:4px;">${esc(f.body)}</div></div>`;
+    `<div style="background:${ci.tint};border-radius:14px;padding:12px 15px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentDeep};">${esc(f.label)}</div>`
+    + `<div style="font-size:10px;line-height:1.5;color:${ci.body};margin-top:4px;">${esc(f.body)}</div></div>`;
+
+  // LEFT of the hero: the pricing moment. Name/tagline at the top, the giant 58px numeral held in the middle, the
+  // strategy body + PoC pill anchored to the floor via space-between so the column fills the whole panel height.
+  const leftCol = `<div style="display:flex;flex-direction:column;justify-content:space-between;padding:24px 26px;position:relative;z-index:1;">`
+    + `<div><div style="font-size:20px;font-weight:800;text-transform:uppercase;line-height:1.05;">${esc(iv.tier_name)}</div>`
+    +   `<div style="font-size:9px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:5px;">${esc(iv.tagline)}</div></div>`
+    + `<div style="margin:18px 0;"><div style="display:flex;align-items:baseline;gap:12px;">`
+    +   `<div style="font-size:58px;font-weight:800;letter-spacing:-0.02em;line-height:1;color:${ci.accentOnDark};">${esc(iv.price)}</div>`
+    +   `<div style="font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.62);line-height:1.4;">${priceUnit}</div></div></div>`
+    + `<div><p style="font-size:10.5px;line-height:1.6;color:rgba(255,255,255,0.78);margin:0 0 12px;">${esc(iv.body)}</p>`
+    +   `<span style="display:inline-block;background:${ci.accentGrad};border-radius:999px;padding:7px 16px;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#FFFFFF;">${esc(iv.poc_chip)}</span></div>`
+    + `</div>`;
+
+  const rightCol = `<div style="display:flex;flex-direction:column;padding:24px 26px;border-left:1px solid rgba(255,255,255,0.14);position:relative;z-index:1;">`
+    + `<div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">Every pod, included</div>`
+    + `<div style="flex:1;display:flex;flex-direction:column;margin-top:10px;">${iv.inclusions.slice(0, 8).map(inclRow).join("")}</div>`
+    + `</div>`;
+
+  // The signature device: one dark pricing hero (the page's earned "moment"), flex:1 so it consumes the page's slack
+  // top-to-bottom, corner radial glow, giant numeral beside the divided inclusion ledger.
+  const hero = `<div style="flex:1;min-height:340px;margin-top:16px;background:${ci.darkPage};border-radius:18px;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(46,26,74,0.28);display:grid;grid-template-columns:0.92fr 1.08fr;">`
+    + `<div style="position:absolute;right:-120px;top:-120px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,${ci.glow} 0%,transparent 70%);pointer-events:none;"></div>`
+    + leftCol + rightCol + `</div>`;
+
+  const honest = `<div style="margin-top:14px;background:#FFFFFF;border-radius:16px;padding:14px 20px;box-shadow:0 6px 18px ${ci.shadow};display:flex;gap:13px;align-items:flex-start;">`
+    + disc(ci, 30, CHECK)
+    + `<div><div style="font-size:9px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};">No fine print</div>`
+    + `<div style="font-size:10.5px;line-height:1.6;color:${ci.body};margin-top:4px;">${esc(iv.honest_para)}</div></div></div>`;
+
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "The Investment") + headline(ci, { lead: "The investment ·", gradient: `the ${iv.tier_name} system` })
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(iv.intro)}</p>`
-    + `<div style="margin-top:16px;background:${ci.darkPage};border-radius:18px;padding:20px 24px;color:#FFFFFF;box-shadow:0 12px 30px rgba(46,26,74,0.28);">`
-    +   `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><div><div style="font-size:20px;font-weight:800;text-transform:uppercase;">${esc(iv.tier_name)}</div><div style="font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentOnDark};margin-top:2px;">${esc(iv.tagline)}</div></div><div style="background:${ci.accentGrad};border-radius:999px;padding:6px 14px;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap;align-self:flex-start;">${esc(iv.poc_chip)}</div></div>`
-    +   `<div style="display:flex;align-items:baseline;gap:14px;margin-top:8px;"><div style="font-size:54px;font-weight:800;letter-spacing:-0.02em;line-height:1;color:${ci.accentOnDark};">${esc(iv.price)}</div><div style="font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.65);line-height:1.5;">${esc(iv.price_unit).replace(/&lt;br\s*\/?&gt;/gi, "<br>")}</div></div>`
-    +   `<p style="font-size:10.5px;line-height:1.6;color:rgba(255,255,255,0.75);margin:10px 0 0;">${esc(iv.body)}</p>`
-    +   `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">${iv.inclusions.slice(0, 8).map(incl).join("")}</div>`
-    + `</div>`
+    + hero
     + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:14px;">${iv.footnotes.slice(0, 3).map(foot).join("")}</div>`
+    + honest
     + sFootLight(ci, d.brand_short));
 }
 
