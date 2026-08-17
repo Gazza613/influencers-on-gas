@@ -116,10 +116,10 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       headline: hl("The opportunity", "no competitor has claimed"),
       // Only the opportunity intro here (the market overview lives on page 05). Capped so a long intro cannot push
       // the definition-of-success box + footer off the page (Gary saw page 3 cut off). A rebuild writes it tight.
-      paras: [clip(c.opportunity?.intro || "", 520)].filter(Boolean),
+      paras: [clipSentence(c.opportunity?.intro || "", 520)].filter(Boolean),
       // stat headline = the model's punchy label if it gave one, else a clean auto-extract. Body is bounded so the
       // cards stay compact and equal enough to sit their sources on one line.
-      stat_cards: (c.market_intel?.stats || []).slice(0, 6).map((s, i) => ({ icon: [IC.trend, IC.bars, IC.target, IC.user, IC.funnel, IC.refresh][i % 6], stat: (s.label && s.label.trim()) || shortStat(s.stat), body: clip(s.stat, 150), source: s.source })),
+      stat_cards: (c.market_intel?.stats || []).slice(0, 6).map((s, i) => ({ icon: [IC.trend, IC.bars, IC.target, IC.user, IC.funnel, IC.refresh][i % 6], stat: (s.label && s.label.trim()) || shortStat(s.stat), body: clipSentence(s.stat, 190), source: s.source })),
       success_body: c.opportunity?.definition_of_success || "",
     },
 
@@ -133,7 +133,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
 
     market: {
       headline: hl("The evidence", "behind every decision"),
-      intro: clip(c.market_intel?.overview || "", 560),
+      intro: clipSentence(c.market_intel?.overview || "", 560),
       split: { left_label: "The shrinking play", left_pct: "", left_width: "38%", right_label: "The growth", right_pct: "", right_width: "62%", caption: "Budget follows the growing opportunity" },
       quotes: (c.market_intel?.stats || []).slice(0, 4).map((s) => ({ body: s.stat, source: s.source })),
       // Title = the model's proper headline (a complete, punchy line, never a mid-sentence fragment). Body = the
@@ -181,7 +181,7 @@ export function buildProposalDoc(c: ProposalContent, x: ProposalDocCtx): Proposa
       rows: personas.map((p) => ({
         name: p.label,
         platforms: (p.platforms || []).slice(0, 3).map((pl) => pl.platform).join(" · "),
-        segments: (p.platforms || []).slice(0, 3).map((pl) => ({ label: pl.platform, text: clip(`${pl.selections.slice(0, 9).join(", ")}. ${pl.approach}`, 165) })),
+        segments: (p.platforms || []).slice(0, 3).map((pl) => ({ label: pl.platform, text: clipSentence(`${pl.selections.slice(0, 7).join(", ")}. ${pl.approach}`, 180) })),
       })),
       matrix: channelMatrix(personas),
     },
@@ -371,15 +371,20 @@ function splitTitleBody(w: string): { title: string; body: string } {
   return { title: deSlashTitle(title), body };
 }
 // Bound a string to n chars on a WORD boundary with an ellipsis, so a fixed-height card never clips mid-sentence.
-const clip = (s: string, n: number): string => { s = String(s || "").trim(); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, "").trimEnd() + "…" : s; };
-// Clip to the last COMPLETE sentence at or under n chars, so a card never ends mid-sentence with an ellipsis
-// (Gary). If no sentence break sits reasonably within the limit, fall back to a word-boundary clip.
+// Bound a string to n chars on a WORD boundary. NO ellipsis (Gary: "…" reads as a cut-off sentence and should never
+// appear). A clean word-boundary trim is used only as a last resort; prefer clipSentence for prose.
+const clip = (s: string, n: number): string => { s = String(s || "").trim(); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, "").trimEnd() : s; };
+// Clip to the last COMPLETE sentence at or under n chars, so a card never ends mid-sentence (Gary). If no sentence
+// break sits reasonably within the limit, back off to a comma/clause break, else a clean word boundary. Never "…".
 const clipSentence = (s: string, n: number): string => {
   s = String(s || "").trim();
   if (s.length <= n) return s;
   const cut = s.slice(0, n);
-  const stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
-  return stop > n * 0.45 ? cut.slice(0, stop + 1).trim() : clip(s, n);
+  const sentence = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  if (sentence > n * 0.45) return cut.slice(0, sentence + 1).trim();
+  const clause = Math.max(cut.lastIndexOf(", "), cut.lastIndexOf("; "), cut.lastIndexOf(" - "));
+  if (clause > n * 0.55) return cut.slice(0, clause).trim();
+  return clip(s, n);
 };
 const numWord = (n: number) => (["zero", "one", "two", "three", "four", "five", "six"][n] || String(n));
 // 1 to 2 words for the timeline rail under each badge (Gary: labels were cut off; keep them short).
