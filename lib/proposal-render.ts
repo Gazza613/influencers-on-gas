@@ -219,9 +219,12 @@ function coverPage(d: ProposalDoc, ci: CiTokens): string {
     +     `<span style="color:${ci.accentOnDark};">${esc(d.cover.headline.gradient)}</span></div>`
     +   `<p style="margin:22px 0 0;font-size:15px;line-height:1.65;color:rgba(255,255,255,0.72);max-width:560px;">${esc(d.cover.summary)}</p>`
     + `</div>`
-    + `<div style="display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:nowrap;position:relative;">`
-    +   `<div style="box-sizing:border-box;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.20);border-radius:999px;padding:9px 20px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(d.cover.audience_chip)}</div>`
-    +   `<div style="box-sizing:border-box;background:${ci.accentGrad};border-radius:999px;padding:9px 20px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;">${esc(d.date_label)} · ${esc(d.validity_label)}</div>`
+    // The pills must always fit the page with complete text (Gary: never run off the edge, never truncate). The date
+    // pill keeps its full phrase on one line (flex-shrink:0, nowrap); the longer "prepared for" pill yields space and
+    // wraps to two lines if a client name is long; the row wraps as a last resort so nothing can overflow.
+    + `<div style="display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;position:relative;">`
+    +   `<div style="box-sizing:border-box;flex:0 1 auto;min-width:0;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.20);border-radius:16px;padding:8px 16px;font-size:10.5px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;line-height:1.4;">${esc(d.cover.audience_chip)}</div>`
+    +   `<div style="box-sizing:border-box;flex-shrink:0;background:${ci.accentGrad};border-radius:999px;padding:8px 16px;font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;">${esc(d.date_label)} · ${esc(d.validity_label)}</div>`
     + `</div>`
     + `<div style="margin-top:32px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);"><span>GAS Marketing Automation · The Agency of Now</span><span>Human Command. AI Execution.</span></div>`
     + `</section>`;
