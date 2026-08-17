@@ -904,11 +904,13 @@ const signalBar = (ci: CiTokens, label: string, pct: number) =>
   `<div style="margin-top:9px;"><div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.8);margin-bottom:3px;"><span>${esc(label)}</span><span style="color:${ci.accentOnDark};font-weight:700;">${pct}</span></div>`
   + `<div style="height:6px;border-radius:999px;background:rgba(255,255,255,0.12);overflow:hidden;"><div style="height:6px;width:${pct}%;border-radius:999px;background:${ci.accentGrad};"></div></div></div>`;
 
-// Sharp-deck footers: the brand line only, no page number (cleaner for a creative deck; no renumber churn on reorder).
-const sFootLight = (ci: CiTokens, brand: string) =>
-  `<div style="margin-top:auto;padding-top:14px;border-top:1px solid rgba(26,16,48,0.12);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};"><span>GAS Marketing Automation · The Agency of NOW</span><span>${esc(brand)}</span></div>`;
-const sFootDark = (brand: string, mt = "14px") =>
-  `<div style="margin-top:${mt};padding-top:14px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);"><span>GAS Marketing Automation · The Agency of NOW</span><span>${esc(brand)}</span></div>`;
+// Sharp-deck footers: the brand line left, the PAGE NUMBER far right (Gary: page number, not the client name). The
+// ##PG## sentinel is replaced with the sequential "NN / total" in renderProposalHtmlSharp, so reordering never needs
+// hand-renumbering. `brand` is accepted for signature stability but no longer shown.
+const sFootLight = (ci: CiTokens, _brand: string) =>
+  `<div style="margin-top:auto;padding-top:14px;border-top:1px solid rgba(26,16,48,0.12);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};"><span>GAS Marketing Automation · The Agency of NOW</span><span class="tabular">##PG##</span></div>`;
+const sFootDark = (_brand: string, mt = "14px") =>
+  `<div style="margin-top:${mt};padding-top:14px;border-top:1px solid rgba(255,255,255,0.22);display:flex;justify-content:space-between;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.55);"><span>GAS Marketing Automation · The Agency of NOW</span><span class="tabular">##PG##</span></div>`;
 
 // ── S01 COVER (dark) — same wedge cover, sequential footer ────────────────────────────────────────────────────
 function sCoverPage(d: ProposalDoc, ci: CiTokens): string {
@@ -1338,11 +1340,14 @@ function sSignoffPage(d: ProposalDoc, ci: CiTokens): string {
 // content model (ProposalDoc), same CI recolour. Restores the pertinent detail (competitors, targeting, channels,
 // media/placements) the 13-page cut left out, and drops the step-down funnel chart.
 export function renderProposalHtmlSharp(d: ProposalDoc, ci: CiTokens = deriveCiTokens()): string {
-  const pages = [
-    sCoverPage(d, ci), sExecPage(d, ci), sOpportunityPage(d, ci), sMarketPage(d, ci), sCompetitorsPage(d, ci),
-    sEdgePage(d, ci), sSystemPage(d, ci), sAudiencePage(d, ci), sTargetingPage(d, ci), sCreativePage(d, ci),
-    sChannelsPage(d, ci), sMediaPage(d, ci), sPsiPage(d, ci), sFunnelPage(d, ci), sDashboardPage(d, ci),
-    sRolloutPage(d, ci), sGovernancePage(d, ci), sInvestmentPage(d, ci), sTermsPage(d, ci), sSignoffPage(d, ci),
-  ].join("\n");
+  const fns = [
+    sCoverPage, sExecPage, sOpportunityPage, sMarketPage, sCompetitorsPage,
+    sEdgePage, sSystemPage, sAudiencePage, sTargetingPage, sCreativePage,
+    sChannelsPage, sMediaPage, sPsiPage, sFunnelPage, sDashboardPage,
+    sRolloutPage, sGovernancePage, sInvestmentPage, sTermsPage, sSignoffPage,
+  ];
+  const total = fns.length;
+  // Stamp the far-right footer page number ("NN / total") into each page's ##PG## sentinel. The cover has no sentinel.
+  const pages = fns.map((fn, i) => fn(d, ci).replace("##PG##", `${String(i + 1).padStart(2, "0")} / ${total}`)).join("\n");
   return docShell(pages);
 }
