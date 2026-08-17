@@ -11,7 +11,7 @@ const STEPS: { n: number; label: string; href: string }[] = [
   { n: 1, label: "Brain", href: "/setup/brains" },
   { n: 2, label: "Researcher", href: "/researcher" },
   { n: 3, label: "Strategist", href: "/strategist/plan" },
-  { n: 4, label: "Proposal", href: "/strategist/plan" },
+  { n: 4, label: "Proposal", href: "/proposal" },
 ];
 
 export default function FlowSteps({ active }: { active: 1 | 2 | 3 | 4 }) {

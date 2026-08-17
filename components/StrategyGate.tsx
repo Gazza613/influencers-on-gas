@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Strategy, StrategyContent } from "@/lib/cycle";
-import ProposalBuilder from "@/components/ProposalBuilder";
 import LivingStrategy from "@/components/LivingStrategy";
 import WorkingPanel from "@/components/WorkingPanel";
 
@@ -409,8 +408,14 @@ export default function StrategyGate({ clients, ready, initialClientId = "" }: {
             </div>
           )}
 
-          {/* APPROVED -> the Proposal runs from here (same POD) */}
-          {strategy.status === "approved" && <ProposalBuilder strategyId={strategy.id} />}
+          {/* APPROVED -> hand off to the PROPOSAL, now its own step (Step 4) with its own gate. */}
+          {strategy.status === "approved" && (
+            <div className="rounded-xl border border-[#4ade80]/30 bg-surface-1 p-5">
+              <div className="text-lg font-bold text-[#86efac]">Strategy approved ✓</div>
+              <p className="mt-1 text-lg text-ink-dim">The proposal is the next step. Build it from this approved strategy, then read and gate it section by section.</p>
+              <a href={`/proposal?client=${clientId}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black">Go to the Proposal →</a>
+            </div>
+          )}
         </div>
       )}
     </div>
