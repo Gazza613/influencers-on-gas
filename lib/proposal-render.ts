@@ -1145,21 +1145,51 @@ function sSystemPage(d: ProposalDoc, ci: CiTokens): string {
 
 // ── S05 THE AUDIENCE (light) — 4 personas + geo + the targeting matrix ────────────────────────────────────────
 function sAudiencePage(d: ProposalDoc, ci: CiTokens): string {
+  // Lucide map-pin, used for the geo disc (paths only; disc() supplies the radial + stroke).
+  const MAP_PIN = `<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle>`;
+  // A rich persona "dossier" card: 40px avatar disc + name, an oversized accent pull-quote as the hero, and the
+  // geography pinned to the card floor so the four cards align across the row.
   const persona = (p: { icon: string; name: string; geo: string; quote: string }) =>
-    `<div style="background:#FFFFFF;border-radius:14px;padding:13px 16px;box-shadow:0 6px 18px ${ci.shadow};">`
-    + `<div style="display:flex;align-items:center;gap:10px;">${disc(ci, 30, p.icon)}<div><div style="font-size:12px;font-weight:800;">${esc(p.name)}</div><div style="font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;color:${ci.accent};">${esc(p.geo)}</div></div></div>`
-    + `<div style="font-size:9.5px;line-height:1.5;color:${ci.muted};margin-top:7px;font-style:italic;">&ldquo;${esc(p.quote)}&rdquo;</div></div>`;
+    `<div style="background:#FFFFFF;border-radius:16px;padding:15px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;flex-direction:column;height:100%;">`
+    + `<div style="display:flex;align-items:center;gap:11px;">${disc(ci, 38, p.icon)}<div style="flex:1;min-width:0;font-size:12.5px;font-weight:800;line-height:1.15;">${esc(p.name)}</div></div>`
+    + `<div style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;">`
+    +   `<span style="font-size:26px;font-weight:800;line-height:0.7;color:${ci.accentDeep};flex-shrink:0;">&ldquo;</span>`
+    +   `<div style="font-size:10.5px;line-height:1.55;color:${ci.body};font-style:italic;">${esc(p.quote)}&rdquo;</div></div>`
+    + `<div style="margin-top:auto;padding-top:11px;border-top:1px solid rgba(26,16,48,0.10);display:flex;align-items:center;gap:7px;">`
+    +   `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${ci.accent}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${MAP_PIN}</svg>`
+    +   `<span style="font-size:8.5px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accent};">${esc(p.geo)}</span></div></div>`;
   const geoChip = (c: { label: string; accent: boolean }) =>
     `<span style="background:${c.accent ? ci.accent : ci.tint};color:${c.accent ? "#FFFFFF" : ci.accentDeep};border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:600;">${esc(c.label)}</span>`;
-  const budget = (b: { label: string; body: string; flex: number }) =>
-    `<div style="flex:${b.flex || 1};background:${ci.tint};border-radius:12px;padding:11px 14px;"><div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${ci.accentDeep};">${esc(b.label)}</div><div style="font-size:9.5px;line-height:1.5;color:${ci.body};margin-top:4px;">${esc(b.body)}</div></div>`;
+  const geoStrip = `<div style="margin-top:14px;background:#FFFFFF;border-radius:16px;padding:13px 18px;box-shadow:0 6px 18px ${ci.shadow};display:flex;align-items:center;gap:14px;">`
+    + disc(ci, 26, MAP_PIN)
+    + `<div style="flex-shrink:0;max-width:120px;font-size:8.5px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:${ci.muted};line-height:1.35;">${esc(d.audience.geo_label)}</div>`
+    + `<div style="flex:1;display:flex;flex-wrap:wrap;gap:7px;">${d.audience.geo_chips.map(geoChip).join("")}</div></div>`;
+  // The strategic notes the client needs: how we reach them (the trigger-moment discipline) and the targeting blueprint.
+  const note = (label: string, body: string) =>
+    `<div style="background:${ci.tint};border-radius:14px;padding:13px 16px;"><div style="font-size:8.5px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:${ci.accentDeep};">${label}</div><div style="font-size:9.5px;line-height:1.55;color:${ci.body};margin-top:5px;">${esc(body)}</div></div>`;
+  const notes = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">${note("How we reach them", d.audience.discipline_note)}${note("The targeting blueprint", d.audience.blueprint_note)}</div>`;
+  // The signature device: budget lean as a true proportional stacked bar on a dark ground (the page's dark anchor),
+  // pinned to the base via margin-top:auto. The primary lane is accent; the rest neutral-on-dark whites (never a
+  // second lilac). A weighted legend restates each lane's share as a percentage of total spend.
+  const budgets = (d.audience.budget || []).slice(0, 3);
+  const totalFlex = budgets.reduce((s, b) => s + (b.flex || 1), 0) || 1;
+  const segFill = [ci.accentGrad, "rgba(255,255,255,0.30)", "rgba(255,255,255,0.15)"];
+  const dotFill = [ci.accentOnDark, "rgba(255,255,255,0.55)", "rgba(255,255,255,0.30)"];
+  const bar = `<div style="display:flex;gap:4px;height:16px;margin-top:13px;">`
+    + budgets.map((b, i) => `<div style="flex:${b.flex || 1};background:${segFill[i] || segFill[2]};border-radius:5px;"></div>`).join("") + `</div>`;
+  const legend = `<div style="display:grid;grid-template-columns:repeat(${budgets.length || 1},1fr);gap:16px;margin-top:13px;">`
+    + budgets.map((b, i) => {
+        const pct = Math.round(((b.flex || 1) / totalFlex) * 100);
+        return `<div><div style="display:flex;align-items:center;gap:7px;"><span style="width:9px;height:9px;border-radius:2px;background:${dotFill[i] || dotFill[2]};flex-shrink:0;"></span><span style="font-size:9px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#FFFFFF;">${esc(b.label)}</span><span style="margin-left:auto;font-size:12px;font-weight:800;color:${ci.accentOnDark};">${pct}%</span></div><div style="font-size:9.5px;line-height:1.5;color:rgba(255,255,255,0.72);margin-top:5px;">${esc(b.body)}</div></div>`;
+      }).join("") + `</div>`;
+  const budgetBlock = budgets.length
+    ? `<div style="margin-top:auto;background:${ci.darkCard};border-radius:18px;padding:18px 22px;color:#FFFFFF;"><div style="display:flex;align-items:baseline;gap:10px;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accentOnDark};">Where the budget leans</div><div style="margin-left:auto;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.5);">Weighted to the highest-intent segments</div></div>${bar}${legend}</div>`
+    : "";
   return section(pageLight("52px 60px 40px"),
     eyebrow(ci, "The Audience") + headline(ci, d.audience.headline)
     + `<p style="font-size:11.5px;line-height:1.65;color:${ci.body};margin:12px 0 0;">${esc(d.audience.intro)}</p>`
-    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">${d.audience.personas.slice(0, 4).map(persona).join("")}</div>`
-    + `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;align-items:center;"><span style="font-size:8.5px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:${ci.muted};margin-right:4px;">${esc(d.audience.geo_label)}</span>${d.audience.geo_chips.map(geoChip).join("")}</div>`
-    + (d.audience.budget && d.audience.budget.length ? `<div style="margin-top:auto;"><div style="font-size:8.5px;font-weight:600;letter-spacing:0.24em;text-transform:uppercase;color:${ci.accent};margin-bottom:8px;">Where the budget leans</div><div style="display:flex;gap:10px;">${d.audience.budget.slice(0, 3).map(budget).join("")}</div></div>` : "")
-    + sFootLight(ci, d.brand_short));
+    + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;align-items:stretch;">${d.audience.personas.slice(0, 4).map(persona).join("")}</div>`
+    + geoStrip + notes + budgetBlock + sFootLight(ci, d.brand_short));
 }
 
 // ── S10 TARGETING (light) — the segment rows + the who-leads-on-which-channel matrix ──────────────────────────
