@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { refineProposal, approveProposal, reopenProposal, sharpenProposal } from "@/lib/proposal";
+import { refineProposal, approveProposal, reopenProposal, sharpenProposal, setProposalVersion } from "@/lib/proposal";
 
 // THE PROPOSAL GATE (Human Command). A senior strategist reviews the draft: send it back with comments (refine),
 // approve it for the final cut, or reopen an approved one. Our experts gate every step.
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const b = (await req.json().catch(() => ({}))) as { proposalId?: string; action?: string; comments?: string };
+  const b = (await req.json().catch(() => ({}))) as { proposalId?: string; action?: string; comments?: string; mode?: string };
   const proposalId = String(b.proposalId || "").trim();
   const action = String(b.action || "").trim();
   if (!proposalId) return NextResponse.json({ error: "Missing the proposal." }, { status: 400 });
@@ -32,6 +32,11 @@ export async function POST(req: Request) {
     }
     if (action === "sharpen") {
       const proposal = await sharpenProposal(proposalId, session.user?.email ?? null);
+      return NextResponse.json({ ok: true, proposal });
+    }
+    if (action === "version") {
+      const mode = b.mode === "sharp" ? "sharp" : "full";
+      const proposal = await setProposalVersion(proposalId, mode);
       return NextResponse.json({ ok: true, proposal });
     }
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });

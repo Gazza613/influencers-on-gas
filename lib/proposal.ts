@@ -304,6 +304,7 @@ export type Proposal = {
   id: string; engagement_id: string; campaign_id: string | null; strategy_id: string | null;
   objective: string; tier: string; status: string; content: ProposalContent | null;
   pdf_url: string | null; section_review: Record<string, string> | null;
+  content_full: ProposalContent | null; content_sharp: ProposalContent | null; version_mode: string;
   approved_by: string | null; approved_at: string | null; created_at: string;
 };
 
@@ -409,9 +410,33 @@ export async function sharpenProposal(proposalId: string, userEmail?: string | n
   if (content && leakedContent(content)) content = (await runOnce("proposal-sharpen-retry")) || content;
   if (!content) throw new Error("The sharpen pass came back empty. Try again.");
   content = repairLeakedContent(content);
+  // Keep BOTH versions: the FULL (what we sharpened from) and the SHARPENED. content mirrors the sharpened (now live);
+  // version_mode='sharp'. The team can toggle back to the full any time via setProposalVersion.
+  const full = cur.content;
   const upd = (await db().query(
-    `update proposals set content = $2, status = 'awaiting_approval', approved_by = null, approved_at = null, pdf_url = null, section_review = '{}'::jsonb where id = $1 returning *`,
-    [proposalId, JSON.stringify(content)],
+    `update proposals set content = $2, content_full = $3, content_sharp = $2, version_mode = 'sharp', status = 'awaiting_approval', approved_by = null, approved_at = null, pdf_url = null, section_review = '{}'::jsonb where id = $1 returning *`,
+    [proposalId, JSON.stringify(content), JSON.stringify(full)],
+  )) as Proposal[];
+  return upd[0];
+}
+
+// Switch the live version between the FULL and the SHARPENED copy (Gary: keep both, compare, then choose). Saves the
+// current live copy back into its own stash first so any edits aren't lost, loads the chosen one, and resets the
+// per-section review + PDF since the content changed.
+export async function setProposalVersion(proposalId: string, mode: "full" | "sharp"): Promise<Proposal> {
+  const rows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
+  const cur = rows[0];
+  if (!cur) throw new Error("That proposal was not found.");
+  if (cur.status === "approved") throw new Error("That proposal is approved. Reopen it to switch versions.");
+  if (mode === cur.version_mode) return cur;
+  const target = mode === "full" ? cur.content_full : cur.content_sharp;
+  if (!target) throw new Error(mode === "sharp" ? "There is no sharpened version yet. Sharpen the proposal first." : "There is no full version stored.");
+  // Save the current live copy into its own stash (preserve edits), then make the chosen version live.
+  const keepFull = cur.version_mode === "full" ? cur.content : cur.content_full;
+  const keepSharp = cur.version_mode === "sharp" ? cur.content : cur.content_sharp;
+  const upd = (await db().query(
+    `update proposals set content = $2, content_full = $3, content_sharp = $4, version_mode = $5, status = 'awaiting_approval', approved_by = null, approved_at = null, pdf_url = null, section_review = '{}'::jsonb where id = $1 returning *`,
+    [proposalId, JSON.stringify(target), keepFull ? JSON.stringify(keepFull) : null, keepSharp ? JSON.stringify(keepSharp) : null, mode],
   )) as Proposal[];
   return upd[0];
 }

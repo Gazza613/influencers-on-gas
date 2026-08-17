@@ -107,7 +107,21 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
     }).then((x) => x.json()).catch(() => null);
     setGateBusy(false);
     if (!r?.ok) { setMsg(r?.error || "Couldn't sharpen the proposal."); return; }
-    setMsg("");
+    setMsg("✓ Sharpened version ready. You are now viewing it. Use the toggle below to compare it with the full version.");
+    if (r.proposal) setProposal(r.proposal); else await load();
+  }
+
+  // Switch the live version between the FULL and the SHARPENED copy (both are kept, so the team can compare + choose).
+  async function switchVersion(mode: "full" | "sharp") {
+    if (!proposal || proposal.version_mode === mode) return;
+    setGateBusy(true); setMsg("");
+    const r = await fetch(`/api/studio/proposal/gate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposalId: proposal.id, action: "version", mode }),
+    }).then((x) => x.json()).catch(() => null);
+    setGateBusy(false);
+    if (!r?.ok) { setMsg(r?.error || "Couldn't switch version."); return; }
+    setMsg(mode === "sharp" ? "✓ Now showing the SHARPENED version." : "✓ Now showing the FULL version.");
     if (r.proposal) setProposal(r.proposal); else await load();
   }
 
@@ -259,6 +273,15 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
       {/* THE PROPOSAL DRAFT, section by section */}
       {c && (
         <div className="mt-6 space-y-6">
+          {/* A persistent badge so you always know which version you are viewing (only once a sharpened one exists). */}
+          {proposal?.content_sharp && (
+            <div className="flex items-center gap-2 text-base">
+              <span className="text-ink-faint">You are viewing:</span>
+              <span className={`rounded-full px-3 py-1 text-sm font-extrabold uppercase tracking-wide ${(proposal.version_mode || "full") === "sharp" ? "bg-[#4ade80]/15 text-[#86efac]" : "bg-accent/15 text-accent"}`}>
+                {(proposal.version_mode || "full") === "sharp" ? "Sharpened version" : "Full version"}
+              </span>
+            </div>
+          )}
           {/* SHARPEN: a dedicated pass that makes the whole proposal read short, plain and sharp in the PSI funnel
               voice, keeping every fact and the structure (Gary: too high-level, hard to read). Always available: on an
               approved proposal it simply reopens it for review. */}
@@ -271,9 +294,25 @@ export default function ProposalBuilder({ strategyId }: { strategyId: string }) 
               <button onClick={sharpen} disabled={gateBusy}
                 className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#34c759] px-5 py-2.5 text-lg font-bold text-black disabled:opacity-50">
                 {gateBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
-                {gateBusy ? "Sharpening…" : "Sharpen it"}
+                {gateBusy ? "Sharpening…" : proposal?.content_sharp ? "Sharpen again" : "Sharpen it"}
               </button>
             </div>
+            {/* Both versions are kept: once a sharpened version exists, switch between the two to compare, then approve
+                the one the team prefers. Switching preserves any edits you made to each. */}
+            {proposal?.content_sharp && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                <span className="text-base font-semibold text-ink-dim">Showing:</span>
+                <div className="flex rounded-lg border border-line p-0.5">
+                  {(["full", "sharp"] as const).map((m) => (
+                    <button key={m} onClick={() => switchVersion(m)} disabled={gateBusy}
+                      className={`rounded-md px-4 py-1.5 text-base font-semibold transition disabled:opacity-50 ${(proposal.version_mode || "full") === m ? "bg-accent text-black" : "text-ink-dim hover:text-ink"}`}>
+                      {m === "full" ? "Full version" : "Sharpened version"}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-sm text-ink-faint">Both kept. Switch to compare, then approve the one you want.</span>
+              </div>
+            )}
             {gateBusy && <div className="mt-3 text-base text-accent"><Working messages={WORKING_PROPOSAL} /></div>}
           </div>
 

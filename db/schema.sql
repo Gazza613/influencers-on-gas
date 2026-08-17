@@ -961,3 +961,8 @@ create table if not exists proposals (
 create index if not exists idx_proposals_strategy on proposals(strategy_id, created_at desc);
 create index if not exists idx_proposals_engagement on proposals(engagement_id, created_at desc);
 alter table proposals add column if not exists section_review jsonb not null default '{}'::jsonb;
+-- Keep BOTH the full and the sharpened version so the team can compare and choose (Gary). content mirrors whichever
+-- is active; content_full / content_sharp hold each version; version_mode says which is live ('full' | 'sharp').
+alter table proposals add column if not exists content_full jsonb;
+alter table proposals add column if not exists content_sharp jsonb;
+alter table proposals add column if not exists version_mode text not null default 'full';
