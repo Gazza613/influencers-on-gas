@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { refineProposal, approveProposal, reopenProposal } from "@/lib/proposal";
+import { refineProposal, approveProposal, reopenProposal, sharpenProposal } from "@/lib/proposal";
 
 // THE PROPOSAL GATE (Human Command). A senior strategist reviews the draft: send it back with comments (refine),
 // approve it for the final cut, or reopen an approved one. Our experts gate every step.
@@ -29,6 +29,10 @@ export async function POST(req: Request) {
     if (action === "reopen") {
       await reopenProposal(proposalId);
       return NextResponse.json({ ok: true });
+    }
+    if (action === "sharpen") {
+      const proposal = await sharpenProposal(proposalId, session.user?.email ?? null);
+      return NextResponse.json({ ok: true, proposal });
     }
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   } catch (e) {

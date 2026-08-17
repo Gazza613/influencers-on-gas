@@ -170,6 +170,32 @@ const SYSTEM = (clientName: string, objectiveLabel: string, tier: (typeof TIERS)
   `\n` +
   WRITING_STYLE;
 
+// THE SHARPEN PASS (Gary: proposals must read short, sharp and creative like our PSI funnel). A dedicated SECOND pass
+// whose ONLY job is to rewrite the prose of an already-correct proposal in the funnel voice, with hard limits, so the
+// plain-English rule finally wins (it loses in the first pass, drowned out by the 30 doctrine rules). It changes NO
+// facts, numbers, names or structure - only the words.
+const SHARPEN_SYSTEM = (clientName: string) =>
+  `You are the copy chief at GAS Marketing Automation, the Agency of NOW. You are handed a COMPLETE, factually-correct growth proposal for ${clientName}. Your ONE job: make the writing shorter, plainer and sharper, in the voice of our own PSI funnel. Do NOT change the facts, figures, names, sources, personas, channels, or the structure. Only rewrite the PROSE.\n\n` +
+  `HARD LIMITS (obey every one):\n` +
+  `- Most sentences UNDER 14 words. One idea per sentence. Never stack clauses with commas.\n` +
+  `- Every intro or paragraph is at most 3 short sentences. Cut the third if you can.\n` +
+  `- Grade 7 to 8 reading level. A busy business owner understands every line on the FIRST read.\n` +
+  `- Plain everyday words only. No jargon, no clever compression, no abstract nouns.\n` +
+  `- Keep every fact, figure, name, source, persona, channel and structural field EXACTLY as given. Same number of cards, personas, pods, stats, rows. You are editing, not rewriting the plan.\n\n` +
+  `THE VOICE (our PSI funnel, write like this):\n` +
+  `- Short. Punchy. Confident. "Every lead gets a score. Ready ones reach your team."\n` +
+  `- Fragment taglines that land: "We do not widen the funnel. We sharpen it." "Disqualification is not failure. It is performance." "Stop guessing. Start knowing."\n` +
+  `- Negation for contrast: "Not a form. Not software. Not hours later."\n` +
+  `- A plain question that hooks, where it fits: "Still paying for leads nobody will call?"\n` +
+  `- Plain signposts are welcome: "The problem:" / "Our fix:" / "The goal:".\n` +
+  `- Warm and human, never corporate.\n\n` +
+  `WHERE TO ADD CRAFT (only where it reads naturally, never forced):\n` +
+  `- The exec summary or the opportunity may OPEN with a question or a negation.\n` +
+  `- Give the strongest sections (the opportunity, the strategy, PSI) one strong FRAGMENT TAGLINE.\n` +
+  `- Frame a problem as the problem, then a short sharp consequence.\n\n` +
+  `Return the sharpened proposal via sharpen_proposal, same structure, every field present, every fact intact.\n\n` +
+  WRITING_STYLE;
+
 // Load the shared CONTEXT a proposal (or a single section) is written from: the approved strategy, the client, and
 // the verified research facts. Extracted so the whole-proposal build and the per-section refine draw on the exact
 // same grounding. We sell OUR PSI WhatsApp system, so the client's own contact channels (WhatsApp number, phone,
@@ -350,6 +376,44 @@ export async function approveProposal(proposalId: string, approvedBy: string): P
 // Reopen an approved proposal for further edits.
 export async function reopenProposal(proposalId: string): Promise<void> {
   await db().query(`update proposals set status = 'awaiting_approval', approved_by = null, approved_at = null where id = $1`, [proposalId]);
+}
+
+// THE SHARPEN PASS. Rewrites the PROSE of the current proposal in the PSI-funnel voice (short, plain, sharp), on a
+// dedicated single-job prompt so the plain-English rule finally wins. Facts, figures, names and structure are kept.
+// Same Fable leak guard as the full build. All sections return to needs-review and any PDF is invalidated.
+export async function sharpenProposal(proposalId: string, userEmail?: string | null): Promise<Proposal> {
+  const rows = (await db().query(`select * from proposals where id = $1`, [proposalId])) as Proposal[];
+  const cur = rows[0];
+  if (!cur) throw new Error("That proposal was not found.");
+  if (cur.status === "approved") throw new Error("That proposal is approved. Reopen it to sharpen.");
+  if (!cur.content || !cur.strategy_id) throw new Error("This proposal has no content to sharpen.");
+  const key = await getSecret("anthropic");
+  if (!key) throw new Error("Claude isn't connected.");
+  const { clientId, clientName } = await loadProposalContext(cur.strategy_id);
+  const tool: Anthropic.Tool = { name: "sharpen_proposal", description: "The same proposal, prose sharpened, every fact and field intact.", input_schema: CONTENT_SCHEMA };
+  const user =
+    `CLIENT: ${clientName}\n\n` +
+    `Here is the complete, factually-correct proposal. Rewrite ONLY the prose to be shorter, plainer and sharper in our PSI funnel voice, keeping every fact, figure, name, source and structural field exactly as given (same counts of cards, personas, pods, stats, rows). Return via sharpen_proposal.\n\n` +
+    `CURRENT PROPOSAL:\n${JSON.stringify(cur.content)}`;
+  const client = new Anthropic({ apiKey: key });
+  const runOnce = async (action: string): Promise<ProposalContent | null> => {
+    const msg = await withAnthropicRetry(() => client.messages.stream({
+      model: FABLE, max_tokens: 32000, system: SHARPEN_SYSTEM(clientName),
+      tools: [tool], tool_choice: { type: "tool", name: "sharpen_proposal" },
+      messages: [{ role: "user", content: user }],
+    }).finalMessage());
+    await meterClaude(msg, { clientId, userEmail: userEmail ?? null, model: FABLE, action }).catch(() => {});
+    return extract(msg);
+  };
+  let content = await runOnce("proposal-sharpen");
+  if (content && leakedContent(content)) content = (await runOnce("proposal-sharpen-retry")) || content;
+  if (!content) throw new Error("The sharpen pass came back empty. Try again.");
+  content = repairLeakedContent(content);
+  const upd = (await db().query(
+    `update proposals set content = $2, status = 'awaiting_approval', pdf_url = null, section_review = '{}'::jsonb where id = $1 returning *`,
+    [proposalId, JSON.stringify(content)],
+  )) as Proposal[];
+  return upd[0];
 }
 
 // ── Per-section human-in-the-loop review ─────────────────────────────────────────────────────────────────────
