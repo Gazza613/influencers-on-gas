@@ -75,9 +75,19 @@ export default function BrainLibrary({ brainId }: { brainId: string }) {
 
   async function remove(a: Asset) {
     if (!(await askConfirm({ title: "Remove this file from the brand library?", body: `${a.name || "This file"} - the creatives will no longer have it as a source. This cannot be undone.`, tone: "danger", confirmLabel: "Remove" }))) return;
+    // Confirm the delete succeeded BEFORE removing it from the shelf: the old code removed it optimistically then
+    // swallowed any error, so a failed delete looked done and the file silently returned on reload (B4). On
+    // failure we surface the error and reload to restore the true state.
+    setErr("");
+    const r = await fetch(`/api/brains/${brainId}/assets?assetId=${encodeURIComponent(a.id)}`, { method: "DELETE" }).catch(() => null);
+    if (!r?.ok) {
+      const d = await r?.json().catch(() => ({}));
+      setErr(`Could not remove ${a.name || "that file"}: ${d?.error || "please try again"}.`);
+      await load();
+      return;
+    }
     setGroups((gs) => gs?.map((g) => ({ ...g, assets: g.assets.filter((x) => x.id !== a.id) })).filter((g) => g.assets.length > 0) ?? gs);
     setTotal((t) => Math.max(0, t - 1));
-    await fetch(`/api/brains/${brainId}/assets?assetId=${encodeURIComponent(a.id)}`, { method: "DELETE" }).catch(() => {});
   }
 
   return (

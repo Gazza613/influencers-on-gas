@@ -212,8 +212,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     const e = await fetch(`/api/brains/${brainId}/sync-doctrine`, { method: "POST" }).catch(() => null);
     const d = await e?.json().catch(() => ({}));
     setSavingDoc(false);
-    if (e?.ok) { setDoctrine(full); setDocEntry(""); setFedMsg("Fed to the brain. Add the next rule, or move on."); await refresh(); }
-    else flex(d?.error || "Saved, but could not embed it.");
+    if (e?.ok) {
+      setDoctrine(full); setDocEntry(""); setFedMsg("Fed to the brain. Add the next rule, or move on.");
+      // Doctrine chunks have no source row, so refresh() (which reconciles sources) will not move the totals.
+      // Refresh the server component directly so the header count(*) and the strength score pick up the new
+      // doctrine passages (B3).
+      serverSynced.current = false;
+      router.refresh();
+    } else flex(d?.error || "Saved, but could not embed it.");
   }
 
   // DOCUMENTS (articles, PDFs, decks, notes). Each file goes STRAIGHT to Blob from the browser - a serverless
@@ -252,16 +258,20 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
 
   async function removeSource(s: Source) {
     if (!(await askConfirm({ title: "Delete this source and everything it taught the brain?", body: `${s.uri} - This wipes its chunks and embeddings. It cannot be undone.`, tone: "danger", confirmLabel: "Delete" }))) return;
-    await fetch(`/api/brains/${brainId}/sources?sourceId=${encodeURIComponent(s.id)}`, { method: "DELETE" }).catch(() => {});
+    // Confirm the delete SUCCEEDED before removing the row: swallowing the error made a failed delete look done
+    // (a phantom removal that reappears on reload), which is worse than an honest error (B4).
+    const r = await fetch(`/api/brains/${brainId}/sources?sourceId=${encodeURIComponent(s.id)}`, { method: "DELETE" }).catch(() => null);
+    if (!r?.ok) { const d = await r?.json().catch(() => ({})); flex(d?.error || "Could not delete that source. Please try again."); return; }
     setSources((list) => list.filter((x) => x.id !== s.id));
     router.refresh(); // keep the top header total in step with the delete
   }
 
   async function nukeAll() {
     if (!(await askConfirm({ title: "NUKE all knowledge in this brain?", body: "Every source, chunk and embedding is permanently deleted. The brain stays but forgets everything. This cannot be undone.", tone: "danger", confirmLabel: "Nuke" }))) return;
-    await fetch(`/api/brains/${brainId}/sources?sourceId=all`, { method: "DELETE" }).catch(() => {});
-    router.refresh();
+    const r = await fetch(`/api/brains/${brainId}/sources?sourceId=all`, { method: "DELETE" }).catch(() => null);
+    if (!r?.ok) { const d = await r?.json().catch(() => ({})); flex(d?.error || "Could not clear the brain. Please try again."); return; }
     setSources([]);
+    router.refresh();
   }
 
   // RE-CRAWL one website source in place (a site changed). Clears its passages, sets it re-reading, re-fires the
@@ -304,7 +314,12 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // chunkCount can arrive as a string from Postgres, so coerce before it feeds the `=== 0` empty check and the
   // .toLocaleString() below - otherwise a brand-new brain reads "0" (string), `empty` is false, and the
   // onboarding hero never shows.
-  const liveChunks = sources.reduce((a, s) => a + Number(s.chunk_count ?? 0), 0) || Number(chunkCount) || 0;
+  // The brain's TRUE clean-passage total: the sum across sources PLUS the null-source chunks (brand doctrine and
+  // saved answers, which belong to no source row). chunkCount is the server-rendered count(*) for the whole brain,
+  // so max() of the two counts doctrine in and stays correct if the live source sum has moved ahead of a stale
+  // server total. Without this, the header said 86 while the card said 82 and doctrine added 0 to strength (B3).
+  const sourceChunks = sources.reduce((a, s) => a + Number(s.chunk_count ?? 0), 0);
+  const liveChunks = Math.max(sourceChunks, Number(chunkCount) || 0);
   const indexedSources = sources.filter((s) => s.status === "indexed").length;
   const crawling = sources.some((s) => s.status === "pending");
   const hasSite = sources.some((s) => (s.type === "crawl" || s.type === "website") && s.status === "indexed" && (s.chunk_count ?? 0) > 1);
