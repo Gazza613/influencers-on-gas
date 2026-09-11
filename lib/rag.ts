@@ -1,5 +1,45 @@
+import { createHash } from "crypto";
 import { db } from "./db";
 import { embed, toVectorLiteral } from "./vendors/voyage";
+
+// CLEAN SCRAPED WEB CONTENT before it becomes brain knowledge (Gary: the scrape must be world-class, not a raw
+// dump). Firecrawl markdown carries a lot of non-knowledge: nav/blog-index link soup, image + CDN URLs, cookie
+// and privacy boilerplate, Cloudflare bot-challenge text, and the HTML5 video-player caption UI. None of that is
+// what the brain should retrieve on. Applied to CRAWLED/SCRAPED/FILE content only, never to a human's pasted note.
+export function cleanScraped(md: string): string {
+  let s = String(md || "");
+  s = s.replace(/!\[[^\]]*\]\([^)]*\)/g, " ");            // markdown images: drop entirely
+  s = s.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");           // markdown links: keep the text, drop the URL
+  s = s.replace(/https?:\/\/\S+/g, " ");                   // any remaining bare URLs / asset refs
+  s = s.replace(/\\\s*$/gm, " ").replace(/\\+/g, " ");      // stray markdown line-continuation backslashes
+  // Kill whole lines that are Cloudflare/bot-challenge, cookie-consent or the video-player caption UI.
+  s = s.split("\n").filter((line) => {
+    const l = line.trim();
+    if (!l) return false;
+    if (/(turnstile|challenge-platform|cloudflare|verification (failed|expired)|troubleshoot|refresh)/i.test(l)) return false;
+    if (/(TextColor|Caption Area|Opacity(Opaque|Semi-Transparent)|Semi-TransparentTransparent|Beginning of dialog window|modal window|Escape will cancel|Fullscreen|enable JavaScript|upgrading to a)/i.test(l)) return false;
+    if (/^(we use cookies|this site uses cookies|accept( all)? cookies)/i.test(l)) return false;
+    return true;
+  }).join("\n");
+  return s.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Is a chunk junk we should NOT store? Two tests: too little actual prose (mostly symbols/nav after cleaning),
+// or clear cookie/privacy legalese, which is not marketing knowledge. Kept moderate so real copy is never dropped.
+export function isJunkChunk(c: string): boolean {
+  const letters = (c.match(/[a-z]/gi) || []).length;
+  if (letters < 60) return true;
+  const lc = c.toLowerCase();
+  const legal = ["privacy policy", "personally identifying", "cookies", "third-party vendors", "google adwords", "google display network", "ip address", "web browsers and servers"];
+  return legal.filter((k) => lc.includes(k)).length >= 2;
+}
+
+// A stable content hash for de-duplication: normalise (lowercase, strip non-alphanumerics) then SHA1. Two chunks
+// that say the same thing collapse to the same hash even if whitespace or punctuation differs.
+export function contentHash(c: string): string {
+  const norm = c.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return createHash("sha1").update(norm).digest("hex");
+}
 
 // Split text into overlapping chunks (~900 chars, ~120 overlap) on paragraph/sentence
 // boundaries where possible. Keeps chunks embeddable and retrieval-friendly.
@@ -87,10 +127,25 @@ export async function ingestChunks(
 ): Promise<number> {
   const filtered = items.filter((x) => x.content.trim().length > 0);
   if (!filtered.length) return 0;
+  // DE-DUPLICATION (Gary: no duplication ever). Skip any chunk whose content already exists in THIS brain (from a
+  // prior source, an overlap, or a repeated block), and skip repeats within this call. Existing hashes are read
+  // once; each stored chunk carries its hash in metadata so future ingests dedupe against it too.
+  const existing = (await db().query(
+    `select metadata->>'h' as h from knowledge_chunks where client_id = $1 and metadata->>'h' is not null`, [clientId],
+  ).catch(() => [])) as { h: string }[];
+  const seen = new Set(existing.map((r) => r.h).filter(Boolean));
+  const deduped: { content: string; metadata: Record<string, unknown> }[] = [];
+  for (const it of filtered) {
+    const h = contentHash(it.content);
+    if (seen.has(h)) continue;
+    seen.add(h);
+    deduped.push({ content: it.content, metadata: { ...(it.metadata ?? {}), h } });
+  }
+  if (!deduped.length) return 0;
   let stored = 0;
   const BATCH = 32;
-  for (let b = 0; b < filtered.length; b += BATCH) {
-    const batch = filtered.slice(b, b + BATCH);
+  for (let b = 0; b < deduped.length; b += BATCH) {
+    const batch = deduped.slice(b, b + BATCH);
     const vectors = await embed(batch.map((x) => x.content), "document");
     for (let j = 0; j < batch.length; j++) {
       await db().query(
