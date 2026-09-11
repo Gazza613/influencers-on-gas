@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 import { askConfirm } from "@/lib/confirm";
 import { flex } from "@/lib/flex";
+import { brainStrength, STRENGTH_WEIGHT } from "@/lib/brain-strength";
 import BrainKnowledge from "@/components/BrainKnowledge";
 import BrainLibrary from "@/components/BrainLibrary";
 import LivingBrain from "@/components/LivingBrain";
@@ -351,12 +352,12 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // de-duplicated passage count (fast early credit, diminishing returns), so genuine growth moves the score while
   // junk/volume padding cannot game it (the ingest pass strips boilerplate + dupes). Photos are creative source,
   // not Q&A knowledge, so they carry little weight and a 2nd photo does not change the score - by design.
-  const TYPE_WEIGHT: Record<string, number> = { site: 30, docs: 20, doctrine: 12, assets: 5 };
-  const coveragePts = checklist.reduce((s, c) => s + (c.met ? (TYPE_WEIGHT[c.key] || 0) : 0), 0);
-  const depthPts = Math.round(Math.min(1, Math.sqrt(liveChunks / 1000)) * 33); // clean retrievable knowledge
-  const strengthPct = empty ? 0 : Math.round(Math.min(100, coveragePts + depthPts));
+  // The SAME score the brains overview shows: one shared formula (lib/brain-strength) so the two never disagree.
+  // hasSite here matches the overview's has_site (indexed site with >1 chunk), so the inputs are identical too.
+  const strengthPct = brainStrength({ hasSite, hasDocs, hasDoctrine, hasAssets, liveChunks });
+  const depthPts = Math.round(Math.min(1, Math.sqrt(liveChunks / 1000)) * 33); // for the breakdown line only
   // The single biggest thing still to add, so the indicator is actionable, not just a number.
-  const nextGap = checklist.filter((c) => !c.met).map((c) => ({ label: c.label, pts: TYPE_WEIGHT[c.key] || 0 })).sort((a, b) => b.pts - a.pts)[0];
+  const nextGap = checklist.filter((c) => !c.met).map((c) => ({ label: c.label, pts: STRENGTH_WEIGHT[c.key as keyof typeof STRENGTH_WEIGHT] || 0 })).sort((a, b) => b.pts - a.pts)[0];
 
   return (
     <div className="mt-6 space-y-6">
