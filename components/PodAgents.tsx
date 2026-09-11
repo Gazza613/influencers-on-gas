@@ -37,11 +37,15 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
 
   return (
     <>
+      {/* THE FLEX PILL (Gary): tinted fill + near-white copy for legibility + a slight accent glow that lifts on
+          hover. currentColor is the pod's accent, so the fill, border, dot and glow all sing in the pod's own hue,
+          while the label sits in near-white so it reads cleanly. Same footprint as before. */}
       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
         aria-label={`See the ${count} expert agents in ${data.label}`}
-        className={`relative z-20 mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-current/30 px-3 py-1 text-[13px] font-bold transition hover:border-current hover:bg-current/10 ${accent}`}>
-        <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-        {count} expert agents live here
+        className={`relative z-20 mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-current/40 bg-current/10 px-3 py-1 text-[13px] shadow-[0_0_16px_-6px_currentColor] transition hover:-translate-y-px hover:border-current/70 hover:bg-current/[0.18] hover:shadow-[0_0_22px_-4px_currentColor] ${accent}`}>
+        <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor] animate-pulse" />
+        <span className="tabular font-extrabold">{count}</span>
+        <span className="font-medium tracking-[0.02em] text-ink/90">expert agents live here</span>
         {/* An information glyph so it reads as "click to learn more", not just a label. */}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 opacity-80" aria-hidden>
           <circle cx="12" cy="12" r="9" /><path d="M12 11v5" strokeLinecap="round" /><circle cx="12" cy="7.6" r="0.6" fill="currentColor" stroke="none" />
