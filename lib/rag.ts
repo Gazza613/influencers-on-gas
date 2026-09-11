@@ -180,24 +180,43 @@ export async function ingestChunks(
 // state and must be re-embedded once. The chunk CONTENT is stored, so this is lossless: no re-crawl, no need to
 // re-paste a note, nothing to lose. Scoped to one client_id, which is the brain-isolation guarantee.
 export async function reembedBrain(clientId: string): Promise<number> {
-  const rows = (await db().query(
-    `select id, content from knowledge_chunks where client_id = $1 order by created_at`,
-    [clientId],
-  )) as { id: string; content: string }[];
-  if (!rows.length) return 0;
-
+  const ids = await brainChunkIds(clientId);
+  if (!ids.length) return 0;
   let done = 0;
   const BATCH = 32;
-  for (let b = 0; b < rows.length; b += BATCH) {
-    const batch = rows.slice(b, b + BATCH);
-    const vectors = await embed(batch.map((r) => r.content), "document");
-    for (let j = 0; j < batch.length; j++) {
-      await db().query(
-        `update knowledge_chunks set embedding = $1::vector where id = $2 and client_id = $3`,
-        [toVectorLiteral(vectors[j]), batch[j].id, clientId],
-      );
-      done++;
-    }
+  for (let b = 0; b < ids.length; b += BATCH) {
+    done += await reembedChunks(clientId, ids.slice(b, b + BATCH));
+  }
+  return done;
+}
+
+// The chunk ids for a brain, oldest first. Kept light (ids only) so a durable re-index job can hold the full
+// worklist in one small step and then re-embed it batch by batch, each batch its own retryable step.
+export async function brainChunkIds(clientId: string): Promise<string[]> {
+  const rows = (await db().query(
+    `select id from knowledge_chunks where client_id = $1 order by created_at`,
+    [clientId],
+  )) as { id: string }[];
+  return rows.map((r) => r.id);
+}
+
+// Re-embed a specific set of chunks with the CURRENT model. client_id is in every WHERE - the isolation
+// guarantee holds even when the caller supplies ids. Returns how many were actually re-embedded.
+export async function reembedChunks(clientId: string, ids: string[]): Promise<number> {
+  if (!ids.length) return 0;
+  const rows = (await db().query(
+    `select id, content from knowledge_chunks where client_id = $1 and id = any($2::uuid[])`,
+    [clientId, ids],
+  )) as { id: string; content: string }[];
+  if (!rows.length) return 0;
+  const vectors = await embed(rows.map((r) => r.content), "document");
+  let done = 0;
+  for (let j = 0; j < rows.length; j++) {
+    await db().query(
+      `update knowledge_chunks set embedding = $1::vector where id = $2 and client_id = $3`,
+      [toVectorLiteral(vectors[j]), rows[j].id, clientId],
+    );
+    done++;
   }
   return done;
 }

@@ -19,7 +19,7 @@ import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/he
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape, startCrawl, crawlStatus, sitemapUrls } from "@/lib/vendors/firecrawl";
-import { chunkText, ingestChunks, clearSourceChunks, cleanScraped, isJunkChunk } from "@/lib/rag";
+import { chunkText, ingestChunks, clearSourceChunks, cleanScraped, isJunkChunk, brainChunkIds, reembedChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
 import { recordUsage } from "@/lib/usage";
 
@@ -508,6 +508,35 @@ export const ingestSource = inngest.createFunction(
       await step.run("mark-failed", () => setSourceStatus(sourceId, "failed", why));
       throw e;
     }
+  },
+);
+
+// RE-INDEX A BRAIN, DURABLY. Re-embed every stored chunk with the CURRENT model, one batch per durable step.
+//
+// This used to run inline in the API route under a 300s cap. A large brain could hit that cap half-way, leaving
+// some chunks on the new model and some on the old - and mixed-model vectors retrieve as silent noise (same
+// 1024 dims, no error). As a durable job each batch is its own retryable step, so a single slow batch retries in
+// place instead of killing the whole pass, and the pass can run far longer than any one request. Lossless: only
+// the embedding column is rewritten, the content is untouched. client_id threads through every query (isolation).
+export const reindexBrain = inngest.createFunction(
+  { id: "reindex-brain", retries: 2, onFailure: onProductionFailure, triggers: [{ event: "brain/reindex" }] },
+  async ({ event, step }) => {
+    const clientId = String(event.data.clientId);
+    const userEmail = (event.data.userEmail as string | null) ?? null;
+    const ids = await step.run("list-chunks", () => brainChunkIds(clientId));
+    if (!ids.length) return { ok: true, chunks: 0 };
+
+    let done = 0;
+    const BATCH = 32;
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const slice = ids.slice(i, i + BATCH);
+      const n = await step.run(`reembed-${i / BATCH}`, () => reembedChunks(clientId, slice));
+      // Meter each batch as it lands, so a job that is retried or resumed never double-counts a completed batch
+      // (step.run memoises a finished step) and the Voyage spend is attributed correctly.
+      if (n) await step.run(`usage-${i / BATCH}`, () => recordUsage({ clientId, userEmail, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "brain-reindex", count: n }).catch(() => {}));
+      done += n;
+    }
+    return { ok: true, chunks: done };
   },
 );
 

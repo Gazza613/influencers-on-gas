@@ -293,13 +293,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // Lossless: only the vectors are rebuilt, the stored text is untouched.
   async function reindex() {
     if (reindexing) return;
-    if (!(await askConfirm({ title: "Re-index this brain?", body: "Rebuilds every chunk's embedding with the current model so retrieval works properly. Your sources and text are not touched. Takes a moment on a big brain.", confirmLabel: "Re-index" }))) return;
+    if (!(await askConfirm({ title: "Re-index this brain?", body: "Rebuilds every chunk's embedding with the current model so retrieval works properly, in the background. Your sources and text are not touched.", confirmLabel: "Re-index" }))) return;
     setReindexing(true);
     const r = await fetch(`/api/brains/${brainId}/reindex`, { method: "POST" }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
     setReindexing(false);
-    if (r?.ok) { flex(`Re-indexed ${d.chunks} chunk${d.chunks === 1 ? "" : "s"}. Retrieval is now accurate.`); }
-    else flex(d?.error || "Could not re-index the brain.");
+    // Now a durable background job (audit B5), so we confirm it STARTED rather than report a finished count.
+    if (r?.ok) { flex("Re-indexing in the background. Retrieval will be accurate once it finishes."); }
+    else flex(d?.error || "Could not start the re-index.");
   }
 
   async function deleteBrainNow() {
