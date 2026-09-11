@@ -26,7 +26,9 @@ const WORKING_MARKET = [
 ];
 
 export default function MarketQuestion({ clients }: { clients: Client[] }) {
-  const [clientId, setClientId] = useState(clients[0]?.id || "");
+  // On the landing view the brain always defaults to GAS Marketing (Gary), our own brain, then the team switches.
+  const gasDefault = clients.find((c) => /gas\s*marketing/i.test(c.name))?.id || clients.find((c) => /\bgas\b/i.test(c.name))?.id;
+  const [clientId, setClientId] = useState(gasDefault || clients[0]?.id || "");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [findings, setFindings] = useState<Finding[] | null>(null);
