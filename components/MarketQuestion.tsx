@@ -44,6 +44,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
   // Add-to-Brain (accepts the finding so it is kept for the brain rather than binned).
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [addingId, setAddingId] = useState("");
+  const [showAuto, setShowAuto] = useState(false); // the automation/schedule block is collapsed to keep the panel short
 
   const CEO_API = "/api/studio/intel/ceo-article";
 
@@ -104,7 +105,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
 
   return (
-    <div className="rounded-2xl border border-[#818cf8]/30 bg-gradient-to-br from-[#818cf8]/[0.08] to-[#22d3ee]/[0.03] p-6">
+    <div className="rounded-2xl border border-line bg-surface-1 p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           {/* The Living Researcher radar (same signature visual as the Researcher step), quickening while it scans. */}
@@ -141,18 +142,32 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
         <span className="text-sm text-ink-faint">⌘/Ctrl + Enter · takes a minute, it searches the web live</span>
       </div>
 
+      {/* AUTOMATION collapsed by default (Gary: the section was too long). One toggle under the buttons reveals the
+          schedule + recipients + the CEO-article cadence for the selected brain. */}
+      {clientId && (
+        <div className="mt-3 border-t border-line pt-3">
+          <button onClick={() => setShowAuto((v) => !v)}
+            className="inline-flex items-center gap-2 text-base font-semibold text-ink-dim hover:text-ink">
+            <span className={`inline-block transition-transform ${showAuto ? "rotate-90" : ""}`}>▸</span>
+            Automation and delivery
+            <span className="text-sm font-normal text-ink-faint">· schedule this brain, set recipients, auto-draft the CEO article</span>
+          </button>
+          {showAuto && <div className="mt-4"><IntelEmailControl clientId={clientId} clientName={brainName} /></div>}
+        </div>
+      )}
+
       {busy && <div className="mt-4 text-base text-accent"><Working messages={WORKING_MARKET} /></div>}
       {err && <p className="mt-4 text-base text-alert">{err}</p>}
 
       {findings && !busy && (
         <div className="mt-5 space-y-3">
           {findings.length === 0 ? (
-            <p className="rounded-lg border border-line bg-surface-1 px-4 py-3 text-base text-ink-dim">Nothing solid came back on that. A quiet answer is a real one, the pod never pads or invents. Try a sharper question.</p>
+            <p className="rounded-lg border border-line bg-surface-2 px-4 py-3 text-base text-ink-dim">Nothing solid came back on that. A quiet answer is a real one, the pod never pads or invents. Try a sharper question.</p>
           ) : findings.map((f, i) => {
             const move = String(f.campaign_response || "");
             const tag = /\bdefensive\b/i.test(move) && /\bproactive\b/i.test(move) ? "defensive + proactive" : /\bdefensive\b/i.test(move) ? "defensive" : /\bproactive\b/i.test(move) ? "proactive" : "";
             return (
-              <div key={i} className="rounded-xl border border-line bg-surface-1 p-4">
+              <div key={i} className="rounded-xl border border-line bg-surface-2 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <h4 className="flex-1 text-lg font-bold text-ink">{f.headline}</h4>
                   {tag && <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-bold uppercase tracking-wide ${tag.includes("defensive") ? "bg-[#f87171]/15 text-[#fca5a5]" : "bg-[#4ade80]/15 text-[#86efac]"}`}>{tag}</span>}
@@ -224,13 +239,6 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
             );
           })}
           <p className="text-sm text-ink-faint">These also land in <a href="/strategist" className="text-accent hover:underline">The Strategist · Daily Intelligence</a> queue to accept or bin.</p>
-        </div>
-      )}
-
-      {/* AUTOMATION (Gary): run this on a schedule and auto-draft the CEO article, right here for the selected brain. */}
-      {clientId && (
-        <div className="mt-5">
-          <IntelEmailControl clientId={clientId} clientName={brainName} />
         </div>
       )}
     </div>
