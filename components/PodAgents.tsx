@@ -61,9 +61,9 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
             {/* Header stays pinned so the close ✕ is always reachable, even scrolling the Brain's 12 agents. */}
             <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line bg-surface-1 p-6">
               <div>
-                <div className={`text-[13px] font-bold uppercase tracking-[0.16em] ${accent}`}>Inside {data.label}</div>
-                <h3 className="mt-1 text-[22px] font-extrabold tracking-tight text-ink">{count} expert agents at work</h3>
-                <p className="mt-1 text-[14px] text-ink-dim">Every one is a real, working part of this pod. This is the AI swarm of agents working behind the scenes.</p>
+                <div className={`text-[14px] font-bold uppercase tracking-[0.16em] ${accent}`}>Inside {data.label}</div>
+                <h3 className="mt-1 text-[24px] font-extrabold tracking-tight text-ink">{count} expert agents at work</h3>
+                <p className="mt-1.5 text-[16px] leading-relaxed text-ink-dim">Every one is a real, working part of this pod. This is the AI swarm of agents working behind the scenes.</p>
               </div>
               <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); }}
                 aria-label="Close" className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-[14px] font-bold text-ink-dim hover:bg-surface-2">✕</button>
@@ -72,14 +72,14 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
               {groups.map((g) => (
                 <div key={g.name}>
-                  <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-ink-faint">{g.name}</div>
-                  <ul className="mt-2 space-y-2">
+                  <div className="text-[14px] font-bold uppercase tracking-[0.14em] text-ink-faint">{g.name}</div>
+                  <ul className="mt-2.5 space-y-2.5">
                     {g.items.map((a) => (
-                      <li key={a.name} className="flex gap-3 rounded-lg border border-line bg-surface-2 p-3">
-                        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full bg-current ${accent}`} />
+                      <li key={a.name} className="flex gap-3 rounded-lg border border-line bg-surface-2 p-3.5">
+                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full bg-current ${accent}`} />
                         <span>
-                          <span className="block text-[15px] font-bold text-ink">{a.name}</span>
-                          <span className="block text-[14px] leading-relaxed text-ink-dim">{a.role}</span>
+                          <span className="block text-[17px] font-bold text-ink">{a.name}</span>
+                          <span className="block text-[15px] leading-relaxed text-ink-dim">{a.role}</span>
                         </span>
                       </li>
                     ))}
