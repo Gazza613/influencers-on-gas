@@ -108,10 +108,13 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
     <div className="rounded-2xl border border-[#a855f7]/30 bg-gradient-to-br from-[#ec4899]/[0.10] to-[#a855f7]/[0.04] p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          {/* The Living Researcher radar (same signature visual as the Researcher step). It always sweeps (a slow
-              radar at rest, faster while scanning) so the pod reads as live. */}
+          {/* The Living Researcher radar (same signature visual as the Researcher step), always sweeping so the pod
+              reads as live. The section title sits beside it. */}
           <div className="h-16 w-16 shrink-0"><LivingResearch lit={0.7} active /></div>
-          <h3 className="text-xl font-bold text-ink">Ask the market a question</h3>
+          <div>
+            <h3 className="text-xl font-bold text-ink">Daily Intelligence</h3>
+            <p className="text-base text-ink-dim">The market, on demand.</p>
+          </div>
         </div>
         <span className="text-sm text-ink-faint">Live Market Intelligence pod · sourced, never invented</span>
       </div>
