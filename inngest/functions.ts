@@ -4,7 +4,9 @@ import { buildIdentityPrompt, lookClause, genderWord, REALISM_POSITIVE, SCENE_RE
 import { createFaceElement, generateBatch, generateBatchDetailed, generateAngles2_0, upscaleUrlTo, upscaleUrlToDetailed, filterLoadable, importMediaUrl, submitVideoFromImage, submitTalkingVideo, pollVideoJobOnce, humaniseUrl } from "@/lib/vendors/higgsfield";
 import { submitOmniHuman, pollOmniHumanOnce } from "@/lib/vendors/fal";
 import { submitDopVideo, pollDopOnce, dopConfigured, submitKlingRest, klingRestConfigured, submitImageRest, submitSeedanceRest, seedanceRestConfigured } from "@/lib/vendors/higgsfield-dop";
-import { onProductionFailure, alertIfCritical } from "@/lib/alerts";
+import { onProductionFailure, alertIfCritical, alertOps } from "@/lib/alerts";
+import { cycleStartIso } from "@/lib/cron";
+import { db } from "@/lib/db";
 import { notifyRenderDone } from "@/lib/notify";
 import { bibleWardrobe } from "@/lib/bible";
 import { compressForFal } from "@/lib/image";
@@ -474,6 +476,25 @@ export const ingestSource = inngest.createFunction(
         stored += await step.run(`embed-store-${i / BATCH}`, () => ingestChunks(clientId, sourceId, slice));
       }
       await step.run("usage-embed", () => recordUsage({ clientId, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "ingest", count: stored }));
+      // FIRECRAWL QUOTA ALERT (Gary): the Hobby plan gives 5,000 credits (pages) per 30-day cycle. When a crawl
+      // pushes this cycle past 80% of that, email the admin once a day (throttled) so credits get topped up before
+      // it bills overage. Only fires on the paths that actually spend Firecrawl credits (crawl / website / PDF).
+      if (type === "crawl" || type === "website" || (type === "file" && /\.pdf(\?|$)/i.test(uri))) {
+        await step.run("firecrawl-quota", async () => {
+          const fcStart = cycleStartIso(11);
+          const rows = (await db().query(`select coalesce(sum(count),0)::int as pages from usage_events where provider = 'firecrawl' and created_at >= $1`, [fcStart])) as { pages: number }[];
+          const pages = Number(rows[0]?.pages) || 0;
+          const quota = 5000;
+          if (pages >= quota * 0.8) {
+            await alertOps({
+              title: pages >= quota ? "Firecrawl quota exceeded, it is billing overage credits" : "Firecrawl quota nearly used, top up soon",
+              detail: `${pages} of ${quota} Firecrawl credits (pages) used this cycle since ${fcStart}. Beyond 5,000 it bills overage credits (about R81 per 1,000 pages). Top up the Firecrawl Hobby plan.`,
+              context: { Provider: "Firecrawl", Plan: "Hobby $19/mo", "Pages this cycle": pages, Quota: quota, Used: `${Math.round((pages / quota) * 100)}%` },
+              throttleMinutes: 1440,
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
       await step.run("mark-indexed", () => setSourceStatus(sourceId, "indexed"));
       return { ok: true, chunks: stored };
     } catch (e) {

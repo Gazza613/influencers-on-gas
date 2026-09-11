@@ -74,6 +74,7 @@ export default function CostControlPage() {
   // nobody used this period; totalCents = every active subscription.
   const [fixed, setFixed] = useState<{ totalCents: number; byDesk: { desk: string; cents: number; tint: string }[]; idleCents: number } | null>(null);
   const fixedByDesk = fixed ? Object.fromEntries(fixed.byDesk.map((d) => [d.desk, d.cents])) : {};
+  const [firecrawl, setFirecrawl] = useState<{ pages: number; quota: number; cycleStart: string } | null>(null);
   const [audit, setAudit] = useState<Audit>([]);
   const [prev, setPrev] = useState<{ cents: number; credits: number } | null>(null);
   const [cycle, setCycle] = useState<{ start: string; trackedCredits: number; trackedCents: number } | null>(null);
@@ -102,6 +103,7 @@ export default function CostControlPage() {
       setReport(r.report); setAudit(r.audit || []); setPrev(r.previous ?? null); setCycle(r.cycle ?? null); setRate(r.zarPerUsd || 0);
       const f = r.fixed;
       setFixed(f ? { totalCents: f.totalCents || 0, byDesk: f.byDesk || [], idleCents: (f.idle || []).reduce((s: number, x: { cents: number }) => s + (x.cents || 0), 0) } : null);
+      setFirecrawl(r.firecrawl ?? null);
     }
     setLoading(false);
   }, [from, to, influencerId, provider, userEmail]);
@@ -231,6 +233,10 @@ export default function CostControlPage() {
 
         {/* BY CLIENT / BRAIN - total spend and research-only cost per client (Gary: "this is key") */}
         {report && report.byClient.some((c) => c.id) && <ClientCosts rows={report.byClient} />}
+
+        {/* THE BRAIN · POD COST (Gary: cost exposure per pod, built pod by pod). Fixed = the Firecrawl sub
+            allocated here; usage = the Brain's metered Claude/Voyage spend; plus the Firecrawl page quota + alert. */}
+        {report && <BrainPodCost report={report} fixedCents={fixedByDesk["Brains"] ?? 0} firecrawl={firecrawl} />}
 
         {/* BY SECTION */}
         {report && report.byDesk.length > 0 && <SectionSplit desks={report.byDesk} fixedByDesk={fixedByDesk} idleCents={fixed?.idleCents ?? 0} />}
@@ -386,6 +392,56 @@ function TeamMembers({ rows }: { rows: MemberRow[] }) {
 
 // BY SECTION - each section's true cost: pay-per-use plus its share of the subscriptions its work runs on.
 type DeskRow = { desk: string; credits: number; cents: number; events: number; tint: string };
+// THE BRAIN pod's cost exposure: the Firecrawl subscription allocated here (fixed) + the Brain's metered Claude/
+// Voyage usage, plus a Firecrawl page-quota meter that turns red as it nears the 5,000/cycle Hobby limit (Gary:
+// warn before it bills overage). Built pod by pod - this is the first; the Researcher etc. follow the same shape.
+function BrainPodCost({ report, fixedCents, firecrawl }: { report: Report; fixedCents: number; firecrawl: { pages: number; quota: number; cycleStart: string } | null }) {
+  const brain = report.byDesk.find((d) => d.desk === "Brains");
+  const usageCents = brain?.cents ?? 0;
+  const total = usageCents + fixedCents;
+  const quota = firecrawl?.quota ?? 5000;
+  const pages = firecrawl?.pages ?? 0;
+  const pct = Math.min(100, Math.round((pages / Math.max(1, quota)) * 100));
+  const warn = pct >= 80;
+  const stat = (label: string, value: string, sub: string, strong = false) => (
+    <div className="rounded-lg border border-line bg-surface-2 p-4">
+      <div className="text-sm text-ink-faint">{label}</div>
+      <div className={`tabular mt-1 ${strong ? "text-2xl font-bold text-ink" : "text-xl font-semibold text-ink"}`}>{value}</div>
+      <div className="mt-0.5 text-sm text-ink-faint">{sub}</div>
+    </div>
+  );
+  return (
+    <section className="mt-8">
+      <div className="flex items-center gap-2">
+        <span className="h-3 w-3 rounded-full" style={{ background: "#f472b6" }} />
+        <h2 className="text-xl font-bold">The Brain · cost exposure</h2>
+      </div>
+      <div className="mt-3 rounded-xl border border-line bg-surface-1 p-5">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {stat("Fixed · Firecrawl sub", rand(fixedCents), "$19/mo Hobby, FX to ZAR")}
+          {stat("Usage · Claude + Voyage", rand(usageCents), `${(brain?.events ?? 0).toLocaleString()} paid actions`)}
+          {stat("Total this period", rand(total), "fixed + usage", true)}
+        </div>
+        <div className="mt-5">
+          <div className="flex items-baseline justify-between text-base">
+            <span className="text-ink-dim">Firecrawl pages this cycle</span>
+            <span className="tabular text-ink">{pages.toLocaleString()} / {quota.toLocaleString()}</span>
+          </div>
+          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-2">
+            <div className={`h-full rounded-full ${warn ? "bg-alert" : "bg-gradient-to-r from-[#a855f7] to-[#22d3ee]"}`} style={{ width: `${pct}%` }} />
+          </div>
+          <p className={`mt-2 text-sm ${warn ? "font-semibold text-alert" : "text-ink-faint"}`}>
+            {warn
+              ? `Approaching the 5,000-page Firecrawl limit (${pct}%). Top up credits or it bills overage (about R81 per 1,000 pages).`
+              : `Within the 5,000-page Hobby quota, so crawls are R0 marginal.${firecrawl ? ` Cycle since ${firecrawl.cycleStart}.` : ""}`}
+          </p>
+        </div>
+        <p className="mt-4 text-sm text-ink-faint">Drivers: Firecrawl (fixed sub, R0 within quota) · Voyage embeddings (in-plan, R0, counted) · Claude (ask-the-brain answers, the coverage map and sharpen, the real per-use cost).</p>
+      </div>
+    </section>
+  );
+}
+
 function SectionSplit({ desks, fixedByDesk, idleCents }: { desks: DeskRow[]; fixedByDesk: Record<string, number>; idleCents: number }) {
   const trueOf = (d: DeskRow) => d.cents + (fixedByDesk[d.desk] ?? 0);
   // Include idle plans (paid for, used by nobody) as their own row, so the rows SUM to the hero total exactly:

@@ -15,6 +15,7 @@ const SEED: { provider: string; name: string; monthly_usd: number; note: string 
   { provider: "higgsfield", name: "Higgsfield Ultra", monthly_usd: 375, note: "9,000 credits/mo. nano_banana_pro and gpt_image_2 are unlimited on this plan." },
   { provider: "anthropic", name: "Claude", monthly_usd: 100, note: "Powers every AI step on the platform: co-pilot, research, scripts, QA." },
   { provider: "heygen", name: "HeyGen Pro", monthly_usd: 99, note: "~121 presenter minutes/mo included; overage billed per minute." },
+  { provider: "firecrawl", name: "Firecrawl Hobby", monthly_usd: 19, note: "Brain ingestion crawler. 5,000 credits (pages)/mo; marginal R0 within quota, overage beyond. USD, FX to ZAR. Started 11 Sep 2026, billed every 30 days." },
   { provider: "elevenlabs", name: "ElevenLabs", monthly_usd: 0, note: "Voice, music and SFX run inside this quota. Set the real monthly amount." },
   { provider: "freepik", name: "Freepik / Magnific", monthly_usd: 0, note: "Fallback upscale and stock. Set the real monthly amount." },
   { provider: "vercel", name: "Vercel", monthly_usd: 0, note: "Hosting and functions. Set the real monthly amount." },
