@@ -45,6 +45,16 @@ export default function BrainLibrary({ brainId }: { brainId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Zoom preview: close on Escape and lock body scroll while open (keyboard parity with a click on the backdrop).
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoom(null); };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+  }, [zoom]);
+
   async function addFiles(list: FileList | null) {
     if (!list?.length || busy) return;
     setErr(""); const failed: string[] = []; let done = 0;

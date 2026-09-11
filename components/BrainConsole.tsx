@@ -338,7 +338,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // timeline of what is in vs still to add.
   const ordered = [...checklist].sort((a, b) => Number(b.met) - Number(a.met));
   const empty = sources.length === 0 && !hasDoctrine && liveChunks === 0;
-  const ready = hasSite && metCount >= 3;
+  // Ready needs real KNOWLEDGE (a crawled site OR documents) plus 3 of the 4 inputs - not a website specifically.
+  // Requiring hasSite dead-ended a legitimate doc-only brain that could never go green (H3).
+  const ready = (hasSite || hasDocs) && metCount >= 3;
   const lit = empty ? 0.06 : Math.max(metCount / checklist.length, liveChunks > 0 ? 0.22 : 0);
   // A single 0-100 STRENGTH score for THIS brain (Gary): weighted by the four inputs, with the crawled website the
   // anchor most of the knowledge comes from, plus a depth bonus for how much is actually indexed. So a well-fed

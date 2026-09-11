@@ -16,7 +16,11 @@ export function cleanScraped(md: string): string {
   s = s.split("\n").filter((line) => {
     const l = line.trim();
     if (!l) return false;
-    if (/(turnstile|challenge-platform|cloudflare|verification (failed|expired)|troubleshoot|refresh)/i.test(l)) return false;
+    // Cloudflare/bot-challenge lines only. "troubleshoot"/"refresh" were dropped standalone before, which also
+    // killed legitimate copy ("refresh your brand", "troubleshoot your campaign") - now they only count when a
+    // challenge-specific token is also present on the line (M2).
+    if (/(turnstile|challenge-platform|cloudflare|verification (failed|expired))/i.test(l)) return false;
+    if (/(troubleshoot|refresh)/i.test(l) && /(ray id|performance & security|attention required|are you a robot|checking your browser)/i.test(l)) return false;
     if (/(TextColor|Caption Area|Opacity(Opaque|Semi-Transparent)|Semi-TransparentTransparent|Beginning of dialog window|modal window|Escape will cancel|Fullscreen|enable JavaScript|upgrading to a)/i.test(l)) return false;
     if (/^(we use cookies|this site uses cookies|accept( all)? cookies)/i.test(l)) return false;
     return true;
@@ -28,7 +32,10 @@ export function cleanScraped(md: string): string {
 // or clear cookie/privacy legalese, which is not marketing knowledge. Kept moderate so real copy is never dropped.
 export function isJunkChunk(c: string): boolean {
   const letters = (c.match(/[a-z]/gi) || []).length;
-  if (letters < 60) return true;
+  const words = (c.match(/[a-z]{2,}/gi) || []).length;
+  // Drop only genuine fragments: almost no prose, OR short AND with too few words to be a sentence. A punchy real
+  // line ("We never charge a monthly fee") is 6+ words and now survives, while a 3-word nav crumb still goes (M1).
+  if (letters < 25 || (letters < 60 && words < 6)) return true;
   const lc = c.toLowerCase();
   const legal = ["privacy policy", "personally identifying", "cookies", "third-party vendors", "google adwords", "google display network", "ip address", "web browsers and servers"];
   return legal.filter((k) => lc.includes(k)).length >= 2;
