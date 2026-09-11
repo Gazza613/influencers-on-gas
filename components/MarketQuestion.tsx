@@ -105,11 +105,12 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
 
   return (
-    <div className="rounded-2xl border border-line bg-surface-1 p-6">
+    <div className="rounded-2xl border border-[#a855f7]/30 bg-gradient-to-br from-[#ec4899]/[0.10] to-[#a855f7]/[0.04] p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          {/* The Living Researcher radar (same signature visual as the Researcher step), quickening while it scans. */}
-          <div className="h-11 w-11 shrink-0"><LivingResearch lit={0.55} active={busy} /></div>
+          {/* The Living Researcher radar (same signature visual as the Researcher step). It always sweeps (a slow
+              radar at rest, faster while scanning) so the pod reads as live. */}
+          <div className="h-16 w-16 shrink-0"><LivingResearch lit={0.7} active /></div>
           <h3 className="text-xl font-bold text-ink">Ask the market a question</h3>
         </div>
         <span className="text-sm text-ink-faint">Live Market Intelligence pod · sourced, never invented</span>
