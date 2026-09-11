@@ -184,6 +184,7 @@ type Door = {
   ring: string;      // border + hover glow
   wash: string;      // the faint gradient inside the card
   accent: string;    // the action text
+  agents?: number;   // "N expert agents live here" flex badge on the tile (Gary), for the team to show off
   // An optional SECOND destination in the corner (the showcase eye). A card can have two jobs: go to work, or
   // go and look at the work.
   peek?: { href: string; label: string };
@@ -221,6 +222,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <BrainMark />,
         blurb: "The starting point and the client's living knowledge base. Enter their website(s) and it crawls them in with Firecrawl, so even JavaScript and Cloudflare sites read; add documents, logo and brand rules too.",
         action: "Build the Brain",
+        agents: 4,
         step: 1,
         ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
@@ -232,6 +234,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <ResearcherMark />,
         blurb: "A commissioned deep dive built on the brain: it reads the client's own crawled material as ground truth, then verifies the external record, the market, competitors and positioning, and feeds its findings back.",
         action: "Research the market",
+        agents: 5,
         step: 2,
         ring: "border-[#22d3ee]/30 hover:border-[#22d3ee]/70 hover:shadow-[0_0_50px_-12px_rgba(34,211,238,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
@@ -243,6 +246,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <StrategistMark />,
         blurb: "Turns the approved fact base into one single-minded, defensible strategy, every point traced to a fact. You refine and approve at Gate 2.",
         action: "Set the strategy",
+        agents: 3,
         step: 3,
         ring: "border-[#818cf8]/30 hover:border-[#818cf8]/70 hover:shadow-[0_0_50px_-12px_rgba(129,140,248,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
@@ -256,6 +260,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         mark: <ProposalMark />,
         blurb: "Turns the approved strategy into a client-ready, 24-page branded proposal, recoloured to the client's own brand. Three investment options, dated on download and ready to sign.",
         action: "Generate the proposal",
+        agents: 3,
         step: 4,
         ring: "border-[#ec4899]/30 hover:border-[#ec4899]/70 hover:shadow-[0_0_50px_-12px_rgba(236,72,153,0.45)]",
         wash: "from-[#ec4899]/[0.10] to-[#a855f7]/[0.04]",
@@ -363,6 +368,12 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
         <span className={`relative block ${d.accent}`}>{d.mark}</span>
         <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink">{d.name}</h2>
         <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-dim">{d.blurb}</p>
+        {d.agents ? (
+          <span className={`relative mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-current/30 px-3 py-1 text-[13px] font-bold ${d.accent}`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+            {d.agents} expert agents live here
+          </span>
+        ) : null}
         <span className={`tabular relative mt-5 inline-flex w-fit items-center rounded-full border border-current/40 px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.16em] ${d.accent}`}>
           {d.action}
         </span>

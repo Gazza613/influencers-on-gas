@@ -107,6 +107,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // SEE when the brain is completed"). And keep polling long enough for a real crawl: an 80-page site can take
   // 6-8 minutes, and the old 60x4s=4min cap gave up BEFORE it finished, freezing the row on "indexing... 0 chunks".
   const seenStatus = useRef<Record<string, string>>({});
+  const serverSynced = useRef(false);   // ensures the drift-driven router.refresh() fires at most once
   const [flashDone, setFlashDone] = useState<Set<string>>(new Set());
   async function refresh(tries = 0): Promise<void> {
     const r = await fetch(`/api/brains/${brainId}`, { cache: "no-store" });
@@ -119,6 +120,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       seenStatus.current[s.id] = s.status;
     }
     setSources(next);
+    // If the live total drifts from the server-rendered snapshot (a re-crawl deduped the counts down while this
+    // page sat in the client Router Cache), refresh the server component ONCE so the header "NN passages" total
+    // (app/setup/brains/[id] line 41) also snaps to the truth. Guarded so it fires at most once, never loops.
+    const liveTotal = next.reduce((a, s) => a + Number(s.chunk_count ?? 0), 0);
+    if (!serverSynced.current && liveTotal !== Number(chunkCount)) {
+      serverSynced.current = true;
+      router.refresh();
+    }
     if (newlyDone.length) {
       setFlashDone((cur) => new Set([...cur, ...newlyDone]));
       // Number() is load-bearing: a count from Postgres can arrive as a string, and `0 + "5" + "10"` would
@@ -137,10 +146,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     }
   }
 
-  // Resume polling on load if a crawl is still running (Gary reloaded the page mid-crawl and it looked frozen).
+  // Always reconcile the passage counts against the live DB on load, and resume polling if a crawl is still
+  // running. The brain page is a cached server component, so its rendered per-source counts can be stale after
+  // a re-crawl deduped them down (Gary saw 198/28 on screen while the DB actually held the cleaned 58/24). One
+  // silent fetch on mount fixes the count to the truth; refresh() self-stops when nothing is pending, so this is
+  // a single query when idle, not a loop. seenStatus is seeded first, so no spurious "brain ready" toast fires.
   useEffect(() => {
     for (const s of initialSources) seenStatus.current[s.id] = s.status;
-    if (initialSources.some((s) => s.status === "pending")) refresh();
+    refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
