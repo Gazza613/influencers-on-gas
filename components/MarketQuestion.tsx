@@ -133,7 +133,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
       </div>
       <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={2}
         onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask("question"); }}
-        placeholder={`e.g. What has changed in the SA fintech market that affects ${brainName} this week? What did GoTyme just do?`}
+        placeholder={`e.g. What has changed in ${brainName}'s market recently, and what should we do about it? What did a key rival just do?`}
         className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-accent" />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button onClick={() => ask("question")} disabled={busy || !q.trim()}

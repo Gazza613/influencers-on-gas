@@ -393,7 +393,7 @@ export default function BuilderPage() {
             <span className="text-base text-ink-dim tabular">{refs.length} designs · {deals.length} deals on file</span>
           </div>
           <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
-            placeholder="What is the campaign? e.g. Mother's Day - celebrate mums, send money and airtime to your mother through MoMo, zero fees."
+            placeholder="What is the campaign? e.g. Mother's Day - the offer, who it is for, and the one action you want them to take."
             className="mt-3 w-full resize-y rounded-xl border border-line bg-surface-2 p-4 text-base leading-relaxed outline-none focus:border-accent" />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={buildAll} disabled={!!busy.all || brief.trim().length < 6}

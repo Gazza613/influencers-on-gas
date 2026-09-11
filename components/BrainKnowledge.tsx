@@ -134,7 +134,7 @@ export default function BrainKnowledge({ brainId, total }: { brainId: string; to
           <form onSubmit={search} className="flex gap-2">
             <input
               value={q} onChange={(e) => setQ(e.target.value)}
-              placeholder="Find the exact words, e.g. R5, MAU, zero fees"
+              placeholder="Find the exact words, e.g. a price, a product name, a claim"
               className="flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] outline-none focus:border-line-strong"
             />
             <button type="submit" className="rounded-lg border border-line px-4 py-2.5 text-[18px] font-semibold text-ink hover:border-line-strong">Search</button>
