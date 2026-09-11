@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { POD_AGENTS } from "@/lib/pod-agents";
 
 // THE FLEX BADGE + ROSTER POPUP (Gary: "click on the flex of 12 Agents ... their roles and descriptions could pop
@@ -9,6 +10,8 @@ import { POD_AGENTS } from "@/lib/pod-agents";
 
 export default function PodAgents({ pod, accent }: { pod: string; accent: string }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);   // portal target only exists in the browser
+  useEffect(() => { setMounted(true); }, []);
   const data = POD_AGENTS[pod];
   const count = data?.agents.length ?? 0;
 
@@ -45,13 +48,14 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
         </svg>
       </button>
 
-      {open && (
-        <div role="dialog" aria-modal="true" aria-label={`${data.label} — the agents at work`}
+      {open && mounted && createPortal(
+        <div role="dialog" aria-modal="true" aria-label={`${data.label}: the agents at work`}
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); }}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
           <div onClick={(e) => e.stopPropagation()}
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface-1 p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
+            className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface-1 shadow-2xl">
+            {/* Header stays pinned so the close ✕ is always reachable, even scrolling the Brain's 12 agents. */}
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line bg-surface-1 p-6">
               <div>
                 <div className={`text-[13px] font-bold uppercase tracking-[0.16em] ${accent}`}>Inside {data.label}</div>
                 <h3 className="mt-1 text-[22px] font-extrabold tracking-tight text-ink">{count} expert agents at work</h3>
@@ -61,7 +65,7 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
                 aria-label="Close" className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-[14px] font-bold text-ink-dim hover:bg-surface-2">✕</button>
             </div>
 
-            <div className="mt-5 space-y-5">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
               {groups.map((g) => (
                 <div key={g.name}>
                   <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-ink-faint">{g.name}</div>
@@ -80,7 +84,8 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
