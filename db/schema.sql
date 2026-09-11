@@ -641,7 +641,7 @@ create index if not exists studio_campaigns_client on studio_campaigns (client_i
 --   image/video/ci_doc                - general upload, footage, CI document
 alter table studio_assets drop constraint if exists studio_assets_kind_check;
 alter table studio_assets add constraint studio_assets_kind_check
-  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon','ceo_photo','ceo_cutout','team_photo'));
+  check (kind in ('reference','image','logo','font','video','ci_doc','deal_card','phone_screen','brand_icon','ceo_photo','md_photo','ceo_cutout','team_photo'));
 
 -- ── Subscriptions: the FIXED monthly exposure ────────────────────────────────
 -- Metered usage only ever answered "what did this job cost us at the margin?". For a platform built on
