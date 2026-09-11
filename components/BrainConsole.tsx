@@ -296,6 +296,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const empty = sources.length === 0 && !hasDoctrine && liveChunks === 0;
   const ready = hasSite && metCount >= 3;
   const lit = empty ? 0.06 : Math.max(metCount / checklist.length, liveChunks > 0 ? 0.22 : 0);
+  // A single 0-100 STRENGTH score for THIS brain (Gary): weighted by the four inputs, with the crawled website the
+  // anchor most of the knowledge comes from, plus a depth bonus for how much is actually indexed. So a well-fed
+  // brain reads as strong even before every input type is added, and the number reflects the knowledge on file,
+  // not just how many boxes are ticked. The bar fills to this same score.
+  const TYPE_WEIGHT: Record<string, number> = { site: 35, docs: 20, doctrine: 20, assets: 10 };
+  const coveragePct = checklist.reduce((s, c) => s + (c.met ? (TYPE_WEIGHT[c.key] || 0) : 0), 0);
+  const depthPct = Math.min(1, liveChunks / 250) * 15; // up to 15 points for indexed depth
+  const strengthPct = empty ? 0 : Math.round(Math.min(100, coveragePct + depthPct));
 
   return (
     <div className="mt-6 space-y-6">
@@ -305,6 +313,13 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
         {/* Signature violet aura behind the card, brighter the more the brain knows. */}
         <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full blur-[90px]"
           style={{ background: "radial-gradient(circle, rgba(168,85,247,0.18), transparent 70%)", opacity: 0.4 + 0.6 * Math.min(1, lit) }} />
+        {/* The brain's overall STRENGTH as a single percentage (Gary), top-right. Reflects the knowledge on file. */}
+        {!empty && (
+          <div className="absolute right-5 top-5 text-right leading-none">
+            <div className={`tabular text-[34px] font-extrabold ${ready ? "text-[#86efac]" : "text-[#c79bff]"}`}>{strengthPct}<span className="text-[20px]">%</span></div>
+            <div className="tabular mt-1 text-[11px] uppercase tracking-[0.2em] text-ink-faint">strength</div>
+          </div>
+        )}
         <div className="relative flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-7">
           {/* THE LIVING BRAIN. */}
           <div className="relative h-32 w-32 shrink-0 text-ink-faint">
@@ -335,7 +350,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 {/* One continuous strength bar - fills to the done fraction (2/4 = a solid 50%), no gaps. */}
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
                   <div className={`h-full rounded-full ${ready ? "bg-[#4ade80]" : "bg-gradient-to-r from-[#a855f7] to-[#22d3ee]"}`}
-                    style={{ width: `${(metCount / checklist.length) * 100}%`, transition: "width 0.6s ease-out" }} />
+                    style={{ width: `${strengthPct}%`, transition: "width 0.6s ease-out" }} />
                 </div>
                 {/* The checklist, done items first (a timeline), each unmet item jumps to where you fix it. */}
                 <div className="mt-3.5 flex flex-wrap justify-center gap-2 sm:justify-start">
