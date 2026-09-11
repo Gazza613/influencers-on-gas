@@ -65,7 +65,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const [fullSite, setFullSite] = useState(true);          // full-site crawl vs a single page
   const [text, setText] = useState("");
   const [compliance, setCompliance] = useState("");
-  const [doctrine, setDoctrine] = useState(initialDoctrine);
+  const [doctrine, setDoctrine] = useState(initialDoctrine); // the saved brand book (drives strength + hasDoctrine)
+  const [docEntry, setDocEntry] = useState(""); // the "add a rule" input, blank and cleared after each save
+  const [fedMsg, setFedMsg] = useState(""); // a visible "fed to the brain" confirmation after a teach/paste save
   const [savingDoc, setSavingDoc] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState("");
@@ -164,7 +166,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     const val = (kind === "compliance" ? compliance : text).trim();
     if (val.length < 20) { setAddErr("Paste a bit more text to learn from."); return; }
     if (adding) return;
-    setAdding(true); setAddErr("");
+    setAdding(true); setAddErr(""); setFedMsg("");
     const r = await fetch(`/api/brains/${brainId}/sources`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "text", text: val, ...(kind ? { kind } : {}) }),
@@ -172,6 +174,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setAddErr(d?.error || "Could not add"); setAdding(false); return; }
     if (kind === "compliance") setCompliance(""); else setText("");
+    setFedMsg(kind === "compliance" ? "Compliance copy fed to the brain. Add the next, or move on." : "Fed to the brain. Add the next, or move on.");
     await refresh(); setAdding(false);
   }
 
@@ -179,14 +182,19 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // one action, so it is retrievable, no separate "sync" step.
   async function saveDoctrine() {
     if (savingDoc) return;
-    if (doctrine.trim().length < 20) { setAddErr("Write a bit more positioning to learn from."); return; }
-    setSavingDoc(true); setAddErr("");
-    const s = await fetch(`/api/studio/brand-kit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: brainId, tone_notes: doctrine }) }).catch(() => null);
+    const entry = docEntry.trim();
+    if (entry.length < 20) { setAddErr("Write a bit more positioning to learn from."); return; }
+    setSavingDoc(true); setAddErr(""); setFedMsg("");
+    // APPEND to the brand book (Gary's flow: type a rule, save, blank for the next), so nothing already saved is
+    // lost and re-clicking cannot re-embed the same text. The doctrine sync replaces the doctrine chunks with the
+    // full updated book, so it never stacks duplicates.
+    const full = [doctrine.trim(), entry].filter(Boolean).join("\n\n").slice(0, 4000);
+    const s = await fetch(`/api/studio/brand-kit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: brainId, tone_notes: full }) }).catch(() => null);
     if (!s?.ok) { setSavingDoc(false); flex("Could not save the positioning."); return; }
     const e = await fetch(`/api/brains/${brainId}/sync-doctrine`, { method: "POST" }).catch(() => null);
     const d = await e?.json().catch(() => ({}));
     setSavingDoc(false);
-    if (e?.ok) { flex("Saved. The brain has learnt the positioning and rules."); await refresh(); }
+    if (e?.ok) { setDoctrine(full); setDocEntry(""); setFedMsg("Fed to the brain. Add the next rule, or move on."); await refresh(); }
     else flex(d?.error || "Saved, but could not embed it.");
   }
 
@@ -521,10 +529,10 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           </>
         ) : mode === "positioning" ? (
           <>
-            <textarea value={doctrine} onChange={(e) => setDoctrine(e.target.value)} rows={7} placeholder="The client's positioning, brand rules and proof points. What they stand for, how they talk, what is true about them, what must never be said…"
+            <textarea value={docEntry} onChange={(e) => { setDocEntry(e.target.value); if (fedMsg) setFedMsg(""); }} rows={5} placeholder="Add a positioning point, brand rule or proof point. e.g. a claim we can make, how they talk, or something we must never say…"
               className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] leading-relaxed outline-none focus:border-line-strong" />
-            <button onClick={saveDoctrine} disabled={savingDoc} className="btn-brand mt-3 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{savingDoc ? "Saving…" : "Save & teach the brain"}</button>
-            <p className="mt-2.5 text-[18px] text-ink-dim">This is the <b className="text-ink-dim">brand book</b>: the client&apos;s positioning, rules and proof points, what they stand for, how they talk, and what must never be said. Saved and embedded automatically, no separate sync step.</p>
+            <button onClick={saveDoctrine} disabled={savingDoc || !docEntry.trim()} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{savingDoc && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{savingDoc ? "Feeding the brain…" : "Save & teach the brain"}</button>
+            <p className="mt-2.5 text-[18px] text-ink-dim">This is the <b className="text-ink-dim">brand book</b>: positioning, rules and proof points, what they stand for, how they talk, what must never be said. Each save <b className="text-ink-dim">adds</b> to it; everything already saved shows in <b className="text-ink-dim">What the brain knows</b> below, where you can remove any of it.{doctrine.trim() ? " The brand book already has content on file." : ""}</p>
           </>
         ) : (
           <>
@@ -536,6 +544,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
         </div>
 
         {addErr && <p className="mt-3 text-[18px] text-alert">{addErr}</p>}
+        {fedMsg && <p className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10 px-4 py-2.5 text-[18px] font-semibold text-[#86efac]"><span aria-hidden>✓</span>{fedMsg}</p>}
         {/* The isolation guarantee, said out loud where someone is about to hand us a client's private material. */}
         <p className="mt-4 text-[18px] text-ink-faint">
           Everything added here is chunked and embedded into <b className="text-ink-dim">this brain only</b>. No other brain can read it.
