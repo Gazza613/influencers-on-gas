@@ -315,10 +315,17 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // anchor most of the knowledge comes from, plus a depth bonus for how much is actually indexed. So a well-fed
   // brain reads as strong even before every input type is added, and the number reflects the knowledge on file,
   // not just how many boxes are ticked. The bar fills to this same score.
-  const TYPE_WEIGHT: Record<string, number> = { site: 35, docs: 20, doctrine: 20, assets: 10 };
-  const coveragePct = checklist.reduce((s, c) => s + (c.met ? (TYPE_WEIGHT[c.key] || 0) : 0), 0);
-  const depthPct = Math.min(1, liveChunks / 250) * 15; // up to 15 points for indexed depth
-  const strengthPct = empty ? 0 : Math.round(Math.min(100, coveragePct + depthPct));
+  // KNOWLEDGE-WEIGHTED STRENGTH (Gary: a strong, accurate indicator of true capacity). Coverage of the input types
+  // PLUS how much CLEAN retrievable knowledge the brain actually holds. Depth uses a sqrt curve over the
+  // de-duplicated passage count (fast early credit, diminishing returns), so genuine growth moves the score while
+  // junk/volume padding cannot game it (the ingest pass strips boilerplate + dupes). Photos are creative source,
+  // not Q&A knowledge, so they carry little weight and a 2nd photo does not change the score - by design.
+  const TYPE_WEIGHT: Record<string, number> = { site: 30, docs: 20, doctrine: 12, assets: 5 };
+  const coveragePts = checklist.reduce((s, c) => s + (c.met ? (TYPE_WEIGHT[c.key] || 0) : 0), 0);
+  const depthPts = Math.round(Math.min(1, Math.sqrt(liveChunks / 1000)) * 33); // clean retrievable knowledge
+  const strengthPct = empty ? 0 : Math.round(Math.min(100, coveragePts + depthPts));
+  // The single biggest thing still to add, so the indicator is actionable, not just a number.
+  const nextGap = checklist.filter((c) => !c.met).map((c) => ({ label: c.label, pts: TYPE_WEIGHT[c.key] || 0 })).sort((a, b) => b.pts - a.pts)[0];
 
   return (
     <div className="mt-6 space-y-6">
@@ -367,6 +374,11 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                   <div className={`h-full rounded-full ${ready ? "bg-[#4ade80]" : "bg-gradient-to-r from-[#a855f7] to-[#22d3ee]"}`}
                     style={{ width: `${strengthPct}%`, transition: "width 0.6s ease-out" }} />
                 </div>
+                {/* What makes up the score, so the indicator is transparent and actionable (Gary). */}
+                <p className="mt-2 text-[14px] text-ink-faint">
+                  {liveChunks.toLocaleString("en-ZA")} clean passage{liveChunks === 1 ? "" : "s"} · knowledge depth adds {depthPts} of 33
+                  {nextGap ? <> · <span className="text-ink-dim">add {nextGap.label.toLowerCase()} for +{nextGap.pts}</span></> : <> · fully stocked</>}
+                </p>
                 {/* The checklist, done items first (a timeline), each unmet item jumps to where you fix it. */}
                 <div className="mt-3.5 flex flex-wrap justify-center gap-2 sm:justify-start">
                   {ordered.map((c) => (

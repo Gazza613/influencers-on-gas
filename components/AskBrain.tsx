@@ -94,9 +94,15 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
     }).then((r) => r.json()).catch(() => null);
     setSaving(false);
     if (!d?.ok) { flex(d?.error || "Couldn't add that to the brain."); return; }
-    if (d.duplicate) { setSaved("duplicate"); flex("Already in the brain, nothing added."); return; }
+    if (d.duplicate) { setSaved("duplicate"); setQ(""); flex("Already in the brain, nothing added."); return; }
     setSaved("added");
+    setQ(""); // clear the prompt box, ready for the next question (Gary)
     flex(d.unverified ? "Saved to the brain as an unverified note." : "Saved to the brain.");
+  }
+
+  // Clear the whole exchange (Gary: a clean slate + an empty prompt box, same as after adding to the brain).
+  function clearChat() {
+    setQ(""); setAsked(""); setAnswer(""); setHits([]); setTip(null); setSaved(""); setErr(""); setOpenSources(false);
   }
 
   // Rewrite the question so it retrieves better, and SHOW what changed - the point is that the team learns to
@@ -222,6 +228,8 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
           {/* ADD TO BRAIN: compound a useful answer back into the knowledge base. Non-brain answers save as an
               explicitly unverified note (provenance kept), and the server dedups so "already there" is real. */}
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#a855f7]/20 pt-4">
+            {/* TWO CLEAR CHOICES (Gary): keep the answer (add it to the brain) or discard it (clear chat). Both
+                empty the prompt box afterwards, ready for the next question. */}
             {saved === "added" ? (
               <span className="text-[17px] font-semibold text-[#86efac]">✓ Saved to the brain{answeredMode !== "brain" ? " as an unverified note" : ""}</span>
             ) : saved === "duplicate" ? (
@@ -230,9 +238,13 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
               <button onClick={addToBrain} disabled={saving}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#86efac]/50 px-4 py-2 text-[17px] font-bold text-[#86efac] hover:bg-[#86efac]/10 disabled:opacity-50">
                 {saving && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
-                {saving ? "Saving…" : "＋ Add this answer to the brain"}
+                {saving ? "Saving…" : "＋ Add to brain"}
               </button>
             )}
+            <button onClick={clearChat} disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-[17px] font-semibold text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-50">
+              ✕ Clear chat
+            </button>
             {answeredMode !== "brain" && saved !== "added" && (
               <span className="text-[15px] text-[#fcd34d]">Saved as unverified, since it is not the client&apos;s own verified material.</span>
             )}
