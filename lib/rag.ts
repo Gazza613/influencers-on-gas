@@ -127,11 +127,20 @@ export async function ingestChunks(
 ): Promise<number> {
   const filtered = items.filter((x) => x.content.trim().length > 0);
   if (!filtered.length) return 0;
-  // DE-DUPLICATION (Gary: no duplication ever). Skip any chunk whose content already exists in THIS brain (from a
-  // prior source, an overlap, or a repeated block), and skip repeats within this call. Existing hashes are read
-  // once; each stored chunk carries its hash in metadata so future ingests dedupe against it too.
+  // DE-DUPLICATION (Gary: no duplication ever), scoped to THIS SOURCE - not the whole brain. Cross-source dedup
+  // was a silent knowledge-loss trap: a passage shared by two sources was stored once, owned by whichever source
+  // ingested first, so deleting or re-crawling that source erased content the OTHER source still legitimately
+  // supplied. Now each source keeps its own copy (delete-safe and self-contained); a shared passage is collapsed
+  // to one at RETRIEVAL time (see retrieve()), so the model never sees a duplicate even though two sources hold
+  // it. Null-source chunks (doctrine, saved answers) share one scope per brain via the coalesce below.
+  //
+  // The app-level skip below only avoids paying to embed a chunk we already have; the real guarantee is the
+  // unique index (client_id, coalesce(source_id), metadata->>'h') + ON CONFLICT DO NOTHING on the insert, so even
+  // if this read fails on a transient blip, a duplicate row still cannot be written.
   const existing = (await db().query(
-    `select metadata->>'h' as h from knowledge_chunks where client_id = $1 and metadata->>'h' is not null`, [clientId],
+    `select metadata->>'h' as h from knowledge_chunks
+      where client_id = $1 and coalesce(source_id::text, '') = coalesce($2::text, '') and metadata->>'h' is not null`,
+    [clientId, sourceId],
   ).catch(() => [])) as { h: string }[];
   const seen = new Set(existing.map((r) => r.h).filter(Boolean));
   const deduped: { content: string; metadata: Record<string, unknown> }[] = [];
@@ -148,12 +157,16 @@ export async function ingestChunks(
     const batch = deduped.slice(b, b + BATCH);
     const vectors = await embed(batch.map((x) => x.content), "document");
     for (let j = 0; j < batch.length; j++) {
-      await db().query(
+      // ON CONFLICT DO NOTHING is the blip-proof backstop; RETURNING id tells us whether the row was actually
+      // written, so `stored` counts real inserts (and metering counts what truly landed).
+      const ins = (await db().query(
         `insert into knowledge_chunks (client_id, source_id, content, embedding, metadata)
-         values ($1, $2, $3, $4::vector, $5)`,
+         values ($1, $2, $3, $4::vector, $5)
+         on conflict do nothing
+         returning id`,
         [clientId, sourceId, batch[j].content, toVectorLiteral(vectors[j]), JSON.stringify(batch[j].metadata ?? {})],
-      );
-      stored++;
+      )) as { id: string }[];
+      if (ins.length) stored++;
     }
   }
   return stored;
@@ -196,12 +209,25 @@ export type Retrieved = { content: string; metadata: Record<string, unknown>; sc
 export async function retrieve(clientId: string, query: string, k = 6): Promise<Retrieved[]> {
   const [qv] = await embed([query], "query");
   if (!qv) return [];
-  return (await db().query(
+  // Over-fetch, then collapse duplicates by content hash. Dedup is now per-source (see ingestChunks), so a passage
+  // shared by two sources is stored under each - correct for delete-safety, but the model must never SEE the same
+  // passage twice. We keep the best-scoring copy of each distinct passage and return the top k of what remains.
+  const rows = (await db().query(
     `select content, metadata, 1 - (embedding <=> $2::vector) as score
      from knowledge_chunks
      where client_id = $1 and embedding is not null
      order by embedding <=> $2::vector
      limit $3`,
-    [clientId, toVectorLiteral(qv), k],
+    [clientId, toVectorLiteral(qv), Math.max(k * 4, k + 12)],
   )) as Retrieved[];
+  const out: Retrieved[] = [];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const h = (r.metadata?.h as string) || contentHash(r.content);
+    if (seen.has(h)) continue;
+    seen.add(h);
+    out.push(r);
+    if (out.length >= k) break;
+  }
+  return out;
 }

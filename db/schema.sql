@@ -82,6 +82,13 @@ create table if not exists knowledge_chunks (
 create index if not exists idx_knowledge_chunks_client on knowledge_chunks(client_id);
 create index if not exists idx_knowledge_chunks_embedding
   on knowledge_chunks using hnsw (embedding vector_cosine_ops);
+-- DEDUP BACKSTOP (Gary: no duplication ever). One row per (brain, source, content-hash), so a re-crawl or a
+-- transient blip during the app-level dedup read can never write a duplicate. Scoped to source (not the whole
+-- brain) so a passage shared by two sources keeps a copy under each - delete-safe; retrieve() collapses them at
+-- read time. coalesce() gives null-source chunks (doctrine, saved answers) one shared scope per brain.
+create unique index if not exists knowledge_chunks_dedup
+  on knowledge_chunks (client_id, coalesce(source_id::text, ''), (metadata->>'h'))
+  where metadata->>'h' is not null;
 
 -- ── Productions (the video runs) ──────────────────────────────────────────────
 create table if not exists productions (

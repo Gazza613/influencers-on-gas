@@ -369,10 +369,14 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
         <span className={`relative block ${d.accent}`}>{d.mark}</span>
         <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink">{d.name}</h2>
         <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-dim">{d.blurb}</p>
-        {d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}
-        <span className={`tabular relative mt-5 inline-flex w-fit items-center rounded-full border border-current/40 px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.16em] ${d.accent}`}>
-          {d.action}
-        </span>
+        {/* FOOTER pinned to the card bottom (mt-auto) so the action lines up across every tile: agent flex on the
+            left, the action badge bottom-right (Gary). */}
+        <div className="relative mt-auto flex items-end justify-between gap-3 pt-5">
+          <div className="min-w-0">{d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}</div>
+          <span className={`tabular inline-flex shrink-0 items-center rounded-full border border-current/40 px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.16em] ${d.accent}`}>
+            {d.action}
+          </span>
+        </div>
       </div>
     );
   }
@@ -402,21 +406,28 @@ function Tile({ d, index = 0 }: { d: Door; index?: number }) {
       <span className="relative block transition duration-300 group-hover:-translate-y-0.5">{d.mark}</span>
       <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink">{d.name}</h2>
       <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-dim">{d.blurb}</p>
-      {d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}
-      <span className={`relative mt-5 inline-flex items-center gap-1.5 text-[15px] font-bold ${d.accent}`}>
-        {d.action}
-        <span className="transition-transform duration-300 group-hover:translate-x-1">{d.external ? "↗" : "→"}</span>
-      </span>
 
-      {/* THE SHOWCASE EYE, bottom-right and ABOVE the card link so it wins the click. */}
-      {d.peek && (
-        // A NEW TAB (Gary): the showcase is something you look at while your work stays open behind you, so it
-        // must not navigate the dashboard away. A plain anchor, not a router push, for the same reason.
-        <a href={d.peek.href} target="_blank" rel="noreferrer" title={d.peek.label} aria-label={`${d.peek.label} (opens in a new tab)`}
-          className={`absolute bottom-5 right-5 z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line/80 bg-surface-1/70 backdrop-blur-sm transition ${d.accent} hover:scale-110 hover:border-current`}>
-          <EyeMark />
-        </a>
-      )}
+      {/* FOOTER pinned to the card bottom (mt-auto) so the action lines up across every tile (Gary): the agent
+          flex sits bottom-left, the action (and the showcase eye, where there is one) bottom-right, in line. The
+          footer itself carries no z-index, so the action stays UNDER the card's stretched link and a click on it
+          still enters the pod; the pill and the eye bring their own z-20 to win their own clicks. */}
+      <div className="relative mt-auto flex items-end justify-between gap-3 pt-5">
+        <div className="min-w-0">{d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}</div>
+        <div className="flex shrink-0 items-center gap-2.5">
+          {d.peek && (
+            // A NEW TAB (Gary): the showcase is something you look at while your work stays open behind you, so it
+            // must not navigate the dashboard away. A plain anchor, not a router push, for the same reason.
+            <a href={d.peek.href} target="_blank" rel="noreferrer" title={d.peek.label} aria-label={`${d.peek.label} (opens in a new tab)`}
+              className={`relative z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line/80 bg-surface-1/70 backdrop-blur-sm transition ${d.accent} hover:scale-110 hover:border-current`}>
+              <EyeMark />
+            </a>
+          )}
+          <span className={`inline-flex items-center gap-1.5 text-[15px] font-bold ${d.accent}`}>
+            {d.action}
+            <span className="transition-transform duration-300 group-hover:translate-x-1">{d.external ? "↗" : "→"}</span>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

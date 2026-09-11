@@ -42,7 +42,7 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
           while the label sits in near-white so it reads cleanly. Same footprint as before. */}
       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
         aria-label={`See the ${count} expert agents in ${data.label}`}
-        className={`relative z-20 mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-current/40 bg-current/10 px-3 py-1 text-[13px] shadow-[0_0_16px_-6px_currentColor] transition hover:-translate-y-px hover:border-current/70 hover:bg-current/[0.18] hover:shadow-[0_0_22px_-4px_currentColor] ${accent}`}>
+        className={`relative z-20 inline-flex w-fit items-center gap-2 rounded-full border border-current/40 bg-current/10 px-3 py-1 text-[13px] shadow-[0_0_16px_-6px_currentColor] transition hover:-translate-y-px hover:border-current/70 hover:bg-current/[0.18] hover:shadow-[0_0_22px_-4px_currentColor] ${accent}`}>
         <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor] animate-pulse" />
         <span className="tabular font-extrabold">{count}</span>
         <span className="font-medium tracking-[0.02em] text-ink/90">expert agents live here</span>
@@ -63,7 +63,7 @@ export default function PodAgents({ pod, accent }: { pod: string; accent: string
               <div>
                 <div className={`text-[13px] font-bold uppercase tracking-[0.16em] ${accent}`}>Inside {data.label}</div>
                 <h3 className="mt-1 text-[22px] font-extrabold tracking-tight text-ink">{count} expert agents at work</h3>
-                <p className="mt-1 text-[14px] text-ink-dim">Every one is a real, working part of this pod. This is the team behind the flex.</p>
+                <p className="mt-1 text-[14px] text-ink-dim">Every one is a real, working part of this pod. This is the AI swarm of agents working behind the scenes.</p>
               </div>
               <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); }}
                 aria-label="Close" className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-[14px] font-bold text-ink-dim hover:bg-surface-2">✕</button>
