@@ -331,7 +331,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
         {/* The brain's overall STRENGTH as a single percentage (Gary), top-right. Reflects the knowledge on file. */}
         {!empty && (
           <div className="absolute right-5 top-5 text-right leading-none">
-            <div className={`tabular text-[34px] font-bold ${ready ? "text-[#86efac]" : "text-[#c79bff]"}`}>{strengthPct}<span className="text-[20px]">%</span></div>
+            <div className={`tabular text-[34px] font-semibold ${ready ? "text-[#86efac]" : "text-[#c79bff]"}`}>{strengthPct}<span className="text-[20px]">%</span></div>
             <div className="tabular mt-1 text-[11px] uppercase tracking-[0.2em] text-ink-faint">strength</div>
           </div>
         )}
@@ -349,14 +349,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <div className="min-w-0 flex-1 text-center sm:text-left">
             {empty ? (
               <>
-                <h2 className="text-[27px] font-bold tracking-tight text-ink">Let&apos;s bring this brain to life</h2>
+                <h2 className="text-[27px] font-extrabold tracking-tight text-ink">Let&apos;s bring this brain to life</h2>
                 <p className="mt-1.5 text-[18px] leading-relaxed text-ink-dim">Start with the client&apos;s website, the anchor everything else is checked against. Paste it below and it crawls in, JavaScript and Cloudflare sites included, usually a few minutes.</p>
                 <button onClick={() => goto("website")} className="btn-brand mt-4 rounded-lg px-5 py-2.5 text-[18px] font-bold">Start with their website ↓</button>
               </>
             ) : (
               <>
                 <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
-                  <h2 className="text-[27px] font-bold tracking-tight text-ink">Brain strength</h2>
+                  <h2 className="text-[27px] font-extrabold tracking-tight text-ink">Brain strength</h2>
                   <span className="tabular text-[18px] text-ink-faint"><b className="text-ink">{liveChunks.toLocaleString("en-ZA")}</b> passages · <b className="text-ink">{indexedSources}</b> source{indexedSources === 1 ? "" : "s"}{crawling && <span className="text-active"> · indexing…</span>}</span>
                 </div>
                 <p className="mt-1 text-[18px] text-ink-dim">
@@ -412,7 +412,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           <div className="relative flex items-start gap-4">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#4ade80]/20 text-[22px] text-[#86efac]">✓</span>
             <div className="min-w-0 flex-1">
-              <h3 className="text-[22px] font-bold tracking-tight text-ink">Brain updated</h3>
+              <h3 className="text-[22px] font-extrabold tracking-tight text-ink">Brain updated</h3>
               <p className="mt-1 text-[17px] leading-relaxed text-ink-dim">
                 <b className="tabular text-ink">{justCompleted.count.toLocaleString("en-ZA")}</b> new passage{justCompleted.count === 1 ? "" : "s"} indexed and retrievable by every pod. You can move on now, or add more data first.
               </p>
@@ -433,7 +433,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden><path d="M12 3a4 4 0 0 0-4 4 3.5 3.5 0 0 0-2 6.3A3.5 3.5 0 0 0 8 20a4 4 0 0 0 8 0 3.5 3.5 0 0 0 2-6.7A3.5 3.5 0 0 0 16 7a4 4 0 0 0-4-4Z" /><path d="M12 7v13M8.5 10.5 12 12l3.5-1.5" /></svg>
           </span>
           <div>
-            <h2 className="text-[23px] font-bold tracking-tight text-ink">Feed the knowledge</h2>
+            <h2 className="text-[23px] font-extrabold tracking-tight text-ink">Feed the knowledge</h2>
             <p className="text-[18px] text-ink-dim">Everything here becomes the brain&apos;s memory: chunked, embedded, and retrievable by every pod.</p>
           </div>
         </div>

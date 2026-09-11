@@ -36,7 +36,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
           <path d="M18 18a4 4 0 0 0 2-7.464" /><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" />
           <path d="M6 18a4 4 0 0 1-2-7.464" /><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" />
         </svg>
-        <h1 className="text-[34px] font-semibold">{brain.name}</h1>
+        <h1 className="text-[34px] font-bold">{brain.name}</h1>
         <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[13px] uppercase tracking-wide text-ink-faint">brain</span>
         <span className="tabular text-[18px] text-ink-faint">{brain.chunk_count ?? 0} passage{(brain.chunk_count ?? 0) === 1 ? "" : "s"}</span>
       </div>
