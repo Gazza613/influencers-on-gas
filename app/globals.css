@@ -208,6 +208,12 @@ body {
 @keyframes shrinkBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 /* The living brain: lit synapse nodes breathe (opacity only, so SVG needs no transform-origin). */
 @keyframes brainPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+/* The hero brain floats and breathes gently, and its aura pulses, so the icon reads as alive (Gary). */
+@keyframes brainFloat { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2.5px) scale(1.025); } }
+@keyframes brainAura { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.07); } }
+.brain-float { transform-box: fill-box; transform-origin: center; animation: brainFloat 6s ease-in-out infinite; }
+.brain-aura { transform-box: fill-box; transform-origin: center; animation: brainAura 4.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .brain-float, .brain-aura { animation: none !important; } }
 @keyframes growBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .gas-rise { animation: rise 0.5s ease-out both; }
 

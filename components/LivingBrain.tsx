@@ -40,8 +40,11 @@ export default function LivingBrain({ lit, className = "" }: { lit: number; clas
         </filter>
       </defs>
 
-      {/* The aura, brighter the more it knows. */}
-      <circle cx="80" cy="80" r="70" fill="url(#lb-glow)" />
+      {/* The aura, brighter the more it knows, gently pulsing so the icon is alive. */}
+      <circle cx="80" cy="80" r="70" fill="url(#lb-glow)" className="brain-aura" />
+
+      {/* The whole neural graphic floats and breathes as one. */}
+      <g className="brain-float">
 
       {/* Synapses. */}
       {EDGES.map(([a, b], i) => {
@@ -66,6 +69,7 @@ export default function LivingBrain({ lit, className = "" }: { lit: number; clas
           </g>
         );
       })}
+      </g>
     </svg>
   );
 }

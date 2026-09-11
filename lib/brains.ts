@@ -11,6 +11,11 @@ export type Brain = {
   created_at: string;
   chunk_count?: number;
   source_count?: number;
+  // Strength inputs (for the shared brainStrength formula) so the overview can show the same score as the detail page.
+  has_site?: boolean;
+  has_docs?: boolean;
+  has_doctrine?: boolean;
+  has_assets?: boolean;
 };
 
 function slugify(name: string): string {
@@ -21,7 +26,11 @@ export async function listBrains(): Promise<Brain[]> {
   return (await db().query(
     `select c.id, c.name, c.slug, c.status, c.brand, c.created_at,
             (select count(*)::int from knowledge_chunks k where k.client_id = c.id)  as chunk_count,
-            (select count(*)::int from knowledge_sources s where s.client_id = c.id) as source_count
+            (select count(*)::int from knowledge_sources s where s.client_id = c.id) as source_count,
+            exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('crawl','website') and s.status = 'indexed') as has_site,
+            exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('file','text') and s.status = 'indexed') as has_docs,
+            exists(select 1 from studio_brand_kits b where b.client_id = c.id and coalesce(length(trim(b.tone_notes)),0) > 0) as has_doctrine,
+            exists(select 1 from studio_assets a where a.client_id = c.id and a.kind in ('logo','ceo_photo','md_photo','team_photo')) as has_assets
      from clients c order by c.created_at desc`,
   )) as Brain[];
 }
