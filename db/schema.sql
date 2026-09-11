@@ -279,8 +279,11 @@ create index if not exists idx_balance_snapshots_taken on balance_snapshots(take
 
 -- Firecrawl scrape rate (Voyage embeddings already seeded at 0). Nominal ZAR estimate
 -- so brain ingestion shows up in Cost Control with real counts.
+-- FIRECRAWL IS FREE UP TO 50,000 runs/month (Gary), so within that quota the marginal cost of a scrape is R0.
+-- We keep metering the page COUNT (for visibility on Cost Control) but price it at 0, exactly like Voyage
+-- embeddings and the in-plan HeyGen/ElevenLabs usage. If monthly scrapes ever approach 50k, add an overage rate.
 insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_unit, active)
-values ('firecrawl','scrape','page', 0, 3, true)
+values ('firecrawl','scrape','page', 0, 0, true)
 on conflict (provider, model, unit) do nothing;
 
 -- ── Team access (Phase 1b): invited members + passwords ──────────────────────

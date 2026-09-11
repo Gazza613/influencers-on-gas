@@ -143,6 +143,20 @@ function AudienceMark() {
   );
 }
 
+// The Channels: a central hub broadcasting out to the platforms the audience lives on.
+function ChannelsMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" aria-hidden>
+      <circle cx="24" cy="24" r="5.5" stroke="currentColor" strokeWidth="2.6" />
+      <circle cx="10" cy="12" r="3.4" stroke="currentColor" strokeWidth="2.2" opacity="0.8" />
+      <circle cx="38" cy="12" r="3.4" stroke="currentColor" strokeWidth="2.2" opacity="0.8" />
+      <circle cx="12" cy="38" r="3.4" stroke="currentColor" strokeWidth="2.2" opacity="0.8" />
+      <circle cx="37" cy="37" r="3.4" stroke="currentColor" strokeWidth="2.2" opacity="0.8" />
+      <path d="M20 20 12.5 14M28 20 35.5 14M20 28 14.5 35M28 28 34 34" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  );
+}
+
 // The Proposal: a document with a signed-off checkmark - the client-ready deliverable at the end of the flow.
 function ProposalMark() {
   return (
@@ -250,13 +264,24 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
     ],
   },
   {
-    label: "Know",
-    note: "What we know, and how to ask it.",
+    label: "Know Your Audience",
+    note: "Finding your perfect target audience and what digital platforms they frequent.",
     doors: [
       {
         name: <>Audience <span className="brand-grad">on</span> GAS</>,
         href: "#",
         mark: <AudienceMark />,
+        blurb: "Building next.",
+        action: "Coming soon",
+        soon: true,
+        ring: "border-[#34d399]/30 hover:border-[#34d399]/50",
+        wash: "from-[#34d399]/[0.09] to-[#22d3ee]/[0.04]",
+        accent: "text-[#6ee7b7]",
+      },
+      {
+        name: <>Channels <span className="brand-grad">on</span> GAS</>,
+        href: "#",
+        mark: <ChannelsMark />,
         blurb: "Building next.",
         action: "Coming soon",
         soon: true,
