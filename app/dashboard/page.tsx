@@ -270,7 +270,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
     ],
   },
   {
-    label: "Know Your Audience",
+    label: "Know",
     note: "Finding your perfect target audience and what digital platforms they frequent.",
     doors: [
       {
