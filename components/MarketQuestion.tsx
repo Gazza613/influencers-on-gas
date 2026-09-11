@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Working from "@/components/Working";
 import IntelEmailControl from "@/components/IntelEmailControl";
+import LivingResearch from "@/components/LivingResearch";
 
 // ASK THE MARKET A QUESTION (Gary). The Strategist desk, on demand: type a market question about a client and get
 // the same sourced assessment the daily email gives - what changed, what it could do, and the DEFENSIVE/PROACTIVE
@@ -104,9 +105,13 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
 
   return (
     <div className="rounded-2xl border border-[#818cf8]/30 bg-gradient-to-br from-[#818cf8]/[0.08] to-[#22d3ee]/[0.03] p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-xl font-bold text-ink">Ask the market a question</h3>
-        <span className="text-sm text-ink-faint">Live Strategist pod · sourced, never invented</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          {/* The Living Researcher radar (same signature visual as the Researcher step), quickening while it scans. */}
+          <div className="h-11 w-11 shrink-0"><LivingResearch lit={0.55} active={busy} /></div>
+          <h3 className="text-xl font-bold text-ink">Ask the market a question</h3>
+        </div>
+        <span className="text-sm text-ink-faint">Live Market Intelligence pod · sourced, never invented</span>
       </div>
       <p className="mt-1 text-base text-ink-dim">A one-off market read on demand: what a rival did, a category shift, a threat or an opening, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> proactively surfaces fresh topics (last 2 weeks); a typed question looks back up to 3 months.</p>
 

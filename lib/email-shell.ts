@@ -24,14 +24,18 @@ const FONT = `Manrope, "Helvetica Neue", Helvetica, Arial, sans-serif`;
 
 // `wordmark` lets a specific email carry its own name (e.g. STRATEGIST, RESEARCHER) instead of the platform
 // default. Rendered the Pulse way: the word in white, ON in ember, GAS in lava.
-export function emailHeader(strapline: string, dateLabel: string, wordmark = "STUDIO"): string {
+export function emailHeader(strapline: string, dateLabel: string, wordmark = "STUDIO", logoUrl?: string | null): string {
+  // The header wears the CLIENT's logo when the brain has one (Gary), else the GAS ember-orb. A client logo is a
+  // dark-background variant (see pickDarkLogo), so it sits cleanly on the dark panel in a plain rounded tile with
+  // no ember flare (the flare is GAS's mark, not theirs).
+  const logoBlock = logoUrl
+    ? `<img src="${logoUrl}" width="76" height="76" style="display:block;margin:0 auto 16px;border-radius:18px;border:0;outline:none;object-fit:contain;background:transparent;" alt="logo" />`
+    : `<div class="orbwrap" style="width:84px;height:84px;margin:0 auto 16px;border-radius:50%;background:radial-gradient(circle at 50% 50%, rgba(249,98,3,0.42) 0%, rgba(249,98,3,0.16) 42%, rgba(249,98,3,0) 68%);">
+      <img src="${BASE}/gas-logo.png" width="56" height="56" class="orb" style="display:block;margin:0 auto;padding-top:14px;border:0;outline:none;" alt="GAS" /></div>`;
   return `
   <div class="pad" style="padding:28px 20px 20px;text-align:center;">
-    <!-- 84px orbed logo. The soft radial flare sits on the cell BEHIND the transparent PNG so it hugs the orb
-         with no visible edge; a client that ignores the gradient just shows a clean round logo. -->
-    <div class="orbwrap" style="width:84px;height:84px;margin:0 auto 16px;border-radius:50%;background:radial-gradient(circle at 50% 50%, rgba(249,98,3,0.42) 0%, rgba(249,98,3,0.16) 42%, rgba(249,98,3,0) 68%);">
-      <img src="${BASE}/gas-logo.png" width="56" height="56" class="orb" style="display:block;margin:0 auto;padding-top:14px;border:0;outline:none;" alt="GAS" />
-    </div>
+    <!-- 84px orbed GAS logo, or the client's own dark-bg logo as a clean rounded tile. -->
+    ${logoBlock}
     <div class="strap" style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${EMBER};font-weight:800;">${strapline}</div>
     <!-- Wordmark must NEVER be nowrap on a phone: "STRATEGIST ON GAS" is wider than a phone and was clipping
          ("STRATEGI ST ..."). Smaller base + a wrap that keeps "ON GAS" together. Desktop bumps it back up. -->
@@ -74,7 +78,7 @@ export function emailSignature(cadence: string, role = "AI Studio Lead", departm
 // Full email wrapper: the Pulse gradient panel on a dark field, header + body + signature inside it.
 export function emailShell(opts: {
   strapline: string; dateLabel: string; body: string; cadence: string;
-  wordmark?: string; role?: string; department?: string; signName?: string | null;
+  wordmark?: string; role?: string; department?: string; signName?: string | null; logoUrl?: string | null;
 }): string {
   return `
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -97,7 +101,7 @@ export function emailShell(opts: {
   </style>
   <div style="background:${BG};padding:24px 10px;font-family:${FONT};-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
     <div class="container" style="max-width:100%;margin:0 auto;background:linear-gradient(170deg,#0F1820 0%,#13202C 100%);border:1px solid ${RULE};border-radius:16px;overflow:hidden;">
-      ${emailHeader(opts.strapline, opts.dateLabel, opts.wordmark)}
+      ${emailHeader(opts.strapline, opts.dateLabel, opts.wordmark, opts.logoUrl)}
       <div class="pad" style="padding:4px 20px 4px;">${opts.body}</div>
       ${emailSignature(opts.cadence, opts.role, opts.department, opts.wordmark, opts.signName === undefined ? "Sami" : opts.signName)}
     </div>

@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { writeCeoNewsletter } from "@/lib/ceo-newsletter";
 import { sendEmail, emailConfigured } from "@/lib/email";
+import { buildCeoArticleEmail } from "@/lib/ceo-email";
+import { getClientEmailLogo } from "@/lib/client-logo";
 
 // THE CEO THOUGHT-LEADERSHIP ARTICLE (Gary). From a Daily Intelligence finding: DRAFT the client CEO's LinkedIn
 // piece (in their brain's voice + compliance, from the public-safe substance only, never the internal "move"),
@@ -29,24 +31,7 @@ export async function GET(req: Request) {
   });
 }
 
-// Render the article as a clean, plain email (title as heading, blank-line paragraphs). No branding chrome: it
-// is the CEO's own words, ready to paste into LinkedIn or read as-is.
-function articleHtml(post: string, ceoName: string): string {
-  const blocks = post.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-  const title = (blocks.shift() || "").replace(/^#{1,3}\s+/, "");
-  // "## " lines are section headings; everything else is a paragraph. Matches the automated draft's renderer.
-  const bodyHtml = blocks.map((blk) => {
-    const h = blk.match(/^#{1,3}\s+(.*)$/);
-    if (h) return `<h3 style="font-size:17px;line-height:1.3;color:#1a1030;margin:22px 0 8px;">${esc(h[1])}</h3>`;
-    return `<p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:#1a1030;">${esc(blk)}</p>`;
-  }).join("");
-  return `<div style="max-width:600px;margin:0 auto;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:24px;">`
-    + `<div style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#7c3aed;font-weight:700;margin-bottom:14px;">Thought-leadership draft${ceoName ? ` for ${esc(ceoName)}` : ""}</div>`
-    + `<h1 style="font-size:22px;line-height:1.25;color:#1a1030;margin:0 0 16px;">${esc(title)}</h1>`
-    + bodyHtml
-    + `<div style="margin-top:22px;padding-top:14px;border-top:1px solid #eee;font-size:11px;color:#8a8496;">Drafted by GAS Marketing Automation, The Agency of NOW. Please review before publishing.</div></div>`;
-}
-const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const ukDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -94,15 +79,19 @@ export async function POST(req: Request) {
     const post = String(b.post || String(f.headline || "")).trim();
     if (!post) return NextResponse.json({ error: "There is no article to send. Draft it first." }, { status: 400 });
 
-    const brief = (await db().query(`select ceo_name from intel_briefs where client_id = $1`, [clientId]).catch(() => [])) as { ceo_name: string | null }[];
+    const brief = (await db().query(`select b.ceo_name, c.name as client_name from intel_briefs b join clients c on c.id = b.client_id where b.client_id = $1`, [clientId]).catch(() => [])) as { ceo_name: string | null; client_name: string | null }[];
     const ceoName = brief[0]?.ceo_name || "";
-    const title = post.split(/\n{2,}/)[0]?.trim() || "A note on the market";
+    const clientName = brief[0]?.client_name || "";
+    const title = post.split(/\n{2,}/)[0]?.replace(/^#{1,3}\s+/, "").trim() || "A note on the market";
     const subject = String(b.subject || "").trim() || title.slice(0, 150);
+    // The client's own logo in the header (Gary), else the GAS orb. review=false: this is the piece itself, to the CEO.
+    const logoUrl = await getClientEmailLogo(clientId).catch(() => null);
+    const html = buildCeoArticleEmail({ client: clientName, ceoName, post, ceoRecipients: recipients, logoUrl, dateLabel: `${clientName} · ${ukDate(new Date().toISOString())}`, review: false });
 
     const r = await sendEmail({
       to: recipients.join(", "),
       bcc: session.user?.email || undefined,
-      subject, html: articleHtml(post, ceoName), fromName: "GAS Marketing Automation",
+      subject, html, fromName: "Researcher on GAS",
     }).catch((e) => ({ sent: false, error: String((e as Error)?.message || e) }));
     if (!(r as { sent?: boolean }).sent) return NextResponse.json({ error: `Could not send: ${(r as { error?: string }).error || "unknown"}`.slice(0, 200) }, { status: 400 });
 

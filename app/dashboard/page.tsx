@@ -449,22 +449,21 @@ export default async function HomePage() {
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
                 {g.doors.map((d, n) => <Tile key={d.href} d={d} index={gi * 2 + n} />)}
               </div>
+
+              {/* DAILY INTELLIGENCE sits directly under the four Intelligence pods (Gary): the market read on
+                  demand belongs with the brain -> research -> strategy -> proposal flow it feeds. */}
+              {g.label === "Intelligence" && clients.length > 0 && (
+                <div className="mt-6">
+                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                    <h3 className="tabular text-[17px] font-bold uppercase tracking-[0.18em] text-ink-dim">Daily Intelligence</h3>
+                    <span className="text-[15px] text-ink-faint">The market, on demand.</span>
+                  </div>
+                  <div className="mt-4"><MarketQuestion clients={clients} /></div>
+                </div>
+              )}
             </section>
           ))}
         </div>
-
-        {/* ASK THE MARKET (Gary): the Strategist desk on demand, right on the dashboard - the same sourced market
-            read the daily email gives, triggered by a free-text question. */}
-        {clients.length > 0 && (
-          <section className="mt-12">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h2 className="tabular text-[20px] font-bold uppercase tracking-[0.18em] text-ink">Daily Intelligence</h2>
-              <span className="text-[17px] text-ink-dim">The market, on demand.</span>
-              <span aria-hidden className="gas-draw h-px flex-1 bg-gradient-to-r from-line to-transparent" />
-            </div>
-            <div className="mt-4"><MarketQuestion clients={clients} /></div>
-          </section>
-        )}
       </main>
     </div>
   );

@@ -5,6 +5,8 @@ import { sendEmail, emailConfigured } from "@/lib/email";
 import { runIntel, loadIntelBrief, brainsWithIntel, type Intel } from "@/lib/intel";
 import { writeCeoNewsletter } from "@/lib/ceo-newsletter";
 import { emailShell } from "@/lib/email-shell";
+import { buildCeoArticleEmail } from "@/lib/ceo-email";
+import { getClientEmailLogo } from "@/lib/client-logo";
 import { db } from "@/lib/db";
 
 // THE DAILY INTELLIGENCE RUN. The Journalist and The Strategist each go and find what changed, decide whether
@@ -82,7 +84,7 @@ function ukDate(d: Date | string): string {
 // So it now uses the shared GAS shell (dark, orb, Sami's signature) like our other emails, instead of the
 // off-brand light layout it had. The Journalist still runs and still files to the review queue - it is the tool
 // for drafting the CEO's LinkedIn voice, not a daily bulletin, so it no longer pushes an inbox.
-export function buildEmail(client: string, strategist: Intel[], today: string, intro: string, cadence: "daily" | "weekly" = "weekly"): string {
+export function buildEmail(client: string, strategist: Intel[], today: string, intro: string, cadence: "daily" | "weekly" = "weekly", logoUrl?: string | null): string {
   // ONE SOURCE OF TRUTH for how the email describes itself. Everything below reads from these two so the
   // heading, strapline and footer can never disagree (they used to: a "Weekly Intelligence" strapline over a
   // "Daily Intelligence" heading in the same email).
@@ -174,43 +176,15 @@ export function buildEmail(client: string, strategist: Intel[], today: string, i
     dateLabel: `${client} · ${ukDate(today)}`,
     body,
     cadence: footerCadence,
-    wordmark: "STRATEGIST",
+    // From the RESEARCHER, not the Strategist (Gary), and the header wears the client's own logo when on file.
+    wordmark: "RESEARCHER",
+    logoUrl,
     // Signed by the ROLE, carrying the client's name, not by an internal person (Gary): this digest can land in
-    // the client's inbox, where "AI Research Strategist MTN MoMo" is who it is from - not "Sami".
-    role: `AI Research Strategist ${client}`,
+    // the client's inbox, where "AI Researcher, MTN MoMo" is who it is from - not "Sami".
+    role: `AI Researcher · ${client}`,
     department: "GAS Marketing Automation",
     signName: null,
   });
-}
-
-// Render a drafted CEO article to HTML: "## " lines become section headings, blank lines split paragraphs. Shared
-// shape with the on-demand send so a draft reads the same whether it was automated or hand-sent.
-export function renderArticleBody(post: string): string {
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return post.split(/\n{2,}/).map((blk) => blk.trim()).filter(Boolean).map((blk) => {
-    const h = blk.match(/^#{1,3}\s+(.*)$/);
-    if (h) return `<h3 style="font-size:17px;line-height:1.3;color:#1a1030;margin:22px 0 8px;">${esc(h[1])}</h3>`;
-    return `<p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:#1a1030;">${esc(blk)}</p>`;
-  }).join("");
-}
-
-// The CEO-article DRAFT email to the internal team: a review banner (who it is for, and that it is NOT yet sent to
-// the CEO), the piece, the image idea, and the finding it was drawn from.
-function ceoDraftEmail(client: string, ceoName: string, post: string, art: string, ceoRecipients: string[], src: Intel): string {
-  const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const lines = post.split(/\n{2,}/);
-  const title = (lines[0] || "").replace(/^#{1,3}\s+/, "").trim();
-  const rest = lines.slice(1).join("\n\n");
-  const intended = ceoRecipients.length ? ceoRecipients.join(", ") : "(no CEO email saved yet on this brain)";
-  return `<div style="max-width:640px;margin:0 auto;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:24px;">`
-    + `<div style="background:#f5f2fb;border:1px solid #e6def5;border-radius:12px;padding:14px 18px;margin-bottom:20px;">`
-    +   `<div style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#7c3aed;font-weight:700;">CEO article draft for review</div>`
-    +   `<div style="font-size:13px;line-height:1.6;color:#1a1030;margin-top:6px;">A drafted LinkedIn thought-leadership piece for <b>${esc(ceoName || client + "'s CEO")}</b>. This has <b>not</b> been sent to the CEO. Review it, edit if needed, then forward it on to ${esc(intended)}.</div></div>`
-    + `<h1 style="font-size:22px;line-height:1.25;color:#1a1030;margin:0 0 16px;">${esc(title)}</h1>`
-    + renderArticleBody(rest)
-    + `<div style="margin-top:22px;padding-top:14px;border-top:1px solid #eee;font-size:12px;color:#8a8496;">`
-    +   (art ? `<div><b style="color:#6b6580;">Image idea:</b> ${esc(art)}</div>` : "")
-    +   `<div style="margin-top:6px;"><b style="color:#6b6580;">Drawn from:</b> ${esc(src.headline)}</div></div></div>`;
 }
 
 export async function GET(req: Request) {
@@ -288,14 +262,16 @@ export async function GET(req: Request) {
       // PER-BRAIN RECIPIENTS (Gary): each brain's own list, edited on the Strategist page. Empty falls back to
       // the platform default so a brain that has never been given a list still reaches someone.
       const to = c.recipients.length ? c.recipients.join(",") : intelRecipients();
+      // The brain's own logo for the email header (Gary), else the GAS orb.
+      const logoUrl = await getClientEmailLogo(c.id).catch(() => null);
 
       let emailed = false;
       if (c.emailFires && sm.length && emailConfigured()) {
         await sendEmail({
           to,
-          subject: `The Strategist · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
-          html: buildEmail(c.name, sm, today, intro, cadence),
-          fromName: "Strategist on GAS", // it lands with EXCO and MoMo's team: say what it is (Gary)
+          subject: `Market Intelligence · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
+          html: buildEmail(c.name, sm, today, intro, cadence, logoUrl),
+          fromName: "Researcher on GAS", // it lands with EXCO and MoMo's team: say what it is (Gary)
         }).catch(() => {});
         emailed = true;
       }
@@ -317,8 +293,8 @@ export async function GET(req: Request) {
             await sendEmail({
               to,
               subject: `CEO article draft for review · ${c.name} · ${today}`,
-              html: ceoDraftEmail(c.name, c.ceoName, draft.post, draft.art?.subject || "", c.ceoRecipients, top),
-              fromName: "GAS Marketing Automation",
+              html: buildCeoArticleEmail({ client: c.name, ceoName: c.ceoName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: top.headline, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
+              fromName: "Researcher on GAS",
             }).catch(() => {});
             ceoDrafted = true;
           }
