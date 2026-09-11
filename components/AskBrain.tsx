@@ -29,7 +29,8 @@ const MODES: { id: Mode; label: string; note: string }[] = [
   { id: "brain", label: "Brain only", note: "Only this client's own material. Says so when it does not know." },
   { id: "mixed", label: "Brain + Claude", note: "The brain first, general knowledge to fill gaps. Every claim is labelled." },
   { id: "claude", label: "Claude only", note: "General knowledge. No client material is read at all." },
-  { id: "live", label: "Brain + live web", note: "The brain, plus the web searched right now. Fetched claims are cited; remembered ones are marked separately." },
+  // "Brain + live web" removed from the picker (Gary: not needed here). The live-web path stays in the type and
+  // the query route, just no longer offered as an option.
 ];
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
