@@ -24,6 +24,7 @@ const GROUPS: { kind: string; label: string; note: string }[] = [
   { kind: "phone_screen", label: "Phone screens", note: "Real screenshots, never invented" },
   { kind: "brand_icon", label: "Brand icons", note: "" },
   { kind: "ceo_photo", label: "CEO photos", note: "Forensic source for the CEO creative" },
+  { kind: "md_photo", label: "MD photos", note: "Forensic source for the MD's creative and LinkedIn" },
   { kind: "team_photo", label: "Team photos", note: "Real people, used as the source for team creative" },
   { kind: "font", label: "Fonts", note: "" },
   { kind: "ci_doc", label: "CI documents", note: "" },
@@ -58,7 +59,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 // and removed HERE, not only through Intake). The browser uploads the file directly to Blob (the studio signer,
 // which allows images), then posts the finished URL here. Same client_id key, so it lands in the same library
 // the creatives forensically match to. A logo also joins the brand kit so the funnel and social sets see it.
-const UPLOADABLE = new Set(["logo", "ceo_photo", "team_photo", "brand_icon", "image", "phone_screen", "deal_card"]);
+const UPLOADABLE = new Set(["logo", "ceo_photo", "md_photo", "team_photo", "brand_icon", "image", "phone_screen", "deal_card"]);
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

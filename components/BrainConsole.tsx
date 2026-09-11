@@ -297,7 +297,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const hasSite = sources.some((s) => (s.type === "crawl" || s.type === "website") && s.status === "indexed" && (s.chunk_count ?? 0) > 1);
   const hasDocs = sources.some((s) => (s.type === "file" || s.type === "text") && s.status === "indexed");
   const hasDoctrine = doctrine.trim().length > 0;
-  const hasAssets = (assetKinds.logo || 0) + (assetKinds.ceo_photo || 0) + (assetKinds.team_photo || 0) > 0;
+  const hasAssets = (assetKinds.logo || 0) + (assetKinds.ceo_photo || 0) + (assetKinds.md_photo || 0) + (assetKinds.team_photo || 0) > 0;
   const checklist: { key: string; label: string; met: boolean; go: () => void }[] = [
     { key: "site", label: "Website crawled", met: hasSite, go: () => goto("website") },
     { key: "docs", label: "Documents or notes", met: hasDocs, go: () => goto("documents") },

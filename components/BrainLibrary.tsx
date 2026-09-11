@@ -20,6 +20,7 @@ type Group = { kind: string; label: string; note: string; assets: Asset[] };
 const ADD_KINDS: { kind: string; label: string }[] = [
   { kind: "logo", label: "Logo" },
   { kind: "ceo_photo", label: "CEO photo" },
+  { kind: "md_photo", label: "MD photo" },
   { kind: "team_photo", label: "Team photo" },
   { kind: "brand_icon", label: "Brand icon" },
   { kind: "image", label: "Other image" },
