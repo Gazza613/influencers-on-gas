@@ -140,7 +140,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         model: "claude-sonnet-4-6", max_tokens: 900, system: CLAUDE_RULES,
         messages: [{ role: "user", content: query }],
       });
-      await meterClaude(res, { clientId: id, model: "claude-sonnet-4-6", action: "brain-answer" }).catch(() => {});
+      await meterClaude(res, { clientId: id, userEmail: session.user?.email ?? null, model: "claude-sonnet-4-6", action: "brain-answer" }).catch(() => {});
       const answer = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n")
         .replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ").trim();
       return NextResponse.json({ hits: [], answer, mode });
@@ -172,7 +172,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         : {}),
       messages: [{ role: "user", content: `PASSAGES FROM THIS BRAIN:\n\n${passages}\n\nQUESTION: ${query}` }],
     });
-    await meterClaude(res, { clientId: id, model: "claude-sonnet-4-6", action: mode === "live" ? "brain-answer-live" : "brain-answer" }).catch(() => {});
+    await meterClaude(res, { clientId: id, userEmail: session.user?.email ?? null, model: "claude-sonnet-4-6", action: mode === "live" ? "brain-answer-live" : "brain-answer" }).catch(() => {});
 
     const answer = res.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")

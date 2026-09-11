@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { inngest } from "@/lib/inngest";
 import { getBrain } from "@/lib/brains";
 import { db } from "@/lib/db";
+import { isSafeCrawlTarget } from "@/lib/safe-url";
 
 // RE-CRAWL ONE SOURCE (Gary, world-class Brain UX): a site changes, so let the team refresh a single source in
 // place rather than delete and re-add it. Only website/crawl sources can be re-crawled (a pasted note or an
@@ -31,6 +32,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (src.type !== "website" && src.type !== "crawl") {
     return NextResponse.json({ error: "Only a website source can be re-crawled. Re-add a document or note to refresh it." }, { status: 400 });
   }
+  // Re-validate the stored URL before we fetch it again (defence in depth: the guard could have been added after
+  // this row was created, or the stored value tampered with).
+  if (!isSafeCrawlTarget(src.uri)) return NextResponse.json({ error: "That source's URL is not a valid public website." }, { status: 400 });
 
   // Clear its old passages and set it re-reading. The ingest job re-populates from the live site.
   await db().query(`delete from knowledge_chunks where client_id = $1 and source_id = $2`, [id, sourceId]).catch(() => {});

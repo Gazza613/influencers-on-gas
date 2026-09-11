@@ -51,7 +51,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   // Slicing it at a character count split the CEO's name away from his title and made retrieval look broken.
   const pieces = chunkStructured(doctrine);
   const stored = await metered(
-    { clientId: id, provider: "voyage", model: "voyage-4-lite", unit: "embedding", action: "ingest", count: pieces.length },
+    // unit "embed" matches the rate_card row the ingest path uses (the old "embedding" had no row, so the cost
+    // went unattributed); count what was ACTUALLY stored after dedup, not how many pieces we started with.
+    { clientId: id, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "ingest", count: (n: number) => n },
     () => ingestChunks(id, null, pieces.map((content, i) => ({
       content,
       metadata: { kind: DOCTRINE_KIND, title: `${brain.name} brand doctrine`, part: i + 1, of: pieces.length },

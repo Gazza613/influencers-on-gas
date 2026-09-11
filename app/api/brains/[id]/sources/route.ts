@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { inngest } from "@/lib/inngest";
 import { getBrain, createSource, deleteSource, purgeBrain } from "@/lib/brains";
+import { isSafeCrawlTarget } from "@/lib/safe-url";
 
 // Add a knowledge source to a brain: a website URL (scraped) or pasted text.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +18,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let uri = typeof body.uri === "string" ? body.uri.trim() : "";
 
   if (type === "website" || type === "crawl") {
-    if (!/^https?:\/\//i.test(uri)) return NextResponse.json({ error: "Enter a valid website URL (https://…)." }, { status: 400 });
+    // SSRF: the server (and Firecrawl on its behalf) will fetch this URL, so it must be a real public site, never
+    // an internal/localhost/cloud-metadata address. isSafeCrawlTarget allows http or https but blocks private
+    // hosts and IP literals.
+    if (!isSafeCrawlTarget(uri)) return NextResponse.json({ error: "Enter a valid public website URL (https://…)." }, { status: 400 });
   } else if (type === "file") {
     // The browser uploaded straight to Blob and hands us the URL back. It must be OUR blob store: a brain will
     // fetch this URL server-side, so accepting an arbitrary URL here would turn "add a document" into a way to

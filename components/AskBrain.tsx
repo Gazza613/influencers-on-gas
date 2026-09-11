@@ -204,7 +204,7 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
               {answeredMode === "brain" ? "brain only"
                : answeredMode === "mixed" ? "brain + claude"
                : answeredMode === "live" ? "brain + live web"
-               : "claude only — no client material"}
+               : "claude only, no client material"}
             </span>
           </div>
           {/* In mixed mode the model tags each claim [brain] or [general]. Rendered as coloured chips rather

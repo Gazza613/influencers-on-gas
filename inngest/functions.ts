@@ -418,6 +418,11 @@ export const ingestSource = inngest.createFunction(
             pages = st.pages; seen = st.seen;
             if (st.done) break;
           }
+          // METER THE FALLBACK CRAWL. Firecrawl bills per page it fetched, so this branch spends real credits -
+          // it must be recorded, or the spend is invisible AND it dodges the 5,000-credit quota meter and the 80%
+          // alert. Metered on `seen` (what Firecrawl processed), and BEFORE the empty-crawl throw, because even a
+          // crawl that returned no readable text still cost credits.
+          await step.run("usage-crawl-fallback", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: Math.max(seen, pages.length) }));
           if (!pages.length) {
             throw new Error(seen
               ? `fetched ${seen} page${seen === 1 ? "" : "s"} but none had enough readable text`

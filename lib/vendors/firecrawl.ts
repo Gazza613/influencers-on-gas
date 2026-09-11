@@ -1,4 +1,5 @@
 import { getSecret } from "../connections";
+import { isSafeCrawlTarget } from "../safe-url";
 
 // Firecrawl - turn a web page into clean markdown for the knowledge base.
 const BASE = "https://api.firecrawl.dev/v1";
@@ -114,6 +115,10 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
 // It is deterministic, it honours the path filter precisely, and it uses the single-page scrape that has
 // always worked. A site without a sitemap falls back to the crawler.
 export async function sitemapUrls(siteUrl: string, includePath?: string | null): Promise<string[]> {
+  // SSRF: this does a direct server-side fetch of `${origin}/sitemap.xml`, so the target must be a public site,
+  // not an internal/localhost/metadata address. The add/recrawl doors already validate, but guard here too since
+  // this is the actual fetch site.
+  if (!isSafeCrawlTarget(siteUrl)) return [];
   const origin = new URL(siteUrl).origin;
 
   // INFER THE SCOPE FROM THE ADDRESS when none was typed. Giving the crawler ".../blog" plainly means "the
