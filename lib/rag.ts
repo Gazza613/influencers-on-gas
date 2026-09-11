@@ -114,7 +114,20 @@ export function chunkText(text: string, size = 900, overlap = 120): string[] {
     const piece = clean.slice(i, end).trim();
     if (piece) chunks.push(piece);
     if (end >= clean.length) break;
-    i = end - overlap;
+    // START THE NEXT CHUNK ON A CLEAN BOUNDARY, never mid-word. The end is already nudged to a sentence break,
+    // but the overlap start (end - overlap) is a raw character offset that lands inside a word - which is why
+    // every passage after the first read "...oved continuously" / "...ans can do". Snap forward to the start of
+    // a sentence within the overlap window if there is one, otherwise to the next whole word.
+    let next = end - overlap;
+    const win = clean.slice(next, end);
+    const sent = win.search(/[.!?]\s+\S/);
+    if (sent >= 0) {
+      next += sent + (win.slice(sent).match(/[.!?]\s+/)?.[0].length ?? 1);
+    } else {
+      const sp = clean.indexOf(" ", next);
+      if (sp >= 0 && sp < end) next = sp + 1;
+    }
+    i = next;
   }
   return chunks;
 }
