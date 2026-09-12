@@ -19,7 +19,9 @@ export default function HardRefreshGate() {
     // links (/s/[token]) - reloading a public brag link should just refresh it, never bounce to login.
     // Public routes must NOT re-gate on reload: the homepage, login, the invite and reset links (whose whole
     // point is that the user is signed out), and the PUBLIC showcase share links.
-    if (pathname === "/login" || pathname === "/" || pathname.startsWith("/s/")
+    // /dashboard is exempt (Gary): refreshing the front-door dashboard should just refresh it, not re-gate to the
+    // landing page. Other signed-in pages keep the re-gate-on-reload security posture.
+    if (pathname === "/login" || pathname === "/" || pathname === "/dashboard" || pathname.startsWith("/s/")
         || pathname.startsWith("/reset") || pathname.startsWith("/invite")) return;
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     if (nav?.type === "reload") {
