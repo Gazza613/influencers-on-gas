@@ -107,26 +107,31 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
 
   return (
-    <div className="rounded-2xl border border-[#a855f7]/30 bg-gradient-to-br from-[#ec4899]/[0.10] to-[#a855f7]/[0.04] p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="relative isolate overflow-hidden rounded-2xl border border-[#ec4899]/25 p-6"
+      style={{ background: "linear-gradient(160deg,#151022,#0d0a16)" }}>
+      {/* Accent glow, corner to corner, behind the content (Gary's Neon Bento look). */}
+      <span aria-hidden className="pointer-events-none absolute inset-0 -z-10"
+        style={{ background: "radial-gradient(80% 120% at 0% 0%, rgba(236,72,153,0.16), transparent 52%), radial-gradient(70% 120% at 100% 100%, rgba(168,85,247,0.12), transparent 55%)" }} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {/* The Living Researcher radar (same signature visual as the Researcher step), always sweeping so the pod
               reads as live. The section title sits beside it. */}
-          <div className="h-16 w-16 shrink-0"><LivingResearch lit={0.7} active /></div>
+          <div className="h-14 w-14 shrink-0"><LivingResearch lit={0.7} active /></div>
           <div>
-            <h3 className="text-xl font-bold text-ink">Daily Intelligence</h3>
-            <p className="text-base text-ink-dim">The market, on demand.</p>
+            <h3 className="text-[19px] font-bold tracking-tight text-ink">Daily Intelligence</h3>
+            <p className="text-sm text-ink-dim">The market, on demand.</p>
           </div>
         </div>
-        <span className="text-sm text-ink-faint">Live Market Intelligence pod · sourced, never invented</span>
+        <span className="text-right text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim">Live Market Intelligence pod<br />sourced, never invented</span>
       </div>
-      <p className="mt-1 text-base text-ink-dim">A one-off market read on demand: what a rival did, a category shift, a threat or an opening, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> proactively surfaces fresh topics (last 2 weeks); a typed question looks back up to 3 months.</p>
+      <p className="mt-3.5 max-w-[86ch] text-[13px] leading-relaxed text-ink-dim">A one-off market read on demand: what a rival did, a category shift, a threat or an opening, with the move it argues for.</p>
+      <p className="mt-1.5 max-w-[86ch] text-[13px] leading-relaxed text-ink-dim"><b className="text-ink">Find what&rsquo;s new</b> proactively surfaces fresh topics (last 2 weeks); a typed question looks back up to 3 months.</p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="block">
-          <span className="tabular block text-sm uppercase tracking-[0.16em] text-ink-faint">Brain</span>
+          <span className="tabular block text-[10px] uppercase tracking-[0.2em] text-ink-faint">Brain</span>
           <select value={clientId} onChange={(e) => { setClientId(e.target.value); setFindings(null); setErr(""); }}
-            className="mt-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-base outline-none focus:border-accent">
+            className="mt-1.5 rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3 py-2.5 text-[13.5px] text-ink outline-none focus:border-[#a855f7]">
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
@@ -134,18 +139,18 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
       <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={2}
         onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask("question"); }}
         placeholder={`e.g. What has changed in ${brainName}'s market recently, and what should we do about it? What did a key rival just do?`}
-        className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-accent" />
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+        className="mt-3 w-full rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3.5 py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
+      <div className="mt-3.5 flex flex-wrap items-center gap-3">
         <button onClick={() => ask("question")} disabled={busy || !q.trim()}
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-base font-bold text-black hover:opacity-90 disabled:opacity-50">
-          {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
+          {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
           {busy ? "Scanning…" : "Ask the market"}
         </button>
         <button onClick={() => ask("discover")} disabled={busy}
-          className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-5 py-2.5 text-base font-bold text-accent hover:bg-accent/10 disabled:opacity-50">
+          className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 bg-[#a855f7]/10 px-5 py-2.5 text-[13.5px] font-bold text-ink transition hover:-translate-y-0.5 hover:border-[#a855f7] disabled:opacity-50 disabled:hover:translate-y-0">
           ✦ Find what&rsquo;s new
         </button>
-        <span className="text-sm text-ink-faint">⌘/Ctrl + Enter · takes a minute, it searches the web live</span>
+        <span className="text-[11px] text-ink-faint">⌘/Ctrl + Enter · takes a minute, it searches the web live</span>
       </div>
 
       {/* AUTOMATION collapsed by default (Gary: the section was too long). One toggle under the buttons reveals the
@@ -153,10 +158,10 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
       {clientId && (
         <div className="mt-3 border-t border-line pt-3">
           <button onClick={() => setShowAuto((v) => !v)}
-            className="inline-flex items-center gap-2 text-base font-semibold text-ink-dim hover:text-ink">
-            <span className={`inline-block transition-transform ${showAuto ? "rotate-90" : ""}`}>▸</span>
+            className="inline-flex items-center gap-2 text-[13px] font-semibold text-ink-dim hover:text-ink">
+            <span className={`inline-block text-[#a855f7] transition-transform ${showAuto ? "rotate-90" : ""}`}>▸</span>
             Automation and delivery
-            <span className="text-sm font-normal text-ink-faint">· schedule this brain, set recipients, auto-draft the CEO article</span>
+            <span className="text-[11.5px] font-normal text-ink-faint">· schedule this brain, set recipients, auto-draft the CEO article</span>
           </button>
           {showAuto && <div className="mt-4"><IntelEmailControl clientId={clientId} clientName={brainName} /></div>}
         </div>
@@ -213,8 +218,8 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
                             {draftErr && <p className="mt-2 text-base text-alert">{draftErr}</p>}
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <button onClick={() => sendArticle(f)} disabled={sending || !recips.trim()}
-                                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2 text-base font-bold text-black hover:opacity-90 disabled:opacity-50">
-                                {sending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />}
+                                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-5 py-2 text-base font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] hover:opacity-90 disabled:opacity-50">
+                                {sending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
                                 {sending ? "Sending…" : "Approve & send to CEO"}
                               </button>
                               <button onClick={() => draftArticle(f)} disabled={drafting || sending} className="rounded-lg border border-line px-4 py-2 text-base text-ink-dim hover:text-ink disabled:opacity-50">Redraft</button>
