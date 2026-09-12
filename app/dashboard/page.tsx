@@ -2,7 +2,14 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import MarketQuestion from "@/components/MarketQuestion";
 import PodAgents from "@/components/PodAgents";
+import DashboardMotion from "@/components/DashboardMotion";
 import { listStudioClients } from "@/lib/studio";
+import { POD_AGENTS } from "@/lib/pod-agents";
+
+// Section accent (the numbered platform layers). Matches each group's dominant hue.
+const SECTION_ACCENT: Record<string, string> = {
+  Intelligence: "#a855f7", Know: "#34d399", Make: "#60a5fa", Run: "#38bdf8",
+};
 
 // THE AGENCY OF NOW - the first screen after sign-in. It does one job: get the team to the right desk.
 //
@@ -358,82 +365,65 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
   },
 ];
 
-function Tile({ d, index = 0 }: { d: Door; index?: number }) {
-  // A DESK THAT DOES NOT EXIST YET is drawn so the shape of the platform is visible, but it is deliberately
-  // not a link and carries no hover lift. A placeholder that behaves like a live tile is just a dead end with
-  // better manners, and someone will click it twice before believing it.
+function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }) {
+  // The tile's single accent hex, read from its ring class (e.g. "border-[#a855f7]/30" -> "#a855f7"), so the
+  // neon glass, border-glow, mark and pill all sing in the pod's own hue via one CSS custom property.
+  const a = d.ring.match(/#[0-9a-fA-F]{6}/)?.[0] || "#a855f7";
+  const style = { "--a": a } as React.CSSProperties;
+  const podLabel = `POD ${String(podNo).padStart(2, "0")}`;
+
+  // A DESK THAT DOES NOT EXIST YET: drawn so the shape of the platform is visible, but not a link and no hover lift.
   if (d.soon) {
     return (
-      <div className={`gas-rise relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 ${d.wide ? "sm:col-span-2" : ""}`}
-        style={{ animationDelay: `${80 + index * 90}ms` }} aria-disabled="true">
-        <span className={`relative block ${d.accent}`}>{d.mark}</span>
-        <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink">{d.name}</h2>
-        <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-dim">{d.blurb}</p>
-        {/* FOOTER pinned to the card bottom (mt-auto) so the action lines up across every tile: agent flex on the
-            left, the action badge bottom-right (Gary). */}
-        <div className="relative mt-auto flex items-end justify-between gap-3 pt-5">
-          <div className="min-w-0">{d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}</div>
-          <span className={`tabular inline-flex shrink-0 items-center rounded-full border border-current/40 px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.16em] ${d.accent}`}>
-            {d.action}
-          </span>
-        </div>
-      </div>
+      <article className={`agn-tile is-soon ${size}`} style={style} aria-disabled="true">
+        <div className="agn-thead"><span className="agn-mark">{d.mark}</span><span className="agn-pod">{podLabel}</span></div>
+        <h2 className="agn-name">{d.name}</h2>
+        <p className="agn-blurb">{d.blurb}</p>
+        <span className="agn-soonchip">{d.action}</span>
+      </article>
     );
   }
 
-  // The card is a CONTAINER, not itself a link, so a second destination (the showcase eye) can live inside it.
-  // Nesting an anchor inside an anchor is invalid HTML and breaks the inner click, so the main destination is a
-  // stretched overlay link and the eye sits above it on a higher layer.
-  const cls = `group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br ${d.wash} ${d.ring} p-6 transition duration-300 hover:-translate-y-1 ${d.wide ? "sm:col-span-2" : ""}`;
-  // The live products sit on their OWN domains: a plain anchor in a new tab, never a router push (which would
-  // try to route them inside this app and 404).
+  // A live tile is a CONTAINER with a stretched overlay link (the card's destination), so the roster pill and the
+  // showcase eye can sit ABOVE it on their own layer and win their own clicks - never an anchor inside an anchor.
   const label = typeof d.action === "string" ? d.action : "Open";
-
   return (
-    <div className={`${cls} gas-rise`} style={{ animationDelay: `${80 + index * 90}ms` }}>
-      {/* A soft light that only wakes on hover - the card feels lit rather than decorated. */}
-      <span aria-hidden className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${d.wash} opacity-0 blur-2xl transition duration-500 group-hover:opacity-100`} />
-      {/* STEP NUMBER: a faint watermark so a sequenced section reads as one guided flow, 1-2-3-4. */}
-      {d.step && <span aria-hidden className={`tabular pointer-events-none absolute right-5 top-4 z-0 text-[22px] font-black leading-none tracking-[0.06em] ${d.accent} opacity-[0.16]`}>POD {String(d.step).padStart(2, "0")}</span>}
-
-      {/* The main destination, covering the whole card. */}
+    <article className={`agn-tile ${size}`} style={style}>
       {d.external ? (
-        <a href={d.href} target="_blank" rel="noreferrer" aria-label={label} className="absolute inset-0 z-10" />
+        <a href={d.href} target="_blank" rel="noreferrer" aria-label={label} className="agn-tlink" />
       ) : (
-        <Link href={d.href} aria-label={label} className="absolute inset-0 z-10" />
+        <Link href={d.href} aria-label={label} className="agn-tlink" />
       )}
 
-      <span className="relative block transition duration-300 group-hover:-translate-y-0.5">{d.mark}</span>
-      <h2 className="relative mt-4 text-[25px] font-extrabold tracking-tight text-ink">{d.name}</h2>
-      <p className="relative mt-2.5 text-[16px] leading-relaxed text-ink-dim">{d.blurb}</p>
+      <div className="agn-thead"><span className="agn-mark">{d.mark}</span><span className="agn-pod">{podLabel}</span></div>
+      <h2 className="agn-name">{d.name}</h2>
+      <p className="agn-blurb">{d.blurb}</p>
 
-      {/* FOOTER pinned to the card bottom (mt-auto) so the action lines up across every tile (Gary): the agent
-          flex sits bottom-left, the action (and the showcase eye, where there is one) bottom-right, in line. The
-          footer itself carries no z-index, so the action stays UNDER the card's stretched link and a click on it
-          still enters the pod; the pill and the eye bring their own z-20 to win their own clicks. */}
-      <div className="relative mt-auto flex items-end justify-between gap-3 pt-5">
-        <div className="min-w-0">{d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}</div>
-        <div className="flex shrink-0 items-center gap-2.5">
+      <div className="agn-foot">
+        <div style={{ minWidth: 0 }}>{d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {d.peek && (
-            // A NEW TAB (Gary): the showcase is something you look at while your work stays open behind you, so it
-            // must not navigate the dashboard away. A plain anchor, not a router push, for the same reason.
-            <a href={d.peek.href} target="_blank" rel="noreferrer" title={d.peek.label} aria-label={`${d.peek.label} (opens in a new tab)`}
-              className={`relative z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line/80 bg-surface-1/70 backdrop-blur-sm transition ${d.accent} hover:scale-110 hover:border-current`}>
+            <a href={d.peek.href} target="_blank" rel="noreferrer" title={d.peek.label} aria-label={`${d.peek.label} (opens in a new tab)`} className="agn-eye">
               <EyeMark />
             </a>
           )}
-          <span className={`inline-flex items-center gap-1.5 text-[15px] font-bold ${d.accent}`}>
+          <span className={`agn-go${d.external ? " ext" : ""}`}>
             {d.action}
-            <span className="transition-transform duration-300 group-hover:translate-x-1">{d.external ? "↗" : "→"}</span>
+            <span className="arw">{d.external ? "↗" : "→"}</span>
           </span>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
 export default async function HomePage() {
   const clients = await listStudioClients().catch(() => [] as { id: string; name: string }[]);
+  // Hero stats, from the real data: total AI agents across the four Intelligence pods, brains on file, and the
+  // number of pods (tiles) across every section.
+  const agentCount = Object.values(POD_AGENTS).reduce((n, p) => n + p.agents.length, 0);
+  const brainCount = clients.length;
+  const podCount = GROUPS.reduce((n, g) => n + g.doors.length, 0);
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* AMBIENT DEPTH. The page was reading flat (Gary), so it now breathes: soft flares that slowly pulse and
@@ -445,14 +435,107 @@ export default async function HomePage() {
         @keyframes gasFlareA { 0%,100%{opacity:.55;transform:translate3d(0,0,0) scale(1)} 50%{opacity:.9;transform:translate3d(2%,-2%,0) scale(1.08)} }
         @keyframes gasFlareB { 0%,100%{opacity:.5;transform:translate3d(0,0,0) scale(1.05)} 50%{opacity:.85;transform:translate3d(-2%,2%,0) scale(1)} }
         @keyframes gasFlareC { 0%,100%{opacity:.4} 50%{opacity:.7} }
-        /* Tiles arrive in sequence rather than all at once - it reads as composed, not as a page load. */
+
+        /* NEON BENTO FRONT DOOR (Gary-approved concept). Scoped under .agn so nothing leaks into the rest of the
+           app. Poppins is inherited from the global brand face. */
+        .agn{--pink:#ec4899;--purple:#a855f7;--indigo:#818cf8;--cyan:#22d3ee;--blue:#60a5fa;--sky:#38bdf8;--emerald:#34d399;--live:#4ade80;--orange:#f96203;
+          --line:rgba(168,132,247,.16);--line2:rgba(168,132,247,.30);--dim:#a7a3c6;--faint:#6f6a92}
+
+        /* TOP BAR + LIVE indicator */
+        .agn-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+        .agn-eyebrow{display:inline-flex;align-items:center;gap:9px;font-weight:700;font-size:11.5px;letter-spacing:.28em;color:var(--dim);text-transform:uppercase}
+        .agn-eyebrow .d{width:7px;height:7px;border-radius:50%;background:var(--orange);box-shadow:0 0 12px var(--orange)}
+        .agn-live{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--live);
+          border:1px solid color-mix(in srgb,var(--live) 40%,transparent);background:color-mix(in srgb,var(--live) 9%,transparent);border-radius:999px;padding:5px 12px}
+        .agn-live .lb{width:8px;height:8px;border-radius:50%;background:var(--live);box-shadow:0 0 10px var(--live);animation:agnBlink 1.4s ease-in-out infinite}
+        @keyframes agnBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(.65)}}
+
+        /* HERO */
+        .agn-hero{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:28px;margin-bottom:clamp(22px,3.4vw,38px)}
+        .agn-lead{min-width:min(100%,520px);flex:1}
+        .agn-title{font-weight:800;line-height:.98;letter-spacing:-.012em;margin:.05em 0 0;font-size:clamp(34px,5vw,64px);text-wrap:balance}
+        .agn-title .now{background:linear-gradient(100deg,var(--pink),var(--purple) 42%,var(--cyan));background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:agnShimmer 9s ease-in-out infinite}
+        @keyframes agnShimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+        .agn-strap{margin:.5em 0 0;color:var(--dim);font-size:clamp(14px,1.5vw,18px)}
+
+        .agn-stats{display:flex;gap:12px;flex-wrap:wrap}
+        .agn-stat{display:flex;align-items:center;gap:12px;padding:12px 16px 12px 14px;border-radius:14px;position:relative;overflow:hidden;
+          background:linear-gradient(150deg,rgba(21,16,34,.9),rgba(13,10,22,.9));border:1px solid color-mix(in srgb,var(--a) 32%,transparent);box-shadow:0 0 26px -16px var(--a)}
+        .agn-stat::after{content:"";position:absolute;inset:0;z-index:0;opacity:.7;background:radial-gradient(120% 150% at 100% 0%,color-mix(in srgb,var(--a) 24%,transparent),transparent 55%)}
+        .agn-stat::before{content:"";position:absolute;top:0;left:-60%;width:45%;height:100%;z-index:0;transform:skewX(-18deg);background:linear-gradient(100deg,transparent,color-mix(in srgb,var(--a) 16%,transparent),transparent);animation:agnSweep 6s ease-in-out infinite}
+        .agn-stat>*{position:relative;z-index:1}
+        .agn-sic{width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:11px;color:var(--a);background:color-mix(in srgb,var(--a) 15%,transparent);border:1px solid color-mix(in srgb,var(--a) 32%,transparent);animation:agnFloat 5s ease-in-out infinite}
+        .agn-sic svg{width:20px;height:20px}
+        .agn-stx{display:flex;flex-direction:column;line-height:1}
+        .agn-stx b{font-weight:800;font-size:clamp(24px,2.6vw,30px);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+        .agn-stx span{font-weight:700;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:4px}
+        @keyframes agnFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+        @keyframes agnSweep{0%{left:-60%}55%,100%{left:135%}}
+
+        /* SECTION HEADERS */
+        .agn-sec{margin-top:clamp(26px,3.6vw,42px)}
+        .agn-shead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding-bottom:11px;margin-bottom:15px;border-bottom:1px solid color-mix(in srgb,var(--sa) 30%,transparent)}
+        .agn-snum{font-weight:700;font-size:12px;color:var(--sa);letter-spacing:.1em}
+        .agn-slabel{font-weight:700;font-size:12.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink)}
+        .agn-snote{color:var(--dim);font-size:13px;flex:1;min-width:200px}
+
+        /* GRIDS */
+        .agn-bento{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:minmax(124px,auto);gap:13px}
+        .agn-grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
+
+        /* TILES */
+        .agn-tile{position:relative;border-radius:16px;padding:18px;overflow:hidden;isolation:isolate;background:linear-gradient(160deg,rgba(21,16,34,.86),rgba(13,10,22,.86));
+          border:1px solid var(--line);transition:transform .3s cubic-bezier(.2,.7,.3,1),border-color .3s,box-shadow .3s;transform-style:preserve-3d;will-change:transform;display:flex;flex-direction:column}
+        .agn-tile::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:16px;opacity:.5;transition:opacity .35s;background:radial-gradient(120% 90% at 100% 0%,color-mix(in srgb,var(--a) 20%,transparent),transparent 60%)}
+        .agn-tile:hover{border-color:color-mix(in srgb,var(--a) 60%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 30%,transparent),0 22px 60px -24px color-mix(in srgb,var(--a) 70%,transparent)}
+        .agn-tile:hover::before{opacity:.9}
+        .agn-tile.is-soon{opacity:.72}
+        .agn-tile.is-soon:hover{transform:none;box-shadow:none;border-color:var(--line)}
+        .agn-tile.big{grid-column:span 2;grid-row:span 2}
+        .agn-tile.wide{grid-column:span 2}
+        .agn-thead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+        .agn-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;color:var(--a);background:color-mix(in srgb,var(--a) 14%,transparent);border:1px solid color-mix(in srgb,var(--a) 26%,transparent)}
+        .agn-tile.big .agn-mark{width:46px;height:46px;border-radius:14px}
+        .agn-mark svg{width:58%;height:58%}
+        .agn-pod{font-weight:700;font-size:10px;letter-spacing:.18em;color:var(--faint)}
+        .agn-name{font-weight:700;letter-spacing:-.02em;margin:13px 0 0;font-size:18.5px;color:var(--ink)}
+        .agn-tile.big .agn-name{font-size:26px;margin-top:16px}
+        .agn-name .g{background:linear-gradient(100deg,var(--a),color-mix(in srgb,var(--a) 40%,#fff));-webkit-background-clip:text;background-clip:text;color:transparent}
+        .agn-blurb{color:var(--dim);font-size:12.8px;line-height:1.5;margin:7px 0 0}
+        .agn-tile.big .agn-blurb{font-size:13.5px;max-width:46ch}
+        .agn-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
+        .agn-tile.big .agn-foot,.agn-tile.wide .agn-foot{margin-top:auto;padding-top:14px}
+        .agn-go{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12.5px;color:var(--a);white-space:nowrap}
+        .agn-go.ext{color:var(--dim)}
+        .agn-go .arw{transition:transform .3s}
+        .agn-tile:hover .agn-go .arw{transform:translateX(4px)}
+        .agn-meta{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+        .agn-soonchip{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--a);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);border-radius:999px;padding:5px 11px;align-self:flex-start;margin-top:auto}
+        .agn-tlink{position:absolute;inset:0;z-index:1;border-radius:16px}
+        .agn-eye{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;color:var(--a);position:relative;z-index:2;border:1px solid var(--line2);background:color-mix(in srgb,var(--a) 8%,transparent);transition:transform .2s,border-color .2s}
+        .agn-eye:hover{transform:scale(1.08);border-color:color-mix(in srgb,var(--a) 70%,transparent)}
+        .agn-eye svg{width:18px;height:18px}
+
         @keyframes gasRise { from{opacity:0;transform:translate3d(0,14px,0)} to{opacity:1;transform:none} }
-        /* The hairline under each group label draws itself in. */
         @keyframes gasDraw { from{transform:scaleX(0)} to{transform:scaleX(1)} }
         .gas-draw{transform-origin:left;animation:gasDraw .9s cubic-bezier(.22,.8,.28,1) both}
+
+        @media (max-width:920px){
+          .agn-bento{grid-template-columns:repeat(2,1fr)}
+          .agn-tile.big{grid-column:span 2;grid-row:span 1}
+          .agn-tile.wide{grid-column:span 2}
+        }
+        @media (max-width:560px){
+          .agn-bento,.agn-grid2{grid-template-columns:1fr}
+          .agn-tile.big,.agn-tile.wide{grid-column:span 1}
+          .agn-hero{align-items:flex-start}
+          .agn-stats{width:100%}
+          .agn-stat{flex:1;min-width:150px}
+        }
         @media (prefers-reduced-motion: reduce){
-          .gas-flare,.gas-rise,.gas-draw{animation:none !important}
+          .gas-flare,.gas-rise,.gas-draw,.agn-title .now,.agn-sic,.agn-stat::before,.agn-live .lb{animation:none !important}
           .gas-rise{opacity:1 !important}
+          .agn-tile{transition:none !important}
         }
       `}</style>
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
@@ -470,38 +553,59 @@ export default async function HomePage() {
 
       <AppHeader />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
-        <div className="max-w-2xl">
-          <p className="tabular text-[15px] font-semibold uppercase tracking-[0.34em] text-white">GAS Marketing</p>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">
-            The Studio of <span className="brand-grad-anim">NOW</span>
-          </h1>
-          <p className="mt-4 text-[19px] leading-relaxed text-ink-dim">
-            Human command. AI execution. One platform.
-          </p>
+      <main className="agn mx-auto w-full max-w-[1200px] flex-1 px-5 py-10 sm:px-8 sm:py-12">
+        {/* Progressive-enhancement island: count-up + hover tilt. The content below is fully server-rendered. */}
+        <DashboardMotion />
+
+        <div className="agn-top">
+          <span className="agn-eyebrow"><span className="d" /> AI marketing intelligence platform</span>
+          <span className="agn-live"><span className="lb" /> Live</span>
         </div>
 
-        <div className="mt-12 space-y-10">
-          {GROUPS.map((g, gi) => (
-            <section key={g.label}>
-              {/* The group label carries a hairline out to the edge: it reads as a chapter, not a heading. */}
-              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <h2 className="tabular text-[20px] font-bold uppercase tracking-[0.18em] text-ink">{g.label}</h2>
-                <span className="text-[17px] text-ink-dim">{g.note}</span>
-                <span aria-hidden className="gas-draw h-px flex-1 bg-gradient-to-r from-line to-transparent" />
+        <header className="agn-hero">
+          <div className="agn-lead">
+            <h1 className="agn-title">The Agency of <span className="now">NOW</span></h1>
+            <p className="agn-strap">Human command. AI execution. One platform.</p>
+          </div>
+          <div className="agn-stats">
+            <div className="agn-stat" style={{ "--a": "#ec4899" } as React.CSSProperties}>
+              <span className="agn-sic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="7" width="10" height="10" rx="2.5" /><circle cx="12" cy="12" r="2" /><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" /></svg></span>
+              <span className="agn-stx"><b data-count={agentCount}>{agentCount}</b><span>AI agents</span></span>
+            </div>
+            <div className="agn-stat" style={{ "--a": "#a855f7" } as React.CSSProperties}>
+              <span className="agn-sic"><BrainMark /></span>
+              <span className="agn-stx"><b data-count={brainCount}>{brainCount}</b><span>Brains</span></span>
+            </div>
+            <div className="agn-stat" style={{ "--a": "#22d3ee" } as React.CSSProperties}>
+              <span className="agn-sic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6" /><rect x="14" y="3" width="7" height="7" rx="1.6" /><rect x="3" y="14" width="7" height="7" rx="1.6" /><rect x="14" y="14" width="7" height="7" rx="1.6" /></svg></span>
+              <span className="agn-stx"><b data-count={podCount}>{podCount}</b><span>Pods</span></span>
+            </div>
+          </div>
+        </header>
+
+        {GROUPS.map((g, gi) => {
+          const podBase = GROUPS.slice(0, gi).reduce((n, x) => n + x.doors.length, 0);
+          const isIntel = g.label === "Intelligence";
+          return (
+            <section key={g.label} className="agn-sec" style={{ "--sa": SECTION_ACCENT[g.label] || "#a855f7" } as React.CSSProperties}>
+              <div className="agn-shead">
+                <span className="agn-snum">{String(gi + 1).padStart(2, "0")}</span>
+                <span className="agn-slabel">{g.label}</span>
+                <span className="agn-snote">{g.note}</span>
               </div>
-              <div className="mt-4 grid gap-5 sm:grid-cols-2">
-                {g.doors.map((d, n) => <Tile key={d.href} d={d} index={gi * 2 + n} />)}
+              <div className={isIntel ? "agn-bento" : "agn-grid2"}>
+                {g.doors.map((d, n) => (
+                  <Tile key={d.href} d={d} podNo={podBase + n + 1} size={isIntel ? (n === 0 ? "big" : n === 1 ? "wide" : "") : ""} />
+                ))}
               </div>
 
-              {/* DAILY INTELLIGENCE sits directly under the four Intelligence pods, as part of the SAME section
-                  (Gary): no separate sub-heading, the panel carries its own "Daily Intelligence" title inside. */}
-              {g.label === "Intelligence" && clients.length > 0 && (
-                <div className="mt-5"><MarketQuestion clients={clients} /></div>
+              {/* DAILY INTELLIGENCE - the REAL, functional component, unchanged, mounted under the Intelligence pods. */}
+              {isIntel && clients.length > 0 && (
+                <div style={{ marginTop: 13 }}><MarketQuestion clients={clients} /></div>
               )}
             </section>
-          ))}
-        </div>
+          );
+        })}
       </main>
     </div>
   );
