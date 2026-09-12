@@ -10,11 +10,13 @@ export default function DashboardMotion() {
   useEffect(() => {
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // Count-up the hero stats from a visible resting state (the server already rendered the final value).
+    // Count-up the hero stats on landing. A number ticking up is not spatial motion, so we run it even under
+    // reduced-motion (just faster there). Start each at 0 first so it climbs cleanly instead of flashing the
+    // server-rendered final value and snapping back.
     document.querySelectorAll<HTMLElement>(".agn [data-count]").forEach((el) => {
       const target = parseInt(el.getAttribute("data-count") || "0", 10) || 0;
-      if (reduce) { el.textContent = target.toLocaleString("en-ZA"); return; }
-      const start = performance.now(), dur = 1100;
+      el.textContent = "0";
+      const start = performance.now(), dur = reduce ? 900 : 2600;
       const tick = (now: number) => {
         const t = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - t, 3);
         el.textContent = Math.round(target * e).toLocaleString("en-ZA");

@@ -518,8 +518,9 @@ export default async function HomePage() {
         .agn-name .g{background:linear-gradient(100deg,var(--a),color-mix(in srgb,var(--a) 40%,#fff));-webkit-background-clip:text;background-clip:text;color:transparent}
         .agn-blurb{color:var(--dim);font-size:12.8px;line-height:1.5;margin:7px 0 0}
         .agn-tile.big .agn-blurb{font-size:13.5px;max-width:46ch}
-        .agn-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-top:14px}
-        .agn-tile.big .agn-foot,.agn-tile.wide .agn-foot{margin-top:auto;padding-top:14px}
+        /* Every tile's footer pins to the bottom (mt-auto), so the agent pill + action line up across the whole row
+           regardless of how long each blurb is (Gary). */
+        .agn-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-top:auto;padding-top:14px}
         .agn-go{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12.5px;color:var(--a);white-space:nowrap}
         .agn-go.ext{color:var(--dim)}
         .agn-go .arw{transition:transform .3s}
