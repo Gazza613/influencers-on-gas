@@ -399,6 +399,20 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
       <h2 className="agn-name">{d.name}</h2>
       <p className="agn-blurb">{d.blurb}</p>
 
+      {/* The feature (Brain) tile carries a knowledge sparkline, as in the approved concept, so the tall tile reads
+          as a living asset rather than empty space. */}
+      {size === "big" && (
+        <div className="agn-spark">
+          <svg viewBox="0 0 320 44" preserveAspectRatio="none">
+            <defs><linearGradient id="agnsp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a855f7" stopOpacity="0.35" /><stop offset="1" stopColor="#a855f7" stopOpacity="0" /></linearGradient></defs>
+            <path d="M0 38 L26 34 L52 36 L78 28 L104 30 L130 21 L156 24 L182 15 L208 17 L234 10 L260 13 L286 6 L320 5 L320 44 L0 44 Z" fill="url(#agnsp)" />
+            <path d="M0 38 L26 34 L52 36 L78 28 L104 30 L130 21 L156 24 L182 15 L208 17 L234 10 L260 13 L286 6 L320 5" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="320" cy="5" r="3.5" fill="#e9d5ff"><animate attributeName="opacity" values="1;.3;1" dur="2.2s" repeatCount="indefinite" /></circle>
+          </svg>
+          <div className="cap"><span>Passages indexed</span><span>always growing</span></div>
+        </div>
+      )}
+
       <div className="agn-foot">
         <div style={{ minWidth: 0 }}>{d.pod ? <PodAgents pod={d.pod} accent={d.accent} /> : null}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -478,6 +492,7 @@ export default async function HomePage() {
         .agn-snum{font-weight:700;font-size:12px;color:var(--sa);letter-spacing:.1em}
         .agn-slabel{font-weight:700;font-size:12.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink)}
         .agn-snote{color:var(--dim);font-size:13px;flex:1;min-width:200px}
+        .agn-snote b{color:var(--sa);font-weight:600}
 
         /* GRIDS */
         .agn-bento{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:minmax(124px,auto);gap:13px}
@@ -503,13 +518,16 @@ export default async function HomePage() {
         .agn-name .g{background:linear-gradient(100deg,var(--a),color-mix(in srgb,var(--a) 40%,#fff));-webkit-background-clip:text;background-clip:text;color:transparent}
         .agn-blurb{color:var(--dim);font-size:12.8px;line-height:1.5;margin:7px 0 0}
         .agn-tile.big .agn-blurb{font-size:13.5px;max-width:46ch}
-        .agn-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
+        .agn-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-top:14px}
         .agn-tile.big .agn-foot,.agn-tile.wide .agn-foot{margin-top:auto;padding-top:14px}
         .agn-go{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12.5px;color:var(--a);white-space:nowrap}
         .agn-go.ext{color:var(--dim)}
         .agn-go .arw{transition:transform .3s}
         .agn-tile:hover .agn-go .arw{transform:translateX(4px)}
         .agn-meta{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+        .agn-spark{margin-top:16px}
+        .agn-spark svg{width:100%;height:44px;display:block;overflow:visible}
+        .agn-spark .cap{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-top:7px}
         .agn-soonchip{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--a);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);border-radius:999px;padding:5px 11px;align-self:flex-start;margin-top:auto}
         .agn-tlink{position:absolute;inset:0;z-index:1;border-radius:16px}
         .agn-eye{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;color:var(--a);position:relative;z-index:2;border:1px solid var(--line2);background:color-mix(in srgb,var(--a) 8%,transparent);transition:transform .2s,border-color .2s}
@@ -553,7 +571,7 @@ export default async function HomePage() {
 
       <AppHeader />
 
-      <main className="agn mx-auto w-full max-w-[1200px] flex-1 px-5 py-10 sm:px-8 sm:py-12">
+      <main className="agn mx-auto w-full max-w-[1600px] flex-1 px-5 py-10 sm:px-8 sm:py-12">
         {/* Progressive-enhancement island: count-up + hover tilt. The content below is fully server-rendered. */}
         <DashboardMotion />
 
