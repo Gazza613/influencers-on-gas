@@ -313,7 +313,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
       </div>
       {/* TWO MODES, not three flat buttons (Gary): the market surfaces it (research), or you set the topic
           (LinkedIn article). The distinction is made structural below - two labelled cards. */}
-      {isAdmin && <p className="mt-3.5 text-[13px] leading-relaxed text-ink-dim">Two ways to run it: <b className="text-ink">research the market</b> and let it surface what matters, or <b className="text-ink">write a LinkedIn article</b> on a topic you set.</p>}
+      {isAdmin && <p className="mt-3.5 text-[14px] leading-relaxed text-ink-dim">Two ways to run it: <b className="text-ink">research the market</b> and let it surface what matters, or <b className="text-ink">write a LinkedIn article</b> on a topic you set.</p>}
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="block">
@@ -326,13 +326,13 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
       </div>
       {/* CARD 1 - RESEARCH THE MARKET. The market surfaces what matters (research-driven). */}
       <div className="mt-4 rounded-xl border border-[#a855f7]/30 p-4" style={{ background: "rgba(168,85,247,0.05)" }}>
-        <div className="flex items-start gap-2.5">
-          <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-[#a855f7] to-[#7c3aed] text-white">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#a855f7] to-[#7c3aed] text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
           </span>
           <div>
-            <h4 className="text-[16px] font-bold text-ink">Research the market</h4>
-            <p className="text-[12px] leading-relaxed text-ink-dim"><b className="text-ink">The market surfaces it.</b> Ask a specific question and the pod researches the last 3 months to answer it, with the move it argues for. Or Find what&rsquo;s new, which needs no question and proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.</p>
+            <h4 className="text-[20px] font-bold text-ink">Research the market</h4>
+            <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">The market surfaces it.</b> Ask a specific question and the pod researches the last 3 months to answer it, with the move it argues for. Or Find what&rsquo;s new, which needs no question and proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.</p>
           </div>
         </div>
         <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={2}
@@ -363,7 +363,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
             </span>
             <div>
               <h4 className="text-[20px] font-bold" style={{ color: LINKEDIN_BLUE }}>LinkedIn Article</h4>
-              <p className="mt-0.5 text-[13px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
+              <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
             </div>
           </div>
           <textarea value={liTopic} onChange={(e) => setLiTopic(e.target.value)} rows={2}
