@@ -591,7 +591,7 @@ export default async function HomePage() {
         .agn-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;color:var(--a);background:color-mix(in srgb,var(--a) 14%,transparent);border:1px solid color-mix(in srgb,var(--a) 26%,transparent)}
         .agn-tile.big .agn-mark{width:46px;height:46px;border-radius:14px}
         .agn-mark svg{width:58%;height:58%}
-        .agn-pod{font-weight:700;font-size:10px;letter-spacing:.18em;color:var(--faint)}
+        .agn-pod{font-weight:700;font-size:13px;letter-spacing:.16em;color:var(--faint)}
         /* All pod headers share the Brain's size (Gary). Only the Brain tile takes a touch more top margin. */
         .agn-name{font-weight:700;letter-spacing:-.02em;margin:13px 0 0;font-size:26px;color:var(--ink)}
         .agn-tile.big .agn-name{margin-top:16px}
@@ -638,6 +638,8 @@ export default async function HomePage() {
           .agn-stat{flex:1;min-width:150px}
           .agn-hide-mobile{display:none}
           .agn-tile.big .agn-blurb{max-width:100%}
+          /* POD labels stay at their original mobile size (Gary: mobile looks fine); only desktop grows. */
+          .agn-pod{font-size:10px;letter-spacing:.18em}
           /* Smaller section note on mobile so the numbered flow (brain > research > strategy > proposal) fits on one line. */
           .agn-snote{font-size:12.5px}
         }
