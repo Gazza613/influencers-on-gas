@@ -37,6 +37,11 @@ create table if not exists clients (
 );
 alter table clients add column if not exists website text;
 alter table clients add column if not exists websites jsonb;   -- additional official sites (some clients run several)
+-- FRESHNESS SLA / AUTO-RECRAWL (Gary): keep a brain current on its own. 0 = OFF (the default, so nothing auto-
+-- spends until a brain opts in); a positive value is the SLA in days - a daily cron re-crawls this brain's
+-- website sources once they are older than that, capped per run so cost stays bounded. Only website/crawl
+-- sources have a live URL to re-read; documents and pasted notes are untouched.
+alter table clients add column if not exists auto_recrawl_days int not null default 0;
 alter table clients add column if not exists socials jsonb not null default '[]'::jsonb;   -- the client's official social accounts (FB/IG/TikTok/LinkedIn/YouTube/X), mined by the Researcher
 alter table clients add column if not exists research_weekly boolean not null default false;   -- weekly auto-run of the Researcher (Mon 08:30 SAST); OFF by default so no spend happens without opting in
 alter table clients add column if not exists owner_context text;   -- when the subject is a product/brand owned by a parent (e.g. egifts24 owned by StellR): the Researcher researches the parent for context but attributes its people/numbers to the parent

@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/weekly-activity",
       "schedule": "0 5 * * 1"
+    },
+    {
+      "path": "/api/cron/refresh-brains",
+      "schedule": "0 2 * * *"
     }
   ]
 }

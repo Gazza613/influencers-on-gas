@@ -59,8 +59,20 @@ const ICON = {
   coverage: `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/>`,
 } as const;
 
-export default function BrainConsole({ brainId, initialSources, chunkCount = 0, initialDoctrine = "" }: { brainId: string; initialSources: Source[]; chunkCount?: number; initialDoctrine?: string }) {
+export default function BrainConsole({ brainId, initialSources, chunkCount = 0, initialDoctrine = "", isAdmin = false }: { brainId: string; initialSources: Source[]; chunkCount?: number; initialDoctrine?: string; isAdmin?: boolean }) {
   const [sources, setSources] = useState<Source[]>(initialSources);
+  // FRESHNESS SLA: how often this brain auto-recrawls its website sources (0 = off). Loaded once; admin can set it.
+  const [autoRecrawl, setAutoRecrawl] = useState(0);
+  const [savingFresh, setSavingFresh] = useState(false);
+  useEffect(() => {
+    fetch(`/api/brains/${brainId}/freshness`).then((r) => r.json()).then((d) => setAutoRecrawl(Number(d?.autoRecrawlDays) || 0)).catch(() => {});
+  }, [brainId]);
+  async function saveFreshness(days: number) {
+    setSavingFresh(true);
+    const d = await fetch(`/api/brains/${brainId}/freshness`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days }) }).then((r) => r.json()).catch(() => null);
+    setSavingFresh(false);
+    if (d?.ok) setAutoRecrawl(Number(d.autoRecrawlDays) || 0);
+  }
   const [mode, setMode] = useState<Mode>("website");
   const [progress, setProgress] = useState("");
   const [sites, setSites] = useState<string[]>([""]);      // multi-site website scrape
@@ -527,12 +539,32 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
               const dueCount = web.filter((s) => { const f = freshness(s.last_synced_at); return f?.due && s.status !== "pending"; }).length;
               return (
                 <div className="mb-4 rounded-xl border border-[#4ade80]/25 bg-[#4ade80]/[0.04] p-3.5">
-                  <div className="tabular text-[13px] font-bold uppercase tracking-[0.14em] text-[#86efac]">✓ Already crawled</div>
-                  {dueCount > 0 && (
-                    <p className="mt-1.5 text-[15px] text-[#fcd34d]">
-                      <span aria-hidden>↻ </span>{dueCount === 1 ? "1 site is" : `${dueCount} sites are`} 30+ days old. A fresh crawl keeps the brain current.
-                    </p>
-                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="tabular text-[13px] font-bold uppercase tracking-[0.14em] text-[#86efac]">✓ Already crawled</div>
+                    {/* KEEP FRESH AUTOMATICALLY (admin cost dial): auto-recrawl these sites on an SLA so the brain
+                        never quietly goes stale. Off by default; when on, the manual Re-crawl still works too. */}
+                    {isAdmin && (
+                      <label className="flex items-center gap-2 text-[14px] text-ink-dim">
+                        <span>Keep fresh:</span>
+                        <select value={autoRecrawl} disabled={savingFresh}
+                          onChange={(e) => saveFreshness(Number(e.target.value))}
+                          className="rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[14px] text-ink outline-none focus:border-[#4ade80] disabled:opacity-50">
+                          <option value={0}>Off</option>
+                          <option value={14}>Every 14 days</option>
+                          <option value={30}>Every 30 days</option>
+                          <option value={60}>Every 60 days</option>
+                          <option value={90}>Every 90 days</option>
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  {autoRecrawl > 0
+                    ? <p className="mt-1.5 text-[15px] text-[#86efac]"><span aria-hidden>↻ </span>Auto-recrawling any site older than {autoRecrawl} days, so the brain stays current on its own.</p>
+                    : dueCount > 0 && (
+                      <p className="mt-1.5 text-[15px] text-[#fcd34d]">
+                        <span aria-hidden>↻ </span>{dueCount === 1 ? "1 site is" : `${dueCount} sites are`} 30+ days old. A fresh crawl keeps the brain current{isAdmin ? ", or turn on Keep fresh above" : ""}.
+                      </p>
+                    )}
                   <ul className="mt-2 space-y-1.5">
                     {web.map((s) => {
                       const f = freshness(s.last_synced_at);

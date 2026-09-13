@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { getBrain, listSources } from "@/lib/brains";
 import { getBrandKit } from "@/lib/studio";
 import BrainConsole from "@/components/BrainConsole";
@@ -13,6 +14,8 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
   const brain = await getBrain(id);
   if (!brain) notFound();
   const sources = await listSources(id);
+  const session = await auth();
+  const isAdmin = session?.user?.role === "super_admin" || session?.user?.role === "admin";
   // The brand doctrine (positioning + rules) is now edited on this page, not synced from a separate kit.
   const kit = await getBrandKit(id).catch(() => null);
 
@@ -40,7 +43,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
         <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[13px] uppercase tracking-wide text-ink-faint">brain</span>
         <span className="tabular text-[18px] text-ink-faint">{brain.chunk_count ?? 0} passage{(brain.chunk_count ?? 0) === 1 ? "" : "s"}</span>
       </div>
-      <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} initialDoctrine={kit?.tone_notes ?? ""} />
+      <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} initialDoctrine={kit?.tone_notes ?? ""} isAdmin={isAdmin} />
 
       {/* TEST THE BRAIN, in the same place you built it (Gary: fold Test the Brain into The Brain, one tile not two).
           Ask this brain a question and check it answers well before the Researcher builds on it. */}
