@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Working from "@/components/Working";
 import IntelEmailControl from "@/components/IntelEmailControl";
+import LinkedInAutomation from "@/components/LinkedInAutomation";
 import LivingResearch from "@/components/LivingResearch";
 
 // ASK THE MARKET A QUESTION (Gary). The Strategist desk, on demand: type a market question about a client and get
@@ -72,6 +73,9 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [creativeErr, setCreativeErr] = useState("");
   // The LinkedIn-article free-prompt.
   const [liTopic, setLiTopic] = useState("");
+  // Empty-input hints: instead of a silent greyed button, a click on an empty run explains what to type.
+  const [askHint, setAskHint] = useState(false);
+  const [liHint, setLiHint] = useState(false);
   const [liBusy, setLiBusy] = useState(false);
   // Add-to-Brain (accepts the finding so it is kept for the brain rather than binned).
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
@@ -335,16 +339,23 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
             <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">The market surfaces it.</b> Ask a specific question and the pod researches the last 3 months to answer it, with the move it argues for. Or Find what&rsquo;s new, which needs no question and proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.</p>
           </div>
         </div>
-        <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={2}
+        <textarea value={q} onChange={(e) => { setQ(e.target.value); setAskHint(false); }} rows={2}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask("question"); }}
           placeholder={`e.g. What has changed in ${brainName}'s market recently, and what should we do about it? What did a key rival just do?`}
           className="mt-3 w-full rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3.5 py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button onClick={() => ask("question")} disabled={busy || !q.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#7c3aed] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:saturate-[.55] disabled:hover:translate-y-0">
-            {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-            {busy ? "Scanning…" : "Ask the market"}
-          </button>
+          <div className="relative">
+            <button onClick={() => { if (!q.trim()) { setAskHint(true); return; } ask("question"); }} disabled={busy}
+              className={`inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#7c3aed] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:hover:translate-y-0 ${!q.trim() && !busy ? "opacity-50 saturate-50" : ""}`}>
+              {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+              {busy ? "Scanning…" : "Ask the market"}
+            </button>
+            {askHint && !q.trim() && !busy && (
+              <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-lg border border-[#a855f7]/50 bg-[#1a1030] px-3 py-2 text-[12.5px] leading-snug text-ink shadow-xl">
+                Type your market question in the box above first, then Ask the market.
+              </div>
+            )}
+          </div>
           {/* Solid PINK - distinct from Ask (purple), so the two research modes read apart. */}
           <button onClick={() => ask("discover")} disabled={busy}
             className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#db2777] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#ec4899] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
@@ -366,17 +377,24 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
               <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
             </div>
           </div>
-          <textarea value={liTopic} onChange={(e) => setLiTopic(e.target.value)} rows={2}
+          <textarea value={liTopic} onChange={(e) => { setLiTopic(e.target.value); setLiHint(false); }} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) draftFromTopic(); }}
             placeholder={`e.g. why ${brainName}'s customers are shifting to X, and what it means for them`}
             className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-[#0A66C2]" />
           <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-            <button onClick={draftFromTopic} disabled={liBusy || !liTopic.trim()}
-              className="inline-flex items-center gap-2 rounded-lg px-5 py-2 text-base font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
-              style={{ backgroundColor: LINKEDIN_BLUE, boxShadow: "0 8px 24px -12px " + LINKEDIN_BLUE }}>
-              {liBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-              {liBusy ? "Researching…" : "Research & draft"}
-            </button>
+            <div className="relative">
+              <button onClick={() => { if (!liTopic.trim()) { setLiHint(true); return; } draftFromTopic(); }} disabled={liBusy}
+                className={`inline-flex items-center gap-2 rounded-lg px-5 py-2 text-base font-bold text-white transition hover:-translate-y-0.5 disabled:hover:translate-y-0 ${!liTopic.trim() && !liBusy ? "opacity-50 saturate-50" : ""}`}
+                style={{ backgroundColor: LINKEDIN_BLUE, boxShadow: "0 8px 24px -12px " + LINKEDIN_BLUE }}>
+                {liBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+                {liBusy ? "Researching…" : "Research & draft"}
+              </button>
+              {liHint && !liTopic.trim() && !liBusy && (
+                <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-lg border px-3 py-2 text-[12.5px] leading-snug text-ink shadow-xl" style={{ borderColor: LINKEDIN_BLUE + "80", background: "#0d1a2b" }}>
+                  Type the topic you want the piece to be about in the box above first, then Research &amp; draft.
+                </div>
+              )}
+            </div>
             <span className="text-[11px] text-ink-faint">Grounded in the brain and verified sources. Never fabricated to fit the prompt.</span>
           </div>
           {liBusy && <div className="mt-3 text-base text-accent"><Working messages={WORKING_LINKEDIN} /></div>}
@@ -413,7 +431,13 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
               </span>
             </span>
           </button>
-          {showAuto && <div className="mt-4"><IntelEmailControl clientId={clientId} clientName={brainName} /></div>}
+          {showAuto && (
+            <div className="mt-4 space-y-4">
+              <IntelEmailControl clientId={clientId} clientName={brainName} />
+              {/* LinkedIn Article automation is topic-driven and admin-only, so it sits in its own block. */}
+              {isAdmin && <LinkedInAutomation clientId={clientId} />}
+            </div>
+          )}
         </div>
       )}
 

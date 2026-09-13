@@ -731,6 +731,19 @@ alter table intel_briefs add column if not exists newsletter_publisher text not 
 alter table intel_briefs drop constraint if exists intel_briefs_newsletter_publisher_check;
 alter table intel_briefs add constraint intel_briefs_newsletter_publisher_check
   check (newsletter_publisher in ('ceo','md'));
+
+-- LINKEDIN ARTICLE AUTOMATION (Gary). Topic-DRIVEN, the opposite of the market-driven digest: on a cadence the
+-- pod drafts the exec's LinkedIn thought-leadership piece from a TOPIC QUEUE the team controls, and emails the
+-- team a DRAFT to review (never auto-sends under an exec's name). The queue is the team's own topics; the UI also
+-- suggests topics from what the market is currently discussing (the brain's recent findings) to fill it. The
+-- cursor rotates through the queue so successive runs cover different topics. Publisher + recipients are shared
+-- with the CEO-article flow (newsletter_publisher, ceo_recipients).
+alter table intel_briefs add column if not exists linkedin_schedule text not null default 'off';
+alter table intel_briefs drop constraint if exists intel_briefs_linkedin_schedule_check;
+alter table intel_briefs add constraint intel_briefs_linkedin_schedule_check
+  check (linkedin_schedule in ('off','weekly','monthly'));
+alter table intel_briefs add column if not exists linkedin_topics jsonb not null default '[]'::jsonb;
+alter table intel_briefs add column if not exists linkedin_topic_ix int not null default 0;
 alter table intel_briefs add column if not exists deprecated_products jsonb not null default '[]'::jsonb;  -- retired products the client has not yet scrubbed off its site; the Researcher never surfaces these (Gary: GAS Appitude/ROC/INGAiGE)
 
 -- Why an ingest failed. Status alone said "failed" and nothing else, so a broken source could only be

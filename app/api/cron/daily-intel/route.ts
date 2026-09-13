@@ -4,6 +4,7 @@ import { cronAuthed } from "@/lib/cron";
 import { sendEmail, emailConfigured } from "@/lib/email";
 import { runIntel, loadIntelBrief, brainsWithIntel, type Intel } from "@/lib/intel";
 import { writeCeoNewsletter } from "@/lib/ceo-newsletter";
+import { draftLinkedinArticle } from "@/lib/linkedin-article";
 import { emailShell } from "@/lib/email-shell";
 import { buildCeoArticleEmail } from "@/lib/ceo-email";
 import { getClientEmailLogo } from "@/lib/client-logo";
@@ -218,6 +219,8 @@ export async function GET(req: Request) {
   const firstMonday = isMonday && new Date().getUTCDate() <= 7;
   const emailFires = (s: string) => s === "daily" || (s === "weekly" && isMonday);
   const newsFires = (s: string) => s === "daily" || (s === "weekly" && isMonday) || (s === "monthly" && firstMonday);
+  // The LinkedIn-article automation has no 'daily': weekly fires on Monday, monthly on the first Monday.
+  const linkedinFires = (s: string) => (s === "weekly" && isMonday) || (s === "monthly" && firstMonday);
   const clients = configured
     .filter((c) => (only ? c.clientId === only : true))
     .map((c) => ({
@@ -227,8 +230,12 @@ export async function GET(req: Request) {
       // runs every cadence and drafts nothing (a silent cost leak). Manual + email still run regardless.
       newsletterFires: (manual || newsFires(c.newsletterSchedule)) && !!c.ceoRules,
       ceoRules: c.ceoRules, ceoName: c.ceoName, ceoRecipients: c.ceoRecipients,
+      // The LinkedIn-article automation: topic-driven, so it only fires when the brain has a topic queue to draw
+      // from. Publisher + MD name attribute the draft to the right executive.
+      linkedinFires: (manual || linkedinFires(c.linkedinSchedule)) && c.linkedinTopics.length > 0,
+      linkedinTopics: c.linkedinTopics, linkedinTopicIx: c.linkedinTopicIx, publisher: c.publisher, mdName: c.mdName,
     }))
-    .filter((c) => c.emailFires || c.newsletterFires);
+    .filter((c) => c.emailFires || c.newsletterFires || c.linkedinFires);
   if (!clients.length) return NextResponse.json({ ok: true, skipped: manual ? "no brain has an intel brief" : "no brain is scheduled to run today" });
 
   const out: Record<string, unknown>[] = [];
@@ -244,8 +251,14 @@ export async function GET(req: Request) {
       // manual run (a super-admin pressing "Run research now") is attributed to that user; the true cron passes
       // no session, so its spend lands under Super Admin.
       const errors: string[] = [];
-      const strategist = await runIntel(c.id, "strategist", today, session?.user?.email ?? null)
-        .catch((e) => { errors.push(`strategist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; });
+      // The digest research pass is only needed for the email or the finding-driven CEO article. A brain that
+      // ONLY has the LinkedIn automation on skips it entirely (the LinkedIn branch does its own retrieval), so a
+      // LinkedIn-only brain never pays for a digest pass it would not use.
+      const needDigest = c.emailFires || c.newsletterFires;
+      const strategist = needDigest
+        ? await runIntel(c.id, "strategist", today, session?.user?.email ?? null)
+            .catch((e) => { errors.push(`strategist: ${String((e as Error)?.message || e).slice(0, 140)}`); return [] as Intel[]; })
+        : [];
 
       // Only MATERIAL findings are worth an inbox. The rest wait in the queue.
       const sm = strategist.filter((i) => i.material);
@@ -311,7 +324,33 @@ export async function GET(req: Request) {
           }
         }
       }
-      out.push({ client: c.name, cadence, strategist: strategist.length, material: sm.length, emailed, ceoDrafted, errors: errors.length ? errors : undefined });
+
+      // LINKEDIN ARTICLE AUTOMATION (Gary): topic-DRIVEN, the opposite of the finding-driven CEO article above.
+      // On the cadence, take the NEXT topic from the brain's own queue, draft the exec's grounded piece, and email
+      // the DRAFT to the team to review - never to the exec. The cursor rotates so successive runs cover different
+      // topics. Grounded in the brain only here (runExternal:false) so the automated cost stays predictable; the
+      // manual button folds in live external context.
+      let linkedinDrafted = false;
+      let linkedinTopic = "";
+      if (c.linkedinFires && c.linkedinTopics.length) {
+        const ix = ((c.linkedinTopicIx % c.linkedinTopics.length) + c.linkedinTopics.length) % c.linkedinTopics.length;
+        linkedinTopic = c.linkedinTopics[ix];
+        const draft = await draftLinkedinArticle(c.id, linkedinTopic, { userEmail: null, runExternal: false }).catch(() => null);
+        if (draft && draft.ok && emailConfigured()) {
+          const signerName = c.publisher === "md" ? c.mdName : c.ceoName;
+          if (!dryRun) await sendEmail({
+            to: ceoDraftTo, // team-first: the draft goes to the internal list, never the exec
+            subject: `LinkedIn article draft for review · ${c.name} · ${linkedinTopic.slice(0, 60)} · ${today}`,
+            html: buildCeoArticleEmail({ client: c.name, ceoName: signerName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: linkedinTopic, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
+            fromName: "Researcher on GAS",
+          }).catch(() => {});
+          linkedinDrafted = true;
+        }
+        // Advance the queue cursor (not on a dry-run test, so a test never silently consumes a topic).
+        if (!dryRun) await db().query(`update intel_briefs set linkedin_topic_ix = $2 where client_id = $1`, [c.id, (ix + 1) % c.linkedinTopics.length]).catch(() => {});
+      }
+
+      out.push({ client: c.name, cadence, strategist: strategist.length, material: sm.length, emailed, ceoDrafted, linkedinDrafted, linkedinTopic: linkedinTopic || undefined, errors: errors.length ? errors : undefined });
     } catch (e) {
       out.push({ client: c.name, error: String((e as Error)?.message || e).slice(0, 160) });
     }
