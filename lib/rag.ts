@@ -63,6 +63,18 @@ export function contentHash(c: string): string {
 // lines, keep each paragraph whole, and only pack neighbours together while they fit. A paragraph longer than
 // the window still falls back to the character chunker, because something has to give - but that is now the
 // exception rather than what happens to every fact in the document.
+// CONTEXTUAL HEADER (Anthropic's contextual-retrieval idea, kept cheap). A crawled chunk like "R50 minimum,
+// repaid in 30 days" is useless to retrieval without knowing it is about MoMo Nano Credit: the embedding and the
+// lexical index both need the SUBJECT on the chunk. So the page title is prepended as one short lead line to
+// every chunk that does not already open with it. Applied AFTER the junk filter (see the ingest), so prepending
+// the title can never rescue a nav crumb the junk test would otherwise have dropped.
+export function withContextHeader(chunks: string[], context?: string): string[] {
+  const ctx = (context || "").trim().replace(/^#+\s*/, "").slice(0, 120);
+  if (!ctx) return chunks;
+  const lc = ctx.toLowerCase();
+  return chunks.map((c) => c.slice(0, ctx.length + 4).toLowerCase().includes(lc) ? c : `${ctx}\n\n${c}`);
+}
+
 export function chunkStructured(text: string, size = 1200): string[] {
   const clean = text.replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ").trim();
   if (!clean) return [];
@@ -74,8 +86,12 @@ export function chunkStructured(text: string, size = 1200): string[] {
   //
   // Splitting on the heading and KEEPING it at the top of its section also gives every chunk its own subject
   // line, which is what lets a short factual statement be found at all.
+  //
+  // CRAWLED PAGES USE MARKDOWN HEADINGS, not the "--- X ---" doctrine form, so a "# Fees" / "## Eligibility"
+  // is just as much a hard wall as a doctrine banner. Splitting on either keeps a crawled page's own structure
+  // intact instead of guillotining it at ~1200 characters like the old plain chunker did.
   const sections = clean
-    .split(/\n(?=-{2,}\s*[A-Z][^\n]*?-{2,}\s*(?:\n|$))/)
+    .split(/\n(?=(?:-{2,}\s*[A-Z][^\n]*?-{2,}\s*(?:\n|$))|(?:#{1,6}\s+\S))/)
     .map((s) => s.trim())
     .filter(Boolean);
 

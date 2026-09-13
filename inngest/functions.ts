@@ -19,7 +19,7 @@ import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/he
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape, startCrawl, crawlStatus, sitemapUrls } from "@/lib/vendors/firecrawl";
-import { chunkText, ingestChunks, clearSourceChunks, cleanScraped, isJunkChunk, brainChunkIds, reembedChunks } from "@/lib/rag";
+import { chunkStructured, withContextHeader, ingestChunks, clearSourceChunks, cleanScraped, isJunkChunk, brainChunkIds, reembedChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
 import { recordUsage } from "@/lib/usage";
 
@@ -435,12 +435,12 @@ export const ingestSource = inngest.createFunction(
         }
         // Each page keeps its OWN url and title, so a passage can always be traced back to the article it came
         // from - the difference between a citable brain and a pile of text.
-        items = pages.flatMap((pg) => chunkText(cleanScraped(pg.content)).filter((c) => !isJunkChunk(c)).map((c) => ({ content: c, metadata: { url: pg.url, title: pg.title, kind: "article" } })));
+        items = pages.flatMap((pg) => withContextHeader(chunkStructured(cleanScraped(pg.content)).filter((c) => !isJunkChunk(c)), pg.title).map((c) => ({ content: c, metadata: { url: pg.url, title: pg.title, kind: "article" } })));
       } else if (type === "website") {
         const page = await step.run("scrape", () => scrape(uri));
         await step.run("usage-scrape", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: 1 }));
         if (!page.content) throw new Error("page had no readable content");
-        items = chunkText(cleanScraped(page.content)).filter((c) => !isJunkChunk(c)).map((c) => ({ content: c, metadata: { url: page.url, title: page.title } }));
+        items = withContextHeader(chunkStructured(cleanScraped(page.content)).filter((c) => !isJunkChunk(c)), page.title).map((c) => ({ content: c, metadata: { url: page.url, title: page.title } }));
       } else if (type === "file") {
         // AN UPLOADED DOCUMENT (article, PDF, deck, notes). The browser put it straight into Blob, so `uri` is
         // a public blob URL and `text` carries the original filename.
@@ -460,9 +460,9 @@ export const ingestSource = inngest.createFunction(
         });
         if (isPdf) await step.run("usage-parse", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest-pdf", count: 1 }));
         if (!doc.content) throw new Error("that file had no readable text in it (a scanned image PDF has no text layer)");
-        items = chunkText(cleanScraped(doc.content)).filter((c) => !isJunkChunk(c)).map((c) => ({ content: c, metadata: { url: uri, title: doc.title } }));
+        items = withContextHeader(chunkStructured(cleanScraped(doc.content)).filter((c) => !isJunkChunk(c)), doc.title).map((c) => ({ content: c, metadata: { url: uri, title: doc.title } }));
       } else {
-        items = chunkText(text).map((c) => ({ content: c, metadata: { title: uri || (kind === "compliance" ? "Compliance copy" : "Pasted note"), ...(kind ? { kind } : {}) } }));
+        items = chunkStructured(text).map((c) => ({ content: c, metadata: { title: uri || (kind === "compliance" ? "Compliance copy" : "Pasted note"), ...(kind ? { kind } : {}) } }));
       }
       if (!items.length) throw new Error("nothing to ingest");
 
