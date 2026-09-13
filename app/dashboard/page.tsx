@@ -3,6 +3,7 @@ import AppHeader from "@/components/AppHeader";
 import MarketQuestion from "@/components/MarketQuestion";
 import PodAgents from "@/components/PodAgents";
 import DashboardMotion from "@/components/DashboardMotion";
+import HeroStats from "@/components/HeroStats";
 import { listStudioClients } from "@/lib/studio";
 import { POD_AGENTS } from "@/lib/pod-agents";
 
@@ -10,6 +11,20 @@ import { POD_AGENTS } from "@/lib/pod-agents";
 const SECTION_ACCENT: Record<string, string> = {
   Intelligence: "#a855f7", Know: "#34d399", Make: "#60a5fa", Run: "#38bdf8",
 };
+
+// The 10 pods, in tile order, for the clickable "N Pods" hero popup (plain text; the tile names are JSX).
+const HERO_PODS: { name: string; group: string; accent: string }[] = [
+  { name: "The Brain", group: "Intelligence", accent: "#a855f7" },
+  { name: "The Researcher", group: "Intelligence", accent: "#22d3ee" },
+  { name: "The Strategist", group: "Intelligence", accent: "#818cf8" },
+  { name: "The Proposal", group: "Intelligence", accent: "#ec4899" },
+  { name: "Audience on GAS", group: "Know", accent: "#34d399" },
+  { name: "Channels on GAS", group: "Know", accent: "#34d399" },
+  { name: "Influencers on GAS", group: "Make", accent: "#a855f7" },
+  { name: "Creatives on GAS", group: "Make", accent: "#60a5fa" },
+  { name: "Media on GAS", group: "Run", accent: "#38bdf8" },
+  { name: "PSI on GAS", group: "Run", accent: "#ec4899" },
+];
 
 // THE AGENCY OF NOW - the first screen after sign-in. It does one job: get the team to the right desk.
 //
@@ -403,11 +418,37 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
           as a living asset rather than empty space. */}
       {size === "big" && (
         <div className="agn-spark">
-          <svg viewBox="0 0 320 44" preserveAspectRatio="none">
-            <defs><linearGradient id="agnsp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a855f7" stopOpacity="0.35" /><stop offset="1" stopColor="#a855f7" stopOpacity="0" /></linearGradient></defs>
-            <path d="M0 38 L26 34 L52 36 L78 28 L104 30 L130 21 L156 24 L182 15 L208 17 L234 10 L260 13 L286 6 L320 5 L320 44 L0 44 Z" fill="url(#agnsp)" />
-            <path d="M0 38 L26 34 L52 36 L78 28 L104 30 L130 21 L156 24 L182 15 L208 17 L234 10 L260 13 L286 6 L320 5" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="320" cy="5" r="3.5" fill="#e9d5ff"><animate attributeName="opacity" values="1;.3;1" dur="2.2s" repeatCount="indefinite" /></circle>
+          <svg viewBox="0 0 600 220" preserveAspectRatio="none" aria-hidden>
+            <defs>
+              <linearGradient id="agnArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#a855f7" stopOpacity="0.34" />
+                <stop offset="0.55" stopColor="#a855f7" stopOpacity="0.10" />
+                <stop offset="1" stopColor="#a855f7" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="agnLine" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stopColor="#818cf8" />
+                <stop offset="0.5" stopColor="#c084fc" />
+                <stop offset="1" stopColor="#22d3ee" />
+              </linearGradient>
+              <filter id="agnGlow" x="-10%" y="-40%" width="120%" height="180%"><feGaussianBlur stdDeviation="6" /></filter>
+            </defs>
+            {/* faint gridlines */}
+            <g stroke="#a855f7" strokeOpacity="0.09" strokeWidth="1">
+              <line x1="0" y1="55" x2="600" y2="55" /><line x1="0" y1="110" x2="600" y2="110" /><line x1="0" y1="165" x2="600" y2="165" />
+            </g>
+            {/* area fill */}
+            <path d="M0 188 L43 180 L86 184 L129 164 L171 170 L214 150 L257 156 L300 132 L343 138 L386 112 L429 120 L471 96 L514 86 L557 66 L600 48 L600 220 L0 220 Z" fill="url(#agnArea)" />
+            {/* glow underlay */}
+            <path d="M0 188 L43 180 L86 184 L129 164 L171 170 L214 150 L257 156 L300 132 L343 138 L386 112 L429 120 L471 96 L514 86 L557 66 L600 48" fill="none" stroke="url(#agnLine)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" filter="url(#agnGlow)" opacity="0.5" />
+            {/* the line, drawing itself in on land */}
+            <path d="M0 188 L43 180 L86 184 L129 164 L171 170 L214 150 L257 156 L300 132 L343 138 L386 112 L429 120 L471 96 L514 86 L557 66 L600 48" fill="none" stroke="url(#agnLine)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" pathLength={100} strokeDasharray="100" strokeDashoffset="100">
+              <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2.4s" begin="0.15s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.4 0 0.2 1" />
+            </path>
+            {/* the live tip, pulsing */}
+            <circle cx="600" cy="48" r="5" fill="#e9d5ff">
+              <animate attributeName="r" values="5;7.5;5" dur="2.2s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="1;.4;1" dur="2.2s" repeatCount="indefinite" />
+            </circle>
           </svg>
           <div className="cap"><span>Passages indexed</span><span>always growing</span></div>
         </div>
@@ -423,7 +464,13 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
           )}
           <span className={`agn-go${d.external ? " ext" : ""}`}>
             {d.action}
-            <span className="arw">{d.external ? "↗" : "→"}</span>
+            <span className="agn-play" aria-hidden>
+              {d.external ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 16 16 8M9 8h7v7" /></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l7-4.5-7-4.5Z" /></svg>
+              )}
+            </span>
           </span>
         </div>
       </div>
@@ -433,11 +480,9 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
 
 export default async function HomePage() {
   const clients = await listStudioClients().catch(() => [] as { id: string; name: string }[]);
-  // Hero stats, from the real data: total AI agents across the four Intelligence pods, brains on file, and the
-  // number of pods (tiles) across every section.
+  // Total AI agents across the four Intelligence pods, for the hero stat. Brains = clients.length and pods =
+  // HERO_PODS.length are read directly by HeroStats.
   const agentCount = Object.values(POD_AGENTS).reduce((n, p) => n + p.agents.length, 0);
-  const brainCount = clients.length;
-  const podCount = GROUPS.reduce((n, g) => n + g.doors.length, 0);
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* AMBIENT DEPTH. The page was reading flat (Gary), so it now breathes: soft flares that slowly pulse and
@@ -473,8 +518,9 @@ export default async function HomePage() {
         .agn-strap{margin:.5em 0 0;color:var(--dim);font-size:clamp(14px,1.5vw,18px)}
 
         .agn-stats{display:flex;gap:12px;flex-wrap:wrap}
-        .agn-stat{display:flex;align-items:center;gap:12px;padding:12px 16px 12px 14px;border-radius:14px;position:relative;overflow:hidden;
-          background:linear-gradient(150deg,rgba(21,16,34,.9),rgba(13,10,22,.9));border:1px solid color-mix(in srgb,var(--a) 32%,transparent);box-shadow:0 0 26px -16px var(--a)}
+        .agn-stat{display:flex;align-items:center;gap:12px;padding:12px 16px 12px 14px;border-radius:14px;position:relative;overflow:hidden;font:inherit;color:inherit;text-align:left;cursor:pointer;
+          background:linear-gradient(150deg,rgba(21,16,34,.9),rgba(13,10,22,.9));border:1px solid color-mix(in srgb,var(--a) 32%,transparent);box-shadow:0 0 26px -16px var(--a);transition:transform .25s,border-color .25s,box-shadow .25s}
+        .agn-stat:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--a) 60%,transparent);box-shadow:0 14px 40px -18px var(--a)}
         .agn-stat::after{content:"";position:absolute;inset:0;z-index:0;opacity:.7;background:radial-gradient(120% 150% at 100% 0%,color-mix(in srgb,var(--a) 24%,transparent),transparent 55%)}
         .agn-stat::before{content:"";position:absolute;top:0;left:-60%;width:45%;height:100%;z-index:0;transform:skewX(-18deg);background:linear-gradient(100deg,transparent,color-mix(in srgb,var(--a) 16%,transparent),transparent);animation:agnSweep 6s ease-in-out infinite}
         .agn-stat>*{position:relative;z-index:1}
@@ -521,14 +567,20 @@ export default async function HomePage() {
         /* Every tile's footer pins to the bottom (mt-auto), so the agent pill + action line up across the whole row
            regardless of how long each blurb is (Gary). */
         .agn-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-top:auto;padding-top:14px}
-        .agn-go{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12.5px;color:var(--a);white-space:nowrap}
+        .agn-go{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:12.5px;color:var(--a);white-space:nowrap}
+        /* An elegant, subtle "play" affordance instead of a flat arrow (Gary): a thin ring that fills and lifts on
+           hover, the glyph nudging forward. */
+        .agn-play{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+          border:1px solid color-mix(in srgb,var(--a) 55%,transparent);transition:background .3s,box-shadow .3s,transform .3s}
+        .agn-play svg{width:10px;height:10px;transition:transform .3s}
+        .agn-tile:hover .agn-play{background:color-mix(in srgb,var(--a) 20%,transparent);box-shadow:0 0 16px -4px var(--a);transform:translateX(2px)}
+        .agn-tile:hover .agn-play svg{transform:translateX(0.5px)}
         .agn-go.ext{color:var(--dim)}
-        .agn-go .arw{transition:transform .3s}
-        .agn-tile:hover .agn-go .arw{transform:translateX(4px)}
         .agn-meta{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
-        .agn-spark{margin-top:16px}
-        .agn-spark svg{width:100%;height:44px;display:block;overflow:visible}
-        .agn-spark .cap{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-top:7px}
+        /* The knowledge-growth chart grows to fill the feature tile's dead space (flex:1) and stretches to fit. */
+        .agn-spark{margin-top:18px;flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-height:130px}
+        .agn-spark svg{width:100%;flex:1;min-height:84px;display:block;overflow:visible}
+        .agn-spark .cap{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-top:10px}
         .agn-soonchip{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--a);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);border-radius:999px;padding:5px 11px;align-self:flex-start;margin-top:auto}
         .agn-tlink{position:absolute;inset:0;z-index:1;border-radius:16px}
         .agn-eye{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;color:var(--a);position:relative;z-index:2;border:1px solid var(--line2);background:color-mix(in srgb,var(--a) 8%,transparent);transition:transform .2s,border-color .2s}
@@ -550,6 +602,7 @@ export default async function HomePage() {
           .agn-hero{align-items:flex-start}
           .agn-stats{width:100%}
           .agn-stat{flex:1;min-width:150px}
+          .agn-hide-mobile{display:none}
         }
         @media (prefers-reduced-motion: reduce){
           .gas-flare,.gas-rise,.gas-draw,.agn-title .now,.agn-sic,.agn-stat::before,.agn-live .lb{animation:none !important}
@@ -586,20 +639,7 @@ export default async function HomePage() {
             <h1 className="agn-title">The Agency of <span className="now">NOW</span></h1>
             <p className="agn-strap">Human command. AI execution. One platform.</p>
           </div>
-          <div className="agn-stats">
-            <div className="agn-stat" style={{ "--a": "#ec4899" } as React.CSSProperties}>
-              <span className="agn-sic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="7" width="10" height="10" rx="2.5" /><circle cx="12" cy="12" r="2" /><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" /></svg></span>
-              <span className="agn-stx"><b data-count={agentCount}>{agentCount}</b><span>AI agents</span></span>
-            </div>
-            <div className="agn-stat" style={{ "--a": "#a855f7" } as React.CSSProperties}>
-              <span className="agn-sic"><BrainMark /></span>
-              <span className="agn-stx"><b data-count={brainCount}>{brainCount}</b><span>Brains</span></span>
-            </div>
-            <div className="agn-stat" style={{ "--a": "#22d3ee" } as React.CSSProperties}>
-              <span className="agn-sic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6" /><rect x="14" y="3" width="7" height="7" rx="1.6" /><rect x="3" y="14" width="7" height="7" rx="1.6" /><rect x="14" y="14" width="7" height="7" rx="1.6" /></svg></span>
-              <span className="agn-stx"><b data-count={podCount}>{podCount}</b><span>Pods</span></span>
-            </div>
-          </div>
+          <HeroStats agentTotal={agentCount} brains={clients} pods={HERO_PODS} />
         </header>
 
         {GROUPS.map((g, gi) => {

@@ -18,7 +18,11 @@ export default function DashboardMotion() {
       el.textContent = "0";
       const start = performance.now(), dur = reduce ? 900 : 2600;
       const tick = (now: number) => {
-        const t = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - t, 3);
+        // Mostly LINEAR pace so each integer shows for an equal slice of time (a small target like 10/12/30 rolls
+        // evenly instead of jumping several at the start then stalling on the last few - the ease-out "jerk").
+        // Only the final ~15% eases, to soften the stop without the stall.
+        const t = Math.min(1, (now - start) / dur);
+        const e = t < 0.85 ? t : 0.85 + (1 - Math.pow(1 - (t - 0.85) / 0.15, 2)) * 0.15;
         el.textContent = Math.round(target * e).toLocaleString("en-ZA");
         if (t < 1) requestAnimationFrame(tick);
       };
