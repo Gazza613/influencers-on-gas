@@ -26,6 +26,12 @@ export default function CostReadout() {
   }, []);
 
   const pct = bal?.remaining != null ? Math.max(0, Math.min(100, Math.round((bal.remaining / bal.monthly) * 100))) : null;
+  // CREDITS USED = the whole month's Higgsfield burn = monthly pool - live remaining balance (Gary). Our own
+  // usage_events only meter what THIS platform generated, and nano_banana_pro is unlimited (0 credits) - so the
+  // metered figure read 0 while the team was also generating directly on Higgsfield. Deriving it from the live
+  // wallet captures every credit consumed, ours and theirs. Falls back to the metered figure until the live
+  // balance loads.
+  const creditsUsed = bal?.remaining != null ? Math.max(0, bal.monthly - bal.remaining) : (m?.credits ?? null);
 
   return (
     <Link href="/cost-control" className="group tabular flex items-center gap-3 rounded-md border border-line px-3 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink" title="Cost Control · this month">
@@ -36,7 +42,7 @@ export default function CostReadout() {
       </span>
       <span className="text-line-strong">·</span>
       <span>
-        <span className="text-ink">{m ? m.credits.toLocaleString() : "…"}</span> Credits Used
+        <span className="text-ink">{creditsUsed != null ? creditsUsed.toLocaleString() : "…"}</span> Credits Used
       </span>
       <span className="hidden items-center gap-1.5 sm:flex" title="Higgsfield credits remaining this month">
         <span className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-2">
