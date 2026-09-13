@@ -597,7 +597,7 @@ export default async function HomePage() {
         .agn-tile.big .agn-name{margin-top:16px}
         .agn-name .g{background:linear-gradient(100deg,var(--a),color-mix(in srgb,var(--a) 40%,#fff));-webkit-background-clip:text;background-clip:text;color:transparent}
         .agn-blurb{color:var(--dim);font-size:12.8px;line-height:1.5;margin:7px 0 0}
-        .agn-tile.big .agn-blurb{font-size:13.5px;max-width:none;padding-right:8%}
+        .agn-tile.big .agn-blurb{font-size:13.5px;max-width:68%;overflow-wrap:normal}
         /* Every tile's footer pins to the bottom (mt-auto), so the agent pill + action line up across the whole row
            regardless of how long each blurb is (Gary). */
         .agn-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-top:auto;padding-top:14px}
@@ -637,6 +637,7 @@ export default async function HomePage() {
           .agn-stats{width:100%}
           .agn-stat{flex:1;min-width:150px}
           .agn-hide-mobile{display:none}
+          .agn-tile.big .agn-blurb{max-width:100%}
           /* Smaller section note on mobile so the numbered flow (brain > research > strategy > proposal) fits on one line. */
           .agn-snote{font-size:12.5px}
         }
