@@ -58,7 +58,7 @@ export default function HeroStats({ agentTotal, brains, pods }: { agentTotal: nu
             className="flex max-h-[86vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface-1 shadow-2xl">
 
             {open === "agents" && <AgentsBody onClose={() => setOpen(null)} total={agentTotal} />}
-            {open === "brains" && <SimpleBody onClose={() => setOpen(null)} accent="#c79bff" kicker="The estate" title={`${brains.length} brains`} note="Every client has a private, isolated knowledge base. One brain can never read another's."
+            {open === "brains" && <SimpleBody onClose={() => setOpen(null)} accent="#c79bff" kicker="The knowledge" title={`${brains.length} Brains`} note="Every client has a private, isolated knowledge base. One brain can never read another's."
               items={brains.map((b) => ({ name: b.name }))} />}
             {open === "pods" && <PodsBody onClose={() => setOpen(null)} pods={pods} />}
           </div>
