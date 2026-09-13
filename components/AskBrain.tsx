@@ -45,6 +45,7 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
   const [tip, setTip] = useState<{ from: string; why: string } | null>(null);
   const [err, setErr] = useState("");
   const [openSources, setOpenSources] = useState(false);
+  const [highlight, setHighlight] = useState<number | null>(null); // passage index a citation chip points at
   const [mode, setMode] = useState<Mode>("brain");
   const [answeredMode, setAnsweredMode] = useState<Mode>("brain");
   const [saving, setSaving] = useState(false);
@@ -216,7 +217,19 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
                   : part === "[web]" ? <span key={i} className="mr-1 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[15px] font-bold uppercase tracking-wide text-[#93c5fd]">web</span>
                   : part === "[general]" ? <span key={i} className="mr-1 rounded bg-[#fbbf24]/15 px-1.5 py-0.5 text-[15px] font-bold uppercase tracking-wide text-[#fcd34d]">general</span>
                   : <span key={i}>{part}</span>)
-              : answer}
+              : /* BRAIN mode: the answer cites the passage each claim came from as [1], [2]. Render those as small
+                   clickable chips that open the receipts and jump to that passage - a claim you can trace in one tap. */
+                answer.split(/(\[\d+(?:\s*,\s*\d+)*\])/g).map((part, i) => {
+                  const m = part.match(/^\[(\d+(?:\s*,\s*\d+)*)\]$/);
+                  if (!m) return <span key={i}>{part}</span>;
+                  return m[1].split(/\s*,\s*/).map((n, j) => (
+                    <button key={`${i}-${j}`} onClick={() => { setOpenSources(true); setHighlight(Number(n) - 1); }}
+                      title={`Passage ${n}`}
+                      className="mx-0.5 inline-flex items-center rounded bg-accent/15 px-1.5 align-middle text-[14px] font-bold text-accent hover:bg-accent/30">
+                      {n}
+                    </button>
+                  ));
+                })}
           </p>
           {(answeredMode === "mixed" || answeredMode === "live") && (
             <p className="mt-4 text-[16px] text-[#fcd34d]">
@@ -263,8 +276,10 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
           {openSources && (
             <ul className="mt-3 space-y-2.5">
               {hits.map((h, i) => (
-                <li key={i} className="rounded-lg border border-line bg-surface-1 p-4">
-                  <div className="tabular mb-1.5 text-[15px] text-ink-faint">
+                <li key={i} className={`rounded-lg border bg-surface-1 p-4 transition ${highlight === i ? "border-accent ring-1 ring-accent/40" : "border-line"}`}>
+                  <div className="tabular mb-1.5 flex items-center gap-2 text-[15px] text-ink-faint">
+                    {/* The passage number the answer's [n] citations point at. */}
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-accent/15 px-1 text-[13px] font-bold text-accent">{i + 1}</span>
                     match {Math.round(h.score * 100)}%
                     {(h.metadata?.title as string) ? ` · ${h.metadata.title}` : ""}
                   </div>
