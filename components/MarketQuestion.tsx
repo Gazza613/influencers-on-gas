@@ -141,7 +141,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
         className="mt-3 w-full rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3.5 py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
       <div className="mt-3.5 flex flex-wrap items-center gap-3">
         <button onClick={() => ask("question")} disabled={busy || !q.trim()}
-          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
+          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:saturate-[.55] disabled:hover:translate-y-0">
           {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
           {busy ? "Scanning…" : "Ask the market"}
         </button>
