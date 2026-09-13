@@ -4,7 +4,7 @@ import { removeBackground } from "./vendors/fal";
 import { cutoutToTransparent } from "./studio-cutout";
 import { compositeLogo, tidyCallout } from "./studio-slider";
 import { renderPng, fontFaceCss } from "./studio-render";
-import { nameplateCss, nameplateHtml } from "./templates/momo-nameplate";
+import { nameplateCss, nameplateHtml, type NameplateColors } from "./templates/momo-nameplate";
 import { getBrandKit, listAssets, addAsset } from "./studio";
 import { putBytes } from "./blob";
 import { recordUsage } from "./usage";
@@ -34,6 +34,9 @@ type CeoDesign = {
   backdrops: string[];          // three AI backdrop prompts, in the brand's own light/dark register
   logoPrefersLight: boolean;    // true = pick a light-reading logo (for a dark field), false = a dark one
   compliance: string;           // the exact regulated line, or "" for just the AI disclosure
+  nameplate?: NameplateColors;  // per-brand name-plate colours (dark scheme); undefined keeps MoMo's navy + yellow
+  washRgb?: string;             // "r,g,b" for the dark left wash + foot gradient + AI chip; default MoMo navy
+  markColor?: string;           // the AI-mark glyph colour (dark scheme); default MoMo yellow
 };
 
 const MOMO_DESIGN: CeoDesign = {
@@ -88,12 +91,39 @@ const BRIGHTROCK_DESIGN: CeoDesign = {
   compliance: "BrightRock Life Ltd is a licensed financial services provider and life insurer. FSP 11643.",
 };
 
+// GAS MARKETING'S OWN DESIGN (Gary: a GAS piece was rendering in MoMo's fintech navy + yellow). Dark like MoMo,
+// but in GAS's own register: a neutral warm-dark field, the GAS ORANGE mark as the accent (name plate + AI mark),
+// and neutral-dark washes rather than navy. Its backdrops are dark modern SA offices with no fintech-navy cast.
+const GAS_DESIGN: CeoDesign = {
+  scheme: "dark",
+  field: "#241a2e|#0d0a14",
+  textColor: "#ffffff",
+  subColor: "rgba(255,255,255,.82)",
+  accent: "#FD7E43",
+  fspColor: "rgba(255,255,255,.75)",
+  backdrops: [
+    "a premium modern office interior in warm neutral dark tones, soft top-lighting, graphite and charcoal with " +
+    "warm wood accents, clean and corporate, shot as a real place at a shallow depth of field so it reads behind the subject",
+    "the interior of a contemporary Johannesburg headquarters at dusk: floor-to-ceiling glass with a softly blurred " +
+    "city skyline glowing warm beyond it, dark neutral tones, warm downlighting, shallow depth of field",
+    "a sleek executive workspace in warm dark neutrals, matte black and walnut, subtle warm rim-lighting, a calm " +
+    "out-of-focus modern interior, deep and expensive, shallow depth of field",
+  ],
+  logoPrefersLight: true,
+  compliance: "",
+  nameplate: { plate: "#1b1622", plate2: "#2b2233", accent: "#FD7E43", title: "#ffffff" },
+  washRgb: "12,9,16",
+  markColor: "#FD7E43",
+};
+
 // Which design a brain gets. Keyed by client_id, defaulting to MoMo's scheme so nothing that predates this
 // changes. A future client is added here with its own CeoDesign.
 const MOMO_ID = "e44295d7-dc10-4422-bede-4e9ddcad7b2d";
 const BRIGHTROCK_ID = "dfc2efbf-7949-428b-a34d-1c5e92b88875";
+const GAS_ID = "2da4eb14-f802-4af8-9fde-9de2a0a18cfb";
 function designFor(clientId: string): CeoDesign {
   if (clientId === BRIGHTROCK_ID) return BRIGHTROCK_DESIGN;
+  if (clientId === GAS_ID) return GAS_DESIGN;
   return MOMO_DESIGN;
 }
 
@@ -231,7 +261,23 @@ export async function buildCeoCreatives(
     return v;
   };
   const logo = [...logos].sort((a, b) => logoScore(b.name || "") - logoScore(a.name || ""))[0];
-  const logoBuf = logo ? Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer())) : null;
+  let logoBuf: Buffer | null = logo ? Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer())) : null;
+  // NEVER A WHITE BOX (Gary): a logo supplied on a solid white background must not sit in a white square over the
+  // creative. If its background is opaque (little/no transparency), flood-fill the CONNECTED background out from
+  // the edges - that clears the surrounding white while KEEPING interior white elements (e.g. white letters
+  // inside a coloured mark), which a naive white-to-alpha threshold would wrongly erase.
+  if (logoBuf) {
+    try {
+      const lm = await sharp(logoBuf).metadata();
+      let solid = true;
+      if (lm.hasAlpha) {
+        const { data, info } = await sharp(logoBuf).ensureAlpha().extractChannel(3).raw().toBuffer({ resolveWithObject: true });
+        let clear = 0; for (let k = 0; k < data.length; k++) if (data[k] < 16) clear++;
+        solid = clear / (info.width * info.height) < 0.05;
+      }
+      if (solid) logoBuf = await cutoutToTransparent(logoBuf);
+    } catch (e) { console.error("[ceo-creative] logo bg cut-out skipped:", e); }
+  }
 
   const creatives: CeoCreative[] = [];
   for (const ratio of ratios) {
@@ -251,12 +297,21 @@ export async function buildCeoCreatives(
     }
     const figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
 
-    // BLEND INTO THE SCENE: a contact shadow (their own silhouette, blurred) + a tone match to the field.
-    const tone = design.scheme === "light" ? { brightness: 1.0, saturation: 1.0 } : { brightness: 0.94, saturation: 0.88 };
+    // BLEND INTO THE SCENE (Gary: "looks pasted on, needs to fuse with the scenery"): a contact shadow (their own
+    // silhouette, blurred), a tone match to the field, AND a slight edge feather so the cut-out sits IN the scene
+    // rather than as a hard sticker. On dark the figure is graded a touch more muted so it belongs to the room.
+    const tone = design.scheme === "light" ? { brightness: 1.0, saturation: 1.0 } : { brightness: 0.92, saturation: 0.85 };
     const shadowGain = design.scheme === "light" ? 0.42 : 0.5;
-    const figure = design.scheme === "light"
+    let figure = design.scheme === "light"
       ? await sharp(figureRaw).modulate(tone).sharpen({ sigma: 1.1 }).png().toBuffer()
       : await sharp(figureRaw).modulate(tone).png().toBuffer();
+    // Feather the alpha edge by ~1px, so the hard matte line softens into the backdrop instead of reading as a
+    // pasted cut-out. Kept subtle so the face and shoulders stay crisp.
+    if (design.scheme !== "light") {
+      const rgb = await sharp(figure).removeAlpha().toBuffer();
+      const alpha = await sharp(figure).ensureAlpha().extractChannel(3).blur(1.1).toBuffer();
+      figure = await sharp(rgb).joinChannel(alpha).png().toBuffer();
+    }
     const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
     const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
     const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
@@ -305,7 +360,9 @@ export async function buildCeoCreatives(
               { input: overlay, left: 0, top: 0 },
             ];
         let out = await sharp(bg).composite(layers).png().toBuffer();
-        if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 5, wPct: design.scheme === "light" ? 26 : 24 })) as Buffer;
+        // Logo top-left, smaller so it clears the headline (which now starts below it). A 16x9 logo is capped
+        // tighter because a width-based size is proportionally much taller on a landscape canvas.
+        if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: design.scheme === "light" ? (wide ? 16 : 24) : (wide ? 10 : 15) })) as Buffer;
 
         const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
         creatives.push({ url, ratio });
@@ -334,25 +391,31 @@ async function renderCeoOverlay(W: number, H: number, message: string, name: str
   const colW = W * 0.37;
   const longestWord = Math.max(...message.split(/\s+/).map((w) => w.length), 1);
   const msgSize = Math.max(Math.round(H * 0.040), Math.min(Math.round(H * 0.072), Math.floor(colW / (longestWord * 0.60))));
+  const wide = W > H * 1.3;
+  // The message starts BELOW the top-left logo so the two never collide (Gary). The logo is proportionally taller
+  // on a 16x9 canvas, so the message drops further there.
+  const msgTop = wide ? 26 : 21;
+  const wash = design.washRgb || "4,25,40";      // MoMo default = navy; GAS = neutral dark
+  const mark = design.markColor || "#F9CB0F";     // MoMo default = yellow; GAS = orange
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${fontFaceCss(fonts)}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:${W}px;height:${H}px;overflow:hidden;background:transparent}
 /* A soft dark wash on the left so white type reads whatever the backdrop does behind it. */
-.wash{position:absolute;inset:0;background:linear-gradient(102deg, rgba(4,25,40,.85) 0%, rgba(4,25,40,.5) 30%, transparent 52%)}
+.wash{position:absolute;inset:0;background:linear-gradient(102deg, rgba(${wash},.85) 0%, rgba(${wash},.5) 30%, transparent 52%)}
 /* No footer bar (Gary): the disclosure sits on the photograph itself. A soft bottom gradient keeps it
    readable over whatever the backdrop does, without becoming a band. */
-.btm{position:absolute;left:0;right:0;bottom:0;height:16%;background:linear-gradient(to top, rgba(4,20,32,.72) 0%, transparent 100%)}
-.msg{position:absolute;left:6%;top:17%;width:37%;color:#fff;font-family:'MTNBrighterSans',sans-serif;
+.btm{position:absolute;left:0;right:0;bottom:0;height:16%;background:linear-gradient(to top, rgba(${wash},.72) 0%, transparent 100%)}
+.msg{position:absolute;left:6%;top:${msgTop}%;width:37%;color:#fff;font-family:'MTNBrighterSans',sans-serif;
   font-weight:800;font-size:${msgSize}px;line-height:1.06;letter-spacing:-1px;text-shadow:0 3px 18px rgba(0,0,0,.55)}
 .plate{position:absolute;left:6.5%;bottom:12%}
-${nameplateCss(0.42)}
+${nameplateCss(0.42, design.nameplate)}
 /* THE AI MARK - bottom RIGHT, clear of the name plate, small but legible (Gary). An icon plus the words reads
    as a credential rather than a caption, which is the point: it should look deliberate and disclosed, not
    apologetic. */
 .ai{position:absolute;right:5%;bottom:4.5%;display:inline-flex;align-items:center;gap:${Math.round(H * 0.006)}px;
   padding:${Math.round(H * 0.006)}px ${Math.round(H * 0.011)}px;border-radius:999px;
-  border:1px solid rgba(255,255,255,.22);background:rgba(8,26,42,.42);
+  border:1px solid rgba(255,255,255,.22);background:rgba(${wash},.42);
   font-family:'MTNBrighterSans',sans-serif;font-weight:600;letter-spacing:.3px;
   color:rgba(255,255,255,.82);font-size:${Math.round(H * 0.0125)}px}
 .ai svg{width:${Math.round(H * 0.016)}px;height:${Math.round(H * 0.016)}px;flex:none}
@@ -363,8 +426,8 @@ ${nameplateCss(0.42)}
 <div class="plate">${nameplateHtml(name, title)}</div>
 <div class="ai">
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M12 2.6l1.9 5.6 5.6 1.9-5.6 1.9L12 17.6l-1.9-5.6-5.6-1.9 5.6-1.9L12 2.6Z" fill="#F9CB0F"/>
-    <path d="M18.6 15.2l.8 2.3 2.3.8-2.3.8-.8 2.3-.8-2.3-2.3-.8 2.3-.8.8-2.3Z" fill="#F9CB0F" opacity=".75"/>
+    <path d="M12 2.6l1.9 5.6 5.6 1.9-5.6 1.9L12 17.6l-1.9-5.6-5.6-1.9 5.6-1.9L12 2.6Z" fill="${mark}"/>
+    <path d="M18.6 15.2l.8 2.3 2.3.8-2.3.8-.8 2.3-.8-2.3-2.3-.8 2.3-.8.8-2.3Z" fill="${mark}" opacity=".75"/>
   </svg>
   <span>${esc(legal)}</span>
 </div>
