@@ -314,7 +314,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
         <span className="w-full text-left text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim sm:w-auto sm:text-right">Sourced, never invented.</span>
       </div>
       {/* THREE ways to run it (Gary): Ask, Find what's new, and LinkedIn article. */}
-      <p className="mt-3.5 max-w-[94ch] text-[13px] leading-relaxed text-ink-dim">Three ways to run it. <b className="text-ink">Ask the market</b> a specific question and the pod researches the last 3 months to answer it, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> needs no question: it proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.{isAdmin && <> <b style={{ color: LINKEDIN_BLUE }}>LinkedIn article</b> turns a topic you type into a sourced, ready-to-post thought-leadership piece for your CEO or MD.</>}</p>
+      <p className="mt-3.5 max-w-[94ch] text-[13px] leading-relaxed text-ink-dim">Three ways to run it. <b className="text-ink">Ask the market</b> a specific question and the pod researches the last 3 months to answer it, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> needs no question: it proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.{isAdmin && <> <b className="text-ink">LinkedIn article</b> turns a topic you type into a sourced, ready-to-post thought-leadership piece for your CEO or MD.</>}</p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="block">
@@ -335,8 +335,9 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
           {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
           {busy ? "Scanning…" : "Ask the market"}
         </button>
+        {/* Solid PINK - the third brand hue, so Ask (purple) / Find (pink) / LinkedIn (blue) each stand apart. */}
         <button onClick={() => ask("discover")} disabled={busy}
-          className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 bg-[#a855f7]/10 px-5 py-2.5 text-[13.5px] font-bold text-ink transition hover:-translate-y-0.5 hover:border-[#a855f7] disabled:opacity-50 disabled:hover:translate-y-0">
+          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#db2777] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#ec4899] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
           ✦ Find what&rsquo;s new
         </button>
         {/* LinkedIn article (admin-only), in the actual LinkedIn blue so it stands out (Gary). */}
