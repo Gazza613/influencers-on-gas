@@ -15,6 +15,7 @@ export default function LinkedInAutomation({ clientId }: { clientId: string }) {
   const [topics, setTopics] = useState<string[]>([]);
   const [newTopic, setNewTopic] = useState("");
   const [publisher, setPublisher] = useState<"ceo" | "md">("ceo");
+  const [reviewRecips, setReviewRecips] = useState("");
   const [ceoName, setCeoName] = useState("");
   const [mdName, setMdName] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -28,6 +29,7 @@ export default function LinkedInAutomation({ clientId }: { clientId: string }) {
     setBriefed(d.briefed !== false);
     setSchedule((["off", "weekly", "monthly"].includes(d.schedule) ? d.schedule : "off") as Cadence);
     setTopics(Array.isArray(d.topics) ? d.topics : []);
+    setReviewRecips(Array.isArray(d.reviewRecipients) ? d.reviewRecipients.join(", ") : "");
     setPublisher(d.publisher === "md" ? "md" : "ceo");
     setCeoName(d.ceoName || ""); setMdName(d.mdName || "");
     setSuggestions(Array.isArray(d.suggestions) ? d.suggestions : []);
@@ -47,7 +49,7 @@ export default function LinkedInAutomation({ clientId }: { clientId: string }) {
     setSaving(true); setErr("");
     const d = await fetch("/api/studio/intel/linkedin-schedule", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, schedule, topics, publisher }),
+      body: JSON.stringify({ clientId, schedule, topics, publisher, reviewRecipients: reviewRecips.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean) }),
     }).then((r) => r.json()).catch(() => null);
     setSaving(false);
     if (!d?.ok) { setErr(d?.error || "Couldn't save."); return; }
@@ -137,6 +139,15 @@ export default function LinkedInAutomation({ clientId }: { clientId: string }) {
           </div>
         </div>
       )}
+
+      {/* WHO REVIEWS the drafts (Gary): specify the reviewers; empty falls back to the intelligence-digest team. */}
+      <label className="mt-3.5 block">
+        <span className="tabular block text-[11px] uppercase tracking-[0.16em] text-ink-faint">Send review drafts to (comma-separated)</span>
+        <input value={reviewRecips} onChange={(e) => { setReviewRecips(e.target.value); setSaved(false); }}
+          placeholder="you@gasmarketing.co.za, reviewer@gasmarketing.co.za"
+          className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-[13.5px] text-ink outline-none focus:border-[#0A66C2]" />
+        <span className="mt-1 block text-[11px] text-ink-faint">Never the exec. Leave empty to use the intelligence-email team.</span>
+      </label>
 
       {err && <p className="mt-3 text-[13px] text-alert">{err}</p>}
       <div className="mt-3.5 flex flex-wrap items-center gap-3">

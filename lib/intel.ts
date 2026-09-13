@@ -249,14 +249,14 @@ export async function clientWebsites(clientId: string): Promise<string[]> {
 
 // Which brains have research configured at all. The daily run iterates THESE, so adding a brain's brief is what
 // switches its research on - there is no hardcoded client list to keep in step.
-export async function brainsWithIntel(): Promise<{ clientId: string; clientName: string; journalist: boolean; strategist: boolean; researcher: boolean; ceoRules: boolean; emailSchedule: "off" | "daily" | "weekly"; emailRecipients: string[]; newsletterSchedule: "off" | "daily" | "weekly" | "monthly"; ceoName: string; ceoRecipients: string[]; mdRecipients: string[]; publisher: "ceo" | "md"; mdName: string; linkedinSchedule: "off" | "weekly" | "monthly"; linkedinTopics: string[]; linkedinTopicIx: number }[]> {
+export async function brainsWithIntel(): Promise<{ clientId: string; clientName: string; journalist: boolean; strategist: boolean; researcher: boolean; ceoRules: boolean; emailSchedule: "off" | "daily" | "weekly"; emailRecipients: string[]; newsletterSchedule: "off" | "daily" | "weekly" | "monthly"; ceoName: string; ceoRecipients: string[]; mdRecipients: string[]; publisher: "ceo" | "md"; mdName: string; linkedinSchedule: "off" | "weekly" | "monthly"; linkedinTopics: string[]; linkedinTopicIx: number; linkedinReviewRecipients: string[] }[]> {
   const rows = (await db().query(
     `select b.client_id, c.name as client_name,
             (b.journalist is not null) as journalist, (b.strategist is not null) as strategist,
             (b.researcher is not null) as researcher,
             (b.ceo_rules is not null and length(trim(b.ceo_rules)) > 0) as ceo_rules,
             b.email_schedule, b.email_recipients, b.newsletter_schedule, b.ceo_name, b.ceo_recipients, b.md_recipients,
-            b.newsletter_publisher, b.md_name, b.linkedin_schedule, b.linkedin_topics, b.linkedin_topic_ix
+            b.newsletter_publisher, b.md_name, b.linkedin_schedule, b.linkedin_topics, b.linkedin_topic_ix, b.linkedin_review_recipients
      from intel_briefs b join clients c on c.id = b.client_id
      order by c.name`,
     [],
@@ -292,6 +292,7 @@ export async function brainsWithIntel(): Promise<{ clientId: string; clientName:
     linkedinSchedule: normLinkedin(r.linkedin_schedule),
     linkedinTopics: Array.isArray(r.linkedin_topics) ? (r.linkedin_topics as unknown[]).map((s) => String(s).trim()).filter(Boolean) : [],
     linkedinTopicIx: Number(r.linkedin_topic_ix) || 0,
+    linkedinReviewRecipients: Array.isArray(r.linkedin_review_recipients) ? (r.linkedin_review_recipients as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
   }));
 }
 

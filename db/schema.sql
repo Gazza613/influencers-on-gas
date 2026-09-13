@@ -749,6 +749,9 @@ alter table intel_briefs add constraint intel_briefs_linkedin_schedule_check
   check (linkedin_schedule in ('off','weekly','monthly'));
 alter table intel_briefs add column if not exists linkedin_topics jsonb not null default '[]'::jsonb;
 alter table intel_briefs add column if not exists linkedin_topic_ix int not null default 0;
+-- WHO REVIEWS the automated LinkedIn draft (Gary: "can I specify the emails - better"). Empty falls back to the
+-- digest list minus the exec, then the platform team default. Never the exec (team-first always holds).
+alter table intel_briefs add column if not exists linkedin_review_recipients jsonb not null default '[]'::jsonb;
 -- The MD's own recipient list, mirroring ceo_recipients. Used to prefill the send box for an MD-published piece
 -- and, critically, so the automated draft's team-first exclusion drops the MD's own address (not just the CEO's).
 alter table intel_briefs add column if not exists md_recipients jsonb not null default '[]'::jsonb;

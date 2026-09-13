@@ -38,11 +38,11 @@ export async function GET(req: Request) {
   if (!clientId) return NextResponse.json({ error: "Pick the brain first." }, { status: 400 });
 
   const rows = (await db().query(
-    `select linkedin_schedule, linkedin_topics, newsletter_publisher, ceo_name, md_name from intel_briefs where client_id = $1`,
+    `select linkedin_schedule, linkedin_topics, linkedin_review_recipients, newsletter_publisher, ceo_name, md_name from intel_briefs where client_id = $1`,
     [clientId],
-  )) as { linkedin_schedule: string | null; linkedin_topics: unknown; newsletter_publisher: string | null; ceo_name: string | null; md_name: string | null }[];
+  )) as { linkedin_schedule: string | null; linkedin_topics: unknown; linkedin_review_recipients: unknown; newsletter_publisher: string | null; ceo_name: string | null; md_name: string | null }[];
   const r = rows[0];
-  if (!r) return NextResponse.json({ briefed: false, schedule: "off", topics: [], publisher: "ceo", ceoName: "", mdName: "", suggestions: [] });
+  if (!r) return NextResponse.json({ briefed: false, schedule: "off", topics: [], reviewRecipients: [], publisher: "ceo", ceoName: "", mdName: "", suggestions: [] });
 
   // MARKET-SUGGESTED TOPICS: what this brain's own recent research surfaced, deduped, freshest first. Real market
   // interest the team can turn into a piece with one tap, alongside their own typed topics.
@@ -62,21 +62,35 @@ export async function GET(req: Request) {
     briefed: true,
     schedule: normLinkedin(r.linkedin_schedule),
     topics: Array.isArray(r.linkedin_topics) ? (r.linkedin_topics as unknown[]).map((s) => String(s).trim()).filter(Boolean) : [],
+    reviewRecipients: Array.isArray(r.linkedin_review_recipients) ? (r.linkedin_review_recipients as unknown[]).map((s) => String(s).trim()).filter(Boolean) : [],
     publisher: r.newsletter_publisher === "md" ? "md" : "ceo",
     ceoName: r.ceo_name || "", mdName: r.md_name || "",
     suggestions,
   });
 }
 
+const cleanEmails = (input: unknown): string[] => {
+  const raw = Array.isArray(input) ? input : String(input || "").split(/[,\s;]+/);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of raw) {
+    const v = String(e || "").trim().toLowerCase();
+    if (!v || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || seen.has(v)) continue;
+    seen.add(v); out.push(v);
+  }
+  return out;
+};
+
 export async function POST(req: Request) {
   const session = await auth();
   // ADMINS ONLY (Gary): scheduling a draft that goes out under a client exec's name is admin-only.
   if (!isAdmin(session?.user?.role)) return NextResponse.json({ error: "Admins only" }, { status: 403 });
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; schedule?: string; topics?: unknown; publisher?: string };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; schedule?: string; topics?: unknown; publisher?: string; reviewRecipients?: unknown };
   const clientId = String(b.clientId || "").trim();
   if (!clientId) return NextResponse.json({ error: "Pick the brain first." }, { status: 400 });
   const schedule = normLinkedin(b.schedule);
   const topics = cleanTopics(b.topics);
+  const reviewRecipients = cleanEmails(b.reviewRecipients);
   if (schedule !== "off" && !topics.length) {
     return NextResponse.json({ error: "Add at least one topic before switching the automation on, or the scheduled run has nothing to write about." }, { status: 400 });
   }
@@ -84,11 +98,11 @@ export async function POST(req: Request) {
   const pub = b.publisher === undefined ? null : (b.publisher === "md" ? "md" : "ceo");
   const rows = (await db().query(
     `update intel_briefs set linkedin_schedule = $1, linkedin_topics = $2::jsonb,
-       newsletter_publisher = coalesce($4, newsletter_publisher), updated_at = now()
+       linkedin_review_recipients = $5::jsonb, newsletter_publisher = coalesce($4, newsletter_publisher), updated_at = now()
      where client_id = $3
      returning linkedin_schedule`,
-    [schedule, JSON.stringify(topics), clientId, pub],
+    [schedule, JSON.stringify(topics), clientId, pub, JSON.stringify(reviewRecipients)],
   )) as { linkedin_schedule: string }[];
   if (!rows[0]) return NextResponse.json({ error: "This brain has no brief yet, so there is nothing to schedule for it." }, { status: 404 });
-  return NextResponse.json({ ok: true, schedule: rows[0].linkedin_schedule, topics });
+  return NextResponse.json({ ok: true, schedule: rows[0].linkedin_schedule, topics, reviewRecipients });
 }

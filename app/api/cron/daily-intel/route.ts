@@ -234,6 +234,7 @@ export async function GET(req: Request) {
       // from. Publisher + MD name attribute the draft to the right executive.
       linkedinFires: (manual || linkedinFires(c.linkedinSchedule)) && c.linkedinTopics.length > 0,
       linkedinTopics: c.linkedinTopics, linkedinTopicIx: c.linkedinTopicIx, publisher: c.publisher, mdName: c.mdName,
+      linkedinReviewRecipients: c.linkedinReviewRecipients,
     }))
     .filter((c) => c.emailFires || c.newsletterFires || c.linkedinFires);
   if (!clients.length) return NextResponse.json({ ok: true, skipped: manual ? "no brain has an intel brief" : "no brain is scheduled to run today" });
@@ -348,10 +349,13 @@ export async function GET(req: Request) {
         if (draft && draft.ok) {
           if (emailConfigured()) {
             const signerName = c.publisher === "md" ? c.mdName : c.ceoName;
+            // WHERE THE REVIEW DRAFT GOES (Gary): the brain's own review-recipient list if set (trusted, used
+            // exactly), else the team-first fallback (digest minus exec, then platform default).
+            const linkedinTo = c.linkedinReviewRecipients.length ? c.linkedinReviewRecipients.join(",") : ceoDraftTo;
             let sent = dryRun;
             if (!dryRun) {
               const r = await sendEmail({
-                to: ceoDraftTo, // team-first: the draft goes to the internal list, never the exec
+                to: linkedinTo,
                 subject: `LinkedIn article draft for review · ${c.name} · ${linkedinTopic.slice(0, 60)} · ${today}`,
                 html: buildCeoArticleEmail({ client: c.name, ceoName: signerName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: linkedinTopic, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
                 fromName: "Researcher on GAS",

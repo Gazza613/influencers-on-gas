@@ -43,13 +43,16 @@ const LINKEDIN_BLUE = "#0A66C2";
 
 // Render the draft the way the white email will: the first block is the title, "## " lines are section
 // headings, blank lines split paragraphs. So the team reviews the FORMATTED piece, not raw markdown.
-function renderDraftPreview(text: string) {
+function renderDraftPreview(text: string, heroUrl?: string) {
   const blocks = text.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-  if (!blocks.length) return <p className="text-[15px] text-[#7a8085]">Nothing to preview yet.</p>;
-  const title = blocks[0].replace(/^#{1,3}\s+/, "");
+  if (!blocks.length && !heroUrl) return <p className="text-[15px] text-[#7a8085]">Nothing to preview yet.</p>;
+  const title = blocks[0]?.replace(/^#{1,3}\s+/, "") || "";
   const rest = blocks.slice(1);
   return (
-    <div className="rounded-lg border border-line bg-white px-6 py-5" style={{ color: "#16181c" }}>
+    <div className="overflow-hidden rounded-lg border border-line bg-white" style={{ color: "#16181c" }}>
+      {/* The chosen 16:9 creative rides at the top as the newsletter banner, exactly as the email sends it. */}
+      {heroUrl && <img src={heroUrl} alt="" className="block w-full" />}
+      <div className="px-6 py-5">
       <h1 className="text-[24px] font-black leading-tight" style={{ color: "#16181c" }}>{title}</h1>
       {rest.map((b, i) => {
         const h = b.match(/^#{1,3}\s+(.*)$/);
@@ -57,6 +60,7 @@ function renderDraftPreview(text: string) {
           ? <h3 key={i} className="mt-6 text-[18px] font-extrabold leading-snug" style={{ color: "#16181c" }}>{h[1]}</h3>
           : <p key={i} className="mt-3.5 text-[15px] leading-[1.75]" style={{ color: "#3c4043" }}>{b}</p>;
       })}
+      </div>
     </div>
   );
 }
@@ -109,6 +113,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [addingId, setAddingId] = useState("");
   const [showAuto, setShowAuto] = useState(false); // the automation/schedule block is collapsed to keep the panel short
+  const [showDrafts, setShowDrafts] = useState(false); // the resume-a-draft list is collapsed behind a toggle
 
   const CEO_API = "/api/studio/intel/ceo-article";
   const publisherName = publisher === "md" ? mdName : ceoName;
@@ -333,7 +338,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
           ))}
         </div>
         {preview
-          ? renderDraftPreview(draftText)
+          ? renderDraftPreview(draftText, creatives.find((c) => c.ratio === "16x9" && chosen.includes(c.url))?.url)
           : <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)} rows={14}
               className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-accent" />}
 
@@ -526,20 +531,28 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
       {/* RESUME A DRAFT (Gary: a draft must not disappear on exit). Any written-but-unsent piece on this brain can
           be picked back up without re-spending to regenerate it. */}
       {isAdmin && !draftFor && !liSent && drafts.length > 0 && (
-        <div className="mt-3.5 rounded-xl border border-line bg-surface-2/50 p-3.5">
-          <span className="tabular block text-[11px] uppercase tracking-[0.16em] text-ink-faint">Resume a draft ({drafts.length})</span>
-          <div className="mt-2 flex flex-col gap-2">
-            {drafts.map((d) => (
-              <button key={d.id} onClick={() => resumeDraft(d)}
-                className="flex items-center gap-2 rounded-lg border border-line bg-surface-1 px-3 py-2 text-left hover:border-accent/50">
-                <span className="text-accent">↻</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13.5px] font-semibold text-ink">{d.headline}</span>
-                  <span className="block truncate text-[12px] text-ink-faint">{d.snippet}…</span>
-                </span>
-              </button>
-            ))}
-          </div>
+        <div className="mt-3 border-t border-line pt-3">
+          <button onClick={() => setShowDrafts((v) => !v)} className="flex w-full items-center gap-2 text-left text-ink-dim hover:text-ink">
+            <span className={`inline-flex shrink-0 text-[#a855f7] transition-transform ${showDrafts ? "rotate-90" : ""}`} aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M9 6l6 6-6 6" /></svg>
+            </span>
+            <span className="text-[14px] font-bold text-ink sm:text-[16px]">Resume a draft</span>
+            <span className="text-[12px] font-normal text-ink-faint sm:text-[13.5px]">· {drafts.length} written but not yet sent</span>
+          </button>
+          {showDrafts && (
+            <div className="mt-3 flex flex-col gap-2">
+              {drafts.map((d) => (
+                <button key={d.id} onClick={() => resumeDraft(d)}
+                  className="flex items-center gap-2 rounded-lg border border-line bg-surface-1 px-3 py-2 text-left hover:border-accent/50">
+                  <span className="text-accent">↻</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-semibold text-ink">{d.headline}</span>
+                    <span className="block truncate text-[12px] text-ink-faint">{d.snippet}…</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
