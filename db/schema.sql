@@ -744,6 +744,14 @@ alter table intel_briefs add constraint intel_briefs_linkedin_schedule_check
   check (linkedin_schedule in ('off','weekly','monthly'));
 alter table intel_briefs add column if not exists linkedin_topics jsonb not null default '[]'::jsonb;
 alter table intel_briefs add column if not exists linkedin_topic_ix int not null default 0;
+-- The MD's own recipient list, mirroring ceo_recipients. Used to prefill the send box for an MD-published piece
+-- and, critically, so the automated draft's team-first exclusion drops the MD's own address (not just the CEO's).
+alter table intel_briefs add column if not exists md_recipients jsonb not null default '[]'::jsonb;
+
+-- DRAFT PERSISTENCE (Gary: "if I exit out of here the article will disappear"). The draft already lives on
+-- studio_intel.newsletter; this marks when it was actually EMAILED, so the dashboard can offer to resume the
+-- drafts that were written but not yet sent, and stop offering one once it has gone out.
+alter table studio_intel add column if not exists newsletter_sent_at timestamptz;
 alter table intel_briefs add column if not exists deprecated_products jsonb not null default '[]'::jsonb;  -- retired products the client has not yet scrubbed off its site; the Researcher never surfaces these (Gary: GAS Appitude/ROC/INGAiGE)
 
 -- Why an ingest failed. Status alone said "failed" and nothing else, so a broken source could only be

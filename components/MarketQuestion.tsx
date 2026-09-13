@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Working from "@/components/Working";
 import IntelEmailControl from "@/components/IntelEmailControl";
 import LinkedInAutomation from "@/components/LinkedInAutomation";
@@ -77,6 +77,9 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [draftText, setDraftText] = useState("");
   const [artCallout, setArtCallout] = useState("");
   const [recips, setRecips] = useState("");
+  const [ceoRecips, setCeoRecips] = useState<string[]>([]);
+  const [mdRecips, setMdRecips] = useState<string[]>([]);
+  const [drafts, setDrafts] = useState<{ id: string; headline: string; post: string; snippet: string }[]>([]);
   const [draftErr, setDraftErr] = useState("");
   const [sending, setSending] = useState(false);
   const [sentFor, setSentFor] = useState("");
@@ -115,15 +118,43 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     setCreatives([]); setChosen([]); setCreativeErr(""); setDrawing(false); setRatios(["1x1"]);
   }
 
-  // Load the saved recipients + CEO/MD identity + the brain's default publisher, to prefill the draft screen.
+  // Load the saved recipients (CEO and MD) + identity + the brain's default publisher, to prefill the draft screen.
   async function loadDraftMeta() {
     const rec = await fetch(`${CEO_API}?clientId=${encodeURIComponent(clientId)}`).then((r) => r.json()).catch(() => null);
     if (!rec) return;
     setCeoName(rec.ceoName || ""); setMdName(rec.mdName || "");
     setCeoTitle(rec.ceoTitle || ""); setMdTitle(rec.mdTitle || "");
-    setPublisher(rec.publisher === "md" ? "md" : "ceo");
-    setExecSaved(false);
-    if (Array.isArray(rec.recipients) && rec.recipients.length && !recips) setRecips(rec.recipients.join(", "));
+    const ceoR = Array.isArray(rec.recipients) ? rec.recipients : [];
+    const mdR = Array.isArray(rec.mdRecipients) ? rec.mdRecipients : [];
+    setCeoRecips(ceoR); setMdRecips(mdR);
+    const pub = rec.publisher === "md" ? "md" : "ceo";
+    setPublisher(pub); setExecSaved(false);
+    const list = pub === "md" ? mdR : ceoR;
+    if (list.length && !recips) setRecips(list.join(", "));
+  }
+
+  // Switch publisher AND prefill that executive's own recipient list, so an MD-published piece sends to the MD's
+  // saved emails, not the CEO's (each has its own list).
+  function pickPublisher(p: "ceo" | "md") {
+    setPublisher(p); setExecSaved(false);
+    setRecips((p === "md" ? mdRecips : ceoRecips).join(", "));
+  }
+
+  // DRAFT PERSISTENCE (Gary): the brain's written-but-unsent drafts, so a draft survives leaving and coming back.
+  const loadDrafts = useCallback(async () => {
+    if (!isAdmin || !clientId) { setDrafts([]); return; }
+    const d = await fetch(`${CEO_API}?clientId=${encodeURIComponent(clientId)}&drafts=1`).then((r) => r.json()).catch(() => null);
+    setDrafts(Array.isArray(d?.drafts) ? d.drafts : []);
+  }, [clientId, isAdmin]);
+  useEffect(() => { loadDrafts(); }, [loadDrafts]);
+  // Refresh the resume strip whenever the editor closes (a draft was cancelled or sent).
+  useEffect(() => { if (!draftFor) loadDrafts(); }, [draftFor, loadDrafts]);
+
+  // Open a saved draft back up in the editor, without re-spending to regenerate it.
+  function resumeDraft(d: { id: string; post: string }) {
+    setDraftFor(d.id); setLiDraft(true); setLiSent(false); setSentFor(""); setDraftErr("");
+    setDraftText(d.post || ""); setArtCallout(""); resetDraftWorkspace(); setPreview(false);
+    loadDraftMeta();
   }
 
   // Save the chosen executive's name + designation to the brain, so the creative can attribute it and the choice
@@ -272,7 +303,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
             designation, so the name + title are set right here (there is nowhere else to enter them). */}
         <div className="mt-2.5 inline-flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-0.5 text-sm">
           {(["ceo", "md"] as const).map((p) => (
-            <button key={p} onClick={() => { setPublisher(p); setExecSaved(false); }}
+            <button key={p} onClick={() => pickPublisher(p)}
               className={`rounded-md px-3 py-1.5 font-semibold transition ${publisher === p ? "bg-accent/20 text-accent" : "text-ink-dim hover:text-ink"}`}>
               {p === "ceo" ? "CEO" : "MD"}{(p === "ceo" ? ceoName : mdName) ? ` · ${p === "ceo" ? ceoName : mdName}` : ""}
             </button>
@@ -489,6 +520,26 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
       {liDraft && draftFor && (
         <div className="mt-3.5 rounded-xl border p-4" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "0d" }}>
           {draftEditor(draftFor, draftFromTopic)}
+        </div>
+      )}
+
+      {/* RESUME A DRAFT (Gary: a draft must not disappear on exit). Any written-but-unsent piece on this brain can
+          be picked back up without re-spending to regenerate it. */}
+      {isAdmin && !draftFor && !liSent && drafts.length > 0 && (
+        <div className="mt-3.5 rounded-xl border border-line bg-surface-2/50 p-3.5">
+          <span className="tabular block text-[11px] uppercase tracking-[0.16em] text-ink-faint">Resume a draft ({drafts.length})</span>
+          <div className="mt-2 flex flex-col gap-2">
+            {drafts.map((d) => (
+              <button key={d.id} onClick={() => resumeDraft(d)}
+                className="flex items-center gap-2 rounded-lg border border-line bg-surface-1 px-3 py-2 text-left hover:border-accent/50">
+                <span className="text-accent">↻</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13.5px] font-semibold text-ink">{d.headline}</span>
+                  <span className="block truncate text-[12px] text-ink-faint">{d.snippet}…</span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -229,7 +229,7 @@ export async function GET(req: Request) {
       // Only run for the newsletter's sake if the brain actually has CEO voice rules, else a paid research pass
       // runs every cadence and drafts nothing (a silent cost leak). Manual + email still run regardless.
       newsletterFires: (manual || newsFires(c.newsletterSchedule)) && !!c.ceoRules,
-      ceoRules: c.ceoRules, ceoName: c.ceoName, ceoRecipients: c.ceoRecipients,
+      ceoRules: c.ceoRules, ceoName: c.ceoName, ceoRecipients: c.ceoRecipients, mdRecipients: c.mdRecipients,
       // The LinkedIn-article automation: topic-driven, so it only fires when the brain has a topic queue to draw
       // from. Publisher + MD name attribute the draft to the right executive.
       linkedinFires: (manual || linkedinFires(c.linkedinSchedule)) && c.linkedinTopics.length > 0,
@@ -282,8 +282,10 @@ export async function GET(req: Request) {
       // TEAM-FIRST (Gary), enforced in code: the CEO-article DRAFT must never reach the CEO on the automated run.
       // The digest list can legitimately include the client, so we send the draft to that list MINUS any address
       // in the brain's ceo_recipients (and fall back to the platform team list if that leaves nobody).
-      const ceoSet = new Set((c.ceoRecipients || []).map((x) => String(x).toLowerCase().trim()));
-      const draftList = to.split(",").map((x) => x.trim()).filter((x) => x && !ceoSet.has(x.toLowerCase()));
+      // Exclude BOTH exec lists (CEO and MD), so the review draft can never reach either executive regardless of
+      // who it is attributed to - the team-first guarantee holds for an MD-published piece as well as a CEO one.
+      const execSet = new Set([...(c.ceoRecipients || []), ...(c.mdRecipients || [])].map((x) => String(x).toLowerCase().trim()));
+      const draftList = to.split(",").map((x) => x.trim()).filter((x) => x && !execSet.has(x.toLowerCase()));
       const ceoDraftTo = draftList.length ? draftList.join(",") : intelRecipients();
       // The brain's own logo for the email header (Gary), else the GAS orb.
       const logoUrl = await getClientEmailLogo(c.id).catch(() => null);

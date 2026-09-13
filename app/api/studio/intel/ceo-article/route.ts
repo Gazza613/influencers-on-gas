@@ -19,18 +19,34 @@ const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 // sends branded email from the agency mailbox. Members can still read the market; they cannot draft or send.
 const isAdmin = (role?: string | null) => role === "super_admin" || role === "admin";
 
-// GET the saved CEO recipients + the CEO's name/title, to prefill the send box.
+// GET the saved recipients (CEO and MD) + names/titles to prefill the send box; with ?drafts=1, return the
+// brain's UNSENT drafts so the dashboard can offer to resume one (draft persistence).
 export async function GET(req: Request) {
   const session = await auth();
   if (!isAdmin(session?.user?.role)) return NextResponse.json({ error: "Admins only" }, { status: 403 });
-  const clientId = new URL(req.url).searchParams.get("clientId") || "";
-  if (!clientId) return NextResponse.json({ recipients: [], ceoName: "", ceoTitle: "" });
+  const url = new URL(req.url);
+  const clientId = url.searchParams.get("clientId") || "";
+  if (!clientId) return NextResponse.json({ recipients: [], mdRecipients: [], ceoName: "", ceoTitle: "", drafts: [] });
+
+  if (url.searchParams.get("drafts") === "1") {
+    // Written-but-not-sent drafts on this brain, freshest first. These survive a reload/exit, so the team can pick
+    // one up rather than lose it. Scoped by client_id (isolation).
+    const d = (await db().query(
+      `select id, headline, newsletter from studio_intel
+        where client_id = $1 and newsletter is not null and newsletter_sent_at is null
+        order by found_at desc limit 8`,
+      [clientId],
+    ).catch(() => [])) as { id: string; headline: string; newsletter: string }[];
+    return NextResponse.json({ drafts: d.map((x) => ({ id: x.id, headline: x.headline, post: String(x.newsletter || ""), snippet: String(x.newsletter || "").replace(/^#{1,3}\s+/, "").slice(0, 90) })) });
+  }
+
   const rows = (await db().query(
-    `select ceo_recipients, ceo_name, ceo_title, md_name, md_title, newsletter_publisher from intel_briefs where client_id = $1`, [clientId],
-  ).catch(() => [])) as { ceo_recipients: string[] | null; ceo_name: string | null; ceo_title: string | null; md_name: string | null; md_title: string | null; newsletter_publisher: string | null }[];
+    `select ceo_recipients, md_recipients, ceo_name, ceo_title, md_name, md_title, newsletter_publisher from intel_briefs where client_id = $1`, [clientId],
+  ).catch(() => [])) as { ceo_recipients: string[] | null; md_recipients: string[] | null; ceo_name: string | null; ceo_title: string | null; md_name: string | null; md_title: string | null; newsletter_publisher: string | null }[];
   const r = rows[0];
   return NextResponse.json({
     recipients: Array.isArray(r?.ceo_recipients) ? r!.ceo_recipients! : [],
+    mdRecipients: Array.isArray(r?.md_recipients) ? r!.md_recipients! : [],
     ceoName: r?.ceo_name || "", ceoTitle: r?.ceo_title || "",
     mdName: r?.md_name || "", mdTitle: r?.md_title || "",
     publisher: r?.newsletter_publisher === "md" ? "md" : "ceo",
@@ -141,10 +157,13 @@ export async function POST(req: Request) {
     }).catch((e) => ({ sent: false, error: String((e as Error)?.message || e) }));
     if (!(r as { sent?: boolean }).sent) return NextResponse.json({ error: `Could not send: ${(r as { error?: string }).error || "unknown"}`.slice(0, 200) }, { status: 400 });
 
-    // Remember the recipients on the brain (so next time prefills) and keep the sent copy on the finding.
-    await db().query(`update intel_briefs set ceo_recipients = $2::jsonb where client_id = $1`,
+    // Remember the recipients on the brain against the RIGHT executive (CEO vs MD), so the next piece prefills the
+    // correct list and the automated draft's team-first exclusion knows this exec's own address.
+    const recipCol = publisher === "md" ? "md_recipients" : "ceo_recipients";
+    await db().query(`update intel_briefs set ${recipCol} = $2::jsonb where client_id = $1`,
       [clientId, JSON.stringify(recipients)]).catch(() => {});
-    await db().query(`update studio_intel set newsletter = $2 where id = $1 and client_id = $3`, [id, post, clientId]).catch(() => {});
+    // Keep the sent copy on the finding and MARK IT SENT, so it stops being offered as a resumable draft.
+    await db().query(`update studio_intel set newsletter = $2, newsletter_sent_at = now() where id = $1 and client_id = $3`, [id, post, clientId]).catch(() => {});
     return NextResponse.json({ ok: true, sent: recipients.length });
   }
 
