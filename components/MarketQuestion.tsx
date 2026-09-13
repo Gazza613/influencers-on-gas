@@ -71,7 +71,6 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [drawing, setDrawing] = useState(false);
   const [creativeErr, setCreativeErr] = useState("");
   // The LinkedIn-article free-prompt.
-  const [liOpen, setLiOpen] = useState(false);
   const [liTopic, setLiTopic] = useState("");
   const [liBusy, setLiBusy] = useState(false);
   // Add-to-Brain (accepts the finding so it is kept for the brain rather than binned).
@@ -138,7 +137,6 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     setDraftFor(d.id); setLiDraft(true);
     setDraftText(d.post || ""); setArt(d.art?.subject || ""); setArtCallout(d.art?.callout || "");
     if (d.publisher === "md" || d.publisher === "ceo") setPublisher(d.publisher);
-    setLiOpen(false);
   }
 
   // Generate the exec's branded creative(s) in the picked shape(s).
@@ -340,35 +338,33 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
           className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#db2777] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#ec4899] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
           ✦ Find what&rsquo;s new
         </button>
-        {/* LinkedIn article (admin-only), in the actual LinkedIn blue so it stands out (Gary). */}
-        {isAdmin && (
-          <button onClick={() => { setLiOpen((v) => !v); setDraftErr(""); }} disabled={busy}
-            className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-[13.5px] font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
-            style={{ backgroundColor: LINKEDIN_BLUE, boxShadow: "0 8px 24px -12px " + LINKEDIN_BLUE }}>
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.8 0 0 .78 0 1.74v20.52C0 23.22.8 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.74V1.74C24 .78 23.2 0 22.22 0z" /></svg>
-            LinkedIn article
-          </button>
-        )}
       </div>
 
-      {/* THE LINKEDIN-ARTICLE TOPIC PROMPT (admin-only). Type a topic; the pod researches it (grounded, last 3
-          months) and drafts directly. */}
-      {isAdmin && liOpen && !liDraft && (
-        <div className="mt-3.5 rounded-xl border p-3.5" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "12" }}>
-          <span className="tabular block text-sm uppercase tracking-[0.16em] text-ink-faint">Topic for the {whoLabel}&rsquo;s LinkedIn piece</span>
+      {/* THE LINKEDIN-ARTICLE SECTION (admin-only), FIXED underneath because it runs the other way round to the two
+          market-research buttons above: YOU set the topic, rather than the market surfacing one (Gary). */}
+      {isAdmin && !liDraft && (
+        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "0d" }}>
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white" style={{ backgroundColor: LINKEDIN_BLUE }}>
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.8 0 0 .78 0 1.74v20.52C0 23.22.8 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.74V1.74C24 .78 23.2 0 22.22 0z" /></svg>
+            </span>
+            <div>
+              <h4 className="text-[16px] font-bold" style={{ color: LINKEDIN_BLUE }}>LinkedIn article</h4>
+              <p className="text-[12px] leading-relaxed text-ink-dim"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
+            </div>
+          </div>
           <textarea value={liTopic} onChange={(e) => setLiTopic(e.target.value)} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) draftFromTopic(); }}
-            placeholder={`e.g. why ${brainName}'s customers are shifting to X, and what it means`}
-            className="mt-1.5 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-[#0A66C2]" />
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            placeholder={`e.g. why ${brainName}'s customers are shifting to X, and what it means for them`}
+            className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-[#0A66C2]" />
+          <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
             <button onClick={draftFromTopic} disabled={liBusy || !liTopic.trim()}
-              className="inline-flex items-center gap-2 rounded-lg px-5 py-2 text-base font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: LINKEDIN_BLUE }}>
+              className="inline-flex items-center gap-2 rounded-lg px-5 py-2 text-base font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+              style={{ backgroundColor: LINKEDIN_BLUE, boxShadow: "0 8px 24px -12px " + LINKEDIN_BLUE }}>
               {liBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
               {liBusy ? "Researching…" : "Research & draft"}
             </button>
-            <button onClick={() => { setLiOpen(false); setDraftErr(""); }} className="rounded-lg px-3 py-2 text-base text-ink-faint hover:text-ink">Cancel</button>
-            <span className="text-[11px] text-ink-faint">Grounded, verified sources only. Never fabricated to fit the prompt.</span>
+            <span className="text-[11px] text-ink-faint">Grounded in the brain and verified sources. Never fabricated to fit the prompt.</span>
           </div>
           {liBusy && <div className="mt-3 text-base text-accent"><Working messages={WORKING_LINKEDIN} /></div>}
           {draftErr && !liBusy && <p className="mt-2 text-base text-alert">{draftErr}</p>}
