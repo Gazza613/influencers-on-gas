@@ -122,7 +122,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
             <p className="text-sm text-ink-dim">The market, on demand.</p>
           </div>
         </div>
-        <span className="text-right text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim">Live Market Intelligence pod<br />sourced, never invented</span>
+        <span className="w-full text-left text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim sm:w-auto sm:text-right">Live Market Intelligence pod<br />sourced, never invented</span>
       </div>
       <p className="mt-3.5 max-w-[86ch] text-[13px] leading-relaxed text-ink-dim">A one-off market read on demand: what a rival did, a category shift, a threat or an opening, with the move it argues for.</p>
       <p className="mt-1.5 max-w-[86ch] text-[13px] leading-relaxed text-ink-dim"><b className="text-ink">Find what&rsquo;s new</b> proactively surfaces fresh topics (last 2 weeks); a typed question looks back up to 3 months.</p>
