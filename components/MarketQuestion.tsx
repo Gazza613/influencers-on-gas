@@ -339,7 +339,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
             <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">The market surfaces it.</b> Ask a specific question and the pod researches the last 3 months to answer it, with the move it argues for. Or Find what&rsquo;s new, which needs no question and proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.</p>
           </div>
         </div>
-        <textarea value={q} onChange={(e) => { setQ(e.target.value); setAskHint(false); }} rows={2}
+        <textarea value={q} onChange={(e) => { setQ(e.target.value); setAskHint(false); }} onFocus={() => setAskHint(false)} rows={2}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask("question"); }}
           placeholder={`e.g. What has changed in ${brainName}'s market recently, and what should we do about it? What did a key rival just do?`}
           className="mt-3 w-full rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3.5 py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
@@ -377,7 +377,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
               <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
             </div>
           </div>
-          <textarea value={liTopic} onChange={(e) => { setLiTopic(e.target.value); setLiHint(false); }} rows={2}
+          <textarea value={liTopic} onChange={(e) => { setLiTopic(e.target.value); setLiHint(false); }} onFocus={() => setLiHint(false)} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) draftFromTopic(); }}
             placeholder={`e.g. why ${brainName}'s customers are shifting to X, and what it means for them`}
             className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-[#0A66C2]" />
