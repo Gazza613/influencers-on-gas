@@ -661,7 +661,7 @@ export default async function HomePage() {
 
       <AppHeader />
 
-      <main className="agn mx-auto w-full max-w-[1600px] flex-1 px-5 py-10 sm:px-8 sm:py-12">
+      <main className="agn mx-auto w-full max-w-[1600px] flex-1 px-5 pb-10 pt-5 sm:px-8 sm:pb-12 sm:pt-7">
         {/* Progressive-enhancement island: count-up + hover tilt. The content below is fully server-rendered. */}
         <DashboardMotion />
 
