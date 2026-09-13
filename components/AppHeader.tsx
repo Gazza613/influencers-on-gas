@@ -26,7 +26,8 @@ export default function AppHeader() {
         <SetupNav isSuperAdmin={me?.role === "super_admin"} />
       </div>
       <div className="flex items-center gap-3">
-        <CostReadout />
+        {/* The spend readout is hidden on mobile so the nav bar stays a subtle single line; Logout always shows. */}
+        <div className="hidden sm:flex items-center"><CostReadout /></div>
         <SignOutButton />
       </div>
     </header>
