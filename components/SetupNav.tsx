@@ -69,7 +69,7 @@ export default function SetupNav({ isSuperAdmin = false }: { isSuperAdmin?: bool
   // Every nav button carries a subtle grey border + faint fill at rest so it reads as clickable (Gary), and
   // lifts on hover. The active one is a touch stronger.
   const cls = (active: boolean) =>
-    `rounded-md border px-3 py-1.5 text-[13px] font-medium transition ${active ? "border-line-strong bg-surface-2 text-ink" : "border-line bg-surface-2/40 text-ink-dim hover:border-line-strong hover:bg-surface-2 hover:text-ink"}`;
+    `rounded-md border px-3 py-1.5 text-[13px] font-medium transition ${active ? "border-white/30 bg-surface-2 text-ink" : "border-white/15 bg-surface-2/40 text-ink-dim hover:border-white/30 hover:bg-surface-2 hover:text-ink"}`;
   const drawerCls = (active: boolean) =>
     `block rounded-md px-3 py-2 text-[13px] font-medium transition ${active ? "bg-surface-2 text-ink" : "text-ink-dim hover:bg-surface-2/60 hover:text-ink"}`;
 
