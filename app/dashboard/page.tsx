@@ -243,7 +243,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The <span className="brand-grad">Brain</span></>,
         href: "/setup/brains",
         mark: <BrainMark />,
-        blurb: "The client's living knowledge base, and the single source every pod builds from: crawl their sites, add documents, logo and brand rules. Each brain is sealed and isolated, so one client can never read another's.",
+        blurb: "A living knowledge base for each of our clients, and the single source every pod builds from: we crawl our client's sites, add their documents, logo and brand rules. Each brain is sealed and isolated, so one client can never read another's.",
         action: "Feed the Brain",
         pod: "brain",
         step: 1,
@@ -255,7 +255,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The <span className="brand-grad">Researcher</span></>,
         href: "/researcher",
         mark: <ResearcherMark />,
-        blurb: "A commissioned deep dive built on the brain: it reads the client's own crawled material as ground truth, then verifies the external record, the market, competitors and positioning, and feeds its findings back.",
+        blurb: "A commissioned deep dive built on the brain: it takes our client's own crawled material as ground truth, then goes out to verify the external record - the market, competitors, category shifts and where the brand really sits - and feeds every checked finding back for the strategist to build on.",
         action: "Research the market",
         pod: "researcher",
         step: 2,
@@ -674,7 +674,7 @@ export default async function HomePage() {
         <header className="agn-hero">
           <div className="agn-lead">
             <h1 className="agn-title">The Agency of <span className="now">NOW</span></h1>
-            <p className="agn-strap">Human command. AI execution. One platform.</p>
+            <p className="agn-strap">Human Command. AI Execution. One Platform.</p>
           </div>
           <HeroStats agentTotal={agentCount} brains={clients} pods={HERO_PODS} />
         </header>

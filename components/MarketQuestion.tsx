@@ -164,7 +164,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
             </span>
             {/* Mobile: title on its own line, sub-text left-aligned beneath. Desktop: one bigger line. */}
             <span className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-[14px] font-bold text-ink sm:text-[16px]">Automation and delivery</span>
+              <span className="text-[14px] font-bold text-ink sm:text-[16px]">Automation and Delivery</span>
               <span className="text-[12px] font-normal text-ink-faint sm:text-[13.5px]">
                 <span className="sm:hidden">Schedule this brain, set recipients, auto-draft the CEO article</span>
                 <span className="hidden sm:inline">· schedule this brain, set recipients, auto-draft the CEO article</span>

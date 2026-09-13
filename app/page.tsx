@@ -240,7 +240,7 @@ export default function Landing() {
         </div>
 
         <p style={{ fontSize: "clamp(17px, 4.6vw, 22px)", color: "rgba(255,255,255,0.44)", lineHeight: 1.6, margin: "0 auto clamp(32px, 7vw, 52px)", maxWidth: 460, fontWeight: 400, letterSpacing: "-0.1px" }}>
-          Human command. AI execution. One platform.
+          Human Command. AI Execution. One Platform.
         </p>
 
         <button
