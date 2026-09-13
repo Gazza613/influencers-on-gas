@@ -244,7 +244,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         href: "/setup/brains",
         mark: <BrainMark />,
         blurb: "The client's living knowledge base, and the single source every pod builds from: crawl their sites, add documents, logo and brand rules. Each brain is sealed and isolated, so one client can never read another's.",
-        action: "Build the Brain",
+        action: "Feed the Brain",
         pod: "brain",
         step: 1,
         ring: "border-[#a855f7]/30 hover:border-[#a855f7]/70 hover:shadow-[0_0_50px_-12px_rgba(168,85,247,0.45)]",
