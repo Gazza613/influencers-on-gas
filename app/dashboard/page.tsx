@@ -514,7 +514,7 @@ export default async function HomePage() {
   // HERO_PODS.length are read directly by HeroStats.
   const agentCount = Object.values(POD_AGENTS).reduce((n, p) => n + p.agents.length, 0);
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden">
+    <div className="relative flex min-h-dvh flex-col overflow-x-clip">
       {/* AMBIENT DEPTH. The page was reading flat (Gary), so it now breathes: soft flares that slowly pulse and
           drift, an orange one leading because this is GAS's OWN front door and orange is the GAS energy (the
           "orange is the mark alone" rule guards CLIENT creatives, not our own brand page). Kept low-opacity and

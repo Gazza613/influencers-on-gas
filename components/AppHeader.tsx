@@ -16,7 +16,7 @@ export default function AppHeader() {
   }, []);
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center justify-between gap-y-2 border-b border-line bg-surface-1/80 px-4 py-2.5 backdrop-blur-md sm:bg-surface-1 sm:backdrop-blur-none">
+    <header className="sticky top-0 z-40 flex shrink-0 flex-wrap items-center justify-between gap-y-2 border-b border-line bg-surface-1/80 px-4 py-2.5 backdrop-blur-md sm:bg-surface-1 sm:backdrop-blur-none">
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/dashboard" className="flex items-center gap-2 font-extrabold tracking-tight" title="The Agency of NOW - all six pods">
           {/* eslint-disable-next-line @next/next/no-img-element */}
