@@ -311,8 +311,9 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
         </div>
         <span className="w-full text-left text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim sm:w-auto sm:text-right">Sourced, never invented.</span>
       </div>
-      {/* THREE ways to run it (Gary): Ask, Find what's new, and LinkedIn article. */}
-      <p className="mt-3.5 max-w-[94ch] text-[13px] leading-relaxed text-ink-dim">Three ways to run it. <b className="text-ink">Ask the market</b> a specific question and the pod researches the last 3 months to answer it, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> needs no question: it proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.{isAdmin && <> <b className="text-ink">LinkedIn article</b> turns a topic you type into a sourced, ready-to-post thought-leadership piece for your CEO or MD.</>}</p>
+      {/* TWO MODES, not three flat buttons (Gary): the market surfaces it (research), or you set the topic
+          (LinkedIn article). The distinction is made structural below - two labelled cards. */}
+      {isAdmin && <p className="mt-3.5 text-[13px] leading-relaxed text-ink-dim">Two ways to run it: <b className="text-ink">research the market</b> and let it surface what matters, or <b className="text-ink">write a LinkedIn article</b> on a topic you set.</p>}
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="block">
@@ -323,34 +324,46 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
           </select>
         </label>
       </div>
-      <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={2}
-        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask("question"); }}
-        placeholder={`e.g. What has changed in ${brainName}'s market recently, and what should we do about it? What did a key rival just do?`}
-        className="mt-3 w-full rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3.5 py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
-      <div className="mt-3.5 flex flex-wrap items-center gap-3">
-        <button onClick={() => ask("question")} disabled={busy || !q.trim()}
-          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#7c3aed] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:saturate-[.55] disabled:hover:translate-y-0">
-          {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-          {busy ? "Scanning…" : "Ask the market"}
-        </button>
-        {/* Solid PINK - the third brand hue, so Ask (purple) / Find (pink) / LinkedIn (blue) each stand apart. */}
-        <button onClick={() => ask("discover")} disabled={busy}
-          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#db2777] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#ec4899] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
-          ✦ Find what&rsquo;s new
-        </button>
+      {/* CARD 1 - RESEARCH THE MARKET. The market surfaces what matters (research-driven). */}
+      <div className="mt-4 rounded-xl border border-[#a855f7]/30 p-4" style={{ background: "rgba(168,85,247,0.05)" }}>
+        <div className="flex items-start gap-2.5">
+          <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-[#a855f7] to-[#7c3aed] text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+          </span>
+          <div>
+            <h4 className="text-[16px] font-bold text-ink">Research the market</h4>
+            <p className="text-[12px] leading-relaxed text-ink-dim"><b className="text-ink">The market surfaces it.</b> Ask a specific question and the pod researches the last 3 months to answer it, with the move it argues for. Or Find what&rsquo;s new, which needs no question and proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.</p>
+          </div>
+        </div>
+        <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={2}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask("question"); }}
+          placeholder={`e.g. What has changed in ${brainName}'s market recently, and what should we do about it? What did a key rival just do?`}
+          className="mt-3 w-full rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3.5 py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button onClick={() => ask("question")} disabled={busy || !q.trim()}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#7c3aed] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:saturate-[.55] disabled:hover:translate-y-0">
+            {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+            {busy ? "Scanning…" : "Ask the market"}
+          </button>
+          {/* Solid PINK - distinct from Ask (purple), so the two research modes read apart. */}
+          <button onClick={() => ask("discover")} disabled={busy}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#db2777] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#ec4899] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
+            ✦ Find what&rsquo;s new
+          </button>
+        </div>
       </div>
 
       {/* THE LINKEDIN-ARTICLE SECTION (admin-only), FIXED underneath because it runs the other way round to the two
           market-research buttons above: YOU set the topic, rather than the market surfacing one (Gary). */}
       {isAdmin && !liDraft && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "0d" }}>
-          <div className="flex items-start gap-2.5">
-            <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white" style={{ backgroundColor: LINKEDIN_BLUE }}>
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.8 0 0 .78 0 1.74v20.52C0 23.22.8 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.74V1.74C24 .78 23.2 0 22.22 0z" /></svg>
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: LINKEDIN_BLUE }}>
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6" aria-hidden><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.8 0 0 .78 0 1.74v20.52C0 23.22.8 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.74V1.74C24 .78 23.2 0 22.22 0z" /></svg>
             </span>
             <div>
-              <h4 className="text-[16px] font-bold" style={{ color: LINKEDIN_BLUE }}>LinkedIn article</h4>
-              <p className="text-[12px] leading-relaxed text-ink-dim"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
+              <h4 className="text-[20px] font-bold" style={{ color: LINKEDIN_BLUE }}>LinkedIn Article</h4>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
             </div>
           </div>
           <textarea value={liTopic} onChange={(e) => setLiTopic(e.target.value)} rows={2}
