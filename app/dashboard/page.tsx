@@ -440,9 +440,11 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
             <path d="M0 188 L43 180 L86 184 L129 164 L171 170 L214 150 L257 156 L300 132 L343 138 L386 112 L429 120 L471 96 L514 86 L557 66 L600 48 L600 220 L0 220 Z" fill="url(#agnArea)" />
             {/* glow underlay */}
             <path d="M0 188 L43 180 L86 184 L129 164 L171 170 L214 150 L257 156 L300 132 L343 138 L386 112 L429 120 L471 96 L514 86 L557 66 L600 48" fill="none" stroke="url(#agnLine)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" filter="url(#agnGlow)" opacity="0.5" />
-            {/* the line, drawing itself in on land */}
+            {/* a faint STATIC base line, always drawn, so the looping bright sweep never blanks the chart */}
+            <path d="M0 188 L43 180 L86 184 L129 164 L171 170 L214 150 L257 156 L300 132 L343 138 L386 112 L429 120 L471 96 L514 86 L557 66 L600 48" fill="none" stroke="url(#agnLine)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.28" />
+            {/* the bright line draws UP on land, then loops: draws in, holds, redraws (the base keeps it seamless) */}
             <path d="M0 188 L43 180 L86 184 L129 164 L171 170 L214 150 L257 156 L300 132 L343 138 L386 112 L429 120 L471 96 L514 86 L557 66 L600 48" fill="none" stroke="url(#agnLine)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" pathLength={100} strokeDasharray="100" strokeDashoffset="100">
-              <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2.4s" begin="0.15s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.4 0 0.2 1" />
+              <animate attributeName="stroke-dashoffset" values="100;0;0" keyTimes="0;0.5;1" dur="4.8s" begin="0.15s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0 0 1 1" />
             </path>
             {/* the live tip, pulsing */}
             <circle cx="600" cy="48" r="5" fill="#e9d5ff">
@@ -475,6 +477,27 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
         </div>
       </div>
     </article>
+  );
+}
+
+// Renders a section note, turning any " → " flow (brain → research → strategy → proposal) into elegant accent
+// chevrons that point to the next step, instead of a flat text arrow (Gary).
+function StepNote({ text }: { text: string }) {
+  if (!text.includes("→")) return <>{text}</>;
+  const parts = text.split("→");
+  return (
+    <>
+      {parts.map((p, i) => (
+        <span key={i}>
+          {p}
+          {i < parts.length - 1 && (
+            <span className="agn-step" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </span>
+          )}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -512,7 +535,7 @@ export default async function HomePage() {
         /* HERO */
         .agn-hero{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:28px;margin-bottom:clamp(22px,3.4vw,38px)}
         .agn-lead{min-width:min(100%,520px);flex:1}
-        .agn-title{font-weight:800;line-height:.98;letter-spacing:-.012em;margin:.05em 0 0;font-size:clamp(34px,5vw,64px);text-wrap:balance}
+        .agn-title{font-weight:800;line-height:.98;letter-spacing:-.012em;margin:.05em 0 0;font-size:clamp(30px,4.3vw,54px);text-wrap:balance}
         .agn-title .now{background:linear-gradient(100deg,var(--pink),var(--purple) 42%,var(--cyan));background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:agnShimmer 9s ease-in-out infinite}
         @keyframes agnShimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
         .agn-strap{margin:.5em 0 0;color:var(--dim);font-size:clamp(14px,1.5vw,18px)}
@@ -538,6 +561,8 @@ export default async function HomePage() {
         .agn-snum{font-weight:700;font-size:12px;color:var(--sa);letter-spacing:.1em}
         .agn-slabel{font-weight:700;font-size:12.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink)}
         .agn-snote{color:var(--dim);font-size:13px;flex:1;min-width:200px}
+        .agn-step{display:inline-flex;align-items:center;vertical-align:-1px;color:var(--sa);opacity:.85;margin:0 3px}
+        .agn-step svg{width:11px;height:11px}
         .agn-snote b{color:var(--sa);font-weight:600}
 
         /* GRIDS */
@@ -559,11 +584,12 @@ export default async function HomePage() {
         .agn-tile.big .agn-mark{width:46px;height:46px;border-radius:14px}
         .agn-mark svg{width:58%;height:58%}
         .agn-pod{font-weight:700;font-size:10px;letter-spacing:.18em;color:var(--faint)}
-        .agn-name{font-weight:700;letter-spacing:-.02em;margin:13px 0 0;font-size:18.5px;color:var(--ink)}
-        .agn-tile.big .agn-name{font-size:26px;margin-top:16px}
+        /* All pod headers share the Brain's size (Gary). Only the Brain tile takes a touch more top margin. */
+        .agn-name{font-weight:700;letter-spacing:-.02em;margin:13px 0 0;font-size:26px;color:var(--ink)}
+        .agn-tile.big .agn-name{margin-top:16px}
         .agn-name .g{background:linear-gradient(100deg,var(--a),color-mix(in srgb,var(--a) 40%,#fff));-webkit-background-clip:text;background-clip:text;color:transparent}
         .agn-blurb{color:var(--dim);font-size:12.8px;line-height:1.5;margin:7px 0 0}
-        .agn-tile.big .agn-blurb{font-size:13.5px;max-width:46ch}
+        .agn-tile.big .agn-blurb{font-size:13.5px;max-width:none;padding-right:8%}
         /* Every tile's footer pins to the bottom (mt-auto), so the agent pill + action line up across the whole row
            regardless of how long each blurb is (Gary). */
         .agn-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-top:auto;padding-top:14px}
@@ -578,8 +604,8 @@ export default async function HomePage() {
         .agn-go.ext{color:var(--dim)}
         .agn-meta{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
         /* The knowledge-growth chart grows to fill the feature tile's dead space (flex:1) and stretches to fit. */
-        .agn-spark{margin-top:18px;flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-height:130px}
-        .agn-spark svg{width:100%;flex:1;min-height:84px;display:block;overflow:visible}
+        .agn-spark{margin-top:18px;flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-height:110px}
+        .agn-spark svg{width:100%;flex:1;min-height:70px;display:block;overflow:visible}
         .agn-spark .cap{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-top:10px}
         .agn-soonchip{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--a);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);border-radius:999px;padding:5px 11px;align-self:flex-start;margin-top:auto}
         .agn-tlink{position:absolute;inset:0;z-index:1;border-radius:16px}
@@ -650,7 +676,7 @@ export default async function HomePage() {
               <div className="agn-shead">
                 <span className="agn-snum">{String(gi + 1).padStart(2, "0")}</span>
                 <span className="agn-slabel">{g.label}</span>
-                <span className="agn-snote">{g.note}</span>
+                <span className="agn-snote"><StepNote text={g.note} /></span>
               </div>
               <div className={isIntel ? "agn-bento" : "agn-grid2"}>
                 {g.doors.map((d, n) => (
