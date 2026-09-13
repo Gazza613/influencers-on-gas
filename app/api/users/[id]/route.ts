@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { deleteUser, suspendUser, reactivateUser, listUsers } from "@/lib/users";
+import { deleteUser, suspendUser, reactivateUser, setUserRole, listUsers } from "@/lib/users";
 
 // Super-admin only, for both verbs. Both take effect on the person's NEXT REQUEST rather than whenever their
 // token happens to expire, because the auth gate now re-checks account status against the database
@@ -36,10 +36,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const g = await gate(id);
   if ("error" in g) return NextResponse.json({ error: g.error }, { status: g.status });
 
-  const body = (await req.json().catch(() => ({}))) as { action?: string };
+  const body = (await req.json().catch(() => ({}))) as { action?: string; role?: string };
   if (body.action === "suspend") await suspendUser(id);
   else if (body.action === "reactivate") await reactivateUser(id);
-  else return NextResponse.json({ error: "action must be suspend or reactivate" }, { status: 400 });
+  else if (body.action === "setRole") await setUserRole(id, body.role === "admin" ? "admin" : "producer");
+  else return NextResponse.json({ error: "action must be suspend, reactivate or setRole" }, { status: 400 });
 
   return NextResponse.json({ ok: true, users: await listUsers() });
 }

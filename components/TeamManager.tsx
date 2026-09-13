@@ -64,6 +64,23 @@ export default function TeamManager() {
     else setMsg({ kind: "err", text: d?.error || "Could not change that account" });
   }
 
+  async function changeRole(u: User, role: "admin" | "producer") {
+    const label = role === "admin" ? "an admin" : "a team member";
+    if (!(await askConfirm({
+      title: `Make ${u.name || u.email} ${label}?`,
+      body: role === "admin"
+        ? "Admins can manage the team AND run the money-spending desks: Ask the market, draft and send CEO articles, and set schedules. Only make people you trust an admin."
+        : "They lose admin powers (managing the team and the CEO-article send/schedule) and become a standard team member. Takes effect on their next click.",
+      confirmLabel: role === "admin" ? "Make admin" : "Make member",
+    }))) return;
+    const r = await fetch(`/api/users/${u.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setRole", role }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) load();
+    else setMsg({ kind: "err", text: d?.error || "Could not change that role" });
+  }
+
   async function loadActivity(d: number) {
     setDays(d);
     const r = await fetch(`/api/team-activity?days=${d}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
@@ -132,10 +149,18 @@ export default function TeamManager() {
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right">
+                    {/* Promote/demote between team member and admin. Never shown for a super admin. */}
+                    {u.role !== "super_admin" && (
+                      u.role === "admin" ? (
+                        <button onClick={() => changeRole(u, "producer")} className="rounded-md px-2.5 py-1.5 text-[15px] text-ink-faint hover:bg-surface-2 hover:text-ink">Make member</button>
+                      ) : (
+                        <button onClick={() => changeRole(u, "admin")} className="rounded-md px-2.5 py-1.5 text-[15px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/15">Make admin</button>
+                      )
+                    )}
                     {u.status === "suspended" ? (
-                      <button onClick={() => setStatus(u, "reactivate")} className="rounded-md px-2.5 py-1.5 text-[15px] font-semibold text-ready hover:bg-ready/15">Reactivate</button>
+                      <button onClick={() => setStatus(u, "reactivate")} className="ml-1 rounded-md px-2.5 py-1.5 text-[15px] font-semibold text-ready hover:bg-ready/15">Reactivate</button>
                     ) : (
-                      <button onClick={() => setStatus(u, "suspend")} className="rounded-md px-2.5 py-1.5 text-[15px] text-ink-faint hover:bg-alert/15 hover:text-alert">Suspend</button>
+                      <button onClick={() => setStatus(u, "suspend")} className="ml-1 rounded-md px-2.5 py-1.5 text-[15px] text-ink-faint hover:bg-alert/15 hover:text-alert">Suspend</button>
                     )}
                     <button onClick={() => remove(u)} className="ml-1 rounded-md px-2.5 py-1.5 text-[15px] text-ink-faint hover:bg-alert/15 hover:text-alert">Remove</button>
                   </td>

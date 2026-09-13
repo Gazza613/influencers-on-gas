@@ -53,7 +53,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ADMINS ONLY (Gary): the cadence + recipient list is a cost dial and a delivery redirect, so only admins write it.
+  if (session?.user?.role !== "super_admin" && session?.user?.role !== "admin") return NextResponse.json({ error: "Admins only" }, { status: 403 });
   const b = (await req.json().catch(() => ({}))) as { clientId?: string; schedule?: string; recipients?: unknown; newsletterSchedule?: string };
   const clientId = String(b.clientId || "").trim();
   if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });

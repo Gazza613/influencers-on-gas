@@ -152,3 +152,13 @@ export async function reactivateUser(id: string): Promise<void> {
      where id=$1`, [id],
   );
 }
+
+// PROMOTE / DEMOTE between team member (producer) and admin. Never touches super_admin (the env account that
+// can always put things right). The access re-check in the auth gate means the new role takes effect on the
+// person's next request. Only 'admin' or 'producer' are reachable here - you cannot mint a super admin.
+export async function setUserRole(id: string, role: "admin" | "producer"): Promise<void> {
+  await db().query(
+    `update users set role=$2 where id=$1 and role <> 'super_admin'`,
+    [id, role === "admin" ? "admin" : "producer"],
+  );
+}

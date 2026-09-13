@@ -15,10 +15,14 @@ export const dynamic = "force-dynamic";
 
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 
+// ADMINS ONLY (Gary): drafting, editing recipients and sending a client CEO's article is admin-only, since it
+// sends branded email from the agency mailbox. Members can still read the market; they cannot draft or send.
+const isAdmin = (role?: string | null) => role === "super_admin" || role === "admin";
+
 // GET the saved CEO recipients + the CEO's name/title, to prefill the send box.
 export async function GET(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(session?.user?.role)) return NextResponse.json({ error: "Admins only" }, { status: 403 });
   const clientId = new URL(req.url).searchParams.get("clientId") || "";
   if (!clientId) return NextResponse.json({ recipients: [], ceoName: "", ceoTitle: "" });
   const rows = (await db().query(
@@ -35,7 +39,7 @@ const ukDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "nu
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(session?.user?.role)) return NextResponse.json({ error: "Admins only" }, { status: 403 });
   const b = (await req.json().catch(() => ({}))) as {
     action?: string; clientId?: string; id?: string; notes?: string;
     recipients?: unknown; post?: string; subject?: string;
