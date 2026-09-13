@@ -4,6 +4,14 @@ import { auth } from "@/auth";
 import { retrieve } from "@/lib/rag";
 import { getSecret } from "@/lib/connections";
 import { meterClaude } from "@/lib/usage";
+import { db } from "@/lib/db";
+
+// ANSWERABILITY STRENGTH from the best retrieval relevance: how well the passages actually covered the question.
+// Rough by design (it feeds a chip + the audit trail, not a gate). Claude-only mode reads no passages, so "none".
+function answerStrength(topScore: number, mode: string, hitCount: number): "strong" | "partial" | "thin" | "none" {
+  if (mode === "claude" || !hitCount) return "none";
+  return topScore >= 0.5 ? "strong" : topScore >= 0.22 ? "partial" : "thin";
+}
 
 // ASK THE BRAIN A QUESTION AND GET AN ANSWER (Gary: "i do not think your brain is working?").
 //
@@ -133,6 +141,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const mode: AskMode = body.mode === "mixed" ? "mixed" : body.mode === "claude" ? "claude" : body.mode === "live" ? "live" : "brain";
   if (!query) return NextResponse.json({ error: "Ask the brain a question." }, { status: 400 });
 
+  // AUDIT TRAIL + STRENGTH: log every answer with the passages it used and how well they covered the question, so
+  // the answer is always reconstructable. Best-effort - a logging failure must never break the answer. Scoped by
+  // client_id (id) like everything else.
+  const logAnswer = async (m: string, answer: string, hits: { metadata?: Record<string, unknown>; score?: number }[]): Promise<"strong" | "partial" | "thin" | "none"> => {
+    const top = hits[0]?.score ?? 0;
+    const strength = answerStrength(top, m, hits.length);
+    await db().query(
+      `insert into brain_answers (client_id, user_email, mode, question, answer, passages, top_score, strength)
+       values ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`,
+      [id, session.user?.email ?? null, m, query, answer || null,
+        JSON.stringify(hits.map((h) => ({ title: h.metadata?.title ?? null, url: h.metadata?.url ?? null }))),
+        top || null, strength],
+    ).catch(() => {});
+    return strength;
+  };
+
   try {
     const key = await getSecret("anthropic");
 
@@ -148,21 +172,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await meterClaude(res, { clientId: id, userEmail: session.user?.email ?? null, model: "claude-sonnet-4-6", action: "brain-answer" }).catch(() => {});
       const answer = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n")
         .replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ").trim();
-      return NextResponse.json({ hits: [], answer, mode });
+      const strength = await logAnswer("claude", answer, []);
+      return NextResponse.json({ hits: [], answer, mode, strength });
     }
 
     // Wider than the old 6. The answer is written from these, so a fact split across a chunk boundary needs
     // its neighbour inside the window too - which is exactly what went wrong with the CEO's name.
     const hits = await retrieve(id, query, 10, { userEmail: session.user?.email ?? null });
     if (!hits.length && mode === "brain") {
-      return NextResponse.json({
-        hits: [],
-        answer: "This brain holds nothing on that yet. Feed it the material, and if the answer lives in the brand doctrine, press Sync the doctrine so the brain can retrieve it.",
-      });
+      const answer = "This brain holds nothing on that yet. Feed it the material, and if the answer lives in the brand doctrine, press Sync the doctrine so the brain can retrieve it.";
+      await logAnswer("brain", answer, []);
+      return NextResponse.json({ hits: [], answer, strength: "none" });
     }
 
     // Claude not connected is not a failure: fall back to passages, which is what this box did before.
-    if (!key) return NextResponse.json({ hits, mode });
+    if (!key) { const strength = await logAnswer(mode, "", hits); return NextResponse.json({ hits, mode, strength }); }
 
     const passages = hits.map((h, i) => `[${i + 1}] ${h.content}`).join("\n\n");
     const client = new Anthropic({ apiKey: key });
@@ -186,7 +210,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .replace(/\s*[—–]\s*/g, " - ")
       .trim();
 
-    return NextResponse.json({ hits, answer, mode });
+    const strength = await logAnswer(mode, answer, hits);
+    return NextResponse.json({ hits, answer, mode, strength });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
   }

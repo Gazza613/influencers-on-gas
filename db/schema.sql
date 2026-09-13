@@ -105,6 +105,24 @@ alter table knowledge_chunks
   generated always as (to_tsvector('english', content)) stored;
 create index if not exists idx_knowledge_chunks_tsv on knowledge_chunks using gin (content_tsv);
 
+-- PER-ANSWER AUDIT TRAIL (traceability). Every brain answer is logged with the question, the answer, the passages
+-- it was built from, and an answerability STRENGTH (how well the retrieved passages covered the question), so
+-- "why did the brain say X" can always be reconstructed and a thin-coverage answer is visible after the fact.
+-- client_id scopes it like everything else; the answer text is the client's own, kept for their own audit.
+create table if not exists brain_answers (
+  id           uuid primary key default gen_random_uuid(),
+  client_id    uuid not null references clients(id) on delete cascade,
+  user_email   text,
+  mode         text not null default 'brain',      -- brain | mixed | live | claude
+  question     text not null,
+  answer       text,
+  passages     jsonb not null default '[]'::jsonb,  -- the titles/urls of the passages used, for traceability
+  top_score    real,                                -- the best retrieval relevance, the basis of `strength`
+  strength     text,                                -- strong | partial | thin | none
+  created_at   timestamptz not null default now()
+);
+create index if not exists idx_brain_answers_client on brain_answers(client_id, created_at desc);
+
 -- ── Productions (the video runs) ──────────────────────────────────────────────
 create table if not exists productions (
   id              uuid primary key default gen_random_uuid(),

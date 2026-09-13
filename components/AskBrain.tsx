@@ -40,6 +40,7 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
   const [asked, setAsked] = useState("");
   const [answer, setAnswer] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
+  const [strength, setStrength] = useState<string | null>(null); // how well the passages covered the question
   const [busy, setBusy] = useState(false);
   const [sharpening, setSharpening] = useState(false);
   const [tip, setTip] = useState<{ from: string; why: string } | null>(null);
@@ -62,7 +63,7 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
     const text = (question ?? q).trim();
     if (!text || !clientId || busy) return;
     const forClient = clientId;
-    setBusy(true); setErr(""); setAnswer(""); setHits([]); setAsked(text); setOpenSources(false); setSaved("");
+    setBusy(true); setErr(""); setAnswer(""); setHits([]); setStrength(null); setAsked(text); setOpenSources(false); setSaved("");
     const d = await fetch(`/api/brains/${forClient}/query`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: text, mode }),
     }).then((r) => r.json()).catch(() => null);
@@ -71,6 +72,7 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
     if (!d || d.error) { setErr(d?.error || "Could not reach the brain."); return; }
     setAnswer(d.answer || "");
     setHits(d.hits || []);
+    setStrength(typeof d.strength === "string" ? d.strength : null);
     // The mode the ANSWER was produced under, not whatever the control says now - otherwise changing the
     // selector after the fact would silently relabel an answer that is already on screen.
     setAnsweredMode((d.mode as Mode) || mode);
@@ -104,7 +106,7 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
 
   // Clear the whole exchange (Gary: a clean slate + an empty prompt box, same as after adding to the brain).
   function clearChat() {
-    setQ(""); setAsked(""); setAnswer(""); setHits([]); setTip(null); setSaved(""); setErr(""); setOpenSources(false);
+    setQ(""); setAsked(""); setAnswer(""); setHits([]); setStrength(null); setTip(null); setSaved(""); setErr(""); setOpenSources(false);
   }
 
   // Rewrite the question so it retrieves better, and SHOW what changed - the point is that the team learns to
@@ -207,6 +209,15 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
                : answeredMode === "live" ? "brain + live web"
                : "claude only, no client material"}
             </span>
+            {/* ANSWERABILITY STRENGTH: how well the brain's own passages covered the question. A quiet "thin"
+                flag tells the reader to treat a weakly-covered answer with more care. */}
+            {answeredMode !== "claude" && (strength === "strong" || strength === "partial" || strength === "thin") && (
+              <span className={`tabular rounded-full px-2.5 py-1 text-[13px] font-bold uppercase tracking-[0.14em] ${
+                strength === "strong" ? "bg-ready/15 text-ready" : strength === "partial" ? "bg-[#fbbf24]/15 text-[#fcd34d]" : "bg-[#f87171]/15 text-[#fca5a5]"}`}
+                title="How well the brain's own passages covered this question.">
+                {strength} coverage
+              </span>
+            )}
           </div>
           {/* In mixed mode the model tags each claim [brain] or [general]. Rendered as coloured chips rather
               than left as raw brackets, so provenance is read at a glance instead of skimmed past. */}
