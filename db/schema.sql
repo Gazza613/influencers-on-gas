@@ -721,6 +721,16 @@ create index if not exists idx_users_reset_token on users(reset_token);
 alter table intel_briefs add column if not exists ceo_rules text;
 alter table intel_briefs add column if not exists ceo_name  text;
 alter table intel_briefs add column if not exists ceo_title text;
+-- THE MD, alongside the CEO (Gary). A brain can publish its thought-leadership under EITHER the CEO or the
+-- Managing Director, so the MD carries the same three fields as the CEO: a name, a designation, and a real
+-- photo (asset kind 'md_photo', already allowed). newsletter_publisher is the per-brain DEFAULT of who publishes;
+-- the draft screen can override it per piece. The MD's own photo lives in the brand library like the CEO's.
+alter table intel_briefs add column if not exists md_name  text;
+alter table intel_briefs add column if not exists md_title text;
+alter table intel_briefs add column if not exists newsletter_publisher text not null default 'ceo';
+alter table intel_briefs drop constraint if exists intel_briefs_newsletter_publisher_check;
+alter table intel_briefs add constraint intel_briefs_newsletter_publisher_check
+  check (newsletter_publisher in ('ceo','md'));
 alter table intel_briefs add column if not exists deprecated_products jsonb not null default '[]'::jsonb;  -- retired products the client has not yet scrubbed off its site; the Researcher never surfaces these (Gary: GAS Appitude/ROC/INGAiGE)
 
 -- Why an ingest failed. Status alone said "failed" and nothing else, so a broken source could only be

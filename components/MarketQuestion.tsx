@@ -8,6 +8,10 @@ import LivingResearch from "@/components/LivingResearch";
 // the same sourced assessment the daily email gives - what changed, what it could do, and the DEFENSIVE/PROACTIVE
 // move - without waiting for the schedule. Runs the real desk (scope-locked, never invents), so the answer is
 // trustworthy and its findings also land in the /strategist review queue.
+//
+// It also drafts the client CEO/MD's LinkedIn thought-leadership piece (admin-only), either from a surfaced
+// finding or from a topic typed into the "LinkedIn article" button, then generates the exec's branded creative
+// (CEO or MD, 1x1 and/or 16x9) and emails the whole thing as a white, post-ready piece.
 
 type Client = { id: string; name: string };
 type Finding = {
@@ -17,6 +21,8 @@ type Finding = {
   verification?: string | null;
   sources: { name: string; url: string }[];
 };
+type Ratio = "1x1" | "16x9";
+type Creative = { url: string; ratio: Ratio };
 
 const WORKING_MARKET = [
   "Scanning the market right now…",
@@ -25,8 +31,16 @@ const WORKING_MARKET = [
   "Grading the move: defensive or proactive…",
   "Writing it up with the sources…",
 ];
+const WORKING_LINKEDIN = [
+  "Researching the topic, last three months…",
+  "Verifying every source before we use it…",
+  "Finding the strongest grounded angle…",
+  "Drafting the thought-leadership piece…",
+];
 
-export default function MarketQuestion({ clients }: { clients: Client[] }) {
+const LINKEDIN_BLUE = "#0A66C2";
+
+export default function MarketQuestion({ clients, isAdmin = false }: { clients: Client[]; isAdmin?: boolean }) {
   // On the landing view the brain always defaults to GAS Marketing (Gary), our own brain, then the team switches.
   const gasDefault = clients.find((c) => /gas\s*marketing/i.test(c.name))?.id || clients.find((c) => /\bgas\b/i.test(c.name))?.id;
   const [clientId, setClientId] = useState(gasDefault || clients[0]?.id || "");
@@ -34,22 +48,53 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
   const [busy, setBusy] = useState(false);
   const [findings, setFindings] = useState<Finding[] | null>(null);
   const [err, setErr] = useState("");
-  // The CEO thought-leadership draft flow (one open at a time).
+  // The CEO/MD thought-leadership draft flow (one open at a time). draftFor is the studio_intel finding id being
+  // drafted - a real id whether it came from a surfaced finding or the LinkedIn-article research.
   const [draftFor, setDraftFor] = useState<string | null>(null);
+  const [liDraft, setLiDraft] = useState(false);   // is the active draft the standalone LinkedIn-article one?
   const [drafting, setDrafting] = useState(false);
   const [draftText, setDraftText] = useState("");
   const [art, setArt] = useState("");
+  const [artCallout, setArtCallout] = useState("");
   const [recips, setRecips] = useState("");
-  const [ceoName, setCeoName] = useState("");
+  const [draftErr, setDraftErr] = useState("");
   const [sending, setSending] = useState(false);
   const [sentFor, setSentFor] = useState("");
-  const [draftErr, setDraftErr] = useState("");
+  // Who publishes: the per-brain default, overridable here. The toggle only shows when the brain has both set.
+  const [publisher, setPublisher] = useState<"ceo" | "md">("ceo");
+  const [ceoName, setCeoName] = useState("");
+  const [mdName, setMdName] = useState("");
+  // The exec's branded creative: pick the shapes, generate, choose which to attach + embed.
+  const [ratios, setRatios] = useState<Ratio[]>(["1x1"]);
+  const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [drawing, setDrawing] = useState(false);
+  const [creativeErr, setCreativeErr] = useState("");
+  // The LinkedIn-article free-prompt.
+  const [liOpen, setLiOpen] = useState(false);
+  const [liTopic, setLiTopic] = useState("");
+  const [liBusy, setLiBusy] = useState(false);
   // Add-to-Brain (accepts the finding so it is kept for the brain rather than binned).
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [addingId, setAddingId] = useState("");
   const [showAuto, setShowAuto] = useState(false); // the automation/schedule block is collapsed to keep the panel short
 
   const CEO_API = "/api/studio/intel/ceo-article";
+  const publisherName = publisher === "md" ? mdName : ceoName;
+
+  // Reset the whole draft workspace (creative, chosen, publisher stays as loaded).
+  function resetDraftWorkspace() {
+    setCreatives([]); setChosen([]); setCreativeErr(""); setDrawing(false); setRatios(["1x1"]);
+  }
+
+  // Load the saved recipients + CEO/MD identity + the brain's default publisher, to prefill the draft screen.
+  async function loadDraftMeta() {
+    const rec = await fetch(`${CEO_API}?clientId=${encodeURIComponent(clientId)}`).then((r) => r.json()).catch(() => null);
+    if (!rec) return;
+    setCeoName(rec.ceoName || ""); setMdName(rec.mdName || "");
+    setPublisher(rec.publisher === "md" ? "md" : "ceo");
+    if (Array.isArray(rec.recipients) && rec.recipients.length && !recips) setRecips(rec.recipients.join(", "));
+  }
 
   // Save a finding to the brain: accept it (the gate that keeps it) rather than letting it sit unreviewed.
   async function addToBrain(f: Finding) {
@@ -63,39 +108,94 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
     if (d?.ok) setAddedIds((prev) => new Set(prev).add(f.id!));
   }
 
-  // Draft the CEO's article from a finding, and prefill the saved recipient(s) for this brain.
+  // Draft the CEO/MD's article from a surfaced finding, and prefill the saved identity + recipient(s).
   async function draftArticle(f: Finding) {
     if (!f.id || drafting) return;
-    setDraftFor(f.id); setDrafting(true); setDraftErr(""); setDraftText(""); setSentFor("");
-    const [d, rec] = await Promise.all([
+    setDraftFor(f.id); setLiDraft(false); setDrafting(true); setDraftErr(""); setDraftText(""); setSentFor("");
+    resetDraftWorkspace();
+    const [d] = await Promise.all([
       fetch(CEO_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "draft", clientId, id: f.id }) }).then((r) => r.json()).catch(() => null),
-      fetch(`${CEO_API}?clientId=${encodeURIComponent(clientId)}`).then((r) => r.json()).catch(() => null),
+      loadDraftMeta(),
     ]);
     setDrafting(false);
     if (!d?.ok) { setDraftErr(d?.error || "Couldn't draft that."); return; }
-    setDraftText(d.post || ""); setArt(d.art?.subject || "");
-    if (rec?.ceoName) setCeoName(rec.ceoName);
-    if (Array.isArray(rec?.recipients) && rec.recipients.length && !recips) setRecips(rec.recipients.join(", "));
+    setDraftText(d.post || ""); setArt(d.art?.subject || ""); setArtCallout(d.art?.callout || "");
   }
 
-  // Send the (edited) article to the CEO's email(s); bcc's the sender.
-  async function sendArticle(f: Finding) {
-    if (!f.id || sending) return;
+  // The LinkedIn-article button: research a typed topic (grounded, last 3 months) and draft directly.
+  async function draftFromTopic() {
+    if (liBusy || !clientId || !liTopic.trim()) return;
+    setLiBusy(true); setDraftErr(""); setDraftText(""); setSentFor(""); resetDraftWorkspace();
+    const [d] = await Promise.all([
+      fetch("/api/studio/intel/linkedin-article", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, topic: liTopic }),
+      }).then((r) => r.json()).catch(() => null),
+      loadDraftMeta(),
+    ]);
+    setLiBusy(false);
+    if (!d?.ok) { setDraftErr(d?.error || "Couldn't research that topic."); setDraftFor("li-pending"); setLiDraft(true); return; }
+    setDraftFor(d.id); setLiDraft(true);
+    setDraftText(d.post || ""); setArt(d.art?.subject || ""); setArtCallout(d.art?.callout || "");
+    if (d.publisher === "md" || d.publisher === "ceo") setPublisher(d.publisher);
+    setLiOpen(false);
+  }
+
+  // Generate the exec's branded creative(s) in the picked shape(s).
+  async function drawCreative() {
+    if (drawing || !ratios.length) return;
+    setDrawing(true); setCreativeErr(""); setCreatives([]); setChosen([]);
+    const title = draftText.split(/\n{2,}/)[0]?.replace(/^#{1,3}\s+/, "").trim() || "";
+    const c = await fetch("/api/studio/intel/newsletter-creative", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, subject: art || title, callout: artCallout || title, publisher, ratios }),
+      signal: AbortSignal.timeout(6 * 60 * 1000),
+    }).then((r) => r.json()).catch((e) => ({
+      error: (e as Error)?.name === "TimeoutError" ? "The creative took too long and was cut off. The article is safe - hit Generate again." : "The creative request failed. The article is safe - try again.",
+    }));
+    setDrawing(false);
+    if (c?.error || !Array.isArray(c?.creatives) && !c?.url) { setCreativeErr(c?.error || "The creative did not come back."); return; }
+    const made: Creative[] = Array.isArray(c.creatives) && c.creatives.length
+      ? c.creatives.map((x: { url: string; ratio: Ratio }) => ({ url: x.url, ratio: x.ratio }))
+      : (Array.isArray(c.urls) ? c.urls : c.url ? [c.url] : []).map((u: string) => ({ url: u, ratio: "1x1" as Ratio }));
+    setCreatives(made);
+    // Auto-select the first of each shape so a send always has something to attach.
+    const firstByRatio = new Map<Ratio, string>();
+    for (const m of made) if (!firstByRatio.has(m.ratio)) firstByRatio.set(m.ratio, m.url);
+    setChosen([...firstByRatio.values()]);
+  }
+
+  function toggleChosen(url: string) {
+    setChosen((prev) => prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]);
+  }
+  function toggleRatio(r: Ratio) {
+    setRatios((prev) => prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]);
+  }
+
+  // Send the (edited) article to the exec's email(s); bcc's the sender. Embeds the chosen 16x9 and attaches all
+  // chosen creatives, so the piece arrives post-ready.
+  async function sendArticle(id: string) {
+    if (!id || sending) return;
     const recipients = recips.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
     if (!recipients.length) { setDraftErr("Add at least one recipient email."); return; }
     setSending(true); setDraftErr("");
-    const d = await fetch(CEO_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "send", clientId, id: f.id, recipients, post: draftText }) }).then((r) => r.json()).catch(() => null);
+    const chosenCreatives = creatives.filter((c) => chosen.includes(c.url));
+    const heroUrl = chosenCreatives.find((c) => c.ratio === "16x9")?.url || "";
+    const d = await fetch(CEO_API, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "send", clientId, id, recipients, post: draftText, publisher, heroUrl, creativeUrls: chosen }),
+    }).then((r) => r.json()).catch(() => null);
     setSending(false);
     if (!d?.ok) { setDraftErr(d?.error || "Couldn't send."); return; }
-    setSentFor(f.id); setDraftFor(null);
+    setSentFor(id); setDraftFor(null); setLiDraft(false);
   }
 
-  // TWO MODES (Gary): "question" answers a specific ask (looks back ~90 days); "discover" proactively finds what is
-  // NEW and relevant to the brain with no question typed (only ~14 days, so it surfaces genuine change).
+  // TWO MODES for the market run (Gary): "question" answers a specific ask (~90 days); "discover" proactively
+  // finds what is NEW with no question (~14 days).
   async function ask(mode: "question" | "discover" = "question") {
     if (busy || !clientId) return;
     if (mode === "question" && !q.trim()) return;
-    setBusy(true); setErr(""); setFindings(null); setDraftFor(null); setSentFor(""); setDraftErr(""); setAddedIds(new Set());
+    setBusy(true); setErr(""); setFindings(null); setDraftFor(null); setLiDraft(false); setSentFor(""); setDraftErr(""); setAddedIds(new Set());
     const d = await fetch(`/api/studio/intel/ask`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, question: mode === "question" ? q : "", mode }),
@@ -106,6 +206,88 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
   }
 
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
+  const whoLabel = publisher === "md" ? "MD" : "CEO";
+
+  // THE SHARED DRAFT EDITOR, used by both a surfaced finding and the standalone LinkedIn-article draft. `id` is the
+  // studio_intel finding id; `onRedraft` re-runs the right drafting path.
+  function draftEditor(id: string, onRedraft: () => void) {
+    return (
+      <>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="tabular text-sm uppercase tracking-[0.16em] text-ink-faint">{whoLabel} article{publisherName ? ` · ${publisherName}` : ""} · edit before sending</span>
+          {art && <span className="text-sm text-ink-faint">Image idea: {art}</span>}
+        </div>
+
+        {/* WHO PUBLISHES: CEO or MD. Only shown when the brain has both on file. */}
+        {ceoName && mdName && (
+          <div className="mt-2.5 inline-flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-0.5 text-sm">
+            {(["ceo", "md"] as const).map((p) => (
+              <button key={p} onClick={() => setPublisher(p)}
+                className={`rounded-md px-3 py-1.5 font-semibold transition ${publisher === p ? "bg-accent/20 text-accent" : "text-ink-dim hover:text-ink"}`}>
+                {p === "ceo" ? "CEO" : "MD"}{p === "ceo" ? (ceoName ? ` · ${ceoName}` : "") : (mdName ? ` · ${mdName}` : "")}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)} rows={12}
+          className="mt-2.5 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-accent" />
+
+        {/* THE EXEC'S BRANDED CREATIVE: pick the shapes, generate, choose which to attach + embed. */}
+        <div className="mt-3 rounded-lg border border-line bg-surface-2/60 p-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="tabular text-sm uppercase tracking-[0.16em] text-ink-faint">Creative</span>
+            {(["1x1", "16x9"] as const).map((r) => (
+              <button key={r} onClick={() => toggleRatio(r)}
+                className={`rounded-md border px-2.5 py-1 text-sm font-semibold transition ${ratios.includes(r) ? "border-accent/60 bg-accent/15 text-accent" : "border-line text-ink-dim hover:text-ink"}`}>
+                {ratios.includes(r) ? "✓ " : ""}{r === "1x1" ? "Square 1:1" : "Landscape 16:9"}
+              </button>
+            ))}
+            <button onClick={drawCreative} disabled={drawing || !ratios.length}
+              className="inline-flex items-center gap-2 rounded-md border border-accent/50 px-3 py-1 text-sm font-semibold text-accent hover:bg-accent/10 disabled:opacity-50">
+              {drawing && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />}
+              {drawing ? "Generating…" : creatives.length ? "Regenerate" : "Generate creative"}
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-ink-faint">Built from {whoLabel === "MD" ? "the MD's" : "the CEO's"} real photo and the client&rsquo;s brand. Tick the ones to attach; the 16:9 rides at the top of the email.</p>
+          {creativeErr && <p className="mt-2 text-sm text-alert">{creativeErr}</p>}
+          {creatives.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              {creatives.map((c, i) => {
+                const on = chosen.includes(c.url);
+                return (
+                  <button key={i} onClick={() => toggleChosen(c.url)}
+                    className={`group relative overflow-hidden rounded-lg border-2 transition ${on ? "border-accent" : "border-line hover:border-line-strong"}`}
+                    style={{ width: c.ratio === "16x9" ? 168 : 104, height: 104 }} title={c.ratio}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={c.url} alt="" className="h-full w-full object-cover" />
+                    <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">{c.ratio === "16x9" ? "16:9" : "1:1"}</span>
+                    {on && <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <label className="mt-3 block">
+          <span className="tabular block text-sm uppercase tracking-[0.16em] text-ink-faint">Send to ({whoLabel} email, comma-separated)</span>
+          <input value={recips} onChange={(e) => setRecips(e.target.value)} placeholder="name@company.com"
+            className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-base text-ink outline-none focus:border-accent" />
+        </label>
+        {draftErr && <p className="mt-2 text-base text-alert">{draftErr}</p>}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button onClick={() => sendArticle(id)} disabled={sending || !recips.trim()}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#7c3aed] px-5 py-2 text-base font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] hover:opacity-90 disabled:opacity-50">
+            {sending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+            {sending ? "Sending…" : `Approve & send to ${whoLabel}`}
+          </button>
+          <button onClick={onRedraft} disabled={drafting || liBusy || sending} className="rounded-lg border border-line px-4 py-2 text-base text-ink-dim hover:text-ink disabled:opacity-50">Redraft</button>
+          <button onClick={() => { setDraftFor(null); setLiDraft(false); setDraftErr(""); }} className="rounded-lg px-3 py-2 text-base text-ink-faint hover:text-ink">Cancel</button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="relative isolate overflow-hidden rounded-2xl border border-[#ec4899]/25 p-6"
@@ -129,14 +311,15 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
             <p className="mt-1.5 text-sm text-ink-dim">The market, on demand.</p>
           </div>
         </div>
-        <span className="w-full text-left text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim sm:w-auto sm:text-right">Sourced, never invented</span>
+        <span className="w-full text-left text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim sm:w-auto sm:text-right">Sourced, never invented.</span>
       </div>
-      <p className="mt-3.5 max-w-[94ch] text-[13px] leading-relaxed text-ink-dim">Two ways to run it. <b className="text-ink">Ask the market</b> a specific question and the pod researches the last 3 months to answer it, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> needs no question: it proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.</p>
+      {/* THREE ways to run it (Gary): Ask, Find what's new, and LinkedIn article. */}
+      <p className="mt-3.5 max-w-[94ch] text-[13px] leading-relaxed text-ink-dim">Three ways to run it. <b className="text-ink">Ask the market</b> a specific question and the pod researches the last 3 months to answer it, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> needs no question: it proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.{isAdmin && <> <b style={{ color: LINKEDIN_BLUE }}>LinkedIn article</b> turns a topic you type into a sourced, ready-to-post thought-leadership piece for your CEO or MD.</>}</p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="block">
           <span className="tabular block text-[10px] uppercase tracking-[0.2em] text-ink-faint">Brain</span>
-          <select value={clientId} onChange={(e) => { setClientId(e.target.value); setFindings(null); setErr(""); }}
+          <select value={clientId} onChange={(e) => { setClientId(e.target.value); setFindings(null); setErr(""); setDraftFor(null); setLiDraft(false); }}
             className="mt-1.5 rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3 py-2.5 text-[13.5px] text-ink outline-none focus:border-[#a855f7]">
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -156,8 +339,51 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
           className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 bg-[#a855f7]/10 px-5 py-2.5 text-[13.5px] font-bold text-ink transition hover:-translate-y-0.5 hover:border-[#a855f7] disabled:opacity-50 disabled:hover:translate-y-0">
           ✦ Find what&rsquo;s new
         </button>
-        <span className="text-[11px] text-ink-faint">⌘/Ctrl + Enter · takes a minute, it searches the web live</span>
+        {/* LinkedIn article (admin-only), in the actual LinkedIn blue so it stands out (Gary). */}
+        {isAdmin && (
+          <button onClick={() => { setLiOpen((v) => !v); setDraftErr(""); }} disabled={busy}
+            className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-[13.5px] font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+            style={{ backgroundColor: LINKEDIN_BLUE, boxShadow: "0 8px 24px -12px " + LINKEDIN_BLUE }}>
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.8 0 0 .78 0 1.74v20.52C0 23.22.8 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.74V1.74C24 .78 23.2 0 22.22 0z" /></svg>
+            LinkedIn article
+          </button>
+        )}
       </div>
+
+      {/* THE LINKEDIN-ARTICLE TOPIC PROMPT (admin-only). Type a topic; the pod researches it (grounded, last 3
+          months) and drafts directly. */}
+      {isAdmin && liOpen && !liDraft && (
+        <div className="mt-3.5 rounded-xl border p-3.5" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "12" }}>
+          <span className="tabular block text-sm uppercase tracking-[0.16em] text-ink-faint">Topic for the {whoLabel}&rsquo;s LinkedIn piece</span>
+          <textarea value={liTopic} onChange={(e) => setLiTopic(e.target.value)} rows={2}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) draftFromTopic(); }}
+            placeholder={`e.g. why ${brainName}'s customers are shifting to X, and what it means`}
+            className="mt-1.5 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-[#0A66C2]" />
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <button onClick={draftFromTopic} disabled={liBusy || !liTopic.trim()}
+              className="inline-flex items-center gap-2 rounded-lg px-5 py-2 text-base font-bold text-white disabled:opacity-50"
+              style={{ backgroundColor: LINKEDIN_BLUE }}>
+              {liBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+              {liBusy ? "Researching…" : "Research & draft"}
+            </button>
+            <button onClick={() => { setLiOpen(false); setDraftErr(""); }} className="rounded-lg px-3 py-2 text-base text-ink-faint hover:text-ink">Cancel</button>
+            <span className="text-[11px] text-ink-faint">Grounded, verified sources only. Never fabricated to fit the prompt.</span>
+          </div>
+          {liBusy && <div className="mt-3 text-base text-accent"><Working messages={WORKING_LINKEDIN} /></div>}
+          {draftErr && !liBusy && <p className="mt-2 text-base text-alert">{draftErr}</p>}
+        </div>
+      )}
+
+      {/* THE STANDALONE LINKEDIN DRAFT (once research + draft came back). */}
+      {liDraft && draftFor && (
+        <div className="mt-3.5 rounded-xl border p-4" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "0d" }}>
+          {sentFor === draftFor ? (
+            <p className="text-base font-semibold text-[#86efac]">✓ Article emailed to the {whoLabel}. A copy is in your inbox.</p>
+          ) : draftFor === "li-pending" ? (
+            <p className="text-base text-alert">{draftErr}</p>
+          ) : draftEditor(draftFor, draftFromTopic)}
+        </div>
+      )}
 
       {/* AUTOMATION collapsed by default (Gary: the section was too long). One toggle under the buttons reveals the
           schedule + recipients + the CEO-article cadence for the selected brain. */}
@@ -213,40 +439,17 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
                   </div>
                 )}
 
-                {/* CEO THOUGHT-LEADERSHIP (Gary): draft this finding into the client CEO's LinkedIn piece, then email it. */}
+                {/* CEO/MD THOUGHT-LEADERSHIP (Gary): draft this finding into the exec's LinkedIn piece, then email it.
+                    Drafting + sending is admin-only; members keep Add-to-brain. */}
                 {f.id && (
                   <div className="mt-3 border-t border-line pt-3">
                     {sentFor === f.id ? (
-                      <p className="text-base font-semibold text-[#86efac]">✓ Article emailed to the CEO. A copy is in your inbox.</p>
-                    ) : draftFor === f.id ? (
+                      <p className="text-base font-semibold text-[#86efac]">✓ Article emailed to the {whoLabel}. A copy is in your inbox.</p>
+                    ) : draftFor === f.id && !liDraft ? (
                       <div>
                         {drafting ? (
-                          <p className="text-base text-accent">Drafting the CEO&rsquo;s article…</p>
-                        ) : (
-                          <>
-                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                              <span className="tabular text-sm uppercase tracking-[0.16em] text-ink-faint">CEO article{ceoName ? ` · ${ceoName}` : ""} · edit before sending</span>
-                              {art && <span className="text-sm text-ink-faint">Image idea: {art}</span>}
-                            </div>
-                            <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)} rows={12}
-                              className="mt-2 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-accent" />
-                            <label className="mt-3 block">
-                              <span className="tabular block text-sm uppercase tracking-[0.16em] text-ink-faint">Send to (CEO email, comma-separated)</span>
-                              <input value={recips} onChange={(e) => setRecips(e.target.value)} placeholder="kagiso@mtn.com, ea@mtn.com"
-                                className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-base text-ink outline-none focus:border-accent" />
-                            </label>
-                            {draftErr && <p className="mt-2 text-base text-alert">{draftErr}</p>}
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <button onClick={() => sendArticle(f)} disabled={sending || !recips.trim()}
-                                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-5 py-2 text-base font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] hover:opacity-90 disabled:opacity-50">
-                                {sending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-                                {sending ? "Sending…" : "Approve & send to CEO"}
-                              </button>
-                              <button onClick={() => draftArticle(f)} disabled={drafting || sending} className="rounded-lg border border-line px-4 py-2 text-base text-ink-dim hover:text-ink disabled:opacity-50">Redraft</button>
-                              <button onClick={() => { setDraftFor(null); setDraftErr(""); }} className="rounded-lg px-3 py-2 text-base text-ink-faint hover:text-ink">Cancel</button>
-                            </div>
-                          </>
-                        )}
+                          <p className="text-base text-accent">Drafting the {whoLabel}&rsquo;s article…</p>
+                        ) : draftEditor(f.id, () => draftArticle(f))}
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
@@ -258,10 +461,12 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
                             {addingId === f.id ? "Adding…" : "＋ Add to brain"}
                           </button>
                         )}
-                        <button onClick={() => draftArticle(f)} disabled={drafting}
-                          className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-2 text-base font-semibold text-accent hover:bg-accent/10 disabled:opacity-50">
-                          ✍️ Write me a LinkedIn article
-                        </button>
+                        {isAdmin && (
+                          <button onClick={() => draftArticle(f)} disabled={drafting}
+                            className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-2 text-base font-semibold text-accent hover:bg-accent/10 disabled:opacity-50">
+                            ✍️ Draft the {whoLabel}&rsquo;s article
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

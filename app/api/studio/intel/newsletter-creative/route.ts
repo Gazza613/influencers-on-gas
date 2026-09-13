@@ -32,30 +32,39 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { clientId?: string; subject?: string; callout?: string };
+  const b = (await req.json().catch(() => ({}))) as { clientId?: string; subject?: string; callout?: string; publisher?: string; ratios?: unknown };
   const clientId = String(b.clientId || "");
   const subject = String(b.subject || "").trim();
+  // WHICH SHAPES the team picked (Gary): 1x1, 16x9, or both. Defaults to 1x1 for the existing callers that do
+  // not pass it (the intel queue and research gate).
+  const ratios = (Array.isArray(b.ratios) ? b.ratios : []).map((x) => String(x)).filter((r) => r === "1x1" || r === "16x9") as ("1x1" | "16x9")[];
   // ONE LINE for a newsletter post (Gary: "keep the callout to 1 line for a more corporate appeal"). If the
   // writer hands back a two-part line, we take the first half rather than stack it.
   const callout = tidyCallout(String(b.callout || "")).split("/")[0].replace(/[,;]\s*$/, "").trim();
   if (!clientId || !subject) return NextResponse.json({ error: "Nothing to art-direct yet." }, { status: 400 });
 
   try {
-    // IF THE CLIENT HAS A CEO PHOTO ON FILE, the creative is HIM - forensically, his real cut-out face on a MoMo
-    // field, with his name plate (Gary). Returns THREE for the team to pick from. Otherwise we fall back to the
-    // generic emotive photograph below.
-    const ceoPhotos = await listAssets(clientId, "ceo_photo").catch(() => []);
-    if (ceoPhotos.length) {
-      // Identity comes from THIS brain. Passing nothing used to mean MoMo's CEO by default.
-      const brief = await loadIntelBrief(clientId).catch(() => null);
+    // IF THE PUBLISHER HAS A PHOTO ON FILE, the creative is THEM - forensically, their real cut-out face on the
+    // brand field, with their name plate (Gary). Who publishes (CEO or MD) is the per-brain default unless the
+    // caller overrides it; the photo, name and designation all follow that choice. Returns the picked shapes,
+    // three backdrops each, for the team to choose from. Otherwise we fall back to the generic photograph below.
+    const brief = await loadIntelBrief(clientId).catch(() => null);
+    const publisher = b.publisher === "md" || b.publisher === "ceo" ? b.publisher : (brief?.publisher ?? "ceo");
+    const photoKind = publisher === "md" ? "md_photo" : "ceo_photo";
+    const execPhotos = await listAssets(clientId, photoKind).catch(() => []);
+    if (execPhotos.length) {
+      const name = publisher === "md" ? brief?.mdName : brief?.ceoName;
+      const title = publisher === "md" ? brief?.mdTitle : brief?.ceoTitle;
       const r = await buildCeoCreatives(clientId, {
         message: callout || subject,
-        name: brief?.ceoName ?? undefined,
-        title: brief?.ceoTitle ?? undefined,
+        name: name ?? undefined,
+        title: title ?? undefined,
+        photoKind,
+        ratios: ratios.length ? ratios : ["1x1"],
       });
-      const urls = r.creatives.filter((c) => c.url).map((c) => c.url);
-      if (urls.length) return NextResponse.json({ ok: true, url: urls[0], urls });
-      return NextResponse.json({ error: r.error || "the CEO creative did not come back" }, { status: 500 });
+      const made = r.creatives.filter((c) => c.url);
+      if (made.length) return NextResponse.json({ ok: true, url: made[0].url, urls: made.map((c) => c.url), creatives: made });
+      return NextResponse.json({ error: r.error || "the creative did not come back" }, { status: 500 });
     }
 
     // 1. A CLEAN PHOTOGRAPH, 1:1 (1200x1200).

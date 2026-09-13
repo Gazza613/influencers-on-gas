@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import AppHeader from "@/components/AppHeader";
 import MarketQuestion from "@/components/MarketQuestion";
 import PodAgents from "@/components/PodAgents";
@@ -506,6 +507,9 @@ function StepNote({ text }: { text: string }) {
 
 export default async function HomePage() {
   const clients = await listStudioClients().catch(() => [] as { id: string; name: string }[]);
+  // The LinkedIn-article button drafts a piece that goes out under a client exec's name, so it is admin-only.
+  const session = await auth();
+  const isAdmin = session?.user?.role === "super_admin" || session?.user?.role === "admin";
   // Total AI agents across the four Intelligence pods, for the hero stat. Brains = clients.length and pods =
   // HERO_PODS.length are read directly by HeroStats.
   const agentCount = Object.values(POD_AGENTS).reduce((n, p) => n + p.agents.length, 0);
@@ -695,7 +699,7 @@ export default async function HomePage() {
 
               {/* DAILY INTELLIGENCE - the REAL, functional component, unchanged, mounted under the Intelligence pods. */}
               {isIntel && clients.length > 0 && (
-                <div style={{ marginTop: 13 }}><MarketQuestion clients={clients} /></div>
+                <div style={{ marginTop: 13 }}><MarketQuestion clients={clients} isAdmin={isAdmin} /></div>
               )}
             </section>
           );

@@ -158,6 +158,11 @@ export type IntelBrief = {
   ceoRules: string | null;
   ceoName: string | null;
   ceoTitle: string | null;
+  // THE MD, the alternate publisher (Gary). Same shape as the CEO. `publisher` is the per-brain default of who
+  // the thought-leadership goes out under ('ceo' | 'md'); the draft screen can override it per piece.
+  mdName: string | null;
+  mdTitle: string | null;
+  publisher: "ceo" | "md";
   // The client's OWN official website - the ground truth the desks must stay inside (Gary). Both desks anchor
   // to it so they can never research a same-named but different business.
   website: string | null;
@@ -180,7 +185,8 @@ function normSchedule(v: unknown): "off" | "daily" | "weekly" {
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const rows = (await db().query(
     `select b.client_id, c.name as client_name, c.website, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
-            b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title, b.deprecated_products, b.email_schedule, b.email_recipients
+            b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title, b.md_name, b.md_title, b.newsletter_publisher,
+            b.deprecated_products, b.email_schedule, b.email_recipients
      from intel_briefs b join clients c on c.id = b.client_id
      where b.client_id = $1`,
     [clientId],
@@ -199,6 +205,9 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
     ceoRules: (r.ceo_rules as string) || null,
     ceoName: (r.ceo_name as string) || null,
     ceoTitle: (r.ceo_title as string) || null,
+    mdName: (r.md_name as string) || null,
+    mdTitle: (r.md_title as string) || null,
+    publisher: r.newsletter_publisher === "md" ? "md" : "ceo",
     website: (r.website as string) || null,
     deprecatedProducts: Array.isArray(r.deprecated_products) ? (r.deprecated_products as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
     emailSchedule: normSchedule(r.email_schedule),

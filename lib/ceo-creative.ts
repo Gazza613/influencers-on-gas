@@ -97,13 +97,27 @@ function designFor(clientId: string): CeoDesign {
   return MOMO_DESIGN;
 }
 
-export type CeoCreative = { url: string; error?: string };
+// The creative comes in the shapes the team picks (Gary): a 1x1 square for the LinkedIn feed and a 16x9
+// landscape. Each is a full render at its own canvas + backdrop aspect, tagged so the UI can group and the
+// email can embed the 16x9 and attach the chosen shape(s).
+export type Ratio = "1x1" | "16x9";
+const RATIO_DIMS: Record<Ratio, { W: number; H: number; aspect: "1:1" | "16:9" }> = {
+  "1x1": { W: 1200, H: 1200, aspect: "1:1" },
+  "16x9": { W: 1920, H: 1080, aspect: "16:9" },
+};
+
+export type CeoCreative = { url: string; ratio: Ratio; error?: string };
 
 export async function buildCeoCreatives(
   clientId: string,
-  opts: { message: string; name?: string; title?: string },
+  opts: { message: string; name?: string; title?: string; photoKind?: "ceo_photo" | "md_photo"; ratios?: Ratio[] },
 ): Promise<{ creatives: CeoCreative[]; error: string | null }> {
   const design = designFor(clientId);
+  // WHO PUBLISHES (Gary): the CEO or the MD. Their real photo lives under the matching asset kind; a missing
+  // photo for the chosen publisher is a refusal, never a fall-back to the other person's face.
+  const photoKind = opts.photoKind === "md_photo" ? "md_photo" : "ceo_photo";
+  const who = photoKind === "md_photo" ? "MD" : "CEO";
+  const ratios: Ratio[] = (opts.ratios && opts.ratios.length ? opts.ratios : ["1x1"]).filter((r): r is Ratio => r === "1x1" || r === "16x9");
   // 1. His real photo. VARIED, not always the same one (Gary: "does Kagiso always have to be wearing the same
   //    clothes - this will make the post very stale").
   //
@@ -114,8 +128,8 @@ export async function buildCeoCreatives(
   //
   //    Resolution still gates the choice, because a soft face is worse than a repeated jacket: only photos
   //    within reach of the largest are eligible, then we rotate among those so successive posts differ.
-  const photos = await listAssets(clientId, "ceo_photo");
-  if (!photos.length) return { creatives: [], error: "No CEO photo on file. Upload one on the intake page first." };
+  const photos = await listAssets(clientId, photoKind);
+  if (!photos.length) return { creatives: [], error: `No ${who} photo on file. Upload one on the intake page first.` };
   const sized = await Promise.all(photos.map(async (p) => {
     try {
       const m = await sharp(Buffer.from(new Uint8Array(await (await fetch(p.url)).arrayBuffer()))).metadata();
@@ -142,10 +156,9 @@ export async function buildCeoCreatives(
   const name = (opts.name || "").trim();
   const title = (opts.title || "").trim();
   if (!name || !title) {
-    return { creatives: [], error: "This brain has no CEO name and title set, so there is nobody to attribute the creative to." };
+    return { creatives: [], error: `This brain has no ${who} name and title set, so there is nobody to attribute the creative to.` };
   }
   const message = tidyCallout(opts.message).split("/")[0].replace(/[,;]\s*$/, "").trim();
-  const W = 1200, H = 1200;
 
   // 2. Cut him out ONCE with a PROPER matting model - fal BiRefNet - not luminance keying. A CEO cut-out has to
   //    be flawless (Gary: "not good, CEO will not approve"), and flood-fill left a ragged, haloed edge on his
@@ -198,74 +211,11 @@ export async function buildCeoCreatives(
     } catch (e) { console.error("[ceo-creative] could not cache the cut-out:", e); }
   }
 
-  // Size him to sit on the RIGHT, bottom-anchored. Right-aligned with a small right bleed so his left edge lands
-  // clear of the message column, whatever his shoulder width.
+  // The cut-out is ratio-independent, so it is done once above. Everything below - figure sizing, the backdrops,
+  // the overlay - depends on the CANVAS, so it runs once PER RATIO. The logo pick is canvas-independent too.
   const cm = await sharp(cut).metadata();
-  // NEVER UPSCALE HARD. Enlarging a small cut-out cannot add detail, it only softens his face - the pixelation
-  // Gary saw. Allow a mild 1.15x at most, otherwise render him at his native size and let him sit slightly
-  // smaller in frame. Crisp and smaller beats big and mushy on a CEO.
   const nativeH = cm.height || 0;
-  // She is the hero and sits PROMINENT on both schemes - a shrunk figure floating in the corner is not a CEO
-  // portrait. A head-and-shoulders cut-out is naturally near-square (wide crossed arms, a narrow head), so the
-  // light layout does NOT try to fit her whole width beside the panel; it centres her by the HEAD and lets the
-  // wide arms tuck behind the panel and bleed gently off frame, the way an executive portrait actually sits.
-  const figScale = design.scheme === "light" ? 0.88 : 0.96;
-  const figH = Math.min(Math.round(H * figScale), Math.round((nativeH || H) * 1.15));
-  const figW = Math.round((cm.width || 800) * (figH / (nativeH || 1000)));
-  const figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
-
-  // BLEND HIM INTO THE SCENE. A hard cut-out on a generated backdrop reads as two separate pictures (Gary:
-  // "looks detached"). Two cheap, physical fixes do most of the work:
-  //   1. a CONTACT SHADOW - their own silhouette, blurred and dimmed, sitting behind and just off them.
-  //   2. a TONE MATCH - pull saturation and brightness so they share the backdrop's grade. On a LIGHT field a
-  //      near-black grade would over-darken the figure and a heavy shadow would smudge; both are lightened.
-  const tone = design.scheme === "light" ? { brightness: 1.0, saturation: 1.0 } : { brightness: 0.94, saturation: 0.88 };
-  const shadowGain = design.scheme === "light" ? 0.42 : 0.5;
-  const figure = design.scheme === "light"
-    ? await sharp(figureRaw).modulate(tone).sharpen({ sigma: 1.1 }).png().toBuffer()
-    : await sharp(figureRaw).modulate(tone).png().toBuffer();
-  const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
-  const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
-  const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
-  // WHERE THE FIGURE SITS, bottom-anchored, leftmost point clearing the message column so the headline never
-  // reaches it.
-  //   - DARK (MoMo): a small RIGHT BLEED - the figure runs off the right edge, which suits a full-bleed navy
-  //     composition. Floor 45%.
-  //   - LIGHT (BrightRock): she must sit WHOLE, not cut off (Gary). Right-align her against a small right
-  //     margin so the whole person is in frame, and only fall back to the 48% floor if she is so wide that
-  //     keeping her whole would cross into the text column - in which case the figure was over-scaled upstream.
-  let figLeft: number;
-  if (design.scheme === "light") {
-    // CENTRE HER BY THE HEAD in the office (Gary: "moved over and centred in this section"). Her head sits at
-    // the horizontal centre of the cut-out, so putting the figure centre near 63% of the frame places her head
-    // in the middle of the room. The wide arms then tuck behind the panel on the left and bleed a little off the
-    // right - both are low, soft parts of the silhouette, never her face. Bleed is capped to ~6% so "cut off on
-    // the right" never returns.
-    const headCentre = Math.round(W * 0.63);
-    figLeft = Math.min(headCentre - Math.round(figW / 2), W - Math.round(figW * 0.94));
-  } else {
-    figLeft = Math.max(Math.round(W * 0.45), W - figW);
-  }
-  const figTop = H - figH;
-
-  // 3. The foreground overlay - message, name plate, compliance, logo, mark - one render, in the brand's design.
-  const overlay = await renderCeoOverlay(W, H, message, name, title, legal, fonts, design);
-
-  // 4. The three fields.
-  //
-  //   - DARK (MoMo): AI-generated navy backdrops - studio, HQ, dusk - which give a rich, real depth behind him.
-  //   - LIGHT (BrightRock): DESIGNED gradient fields, NOT AI. Gary asked for "no background, corporate", and an
-  //     AI office for a light insurer came back flat and cheap while WASHING HER OUT - a light figure on a
-  //     light AI field with no tonal control disappears. A designed field guarantees the one thing that fixes
-  //     that: a soft deepening behind and below her so she always separates from the background. It is also
-  //     cleaner, more corporate, and costs no generation. Three subtle variants so the team still picks from
-  //     three.
-  const prompts = design.backdrops.map((d) =>
-    `${d}. NO people, NO faces, NO text, NO lettering, NO numbers, NO logo, NO graphics of any kind - it is a ` +
-    `plain BACKGROUND only. Keep the LEFT third calmer and less busy so a headline can sit over it; the RIGHT ` +
-    `side carries the room. Sharp, high resolution.`);
-  const shots = await generateBatchDetailed(prompts, "nano_banana_pro", "1:1", { resolution: "2k" }, null);
-  await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
+  const nativeW = cm.width || 800;
 
   // The logo lockup that reads on THIS field. A dark field wants the light/reversed mark; a light field wants
   // the dark one. logoPrefersLight flips the whole score, so the same picker serves both.
@@ -284,41 +234,88 @@ export async function buildCeoCreatives(
   const logoBuf = logo ? Buffer.from(new Uint8Array(await (await fetch(logo.url)).arrayBuffer())) : null;
 
   const creatives: CeoCreative[] = [];
-  for (let i = 0; i < shots.length; i++) {
-    try {
-      const bgUrl = shots[i]?.url;
-      // LIGHT: a designed field with a soft deepening where she stands, so she separates. Three subtle variants.
-      // DARK: the AI backdrop, or the brand field as a fallback.
-      const bg = bgUrl
-        ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
-        : design.scheme === "light" ? await lightField(W, H, i) : await brandField(W, H, design.field);
+  for (const ratio of ratios) {
+    const { W, H, aspect } = RATIO_DIMS[ratio];
+    const wide = ratio === "16x9";
 
-      // DARK allows up to a 50% right bleed; LIGHT allows the small (~6%) arm bleed figLeft already sized, so
-      // her head stays centred in the room rather than being shoved back on-canvas.
-      const x = design.scheme === "light"
-        ? Math.max(0, figLeft)
-        : Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
-      // NO CONTACT SHADOW ON LIGHT. A blurred black shadow bleeds through her translucent hair and shoulder
-      // edges as grey murk on a light field - the "shading on her face" Gary saw. A photographic boardroom
-      // separates her by its own depth of field, so the shadow only hurts. MoMo keeps its shadow on dark.
-      const layers = design.scheme === "light"
-        ? [{ input: figure, left: x, top: figTop }, { input: overlay, left: 0, top: 0 }]
-        : [
-            { input: shadow, left: Math.max(0, x - Math.round(figW * 0.03)), top: Math.max(0, figTop + Math.round(figH * 0.012)) },
-            { input: figure, left: x, top: figTop },
-            { input: overlay, left: 0, top: 0 },
-          ];
-      let out = await sharp(bg).composite(layers).png().toBuffer();
-      if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 5, wPct: design.scheme === "light" ? 26 : 24 })) as Buffer;
+    // SIZE THE FIGURE FOR THIS CANVAS, bottom-anchored, never hard-upscaled (>1.15x only softens a face).
+    // On 16x9 the figure is capped to the right ~half so it never crosses the text column, which is why a wide
+    // landscape needs its own clamp the square never did.
+    const figScale = design.scheme === "light" ? (wide ? 0.98 : 0.88) : 0.96;
+    let figH = Math.min(Math.round(H * figScale), Math.round((nativeH || H) * 1.15));
+    let figW = Math.round(nativeW * (figH / (nativeH || 1000)));
+    if (wide && figW > Math.round(W * 0.52)) {
+      // Too wide for a landscape: pull the height down so the figure fits the right half and the left stays clear.
+      figW = Math.round(W * 0.52);
+      figH = Math.round((nativeH || 1000) * (figW / (nativeW || 800)));
+    }
+    const figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
 
-      const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
-      creatives.push({ url });
-    } catch (e) {
-      creatives.push({ url: "", error: String((e as Error)?.message || e).slice(0, 120) });
+    // BLEND INTO THE SCENE: a contact shadow (their own silhouette, blurred) + a tone match to the field.
+    const tone = design.scheme === "light" ? { brightness: 1.0, saturation: 1.0 } : { brightness: 0.94, saturation: 0.88 };
+    const shadowGain = design.scheme === "light" ? 0.42 : 0.5;
+    const figure = design.scheme === "light"
+      ? await sharp(figureRaw).modulate(tone).sharpen({ sigma: 1.1 }).png().toBuffer()
+      : await sharp(figureRaw).modulate(tone).png().toBuffer();
+    const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
+    const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
+    const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
+
+    // WHERE THE FIGURE SITS. 16x9: right-anchored, the text living in the calm left half. Square: the tuned
+    // per-scheme placement (dark bleeds off the right; light centres the head in the room).
+    let figLeft: number;
+    if (wide) {
+      figLeft = W - figW;
+    } else if (design.scheme === "light") {
+      const headCentre = Math.round(W * 0.63);
+      figLeft = Math.min(headCentre - Math.round(figW / 2), W - Math.round(figW * 0.94));
+    } else {
+      figLeft = Math.max(Math.round(W * 0.45), W - figW);
+    }
+    const figTop = H - figH;
+
+    // The foreground overlay - message, name plate, compliance, logo, mark - one render per canvas.
+    const overlay = await renderCeoOverlay(W, H, message, name, title, legal, fonts, design);
+
+    // THE THREE FIELDS at this aspect (generated for both schemes; the light scheme uses its designed gradient
+    // field when a generation comes back soft, via the composite fallback below - behaviour unchanged from 1x1).
+    const prompts = design.backdrops.map((d) =>
+      `${d}. NO people, NO faces, NO text, NO lettering, NO numbers, NO logo, NO graphics of any kind - it is a ` +
+      `plain BACKGROUND only. Keep the LEFT third calmer and less busy so a headline can sit over it; the RIGHT ` +
+      `side carries the room. Sharp, high resolution.`);
+    const shots = await generateBatchDetailed(prompts, "nano_banana_pro", aspect, { resolution: "2k" }, null);
+    await recordUsage({ clientId, provider: "higgsfield", model: "nano_banana_pro", unit: "image", action: "ceo-backdrop", count: shots.length }).catch(() => {});
+
+    for (let i = 0; i < shots.length; i++) {
+      try {
+        const bgUrl = shots[i]?.url;
+        const bg = bgUrl
+          ? await sharp(Buffer.from(new Uint8Array(await (await fetch(bgUrl)).arrayBuffer()))).resize(W, H, { fit: "cover" }).png().toBuffer()
+          : design.scheme === "light" ? await lightField(W, H, i) : await brandField(W, H, design.field);
+
+        const x = design.scheme === "light" || wide
+          ? Math.max(0, figLeft)
+          : Math.max(0, Math.min(figLeft, W - Math.round(figW * 0.5)));
+        // No contact shadow on light (it smudges translucent hair/shoulders on a light field). Dark keeps it.
+        const layers = design.scheme === "light"
+          ? [{ input: figure, left: x, top: figTop }, { input: overlay, left: 0, top: 0 }]
+          : [
+              { input: shadow, left: Math.max(0, x - Math.round(figW * 0.03)), top: Math.max(0, figTop + Math.round(figH * 0.012)) },
+              { input: figure, left: x, top: figTop },
+              { input: overlay, left: 0, top: 0 },
+            ];
+        let out = await sharp(bg).composite(layers).png().toBuffer();
+        if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 5, yPct: 5, wPct: design.scheme === "light" ? 26 : 24 })) as Buffer;
+
+        const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
+        creatives.push({ url, ratio });
+      } catch (e) {
+        creatives.push({ url: "", ratio, error: String((e as Error)?.message || e).slice(0, 120) });
+      }
     }
   }
   const ok = creatives.filter((c) => c.url);
-  return { creatives: ok.length ? creatives : [], error: ok.length ? null : "All three renders failed. Try again." };
+  return { creatives: ok.length ? ok : [], error: ok.length ? null : "All the renders failed. Try again." };
 }
 
 // The message + name plate + compliance, as one transparent overlay, in the brand's design. Left-aligned - the

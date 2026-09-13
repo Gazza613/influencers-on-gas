@@ -8,7 +8,13 @@ export function emailConfigured() {
 
 // `fromName` overrides the inbox display name for a single email. The Strategist briefing goes to EXCO and to
 // MoMo's internal team, and landing there as "Influencers on GAS" mislabels it (Gary). The address is unchanged.
-export async function sendEmail(opts: { to: string; subject: string; html: string; bcc?: string; fromName?: string }) {
+// `attachments` rides straight through to nodemailer. The CEO thought-leadership email attaches the chosen
+// creative(s) so the piece arrives post-ready (Gary): pass the Vercel Blob URL as `path` and nodemailer fetches
+// and attaches it. A `content` Buffer is also supported for anything generated in-process.
+export async function sendEmail(opts: {
+  to: string; subject: string; html: string; bcc?: string; fromName?: string;
+  attachments?: { filename: string; path?: string; content?: Buffer; contentType?: string }[];
+}) {
   if (!emailConfigured()) return { sent: false, reason: "GMAIL_USER / GMAIL_APP_PASSWORD not set" };
   const transport = nodemailer.createTransport({
     service: "gmail",
@@ -21,6 +27,10 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   const from = `${opts.fromName || "Studio on GAS"} <${process.env.GMAIL_USER}>`;
   // Strip CR/LF from the subject as a header-injection backstop (nodemailer encodes headers too, belt and braces).
   const subject = String(opts.subject || "").replace(/[\r\n]+/g, " ").trim();
-  await transport.sendMail({ from, to: opts.to, subject, html: opts.html, ...(opts.bcc ? { bcc: opts.bcc } : {}) });
+  await transport.sendMail({
+    from, to: opts.to, subject, html: opts.html,
+    ...(opts.bcc ? { bcc: opts.bcc } : {}),
+    ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
+  });
   return { sent: true };
 }

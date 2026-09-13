@@ -26,12 +26,14 @@ export async function GET(req: Request) {
   const clientId = new URL(req.url).searchParams.get("clientId") || "";
   if (!clientId) return NextResponse.json({ recipients: [], ceoName: "", ceoTitle: "" });
   const rows = (await db().query(
-    `select ceo_recipients, ceo_name, ceo_title from intel_briefs where client_id = $1`, [clientId],
-  ).catch(() => [])) as { ceo_recipients: string[] | null; ceo_name: string | null; ceo_title: string | null }[];
+    `select ceo_recipients, ceo_name, ceo_title, md_name, md_title, newsletter_publisher from intel_briefs where client_id = $1`, [clientId],
+  ).catch(() => [])) as { ceo_recipients: string[] | null; ceo_name: string | null; ceo_title: string | null; md_name: string | null; md_title: string | null; newsletter_publisher: string | null }[];
   const r = rows[0];
   return NextResponse.json({
     recipients: Array.isArray(r?.ceo_recipients) ? r!.ceo_recipients! : [],
     ceoName: r?.ceo_name || "", ceoTitle: r?.ceo_title || "",
+    mdName: r?.md_name || "", mdTitle: r?.md_title || "",
+    publisher: r?.newsletter_publisher === "md" ? "md" : "ceo",
   });
 }
 
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => ({}))) as {
     action?: string; clientId?: string; id?: string; notes?: string;
     recipients?: unknown; post?: string; subject?: string;
+    publisher?: string; heroUrl?: string; creativeUrls?: unknown;
   };
   const action = String(b.action || "").trim();
   const clientId = String(b.clientId || "").trim();
@@ -89,19 +92,28 @@ export async function POST(req: Request) {
     const post = String(b.post || String(f.headline || "")).trim();
     if (!post) return NextResponse.json({ error: "There is no article to send. Draft it first." }, { status: 400 });
 
-    const brief = (await db().query(`select b.ceo_name, c.name as client_name from intel_briefs b join clients c on c.id = b.client_id where b.client_id = $1`, [clientId]).catch(() => [])) as { ceo_name: string | null; client_name: string | null }[];
-    const ceoName = brief[0]?.ceo_name || "";
+    const brief = (await db().query(`select b.ceo_name, b.ceo_title, b.md_name, b.md_title, b.newsletter_publisher, c.name as client_name from intel_briefs b join clients c on c.id = b.client_id where b.client_id = $1`, [clientId]).catch(() => [])) as { ceo_name: string | null; ceo_title: string | null; md_name: string | null; md_title: string | null; newsletter_publisher: string | null; client_name: string | null }[];
+    // WHO PUBLISHES: the per-brain default, overridable at send time (Gary). The signer's name + designation come
+    // from whichever executive is publishing.
+    const publisher = b.publisher === "md" || b.publisher === "ceo" ? b.publisher : (brief[0]?.newsletter_publisher === "md" ? "md" : "ceo");
+    const signerName = (publisher === "md" ? brief[0]?.md_name : brief[0]?.ceo_name) || "";
+    const signerTitle = (publisher === "md" ? brief[0]?.md_title : brief[0]?.ceo_title) || "";
     const clientName = brief[0]?.client_name || "";
     const title = post.split(/\n{2,}/)[0]?.replace(/^#{1,3}\s+/, "").trim() || "A note on the market";
     const subject = String(b.subject || "").trim() || title.slice(0, 150);
-    // The client's own logo in the header (Gary), else the GAS orb. review=false: this is the piece itself, to the CEO.
+    // The client's own logo in the header (Gary), else the GAS orb. review=false: the WHITE editorial piece itself.
     const logoUrl = await getClientEmailLogo(clientId).catch(() => null);
-    const html = buildCeoArticleEmail({ client: clientName, ceoName, post, ceoRecipients: recipients, logoUrl, dateLabel: `${clientName} · ${ukDate(new Date().toISOString())}`, review: false });
+    // The 16x9 creative rides at the top of the email; every chosen creative is attached so the piece is post-ready.
+    const heroUrl = String(b.heroUrl || "").trim() || null;
+    const creativeUrls = (Array.isArray(b.creativeUrls) ? b.creativeUrls : []).map((x) => String(x).trim()).filter((u) => /^https?:\/\//.test(u));
+    const html = buildCeoArticleEmail({ client: clientName, ceoName: signerName, ceoTitle: signerTitle, post, ceoRecipients: recipients, logoUrl, heroUrl, dateLabel: `${clientName} · ${ukDate(new Date().toISOString())}`, review: false });
+    const attachments = creativeUrls.map((url, i) => ({ filename: `${clientName || "creative"}-${i + 1}.png`.replace(/\s+/g, "-"), path: url }));
 
     const r = await sendEmail({
       to: recipients.join(", "),
       bcc: session.user?.email || undefined,
       subject, html, fromName: "Researcher on GAS",
+      ...(attachments.length ? { attachments } : {}),
     }).catch((e) => ({ sent: false, error: String((e as Error)?.message || e) }));
     if (!(r as { sent?: boolean }).sent) return NextResponse.json({ error: `Could not send: ${(r as { error?: string }).error || "unknown"}`.slice(0, 200) }, { status: 400 });
 
