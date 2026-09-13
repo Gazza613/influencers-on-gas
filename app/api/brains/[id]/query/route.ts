@@ -148,7 +148,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Wider than the old 6. The answer is written from these, so a fact split across a chunk boundary needs
     // its neighbour inside the window too - which is exactly what went wrong with the CEO's name.
-    const hits = await retrieve(id, query, 10);
+    const hits = await retrieve(id, query, 10, { userEmail: session.user?.email ?? null });
     if (!hits.length && mode === "brain") {
       return NextResponse.json({
         hits: [],

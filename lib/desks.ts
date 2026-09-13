@@ -73,7 +73,7 @@ const STRATEGIST = new Set(["daily-intel", "intel-verify"]);
 // everything you DO with it - asking it (brain-answer / -live), the coverage map, sharpening a saved answer,
 // and embedding a saved answer back in (ask-ingest). These Claude + Voyage actions used to leak to Unattributed,
 // so the Brain read cheaper than it is (Gary: brain costs must be accurate and visible).
-const BRAINS = new Set(["ingest", "brain-reindex", "brain-answer", "brain-answer-live", "brain-coverage", "sharpen-question", "ask-ingest"]);
+const BRAINS = new Set(["ingest", "brain-reindex", "brain-answer", "brain-answer-live", "brain-coverage", "sharpen-question", "ask-ingest", "brain-rerank"]);
 const PLATFORM = new Set(["research", "list", "status", "create", "search"]);
 
 export function deskOf(action: string | null | undefined): Desk {

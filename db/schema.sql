@@ -89,6 +89,16 @@ create index if not exists idx_knowledge_chunks_embedding
 create unique index if not exists knowledge_chunks_dedup
   on knowledge_chunks (client_id, coalesce(source_id::text, ''), (metadata->>'h'))
   where metadata->>'h' is not null;
+-- HYBRID RETRIEVAL, lexical half (Gary: retrieval must be world-class). A single dense vector misses exact terms
+-- a brand cares about - a product name, a price, a person's name - because the embedding smooths them into a
+-- topic. So retrieve() now fuses the dense cosine search with a lexical tsvector search (Reciprocal Rank Fusion)
+-- and hands the shortlist to Voyage rerank-2.5. This generated column IS the lexical index: `stored` keeps it in
+-- lock-step with content with zero ingest changes, and adding it backfills every existing chunk. The 2-arg
+-- to_tsvector('english', ...) form is IMMUTABLE (a constant config), which a generated column requires.
+alter table knowledge_chunks
+  add column if not exists content_tsv tsvector
+  generated always as (to_tsvector('english', content)) stored;
+create index if not exists idx_knowledge_chunks_tsv on knowledge_chunks using gin (content_tsv);
 
 -- ── Productions (the video runs) ──────────────────────────────────────────────
 create table if not exists productions (
@@ -369,6 +379,9 @@ insert into rate_card (provider, model, unit, credits_per_unit, price_cents_per_
   ('anthropic','claude-opus-4-8','request', 0, 500, true),
   ('anthropic','claude-haiku-4-5','image', 0, 5, true),
   ('voyage','voyage-4-lite','embed', 0, 0, true),
+  -- Voyage rerank-2.5, the final stage of hybrid retrieval. Priced per token like the embeddings and, on a
+  -- single query + a ~24-passage shortlist, negligible - metered at 0 for visibility, Recalibrate trues it up.
+  ('voyage','rerank-2.5','rerank', 0, 0, true),
   -- B-ROLL motion (Producer): Kling 3.0 image->video ~5s std, from the 9,000-credit Ultra POOL.
   -- ~6 credits/clip (2026 sourced; Higgsfield publishes no per-model table) × ~R0.77/credit.
   ('higgsfield','kling3','video', 6, 462, true),

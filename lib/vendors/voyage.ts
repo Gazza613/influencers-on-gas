@@ -41,3 +41,34 @@ export async function embed(texts: string[], inputType: "document" | "query" = "
 export function toVectorLiteral(v: number[]): string {
   return `[${v.join(",")}]`;
 }
+
+// RERANK (cross-encoder). A bi-encoder embedding scores query and document independently, so it misses fine
+// relevance ("who is the CEO" vs a passage that only mentions the CEO in passing). rerank-2.5 reads the query
+// and each candidate TOGETHER and scores true relevance, which is why it belongs at the end of retrieval: cast a
+// wide, cheap net first (dense + lexical), then let the expensive-but-accurate reranker pick the final order.
+const RERANK_BASE = "https://api.voyageai.com/v1/rerank";
+const RERANK_MODEL = "rerank-2.5";
+
+export type RerankResult = { index: number; score: number };
+
+// Score `documents` against `query`, most-relevant first. Returns the ORIGINAL index of each document plus its
+// relevance score, so the caller maps results back to its own candidate array. `truncation` lets Voyage clip an
+// over-long document rather than error the whole batch.
+export async function rerank(query: string, documents: string[], topK?: number): Promise<RerankResult[]> {
+  if (!documents.length) return [];
+  const k = await key();
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(RERANK_BASE, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${k}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: RERANK_MODEL, query, documents, top_k: topK ?? documents.length, truncation: true }),
+    });
+    if (res.status === 429 && attempt < 4) {
+      await new Promise((r) => setTimeout(r, 21000));
+      continue;
+    }
+    const data = (await res.json().catch(() => ({}))) as { data?: { index: number; relevance_score: number }[]; detail?: string };
+    if (!res.ok) throw new Error(`Voyage rerank failed (${res.status}): ${(data.detail || JSON.stringify(data)).slice(0, 180)}`);
+    return (data.data ?? []).map((d) => ({ index: d.index, score: d.relevance_score }));
+  }
+}

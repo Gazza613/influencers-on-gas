@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { db } from "./db";
-import { embed, toVectorLiteral } from "./vendors/voyage";
+import { embed, rerank, toVectorLiteral } from "./vendors/voyage";
+import { recordUsage } from "./usage";
 
 // CLEAN SCRAPED WEB CONTENT before it becomes brain knowledge (Gary: the scrape must be world-class, not a raw
 // dump). Firecrawl markdown carries a lot of non-knowledge: nav/blog-index link soup, image + CDN URLs, cookie
@@ -243,30 +244,89 @@ export async function reembedChunks(clientId: string, ids: string[]): Promise<nu
 
 export type Retrieved = { content: string; metadata: Record<string, unknown>; score: number };
 
+// HYBRID RETRIEVAL tuning. Cast a wide, cheap net with two retrievers, fuse, then rerank a bounded shortlist.
+const DENSE_N = 40;    // dense (vector) candidates pulled
+const LEX_N = 40;      // lexical (tsvector) candidates pulled
+const RRF_K = 60;      // Reciprocal Rank Fusion damping (the standard constant); larger flattens each rank's pull
+const SHORTLIST = 24;  // how many fused candidates the reranker actually scores
+
 // Retrieve the top-k most relevant chunks for a query, HARD-SCOPED to one brain.
-// The `client_id = $1` filter is the isolation guarantee.
-export async function retrieve(clientId: string, query: string, k = 6): Promise<Retrieved[]> {
-  const [qv] = await embed([query], "query");
-  if (!qv) return [];
-  // Over-fetch, then collapse duplicates by content hash. Dedup is now per-source (see ingestChunks), so a passage
-  // shared by two sources is stored under each - correct for delete-safety, but the model must never SEE the same
-  // passage twice. We keep the best-scoring copy of each distinct passage and return the top k of what remains.
-  const rows = (await db().query(
-    `select content, metadata, 1 - (embedding <=> $2::vector) as score
-     from knowledge_chunks
-     where client_id = $1 and embedding is not null
-     order by embedding <=> $2::vector
-     limit $3`,
-    [clientId, toVectorLiteral(qv), Math.max(k * 4, k + 12)],
-  )) as Retrieved[];
-  const out: Retrieved[] = [];
-  const seen = new Set<string>();
-  for (const r of rows) {
-    const h = (r.metadata?.h as string) || contentHash(r.content);
-    if (seen.has(h)) continue;
-    seen.add(h);
-    out.push(r);
-    if (out.length >= k) break;
+//
+// Three stages, best-in-class RAG retrieval:
+//   1. DENSE (semantic) - the Voyage query embedding vs the chunk embeddings (pgvector cosine). Great at meaning,
+//      weak on exact tokens (a product name, a price, a person) that the embedding smooths into a topic.
+//   2. LEXICAL (exact term) - a Postgres tsvector match. Great at the exact tokens dense misses.
+//   3. FUSE the two by Reciprocal Rank Fusion, then RERANK the shortlist with Voyage rerank-2.5 (a cross-encoder
+//      that reads the query and each passage together), which is the real accuracy lever.
+//
+// The `client_id = $1` filter on EVERY query is the brain-isolation guarantee. Every stage degrades gracefully:
+// no embedding, no lexical match, or a reranker outage each fall back to what the remaining stages found, so a
+// question always gets the best answer available rather than an error.
+export async function retrieve(clientId: string, query: string, k = 6, opts?: { userEmail?: string | null }): Promise<Retrieved[]> {
+  const q = String(query || "").trim();
+  if (!q) return [];
+  const [qv] = await embed([q], "query").catch(() => [] as number[][]);
+
+  // The two halves run in parallel. websearch_to_tsquery parses free user text safely (nothing to escape) and
+  // returns an empty query for all-stopword input, in which case the lexical half matches nothing and the dense
+  // half carries the retrieval on its own.
+  const runDense = async (): Promise<Retrieved[]> => {
+    if (!qv) return [];
+    try {
+      return (await db().query(
+        `select content, metadata, 1 - (embedding <=> $2::vector) as score
+         from knowledge_chunks
+         where client_id = $1 and embedding is not null
+         order by embedding <=> $2::vector
+         limit $3`,
+        [clientId, toVectorLiteral(qv), DENSE_N],
+      )) as Retrieved[];
+    } catch { return []; }
+  };
+  const runLex = async (): Promise<Retrieved[]> => {
+    try {
+      return (await db().query(
+        `select content, metadata, ts_rank_cd(content_tsv, websearch_to_tsquery('english', $2)) as score
+         from knowledge_chunks
+         where client_id = $1 and content_tsv @@ websearch_to_tsquery('english', $2)
+         order by score desc
+         limit $3`,
+        [clientId, q, LEX_N],
+      )) as Retrieved[];
+    } catch { return []; }
+  };
+  const [dense, lex] = await Promise.all([runDense(), runLex()]);
+
+  // RECIPROCAL RANK FUSION. Combine the lists by RANK, not raw score: cosine and ts_rank live on different
+  // scales, and normalising them is brittle. RRF sums 1/(K + rank) across the lists a passage appears in, which
+  // rewards agreement between the two retrievers with no scale juggling. Fusion also does the dedup - keying by
+  // content hash collapses a passage two sources both hold (per-source storage lets it show up in either list).
+  const fused = new Map<string, { row: Retrieved; rrf: number }>();
+  const addList = (rows: Retrieved[]) => {
+    rows.forEach((row, i) => {
+      const h = (row.metadata?.h as string) || contentHash(row.content);
+      const inc = 1 / (RRF_K + i + 1);
+      const cur = fused.get(h);
+      if (cur) cur.rrf += inc;
+      else fused.set(h, { row, rrf: inc });
+    });
+  };
+  addList(dense);
+  addList(lex);
+  if (!fused.size) return [];
+
+  const shortlist = [...fused.values()].sort((a, b) => b.rrf - a.rrf).slice(0, SHORTLIST).map((x) => x.row);
+
+  // RERANK the shortlist with the cross-encoder - the accuracy stage. If Voyage is unavailable or errors, DO NOT
+  // fail retrieval: fall back to the RRF order, which is already a strong hybrid ranking. Degrade, never break.
+  try {
+    const scored = await rerank(q, shortlist.map((r) => r.content), k);
+    if (scored.length) {
+      await recordUsage({ clientId, userEmail: opts?.userEmail ?? null, provider: "voyage", model: "rerank-2.5", unit: "rerank", action: "brain-rerank", count: 1 }).catch(() => {});
+      return scored.map((s) => ({ ...shortlist[s.index], score: s.score })).slice(0, k);
+    }
+  } catch {
+    // fall through to the fused order
   }
-  return out;
+  return shortlist.slice(0, k);
 }
