@@ -452,7 +452,7 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
               <animate attributeName="opacity" values="1;.4;1" dur="2.2s" repeatCount="indefinite" />
             </circle>
           </svg>
-          <div className="cap"><span>Passages indexed</span><span>always growing</span></div>
+          <div className="cap"><span>Knowledge base</span><span>always growing</span></div>
         </div>
       )}
 
@@ -558,9 +558,9 @@ export default async function HomePage() {
         /* SECTION HEADERS */
         .agn-sec{margin-top:clamp(26px,3.6vw,42px)}
         .agn-shead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding-bottom:11px;margin-bottom:15px;border-bottom:1px solid color-mix(in srgb,var(--sa) 30%,transparent)}
-        .agn-snum{font-weight:700;font-size:12px;color:var(--sa);letter-spacing:.1em}
-        .agn-slabel{font-weight:700;font-size:12.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink)}
-        .agn-snote{color:var(--dim);font-size:13px;flex:1;min-width:200px}
+        .agn-snum{font-weight:700;font-size:14px;color:var(--sa);letter-spacing:.1em}
+        .agn-slabel{font-weight:700;font-size:14.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink)}
+        .agn-snote{color:var(--dim);font-size:15px;flex:1;min-width:200px}
         .agn-step{display:inline-flex;align-items:center;vertical-align:-1px;color:var(--sa);opacity:.85;margin:0 3px}
         .agn-step svg{width:11px;height:11px}
         .agn-snote b{color:var(--sa);font-weight:600}
