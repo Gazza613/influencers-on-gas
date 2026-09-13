@@ -50,6 +50,25 @@ export async function POST(req: Request) {
   const action = String(b.action || "").trim();
   const clientId = String(b.clientId || "").trim();
   const id = String(b.id || "").trim();
+
+  // SAVE THE EXECUTIVE'S DETAILS (Gary): the CEO/MD name + designation are set right here, so the creative can be
+  // attributed and the toggle is meaningful even on a brain that only has photos loaded. No finding needed - this
+  // is a brain-level setting. Also stores the publisher as the brain default so next time it prefills.
+  if (action === "saveExec") {
+    if (!clientId) return NextResponse.json({ error: "Pick the brain first." }, { status: 400 });
+    const who = b.publisher === "md" ? "md" : "ceo";
+    const name = String((b as { name?: string }).name || "").trim().slice(0, 120);
+    const title = String((b as { title?: string }).title || "").trim().slice(0, 160);
+    if (!name || !title) return NextResponse.json({ error: "Enter both a name and a designation." }, { status: 400 });
+    const col = who === "md" ? ["md_name", "md_title"] : ["ceo_name", "ceo_title"];
+    const rows = (await db().query(
+      `update intel_briefs set ${col[0]} = $2, ${col[1]} = $3, newsletter_publisher = $4, updated_at = now() where client_id = $1 returning client_id`,
+      [clientId, name, title, who],
+    )) as { client_id: string }[];
+    if (!rows[0]) return NextResponse.json({ error: "This brain has no brief yet, so there is nothing to save against." }, { status: 404 });
+    return NextResponse.json({ ok: true, publisher: who, name, title });
+  }
+
   if (!clientId || !id) return NextResponse.json({ error: "Missing the brain or the finding." }, { status: 400 });
 
   // Load the finding on THIS brain. Any role is eligible for the tick path: we pass only the PUBLIC-SAFE substance
