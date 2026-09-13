@@ -157,12 +157,15 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
       {clientId && (
         <div className="mt-3 border-t border-line pt-3">
           <button onClick={() => setShowAuto((v) => !v)}
-            className="inline-flex items-center gap-2 text-[13px] font-semibold text-ink-dim hover:text-ink">
-            <span className={`inline-flex shrink-0 text-[#a855f7] transition-transform ${showAuto ? "rotate-90" : ""}`} aria-hidden>
+            className="flex w-full items-start gap-2 text-left text-ink-dim hover:text-ink sm:items-center">
+            <span className={`mt-0.5 inline-flex shrink-0 text-[#a855f7] transition-transform sm:mt-0 ${showAuto ? "rotate-90" : ""}`} aria-hidden>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M9 6l6 6-6 6" /></svg>
             </span>
-            Automation and delivery
-            <span className="text-[11.5px] font-normal text-ink-faint">· schedule this brain, set recipients, auto-draft the CEO article</span>
+            {/* Mobile: title on its own line, sub-text left-aligned beneath. Desktop: one bigger line. */}
+            <span className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+              <span className="text-[14px] font-bold text-ink sm:text-[16px]">Automation and delivery</span>
+              <span className="text-[12px] font-normal text-ink-faint sm:text-[13.5px]">· schedule this brain, set recipients, auto-draft the CEO article</span>
+            </span>
           </button>
           {showAuto && <div className="mt-4"><IntelEmailControl clientId={clientId} clientName={brainName} /></div>}
         </div>
