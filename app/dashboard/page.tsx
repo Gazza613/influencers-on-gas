@@ -243,7 +243,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The <span className="brand-grad">Brain</span></>,
         href: "/setup/brains",
         mark: <BrainMark />,
-        blurb: "The starting point and the client's living knowledge base. Enter their website(s) and it crawls them in with Firecrawl, so even JavaScript and Cloudflare sites read; add documents, logo and brand rules too.",
+        blurb: "The client's living knowledge base, and the single source every pod builds from: crawl their sites, add documents, logo and brand rules. Each brain is sealed and isolated, so one client can never read another's.",
         action: "Build the Brain",
         pod: "brain",
         step: 1,
