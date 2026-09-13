@@ -121,7 +121,11 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
           <div>
             {/* The section headline wears the same creative as the pod tiles: 26px, the key words in the
                 pink -> purple -> blue brand gradient (Gary). */}
-            <h3 className="text-[26px] font-bold leading-none tracking-tight text-ink">Live <span className="brand-grad">Market Intelligence</span></h3>
+            <h3 className="text-[26px] font-bold leading-none tracking-tight text-ink">
+              {/* Desktop: Live + gradient. Mobile: shorter 'Market Intelligence' on one line, Market in white. */}
+              <span className="hidden sm:inline">Live <span className="brand-grad">Market Intelligence</span></span>
+              <span className="whitespace-nowrap sm:hidden">Market <span className="brand-grad">Intelligence</span></span>
+            </h3>
             <p className="mt-1.5 text-sm text-ink-dim">The market, on demand.</p>
           </div>
         </div>

@@ -1,7 +1,7 @@
-import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import MarketQuestion from "@/components/MarketQuestion";
 import PodAgents from "@/components/PodAgents";
+import TileLink from "@/components/TileLink";
 import DashboardMotion from "@/components/DashboardMotion";
 import HeroStats from "@/components/HeroStats";
 import { listStudioClients } from "@/lib/studio";
@@ -404,11 +404,7 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
   const label = typeof d.action === "string" ? d.action : "Open";
   return (
     <article className={`agn-tile ${size}`} style={style}>
-      {d.external ? (
-        <a href={d.href} target="_blank" rel="noreferrer" aria-label={label} className="agn-tlink" />
-      ) : (
-        <Link href={d.href} aria-label={label} className="agn-tlink" />
-      )}
+      <TileLink href={d.href} external={d.external} label={label} />
 
       <div className="agn-thead"><span className="agn-mark">{d.mark}</span><span className="agn-pod">{podLabel}</span></div>
       <h2 className="agn-name">{d.name}</h2>
@@ -616,7 +612,7 @@ export default async function HomePage() {
         .agn-spark svg{width:100%;flex:1;min-height:70px;display:block;overflow:visible}
         .agn-spark .cap{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-top:10px}
         .agn-soonchip{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--a);border:1px solid color-mix(in srgb,var(--a) 40%,transparent);border-radius:999px;padding:5px 11px;align-self:flex-start;margin-top:auto}
-        .agn-tlink{position:absolute;inset:0;z-index:1;border-radius:16px}
+        .agn-tlink{position:absolute;inset:0;z-index:1;border-radius:16px;cursor:pointer}
         .agn-eye{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;color:var(--a);position:relative;z-index:2;border:1px solid var(--line2);background:color-mix(in srgb,var(--a) 8%,transparent);transition:transform .2s,border-color .2s}
         .agn-eye:hover{transform:scale(1.08);border-color:color-mix(in srgb,var(--a) 70%,transparent)}
         .agn-eye svg{width:18px;height:18px}
