@@ -115,7 +115,7 @@ export default function SetupNav({ isSuperAdmin = false }: { isSuperAdmin?: bool
 
       {/* Platform admin, one menu, out of the way. */}
       <div className="relative">
-        <button onClick={() => setSetupOpen((o) => !o)} aria-label="Setup menu" aria-expanded={setupOpen} className={cls(admin.some((l) => isActive(l.href)))}>⚙</button>
+        <button onClick={() => setSetupOpen((o) => !o)} aria-label="Setup menu" aria-expanded={setupOpen} className={cls(admin.some((l) => isActive(l.href)))}><span className="text-[17px] leading-none">⚙</span></button>
         {setupOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setSetupOpen(false)} />

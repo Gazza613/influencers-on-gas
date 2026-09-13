@@ -23,7 +23,6 @@ export default function AppHeader() {
           <img src="/gas-logo.png" alt="GAS" className="h-6 w-6 rounded-full" />
           <span className="hidden sm:inline">The Agency of <span className="brand-grad">NOW</span></span>
         </Link>
-        <span className="hidden text-ink-faint sm:inline">/</span>
         <SetupNav isSuperAdmin={me?.role === "super_admin"} />
       </div>
       <div className="flex items-center gap-3">
