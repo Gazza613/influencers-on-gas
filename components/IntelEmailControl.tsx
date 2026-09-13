@@ -141,11 +141,11 @@ export default function IntelEmailControl({ clientId, clientName }: { clientId: 
           return (
             <button key={o.id} role="radio" aria-checked={on} disabled={!loaded}
               onClick={() => pick(o.id)}
-              className={`rounded-lg border px-3 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#a855f7] disabled:opacity-50 ${
+              className={`rounded-lg border px-2 py-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#a855f7] disabled:opacity-50 sm:px-3 sm:py-2.5 ${
                 on ? "border-[#a855f7]/60 bg-[#a855f7]/12" : "border-line bg-surface-2 hover:border-line-strong"
               }`}>
-              <div className={`text-[16px] font-bold ${on ? "text-[#c79bff]" : "text-ink"}`}>{o.label}</div>
-              <div className="mt-0.5 text-[13px] text-ink-faint">{o.sub}</div>
+              <div className={`text-[13px] font-bold sm:text-[16px] ${on ? "text-[#c79bff]" : "text-ink"}`}>{o.label}</div>
+              <div className="mt-0.5 text-[11px] text-ink-faint sm:text-[13px]">{o.sub}</div>
             </button>
           );
         })}
@@ -196,11 +196,11 @@ export default function IntelEmailControl({ clientId, clientName }: { clientId: 
             return (
               <button key={o.id} role="radio" aria-checked={on} disabled={!loaded}
                 onClick={() => pickNewsletter(o.id)}
-                className={`rounded-lg border px-2.5 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#a855f7] disabled:opacity-50 ${
+                className={`rounded-lg border px-2 py-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#a855f7] disabled:opacity-50 sm:px-2.5 sm:py-2.5 ${
                   on ? "border-[#a855f7]/60 bg-[#a855f7]/12" : "border-line bg-surface-2 hover:border-line-strong"
                 }`}>
-                <div className={`text-[15px] font-bold ${on ? "text-[#c79bff]" : "text-ink"}`}>{o.label}</div>
-                <div className="mt-0.5 text-[12px] text-ink-faint">{o.sub}</div>
+                <div className={`text-[11.5px] font-bold leading-tight sm:text-[15px] ${on ? "text-[#c79bff]" : "text-ink"}`}>{o.label}</div>
+                <div className="mt-0.5 text-[10px] leading-tight text-ink-faint sm:text-[12px]">{o.sub}</div>
               </button>
             );
           })}
