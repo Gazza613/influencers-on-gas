@@ -1,9 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "./db";
 import { getSecret } from "./connections";
-import { PREMIUM } from "./vendors/anthropic";
+import { PREMIUM, INGEST } from "./vendors/anthropic";
 import { getBrandKit } from "./studio";
 import { recordTokens } from "./usage";
+import { verifyFinding } from "./verify";
 
 // THE DAILY INTELLIGENCE RUN — shared engine for The Journalist and The Strategist.
 //
@@ -429,14 +430,38 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const findings = Array.isArray(out.findings) ? out.findings : [];
   if (!findings.length) return [];
 
-  // THE GATE. Reject anything we cannot prove is current, before it is ever stored.
+  // VERIFY each finding against the page it cites, before it is ever stored (lib/verify.ts). This is the
+  // anti-hallucination gate the daily intel + CEO article were missing: a DEAD (404) or REFUTED (page read, does
+  // not support the claim) source is DROPPED, so a fabricated or misattributed link can never reach the queue, an
+  // inbox, or a CEO article. A bot-blocked source is KEPT, flagged 'unverified' - we never bin a real finding just
+  // because a publisher blocks robots. The verified publication date replaces the model's when we could read it.
+  const verdicts = await Promise.all(findings.map(async (f) => {
+    const vsrcs = (Array.isArray(f.sources) ? f.sources : [])
+      .filter((s): s is { name: string; url: string } => !!s && typeof (s as { url?: string }).url === "string" && /^https?:\/\//i.test((s as { url: string }).url));
+    if (!vsrcs.length) return { status: "unverified" as const, date: null as string | null };
+    const v = await verifyFinding(
+      { headline: String(f.headline || ""), detail: String(f.detail || ""), published_at: f.published_at ? String(f.published_at) : null },
+      vsrcs, client, () => {},
+    ).catch(() => null);
+    if (v?.usage) {
+      await recordTokens({
+        clientId, userEmail, model: INGEST, action: "intel-verify",
+        inputTokens: v.usage.inputTokens, outputTokens: v.usage.outputTokens,
+        cacheReadTokens: v.usage.cacheReadTokens, cacheCreationTokens: v.usage.cacheCreationTokens,
+      }).catch(() => {});
+    }
+    return v || { status: "unverified" as const, date: null as string | null };
+  }));
+
+  // THE GATE. Drop fabricated/refuted sources ALWAYS; drop stale/undated only on the daily/discover run.
   const cutoff = Date.now() - windowDays * 86_400_000;
   const dropped: string[] = [];
-  const fresh = findings.filter((f) => {
+  const surviving = findings.map((f, i) => ({ f, v: verdicts[i] })).filter(({ f, v }) => {
+    if (v.status === "dead" || v.status === "refuted") { dropped.push(`${String(f.headline || "?").slice(0, 60)} — ${v.status}`); return false; }
+    if (v.date) f.published_at = v.date; // the read date beats the model's guess
     // ANSWER MODE (a typed question) is deliberately allowed older background and the off-scope pivot, which is
-    // often undated - so we do NOT drop for age/date here, or the model's "always give a useful answer" pivot
-    // silently vanishes and the user wrongly sees "nothing came back". The hard freshness gate below is only for
-    // the DAILY/discover run, whose whole job is "what CHANGED".
+    // often undated - so we do NOT drop for age/date here. The hard freshness gate below is only for the
+    // DAILY/discover run, whose whole job is "what CHANGED".
     if (answerMode) return true;
     const d = String(f.published_at || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { dropped.push(`${String(f.headline || "?").slice(0, 60)} — undated`); return false; }
@@ -447,7 +472,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     }
     return true;
   });
-  if (dropped.length) console.warn(`[intel:${role}] dropped ${dropped.length} stale/undated finding(s): ${dropped.join(" | ")}`);
+  if (dropped.length) console.warn(`[intel:${role}] dropped ${dropped.length} finding(s): ${dropped.join(" | ")}`);
 
   // NO EM DASHES, EVER (Gary). The prompt asks, but a prompt is not a guarantee and this is a house rule, so we
   // enforce it on the way into the database: every em dash and en dash becomes a plain hyphen. Once stored clean,
@@ -463,22 +488,26 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     .trim();
 
   const saved: Intel[] = [];
-  for (const f of fresh) {
+  for (const { f, v } of surviving) {
     const srcs = (Array.isArray(f.sources) ? f.sources : [])
       .filter((s): s is { name: string; url: string } => !!s && typeof (s as { url?: string }).url === "string" && /^https?:\/\//i.test((s as { url: string }).url))
       .slice(0, 8);
+    // A source-supported finding cannot be "high" confidence if we could not confirm it: cap unverified findings.
+    const conf = ["high", "medium", "low"].includes(String(f.confidence)) ? String(f.confidence) : "medium";
+    const confidence = v.status === "verified" ? conf : (conf === "high" ? "medium" : conf);
     const rows = (await db().query(
-      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-       returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at`,
+      `insert into studio_intel (client_id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, verification)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       returning id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, status, found_at, verification`,
       [clientId, role, noDash(f.headline).slice(0, 300), noDash(f.why_it_matters).slice(0, 1200),
        noDash(f.detail).slice(0, 4000), JSON.stringify(srcs),
        srcs[0]?.url ?? null, srcs.map((s) => s.name).join(" · ").slice(0, 200) || null,
        /^\d{4}-\d{2}-\d{2}$/.test(String(f.published_at || "")) ? f.published_at : null,
        String(f.period || "").slice(0, 60) || null,
-       ["high", "medium", "low"].includes(String(f.confidence)) ? f.confidence : "medium", f.material === true,
+       confidence, f.material === true,
        noDash(f.impact_risk).slice(0, 3000) || null,
-       noDash(f.campaign_response).slice(0, 3000) || null],
+       noDash(f.campaign_response).slice(0, 3000) || null,
+       v.status],
     )) as Intel[];
     saved.push(rows[0]);
   }
@@ -487,7 +516,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
 export async function listIntel(clientId: string, status = "new"): Promise<Intel[]> {
   return (await db().query(
-    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, newsletter, newsletter_art, newsletter_options, status, found_at
+    `select id, role, headline, why_it_matters, detail, sources, source_url, source_name, published_at, period, confidence, material, impact_risk, campaign_response, newsletter, newsletter_art, newsletter_options, status, found_at, verification
      from studio_intel where client_id = $1 and status = $2 order by material desc, found_at desc limit 80`,
     [clientId, status],
   )) as Intel[];

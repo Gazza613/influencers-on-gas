@@ -524,6 +524,12 @@ alter table studio_intel add column if not exists sources jsonb not null default
 alter table studio_intel add column if not exists published_at date;
 alter table studio_intel add column if not exists period text;
 
+-- VERIFICATION verdict, set when a finding is checked against the page it cites (lib/verify.ts). 'verified' = the
+-- page supports the claim; 'partial' = page reached, support not gradeable; 'unverified' = source bot-blocked, kept
+-- but flagged. 'dead' (404) and 'refuted' findings are dropped before insert, so they never appear here. Only a
+-- verified/partial finding may seed a CEO thought-leadership article.
+alter table studio_intel add column if not exists verification text;
+
 -- A finding that stops at "this happened" makes the reader do the work. Two INTERNAL columns carry it through
 -- to a decision (Gary: "assess deeply the possible impact/risk for MoMo SA, then make a campaign recommendation
 -- as a defensive and pro-active move"):

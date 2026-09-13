@@ -14,6 +14,7 @@ type Finding = {
   id?: string;
   headline: string; why_it_matters: string; detail: string | null;
   impact_risk: string | null; campaign_response: string | null; material: boolean;
+  verification?: string | null;
   sources: { name: string; url: string }[];
 };
 
@@ -188,6 +189,12 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
               <div key={i} className="rounded-xl border border-line bg-surface-2 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <h4 className="flex-1 text-lg font-bold text-ink">{f.headline}</h4>
+                  {/* Machine-verification verdict: we checked the cited page. Verified = it supports the claim. */}
+                  {f.verification === "verified" ? (
+                    <span className="shrink-0 rounded-full bg-[#4ade80]/15 px-2.5 py-0.5 text-sm font-bold uppercase tracking-wide text-[#86efac]">✓ Verified</span>
+                  ) : f.verification === "unverified" ? (
+                    <span className="shrink-0 rounded-full bg-[#fbbf24]/15 px-2.5 py-0.5 text-sm font-bold uppercase tracking-wide text-[#fcd34d]" title="The cited source could not be fetched to confirm it (may be bot-blocked). Treat with care.">Unverified</span>
+                  ) : null}
                   {tag && <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-bold uppercase tracking-wide ${tag.includes("defensive") ? "bg-[#f87171]/15 text-[#fca5a5]" : "bg-[#4ade80]/15 text-[#86efac]"}`}>{tag}</span>}
                 </div>
                 {f.why_it_matters && <p className="mt-1.5 text-base text-ink-dim"><b className="text-ink">Why it matters</b> · {f.why_it_matters}</p>}

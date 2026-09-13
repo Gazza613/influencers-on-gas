@@ -37,6 +37,7 @@ export async function POST(req: Request) {
         impact_risk: f.impact_risk,
         campaign_response: f.campaign_response,
         material: f.material,
+        verification: f.verification ?? null,
         sources: Array.isArray(f.sources) ? f.sources : [],
       })),
     });

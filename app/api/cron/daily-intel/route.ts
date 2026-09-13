@@ -291,7 +291,8 @@ export async function GET(req: Request) {
       // brain has no CEO voice rules, or nothing worth writing about came back.
       let ceoDrafted = false;
       if (c.newsletterFires && c.ceoRules) {
-        const top = sm[0] || strategist[0];
+        // Only a machine-VERIFIED (or partial) finding may seed a CEO article - never an unverified/bot-blocked one.
+        const top = [...sm, ...strategist].find((i) => i.verification === "verified" || i.verification === "partial");
         if (top && emailConfigured()) {
           const draft = await writeCeoNewsletter(c.id, {
             headline: top.headline, why_it_matters: top.why_it_matters, detail: top.detail,

@@ -53,13 +53,19 @@ export async function POST(req: Request) {
   // (headline, why, detail, sources) to the writer, never the internal campaign_response, so a blunt Strategist
   // finding still becomes a clean, compliant CEO piece.
   const rows = (await db().query(
-    `select headline, why_it_matters, detail, sources, published_at from studio_intel where id = $1 and client_id = $2`,
+    `select headline, why_it_matters, detail, sources, published_at, verification from studio_intel where id = $1 and client_id = $2`,
     [id, clientId],
   )) as Record<string, unknown>[];
   const f = rows[0];
   if (!f) return NextResponse.json({ error: "That finding is not on this brain." }, { status: 404 });
 
   if (action === "draft") {
+    // GROUNDING GATE: a CEO thought-leadership piece may only be written from a source we actually verified. An
+    // unverified (bot-blocked), refuted or dead finding cannot seed a public article under a CEO's name.
+    const ver = String(f.verification || "");
+    if (ver && ver !== "verified" && ver !== "partial") {
+      return NextResponse.json({ error: "This finding's source could not be verified, so it cannot seed a CEO article. Use a verified finding." }, { status: 400 });
+    }
     const result = await writeCeoNewsletter(clientId, {
       headline: String(f.headline || ""),
       why_it_matters: String(f.why_it_matters || ""),

@@ -67,7 +67,7 @@ const CREATIVES = new Set([
 // Journalist tile), so the CEO-article actions - which now publish from the Researcher desk - live here too,
 // alongside the deep-research run and its source-verification pass. The Strategist is the daily newswire.
 const RESEARCHER = new Set(["deep-research", "research-file", "research-verify", "ceo-newsletter", "ceo-backdrop", "ceo-linkedin-creative"]);
-const STRATEGIST = new Set(["daily-intel"]);
+const STRATEGIST = new Set(["daily-intel", "intel-verify"]);
 
 // Shared client knowledge (The Brain pod): building it (crawl + embed), keeping it current (re-index), and
 // everything you DO with it - asking it (brain-answer / -live), the coverage map, sharpening a saved answer,
