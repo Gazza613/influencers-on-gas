@@ -195,6 +195,8 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const only = url.searchParams.get("clientId") || "";
+  // A manual test run can pass ?noEmail=1 to run the research + draft without emailing anyone (no footgun).
+  const dryRun = url.searchParams.get("noEmail") === "1" || url.searchParams.get("dryRun") === "1";
   const today = new Date().toISOString().slice(0, 10);
   // The cron fires 06:30 UTC = 08:30 SAST, the same calendar day, so the UTC weekday IS the SAST weekday.
   // Monday = 1. 'weekly' brains only fire on a Monday; 'daily' brains fire every weekday the cron runs.
@@ -221,7 +223,9 @@ export async function GET(req: Request) {
     .map((c) => ({
       id: c.clientId, name: c.clientName, schedule: c.emailSchedule, recipients: c.emailRecipients,
       emailFires: manual || emailFires(c.emailSchedule),
-      newsletterFires: manual || newsFires(c.newsletterSchedule),
+      // Only run for the newsletter's sake if the brain actually has CEO voice rules, else a paid research pass
+      // runs every cadence and drafts nothing (a silent cost leak). Manual + email still run regardless.
+      newsletterFires: (manual || newsFires(c.newsletterSchedule)) && !!c.ceoRules,
       ceoRules: c.ceoRules, ceoName: c.ceoName, ceoRecipients: c.ceoRecipients,
     }))
     .filter((c) => c.emailFires || c.newsletterFires);
@@ -262,11 +266,17 @@ export async function GET(req: Request) {
       // PER-BRAIN RECIPIENTS (Gary): each brain's own list, edited on the Strategist page. Empty falls back to
       // the platform default so a brain that has never been given a list still reaches someone.
       const to = c.recipients.length ? c.recipients.join(",") : intelRecipients();
+      // TEAM-FIRST (Gary), enforced in code: the CEO-article DRAFT must never reach the CEO on the automated run.
+      // The digest list can legitimately include the client, so we send the draft to that list MINUS any address
+      // in the brain's ceo_recipients (and fall back to the platform team list if that leaves nobody).
+      const ceoSet = new Set((c.ceoRecipients || []).map((x) => String(x).toLowerCase().trim()));
+      const draftList = to.split(",").map((x) => x.trim()).filter((x) => x && !ceoSet.has(x.toLowerCase()));
+      const ceoDraftTo = draftList.length ? draftList.join(",") : intelRecipients();
       // The brain's own logo for the email header (Gary), else the GAS orb.
       const logoUrl = await getClientEmailLogo(c.id).catch(() => null);
 
       let emailed = false;
-      if (c.emailFires && sm.length && emailConfigured()) {
+      if (c.emailFires && sm.length && emailConfigured() && !dryRun) {
         await sendEmail({
           to,
           subject: `Market Intelligence · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
@@ -288,10 +298,10 @@ export async function GET(req: Request) {
             sources: top.sources, published_at: top.published_at,
           }, { userEmail: null }).catch(() => null);
           if (draft && draft.ok) {
-            await db().query(`update studio_intel set newsletter = $2, newsletter_art = $3 where id = $1`,
-              [top.id, draft.post, draft.art?.subject || null]).catch(() => {});
-            await sendEmail({
-              to,
+            await db().query(`update studio_intel set newsletter = $2, newsletter_art = $3 where id = $1 and client_id = $4`,
+              [top.id, draft.post, draft.art?.subject || null, c.id]).catch(() => {});
+            if (!dryRun) await sendEmail({
+              to: ceoDraftTo, // team-first: the draft goes to the internal list, never the CEO
               subject: `CEO article draft for review · ${c.name} · ${today}`,
               html: buildCeoArticleEmail({ client: c.name, ceoName: c.ceoName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: top.headline, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
               fromName: "Researcher on GAS",

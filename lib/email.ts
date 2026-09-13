@@ -19,6 +19,8 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   // resets and cost alerts all arrived branded as the old product. The Strategist briefing overrides it to say
   // what it is; everything else should say what the platform is.
   const from = `${opts.fromName || "Studio on GAS"} <${process.env.GMAIL_USER}>`;
-  await transport.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, ...(opts.bcc ? { bcc: opts.bcc } : {}) });
+  // Strip CR/LF from the subject as a header-injection backstop (nodemailer encodes headers too, belt and braces).
+  const subject = String(opts.subject || "").replace(/[\r\n]+/g, " ").trim();
+  await transport.sendMail({ from, to: opts.to, subject, html: opts.html, ...(opts.bcc ? { bcc: opts.bcc } : {}) });
   return { sent: true };
 }

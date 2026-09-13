@@ -433,6 +433,11 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const cutoff = Date.now() - windowDays * 86_400_000;
   const dropped: string[] = [];
   const fresh = findings.filter((f) => {
+    // ANSWER MODE (a typed question) is deliberately allowed older background and the off-scope pivot, which is
+    // often undated - so we do NOT drop for age/date here, or the model's "always give a useful answer" pivot
+    // silently vanishes and the user wrongly sees "nothing came back". The hard freshness gate below is only for
+    // the DAILY/discover run, whose whole job is "what CHANGED".
+    if (answerMode) return true;
     const d = String(f.published_at || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { dropped.push(`${String(f.headline || "?").slice(0, 60)} — undated`); return false; }
     const t = new Date(d).getTime();
@@ -452,6 +457,9 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const noDash = (s: unknown) => String(s ?? "")
     .replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2")
     .replace(/\s*[—–]\s*/g, " - ")
+    // BANNED PHRASE (Gary): "the uncomfortable truth" is a house rule, and a prompt is not a guarantee, so we
+    // strip it on the way into the database, exactly like the em dash. Replaced with a neutral so grammar holds.
+    .replace(/\bthe uncomfortable truth\b/gi, "the reality")
     .trim();
 
   const saved: Intel[] = [];

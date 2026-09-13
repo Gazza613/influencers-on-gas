@@ -69,8 +69,8 @@ export async function POST(req: Request) {
     }, { userEmail: session.user?.email ?? null, notes: b.notes || null });
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
     // Keep the draft on the finding so it survives a reload.
-    await db().query(`update studio_intel set newsletter = $2, newsletter_art = $3 where id = $1`,
-      [id, result.post, result.art?.subject || null]).catch(() => {});
+    await db().query(`update studio_intel set newsletter = $2, newsletter_art = $3 where id = $1 and client_id = $4`,
+      [id, result.post, result.art?.subject || null, clientId]).catch(() => {});
     return NextResponse.json({ ok: true, post: result.post, art: result.art });
   }
 
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     // Remember the recipients on the brain (so next time prefills) and keep the sent copy on the finding.
     await db().query(`update intel_briefs set ceo_recipients = $2::jsonb where client_id = $1`,
       [clientId, JSON.stringify(recipients)]).catch(() => {});
-    await db().query(`update studio_intel set newsletter = $2 where id = $1`, [id, post]).catch(() => {});
+    await db().query(`update studio_intel set newsletter = $2 where id = $1 and client_id = $3`, [id, post, clientId]).catch(() => {});
     return NextResponse.json({ ok: true, sent: recipients.length });
   }
 
