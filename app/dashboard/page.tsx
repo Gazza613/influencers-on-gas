@@ -484,19 +484,26 @@ function Tile({ d, podNo, size = "" }: { d: Door; podNo: number; size?: string }
 // chevrons that point to the next step, instead of a flat text arrow (Gary).
 function StepNote({ text }: { text: string }) {
   if (!text.includes("→")) return <>{text}</>;
-  const parts = text.split("→");
+  // Split an optional lead ("Know your customer:") from the arrow flow, so the flow itself stays on ONE line on
+  // mobile (Gary) - the lead can wrap above it, the flow never breaks between steps.
+  const colon = text.indexOf(": ");
+  const hasLead = colon > -1 && text.slice(0, colon).indexOf("→") === -1;
+  const lead = hasLead ? text.slice(0, colon + 1) : "";
+  const flow = hasLead ? text.slice(colon + 2) : text;
+  const parts = flow.split("→").map((p) => p.trim());
+  const chev = (
+    <span className="agn-step" aria-hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+    </span>
+  );
   return (
     <>
-      {parts.map((p, i) => (
-        <span key={i}>
-          {p}
-          {i < parts.length - 1 && (
-            <span className="agn-step" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-            </span>
-          )}
-        </span>
-      ))}
+      {lead && <span>{lead} </span>}
+      <span className="agn-flow">
+        {parts.map((p, i) => (
+          <span key={i}>{p}{i < parts.length - 1 && chev}</span>
+        ))}
+      </span>
     </>
   );
 }
@@ -563,6 +570,7 @@ export default async function HomePage() {
         .agn-snote{color:var(--dim);font-size:15px;flex:1;min-width:200px}
         .agn-step{display:inline-flex;align-items:center;vertical-align:-1px;color:var(--sa);opacity:.85;margin:0 3px}
         .agn-step svg{width:11px;height:11px}
+        .agn-flow{white-space:nowrap}
         .agn-snote b{color:var(--sa);font-weight:600}
 
         /* GRIDS */
@@ -629,6 +637,8 @@ export default async function HomePage() {
           .agn-stats{width:100%}
           .agn-stat{flex:1;min-width:150px}
           .agn-hide-mobile{display:none}
+          /* Smaller section note on mobile so the numbered flow (brain > research > strategy > proposal) fits on one line. */
+          .agn-snote{font-size:12.5px}
         }
         @media (prefers-reduced-motion: reduce){
           .gas-flare,.gas-rise,.gas-draw,.agn-title .now,.agn-sic,.agn-stat::before,.agn-live .lb{animation:none !important}
@@ -656,7 +666,7 @@ export default async function HomePage() {
         <DashboardMotion />
 
         <div className="agn-top">
-          <span className="agn-eyebrow"><span className="d" /> AI marketing intelligence platform</span>
+          <span className="agn-eyebrow"><span className="d" /> <span className="sm:hidden">AI marketing platform</span><span className="hidden sm:inline">AI marketing intelligence platform</span></span>
           <span className="agn-live"><span className="lb" /> Live</span>
         </div>
 
