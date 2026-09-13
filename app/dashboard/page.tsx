@@ -267,7 +267,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         name: <>The <span className="brand-grad">Strategist</span></>,
         href: "/strategist/plan",
         mark: <StrategistMark />,
-        blurb: "Turns the approved fact base into one single-minded, defensible strategy, every point traced to a fact and nothing left to opinion or guesswork.",
+        blurb: "Turns the approved fact base into one single-minded, defensible strategy, every point traced to a fact and nothing left to opinion or guesswork. One clear line of attack the whole team can line up behind.",
         action: "Set the strategy",
         pod: "strategist",
         step: 3,
