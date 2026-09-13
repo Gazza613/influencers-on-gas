@@ -30,7 +30,7 @@ export default function CostReadout() {
   return (
     <Link href="/cost-control" className="group tabular flex items-center gap-3 rounded-md border border-line px-3 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink" title="Cost Control · this month">
       <span>
-        Total Spend{" "}
+        Spend this Month{" "}
         <span className="text-ink">{m ? rand(m.cents) : "…"}</span>
         {m && rate > 0 && <span className="text-ink-faint"> ({usd(m.cents, rate)})</span>}
       </span>

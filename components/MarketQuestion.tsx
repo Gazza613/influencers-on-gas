@@ -119,11 +119,13 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
               reads as live. The section title sits beside it. */}
           <div className="h-14 w-14 shrink-0"><LivingResearch lit={0.7} active /></div>
           <div>
-            <h3 className="text-[19px] font-bold tracking-tight text-ink">Daily Intelligence</h3>
-            <p className="text-sm text-ink-dim">The market, on demand.</p>
+            {/* The section headline wears the same creative as the pod tiles: 26px, the key words in the
+                pink -> purple -> blue brand gradient (Gary). */}
+            <h3 className="text-[26px] font-bold leading-none tracking-tight text-ink">Live <span className="brand-grad">Market Intelligence</span></h3>
+            <p className="mt-1.5 text-sm text-ink-dim">The market, on demand.</p>
           </div>
         </div>
-        <span className="w-full text-left text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim sm:w-auto sm:text-right">Live Market Intelligence pod<br />sourced, never invented</span>
+        <span className="w-full text-left text-[11px] font-semibold uppercase leading-relaxed tracking-[0.1em] text-ink-dim sm:w-auto sm:text-right">Sourced, never invented</span>
       </div>
       <p className="mt-3.5 max-w-[94ch] text-[13px] leading-relaxed text-ink-dim">Two ways to run it. <b className="text-ink">Ask the market</b> a specific question and the pod researches the last 3 months to answer it, with the move it argues for. <b className="text-ink">Find what&rsquo;s new</b> needs no question: it proactively surfaces the freshest shifts, threats and openings from the past 2 weeks.</p>
 
@@ -142,7 +144,7 @@ export default function MarketQuestion({ clients }: { clients: Client[] }) {
         className="mt-3 w-full rounded-lg border border-[#a855f7]/30 bg-[#0d0a16] px-3.5 py-3 text-[13.5px] leading-relaxed text-ink outline-none focus:border-[#a855f7]" />
       <div className="mt-3.5 flex flex-wrap items-center gap-3">
         <button onClick={() => ask("question")} disabled={busy || !q.trim()}
-          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:saturate-[.55] disabled:hover:translate-y-0">
+          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#7c3aed] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:saturate-[.55] disabled:hover:translate-y-0">
           {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
           {busy ? "Scanning…" : "Ask the market"}
         </button>
