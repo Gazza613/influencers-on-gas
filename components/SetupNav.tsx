@@ -77,7 +77,7 @@ export default function SetupNav({ isSuperAdmin = false }: { isSuperAdmin?: bool
     <nav className="flex items-center gap-1">
       {/* Back to the six pods, from anywhere that is not already there. */}
       {!onDashboard && (
-        <Link href="/dashboard" className={cls(false)} title="All six pods">← Dashboard</Link>
+        <Link href="/dashboard" className={cls(false)} title="All 10 pods">← Dashboard</Link>
       )}
 
       {/* The pod's own create action, where it has one. */}
