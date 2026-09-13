@@ -47,9 +47,13 @@ export async function GET(req: Request) {
   // MARKET-SUGGESTED TOPICS: what this brain's own recent research surfaced, deduped, freshest first. Real market
   // interest the team can turn into a piece with one tap, alongside their own typed topics.
   const sug = (await db().query(
-    `select distinct on (lower(headline)) headline from studio_intel
-      where client_id = $1 and found_at > now() - interval '60 days'
-      order by lower(headline), found_at desc`,
+    // DISTINCT ON dedups by headline (keeping the newest of each), but forces alphabetical order; the outer query
+    // re-sorts the deduped rows FRESHEST FIRST so a slice keeps the most recent market chatter, not the A-Z head.
+    `select headline from (
+       select distinct on (lower(headline)) headline, found_at from studio_intel
+        where client_id = $1 and found_at > now() - interval '60 days'
+        order by lower(headline), found_at desc
+     ) d order by d.found_at desc`,
     [clientId],
   ).catch(() => [])) as { headline: string }[];
   const suggestions = sug.map((x) => String(x.headline || "").trim()).filter(Boolean).slice(0, 10);

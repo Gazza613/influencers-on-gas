@@ -290,13 +290,15 @@ export async function GET(req: Request) {
 
       let emailed = false;
       if (c.emailFires && sm.length && emailConfigured() && !dryRun) {
-        await sendEmail({
+        // Report the ACTUAL send result, not "true" regardless: a swallowed send failure must not read as sent.
+        const r = await sendEmail({
           to,
           subject: `Market Intelligence · ${c.name} · ${sm.length} material finding${sm.length === 1 ? "" : "s"} · ${today}`,
           html: buildEmail(c.name, sm, today, intro, cadence, logoUrl),
           fromName: "Researcher on GAS", // it lands with EXCO and MoMo's team: say what it is (Gary)
-        }).catch(() => {});
-        emailed = true;
+        }).catch(() => ({ sent: false }));
+        emailed = !!(r as { sent?: boolean }).sent;
+        if (!emailed) errors.push("digest email did not send");
       }
 
       // CEO ARTICLE AUTOMATION (Gary): on the newsletter cadence, draft the CEO's LinkedIn piece from the strongest
@@ -314,13 +316,18 @@ export async function GET(req: Request) {
           if (draft && draft.ok) {
             await db().query(`update studio_intel set newsletter = $2, newsletter_art = $3 where id = $1 and client_id = $4`,
               [top.id, draft.post, draft.art?.subject || null, c.id]).catch(() => {});
-            if (!dryRun) await sendEmail({
-              to: ceoDraftTo, // team-first: the draft goes to the internal list, never the CEO
-              subject: `CEO article draft for review · ${c.name} · ${today}`,
-              html: buildCeoArticleEmail({ client: c.name, ceoName: c.ceoName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: top.headline, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
-              fromName: "Researcher on GAS",
-            }).catch(() => {});
-            ceoDrafted = true;
+            let sent = dryRun;
+            if (!dryRun) {
+              const r = await sendEmail({
+                to: ceoDraftTo, // team-first: the draft goes to the internal list, never the CEO
+                subject: `CEO article draft for review · ${c.name} · ${today}`,
+                html: buildCeoArticleEmail({ client: c.name, ceoName: c.ceoName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: top.headline, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
+                fromName: "Researcher on GAS",
+              }).catch(() => ({ sent: false }));
+              sent = !!(r as { sent?: boolean }).sent;
+            }
+            ceoDrafted = sent;
+            if (!sent) errors.push("CEO article draft did not send");
           }
         }
       }
@@ -336,18 +343,26 @@ export async function GET(req: Request) {
         const ix = ((c.linkedinTopicIx % c.linkedinTopics.length) + c.linkedinTopics.length) % c.linkedinTopics.length;
         linkedinTopic = c.linkedinTopics[ix];
         const draft = await draftLinkedinArticle(c.id, linkedinTopic, { userEmail: null, runExternal: false }).catch(() => null);
-        if (draft && draft.ok && emailConfigured()) {
-          const signerName = c.publisher === "md" ? c.mdName : c.ceoName;
-          if (!dryRun) await sendEmail({
-            to: ceoDraftTo, // team-first: the draft goes to the internal list, never the exec
-            subject: `LinkedIn article draft for review · ${c.name} · ${linkedinTopic.slice(0, 60)} · ${today}`,
-            html: buildCeoArticleEmail({ client: c.name, ceoName: signerName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: linkedinTopic, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
-            fromName: "Researcher on GAS",
-          }).catch(() => {});
-          linkedinDrafted = true;
+        if (draft && draft.ok) {
+          if (emailConfigured()) {
+            const signerName = c.publisher === "md" ? c.mdName : c.ceoName;
+            let sent = dryRun;
+            if (!dryRun) {
+              const r = await sendEmail({
+                to: ceoDraftTo, // team-first: the draft goes to the internal list, never the exec
+                subject: `LinkedIn article draft for review · ${c.name} · ${linkedinTopic.slice(0, 60)} · ${today}`,
+                html: buildCeoArticleEmail({ client: c.name, ceoName: signerName, post: draft.post, art: draft.art?.subject || "", ceoRecipients: c.ceoRecipients, srcHeadline: linkedinTopic, logoUrl, dateLabel: `${c.name} · ${ukDate(today)}`, review: true }),
+                fromName: "Researcher on GAS",
+              }).catch(() => ({ sent: false }));
+              sent = !!(r as { sent?: boolean }).sent;
+            }
+            linkedinDrafted = sent;
+            if (!sent) errors.push("LinkedIn article draft did not send");
+          }
+          // Advance the queue cursor ONLY on a successful draft (never on a failure - a transient error must not
+          // silently skip a topic), and never on a dry-run test.
+          if (!dryRun) await db().query(`update intel_briefs set linkedin_topic_ix = $2 where client_id = $1`, [c.id, (ix + 1) % c.linkedinTopics.length]).catch(() => {});
         }
-        // Advance the queue cursor (not on a dry-run test, so a test never silently consumes a topic).
-        if (!dryRun) await db().query(`update intel_briefs set linkedin_topic_ix = $2 where client_id = $1`, [c.id, (ix + 1) % c.linkedinTopics.length]).catch(() => {});
       }
 
       out.push({ client: c.name, cadence, strategist: strategist.length, material: sm.length, emailed, ceoDrafted, linkedinDrafted, linkedinTopic: linkedinTopic || undefined, errors: errors.length ? errors : undefined });

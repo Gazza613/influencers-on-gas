@@ -6,7 +6,9 @@ import { emailShell } from "./email-shell";
 //   - review=false -> the PIECE ITSELF, to the exec, on a clean WHITE editorial template branded to the client
 //                     (their logo, the creative embedded at the top), so it arrives post-ready for LinkedIn.
 // Branded from the RESEARCHER. Works for either publisher: pass the CEO's or the MD's name + designation.
-const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Escapes for HTML text AND attributes: quotes are escaped too, because several values here go into
+// attributes (alt="...", src="..."), where an unescaped quote would break out of the attribute.
+const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 // "## " lines become light section headings; blank lines split paragraphs. Rendered for the DARK branded panel.
 export function renderArticleBody(post: string): string {
@@ -35,10 +37,10 @@ function renderWhiteCeoEmail(opts: {
 }): string {
   const FONT = `"Helvetica Neue", Helvetica, Arial, sans-serif`;
   const logoBlock = opts.logoUrl
-    ? `<img src="${opts.logoUrl}" width="150" style="display:block;margin:0 auto;max-height:56px;object-fit:contain;border:0;outline:none;" alt="${esc(opts.client)}" />`
+    ? `<img src="${esc(opts.logoUrl)}" width="150" style="display:block;margin:0 auto;max-height:56px;object-fit:contain;border:0;outline:none;" alt="${esc(opts.client)}" />`
     : `<div style="font-size:18px;font-weight:800;letter-spacing:.5px;color:#16181c;">${esc(opts.client)}</div>`;
   const hero = opts.heroUrl
-    ? `<img src="${opts.heroUrl}" width="100%" style="display:block;width:100%;height:auto;border:0;outline:none;margin:22px 0 0;" alt="" />`
+    ? `<img src="${esc(opts.heroUrl)}" width="100%" style="display:block;width:100%;height:auto;border:0;outline:none;margin:22px 0 0;" alt="" />`
     : "";
   const signer = [opts.signerName, [opts.signerTitle, opts.client].filter(Boolean).join(" · ")].filter(Boolean);
   return `
@@ -86,7 +88,7 @@ export function buildCeoArticleEmail(opts: {
   const banner = `<div style="background:rgba(249,98,3,0.08);border:1px solid rgba(168,85,247,0.22);border-radius:12px;padding:14px 16px;margin-bottom:18px;">`
     + `<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#F96203;font-weight:800;">Thought-leadership draft, for review</div>`
     + `<div style="font-size:13px;line-height:1.6;color:rgba(255,251,248,0.86);margin-top:6px;">A LinkedIn thought-leadership piece for <b style="color:#FFFBF8;">${esc(opts.ceoName || opts.client + "'s exec")}</b>. It has <b>not</b> been sent. Review it, edit if needed, then forward to ${esc(intended)}.</div></div>`;
-  const heroImg = opts.heroUrl ? `<img src="${opts.heroUrl}" width="100%" style="display:block;width:100%;height:auto;border-radius:12px;border:0;outline:none;margin:0 0 16px;" alt="" />` : "";
+  const heroImg = opts.heroUrl ? `<img src="${esc(opts.heroUrl)}" width="100%" style="display:block;width:100%;height:auto;border-radius:12px;border:0;outline:none;margin:0 0 16px;" alt="" />` : "";
   const meta = `<div style="margin-top:22px;padding-top:14px;border-top:1px solid rgba(168,85,247,0.18);font-size:12px;color:rgba(255,251,248,0.58);">`
     + (opts.art ? `<div><b style="color:rgba(255,251,248,0.82);">Image idea:</b> ${esc(opts.art)}</div>` : "")
     + (opts.srcHeadline ? `<div style="margin-top:6px;"><b style="color:rgba(255,251,248,0.82);">Drawn from:</b> ${esc(opts.srcHeadline)}</div>` : "")

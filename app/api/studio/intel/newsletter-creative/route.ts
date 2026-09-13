@@ -8,6 +8,11 @@ import { buildCeoCreatives } from "@/lib/ceo-creative";
 import { putBytes } from "@/lib/blob";
 import { recordUsage } from "@/lib/usage";
 import { loadIntelBrief } from "@/lib/intel";
+import { db } from "@/lib/db";
+
+// ADMINS ONLY: this fires a paid Higgsfield render, and it is part of the admin-only CEO/MD article flow. A
+// member must never be able to drive paid image generation.
+const isAdmin = (role?: string | null) => role === "super_admin" || role === "admin";
 
 // THE CEO'S LINKEDIN CREATIVE, to run with his newsletter.
 //
@@ -30,11 +35,17 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
+  if (!isAdmin(session?.user?.role)) return NextResponse.json({ error: "Admins only" }, { status: 403 });
 
   const b = (await req.json().catch(() => ({}))) as { clientId?: string; subject?: string; callout?: string; publisher?: string; ratios?: unknown };
   const clientId = String(b.clientId || "");
   const subject = String(b.subject || "").trim();
+  // VALIDATE THE BRAIN EXISTS before any paid call, so an arbitrary clientId can never burn Higgsfield credits
+  // (and can never be interpolated into a blob key for a brain that is not real).
+  if (clientId) {
+    const ok = (await db().query(`select 1 from clients where id = $1`, [clientId]).catch(() => [])) as unknown[];
+    if (!ok.length) return NextResponse.json({ error: "That brain does not exist." }, { status: 404 });
+  }
   // WHICH SHAPES the team picked (Gary): 1x1, 16x9, or both. Defaults to 1x1 for the existing callers that do
   // not pass it (the intel queue and research gate).
   const ratios = (Array.isArray(b.ratios) ? b.ratios : []).map((x) => String(x)).filter((r) => r === "1x1" || r === "16x9") as ("1x1" | "16x9")[];

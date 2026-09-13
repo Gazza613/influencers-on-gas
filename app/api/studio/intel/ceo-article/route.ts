@@ -123,8 +123,13 @@ export async function POST(req: Request) {
     // The client's own logo in the header (Gary), else the GAS orb. review=false: the WHITE editorial piece itself.
     const logoUrl = await getClientEmailLogo(clientId).catch(() => null);
     // The 16x9 creative rides at the top of the email; every chosen creative is attached so the piece is post-ready.
-    const heroUrl = String(b.heroUrl || "").trim() || null;
-    const creativeUrls = (Array.isArray(b.creativeUrls) ? b.creativeUrls : []).map((x) => String(x).trim()).filter((u) => /^https?:\/\//.test(u));
+    // SSRF GUARD: nodemailer fetches each attachment server-side, and the email client fetches the embedded hero,
+    // so both are restricted to OUR OWN Vercel Blob host - the only place a real creative can live. This blocks an
+    // admin (or a replayed request) pointing them at an internal-network or arbitrary URL.
+    const isOurBlob = (u: string) => /^https:\/\/[^/]+\.blob\.vercel-storage\.com\//i.test(u);
+    const heroRaw = String(b.heroUrl || "").trim();
+    const heroUrl = heroRaw && isOurBlob(heroRaw) ? heroRaw : null;
+    const creativeUrls = (Array.isArray(b.creativeUrls) ? b.creativeUrls : []).map((x) => String(x).trim()).filter(isOurBlob);
     const html = buildCeoArticleEmail({ client: clientName, ceoName: signerName, ceoTitle: signerTitle, post, ceoRecipients: recipients, logoUrl, heroUrl, dateLabel: `${clientName} · ${ukDate(new Date().toISOString())}`, review: false });
     const attachments = creativeUrls.map((url, i) => ({ filename: `${clientName || "creative"}-${i + 1}.png`.replace(/\s+/g, "-"), path: url }));
 

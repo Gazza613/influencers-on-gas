@@ -40,7 +40,7 @@ export type NewsletterResult =
   | { ok: false; error: string; status: number };
 
 // Em dash + the banned phrase are house rules; a prompt is not a guarantee, so we enforce both on the output.
-const noDash = (t: unknown) => String(t ?? "").replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ").replace(/\b(here'?s |an? )?the uncomfortable truth\b/gi, "the reality").trim();
+const noDash = (t: unknown) => String(t ?? "").replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ").replace(/\b(the|an?)\s+uncomfortable\s+truth\b/gi, "the reality").trim();
 
 // REGISTER + COMPLIANCE BACKSTOP, brain-aware. The specific voice is the brain's ceoRules; this only makes sure
 // the piece lands in the register a business of this size and category would actually publish, and stays inside

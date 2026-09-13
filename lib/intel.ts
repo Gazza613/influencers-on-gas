@@ -505,7 +505,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     .replace(/\s*[—–]\s*/g, " - ")
     // BANNED PHRASE (Gary): "the uncomfortable truth" is a house rule, and a prompt is not a guarantee, so we
     // strip it on the way into the database, exactly like the em dash. Replaced with a neutral so grammar holds.
-    .replace(/\bthe uncomfortable truth\b/gi, "the reality")
+    .replace(/\b(the|an?)\s+uncomfortable\s+truth\b/gi, "the reality")
     .trim();
 
   const saved: Intel[] = [];
