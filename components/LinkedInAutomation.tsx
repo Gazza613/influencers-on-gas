@@ -72,7 +72,7 @@ export default function LinkedInAutomation({ clientId }: { clientId: string }) {
           <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.8 0 0 .78 0 1.74v20.52C0 23.22.8 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.74V1.74C24 .78 23.2 0 22.22 0z" /></svg>
         </span>
         <div>
-          <h4 className="text-[16px] font-bold" style={{ color: LINKEDIN_BLUE }}>LinkedIn Article automation</h4>
+          <h4 className="text-[16px] font-bold" style={{ color: LINKEDIN_BLUE }}>LinkedIn Article Automation</h4>
           <p className="text-[12.5px] leading-relaxed text-ink-dim sm:max-w-[80%]">On the cadence, the pod drafts your {publisher === "md" ? "MD" : "CEO"}&rsquo;s piece from the next topic in the queue and emails the <b className="text-ink">team a draft to review</b>, never the exec directly. Fill the queue with your own topics, or add one the market is talking about.</p>
         </div>
       </div>
