@@ -129,7 +129,7 @@ export default function IntelEmailControl({ clientId, clientName }: { clientId: 
         </div>
       </div>
       <p className="mt-1.5 text-[15px] leading-relaxed text-ink-dim">
-        When <b className="text-ink">{clientName}</b>&apos;s Research emails, and who gets it. Off means the
+        <b className="text-ink">{clientName}</b>&apos;s Research emails, and who gets it. Off means the
         brain is skipped entirely on the automated run, so it costs nothing on the days it is silent.
       </p>
 
