@@ -24,7 +24,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "super_admin") return NextResponse.json({ error: "super-admin only" }, { status: 401 });
+  // Admins set the client's ground-truth website(s) - it belongs on the Brain page alongside feeding the brain.
+  if (session?.user?.role !== "super_admin" && session?.user?.role !== "admin") return NextResponse.json({ error: "Admins only" }, { status: 403 });
   const b = (await req.json().catch(() => ({}))) as { clientId?: string; website?: string; websites?: string[]; socials?: string[] };
   const clientId = String(b.clientId || "").trim();
   if (!clientId) return NextResponse.json({ error: "Pick the client first." }, { status: 400 });

@@ -251,7 +251,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     const c = await fetch("/api/studio/intel/newsletter-creative", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, subject: title, callout: creativeHeadline.trim() || artCallout || title, publisher, ratios }),
-      signal: AbortSignal.timeout(6 * 60 * 1000),
+      signal: AbortSignal.timeout(12 * 60 * 1000), // generous, under the route's 800s server budget; 'both' shapes = 6 renders and needs the room
     }).then((r) => r.json()).catch((e) => ({
       error: (e as Error)?.name === "TimeoutError" ? "The creative took too long and was cut off. The article is safe - hit Generate again." : "The creative request failed. The article is safe - try again.",
     }));

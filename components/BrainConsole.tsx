@@ -74,6 +74,20 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     setSavingFresh(false);
     if (d?.ok) setAutoRecrawl(Number(d.autoRecrawlDays) || 0);
   }
+  // THE CLIENT'S OFFICIAL WEBSITE - the ground-truth anchor the research pods lock onto (Gary: there was nowhere
+  // to set it on the Brain page). Loaded once; admin can set it right here.
+  const [website, setWebsite] = useState("");
+  const [savingWeb, setSavingWeb] = useState(false);
+  const [webSaved, setWebSaved] = useState(false);
+  useEffect(() => {
+    fetch(`/api/studio/client-website?clientId=${brainId}`).then((r) => r.json()).then((d) => setWebsite(d?.website || "")).catch(() => {});
+  }, [brainId]);
+  async function saveWebsite() {
+    setSavingWeb(true); setWebSaved(false);
+    const d = await fetch(`/api/studio/client-website`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: brainId, website: website.trim() }) }).then((r) => r.json()).catch(() => null);
+    setSavingWeb(false);
+    if (d?.ok) { setWebsite(d.website || ""); setWebSaved(true); }
+  }
   const [mode, setMode] = useState<Mode>("website");
   const [progress, setProgress] = useState("");
   const [sites, setSites] = useState<string[]>([""]);      // multi-site website scrape
@@ -512,6 +526,24 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <p className="text-[18px] text-ink-dim">Everything here becomes the brain&apos;s memory: chunked, embedded, and retrievable by every pod.</p>
           </div>
         </div>
+
+        {/* THE CLIENT'S OFFICIAL WEBSITE - the ground-truth anchor (Gary). Setting it here locks the research pods
+            to the right company (never a same-named other business), so it belongs right where the brain is fed. */}
+        {isAdmin && (
+          <div className="mt-4 rounded-xl border border-line bg-surface-2/50 p-3.5">
+            <label className="block">
+              <span className="tabular block text-[13px] font-bold uppercase tracking-[0.16em] text-ink-faint">Client&apos;s official website</span>
+              <span className="mt-0.5 block text-[15px] text-ink-dim">The ground-truth anchor. The Researcher and Strategist lock to this site, so they never research a same-named but different business.</span>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input value={website} onChange={(e) => { setWebsite(e.target.value); setWebSaved(false); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveWebsite(); } }}
+                  placeholder="https://client-official-site.co.za"
+                  className="min-w-[260px] flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-[18px] text-ink outline-none focus:border-line-strong" />
+                <button onClick={saveWebsite} disabled={savingWeb} className="btn-brand rounded-lg px-4 py-2 text-[17px] font-bold disabled:opacity-50">{savingWeb ? "Saving…" : webSaved ? "✓ Saved" : "Save site"}</button>
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* TWO HONEST ZONES (world-class IA): "Feed it" is raw source material; "Teach it" is the structured rules
             and positioning the brain applies. The brand library (the artwork) is its own zone lower down. Splitting
