@@ -96,6 +96,9 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [findings, setFindings] = useState<Finding[] | null>(null);
+  // What the last research run actually did, so the results (and the empty state) can be honest about the window:
+  // "Find what's new" starts at 2 weeks and auto-widens to 6 weeks if that is empty.
+  const [lastRun, setLastRun] = useState<{ mode: "question" | "discover"; windowDays: number; widened: number | null } | null>(null);
   const [err, setErr] = useState("");
   // The CEO/MD thought-leadership draft flow (one open at a time). draftFor is the studio_intel finding id being
   // drafted - a real id whether it came from a surfaced finding or the LinkedIn-article research.
@@ -326,13 +329,14 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     // Clear ANY prior draft/send state (incl. the LinkedIn/CEO "sent" banner): a research run neither drafts nor
     // sends, so a leftover success banner from an earlier send must not stay on screen and imply this run emailed
     // anyone. This is a research action only - it surfaces findings, it never sends email (Gary).
-    setBusy(true); setErr(""); setFindings(null); setDraftFor(null); setLiDraft(false); setLiSent(false); setSentFor(""); setDraftErr("");
+    setBusy(true); setErr(""); setFindings(null); setLastRun(null); setDraftFor(null); setLiDraft(false); setLiSent(false); setSentFor(""); setDraftErr("");
     const d = await fetch(`/api/studio/intel/ask`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, question: mode === "question" ? q : "", mode }),
     }).then((r) => r.json()).catch(() => null);
     setBusy(false);
     if (!d?.ok) { setErr(d?.error || "Couldn't run that."); return; }
+    setLastRun({ mode, windowDays: Number(d.windowDays) || (mode === "discover" ? 14 : 90), widened: d.widened ? Number(d.widened) : null });
     setFindings(Array.isArray(d.findings) ? d.findings : []);
   }
 
@@ -656,8 +660,17 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
 
       {findings && !busy && (
         <div className="mt-5 space-y-3">
+          {/* When "Find what's new" comes back empty at 2 weeks, it looks back 6 weeks before giving up - say so, so
+              a quiet 2 weeks (with older but still material news) never reads as "the pod can't research". */}
+          {lastRun?.widened && findings.length > 0 && (
+            <p className="rounded-lg border border-accent/25 bg-accent/10 px-4 py-2.5 text-sm text-ink-dim">Nothing new in the last 2 weeks, so this shows the last 6 weeks. For anything older, use <b className="text-ink">Ask the market</b> (it looks back 3 months).</p>
+          )}
           {findings.length === 0 ? (
-            <p className="rounded-lg border border-line bg-surface-2 px-4 py-3 text-base text-ink-dim">Nothing solid came back on that. A quiet answer is a real one, the pod never pads or invents. Try a sharper question.</p>
+            lastRun?.mode === "discover" ? (
+              <p className="rounded-lg border border-line bg-surface-2 px-4 py-3 text-base text-ink-dim">Nothing new surfaced for {brainName} in the last 6 weeks. This sweep only reports genuinely fresh moves and never pads or invents. For older context, use <b className="text-ink">Ask the market</b> with a specific question, it looks back up to 3 months.</p>
+            ) : (
+              <p className="rounded-lg border border-line bg-surface-2 px-4 py-3 text-base text-ink-dim">Nothing solid came back on that. A quiet answer is a real one, the pod never pads or invents. Try a sharper question, or widen it out.</p>
+            )
           ) : findings.map((f, i) => {
             const move = String(f.campaign_response || "");
             const tag = /\bdefensive\b/i.test(move) && /\bproactive\b/i.test(move) ? "defensive + proactive" : /\bdefensive\b/i.test(move) ? "defensive" : /\bproactive\b/i.test(move) ? "proactive" : "";
