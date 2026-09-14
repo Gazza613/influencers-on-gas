@@ -95,6 +95,25 @@ export async function deriveResearchBrief(clientId: string): Promise<{ clientNam
   return { clientName: name, scope, remit, doctrine };
 }
 
+// A DERIVED intel brief for a brain that has its OWN material but no stored intel_briefs row (Gary fed a brain
+// but it was never briefed). Built entirely from THIS brain's name + crawled material, so the scope lock is the
+// brain's own - never borrowed. Makes any well-fed brain immediately researchable; the daily automation still
+// only runs brains that opt in via a real brief (this fallback is for on-demand Ask / Find / LinkedIn).
+async function deriveIntelBrief(clientId: string): Promise<IntelBrief | null> {
+  const d = await deriveResearchBrief(clientId);
+  if (!d) return null;
+  const website = await clientWebsite(clientId).catch(() => null);
+  return {
+    clientId, clientName: d.clientName, scope: d.scope,
+    journalist: null,
+    strategist: `Watch ${d.clientName}'s market and report what has CHANGED for ${d.clientName}: rival moves, category and regulatory shifts, and openings or threats, each with the defensive or proactive move it argues for. Ground every finding in ${d.clientName}'s own material and current, verifiable web research about ${d.clientName} and its market.`,
+    researcher: d.remit,
+    windowDays: 30, emailIntro: null,
+    ceoRules: null, ceoName: null, ceoTitle: null, mdName: null, mdTitle: null, publisher: "ceo",
+    website, deprecatedProducts: [], emailSchedule: "off", emailRecipients: [],
+  };
+}
+
 // Which brains the Researcher can run: any with an explicit researcher remit, OR any that has crawled knowledge
 // (so a freshly-crawled brain is immediately researchable via the derived brief above).
 export async function researchableClientIds(): Promise<string[]> {
@@ -360,10 +379,11 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   if (!key) throw new Error("Claude isn't connected");
 
   // THE BRAIN IS THE RINGFENCE. Everything client-specific - the scope lock and the role brief - comes from THIS
-  // brain, alongside its own doctrine. No brief means we REFUSE to run: silently falling back to another brain's
-  // scope is precisely the contamination this design exists to prevent.
-  const cfg = await loadIntelBrief(clientId);
-  if (!cfg) throw new Error("This brain has no intel brief, so its scope lock is unknown. Refusing to research it rather than borrow another brain's scope. Add a row to intel_briefs.");
+  // brain, alongside its own doctrine. A brain with a stored brief uses it; a brain WITHOUT one but with its own
+  // crawled material DERIVES its scope + remit from that material (deriveIntelBrief) - never another brain's, so
+  // the ringfence holds. Only a brain with neither a brief nor material genuinely cannot be researched.
+  const cfg = (await loadIntelBrief(clientId)) ?? (await deriveIntelBrief(clientId));
+  if (!cfg) throw new Error("This brain has no material yet, so there is nothing to research. Feed it the client's website and documents on the Brain page first, then run this again.");
   const roleBrief = role === "journalist" ? cfg.journalist : cfg.strategist;
   if (!roleBrief) return []; // this brain deliberately does not run this role
 
