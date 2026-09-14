@@ -140,10 +140,9 @@ export default function ResearchGate({ clients, configured = [], initialClientId
   const [creating, setCreating] = useState(false);
   // Ground-truth website (Gary, material): the team offers up the client's real site so the collect can never
   // research a same-named but different business. Reuses the existing client-website endpoint.
+  // Read-only here now: the website(s) and socials are set on the Brain, this desk just displays them (Gary).
   const [sites, setSites] = useState<string[]>([""]);   // the client's ground-truth websites (some run several)
-  const [siteSaved, setSiteSaved] = useState(false);
-  const [socials, setSocials] = useState<string[]>([""]);   // the client's official social accounts (Gary: mine these too)
-  const [socSaved, setSocSaved] = useState(false);
+  const [socials, setSocials] = useState<string[]>([""]);   // the client's official social accounts
   // CEO NEWSLETTER (Gary): tag a fact -> write the CEO's LinkedIn piece + its creative, then approve/reject/rewrite.
   const [nl, setNl] = useState<null | { claim: Claim; post: string; art: { subject: string; callout: string } | null; img: string | null; imgs: string[]; busy: boolean; imgBusy: boolean; saving: boolean; saved: boolean; err: string; note: string; showNote: boolean }>(null);
   // The newsletter preview is DRAGGABLE (Gary: "drag the preview box down using the bottom-right dragger") - the
@@ -264,28 +263,6 @@ export default function ResearchGate({ clients, configured = [], initialClientId
   }, [clientId]);
   useEffect(() => { loadSpend(run?.id); }, [loadSpend, run?.id]);
 
-  // WEEKLY AUTO-RUN toggle (Gary): per client, Monday 08:30 SAST. Loaded for the selected client, off by default.
-  const [weekly, setWeekly] = useState<{ on: boolean; busy: boolean }>({ on: false, busy: false });
-  useEffect(() => {
-    if (!clientId) return;
-    let live = true;
-    fetch(`/api/studio/researcher/weekly?clientId=${clientId}`, { cache: "no-store" })
-      .then((r) => r.json()).then((d) => { if (live) setWeekly({ on: !!d?.enabled, busy: false }); }).catch(() => {});
-    return () => { live = false; };
-  }, [clientId]);
-  async function toggleWeekly() {
-    if (weekly.busy) return;
-    const next = !weekly.on;
-    setWeekly({ on: next, busy: true });
-    const d = await fetch(`/api/studio/researcher/weekly`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, enabled: next }),
-    }).then((r) => r.json()).catch(() => null);
-    if (!d?.ok) { setWeekly({ on: !next, busy: false }); flex(d?.error || "Couldn't change the weekly run."); return; }
-    setWeekly({ on: d.enabled, busy: false });
-    flex(d.enabled ? "Weekly auto-run ON. This brain runs every Monday 08:30 and emails you to approve." : "Weekly auto-run OFF. No scheduled runs for this brain.");
-  }
-
   async function createBrain() {
     const name = nb.name.trim();
     const sites = nb.sites.map((s) => s.trim()).filter(Boolean);
@@ -308,7 +285,7 @@ export default function ResearchGate({ clients, configured = [], initialClientId
     if (!clientId) return;
     let live = true;
     fetch(`/api/studio/client-website?clientId=${clientId}`, { cache: "no-store" })
-      .then((r) => r.json()).then((d) => { if (live) { const w = Array.isArray(d?.websites) && d.websites.length ? d.websites : (d?.website ? [d.website] : [""]); setSites(w.length ? w : [""]); setSiteSaved(false); const s = Array.isArray(d?.socials) && d.socials.length ? d.socials : [""]; setSocials(s.length ? s : [""]); setSocSaved(false); } }).catch(() => {});
+      .then((r) => r.json()).then((d) => { if (live) { const w = Array.isArray(d?.websites) && d.websites.length ? d.websites : (d?.website ? [d.website] : [""]); setSites(w.length ? w : [""]); const s = Array.isArray(d?.socials) && d.socials.length ? d.socials : [""]; setSocials(s.length ? s : [""]); } }).catch(() => {});
     return () => { live = false; };
   }, [clientId]);
 
@@ -321,25 +298,6 @@ export default function ResearchGate({ clients, configured = [], initialClientId
     return () => clearInterval(t);
   }, [running]);
 
-  async function saveSites() {
-    const list = sites.map((s) => s.trim()).filter(Boolean);
-    const r = await fetch("/api/studio/client-website", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, websites: list }),
-    }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) { setSites(r.websites?.length ? r.websites : [""]); setSiteSaved(true); setTimeout(() => setSiteSaved(false), 1800); }
-    else flex(r?.error || "Couldn't save the websites.");
-  }
-
-  async function saveSocials() {
-    const list = socials.map((s) => s.trim()).filter(Boolean);
-    const r = await fetch("/api/studio/client-website", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, socials: list }),
-    }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) { setSocials(r.socials?.length ? r.socials : [""]); setSocSaved(true); setTimeout(() => setSocSaved(false), 1800); }
-    else flex(r?.error || "Couldn't save the social accounts.");
-  }
 
   // Commission a collect. withNotes runs a "Rerun with notes" - a fresh VERSION addressing corrections, never an
   // overwrite. The collect fires a DURABLE, phase-stepped Inngest job and returns immediately; we then POLL the run
@@ -665,68 +623,33 @@ export default function ResearchGate({ clients, configured = [], initialClientId
               </div>
             )}
 
-            {/* WEEKLY AUTO-RUN (Gary): opt this brain into a Monday 08:30 run, off by default so nothing is charged
-                without opting in. It emails you when it lands, then you approve or reject at Gate 1 as usual. */}
-            {isConfigured && (
-              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-2/50 px-4 py-3">
-                <button role="switch" aria-checked={weekly.on} onClick={toggleWeekly} disabled={weekly.busy}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${weekly.on ? "bg-[#4ade80]" : "bg-surface-2 ring-1 ring-line"} disabled:opacity-60`}>
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${weekly.on ? "left-[22px]" : "left-0.5"}`} />
-                </button>
-                <div className="min-w-0">
-                  <div className="text-[17px] font-semibold text-ink">Weekly auto-run · Monday 08:30</div>
-                  <div className="text-[15px] text-ink-faint">
-                    {weekly.on
-                      ? "ON. This brain researches every Monday morning and emails you to approve. Only new facts surface."
-                      : "OFF. Turn on to research this brain automatically each week, so you never forget and never overspend."}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* RIGHT: the ground truth */}
+          {/* RIGHT: the ground truth, READ-ONLY. Website + socials are now set in ONE place, on the Brain, and every
+              desk reads them from there (Gary). Shown here so the team can confirm the anchor before commissioning. */}
           <div className="space-y-5">
-            <div>
-              <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Ground-truth website(s)</span>
-              <div className="mt-1.5 space-y-2">
-                {sites.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input value={s} onChange={(e) => { const next = [...sites]; next[i] = e.target.value; setSites(next); }}
-                      placeholder={i === 0 ? "https://www.the-amber-room.co.za/" : "https://another-official-site.co.za"}
-                      className="block w-full min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] outline-none focus:border-accent" />
-                    {sites.length > 1 && <button onClick={() => setSites(sites.filter((_, j) => j !== i))} aria-label="Remove website" className="shrink-0 text-ink-faint hover:text-alert">✕</button>}
-                  </div>
-                ))}
+            <div className="rounded-xl border border-line bg-surface-2/40 p-4">
+              <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Ground truth (set on the Brain)</span>
+              <div className="mt-2.5">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-ink-faint">Website(s)</div>
+                {sites.filter(Boolean).length
+                  ? <ul className="mt-1 space-y-0.5">{sites.filter(Boolean).map((s, i) => <li key={i} className="truncate text-[16px] text-ink">{s}</li>)}</ul>
+                  : <p className="mt-1 text-[16px] text-ink-faint">No website set yet, add it on the Brain, it is the anchor.</p>}
               </div>
-              <div className="mt-2 flex items-center gap-3">
-                <button onClick={() => setSites([...sites, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add another website</button>
-                <button onClick={saveSites} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{siteSaved ? "✓ Saved" : "Save"}</button>
+              <div className="mt-3">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-ink-faint">Social accounts</div>
+                {socials.filter(Boolean).length
+                  ? <ul className="mt-1 space-y-0.5">{socials.filter(Boolean).map((s, i) => <li key={i} className="truncate text-[16px] text-ink">{s}</li>)}</ul>
+                  : <p className="mt-1 text-[16px] text-ink-faint">None set.</p>}
               </div>
-            </div>
-
-            {/* SOCIAL ACCOUNTS (Gary): the client's own social profiles, mined for cadence, content themes and audience. */}
-            <div>
-              <span className="text-[15px] font-semibold uppercase tracking-wide text-ink-faint">Social media accounts</span>
-              <div className="mt-1.5 space-y-2">
-                {socials.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input value={s} onChange={(e) => { const next = [...socials]; next[i] = e.target.value; setSocials(next); }}
-                      placeholder={i === 0 ? "https://www.instagram.com/theclient" : "https://www.linkedin.com/company/theclient"}
-                      className="block w-full min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[17px] outline-none focus:border-accent" />
-                    {socials.length > 1 && <button onClick={() => setSocials(socials.filter((_, j) => j !== i))} aria-label="Remove social account" className="shrink-0 text-ink-faint hover:text-alert">✕</button>}
-                  </div>
-                ))}
-              </div>
-              <div className="mt-2 flex items-center gap-3">
-                <button onClick={() => setSocials([...socials, ""])} className="text-[15px] font-semibold text-accent hover:underline">+ Add a social account</button>
-                <button onClick={saveSocials} className="rounded-lg border border-line px-3 py-1.5 text-[15px] font-semibold text-ink-dim hover:text-ink">{socSaved ? "✓ Saved" : "Save"}</button>
-              </div>
+              {clientId && (
+                <a href={`/setup/brains/${clientId}`} className="mt-3 inline-block text-[15px] font-semibold text-accent hover:underline">Set the website and socials on the Brain →</a>
+              )}
             </div>
           </div>
         </div>
 
-        <p className="mt-5 border-t border-line pt-4 text-[15px] text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses, and reads every one of them. Social accounts are mined for cadence, content themes and audience signals.</p>
+        <p className="mt-5 border-t border-line pt-4 text-[15px] text-ink-faint">The website(s) are the anchor: The Researcher reports only the organisation at those addresses. The website and social accounts are now set once on the Brain, and every desk reads them from there.</p>
       </div>
 
       {/* NEW BRAIN */}

@@ -103,6 +103,8 @@ async function deriveIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const d = await deriveResearchBrief(clientId);
   if (!d) return null;
   const website = await clientWebsite(clientId).catch(() => null);
+  const socRows = (await db().query(`select socials from clients where id = $1`, [clientId]).catch(() => [])) as { socials: string[] | null }[];
+  const socials = Array.isArray(socRows[0]?.socials) ? socRows[0]!.socials!.filter((s) => typeof s === "string" && s.trim()) : [];
   return {
     clientId, clientName: d.clientName, scope: d.scope,
     journalist: null,
@@ -110,7 +112,7 @@ async function deriveIntelBrief(clientId: string): Promise<IntelBrief | null> {
     researcher: d.remit,
     windowDays: 30, emailIntro: null,
     ceoRules: null, ceoName: null, ceoTitle: null, mdName: null, mdTitle: null, publisher: "ceo",
-    website, deprecatedProducts: [], emailSchedule: "off", emailRecipients: [],
+    website, socials, deprecatedProducts: [], emailSchedule: "off", emailRecipients: [],
   };
 }
 
@@ -188,6 +190,9 @@ export type IntelBrief = {
   // The client's OWN official website - the ground truth the desks must stay inside (Gary). Both desks anchor
   // to it so they can never research a same-named but different business.
   website: string | null;
+  // The client's OWN official social accounts (set on the Brain). Mined for the client's own public activity and
+  // used to pin the RIGHT entity when the name is shared. Same ground-truth role as the website.
+  socials: string[];
   // RETIRED PRODUCTS the client no longer sells but has not yet scrubbed from its own site (Gary: GAS still lists
   // Appitude / ROC / INGAiGE). Ground truth from the team: NEVER present these as current, never reference them.
   deprecatedProducts: string[];
@@ -206,7 +211,7 @@ function normSchedule(v: unknown): "off" | "daily" | "weekly" {
 
 export async function loadIntelBrief(clientId: string): Promise<IntelBrief | null> {
   const rows = (await db().query(
-    `select b.client_id, c.name as client_name, c.website, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
+    `select b.client_id, c.name as client_name, c.website, c.socials, b.scope, b.journalist, b.strategist, b.researcher, b.window_days,
             b.email_intro, b.ceo_rules, b.ceo_name, b.ceo_title, b.md_name, b.md_title, b.newsletter_publisher,
             b.deprecated_products, b.email_schedule, b.email_recipients
      from intel_briefs b join clients c on c.id = b.client_id
@@ -231,6 +236,7 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
     mdTitle: (r.md_title as string) || null,
     publisher: r.newsletter_publisher === "md" ? "md" : "ceo",
     website: (r.website as string) || null,
+    socials: Array.isArray(r.socials) ? (r.socials as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
     deprecatedProducts: Array.isArray(r.deprecated_products) ? (r.deprecated_products as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
     emailSchedule: normSchedule(r.email_schedule),
     emailRecipients: Array.isArray(r.email_recipients) ? (r.email_recipients as string[]).filter((s) => typeof s === "string" && s.trim()) : [],
@@ -240,9 +246,14 @@ export async function loadIntelBrief(clientId: string): Promise<IntelBrief | nul
 // THE GROUND-TRUTH ANCHOR (Gary, material): the desks kept drifting to a same-named but different business
 // ("theamberroom.co.za" instead of the client's "the-amber-room.co.za"). This block, injected into every intel
 // scope, forces the research to validate every source against the client's OWN website and reject look-alikes.
-export function siteAnchor(name: string, website: string | null | undefined): string {
+export function siteAnchor(name: string, website: string | null | undefined, socials?: string[]): string {
   if (!website) return "";
-  return `\n\nGROUND-TRUTH ANCHOR (non-negotiable). The client is ${name}, the organisation at its OWN official website ${website}. This anchor fixes WHICH organisation you research - it does NOT restrict you to their own website. In fact, RANGE WIDELY and actively seek INDEPENDENT coverage of this organisation: news and press/media releases, trade and industry publications, the relevant regulator's records, partner and award announcements, interviews and podcasts, business directories, and review platforms. Their own site establishes who they are; the independent record is where much of the story lives, so do not lean only on their site. THE RULE IS ABOUT THE ENTITY, NOT THE SOURCE: use any credible source, provided it is genuinely about the ${name} at ${website} and not a same-named but different business. A business that merely SHARES the name is a different entity, never research or cite it. If you genuinely cannot tell which entity a source is about, treat it as unverified or low-confidence rather than as fact, do not silently drop useful coverage. If ${name} publishes an official regulatory or registration number (for example an FSP number or a company registration number, usually in the site footer), that number is the DEFINITIVE identity check: use it to confirm you have the right entity and to pull the regulator's own record.`;
+  // The official socials are ground truth too: they confirm the RIGHT entity and are a place to find the client's
+  // OWN announcements (which often break there first). They do not widen the scope - same entity, more windows on it.
+  const socialLine = socials && socials.length
+    ? ` The client's OWN official social accounts are: ${socials.join(", ")}. Treat these as ground truth for the SAME entity - use them to confirm identity and to find the client's own public announcements, and never confuse a look-alike account for them.`
+    : "";
+  return `\n\nGROUND-TRUTH ANCHOR (non-negotiable). The client is ${name}, the organisation at its OWN official website ${website}.${socialLine} This anchor fixes WHICH organisation you research - it does NOT restrict you to their own website. In fact, RANGE WIDELY and actively seek INDEPENDENT coverage of this organisation: news and press/media releases, trade and industry publications, the relevant regulator's records, partner and award announcements, interviews and podcasts, business directories, and review platforms. Their own site establishes who they are; the independent record is where much of the story lives, so do not lean only on their site. THE RULE IS ABOUT THE ENTITY, NOT THE SOURCE: use any credible source, provided it is genuinely about the ${name} at ${website} and not a same-named but different business. A business that merely SHARES the name is a different entity, never research or cite it. If you genuinely cannot tell which entity a source is about, treat it as unverified or low-confidence rather than as fact, do not silently drop useful coverage. If ${name} publishes an official regulatory or registration number (for example an FSP number or a company registration number, usually in the site footer), that number is the DEFINITIVE identity check: use it to confirm you have the right entity and to pull the regulator's own record.`;
 }
 
 // The client's canonical website: the explicit one they set, else the domain their crawled knowledge came from.
@@ -434,7 +445,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: 6000,
-    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website)}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays, answerMode)}\n\n${STYLE}`,
+    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays, answerMode)}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -459,7 +470,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     max_tokens: 6000,
     // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
     // never carried the UK-spelling / no-em-dash rule at all, which is how em dashes kept reaching the inbox.
-    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website)}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],

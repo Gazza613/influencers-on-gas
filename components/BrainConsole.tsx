@@ -79,14 +79,29 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const [website, setWebsite] = useState("");
   const [savingWeb, setSavingWeb] = useState(false);
   const [webSaved, setWebSaved] = useState(false);
+  // THE CLIENT'S OFFICIAL SOCIALS - now set HERE on the Brain, the single home for the ground truth (Gary). One per
+  // line. The research pods mine them for the right entity's public activity alongside the website.
+  const [socials, setSocials] = useState("");
+  const [savingSoc, setSavingSoc] = useState(false);
+  const [socSaved, setSocSaved] = useState(false);
   useEffect(() => {
-    fetch(`/api/studio/client-website?clientId=${brainId}`).then((r) => r.json()).then((d) => setWebsite(d?.website || "")).catch(() => {});
+    fetch(`/api/studio/client-website?clientId=${brainId}`).then((r) => r.json()).then((d) => {
+      setWebsite(d?.website || "");
+      setSocials(Array.isArray(d?.socials) ? d.socials.join("\n") : "");
+    }).catch(() => {});
   }, [brainId]);
   async function saveWebsite() {
     setSavingWeb(true); setWebSaved(false);
     const d = await fetch(`/api/studio/client-website`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: brainId, website: website.trim() }) }).then((r) => r.json()).catch(() => null);
     setSavingWeb(false);
     if (d?.ok) { setWebsite(d.website || ""); setWebSaved(true); }
+  }
+  async function saveSocials() {
+    setSavingSoc(true); setSocSaved(false);
+    const list = socials.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    const d = await fetch(`/api/studio/client-website`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: brainId, socials: list }) }).then((r) => r.json()).catch(() => null);
+    setSavingSoc(false);
+    if (d?.ok) { setSocials(Array.isArray(d.socials) ? d.socials.join("\n") : ""); setSocSaved(true); }
   }
   const [mode, setMode] = useState<Mode>("website");
   const [progress, setProgress] = useState("");
@@ -540,6 +555,18 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                   placeholder="https://client-official-site.co.za"
                   className="min-w-[260px] flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-[18px] text-ink outline-none focus:border-line-strong" />
                 <button onClick={saveWebsite} disabled={savingWeb} className="btn-brand rounded-lg px-4 py-2 text-[17px] font-bold disabled:opacity-50">{savingWeb ? "Saving…" : webSaved ? "✓ Saved" : "Save site"}</button>
+              </div>
+            </label>
+            {/* OFFICIAL SOCIALS - the single home for these too (Gary). The research pods mine them for the client's
+                own public activity, and they help pin the RIGHT entity when the name is shared. One per line. */}
+            <label className="mt-4 block border-t border-line pt-3.5">
+              <span className="tabular block text-[13px] font-bold uppercase tracking-[0.16em] text-ink-faint">Official social accounts</span>
+              <span className="mt-0.5 block text-[15px] text-ink-dim">Their real LinkedIn, Facebook, Instagram, X and so on, one per line. Mined alongside the website for the client&apos;s own activity.</span>
+              <div className="mt-2 flex flex-wrap items-start gap-2">
+                <textarea value={socials} onChange={(e) => { setSocials(e.target.value); setSocSaved(false); }} rows={3}
+                  placeholder={"https://www.linkedin.com/company/…\nhttps://www.instagram.com/…"}
+                  className="min-w-[260px] flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-[16px] leading-relaxed text-ink outline-none focus:border-line-strong" />
+                <button onClick={saveSocials} disabled={savingSoc} className="btn-brand rounded-lg px-4 py-2 text-[17px] font-bold disabled:opacity-50">{savingSoc ? "Saving…" : socSaved ? "✓ Saved" : "Save socials"}</button>
               </div>
             </label>
           </div>
