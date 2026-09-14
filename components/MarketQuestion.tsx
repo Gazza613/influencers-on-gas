@@ -86,6 +86,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [mdRecips, setMdRecips] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<{ id: string; headline: string; post: string; snippet: string }[]>([]);
   const [draftErr, setDraftErr] = useState("");
+  const [draftBlock, setDraftBlock] = useState<{ id: string; msg: string } | null>(null); // a finding whose draft was refused (e.g. unverified source), shown on its card
   const [sending, setSending] = useState(false);
   const [sentFor, setSentFor] = useState("");
   const [preview, setPreview] = useState(false); // show the draft as formatted HTML (as the email renders it)
@@ -195,14 +196,16 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   // Draft the CEO/MD's article from a surfaced finding, and prefill the saved identity + recipient(s).
   async function draftArticle(f: Finding) {
     if (!f.id || drafting) return;
-    setDraftFor(f.id); setLiDraft(false); setDrafting(true); setDraftErr(""); setDraftText(""); setSentFor("");
+    setDraftFor(f.id); setLiDraft(false); setDrafting(true); setDraftErr(""); setDraftText(""); setSentFor(""); setDraftBlock(null);
     resetDraftWorkspace();
     const [d] = await Promise.all([
       fetch(CEO_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "draft", clientId, id: f.id }) }).then((r) => r.json()).catch(() => null),
       loadDraftMeta(),
     ]);
     setDrafting(false);
-    if (!d?.ok) { setDraftErr(d?.error || "Couldn't draft that."); return; }
+    // A refused draft (e.g. an unverified source) should NOT leave an empty editor open: close it and show the
+    // reason right on the finding card, pointing to the alternative.
+    if (!d?.ok) { setDraftFor(null); setDraftBlock({ id: f.id, msg: d?.error || "Couldn't draft that." }); return; }
     setDraftText(d.post || ""); setArtCallout(d.art?.callout || "");
   }
 
@@ -645,22 +648,31 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
                         ) : draftEditor(f.id, () => draftArticle(f))}
                       </div>
                     ) : (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {addedIds.has(f.id) ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10 px-4 py-2 text-base font-semibold text-[#86efac]">✓ Added to brain</span>
-                        ) : (
-                          <button onClick={() => addToBrain(f)} disabled={addingId === f.id}
-                            className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink hover:border-line-strong disabled:opacity-50">
-                            {addingId === f.id ? "Adding…" : "＋ Add to brain"}
-                          </button>
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {addedIds.has(f.id) ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10 px-4 py-2 text-base font-semibold text-[#86efac]">✓ Added to brain</span>
+                          ) : (
+                            <button onClick={() => addToBrain(f)} disabled={addingId === f.id}
+                              className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink hover:border-line-strong disabled:opacity-50">
+                              {addingId === f.id ? "Adding…" : "＋ Add to brain"}
+                            </button>
+                          )}
+                          {/* Drafting is blocked on an unverified finding (grounding stays strict), so say so up
+                              front rather than only after a click. */}
+                          {isAdmin && (
+                            <button onClick={() => draftArticle(f)} disabled={drafting || f.verification === "unverified"}
+                              title={f.verification === "unverified" ? "This finding is unverified, so it cannot seed a piece under an executive's name." : undefined}
+                              className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-2 text-base font-semibold text-accent hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-45">
+                              ✍️ Draft the {whoLabel}&rsquo;s article
+                            </button>
+                          )}
+                        </div>
+                        {draftBlock?.id === f.id && <p className="mt-2 rounded-lg border border-[#fbbf24]/30 bg-[#fbbf24]/[0.06] px-3 py-2 text-base text-[#fcd34d]">{draftBlock.msg}</p>}
+                        {isAdmin && f.verification === "unverified" && draftBlock?.id !== f.id && (
+                          <p className="mt-2 text-sm text-ink-faint">Unverified source, so it can&rsquo;t seed an exec article. Use the <b className="text-ink-dim">LinkedIn Article</b> box above to write on this topic, grounded in the brain.</p>
                         )}
-                        {isAdmin && (
-                          <button onClick={() => draftArticle(f)} disabled={drafting}
-                            className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-2 text-base font-semibold text-accent hover:bg-accent/10 disabled:opacity-50">
-                            ✍️ Draft the {whoLabel}&rsquo;s article
-                          </button>
-                        )}
-                      </div>
+                      </>
                     )}
                   </div>
                 )}

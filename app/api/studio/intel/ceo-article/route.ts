@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     // unverified (bot-blocked), refuted or dead finding cannot seed a public article under a CEO's name.
     const ver = String(f.verification || "");
     if (ver && ver !== "verified" && ver !== "partial") {
-      return NextResponse.json({ error: "This finding's source could not be verified, so it cannot seed a CEO article. Use a verified finding." }, { status: 400 });
+      return NextResponse.json({ error: "This finding is unverified - its sources could not be machine-confirmed, so it cannot seed a piece published under an executive's name. Draft from a finding marked ✓ Verified instead, or use the LinkedIn Article button to write on a topic grounded in the brain.", blocked: true }, { status: 400 });
     }
     const result = await writeCeoNewsletter(clientId, {
       headline: String(f.headline || ""),
