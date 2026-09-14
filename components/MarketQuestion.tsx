@@ -113,8 +113,8 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [liHint, setLiHint] = useState(false);
   const [liBusy, setLiBusy] = useState(false);
   // Add-to-Brain (accepts the finding so it is kept for the brain rather than binned).
-  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [addingId, setAddingId] = useState("");
+  const [rejectingId, setRejectingId] = useState("");
   const [showAuto, setShowAuto] = useState(false); // the automation/schedule block is collapsed to keep the panel short
   const [showDrafts, setShowDrafts] = useState(false); // the resume-a-draft list is collapsed behind a toggle
   const [showPub, setShowPub] = useState(false); // the publish + measure view is collapsed behind a toggle
@@ -191,7 +191,20 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
       body: JSON.stringify({ clientId, id: f.id, status: "accepted" }),
     }).then((r) => r.json()).catch(() => null);
     setAddingId("");
-    if (d?.ok) setAddedIds((prev) => new Set(prev).add(f.id!));
+    // Added to the brain: close the finding out of view (Gary), same as rejecting closes it.
+    if (d?.ok) setFindings((prev) => (prev ? prev.filter((x) => x.id !== f.id) : prev));
+  }
+
+  // Reject a finding: bin it (so it leaves the Strategist queue too) and close it from view.
+  async function rejectFinding(f: Finding) {
+    if (!f.id || rejectingId) return;
+    setRejectingId(f.id);
+    const d = await fetch(`/api/studio/intel`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, id: f.id, status: "binned" }),
+    }).then((r) => r.json()).catch(() => null);
+    setRejectingId("");
+    if (d?.ok) setFindings((prev) => (prev ? prev.filter((x) => x.id !== f.id) : prev));
   }
 
   // Draft the CEO/MD's article from a surfaced finding, and prefill the saved identity + recipient(s).
@@ -287,7 +300,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   async function ask(mode: "question" | "discover" = "question") {
     if (busy || !clientId) return;
     if (mode === "question" && !q.trim()) return;
-    setBusy(true); setErr(""); setFindings(null); setDraftFor(null); setLiDraft(false); setSentFor(""); setDraftErr(""); setAddedIds(new Set());
+    setBusy(true); setErr(""); setFindings(null); setDraftFor(null); setLiDraft(false); setSentFor(""); setDraftErr("");
     const d = await fetch(`/api/studio/intel/ask`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, question: mode === "question" ? q : "", mode }),
@@ -659,14 +672,15 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
                     ) : (
                       <>
                         <div className="flex flex-wrap items-center gap-2">
-                          {addedIds.has(f.id) ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10 px-4 py-2 text-base font-semibold text-[#86efac]">✓ Added to brain</span>
-                          ) : (
-                            <button onClick={() => addToBrain(f)} disabled={addingId === f.id}
-                              className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink hover:border-line-strong disabled:opacity-50">
-                              {addingId === f.id ? "Adding…" : "＋ Add to brain"}
-                            </button>
-                          )}
+                          <button onClick={() => addToBrain(f)} disabled={addingId === f.id || rejectingId === f.id}
+                            className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-dim hover:text-ink hover:border-line-strong disabled:opacity-50">
+                            {addingId === f.id ? "Adding…" : "＋ Add to brain"}
+                          </button>
+                          {/* Reject: bin the finding and close it out (Gary). */}
+                          <button onClick={() => rejectFinding(f)} disabled={addingId === f.id || rejectingId === f.id}
+                            className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-faint hover:text-alert hover:border-alert/40 disabled:opacity-50">
+                            {rejectingId === f.id ? "Removing…" : "✕ Reject"}
+                          </button>
                           {/* Drafting is blocked on an unverified finding (grounding stays strict), so say so up
                               front rather than only after a click. */}
                           {isAdmin && (
