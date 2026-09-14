@@ -367,9 +367,11 @@ export async function buildCeoCreatives(
               { input: overlay, left: 0, top: 0 },
             ];
         let out = await sharp(bg).composite(layers).png().toBuffer();
-        // Logo top-left, small so it clears the headline (which starts below it). A 16x9 logo is capped tighter
-        // still because a width-based size is proportionally much taller on a landscape canvas.
-        if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: design.scheme === "light" ? (wide ? 13 : 22) : (wide ? 8 : 13) })) as Buffer;
+        // Logo top-left, small so it clears the headline below it. minWFrac drops the slider's 18% floor, and
+        // maxHFrac caps the HEIGHT so a CIRCULAR logo (e.g. GAS) is never taller than the corner it sits in - the
+        // width-only size is what let a round logo swallow the first headline line. A wide wordmark (e.g. MoMo)
+        // stays short and is unaffected.
+        if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: design.scheme === "light" ? (wide ? 15 : 22) : (wide ? 12 : 16) }, { minWFrac: 0.05, maxHFrac: wide ? 0.14 : 0.15 })) as Buffer;
 
         const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
         creatives.push({ url, ratio });

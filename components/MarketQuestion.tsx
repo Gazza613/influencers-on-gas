@@ -81,6 +81,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [drafting, setDrafting] = useState(false);
   const [draftText, setDraftText] = useState("");
   const [artCallout, setArtCallout] = useState("");
+  const [creativeHeadline, setCreativeHeadline] = useState(""); // the line on the creative, user-overridable
   const [recips, setRecips] = useState("");
   const [ceoRecips, setCeoRecips] = useState<string[]>([]);
   const [mdRecips, setMdRecips] = useState<string[]>([]);
@@ -123,7 +124,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
 
   // Reset the whole draft workspace (creative, chosen, publisher stays as loaded).
   function resetDraftWorkspace() {
-    setCreatives([]); setChosen([]); setCreativeErr(""); setDrawing(false); setRatios(["1x1"]);
+    setCreatives([]); setChosen([]); setCreativeErr(""); setDrawing(false); setRatios(["1x1"]); setCreativeHeadline("");
   }
 
   // Load the saved recipients (CEO and MD) + identity + the brain's default publisher, to prefill the draft screen.
@@ -236,7 +237,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     const title = draftText.split(/\n{2,}/)[0]?.replace(/^#{1,3}\s+/, "").trim() || "";
     const c = await fetch("/api/studio/intel/newsletter-creative", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, subject: title, callout: artCallout || title, publisher, ratios }),
+      body: JSON.stringify({ clientId, subject: title, callout: creativeHeadline.trim() || artCallout || title, publisher, ratios }),
       signal: AbortSignal.timeout(6 * 60 * 1000),
     }).then((r) => r.json()).catch((e) => ({
       error: (e as Error)?.name === "TimeoutError" ? "The creative took too long and was cut off. The article is safe - hit Generate again." : "The creative request failed. The article is safe - try again.",
@@ -347,9 +348,17 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
           : <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)} rows={14}
               className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-accent" />}
 
-        {/* THE EXEC'S BRANDED CREATIVE: pick the shapes, generate, choose which to attach + embed. */}
+        {/* THE EXEC'S BRANDED CREATIVE: set the headline, pick the shapes, generate, choose which to attach. */}
         <div className="mt-3 rounded-lg border border-line bg-surface-2/60 p-3">
-          <div className="flex flex-wrap items-center gap-2.5">
+          {/* HEADLINE ON THE CREATIVE (Gary: let me define it). A short line; empty uses the auto-written one. */}
+          <label className="block">
+            <span className="tabular block text-sm uppercase tracking-[0.16em] text-ink-faint">Headline on the creative</span>
+            <input value={creativeHeadline} onChange={(e) => setCreativeHeadline(e.target.value)} maxLength={80}
+              placeholder={artCallout ? `Auto: ${artCallout}` : "A short, punchy line (or leave blank for the auto one)"}
+              className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-sm text-ink outline-none focus:border-accent" />
+            <span className="mt-1 block text-xs text-ink-faint">Kept short so it never runs under the logo. Generate again after editing it.</span>
+          </label>
+          <div className="mt-3 flex flex-wrap items-center gap-2.5">
             <span className="tabular text-sm uppercase tracking-[0.16em] text-ink-faint">Creative</span>
             {(["1x1", "16x9"] as const).map((r) => (
               <button key={r} onClick={() => toggleRatio(r)}

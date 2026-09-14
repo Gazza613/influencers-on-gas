@@ -134,7 +134,7 @@ ${legalLine ? `<div class="legal">${esc(legalLine)}</div>` : ""}
 //
 // `box` is the detected logo position as fractions of the canvas (xPct/yPct top-left, wPct width). We place the
 // real logo to match its width and add a small margin so no garbled edge peeks out.
-export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xPct: number; yPct: number; wPct: number }, opts?: { halo?: boolean }): Promise<Buffer> {
+export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xPct: number; yPct: number; wPct: number }, opts?: { halo?: boolean; minWFrac?: number; maxHFrac?: number }): Promise<Buffer> {
   const meta = await sharp(baseBuf).metadata();
   const W = meta.width || 1080, H = meta.height || 1080;
   const b = box || { xPct: 4, yPct: 4, wPct: 28 };
@@ -144,12 +144,20 @@ export async function compositeLogo(baseBuf: Buffer, logoBuf: Buffer, box?: { xP
   const yFrac = (b.yPct > 1 ? b.yPct / 100 : b.yPct);
 
   // FORENSIC placement: honour the reference's own logo box (position + size), only clamped to sane bounds. The
-  // gold-standard slider logo is large (~28-32% wide), so allow up to 38%. Trim the logo's transparent padding
-  // first so it fills the box instead of floating small inside it (Gary: "logo too small").
+  // gold-standard slider logo is large (~28-32% wide), so allow up to 38%. The 18% MINIMUM width is a slider
+  // default; a caller can lower it via minWFrac (the CEO creative wants a small logo). Trim the transparent
+  // padding first so it fills the box (Gary: "logo too small"). maxHFrac then caps the HEIGHT: a width-only size
+  // makes a tall or circular logo far too tall (it swallowed the CEO headline), so the height is bounded too.
   const trimmed = await sharp(logoBuf).trim().png().toBuffer().catch(() => logoBuf);
-  const clampedW = Math.min(0.38, Math.max(0.18, wFrac));
+  const clampedW = Math.min(0.38, Math.max(opts?.minWFrac ?? 0.18, wFrac));
   const targetW = Math.round(W * clampedW);
-  const logo = await sharp(trimmed).resize({ width: targetW }).png().toBuffer();
+  let logo = await sharp(trimmed).resize({ width: targetW }).png().toBuffer();
+  if (opts?.maxHFrac) {
+    const m = await sharp(logo).metadata();
+    if ((m.height || 0) > opts.maxHFrac * H) {
+      logo = await sharp(trimmed).resize({ height: Math.round(opts.maxHFrac * H) }).png().toBuffer();
+    }
+  }
   const lm = await sharp(logo).metadata();
   const lw = lm.width || targetW, lh = lm.height || 0;
   const left = Math.max(0, Math.min(Math.round(W * xFrac), W - lw));
