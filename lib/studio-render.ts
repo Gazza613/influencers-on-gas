@@ -30,31 +30,41 @@ import { isSafePublicUrl } from "./safe-url";
 // '<'" and tells nobody anything. Deferred, the same failure is a catchable exception we can return as JSON.
 
 let _browser: Browser | null = null;
+// SERIALISE THE LAUNCH (Gary: 'spawn ETXTBSY' when both creative shapes render in parallel). @sparticuz/chromium
+// EXTRACTS the browser binary to a temp path and then executes it; two concurrent first-launches race - one is
+// still writing the binary while the other tries to run it, and the OS refuses ("text file busy"). A single
+// in-flight launch promise means the extraction happens once; every concurrent caller then shares the one
+// browser (puppeteer drives many pages on it), so parallel overlay renders are safe.
+let _launching: Promise<Browser> | null = null;
 
-async function browser(): Promise<Browser> {
-  if (_browser?.connected) return _browser;
-  _browser = null;
-
+async function launchBrowser(): Promise<Browser> {
   const puppeteer = (await import("puppeteer-core")).default;
   const local = process.env.CHROME_PATH; // set locally to use a system Chrome
-
   if (local) {
-    _browser = await puppeteer.launch({ executablePath: local, headless: true, args: [] });
-    return _browser;
+    return puppeteer.launch({ executablePath: local, headless: true, args: [] });
   }
-
   const chromium = (await import("@sparticuz/chromium")).default;
   // Skip the swiftshader/WebGL stack. We are screenshotting flat HTML - there is nothing to accelerate, and
   // initialising the graphics layer is memory and cold-start time spent for nothing.
   chromium.setGraphicsMode = false;
-
-  _browser = await puppeteer.launch({
+  return puppeteer.launch({
     args: chromium.args,
     executablePath: await chromium.executablePath(),
     headless: true,
     defaultViewport: null,
   });
-  return _browser;
+}
+
+async function browser(): Promise<Browser> {
+  if (_browser?.connected) return _browser;
+  if (_launching) return _launching;   // a launch is already in flight - join it, never race a second extraction
+  _launching = launchBrowser();
+  try {
+    _browser = await _launching;
+    return _browser;
+  } finally {
+    _launching = null;
+  }
 }
 
 export type RenderOpts = {
