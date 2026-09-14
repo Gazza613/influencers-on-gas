@@ -164,6 +164,14 @@ export async function POST(req: Request) {
       [clientId, JSON.stringify(recipients)]).catch(() => {});
     // Keep the sent copy on the finding and MARK IT SENT, so it stops being offered as a resumable draft.
     await db().query(`update studio_intel set newsletter = $2, newsletter_sent_at = now() where id = $1 and client_id = $3`, [id, post, clientId]).catch(() => {});
+    // PUBLISH + MEASURE LOOP: record this sent piece so it appears in the trend view ready to mark published and
+    // measure. One row per finding - a re-send does not add a duplicate.
+    await db().query(
+      `insert into ceo_publications (client_id, intel_id, publisher, title, topic)
+       select $1, $2, $3, $4, $5
+       where not exists (select 1 from ceo_publications where client_id = $1 and intel_id = $2)`,
+      [clientId, id, publisher, title.slice(0, 300), String(f.headline || "").slice(0, 300) || null],
+    ).catch(() => {});
     return NextResponse.json({ ok: true, sent: recipients.length });
   }
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Working from "@/components/Working";
 import IntelEmailControl from "@/components/IntelEmailControl";
 import LinkedInAutomation from "@/components/LinkedInAutomation";
+import Publications from "@/components/Publications";
 import LivingResearch from "@/components/LivingResearch";
 
 // ASK THE MARKET A QUESTION (Gary). The Strategist desk, on demand: type a market question about a client and get
@@ -114,6 +115,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [addingId, setAddingId] = useState("");
   const [showAuto, setShowAuto] = useState(false); // the automation/schedule block is collapsed to keep the panel short
   const [showDrafts, setShowDrafts] = useState(false); // the resume-a-draft list is collapsed behind a toggle
+  const [showPub, setShowPub] = useState(false); // the publish + measure view is collapsed behind a toggle
 
   const CEO_API = "/api/studio/intel/ceo-article";
   const publisherName = publisher === "md" ? mdName : ceoName;
@@ -581,6 +583,20 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
               {isAdmin && <LinkedInAutomation clientId={clientId} />}
             </div>
           )}
+        </div>
+      )}
+
+      {/* PUBLISH + MEASURE (admin-only): mark a CEO/MD piece published and track how it did over time. */}
+      {isAdmin && clientId && (
+        <div className="mt-3 border-t border-line pt-3">
+          <button onClick={() => setShowPub((v) => !v)} className="flex w-full items-center gap-2 text-left text-ink-dim hover:text-ink">
+            <span className={`inline-flex shrink-0 text-[#a855f7] transition-transform ${showPub ? "rotate-90" : ""}`} aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M9 6l6 6-6 6" /></svg>
+            </span>
+            <span className="text-[14px] font-bold text-ink sm:text-[16px]">Performance</span>
+            <span className="text-[12px] font-normal text-ink-faint sm:text-[13.5px]">· mark pieces published and measure what lands</span>
+          </button>
+          {showPub && <div className="mt-4"><Publications clientId={clientId} /></div>}
         </div>
       )}
 

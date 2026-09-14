@@ -123,6 +123,28 @@ create table if not exists brain_answers (
 );
 create index if not exists idx_brain_answers_client on brain_answers(client_id, created_at desc);
 
+-- CEO/MD PUBLISH + MEASURE LOOP (Gary). A thought-leadership piece is posted to LinkedIn by the exec, OFF the
+-- platform, so we close the loop by recording the published post and its performance here. Manual metrics are the
+-- honest v1 (LinkedIn's API is gated): the team marks a piece published with its post URL, then enters reach /
+-- reactions / comments / reshares over time. The platform then trends what lands, per exec and per topic.
+create table if not exists ceo_publications (
+  id           uuid primary key default gen_random_uuid(),
+  client_id    uuid not null references clients(id) on delete cascade,
+  intel_id     uuid,                                  -- the studio_intel piece it came from, if any (not FK: the finding may be pruned)
+  publisher    text not null default 'ceo',           -- ceo | md
+  title        text not null,
+  topic        text,
+  linkedin_url text,
+  published_at date,
+  reach        int,
+  reactions    int,
+  comments     int,
+  reshares     int,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists idx_ceo_publications_client on ceo_publications(client_id, published_at desc nulls last, created_at desc);
+
 -- ── Productions (the video runs) ──────────────────────────────────────────────
 create table if not exists productions (
   id              uuid primary key default gen_random_uuid(),
