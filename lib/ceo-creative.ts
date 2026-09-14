@@ -188,7 +188,14 @@ export async function buildCeoCreatives(
   if (!name || !title) {
     return { creatives: [], error: `This brain has no ${who} name and title set, so there is nobody to attribute the creative to.` };
   }
-  const message = tidyCallout(opts.message).split("/")[0].replace(/[,;]\s*$/, "").trim();
+  // THE CREATIVE HEADLINE MUST BE SHORT (Gary: a run-on callout filled the whole column and ran under the logo).
+  // Take the LEAD CLAUSE - up to the first slash or comma - so a sentence-long callout becomes a punchy line, and
+  // hard-cap it at ~52 characters on a word boundary as a backstop. A genuinely short callout is left untouched.
+  let message = tidyCallout(opts.message).split("/")[0].split(/,\s/)[0].replace(/[,;.]\s*$/, "").trim();
+  if (message.length > 52) {
+    const cut = message.slice(0, 52);
+    message = cut.slice(0, Math.max(cut.lastIndexOf(" "), 30)).trim();
+  }
 
   // 2. Cut him out ONCE with a PROPER matting model - fal BiRefNet - not luminance keying. A CEO cut-out has to
   //    be flawless (Gary: "not good, CEO will not approve"), and flood-fill left a ragged, haloed edge on his
@@ -360,9 +367,9 @@ export async function buildCeoCreatives(
               { input: overlay, left: 0, top: 0 },
             ];
         let out = await sharp(bg).composite(layers).png().toBuffer();
-        // Logo top-left, smaller so it clears the headline (which now starts below it). A 16x9 logo is capped
-        // tighter because a width-based size is proportionally much taller on a landscape canvas.
-        if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: design.scheme === "light" ? (wide ? 16 : 24) : (wide ? 10 : 15) })) as Buffer;
+        // Logo top-left, small so it clears the headline (which starts below it). A 16x9 logo is capped tighter
+        // still because a width-based size is proportionally much taller on a landscape canvas.
+        if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: design.scheme === "light" ? (wide ? 13 : 22) : (wide ? 8 : 13) })) as Buffer;
 
         const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
         creatives.push({ url, ratio });
