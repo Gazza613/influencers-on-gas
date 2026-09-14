@@ -168,6 +168,9 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [rejectingId, setRejectingId] = useState("");
   const [showAuto, setShowAuto] = useState(false); // the automation/schedule block is collapsed to keep the panel short
   const [showDrafts, setShowDrafts] = useState(false); // the resume-a-draft list is collapsed behind a toggle
+  // PREVIOUSLY SENT newsletters (Gary): reopen one to view, edit and send again. Collapsed behind its own toggle.
+  const [sentList, setSentList] = useState<{ id: string; title: string; post: string; sentOn: string }[]>([]);
+  const [showSent, setShowSent] = useState(false);
   const [showPub, setShowPub] = useState(false); // the publish + measure view is collapsed behind a toggle
 
   const CEO_API = "/api/studio/intel/ceo-article";
@@ -210,10 +213,28 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   // Refresh the resume strip whenever the editor closes (a draft was cancelled or sent).
   useEffect(() => { if (!draftFor) loadDrafts(); }, [draftFor, loadDrafts]);
 
+  // The brain's previously SENT newsletters, freshest first, to reopen and send again.
+  const loadSent = useCallback(async () => {
+    if (!isAdmin || !clientId) { setSentList([]); return; }
+    const d = await fetch(`${CEO_API}?clientId=${encodeURIComponent(clientId)}&sent=1`).then((r) => r.json()).catch(() => null);
+    setSentList(Array.isArray(d?.sent) ? d.sent : []);
+  }, [clientId, isAdmin]);
+  useEffect(() => { loadSent(); }, [loadSent]);
+  // A newly-sent piece should appear in the list, so refresh it when the editor closes.
+  useEffect(() => { if (!draftFor) loadSent(); }, [draftFor, loadSent]);
+
   // Open a saved draft back up in the editor, without re-spending to regenerate it.
   function resumeDraft(d: { id: string; post: string }) {
     setDraftFor(d.id); setLiDraft(true); setLiSent(false); setSentFor(""); setDraftErr("");
     setDraftText(d.post || ""); setArtCallout(""); resetDraftWorkspace(); setPreview(false);
+    loadDraftMeta();
+  }
+
+  // Reopen a previously SENT newsletter in the editor: fully editable, previewable, and re-sendable (Gary). Same
+  // editor as a draft; sending again re-emails it (the publication record de-dupes, so no duplicate is logged).
+  function openSent(d: { id: string; post: string }) {
+    setDraftFor(d.id); setLiDraft(true); setLiSent(false); setSentFor(""); setDraftErr("");
+    setDraftText(d.post || ""); setArtCallout(""); resetDraftWorkspace(); setPreview(true);
     loadDraftMeta();
   }
 
@@ -277,7 +298,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   // The LinkedIn-article button: research a typed topic (grounded, last 3 months) and draft directly.
   async function draftFromTopic() {
     if (liBusy || !clientId || !liTopic.trim()) return;
-    setLiBusy(true); setDraftErr(""); setDraftText(""); setSentFor(""); resetDraftWorkspace();
+    setLiBusy(true); setLiSent(false); setDraftErr(""); setDraftText(""); setSentFor(""); resetDraftWorkspace();
     const [d] = await Promise.all([
       fetch("/api/studio/intel/linkedin-article", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -627,14 +648,16 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
 
       {/* THE LINKEDIN-ARTICLE SECTION (admin-only), FIXED underneath because it runs the other way round to the two
           market-research buttons above: YOU set the topic, rather than the market surfacing one (Gary). */}
-      {isAdmin && liSent && !liDraft && (
+      {isAdmin && !liDraft && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "0d" }}>
-          <p className="text-base font-semibold text-[#86efac]">✓ Article emailed to the {whoLabel}. A copy is in your inbox.</p>
-          <button onClick={() => { setLiSent(false); setDraftErr(""); }} className="mt-3 rounded-lg px-4 py-2 text-base font-semibold text-white" style={{ backgroundColor: LINKEDIN_BLUE }}>Draft another</button>
-        </div>
-      )}
-      {isAdmin && !liDraft && !liSent && (
-        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: LINKEDIN_BLUE + "66", background: LINKEDIN_BLUE + "0d" }}>
+          {/* After a send: the green confirmation stays, and the prompt box below is ready for the next one, so the
+              team can fire off another without clicking away first (Gary). The × dismisses the confirmation. */}
+          {liSent && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/10 px-3.5 py-2.5">
+              <p className="text-base font-semibold text-[#86efac]">✓ Article emailed to the {whoLabel}. A copy is in your inbox. Write another below.</p>
+              <button onClick={() => setLiSent(false)} aria-label="Dismiss" className="shrink-0 text-lg leading-none text-[#86efac]/70 hover:text-[#86efac]">×</button>
+            </div>
+          )}
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white" style={{ backgroundColor: LINKEDIN_BLUE }}>
               <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6" aria-hidden><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.8 0 0 .78 0 1.74v20.52C0 23.22.8 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.74V1.74C24 .78 23.2 0 22.22 0z" /></svg>
@@ -644,7 +667,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
               <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
             </div>
           </div>
-          <textarea value={liTopic} onChange={(e) => { setLiTopic(e.target.value); setLiHint(false); }} onFocus={() => setLiHint(false)} rows={2}
+          <textarea value={liTopic} onChange={(e) => { setLiTopic(e.target.value); setLiHint(false); setLiSent(false); }} onFocus={() => { setLiHint(false); setLiSent(false); }} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) draftFromTopic(); }}
             placeholder={`e.g. why ${brainName}'s customers are shifting to X, and what it means for them`}
             className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-[#0A66C2]" />
@@ -696,6 +719,34 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold text-ink">{d.headline}</span>
                     <span className="block truncate text-[12px] text-ink-faint">{d.snippet}…</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PREVIOUSLY SENT (Gary): reopen a sent newsletter to view, edit and send again. Opens straight into preview,
+          fully editable. Own collapsible so it never clutters the drafting view. */}
+      {isAdmin && !draftFor && sentList.length > 0 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <button onClick={() => setShowSent((v) => !v)} className="flex w-full items-center gap-2 text-left text-ink-dim hover:text-ink">
+            <span className={`inline-flex shrink-0 text-[#a855f7] transition-transform ${showSent ? "rotate-90" : ""}`} aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M9 6l6 6-6 6" /></svg>
+            </span>
+            <span className="text-[14px] font-bold text-ink sm:text-[16px]">Previously sent</span>
+            <span className="text-[12px] font-normal text-ink-faint sm:text-[13.5px]">· {sentList.length} sent, reopen to view, edit or send again</span>
+          </button>
+          {showSent && (
+            <div className="mt-3 flex flex-col gap-2">
+              {sentList.map((d) => (
+                <button key={d.id} onClick={() => openSent(d)}
+                  className="flex items-center gap-2 rounded-lg border border-line bg-surface-1 px-3 py-2 text-left hover:border-accent/50">
+                  <span className="text-[#86efac]">✓</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-semibold text-ink">{d.title}</span>
+                    <span className="block truncate text-[12px] text-ink-faint">Sent {d.sentOn}</span>
                   </span>
                 </button>
               ))}

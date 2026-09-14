@@ -40,6 +40,21 @@ export async function GET(req: Request) {
     return NextResponse.json({ drafts: d.map((x) => ({ id: x.id, headline: x.headline, post: String(x.newsletter || ""), snippet: String(x.newsletter || "").replace(/^#{1,3}\s+/, "").slice(0, 90) })) });
   }
 
+  if (url.searchParams.get("sent") === "1") {
+    // Previously SENT newsletters on this brain, freshest first (Gary). The team can reopen one to view, edit and
+    // send again. Scoped by client_id (isolation). The title is the first block of the stored piece.
+    const s = (await db().query(
+      `select id, headline, newsletter, to_char(newsletter_sent_at, 'DD Mon YYYY') as sent_on from studio_intel
+        where client_id = $1 and newsletter is not null and newsletter_sent_at is not null
+        order by newsletter_sent_at desc limit 20`,
+      [clientId],
+    ).catch(() => [])) as { id: string; headline: string; newsletter: string; sent_on: string }[];
+    return NextResponse.json({ sent: s.map((x) => {
+      const title = String(x.newsletter || "").split(/\n{2,}/)[0]?.replace(/^#{1,3}\s+/, "").trim() || x.headline;
+      return { id: x.id, title, post: String(x.newsletter || ""), sentOn: x.sent_on };
+    }) });
+  }
+
   const rows = (await db().query(
     `select ceo_recipients, md_recipients, ceo_name, ceo_title, md_name, md_title, newsletter_publisher from intel_briefs where client_id = $1`, [clientId],
   ).catch(() => [])) as { ceo_recipients: string[] | null; md_recipients: string[] | null; ceo_name: string | null; ceo_title: string | null; md_name: string | null; md_title: string | null; newsletter_publisher: string | null }[];
