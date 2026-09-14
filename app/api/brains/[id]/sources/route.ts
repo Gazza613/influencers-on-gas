@@ -13,15 +13,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const type = body.type === "website" ? "website" : body.type === "crawl" ? "crawl" : body.type === "file" ? "file" : "text";
+  const type = body.type === "website" ? "website" : body.type === "crawl" ? "crawl" : body.type === "feed" ? "feed" : body.type === "file" ? "file" : "text";
   const text = typeof body.text === "string" ? body.text.trim() : "";
   let uri = typeof body.uri === "string" ? body.uri.trim() : "";
 
-  if (type === "website" || type === "crawl") {
-    // SSRF: the server (and Firecrawl on its behalf) will fetch this URL, so it must be a real public site, never
-    // an internal/localhost/cloud-metadata address. isSafeCrawlTarget allows http or https but blocks private
-    // hosts and IP literals.
-    if (!isSafeCrawlTarget(uri)) return NextResponse.json({ error: "Enter a valid public website URL (https://…)." }, { status: 400 });
+  if (type === "website" || type === "crawl" || type === "feed") {
+    // SSRF: the server fetches this URL (Firecrawl for a site, a plain fetch for a feed), so it must be a real
+    // public URL, never an internal/localhost/cloud-metadata address. isSafeCrawlTarget blocks private hosts.
+    if (!isSafeCrawlTarget(uri)) return NextResponse.json({ error: type === "feed" ? "Enter a valid public RSS/Atom feed URL (https://…)." : "Enter a valid public website URL (https://…)." }, { status: 400 });
   } else if (type === "file") {
     // The browser uploaded straight to Blob and hands us the URL back. It must be OUR blob store: a brain will
     // fetch this URL server-side, so accepting an arbitrary URL here would turn "add a document" into a way to

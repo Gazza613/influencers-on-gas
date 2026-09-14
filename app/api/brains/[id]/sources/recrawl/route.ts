@@ -29,8 +29,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   )) as { type: string; uri: string; include_path: string | null }[];
   const src = rows[0];
   if (!src) return NextResponse.json({ error: "That source is not on this brain." }, { status: 404 });
-  if (src.type !== "website" && src.type !== "crawl") {
-    return NextResponse.json({ error: "Only a website source can be re-crawled. Re-add a document or note to refresh it." }, { status: 400 });
+  if (src.type !== "website" && src.type !== "crawl" && src.type !== "feed") {
+    return NextResponse.json({ error: "Only a website or feed source can be re-crawled. Re-add a document or note to refresh it." }, { status: 400 });
   }
   // Re-validate the stored URL before we fetch it again (defence in depth: the guard could have been added after
   // this row was created, or the stored value tampered with).

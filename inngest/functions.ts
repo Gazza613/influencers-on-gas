@@ -19,6 +19,7 @@ import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/he
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
 import { scrape, startCrawl, crawlStatus, sitemapUrls } from "@/lib/vendors/firecrawl";
+import { fetchFeed } from "@/lib/feed";
 import { chunkStructured, withContextHeader, ingestChunks, clearSourceChunks, cleanScraped, isJunkChunk, brainChunkIds, reembedChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
 import { recordUsage } from "@/lib/usage";
@@ -441,6 +442,18 @@ export const ingestSource = inngest.createFunction(
         await step.run("usage-scrape", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: 1 }));
         if (!page.content) throw new Error("page had no readable content");
         items = withContextHeader(chunkStructured(cleanScraped(page.content)).filter((c) => !isJunkChunk(c)), page.title).map((c) => ({ content: c, metadata: { url: page.url, title: page.title } }));
+      } else if (type === "feed") {
+        // AN RSS / ATOM FEED (Gary: broader source intake). Read the feed's OWN item content - no per-article
+        // scrape - and ingest each item as its own passage, tagged with the item title + link so a claim traces
+        // back to the article. Re-running the ingest (the freshness cron) adds only NEW items, because the
+        // per-source content-hash dedup skips items already stored. A feed that yields nothing new is not an error.
+        const feedItems = await step.run("fetch-feed", () => fetchFeed(uri, 20));
+        items = feedItems.flatMap((it) => {
+          const body = [it.title, it.content].filter(Boolean).join("\n\n");
+          if (!body.trim()) return [];
+          return withContextHeader(chunkStructured(cleanScraped(body)).filter((c) => !isJunkChunk(c)), it.title)
+            .map((c) => ({ content: c, metadata: { url: it.link || uri, title: it.title || "Feed item", kind: "feed-item", ...(it.date ? { published: it.date } : {}) } }));
+        });
       } else if (type === "file") {
         // AN UPLOADED DOCUMENT (article, PDF, deck, notes). The browser put it straight into Blob, so `uri` is
         // a public blob URL and `text` carries the original filename.

@@ -28,12 +28,13 @@ function freshness(iso?: string | null): { label: string; date: string; days: nu
   return { label, date, days, due: days >= 30, stale: days >= 90 };
 }
 
-type Mode = "website" | "documents" | "text" | "compliance" | "positioning";
+type Mode = "website" | "feed" | "documents" | "text" | "compliance" | "positioning";
 
 // A professional 2px-stroke mark per source type, in the brain's violet->cyan family (via currentColor).
 function SourceIcon({ m }: { m: Mode }) {
   const paths: Record<Mode, string> = {
     website: `<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 3.5 5.8 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.8-3.5-9s1-6.5 3.5-9Z"/>`,
+    feed: `<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/>`,
     documents: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/>`,
     text: `<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/>`,
     compliance: `<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 .58-.91l7-3.5a1 1 0 0 1 .84 0l7 3.5A1 1 0 0 1 20 6Z"/><path d="m9 12 2 2 4-4"/>`,
@@ -77,6 +78,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const [progress, setProgress] = useState("");
   const [sites, setSites] = useState<string[]>([""]);      // multi-site website scrape
   const [fullSite, setFullSite] = useState(true);          // full-site crawl vs a single page
+  const [feedUrl, setFeedUrl] = useState("");              // RSS/Atom feed URL
   const [text, setText] = useState("");
   const [compliance, setCompliance] = useState("");
   const [doctrine, setDoctrine] = useState(initialDoctrine); // the saved brand book (drives strength + hasDoctrine)
@@ -188,6 +190,23 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     }
     if (failed.length) setAddErr(failed.join(" · "));
     else { setSites([""]); flex(fullSite ? "Scraping the site now, every page it can reach." : "Reading the page now."); }
+    await refresh(); setAdding(false);
+  }
+
+  // ADD AN RSS / ATOM FEED (Gary: broader source intake). The pod reads the feed's own item content and keeps it
+  // current on the freshness cadence, adding only new items each time.
+  async function addFeed() {
+    const url = feedUrl.trim();
+    if (!/^https?:\/\//i.test(url)) { setAddErr("Enter a valid public RSS/Atom feed URL (https://…)."); return; }
+    if (adding) return;
+    setAdding(true); setAddErr(""); setJustCompleted(null);
+    const r = await fetch(`/api/brains/${brainId}/sources`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "feed", uri: url }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) setAddErr(d?.error || "Could not add that feed.");
+    else { setFeedUrl(""); flex("Reading the feed now, and keeping it current."); }
     await refresh(); setAdding(false);
   }
 
@@ -498,7 +517,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             and positioning the brain applies. The brand library (the artwork) is its own zone lower down. Splitting
             them means the team holds one mental model at a time instead of six chips in a row. */}
         <div className="mt-5 space-y-4">
-          {([["Feed it", "raw source material", [["website", "Website"], ["documents", "Documents"], ["text", "Paste text"]]],
+          {([["Feed it", "raw source material", [["website", "Website"], ["feed", "RSS feed"], ["documents", "Documents"], ["text", "Paste text"]]],
              ["Teach it", "rules & positioning it applies", [["positioning", "Positioning & rules"], ["compliance", "Compliance"]]]] as const).map(([zone, note, modes]) => (
             <div key={zone}>
               <div className="tabular text-[13px] font-bold uppercase tracking-[0.16em] text-ink-faint">{zone} <span className="ml-1 font-normal normal-case tracking-normal text-ink-faint">· {note}</span></div>
@@ -603,6 +622,14 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading and adding the pages…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
             <p className="mt-2.5 text-[18px] text-ink-dim">{fullSite ? "Reads every page it can reach, up to 80 per site. Takes a few minutes and keeps running if you close the tab." : "Reads just the page at each URL."}</p>
           </>
+        ) : mode === "feed" ? (
+          <>
+            <input value={feedUrl} onChange={(e) => setFeedUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addFeed(); } }}
+              placeholder="https://example.com/feed.xml (RSS or Atom)"
+              className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-[18px] outline-none focus:border-line-strong" />
+            <button onClick={addFeed} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading the feed…" : "Add this feed"}</button>
+            <p className="mt-2.5 text-[18px] text-ink-dim">Reads the feed&apos;s own articles and keeps it current on the brain&apos;s refresh cadence, adding only new items each time. A news site&apos;s RSS, a regulator&apos;s updates page feed, an industry blog.</p>
+          </>
         ) : mode === "compliance" ? (
           <>
             <textarea value={compliance} onChange={(e) => setCompliance(e.target.value)} rows={5} placeholder="Paste the client's mandatory compliance copy: disclaimers, licence wording, advertising rules…"
@@ -670,12 +697,13 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                   <button onClick={() => removeSource(s)} title="Delete this source" aria-label="Delete this source" className="rounded px-1.5 py-0.5 text-ink-faint hover:bg-alert/15 hover:text-alert">✕</button>
                 </span>
                 </div>
-                {/* Freshness + re-crawl, for website sources only (a note/file has no live URL to re-read). */}
-                {(s.type === "website" || s.type === "crawl") && s.status !== "pending" && (() => {
+                {/* Freshness + re-crawl, for website AND feed sources (a note/file has no live URL to re-read). */}
+                {(s.type === "website" || s.type === "crawl" || s.type === "feed") && s.status !== "pending" && (() => {
                   const f = freshness(s.last_synced_at);
+                  const verb = s.type === "feed" ? "read" : "crawled";
                   return (
                     <div className="mt-1 flex items-center gap-3 text-[15px] text-ink-faint">
-                      {f && <span className={f.stale ? "font-semibold text-[#fcd34d]" : ""}>crawled {f.label}{f.stale ? " · stale, worth a refresh" : ""}</span>}
+                      {f && <span className={f.stale ? "font-semibold text-[#fcd34d]" : ""}>{verb} {f.label}{f.stale ? " · stale, worth a refresh" : ""}</span>}
                       <button onClick={() => recrawl(s)} className="font-semibold text-ink-dim hover:text-ink">↻ Re-crawl</button>
                     </div>
                   );

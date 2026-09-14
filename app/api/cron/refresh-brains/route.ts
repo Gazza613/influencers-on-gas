@@ -30,14 +30,18 @@ export async function GET(req: Request) {
   // STALE, OPTED-IN website sources, oldest first. A source with no last_synced_at (never dated) is treated as
   // due. `force` ignores the age test but still honours the opt-in and the caps. client_id scopes everything.
   const rows = (await db().query(
+    // FEEDS refresh DAILY (they exist to be current, and a re-read is cheap - no Firecrawl); WEBSITE/CRAWL
+    // sources honour the brain's days-based SLA. Both only for opted-in brains, and both capped below.
     `select s.id, s.client_id, s.type, s.uri, s.include_path, s.last_synced_at, c.name as client_name
        from knowledge_sources s
        join clients c on c.id = s.client_id
       where c.auto_recrawl_days > 0
-        and s.type in ('website','crawl')
+        and s.type in ('website','crawl','feed')
         and s.status = 'indexed'
         and ($1 = '' or s.client_id = $1::uuid)
-        and ($2 or s.last_synced_at is null or s.last_synced_at < now() - make_interval(days => c.auto_recrawl_days))
+        and ($2 or s.last_synced_at is null
+             or (s.type = 'feed' and s.last_synced_at < now() - interval '20 hours')
+             or (s.type in ('website','crawl') and s.last_synced_at < now() - make_interval(days => c.auto_recrawl_days)))
       order by s.client_id, s.last_synced_at asc nulls first`,
     [only, force],
   ).catch(() => [])) as { id: string; client_id: string; type: string; uri: string; include_path: string | null; last_synced_at: string | null; client_name: string }[];
