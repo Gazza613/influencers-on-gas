@@ -99,6 +99,14 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   // What the last research run actually did, so the results (and the empty state) can be honest about the window:
   // "Find what's new" starts at 2 weeks and auto-widens to 6 weeks if that is empty.
   const [lastRun, setLastRun] = useState<{ mode: "question" | "discover"; windowDays: number; widened: number | null } | null>(null);
+  // Full-size preview of a creative (the eye on each thumbnail opens it; the cross or Esc closes it back to the grid).
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
   const [err, setErr] = useState("");
   // The CEO/MD thought-leadership draft flow (one open at a time). draftFor is the studio_intel finding id being
   // drafted - a real id whether it came from a surfaced finding or the LinkedIn-article research.
@@ -429,9 +437,29 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
                     <img src={c.url} alt="" className="h-full w-full object-cover" />
                     <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">{c.ratio === "16x9" ? "16:9" : "1:1"}</span>
                     {on && <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white">✓</span>}
+                    {/* Preview at full size (span, not a nested button, so the card stays valid HTML). Stops the
+                        click bubbling so viewing does not also tick/untick the creative. */}
+                    <span role="button" tabIndex={0} title="View full size"
+                      onClick={(e) => { e.stopPropagation(); setLightbox(c.url); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setLightbox(c.url); } }}
+                      className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/80">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg>
+                    </span>
                   </button>
                 );
               })}
+            </div>
+          )}
+          {/* FULL-SIZE PREVIEW. Click the backdrop or the cross to come back to the thumbnails. */}
+          {lightbox && (
+            <div onClick={() => setLightbox(null)}
+              className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+              role="dialog" aria-modal="true">
+              <button onClick={(e) => { e.stopPropagation(); setLightbox(null); }} title="Close"
+                className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-2xl leading-none text-white hover:bg-white/20">×</button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={lightbox} alt="" onClick={(e) => e.stopPropagation()}
+                className="max-h-[90vh] max-w-[92vw] rounded-lg object-contain shadow-2xl" />
             </div>
           )}
         </div>
