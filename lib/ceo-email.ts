@@ -25,8 +25,8 @@ export function renderArticleBody(post: string): string {
 function renderArticleBodyLight(post: string): string {
   return post.split(/\n{2,}/).map((blk) => blk.trim()).filter(Boolean).map((blk) => {
     const h = blk.match(/^#{1,3}\s+(.*)$/);
-    if (h) return `<h3 class="wh3" style="font-size:18px;line-height:1.35;color:#16181c;margin:24px 0 9px;font-weight:800;">${esc(h[1])}</h3>`;
-    return `<p class="wpara" style="margin:0 0 15px;font-size:15px;line-height:1.78;color:#3c4043;">${esc(blk)}</p>`;
+    if (h) return `<h3 class="wh3" style="font-size:18px;line-height:1.3;color:#16181c;margin:24px 0 9px;font-weight:800;">${esc(h[1])}</h3>`;
+    return `<p class="wpara" style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3c4043;">${esc(blk)}</p>`;
   }).join("");
 }
 
@@ -78,33 +78,24 @@ function renderWhiteCeoEmail(opts: {
     (mh.byline ? `<div style="font-size:13px;line-height:1.5;color:#5f6368;margin:0 0 4px;">${esc(mh.byline)}</div>` : "")
     + `<div style="font-size:12px;line-height:1.5;color:#9aa0a6;margin:0 0 2px;">${esc(mh.meta)}</div>`
     + `<div style="font-size:12px;line-height:1.5;color:#9aa0a6;margin:0 0 18px;">${esc(mh.prepared)}</div>`;
-  // The header meta: "THOUGHT LEADERSHIP", then the client, then the date. dateLabel arrives as "Client · Date";
-  // we split so the client and the date are their own spans. On DESKTOP they sit on one line ("CLIENT · DATE") -
-  // unchanged from what Gary approved. On MOBILE the media query stacks them and drops the date to 80% (Gary).
+  // The header meta stacks as THREE lines (Gary): "THOUGHT LEADERSHIP", then the client, then the date on its OWN
+  // line at 80% size. dateLabel arrives as "Client · Date"; we take the date part. This is baked into the base
+  // inline styles - NOT a media query - because Gmail (and others) strip <style>/@media, so a mobile-only rule
+  // silently did nothing. Stacked reads clean on both phone and desktop.
   const dateOnly = String(opts.dateLabel).includes(" · ") ? String(opts.dateLabel).split(" · ").slice(1).join(" · ") : String(opts.dateLabel);
-  // MOBILE-ONLY tweaks: smaller headline, tighter body line height, and the stacked client/date header. Inline
-  // styles win over a plain <style> rule, so the mobile overrides carry !important to take effect on small screens.
-  const mobileCss = `<style>@media only screen and (max-width:480px){`
-    + `.wtitle{font-size:21px!important;line-height:1.24!important}`
-    + `.wpara{line-height:1.5!important}`
-    + `.wh3{line-height:1.28!important}`
-    + `.hsep{display:none!important}`
-    + `.hclient,.hdate{display:block!important}`
-    + `.hdate{font-size:80%!important;margin-top:3px!important}`
-    + `}</style>`;
   return `
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  ${mobileCss}
   <div style="background:#eef0f2;padding:26px 10px;font-family:${FONT};-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
     <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e6e8eb;">
       <div style="padding:30px 34px 0;text-align:center;">
         ${logoBlock}
         <div style="margin-top:16px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#9aa0a6;font-weight:700;">Thought leadership</div>
-        <div style="margin-top:6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b6bbc0;font-weight:600;"><span class="hclient">${esc(opts.client)}</span><span class="hsep"> · </span><span class="hdate">${esc(dateOnly)}</span></div>
+        <div style="margin-top:6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b6bbc0;font-weight:600;">${esc(opts.client)}</div>
+        <div style="margin-top:3px;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:#c2c7cc;font-weight:600;">${esc(dateOnly)}</div>
       </div>
       ${hero}
       <div style="padding:26px 34px 6px;">
-        <h1 class="wtitle" style="font-size:25px;line-height:1.25;color:#16181c;margin:0 0 10px;font-weight:900;letter-spacing:-.01em;">${esc(opts.title)}</h1>
+        <h1 class="wtitle" style="font-size:22px;line-height:1.24;color:#16181c;margin:0 0 10px;font-weight:900;letter-spacing:-.01em;">${esc(opts.title)}</h1>
         ${mastheadHtml}
         ${renderArticleBodyLight(body)}
       </div>
