@@ -307,13 +307,11 @@ export async function buildCeoCreatives(
     }
     let figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
 
-    // KILL THE ALPHA PEDESTAL (Gary: "weird transparent shadow behind the CEO"). BiRefNet can leave a faint,
-    // near-transparent haze across the WHOLE bounding box. Both the figure and its silhouette shadow are derived
-    // from this buffer, so that haze composites as a translucent rectangle behind him - on 16x9 AND 1x1. We remap
-    // the alpha so anything below ~14% opacity becomes fully transparent (and rescale the rest to full range),
-    // clearing the background for good while leaving his real edge - hair and shoulders sit well above that floor.
-    // Done ONCE here so the cleaned alpha flows into every derived buffer. Dark scheme only: the light scheme's
-    // translucent-hair handling is deliberately left untouched.
+    // ALPHA PEDESTAL SAFETY NET. Some matte outputs leave a faint near-transparent haze across the bounding box,
+    // which would composite as a rectangle behind the figure. We map anything below ~14% opacity to fully
+    // transparent (rescaling the rest), so a hazy cutout can never paint a background rectangle. Measured clean on
+    // the GAS cutout (background alpha 0%), so here it is a no-op, but it protects any future poorly-matted photo.
+    // The dark halo Gary saw was the CONTACT SHADOW below, not a pedestal - fixed there. Dark scheme only.
     if (design.scheme !== "light") {
       const rgb = await sharp(figureRaw).removeAlpha().toBuffer();
       const a = await sharp(figureRaw).ensureAlpha().extractChannel(3).linear(1 / 0.86, -(0.14 / 0.86) * 255).toBuffer();
@@ -324,7 +322,12 @@ export async function buildCeoCreatives(
     // silhouette, blurred), a tone match to the field, AND a slight edge feather so the cut-out sits IN the scene
     // rather than as a hard sticker. On dark the figure is graded a touch more muted so it belongs to the room.
     const tone = design.scheme === "light" ? { brightness: 1.0, saturation: 1.0 } : { brightness: 0.92, saturation: 0.85 };
-    const shadowGain = design.scheme === "light" ? 0.42 : 0.5;
+    // THE CONTACT SHADOW, aspect-aware (Gary: 16x9 reads clean, 1x1 showed a dark halo behind him). On 16x9 the
+    // figure sits flush-right, so the shadow hides almost entirely behind him and only a faint edge shows. On 1x1
+    // the figure is much larger and more central, so the SAME shadow reads as a halo. So the square gets a far
+    // lighter, tighter shadow - present enough to ground him, never a visible band. Wide is unchanged.
+    const shadowGain = design.scheme === "light" ? 0.42 : (wide ? 0.5 : 0.2);
+    const shadowBlur = design.scheme === "light" ? 26 : (wide ? 30 : 20);
     let figure = design.scheme === "light"
       ? await sharp(figureRaw).modulate(tone).sharpen({ sigma: 1.1 }).png().toBuffer()
       : await sharp(figureRaw).modulate(tone).png().toBuffer();
@@ -335,7 +338,7 @@ export async function buildCeoCreatives(
       const alpha = await sharp(figure).ensureAlpha().extractChannel(3).blur(1.1).toBuffer();
       figure = await sharp(rgb).joinChannel(alpha).png().toBuffer();
     }
-    const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(design.scheme === "light" ? 26 : 30).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
+    const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(shadowBlur).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
     const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
     const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
 
