@@ -42,6 +42,9 @@ const WORKING_LINKEDIN = [
 ];
 
 const LINKEDIN_BLUE = "#0A66C2";
+// The headline on the creative auto-shrinks to fit, but past this it gets too small to read (and the renderer
+// hard-caps the line anyway). So we cap the input here and alert the user rather than silently truncating (Gary).
+const MAX_HEADLINE = 48;
 
 // Render the draft the way the white email will: title, masthead, "## " section headings, developed paragraphs,
 // then the Fact Check & Sources block with LIVE links. So the team reviews the FORMATTED piece, not raw markdown.
@@ -68,6 +71,16 @@ function renderDraftPreview(text: string, heroUrl?: string, meta?: { signerName?
           ? <h3 key={i} className="mt-6 text-[18px] font-extrabold leading-snug" style={{ color: "#16181c" }}>{h[1]}</h3>
           : <p key={i} className="mt-3.5 text-[15px] leading-[1.75]" style={{ color: "#3c4043" }}>{b}</p>;
       })}
+      {/* THE SIGNATURE. The exec signs off here, and the Fact Check sits UNDERNEATH it so it never reads as part of
+          the article itself (Gary). Mirrors exactly where the sent email places them. */}
+      {(meta?.signerName || mh.byline) && (
+        <div className="mt-6 border-t border-line pt-4">
+          {meta?.signerName && <div className="text-[15px] font-extrabold" style={{ color: "#16181c" }}>{meta.signerName}</div>}
+          {(meta?.signerTitle || meta?.company) && (
+            <div className="mt-0.5 text-[12.5px]" style={{ color: "#7a8085" }}>{[meta?.signerTitle, meta?.company].filter(Boolean).join(" · ")}</div>
+          )}
+        </div>
+      )}
       {/* FACT CHECK & SOURCES, with live links Gary can click to verify - retained through every review round. */}
       {factCheck.length > 0 && (
         <div className="mt-6 border-t border-line pt-4">
@@ -101,6 +114,9 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [lastRun, setLastRun] = useState<{ mode: "question" | "discover"; windowDays: number; widened: number | null } | null>(null);
   // Full-size preview of a creative (the eye on each thumbnail opens it; the cross or Esc closes it back to the grid).
   const [lightbox, setLightbox] = useState<string | null>(null);
+  // The one-off "Build the baseline" sweep (admin): its running flag and the summary of what it added/left to review.
+  const [baselineBusy, setBaselineBusy] = useState(false);
+  const [baselineMsg, setBaselineMsg] = useState("");
   useEffect(() => {
     if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
@@ -116,6 +132,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [draftText, setDraftText] = useState("");
   const [artCallout, setArtCallout] = useState("");
   const [creativeHeadline, setCreativeHeadline] = useState(""); // the line on the creative, user-overridable
+  const [headlineAlert, setHeadlineAlert] = useState(false);    // show the "too long" popover for the headline
   const [recips, setRecips] = useState("");
   const [ceoRecips, setCeoRecips] = useState<string[]>([]);
   const [mdRecips, setMdRecips] = useState<string[]>([]);
@@ -280,6 +297,8 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   // Generate the exec's branded creative(s) in the picked shape(s).
   async function drawCreative() {
     if (drawing || !ratios.length) return;
+    // Block a headline that would not fit (and pop the alert), rather than let the renderer truncate it (Gary).
+    if (creativeHeadline.trim().length > MAX_HEADLINE) { setHeadlineAlert(true); return; }
     setDrawing(true); setCreativeErr(""); setCreatives([]); setChosen([]);
     const title = draftText.split(/\n{2,}/)[0]?.replace(/^#{1,3}\s+/, "").trim() || "";
     const c = await fetch("/api/studio/intel/newsletter-creative", {
@@ -348,6 +367,23 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     setFindings(Array.isArray(d.findings) ? d.findings : []);
   }
 
+  // BUILD THE BASELINE (Gary): a wide ~24-month open-web sweep that gives the brain full context, so "what's new"
+  // has something to judge against. Auto-accepts the confirmed facts; the rest land in the list to accept or reject.
+  async function buildBaseline() {
+    if (baselineBusy || !clientId) return;
+    setBaselineBusy(true); setErr(""); setBaselineMsg(""); setFindings(null); setLastRun(null);
+    setDraftFor(null); setLiDraft(false); setLiSent(false); setSentFor(""); setDraftErr("");
+    const d = await fetch(`/api/studio/intel/baseline`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId }),
+    }).then((r) => r.json()).catch(() => null);
+    setBaselineBusy(false);
+    if (!d?.ok) { setErr(d?.error || "Couldn't build the baseline."); return; }
+    const review = Array.isArray(d.review) ? d.review : [];
+    setBaselineMsg(`Baseline built for ${brainName}: ${d.autoAccepted} confirmed ${d.autoAccepted === 1 ? "fact" : "facts"} added to the brain automatically.${review.length ? ` ${review.length} more could not be machine-confirmed, review them below.` : ""}`);
+    setFindings(review);
+  }
+
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
   const whoLabel = publisher === "md" ? "MD" : "CEO";
 
@@ -403,10 +439,21 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
         <div className="mt-3 rounded-lg border border-line bg-surface-2/60 p-3">
           {/* HEADLINE ON THE CREATIVE (Gary: let me define it). A short line; empty uses the auto-written one. */}
           <label className="block">
-            <span className="tabular block text-sm uppercase tracking-[0.16em] text-ink-faint">Headline on the creative</span>
-            <input value={creativeHeadline} onChange={(e) => setCreativeHeadline(e.target.value)} maxLength={80}
-              placeholder={artCallout ? `Auto: ${artCallout}` : "A short, punchy line (or leave blank for the auto one)"}
-              className="mt-1 w-full rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-sm text-ink outline-none focus:border-accent" />
+            <span className="tabular flex items-center justify-between text-sm uppercase tracking-[0.16em] text-ink-faint">
+              <span>Headline on the creative</span>
+              <span className={creativeHeadline.trim().length > MAX_HEADLINE ? "text-alert" : "text-ink-faint"}>{creativeHeadline.trim().length}/{MAX_HEADLINE}</span>
+            </span>
+            <div className="relative">
+              <input value={creativeHeadline}
+                onChange={(e) => { setCreativeHeadline(e.target.value); setHeadlineAlert(e.target.value.trim().length > MAX_HEADLINE); }}
+                placeholder={artCallout ? `Auto: ${artCallout}` : "A short, punchy line (or leave blank for the auto one)"}
+                className={`mt-1 w-full rounded-lg border bg-surface-2 px-3 py-1.5 text-sm text-ink outline-none focus:border-accent ${creativeHeadline.trim().length > MAX_HEADLINE ? "border-alert" : "border-line"}`} />
+              {headlineAlert && creativeHeadline.trim().length > MAX_HEADLINE && (
+                <div className="absolute left-0 top-full z-20 mt-1.5 w-72 rounded-lg border border-alert/60 bg-[#2a1420] px-3 py-2 text-[12.5px] leading-snug text-ink shadow-xl">
+                  That headline is too long for the creative and would be cut off. Keep it to {MAX_HEADLINE} characters or fewer, it currently has {creativeHeadline.trim().length}. Trim {creativeHeadline.trim().length - MAX_HEADLINE} to fit.
+                </div>
+              )}
+            </div>
             <span className="mt-1 block text-xs text-ink-faint">Kept short so it never runs under the logo. Generate again after editing it.</span>
           </label>
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
@@ -555,11 +602,27 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
             )}
           </div>
           {/* Solid PINK - distinct from Ask (purple), so the two research modes read apart. */}
-          <button onClick={() => ask("discover")} disabled={busy}
+          <button onClick={() => ask("discover")} disabled={busy || baselineBusy}
             className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#db2777] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#ec4899] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
             ✦ Find what&rsquo;s new
           </button>
         </div>
+        {/* BUILD THE BASELINE (admin): a one-off wide sweep so "what's new" has full context. Set apart below the two
+            live-research buttons because it is a foundational, run-once action, not a day-to-day one. */}
+        {isAdmin && (
+          <div className="mt-4 border-t border-[#a855f7]/15 pt-3.5">
+            <div className="flex flex-wrap items-center gap-3">
+              <button onClick={buildBaseline} disabled={busy || baselineBusy}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/50 px-4 py-2 text-[13.5px] font-semibold text-[#c9a7f5] transition hover:bg-[#a855f7]/10 disabled:opacity-50">
+                {baselineBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#a855f7]/30 border-t-[#a855f7]" />}
+                {baselineBusy ? "Building the baseline…" : "Build the baseline"}
+              </button>
+              <span className="text-[12.5px] leading-snug text-ink-faint sm:max-w-[62%]">A one-off ~24-month sweep of the open web. Confirmed facts are added to the brain automatically; the rest come back to accept or reject. Do this once when you set a brain up, so <b className="text-ink-dim">Find what&rsquo;s new</b> has full context.</span>
+            </div>
+            {baselineBusy && <p className="mt-2 text-[12.5px] text-ink-faint">This runs a wide, thorough search and can take a couple of minutes. You can leave this open.</p>}
+            {baselineMsg && <p className="mt-2.5 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/10 px-3.5 py-2.5 text-[13px] leading-relaxed text-ink-dim">{baselineMsg}</p>}
+          </div>
+        )}
       </div>
 
       {/* THE LINKEDIN-ARTICLE SECTION (admin-only), FIXED underneath because it runs the other way round to the two

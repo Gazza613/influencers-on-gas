@@ -91,13 +91,13 @@ function renderWhiteCeoEmail(opts: {
         <h1 style="font-size:25px;line-height:1.25;color:#16181c;margin:0 0 10px;font-weight:900;letter-spacing:-.01em;">${esc(opts.title)}</h1>
         ${mastheadHtml}
         ${renderArticleBodyLight(body)}
-        ${renderFactCheck(factCheck, false)}
       </div>
-      <div style="padding:20px 34px 30px;border-top:1px solid #eceef0;margin-top:14px;">
+      <div style="padding:20px 34px 24px;border-top:1px solid #eceef0;margin-top:14px;">
         ${signer[0] ? `<div style="font-size:14px;font-weight:800;color:#16181c;">${esc(signer[0])}</div>` : ""}
         ${signer[1] ? `<div style="font-size:12px;color:#7a8085;margin-top:2px;">${esc(signer[1])}</div>` : ""}
         <div style="margin-top:14px;font-size:11px;line-height:1.6;color:#9aa0a6;">Drafted for you by GAS Marketing's Researcher. Review and edit before you post.</div>
       </div>
+      ${factCheck.length ? `<div style="padding:0 34px 30px;">${renderFactCheck(factCheck, false)}</div>` : ""}
     </div>
   </div>`;
 }
@@ -137,10 +137,18 @@ export function buildCeoArticleEmail(opts: {
     + (mh.byline ? `<div style="font-size:12.5px;line-height:1.5;color:rgba(255,251,248,0.66);">${esc(mh.byline)}</div>` : "")
     + `<div style="font-size:11.5px;line-height:1.5;color:rgba(255,251,248,0.5);">${esc(mh.meta)}</div>`
     + `<div style="font-size:11.5px;line-height:1.5;color:rgba(255,251,248,0.5);">${esc(mh.prepared)}</div></div>`;
+  // The sign-off, then the Fact Check UNDERNEATH it, so the sources never read as part of the article (Gary).
+  const signOff = opts.ceoName
+    ? `<div style="margin-top:22px;padding-top:14px;border-top:1px solid rgba(168,85,247,0.18);">`
+      + `<div style="font-size:14px;font-weight:800;color:#FFFBF8;">${esc(opts.ceoName)}</div>`
+      + (opts.ceoTitle || opts.client ? `<div style="font-size:12px;color:rgba(255,251,248,0.6);margin-top:2px;">${esc([opts.ceoTitle, opts.client].filter(Boolean).join(" · "))}</div>` : "")
+      + `</div>`
+    : "";
   const body = banner + heroImg
     + `<h1 style="font-size:22px;line-height:1.25;color:#FFFBF8;margin:0 0 10px;font-weight:900;">${esc(title)}</h1>`
     + masthead
     + renderArticleBody(draftBody)
+    + signOff
     + renderFactCheck(factCheck, true) + meta;
   return emailShell({
     strapline: "CEO THOUGHT LEADERSHIP",

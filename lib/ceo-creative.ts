@@ -305,7 +305,20 @@ export async function buildCeoCreatives(
       figW = Math.round(W * 0.52);
       figH = Math.round((nativeH || 1000) * (figW / (nativeW || 800)));
     }
-    const figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
+    let figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
+
+    // KILL THE ALPHA PEDESTAL (Gary: "weird transparent shadow behind the CEO"). BiRefNet can leave a faint,
+    // near-transparent haze across the WHOLE bounding box. Both the figure and its silhouette shadow are derived
+    // from this buffer, so that haze composites as a translucent rectangle behind him - on 16x9 AND 1x1. We remap
+    // the alpha so anything below ~14% opacity becomes fully transparent (and rescale the rest to full range),
+    // clearing the background for good while leaving his real edge - hair and shoulders sit well above that floor.
+    // Done ONCE here so the cleaned alpha flows into every derived buffer. Dark scheme only: the light scheme's
+    // translucent-hair handling is deliberately left untouched.
+    if (design.scheme !== "light") {
+      const rgb = await sharp(figureRaw).removeAlpha().toBuffer();
+      const a = await sharp(figureRaw).ensureAlpha().extractChannel(3).linear(1 / 0.86, -(0.14 / 0.86) * 255).toBuffer();
+      figureRaw = await sharp(rgb).joinChannel(a).png().toBuffer();
+    }
 
     // BLEND INTO THE SCENE (Gary: "looks pasted on, needs to fuse with the scenery"): a contact shadow (their own
     // silhouette, blurred), a tone match to the field, AND a slight edge feather so the cut-out sits IN the scene
@@ -403,12 +416,29 @@ async function renderCeoOverlay(W: number, H: number, message: string, name: str
   // width, so the column is capped at 42% and auto-sized so even the LONGEST WORD fits inside it - a long word
   // cannot break, so the type must shrink to the column rather than run under his shoulder (Gary).
   const colW = W * 0.37;
-  const longestWord = Math.max(...message.split(/\s+/).map((w) => w.length), 1);
-  const msgSize = Math.max(Math.round(H * 0.040), Math.min(Math.round(H * 0.072), Math.floor(colW / (longestWord * 0.60))));
   const wide = W > H * 1.3;
   // The message starts BELOW the top-left logo so the two never collide (Gary). The logo is proportionally taller
   // on a 16x9 canvas, so the message drops further there.
   const msgTop = wide ? 26 : 21;
+  // AUTO-SIZE THE TYPE TO FIT, so a longer headline shrinks to sit fully inside its column instead of wrapping past
+  // the band and clipping (Gary: "headline gets cut off"). Two constraints: (1) the LONGEST WORD must fit the
+  // column width (a word cannot break), and (2) every wrapped line must fit the VERTICAL band between the logo and
+  // the nameplate. We take the smaller, then never go below a readable floor.
+  const longestWord = Math.max(...message.split(/\s+/).map((w) => w.length), 1);
+  const lineH = 1.06;
+  const minSize = Math.round(H * 0.032);
+  const maxSize = Math.round(H * 0.072);
+  const bandBottomPct = wide ? 58 : 64;                        // the nameplate sits below this
+  const bandH = ((bandBottomPct - msgTop) / 100) * H;
+  const byWord = Math.floor(colW / (longestWord * 0.60));
+  let msgSize = Math.min(maxSize, byWord);
+  // Shrink until the wrapped lines fit the band (bold condensed type averages ~0.52 * size per character).
+  for (; msgSize > minSize; msgSize--) {
+    const charsPerLine = Math.max(1, Math.floor(colW / (msgSize * 0.52)));
+    const lines = Math.ceil(message.length / charsPerLine);
+    if (lines * msgSize * lineH <= bandH) break;
+  }
+  msgSize = Math.max(minSize, Math.min(maxSize, msgSize));
   const wash = design.washRgb || "4,25,40";      // MoMo default = navy; GAS = neutral dark
   const mark = design.markColor || "#F9CB0F";     // MoMo default = yellow; GAS = orange
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>

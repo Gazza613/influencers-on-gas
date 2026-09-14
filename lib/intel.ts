@@ -129,11 +129,14 @@ export async function researchableClientIds(): Promise<string[]> {
 // AGENTS WORKING TOGETHER (Gary). Recent findings a HUMAN accepted into the brain from the OTHER desk, so the
 // Strategist watches what the Researcher established and the Researcher builds on what the Strategist has seen.
 // Accepted only - the validated signal - and recent, capped, headline + why so it stays cheap to carry.
-export async function loadDeskContext(clientId: string, ofRole: "researcher" | "strategist", limit = 20): Promise<{ headline: string; why: string }[]> {
+export async function loadDeskContext(clientId: string, ofRole: "researcher" | "strategist", limit = 40): Promise<{ headline: string; why: string }[]> {
+  // Accepted findings are HUMAN-validated signal, and the baseline build deliberately files 24-month-old facts, so
+  // this carries them for ~26 months rather than ageing the baseline out after 4 months (Gary). Material findings
+  // lead, so the most important context survives the cap; the caller slices the joined text to a token budget.
   const rows = (await db().query(
     `select headline, why_it_matters from studio_intel
-     where client_id = $1 and role = $2 and status = 'accepted' and found_at > now() - interval '120 days'
-     order by found_at desc limit $3`,
+     where client_id = $1 and role = $2 and status = 'accepted' and found_at > now() - interval '780 days'
+     order by material desc, found_at desc limit $3`,
     [clientId, ofRole, limit],
   )) as { headline: string; why_it_matters: string }[];
   return rows.map((r) => ({ headline: String(r.headline || ""), why: String(r.why_it_matters || "") }));
@@ -374,7 +377,9 @@ const SCHEMA = {
 // not of the engine, and two sources of truth for the same setting is how they drift apart.
 
 // Run one role's daily research. Returns the findings it PROPOSES (already stored, status 'new').
-export async function runIntel(clientId: string, role: "journalist" | "strategist", today: string, userEmail?: string | null, focus?: string | null, windowOverride?: number | null): Promise<Intel[]> {
+// role "researcher" runs the same engine but files under the researcher desk (used by the baseline build): it uses
+// the strategist brief to gather, and its findings become the standing research future strategist runs read.
+export async function runIntel(clientId: string, role: "journalist" | "strategist" | "researcher", today: string, userEmail?: string | null, focus?: string | null, windowOverride?: number | null): Promise<Intel[]> {
   const key = await getSecret("anthropic");
   if (!key) throw new Error("Claude isn't connected");
 
