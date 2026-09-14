@@ -286,8 +286,11 @@ export async function buildCeoCreatives(
     } catch (e) { console.error("[ceo-creative] logo bg cut-out skipped:", e); }
   }
 
-  const creatives: CeoCreative[] = [];
-  for (const ratio of ratios) {
+  // BOTH SHAPES RENDER IN PARALLEL (Gary: efficiency). The Higgsfield backdrop jobs are globally concurrency-capped
+  // (MAX_CONCURRENT), so overlapping the two ratios feeds all their generations into that one budget at once
+  // instead of running one shape fully and then the other - roughly halving the wall-clock for "both".
+  const perRatio = await Promise.all(ratios.map(async (ratio): Promise<CeoCreative[]> => {
+    const made: CeoCreative[] = [];
     const { W, H, aspect } = RATIO_DIMS[ratio];
     const wide = ratio === "16x9";
 
@@ -374,12 +377,14 @@ export async function buildCeoCreatives(
         if (logoBuf) out = (await compositeLogo(out, logoBuf, { xPct: 4, yPct: 4, wPct: design.scheme === "light" ? (wide ? 15 : 22) : (wide ? 12 : 16) }, { minWFrac: 0.05, maxHFrac: wide ? 0.14 : 0.15 })) as Buffer;
 
         const url = await putBytes(out, `studio/${clientId}/ceo-creative`, "png", "image/png");
-        creatives.push({ url, ratio });
+        made.push({ url, ratio });
       } catch (e) {
-        creatives.push({ url: "", ratio, error: String((e as Error)?.message || e).slice(0, 120) });
+        made.push({ url: "", ratio, error: String((e as Error)?.message || e).slice(0, 120) });
       }
     }
-  }
+    return made;
+  }));
+  const creatives = perRatio.flat();
   const ok = creatives.filter((c) => c.url);
   return { creatives: ok.length ? ok : [], error: ok.length ? null : "All the renders failed. Try again." };
 }
