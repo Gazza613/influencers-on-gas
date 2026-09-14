@@ -145,6 +145,28 @@ create table if not exists ceo_publications (
 );
 create index if not exists idx_ceo_publications_client on ceo_publications(client_id, published_at desc nulls last, created_at desc);
 
+-- SCHEDULED NEWSLETTER SENDS (Gary: "send-later"). A drafted CEO/MD piece can be queued to email at a chosen time
+-- instead of now. A cron fires the due ones through the same delivery path as an immediate send (lib/ceo-send.ts).
+create table if not exists newsletter_sends (
+  id            uuid primary key default gen_random_uuid(),
+  client_id     uuid not null references clients(id) on delete cascade,
+  intel_id      uuid not null,                          -- the studio_intel piece it sends
+  scheduled_at  timestamptz not null,                   -- when to send it
+  status        text not null default 'pending',        -- pending | sent | failed | cancelled
+  publisher     text,                                   -- ceo | md (override at schedule time)
+  subject       text,
+  post          text not null,                          -- the exact piece to send, frozen at schedule time
+  recipients    jsonb not null default '[]'::jsonb,
+  hero_url      text,
+  creative_urls jsonb not null default '[]'::jsonb,
+  created_by    text,                                   -- who scheduled it (also the bcc on send)
+  created_at    timestamptz not null default now(),
+  sent_at       timestamptz,
+  error         text
+);
+create index if not exists newsletter_sends_due on newsletter_sends(status, scheduled_at);
+create index if not exists newsletter_sends_client on newsletter_sends(client_id, status);
+
 -- ── Productions (the video runs) ──────────────────────────────────────────────
 create table if not exists productions (
   id              uuid primary key default gen_random_uuid(),

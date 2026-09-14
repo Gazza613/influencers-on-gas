@@ -171,6 +171,11 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   // PREVIOUSLY SENT newsletters (Gary): reopen one to view, edit and send again. Collapsed behind its own toggle.
   const [sentList, setSentList] = useState<{ id: string; title: string; post: string; sentOn: string }[]>([]);
   const [showSent, setShowSent] = useState(false);
+  // SEND-LATER (Gary): schedule a drafted piece to email at a chosen time, and the list of what is queued.
+  const [scheduleAt, setScheduleAt] = useState("");   // datetime-local value in the editor
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduledList, setScheduledList] = useState<{ id: string; intelId: string; headline: string; scheduledAt: string; recipients: number }[]>([]);
+  const [showScheduled, setShowScheduled] = useState(false);
   const [showPub, setShowPub] = useState(false); // the publish + measure view is collapsed behind a toggle
 
   const CEO_API = "/api/studio/intel/ceo-article";
@@ -222,6 +227,15 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   useEffect(() => { loadSent(); }, [loadSent]);
   // A newly-sent piece should appear in the list, so refresh it when the editor closes.
   useEffect(() => { if (!draftFor) loadSent(); }, [draftFor, loadSent]);
+
+  // The brain's PENDING scheduled (send-later) newsletters, soonest first.
+  const loadScheduled = useCallback(async () => {
+    if (!isAdmin || !clientId) { setScheduledList([]); return; }
+    const d = await fetch(`${CEO_API}?clientId=${encodeURIComponent(clientId)}&scheduled=1`).then((r) => r.json()).catch(() => null);
+    setScheduledList(Array.isArray(d?.scheduled) ? d.scheduled : []);
+  }, [clientId, isAdmin]);
+  useEffect(() => { loadScheduled(); }, [loadScheduled]);
+  useEffect(() => { if (!draftFor) loadScheduled(); }, [draftFor, loadScheduled]);
 
   // Open a saved draft back up in the editor, without re-spending to regenerate it.
   function resumeDraft(d: { id: string; post: string }) {
@@ -367,6 +381,38 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     // standalone LinkedIn panel unmounts when draftFor clears, so it carries its OWN success flag instead.
     if (liDraft) { setLiSent(true); setLiDraft(false); setDraftFor(null); setLiTopic(""); }
     else { setSentFor(id); setDraftFor(null); }
+  }
+
+  // SEND-LATER (Gary): freeze this piece + recipients + chosen creatives and queue it to email at the chosen time.
+  async function scheduleArticle(id: string) {
+    if (!id || scheduling) return;
+    const recipients = recips.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+    if (!recipients.length) { setDraftErr("Add at least one recipient email."); return; }
+    if (!scheduleAt) { setDraftErr("Pick a date and time to send."); return; }
+    if (new Date(scheduleAt).getTime() < Date.now() + 60_000) { setDraftErr("Pick a time in the future."); return; }
+    setScheduling(true); setDraftErr("");
+    const chosenCreatives = creatives.filter((c) => chosen.includes(c.url));
+    const heroUrl = chosenCreatives.find((c) => c.ratio === "16x9")?.url || "";
+    // Send the local wall-clock time as an ISO instant, so the server schedules the moment the user actually picked.
+    const iso = new Date(scheduleAt).toISOString();
+    const d = await fetch(CEO_API, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "schedule", clientId, id, recipients, post: draftText, publisher, heroUrl, creativeUrls: chosen, subject: "", scheduledAt: iso }),
+    }).then((r) => r.json()).catch(() => null);
+    setScheduling(false);
+    if (!d?.ok) { setDraftErr(d?.error || "Couldn't schedule that."); return; }
+    setScheduleAt("");
+    if (liDraft) { setLiDraft(false); setDraftFor(null); setLiTopic(""); }
+    else setDraftFor(null);
+    loadScheduled();
+  }
+
+  async function cancelScheduled(intelId: string) {
+    const d = await fetch(CEO_API, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancelSchedule", clientId, id: intelId }),
+    }).then((r) => r.json()).catch(() => null);
+    if (d?.ok) loadScheduled();
   }
 
   // TWO MODES for the market run (Gary): "question" answers a specific ask (~90 days); "discover" proactively
@@ -539,13 +585,24 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
         </label>
         {draftErr && <p className="mt-2 text-base text-alert">{draftErr}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button onClick={() => sendArticle(id)} disabled={sending || !recips.trim()}
+          <button onClick={() => sendArticle(id)} disabled={sending || scheduling || !recips.trim()}
             className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#7c3aed] px-5 py-2 text-base font-bold text-white shadow-[0_8px_24px_-12px_#a855f7] hover:opacity-90 disabled:opacity-50">
             {sending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
             {sending ? "Sending…" : `Approve & send to ${whoLabel}`}
           </button>
           <button onClick={onRedraft} disabled={drafting || liBusy || sending} className="rounded-lg border border-line px-4 py-2 text-base text-ink-dim hover:text-ink disabled:opacity-50">Redraft</button>
           <button onClick={() => { setDraftFor(null); setLiDraft(false); setDraftErr(""); }} className="rounded-lg px-3 py-2 text-base text-ink-faint hover:text-ink">Cancel</button>
+        </div>
+        {/* SEND-LATER (Gary): prepare it now, have it email at a chosen time. A cron fires the due ones. */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
+          <span className="tabular text-[12px] uppercase tracking-[0.16em] text-ink-faint">Or send later</span>
+          <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)}
+            className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-sm text-ink outline-none focus:border-accent [color-scheme:dark]" />
+          <button onClick={() => scheduleArticle(id)} disabled={scheduling || sending || !recips.trim() || !scheduleAt}
+            className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-1.5 text-sm font-semibold text-accent hover:bg-accent/10 disabled:opacity-50">
+            {scheduling && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />}
+            {scheduling ? "Scheduling…" : "Schedule send"}
+          </button>
         </div>
       </>
     );
@@ -721,6 +778,33 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
                     <span className="block truncate text-[12px] text-ink-faint">{d.snippet}…</span>
                   </span>
                 </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SCHEDULED (send-later): what is queued to email, soonest first, each cancellable (Gary). */}
+      {isAdmin && !draftFor && scheduledList.length > 0 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <button onClick={() => setShowScheduled((v) => !v)} className="flex w-full items-center gap-2 text-left text-ink-dim hover:text-ink">
+            <span className={`inline-flex shrink-0 text-[#a855f7] transition-transform ${showScheduled ? "rotate-90" : ""}`} aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M9 6l6 6-6 6" /></svg>
+            </span>
+            <span className="text-[14px] font-bold text-ink sm:text-[16px]">Scheduled to send</span>
+            <span className="text-[12px] font-normal text-ink-faint sm:text-[13.5px]">· {scheduledList.length} queued</span>
+          </button>
+          {showScheduled && (
+            <div className="mt-3 flex flex-col gap-2">
+              {scheduledList.map((d) => (
+                <div key={d.id} className="flex items-center gap-2 rounded-lg border border-line bg-surface-1 px-3 py-2">
+                  <span className="text-[#a855f7]">🕒</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-semibold text-ink">{d.headline}</span>
+                    <span className="block truncate text-[12px] text-ink-faint">{new Date(d.scheduledAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {d.recipients} recipient{d.recipients === 1 ? "" : "s"}</span>
+                  </span>
+                  <button onClick={() => cancelScheduled(d.intelId)} className="shrink-0 rounded-md border border-line px-2.5 py-1 text-[12px] font-semibold text-ink-dim hover:border-alert hover:text-alert">Cancel</button>
+                </div>
               ))}
             </div>
           )}

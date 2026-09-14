@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { writeCeoNewsletter } from "@/lib/ceo-newsletter";
-import { sendEmail, emailConfigured } from "@/lib/email";
-import { buildCeoArticleEmail } from "@/lib/ceo-email";
-import { getClientEmailLogo } from "@/lib/client-logo";
+import { deliverCeoArticle } from "@/lib/ceo-send";
 
 // THE CEO THOUGHT-LEADERSHIP ARTICLE (Gary). From a Daily Intelligence finding: DRAFT the client CEO's LinkedIn
 // piece (in their brain's voice + compliance, from the public-safe substance only, never the internal "move"),
@@ -55,6 +53,21 @@ export async function GET(req: Request) {
     }) });
   }
 
+  if (url.searchParams.get("scheduled") === "1") {
+    // Pending scheduled (send-later) newsletters on this brain, soonest first (Gary). The UI shows them and can cancel.
+    const s = (await db().query(
+      `select ns.id, ns.intel_id, ns.scheduled_at, ns.recipients, si.headline
+         from newsletter_sends ns left join studio_intel si on si.id = ns.intel_id
+        where ns.client_id = $1 and ns.status = 'pending'
+        order by ns.scheduled_at asc limit 20`,
+      [clientId],
+    ).catch(() => [])) as { id: string; intel_id: string; scheduled_at: string; recipients: string[] | null; headline: string | null }[];
+    return NextResponse.json({ scheduled: s.map((x) => ({
+      id: x.id, intelId: x.intel_id, headline: x.headline || "Scheduled newsletter",
+      scheduledAt: x.scheduled_at, recipients: Array.isArray(x.recipients) ? x.recipients.length : 0,
+    })) });
+  }
+
   const rows = (await db().query(
     `select ceo_recipients, md_recipients, ceo_name, ceo_title, md_name, md_title, newsletter_publisher from intel_briefs where client_id = $1`, [clientId],
   ).catch(() => [])) as { ceo_recipients: string[] | null; md_recipients: string[] | null; ceo_name: string | null; ceo_title: string | null; md_name: string | null; md_title: string | null; newsletter_publisher: string | null }[];
@@ -68,7 +81,6 @@ export async function GET(req: Request) {
   });
 }
 
-const ukDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -134,60 +146,52 @@ export async function POST(req: Request) {
   }
 
   if (action === "send") {
-    if (!emailConfigured()) return NextResponse.json({ error: "Email is not configured on this deploy (SMTP env vars missing)." }, { status: 400 });
+    const recipients = (Array.isArray(b.recipients) ? b.recipients : []).map((x) => String(x).trim()).filter(Boolean);
+    const post = String(b.post || String(f.headline || "")).trim();
+    const r = await deliverCeoArticle({
+      clientId, intelId: id, post, recipients,
+      publisher: b.publisher, heroUrl: b.heroUrl,
+      creativeUrls: Array.isArray(b.creativeUrls) ? b.creativeUrls.map((x) => String(x)) : [],
+      subject: b.subject, bccEmail: session.user?.email ?? null,
+      srcHeadline: String(f.headline || ""),
+    });
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+    return NextResponse.json({ ok: true, sent: r.sent });
+  }
+
+  // SEND-LATER (Gary): freeze the piece + recipients + creatives now, but email it at a chosen future time. A cron
+  // (/api/cron/send-newsletters) fires the due ones through the exact same delivery path as an immediate send.
+  if (action === "schedule") {
     const recipients = (Array.isArray(b.recipients) ? b.recipients : []).map((x) => String(x).trim()).filter(Boolean);
     const bad = recipients.filter((r) => !isEmail(r));
     if (!recipients.length) return NextResponse.json({ error: "Add at least one recipient email." }, { status: 400 });
     if (bad.length) return NextResponse.json({ error: `Not a valid email: ${bad.join(", ")}` }, { status: 400 });
-    const post = String(b.post || String(f.headline || "")).trim();
-    if (!post) return NextResponse.json({ error: "There is no article to send. Draft it first." }, { status: 400 });
-
-    const brief = (await db().query(`select b.ceo_name, b.ceo_title, b.md_name, b.md_title, b.newsletter_publisher, c.name as client_name from intel_briefs b join clients c on c.id = b.client_id where b.client_id = $1`, [clientId]).catch(() => [])) as { ceo_name: string | null; ceo_title: string | null; md_name: string | null; md_title: string | null; newsletter_publisher: string | null; client_name: string | null }[];
-    // WHO PUBLISHES: the per-brain default, overridable at send time (Gary). The signer's name + designation come
-    // from whichever executive is publishing.
-    const publisher = b.publisher === "md" || b.publisher === "ceo" ? b.publisher : (brief[0]?.newsletter_publisher === "md" ? "md" : "ceo");
-    const signerName = (publisher === "md" ? brief[0]?.md_name : brief[0]?.ceo_name) || "";
-    const signerTitle = (publisher === "md" ? brief[0]?.md_title : brief[0]?.ceo_title) || "";
-    const clientName = brief[0]?.client_name || "";
-    const title = post.split(/\n{2,}/)[0]?.replace(/^#{1,3}\s+/, "").trim() || "A note on the market";
-    const subject = String(b.subject || "").trim() || title.slice(0, 150);
-    // The client's own logo in the header (Gary), else the GAS orb. review=false: the WHITE editorial piece itself.
-    const logoUrl = await getClientEmailLogo(clientId).catch(() => null);
-    // The 16x9 creative rides at the top of the email; every chosen creative is attached so the piece is post-ready.
-    // SSRF GUARD: nodemailer fetches each attachment server-side, and the email client fetches the embedded hero,
-    // so both are restricted to OUR OWN Vercel Blob host - the only place a real creative can live. This blocks an
-    // admin (or a replayed request) pointing them at an internal-network or arbitrary URL.
+    const post = String(b.post || "").trim();
+    if (!post) return NextResponse.json({ error: "There is no article to schedule. Draft it first." }, { status: 400 });
+    const whenRaw = String((b as { scheduledAt?: string }).scheduledAt || "").trim();
+    const when = new Date(whenRaw);
+    if (!whenRaw || Number.isNaN(when.getTime())) return NextResponse.json({ error: "Pick a valid date and time to send." }, { status: 400 });
+    if (when.getTime() < Date.now() + 60_000) return NextResponse.json({ error: "Pick a time in the future." }, { status: 400 });
     const isOurBlob = (u: string) => /^https:\/\/[^/]+\.blob\.vercel-storage\.com\//i.test(u);
     const heroRaw = String(b.heroUrl || "").trim();
     const heroUrl = heroRaw && isOurBlob(heroRaw) ? heroRaw : null;
     const creativeUrls = (Array.isArray(b.creativeUrls) ? b.creativeUrls : []).map((x) => String(x).trim()).filter(isOurBlob);
-    const html = buildCeoArticleEmail({ client: clientName, ceoName: signerName, ceoTitle: signerTitle, post, ceoRecipients: recipients, logoUrl, heroUrl, dateLabel: `${clientName} · ${ukDate(new Date().toISOString())}`, review: false });
-    const attachments = creativeUrls.map((url, i) => ({ filename: `${clientName || "creative"}-${i + 1}.png`.replace(/\s+/g, "-"), path: url }));
-
-    const r = await sendEmail({
-      to: recipients.join(", "),
-      bcc: session.user?.email || undefined,
-      subject, html, fromName: "Researcher on GAS",
-      ...(attachments.length ? { attachments } : {}),
-    }).catch((e) => ({ sent: false, error: String((e as Error)?.message || e) }));
-    if (!(r as { sent?: boolean }).sent) return NextResponse.json({ error: `Could not send: ${(r as { error?: string }).error || "unknown"}`.slice(0, 200) }, { status: 400 });
-
-    // Remember the recipients on the brain against the RIGHT executive (CEO vs MD), so the next piece prefills the
-    // correct list and the automated draft's team-first exclusion knows this exec's own address.
-    const recipCol = publisher === "md" ? "md_recipients" : "ceo_recipients";
-    await db().query(`update intel_briefs set ${recipCol} = $2::jsonb where client_id = $1`,
-      [clientId, JSON.stringify(recipients)]).catch(() => {});
-    // Keep the sent copy on the finding and MARK IT SENT, so it stops being offered as a resumable draft.
-    await db().query(`update studio_intel set newsletter = $2, newsletter_sent_at = now() where id = $1 and client_id = $3`, [id, post, clientId]).catch(() => {});
-    // PUBLISH + MEASURE LOOP: record this sent piece so it appears in the trend view ready to mark published and
-    // measure. One row per finding - a re-send does not add a duplicate.
+    const publisher = b.publisher === "md" || b.publisher === "ceo" ? b.publisher : null;
+    // Only one pending schedule per finding: replacing supersedes an earlier one, so re-scheduling never double-sends.
+    await db().query(`update newsletter_sends set status = 'cancelled' where intel_id = $1 and client_id = $2 and status = 'pending'`, [id, clientId]).catch(() => {});
     await db().query(
-      `insert into ceo_publications (client_id, intel_id, publisher, title, topic)
-       select $1, $2, $3, $4, $5
-       where not exists (select 1 from ceo_publications where client_id = $1 and intel_id = $2)`,
-      [clientId, id, publisher, title.slice(0, 300), String(f.headline || "").slice(0, 300) || null],
-    ).catch(() => {});
-    return NextResponse.json({ ok: true, sent: recipients.length });
+      `insert into newsletter_sends (client_id, intel_id, scheduled_at, publisher, subject, post, recipients, hero_url, creative_urls, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10)`,
+      [clientId, id, when.toISOString(), publisher, String(b.subject || "").trim() || null, post, JSON.stringify(recipients), heroUrl, JSON.stringify(creativeUrls), session.user?.email ?? null],
+    );
+    // Keep the frozen copy on the finding so reopening it shows what was scheduled.
+    await db().query(`update studio_intel set newsletter = $2 where id = $1 and client_id = $3`, [id, post, clientId]).catch(() => {});
+    return NextResponse.json({ ok: true, scheduledAt: when.toISOString() });
+  }
+
+  if (action === "cancelSchedule") {
+    const r = (await db().query(`update newsletter_sends set status = 'cancelled' where intel_id = $1 and client_id = $2 and status = 'pending' returning id`, [id, clientId])) as { id: string }[];
+    return NextResponse.json({ ok: true, cancelled: r.length });
   }
 
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });
