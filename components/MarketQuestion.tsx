@@ -5,6 +5,7 @@ import IntelEmailControl from "@/components/IntelEmailControl";
 import LinkedInAutomation from "@/components/LinkedInAutomation";
 import Publications from "@/components/Publications";
 import LivingResearch from "@/components/LivingResearch";
+import { splitFactCheck, mastheadLines, wordCount, FACT_CHECK_INTRO } from "@/lib/newsletter-format";
 
 // ASK THE MARKET A QUESTION (Gary). The Strategist desk, on demand: type a market question about a client and get
 // the same sourced assessment the daily email gives - what changed, what it could do, and the DEFENSIVE/PROACTIVE
@@ -42,25 +43,47 @@ const WORKING_LINKEDIN = [
 
 const LINKEDIN_BLUE = "#0A66C2";
 
-// Render the draft the way the white email will: the first block is the title, "## " lines are section
-// headings, blank lines split paragraphs. So the team reviews the FORMATTED piece, not raw markdown.
-function renderDraftPreview(text: string, heroUrl?: string) {
-  const blocks = text.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+// Render the draft the way the white email will: title, masthead, "## " section headings, developed paragraphs,
+// then the Fact Check & Sources block with LIVE links. So the team reviews the FORMATTED piece, not raw markdown.
+function renderDraftPreview(text: string, heroUrl?: string, meta?: { signerName?: string; signerTitle?: string; company?: string }) {
+  const { body, factCheck } = splitFactCheck(text);
+  const blocks = body.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   if (!blocks.length && !heroUrl) return <p className="text-[15px] text-[#7a8085]">Nothing to preview yet.</p>;
   const title = blocks[0]?.replace(/^#{1,3}\s+/, "") || "";
   const rest = blocks.slice(1);
+  const preparedDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const mh = mastheadLines({ signerName: meta?.signerName, signerTitle: meta?.signerTitle, company: meta?.company, words: wordCount(rest.join(" ")), preparedDate });
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white" style={{ color: "#16181c" }}>
       {/* The chosen 16:9 creative rides at the top as the newsletter banner, exactly as the email sends it. */}
       {heroUrl && <img src={heroUrl} alt="" className="block w-full" />}
       <div className="px-6 py-5">
       <h1 className="text-[24px] font-black leading-tight" style={{ color: "#16181c" }}>{title}</h1>
+      {mh.byline && <p className="mt-2 text-[13px] leading-snug" style={{ color: "#5f6368" }}>{mh.byline}</p>}
+      <p className="mt-1 text-[12px] leading-snug" style={{ color: "#9aa0a6" }}>{mh.meta}</p>
+      <p className="text-[12px] leading-snug" style={{ color: "#9aa0a6" }}>{mh.prepared}</p>
       {rest.map((b, i) => {
         const h = b.match(/^#{1,3}\s+(.*)$/);
         return h
           ? <h3 key={i} className="mt-6 text-[18px] font-extrabold leading-snug" style={{ color: "#16181c" }}>{h[1]}</h3>
           : <p key={i} className="mt-3.5 text-[15px] leading-[1.75]" style={{ color: "#3c4043" }}>{b}</p>;
       })}
+      {/* FACT CHECK & SOURCES, with live links Gary can click to verify - retained through every review round. */}
+      {factCheck.length > 0 && (
+        <div className="mt-6 border-t border-line pt-4">
+          <div className="text-[15px] font-extrabold" style={{ color: "#16181c" }}>Fact Check &amp; Sources</div>
+          <p className="mt-1 text-[12px] leading-snug" style={{ color: "#9aa0a6" }}>{FACT_CHECK_INTRO}</p>
+          {factCheck.map((it, i) => (
+            <div key={i} className="mt-3 text-[12.5px] leading-[1.55]" style={{ color: "#3c4043" }}>
+              <div><span className="font-bold" style={{ color: "#7a8085" }}>Claim:</span> {it.claim}</div>
+              {it.source && <div><span className="font-bold" style={{ color: "#7a8085" }}>Source:</span> {it.source}</div>}
+              {it.date && <div><span className="font-bold" style={{ color: "#7a8085" }}>Date:</span> {it.date}</div>}
+              <div className="break-all"><span className="font-bold" style={{ color: "#7a8085" }}>Link:</span>{" "}
+                <a href={it.link} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "#0A66C2" }}>{it.link}</a></div>
+            </div>
+          ))}
+        </div>
+      )}
       </div>
     </div>
   );
@@ -300,7 +323,10 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   async function ask(mode: "question" | "discover" = "question") {
     if (busy || !clientId) return;
     if (mode === "question" && !q.trim()) return;
-    setBusy(true); setErr(""); setFindings(null); setDraftFor(null); setLiDraft(false); setSentFor(""); setDraftErr("");
+    // Clear ANY prior draft/send state (incl. the LinkedIn/CEO "sent" banner): a research run neither drafts nor
+    // sends, so a leftover success banner from an earlier send must not stay on screen and imply this run emailed
+    // anyone. This is a research action only - it surfaces findings, it never sends email (Gary).
+    setBusy(true); setErr(""); setFindings(null); setDraftFor(null); setLiDraft(false); setLiSent(false); setSentFor(""); setDraftErr("");
     const d = await fetch(`/api/studio/intel/ask`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, question: mode === "question" ? q : "", mode }),
@@ -357,7 +383,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
           ))}
         </div>
         {preview
-          ? renderDraftPreview(draftText, creatives.find((c) => c.ratio === "16x9" && chosen.includes(c.url))?.url)
+          ? renderDraftPreview(draftText, creatives.find((c) => c.ratio === "16x9" && chosen.includes(c.url))?.url, { signerName: publisherName, signerTitle: publisher === "md" ? mdTitle : ceoTitle, company: brainName })
           : <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)} rows={14}
               className="w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-accent" />}
 

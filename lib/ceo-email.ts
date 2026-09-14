@@ -1,4 +1,5 @@
 import { emailShell } from "./email-shell";
+import { splitFactCheck, mastheadLines, wordCount, FACT_CHECK_INTRO, type FactCheckItem } from "./newsletter-format";
 
 // THE CEO/MD THOUGHT-LEADERSHIP EMAIL (Gary). Two looks, one builder:
 //   - review=true  -> the INTERNAL draft preview, on the dark ops shell, with a "not yet sent" banner. This is
@@ -28,12 +29,37 @@ function renderArticleBodyLight(post: string): string {
   }).join("");
 }
 
+// THE FACT CHECK & SOURCES block, with LIVE links (Gary: "Retain hyperlinks through every review round"). One
+// variant for the white editorial email, one for the dark internal preview. Links open in a new tab.
+function renderFactCheck(items: FactCheckItem[], dark: boolean): string {
+  if (!items.length) return "";
+  const ink = dark ? "rgba(255,251,248,0.86)" : "#3c4043";
+  const faint = dark ? "rgba(255,251,248,0.55)" : "#7a8085";
+  const head = dark ? "#FFFBF8" : "#16181c";
+  const rule = dark ? "rgba(168,85,247,0.18)" : "#eceef0";
+  const link = dark ? "#c9a7f5" : "#0A66C2";
+  const rows = items.map((it) => {
+    const line = (label: string, val: string) => val ? `<div style="margin:1px 0;font-size:12.5px;line-height:1.55;color:${ink};"><span style="color:${faint};font-weight:700;">${label}:</span> ${esc(val)}</div>` : "";
+    const href = esc(it.link);
+    return `<div style="margin:0 0 13px;">`
+      + line("Claim", it.claim)
+      + line("Source", it.source)
+      + line("Date", it.date)
+      + `<div style="margin:1px 0;font-size:12.5px;line-height:1.55;color:${ink};"><span style="color:${faint};font-weight:700;">Link:</span> <a href="${href}" target="_blank" rel="noopener noreferrer" style="color:${link};text-decoration:underline;word-break:break-all;">${href}</a></div>`
+      + `</div>`;
+  }).join("");
+  return `<div style="margin-top:26px;padding-top:16px;border-top:1px solid ${rule};">`
+    + `<div style="font-size:15px;font-weight:800;color:${head};margin:0 0 4px;">Fact Check &amp; Sources</div>`
+    + `<div style="font-size:12px;line-height:1.5;color:${faint};margin:0 0 14px;">${esc(FACT_CHECK_INTRO)}</div>`
+    + rows + `</div>`;
+}
+
 // THE WHITE EDITORIAL EMAIL. A clean white card on a light field, the client's own logo at the top, the chosen
 // 16x9 creative embedded as the hero, then the piece. Branded but not busy - it should look like a considered
 // note from the exec's office, not a marketing blast. The image is a public Vercel Blob URL, embedded inline.
 function renderWhiteCeoEmail(opts: {
   client: string; signerName?: string; signerTitle?: string; title: string; rest: string;
-  logoUrl?: string | null; heroUrl?: string | null; dateLabel: string;
+  logoUrl?: string | null; heroUrl?: string | null; dateLabel: string; preparedDate: string;
 }): string {
   const FONT = `"Helvetica Neue", Helvetica, Arial, sans-serif`;
   const logoBlock = opts.logoUrl
@@ -43,6 +69,14 @@ function renderWhiteCeoEmail(opts: {
     ? `<img src="${esc(opts.heroUrl)}" width="100%" style="display:block;width:100%;height:auto;border:0;outline:none;margin:22px 0 0;" alt="" />`
     : "";
   const signer = [opts.signerName, [opts.signerTitle, opts.client].filter(Boolean).join(" · ")].filter(Boolean);
+  // The body and the fact-check are stored together; split them so the sources render as their own linked block.
+  const { body, factCheck } = splitFactCheck(opts.rest);
+  // The masthead lines that sit under the title, exactly as the client-approved piece is laid out.
+  const mh = mastheadLines({ signerName: opts.signerName, signerTitle: opts.signerTitle, company: opts.client, words: wordCount(body), preparedDate: opts.preparedDate });
+  const mastheadHtml =
+    (mh.byline ? `<div style="font-size:13px;line-height:1.5;color:#5f6368;margin:0 0 4px;">${esc(mh.byline)}</div>` : "")
+    + `<div style="font-size:12px;line-height:1.5;color:#9aa0a6;margin:0 0 2px;">${esc(mh.meta)}</div>`
+    + `<div style="font-size:12px;line-height:1.5;color:#9aa0a6;margin:0 0 18px;">${esc(mh.prepared)}</div>`;
   return `
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <div style="background:#eef0f2;padding:26px 10px;font-family:${FONT};-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
@@ -54,8 +88,10 @@ function renderWhiteCeoEmail(opts: {
       </div>
       ${hero}
       <div style="padding:26px 34px 6px;">
-        <h1 style="font-size:25px;line-height:1.25;color:#16181c;margin:0 0 18px;font-weight:900;letter-spacing:-.01em;">${esc(opts.title)}</h1>
-        ${renderArticleBodyLight(opts.rest)}
+        <h1 style="font-size:25px;line-height:1.25;color:#16181c;margin:0 0 10px;font-weight:900;letter-spacing:-.01em;">${esc(opts.title)}</h1>
+        ${mastheadHtml}
+        ${renderArticleBodyLight(body)}
+        ${renderFactCheck(factCheck, false)}
       </div>
       <div style="padding:20px 34px 30px;border-top:1px solid #eceef0;margin-top:14px;">
         ${signer[0] ? `<div style="font-size:14px;font-weight:800;color:#16181c;">${esc(signer[0])}</div>` : ""}
@@ -68,17 +104,18 @@ function renderWhiteCeoEmail(opts: {
 
 export function buildCeoArticleEmail(opts: {
   client: string; ceoName?: string; ceoTitle?: string; post: string; art?: string; ceoRecipients?: string[];
-  srcHeadline?: string; logoUrl?: string | null; heroUrl?: string | null; dateLabel: string; review: boolean;
+  srcHeadline?: string; logoUrl?: string | null; heroUrl?: string | null; dateLabel: string; preparedDate?: string; review: boolean;
 }): string {
   const lines = opts.post.split(/\n{2,}/);
   const title = (lines[0] || "").replace(/^#{1,3}\s+/, "").trim();
   const rest = lines.slice(1).join("\n\n");
+  const preparedDate = opts.preparedDate || new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
 
   // THE PIECE ITSELF -> the clean white editorial email, post-ready, with the creative embedded.
   if (!opts.review) {
     return renderWhiteCeoEmail({
       client: opts.client, signerName: opts.ceoName, signerTitle: opts.ceoTitle,
-      title, rest, logoUrl: opts.logoUrl, heroUrl: opts.heroUrl, dateLabel: opts.dateLabel,
+      title, rest, logoUrl: opts.logoUrl, heroUrl: opts.heroUrl, dateLabel: opts.dateLabel, preparedDate,
     });
   }
 
@@ -93,9 +130,18 @@ export function buildCeoArticleEmail(opts: {
     + (opts.art ? `<div><b style="color:rgba(255,251,248,0.82);">Image idea:</b> ${esc(opts.art)}</div>` : "")
     + (opts.srcHeadline ? `<div style="margin-top:6px;"><b style="color:rgba(255,251,248,0.82);">Drawn from:</b> ${esc(opts.srcHeadline)}</div>` : "")
     + `</div>`;
+  // Split the fact-check off so the internal preview shows the SAME linked sources block the exec's copy carries.
+  const { body: draftBody, factCheck } = splitFactCheck(rest);
+  const mh = mastheadLines({ signerName: opts.ceoName, signerTitle: opts.ceoTitle, company: opts.client, words: wordCount(draftBody), preparedDate });
+  const masthead = `<div style="margin:0 0 16px;">`
+    + (mh.byline ? `<div style="font-size:12.5px;line-height:1.5;color:rgba(255,251,248,0.66);">${esc(mh.byline)}</div>` : "")
+    + `<div style="font-size:11.5px;line-height:1.5;color:rgba(255,251,248,0.5);">${esc(mh.meta)}</div>`
+    + `<div style="font-size:11.5px;line-height:1.5;color:rgba(255,251,248,0.5);">${esc(mh.prepared)}</div></div>`;
   const body = banner + heroImg
-    + `<h1 style="font-size:22px;line-height:1.25;color:#FFFBF8;margin:0 0 16px;font-weight:900;">${esc(title)}</h1>`
-    + renderArticleBody(rest) + meta;
+    + `<h1 style="font-size:22px;line-height:1.25;color:#FFFBF8;margin:0 0 10px;font-weight:900;">${esc(title)}</h1>`
+    + masthead
+    + renderArticleBody(draftBody)
+    + renderFactCheck(factCheck, true) + meta;
   return emailShell({
     strapline: "CEO THOUGHT LEADERSHIP",
     dateLabel: opts.dateLabel,
