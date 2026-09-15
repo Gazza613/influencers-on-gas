@@ -83,30 +83,39 @@ function renderWhiteCeoEmail(opts: {
   // inline styles - NOT a media query - because Gmail (and others) strip <style>/@media, so a mobile-only rule
   // silently did nothing. Stacked reads clean on both phone and desktop.
   const dateOnly = String(opts.dateLabel).includes(" · ") ? String(opts.dateLabel).split(" · ").slice(1).join(" · ") : String(opts.dateLabel);
+  // TABLE-BASED, FIXED-WIDTH layout (Gary: "forwarding the approval email distorts it"). Forwarding through Gmail /
+  // Outlook re-renders the HTML, and div + max-width + percentage layouts reflow or collapse on the way. A centred
+  // 600px table with explicit widths and inline styles is the email-dev standard that survives a forward and
+  // Outlook. width="600" (the attribute) anchors it for Outlook/forward; max-width:600px lets it shrink on a phone.
+  const heroTable = opts.heroUrl
+    ? `<tr><td style="padding:22px 0 0;font-size:0;line-height:0;"><img src="${esc(opts.heroUrl)}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;" alt="" /></td></tr>`
+    : "";
   return `
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <div style="background:#eef0f2;padding:26px 10px;font-family:${FONT};-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%;">
-    <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e6e8eb;">
-      <div style="padding:30px 34px 0;text-align:center;">
-        ${logoBlock}
-        <div style="margin-top:16px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#9aa0a6;font-weight:700;">Thought leadership</div>
-        <div style="margin-top:6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b6bbc0;font-weight:600;">${esc(opts.client)}</div>
-        <div style="margin-top:3px;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:#c2c7cc;font-weight:600;">${esc(dateOnly)}</div>
-      </div>
-      ${hero}
-      <div style="padding:26px 34px 6px;">
-        <h1 class="wtitle" style="font-size:22px;line-height:1.24;color:#16181c;margin:0 0 10px;font-weight:900;letter-spacing:-.01em;">${esc(opts.title)}</h1>
-        ${mastheadHtml}
-        ${renderArticleBodyLight(body)}
-      </div>
-      <div style="padding:20px 34px 24px;border-top:1px solid #eceef0;margin-top:14px;">
-        ${signer[0] ? `<div style="font-size:14px;font-weight:800;color:#16181c;">${esc(signer[0])}</div>` : ""}
-        ${signer[1] ? `<div style="font-size:12px;color:#7a8085;margin-top:2px;">${esc(signer[1])}</div>` : ""}
-        <div style="margin-top:14px;font-size:11px;line-height:1.6;color:#9aa0a6;">Drafted for you by GAS Marketing's Researcher. Review and edit before you post.</div>
-      </div>
-      ${factCheck.length ? `<div style="padding:0 34px 30px;">${renderFactCheck(factCheck, false)}</div>` : ""}
-    </div>
-  </div>`;
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#eef0f2;">
+    <tr><td align="center" style="padding:26px 10px;font-family:${FONT};-webkit-text-size-adjust:100%;text-size-adjust:100%;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e6e8eb;border-radius:12px;">
+        <tr><td align="center" style="padding:30px 34px 0;">
+          ${logoBlock}
+          <div style="margin-top:16px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#9aa0a6;font-weight:700;">Thought leadership</div>
+          <div style="margin-top:6px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b6bbc0;font-weight:600;">${esc(opts.client)}</div>
+          <div style="margin-top:3px;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:#c2c7cc;font-weight:600;">${esc(dateOnly)}</div>
+        </td></tr>
+        ${heroTable}
+        <tr><td style="padding:26px 34px 6px;">
+          <h1 style="font-size:22px;line-height:1.24;color:#16181c;margin:0 0 10px;font-weight:900;letter-spacing:-.01em;">${esc(opts.title)}</h1>
+          ${mastheadHtml}
+          ${renderArticleBodyLight(body)}
+        </td></tr>
+        <tr><td style="padding:20px 34px 24px;border-top:1px solid #eceef0;">
+          ${signer[0] ? `<div style="font-size:14px;font-weight:800;color:#16181c;">${esc(signer[0])}</div>` : ""}
+          ${signer[1] ? `<div style="font-size:12px;color:#7a8085;margin-top:2px;">${esc(signer[1])}</div>` : ""}
+          <div style="margin-top:14px;font-size:11px;line-height:1.6;color:#9aa0a6;">Drafted for you by GAS Marketing's Researcher. Review and edit before you post.</div>
+        </td></tr>
+        ${factCheck.length ? `<tr><td style="padding:0 34px 30px;">${renderFactCheck(factCheck, false)}</td></tr>` : ""}
+      </table>
+    </td></tr>
+  </table>`;
 }
 
 export function buildCeoArticleEmail(opts: {
