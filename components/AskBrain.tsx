@@ -34,6 +34,15 @@ const MODES: { id: Mode; label: string; note: string }[] = [
 ];
 type Hit = { content: string; metadata: Record<string, unknown>; score: number };
 
+// Render inline **bold** as actual bold rather than showing raw asterisks (Gary: "why are the asterisks in the
+// result?"). Everything else is passed through as text; the citation/label chips are handled by the caller.
+function renderInline(text: string, keyBase: string | number): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((seg, k) => {
+    const b = seg.match(/^\*\*([^*]+)\*\*$/);
+    return b ? <strong key={`${keyBase}-b${k}`}>{b[1]}</strong> : <span key={`${keyBase}-t${k}`}>{seg}</span>;
+  });
+}
+
 export default function AskBrain({ clients, initialClientId, lockClient }: { clients: Client[]; initialClientId?: string; lockClient?: boolean }) {
   const [clientId, setClientId] = useState(initialClientId || clients[0]?.id || "");
   const [q, setQ] = useState("");
@@ -258,12 +267,12 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
                   part === "[brain]" ? <span key={i} className="mr-1 rounded bg-ready/15 px-1.5 py-0.5 text-[15px] font-bold uppercase tracking-wide text-ready">brain</span>
                   : part === "[web]" ? <span key={i} className="mr-1 rounded bg-[#60a5fa]/15 px-1.5 py-0.5 text-[15px] font-bold uppercase tracking-wide text-[#93c5fd]">web</span>
                   : part === "[general]" ? <span key={i} className="mr-1 rounded bg-[#fbbf24]/15 px-1.5 py-0.5 text-[15px] font-bold uppercase tracking-wide text-[#fcd34d]">general</span>
-                  : <span key={i}>{part}</span>)
+                  : <span key={i}>{renderInline(part, i)}</span>)
               : /* BRAIN mode: the answer cites the passage each claim came from as [1], [2]. Render those as small
                    clickable chips that open the receipts and jump to that passage - a claim you can trace in one tap. */
                 answer.split(/(\[\d+(?:\s*,\s*\d+)*\])/g).map((part, i) => {
                   const m = part.match(/^\[(\d+(?:\s*,\s*\d+)*)\]$/);
-                  if (!m) return <span key={i}>{part}</span>;
+                  if (!m) return <span key={i}>{renderInline(part, i)}</span>;
                   return m[1].split(/\s*,\s*/).map((n, j) => (
                     <button key={`${i}-${j}`} onClick={() => { setOpenSources(true); setHighlight(Number(n) - 1); }}
                       title={`Passage ${n}`}

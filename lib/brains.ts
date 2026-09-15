@@ -31,7 +31,7 @@ export async function listBrains(): Promise<Brain[]> {
             (select count(*)::int from knowledge_sources s where s.client_id = c.id) as source_count,
             exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('crawl','website') and s.status = 'indexed'
                    and (select count(*) from knowledge_chunks k where k.source_id = s.id) > 1) as has_site,
-            exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('file','text','market') and s.status = 'indexed') as has_docs,
+            exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('file','text','market','note') and s.status = 'indexed') as has_docs,
             exists(select 1 from studio_brand_kits b where b.client_id = c.id and coalesce(length(trim(b.tone_notes)),0) > 0) as has_doctrine,
             exists(select 1 from studio_assets a where a.client_id = c.id and a.kind in ('logo','ceo_photo','md_photo','team_photo')) as has_assets
      from clients c order by c.created_at desc`,

@@ -429,7 +429,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   // loosens the scope lock or the no-fabrication rule.
   const answerMode = !!focus?.trim();
   const focusLine = answerMode
-    ? `\n\nTHE TEAM HAS A SPECIFIC QUESTION FOR THIS RUN - answering it is the PRIORITY: "${focus!.trim().slice(0, 600)}"\nSearch specifically to answer it and file sourced findings that address it directly, then flag anything else genuinely material. If the EXACT subject is not a direct player in ${cfg.clientName}'s market (wrong country, different sector, a name mix-up), DO NOT just return nothing: file one finding that says so plainly and pivots to the nearest relevant read (for example the local equivalent, or the closest real competitor), so the team always gets a useful answer. Only return empty if there is genuinely nothing sourced to say at all.`
+    ? `\n\nTHE TEAM HAS A SPECIFIC BRIEF FOR THIS RUN - addressing it is the PRIORITY:\n"${focus!.trim().slice(0, 8000)}"\nSearch specifically to address it and file sourced findings that speak to it directly, then flag anything else genuinely material. If the EXACT subject is not a direct player in ${cfg.clientName}'s market (wrong country, different sector, a name mix-up), DO NOT just return nothing: file one finding that says so plainly and pivots to the nearest relevant read (for example the local equivalent, or the closest real competitor), so the team always gets a useful answer. Only return empty if there is genuinely nothing sourced to say at all.`
     : "";
   const opening = answerMode
     ? `Today is ${today}. The team has asked a specific question. Give a genuine, sourced market read that ANSWERS it, strictly inside your scope lock.${focusLine}`
@@ -442,11 +442,14 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     : `Search the web now. Then set out what is genuinely new and worth our attention, with the real source for each.`;
   const brief = `${opening}\n\n${knowLine}\n${(kit?.tone_notes || "(no doctrine loaded)").slice(0, 6000)}${researchContext}\n\n${closing}`;
 
+  // The RESEARCHER role (the market sweep) wants BREADTH: more searches and more room to write, so a wide market
+  // baseline is not throttled into a couple of findings. The Strategist/Journalist daily watch stays lean.
+  const deep = role === "researcher";
   const research = await client.messages.create({
     model: PREMIUM,
-    max_tokens: 6000,
+    max_tokens: deep ? 8000 : 6000,
     system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays, answerMode)}\n\n${STYLE}`,
-    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 } as unknown as Anthropic.Tool],
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: deep ? 18 : 10 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
   // TOKEN-ACCURATE metering (Gary): the WEEKLY Strategist runs on Opus 4.8 + web search - now that it is once a
@@ -466,8 +469,9 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
 
   const res = await client.messages.create({
     model: PREMIUM,
-    // The assessment adds two reasoned fields per finding, so the filing step needs the room to think.
-    max_tokens: 6000,
+    // The assessment adds two reasoned fields per finding, so the filing step needs the room to think. The sweep
+    // (researcher) files MANY findings, so it gets more room again.
+    max_tokens: deep ? 8000 : 6000,
     // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
     // never carried the UK-spelling / no-em-dash rule at all, which is how em dashes kept reaching the inbox.
     system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,

@@ -76,7 +76,11 @@ never attach a citation to something the passages do not actually support.
 HOW TO ANSWER:
 - Lead with the answer in the first sentence. No preamble, never "based on the passages provided".
 - Then add only what genuinely helps: surrounding detail, a caveat, an instruction the passages attach to it.
-- Short and direct. UK British spelling. Never an em dash or an en dash: use a comma, a full stop or a hyphen.`;
+- Short and direct. UK British spelling. Never an em dash or an en dash: use a comma, a full stop or a hyphen.
+- NO MARKDOWN. Do not use asterisks for bold (no ** **), no hashes for headings, no bullet characters. Write plain
+  sentences and short paragraphs. The ONLY bracketed markers allowed are the passage citations [1], [2].
+- CITE ONLY as [n] inline, using a passage number that actually exists in the list above. Never write a bare
+  footnote number after a sentence (like "... rates. 47"); a citation must always be in square brackets.`;
 
 // Mixed: the brain leads, general knowledge fills gaps, and the reader can always tell which is which.
 const MIXED_RULES = `You answer questions about a client using their private knowledge base FIRST, and your own

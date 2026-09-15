@@ -120,6 +120,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // MARKET SWEEP (Gary): a wide 24-month sweep run from the Brain. Confirmed facts embed straight in; the rest land
   // in a review tray to accept (embed) or reject. Accepted facts appear in Knowledge Sources and lift the strength.
   const [sweepBusy, setSweepBusy] = useState(false);
+  const [sweepDone, setSweepDone] = useState(false);   // green "done" state on the sweep button after it completes
+  const [addedFlash, setAddedFlash] = useState(false); // green flash on the crawl button after a site is submitted
   const [sweepMsg, setSweepMsg] = useState("");
   const [sweepErr, setSweepErr] = useState("");
   const [sweepReview, setSweepReview] = useState<{ id: string; headline: string; why_it_matters: string; detail: string; verification: string | null; sources: { name?: string; url?: string }[] }[]>([]);
@@ -212,7 +214,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // to review. After it lands, refresh() so the new market sources + the lifted strength show immediately.
   async function runSweep() {
     if (sweepBusy) return;
-    setSweepBusy(true); setSweepErr(""); setSweepMsg(""); setSweepReview([]);
+    setSweepBusy(true); setSweepDone(false); setSweepErr(""); setSweepMsg(""); setSweepReview([]);
     const d = await fetch(`/api/brains/${brainId}/market-sweep`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sweep" }),
     }).then((r) => r.json()).catch(() => null);
@@ -225,6 +227,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       setSweepMsg(`Market sweep done: ${review.length} ${review.length === 1 ? "finding" : "findings"} to review below. Nothing is in the brain yet - accept the ones you want, decline the rest.`);
     }
     setSweepReview(review);
+    setSweepDone(true);
   }
   async function acceptSweep(id: string) {
     if (sweepItemBusy) return;
@@ -263,7 +266,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       if (!r.ok) failed.push(`${site}: ${d?.error || "could not add"}`);
     }
     if (failed.length) setAddErr(failed.join(" · "));
-    else { setSites([""]); flex(fullSite ? "Scraping the site now, every page it can reach." : "Reading the page now."); }
+    else { setSites([""]); setAddedFlash(true); setTimeout(() => setAddedFlash(false), 4000); flex(fullSite ? "Scraping the site now, every page it can reach." : "Reading the page now."); }
     await refresh(); setAdding(false);
   }
 
@@ -433,7 +436,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const indexedSources = sources.filter((s) => s.status === "indexed").length;
   const crawling = sources.some((s) => s.status === "pending");
   const hasSite = sources.some((s) => (s.type === "crawl" || s.type === "website") && s.status === "indexed" && (s.chunk_count ?? 0) > 1);
-  const hasDocs = sources.some((s) => (s.type === "file" || s.type === "text" || s.type === "market") && s.status === "indexed");
+  const hasDocs = sources.some((s) => (s.type === "file" || s.type === "text" || s.type === "market" || s.type === "note") && s.status === "indexed");
   const hasDoctrine = doctrine.trim().length > 0;
   const hasAssets = (assetKinds.logo || 0) + (assetKinds.ceo_photo || 0) + (assetKinds.md_photo || 0) + (assetKinds.team_photo || 0) > 0;
   const checklist: { key: string; label: string; met: boolean; go: () => void }[] = [
@@ -602,7 +605,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveWebsite(); } }}
                   placeholder="https://client-official-site.co.za"
                   className="min-w-[260px] flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-[18px] text-ink outline-none focus:border-line-strong" />
-                <button onClick={saveWebsite} disabled={savingWeb} className="btn-brand rounded-lg px-4 py-2 text-[17px] font-bold disabled:opacity-50">{savingWeb ? "Saving…" : webSaved ? "✓ Saved" : "Save site"}</button>
+                <button onClick={saveWebsite} disabled={savingWeb} className={`rounded-lg px-4 py-2 text-[17px] font-bold text-white transition disabled:opacity-50 ${webSaved && !savingWeb ? "bg-[#22c55e] hover:bg-[#16a34a]" : "btn-brand"}`}>{savingWeb ? "Saving…" : webSaved ? "✓ Saved" : "Save site"}</button>
               </div>
             </label>
             {/* OFFICIAL SOCIALS - the single home for these too (Gary). The research pods mine them for the client's
@@ -614,7 +617,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                 <textarea value={socials} onChange={(e) => { setSocials(e.target.value); setSocSaved(false); }} rows={3}
                   placeholder={"https://www.linkedin.com/company/…\nhttps://www.instagram.com/…"}
                   className="min-w-[260px] flex-1 rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-[16px] leading-relaxed text-ink outline-none focus:border-line-strong" />
-                <button onClick={saveSocials} disabled={savingSoc} className="btn-brand rounded-lg px-4 py-2 text-[17px] font-bold disabled:opacity-50">{savingSoc ? "Saving…" : socSaved ? "✓ Saved" : "Save socials"}</button>
+                <button onClick={saveSocials} disabled={savingSoc} className={`rounded-lg px-4 py-2 text-[17px] font-bold text-white transition disabled:opacity-50 ${socSaved && !savingSoc ? "bg-[#22c55e] hover:bg-[#16a34a]" : "btn-brand"}`}>{savingSoc ? "Saving…" : socSaved ? "✓ Saved" : "Save socials"}</button>
               </div>
             </label>
           </div>
@@ -733,7 +736,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
               </div>
             ))}
             <button onClick={() => setSites((list) => [...list, ""])} className="mt-2.5 text-[17px] font-semibold text-[#c79bff] hover:underline">+ Add another website</button>
-            <div><button onClick={addWebsites} disabled={adding} className="btn-brand mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold disabled:opacity-50">{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading and adding the pages…" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
+            <div><button onClick={addWebsites} disabled={adding} className={`mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[18px] font-bold text-white transition disabled:opacity-50 ${addedFlash && !adding ? "bg-[#22c55e] hover:bg-[#16a34a]" : "btn-brand"}`}>{adding && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />}{adding ? "Reading and adding the pages…" : addedFlash ? "✓ Added, crawling now" : fullSite ? "Scrape and add every page" : "Add these pages"}</button></div>
             <p className="mt-2.5 text-[18px] text-ink-dim">{fullSite ? "Reads every page it can reach, up to 80 per site. Takes a few minutes and keeps running if you close the tab." : "Reads just the page at each URL."}</p>
           </>
         ) : mode === "feed" ? (
@@ -788,9 +791,9 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button onClick={runSweep} disabled={sweepBusy}
-              className="btn-brand inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-[18px] font-bold disabled:opacity-50">
+              className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-[18px] font-bold text-white transition disabled:opacity-50 ${sweepDone && !sweepBusy ? "bg-[#22c55e] hover:bg-[#16a34a]" : "btn-brand"}`}>
               {sweepBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-              {sweepBusy ? "Sweeping the market…" : "Run a market sweep"}
+              {sweepBusy ? "Sweeping the market…" : sweepDone ? "✓ Sweep done · run again" : "Run a market sweep"}
             </button>
             {sweepBusy && <span className="text-[15px] text-ink-faint">This runs a wide, thorough search and can take a couple of minutes. You can leave this page.</span>}
           </div>

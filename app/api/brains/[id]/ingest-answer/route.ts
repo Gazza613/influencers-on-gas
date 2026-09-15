@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getBrain } from "@/lib/brains";
+import { getBrain, createSource, setSourceStatus } from "@/lib/brains";
 import { ingestChunks } from "@/lib/rag";
 import { recordUsage } from "@/lib/usage";
 import { db } from "@/lib/db";
@@ -59,7 +59,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     `${question ? ` · question: ${question}` : ""} · saved by ${session.user?.email || "the team"}]`;
   const content = `${header}\n\n${answer}`;
 
-  const added = await ingestChunks(id, null, [{
+  // A SAVED ANSWER IS A KNOWLEDGE SOURCE (Gary): it now gets its own source row, so it appears in the Knowledge
+  // Sources list as a line item ("Saved answer: <question>"), is removable there, and counts toward strength - the
+  // same "anything that stacks the brain shows up" rule as the market sweep. Embedded synchronously, so the source
+  // is marked indexed right after.
+  const label = (question ? `Saved answer: ${question.slice(0, 90)}` : "Saved answer") + (unverified ? " (unverified)" : "");
+  const sourceId = await createSource(id, "note", label, null);
+  const added = await ingestChunks(id, sourceId, [{
     content,
     metadata: {
       kind: "ask_note",
@@ -71,6 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       title: question ? `Saved answer: ${question.slice(0, 80)}` : "Saved answer",
     },
   }]);
+  await setSourceStatus(sourceId, added ? "indexed" : "failed", added ? null : "nothing could be embedded from this answer").catch(() => {});
   if (added) await recordUsage({ clientId: id, userEmail: session.user?.email ?? null, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "ask-ingest", count: added }).catch(() => {});
 
   return NextResponse.json({ ok: true, added, duplicate: false, unverified });

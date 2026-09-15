@@ -28,7 +28,12 @@ const MARKET_INSTRUCTIONS =
   "competitor or the wider category IS wanted here, filed as this client's market context.\n" +
   "(2) THE CLIENT ITSELF, where public coverage exists: investments, deals, launches, leadership and board " +
   "changes, partnerships, funding, awards and milestones.\n" +
-  "Search the CATEGORY and the COMPETITORS by name, not only the client's own name.\n" +
+  "AIM FOR BREADTH, do not fixate on one theme. Make SEPARATE searches for each of these and file the material, " +
+  "well-sourced facts from every angle: (a) the key competitors by name and what each is doing; (b) the category's " +
+  "size, growth and structure; (c) demand and customer-behaviour shifts; (d) pricing, cost and business-model " +
+  "dynamics; (e) technology and operations trends; (f) regulation and policy. Target roughly 8 to 15 DISTINCT " +
+  "findings across these dimensions, not two on a single sub-topic. Search the CATEGORY and the COMPETITORS by " +
+  "name, not only the client's own name.\n" +
   "RECENCY: focus developments, trends, statistics and events on roughly the LAST 24 MONTHS, and never surface an " +
   "old news event as if it were current. STATIC context - who a competitor is, when they were founded, who they " +
   "serve - may reference an older date, because that is background identity, not news. Only file what is genuinely " +
