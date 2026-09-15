@@ -130,36 +130,77 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
 //
 // It is deterministic, it honours the path filter precisely, and it uses the single-page scrape that has
 // always worked. A site without a sitemap falls back to the crawler.
+// Fetch a sitemap/robots document, SSRF-guarded. Returns the text, or null on any failure.
+async function fetchXml(url: string): Promise<string | null> {
+  if (!isSafeCrawlTarget(url)) return null;
+  const res = await fetch(url, { headers: { "User-Agent": "FirecrawlAgent" } }).catch(() => null);
+  if (!res?.ok) return null;
+  return await res.text().catch(() => null);
+}
+
+// Parse a sitemap OR a sitemap-index into {url, lastmod} entries. Handles <url> and <sitemap> blocks (both carry
+// <loc> + optional <lastmod>), falling back to bare <loc> matching. lastmod is a timestamp (0 when absent).
+function parseSitemap(xml: string): { url: string; lastmod: number }[] {
+  const out: { url: string; lastmod: number }[] = [];
+  const blocks = xml.match(/<(?:url|sitemap)>[\s\S]*?<\/(?:url|sitemap)>/g);
+  if (blocks) {
+    for (const b of blocks) {
+      const loc = b.match(/<loc>([^<]+)<\/loc>/)?.[1]?.trim();
+      const lm = b.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1]?.trim();
+      if (loc) out.push({ url: loc, lastmod: lm ? (Date.parse(lm) || 0) : 0 });
+    }
+  } else {
+    for (const m of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) out.push({ url: m[1].trim(), lastmod: 0 });
+  }
+  return out;
+}
+
 export async function sitemapUrls(siteUrl: string, includePath?: string | null): Promise<string[]> {
-  // SSRF: this does a direct server-side fetch of `${origin}/sitemap.xml`, so the target must be a public site,
-  // not an internal/localhost/metadata address. The add/recrawl doors already validate, but guard here too since
-  // this is the actual fetch site.
+  // SSRF: every fetch below is server-side, so the target must be a public site. The add/recrawl doors validate,
+  // and fetchXml guards each fetch too since this is the actual fetch site.
   if (!isSafeCrawlTarget(siteUrl)) return [];
   const origin = new URL(siteUrl).origin;
 
   // INFER THE SCOPE FROM THE ADDRESS when none was typed. Giving the crawler ".../blog" plainly means "the
   // blog", and making someone repeat that in a second field is a trap: leave it blank and the whole site
-  // comes in, which is the opposite of what they asked for. An explicit path still wins.
-  //
-  // The path is taken AS TYPED, deliberately not after following redirects. Following them looked like the
-  // careful choice and is exactly wrong here: /blog 301s to /articles on this site, while the articles
-  // themselves live at /blog/... - so resolving the redirect would scope to /articles and select nothing.
-  // What someone types is what they mean.
+  // comes in, which is the opposite of what they asked for. An explicit path still wins. Taken AS TYPED, not after
+  // redirects (/blog 301s to /articles on this site while the articles live at /blog/...).
   let scope = includePath;
   if (!scope) {
     const trimmed = new URL(siteUrl).pathname.replace(/^\/+|\/+$/g, "");
     if (trimmed) scope = trimmed;
   }
-  const res = await fetch(`${origin}/sitemap.xml`, { headers: { "User-Agent": "FirecrawlAgent" } });
-  if (!res.ok) return [];
-  const xml = await res.text();
-  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+
+  // FIND A SITEMAP. Try robots.txt's declared Sitemap: lines first (the authoritative pointer), then the two
+  // conventional locations. Enterprise sites often only declare it in robots or use /sitemap_index.xml.
+  const candidates: string[] = [];
+  const robots = await fetchXml(`${origin}/robots.txt`);
+  if (robots) for (const m of robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)) candidates.push(m[1].trim());
+  candidates.push(`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`);
+  let xml: string | null = null;
+  for (const c of [...new Set(candidates)]) { xml = await fetchXml(c); if (xml) break; }
+  if (!xml) return [];
+
+  // If this is a sitemap INDEX (every entry points at a child .xml sitemap), follow the freshest children and
+  // gather their page URLs - a common enterprise shape that the old single-fetch simply discarded.
+  let entries = parseSitemap(xml);
+  const isIndex = entries.length > 0 && entries.every((e) => /\.xml(\?|$)/i.test(e.url) && e.url.startsWith(origin));
+  if (isIndex) {
+    const children = entries.sort((a, b) => b.lastmod - a.lastmod).slice(0, 10);
+    entries = [];
+    for (const child of children) { const cx = await fetchXml(child.url); if (cx) entries.push(...parseSitemap(cx)); }
+  }
 
   const want = scope ? `/${scope.replace(/^\/+|\/+$/g, "")}/` : null;
-  return [...new Set(urls)]
-    .filter((u) => u.startsWith(origin))
+  const dedup = new Map<string, { url: string; lastmod: number }>();
+  for (const e of entries) if (!dedup.has(e.url)) dedup.set(e.url, e);
+  return [...dedup.values()]
+    .filter((e) => e.url.startsWith(origin))
     // The path filter, applied to the URL itself rather than trusted to a crawler's scoping.
-    .filter((u) => (want ? new URL(u).pathname.startsWith(want) : true))
-    // Never the sitemap or other non-pages.
-    .filter((u) => !/\.(xml|json|txt|pdf|png|jpe?g|svg|webp)(\?|$)/i.test(u));
+    .filter((e) => (want ? new URL(e.url).pathname.startsWith(want) : true))
+    // Never a sitemap or other non-page asset.
+    .filter((e) => !/\.(xml|json|txt|pdf|png|jpe?g|svg|webp)(\?|$)/i.test(e.url))
+    // NEWEST FIRST (audit): so when the caller caps the list, it keeps the freshest pages, not an arbitrary slice.
+    .sort((a, b) => b.lastmod - a.lastmod)
+    .map((e) => e.url);
 }
