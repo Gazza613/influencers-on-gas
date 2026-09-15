@@ -484,7 +484,9 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     max_tokens: deep ? 8000 : 6000,
     // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
     // never carried the UK-spelling / no-em-dash rule at all, which is how em dashes kept reaching the inbox.
-    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}${sweepBreadth}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}${sweepBreadth}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. ${deep
+      ? "This is a market BASELINE, so file EVERY material, well-sourced market fact in the notes - established facts are exactly what is wanted, NOT only breaking news. Do NOT skip a fact because it is not new, and do NOT return an empty list just because the material is not fresh. Only return empty if the notes genuinely contain no sourced market fact at all."
+      : "If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure."}`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}${deep
