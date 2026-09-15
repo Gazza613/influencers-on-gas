@@ -114,7 +114,7 @@ export default function BrainLibrary({ brainId, onChange }: { brainId: string; o
           <div className="tabular text-[15px] uppercase tracking-[0.2em] text-ink-faint">Brand library</div>
           <p className="mt-1.5 text-[18px] text-ink-dim">
             The real artwork this brain builds from: <b className="text-ink">{total}</b> file{total === 1 ? "" : "s"}.
-            Add the logo, CEO and team photos here directly. Creatives are forensically matched to these, never invented.
+            Add the logo, CEO, MD and team photos here directly. Creatives are forensically matched to these, never invented.
           </p>
         </div>
       </div>
