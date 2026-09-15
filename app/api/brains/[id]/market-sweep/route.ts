@@ -52,12 +52,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const b = (await req.json().catch(() => ({}))) as { action?: string; intelId?: string };
   const action = String(b.action || "sweep").trim();
 
-  // ADD one reviewed finding into the brain (embed + accept).
+  // ADD one reviewed finding INTO THE BRAIN - embed into RAG + standing research. Only for facts genuinely about
+  // the client, so the brain's own knowledge is never contaminated with pure competitor data (Gary).
   if (action === "add") {
     const intelId = String(b.intelId || "").trim();
     if (!intelId) return NextResponse.json({ error: "Missing the finding." }, { status: 400 });
     const r = await addFindingToBrain(clientId, intelId);
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // KEEP one finding AS MARKET INTELLIGENCE - accepted standing research the Researcher/Strategist reasons with,
+  // but NEVER embedded into the brain's RAG (Gary: the FedEx brain must stay FedEx-only; competitor and category
+  // facts are strategic intelligence, not brain knowledge). Same accepted status, just no createSource/embed.
+  if (action === "intel") {
+    const intelId = String(b.intelId || "").trim();
+    if (!intelId) return NextResponse.json({ error: "Missing the finding." }, { status: 400 });
+    await setIntelStatus(clientId, intelId, "accepted").catch(() => {});
     return NextResponse.json({ ok: true });
   }
 

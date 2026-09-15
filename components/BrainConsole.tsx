@@ -228,7 +228,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     if (review.length === 0) {
       setSweepMsg("The sweep found no new market facts this time. That can happen when the market has been quiet, and it never invents facts to pad the result. Nothing was added.");
     } else {
-      setSweepMsg(`Market sweep done: ${review.length} ${review.length === 1 ? "finding" : "findings"} to review below. Nothing is in the brain yet - accept the ones you want, decline the rest.`);
+      setSweepMsg(`Market sweep done: ${review.length} ${review.length === 1 ? "finding" : "findings"} to sort below. Add this client's own facts to the brain, keep competitor and market facts as intelligence, or decline the rest.`);
     }
     setSweepReview(review);
     setSweepDone(true);
@@ -242,6 +242,18 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     setSweepItemBusy("");
     if (d?.ok) { setSweepReview((list) => list.filter((x) => x.id !== id)); await refresh(); router.refresh(); }
     else setSweepErr(d?.error || "Couldn't add that finding.");
+  }
+  // KEEP AS MARKET INTELLIGENCE (Gary): standing research for the Strategist, NOT embedded into the FedEx brain, so
+  // competitor/category facts never contaminate the brain's own knowledge.
+  async function keepIntel(id: string) {
+    if (sweepItemBusy) return;
+    setSweepItemBusy(id);
+    const d = await fetch(`/api/brains/${brainId}/market-sweep`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "intel", intelId: id }),
+    }).then((r) => r.json()).catch(() => null);
+    setSweepItemBusy("");
+    if (d?.ok) setSweepReview((list) => list.filter((x) => x.id !== id));
+    else setSweepErr(d?.error || "Couldn't keep that finding.");
   }
   async function rejectSweep(id: string) {
     if (sweepItemBusy) return;
@@ -790,7 +802,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <SectionTile d={ICON.sources} />
             <div>
               <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Market intelligence</div>
-              <p className="mt-0.5 text-[16px] text-ink-dim">A one-off ~24-month sweep of this client and their market. Every finding comes back for you to review, and <b className="text-ink-dim">nothing enters the brain until you accept it</b>. Accepted facts strengthen the brain and appear in Knowledge Sources. Do this once when you set the brain up.</p>
+              <p className="mt-0.5 text-[16px] text-ink-dim">A one-off ~24-month sweep of this client and their market. Every finding comes back for you to sort: <b className="text-ink-dim">Add to brain</b> for facts genuinely about this client (embedded into the brain, shown in Knowledge Sources), or <b className="text-ink-dim">Keep as intelligence</b> for competitor and market facts (strategic research the Researcher reads, <b className="text-ink-dim">never added to the brain</b> so it stays clean). Nothing lands until you choose.</p>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -805,7 +817,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           {sweepMsg && <p className="mt-3 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/10 px-4 py-3 text-[16px] leading-relaxed text-ink-dim">{sweepMsg}</p>}
           {sweepReview.length > 0 && (
             <div className="mt-4">
-              <div className="tabular text-[15px] uppercase tracking-[0.16em] text-ink-faint">Review, then accept into the brain or reject</div>
+              <div className="tabular text-[15px] uppercase tracking-[0.16em] text-ink-faint">Sort each: add to the brain, keep as intelligence, or reject</div>
               <ul className="mt-2 space-y-2">
                 {sweepReview.map((f) => {
                   // GRADE (Gary): verified = green, unverified-but-sourced = orange, no source at all = red. A red
@@ -832,10 +844,13 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                           ? <span className="mt-1.5 inline-block rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[13px] font-bold text-[#fcd34d]">unverified · source not machine-confirmed</span>
                           : <span className="mt-1.5 inline-block rounded bg-alert/15 px-2 py-0.5 text-[13px] font-bold text-alert">source unknown · cannot be added</span>}
                       </div>
-                      <div className="flex shrink-0 gap-2">
+                      <div className="flex shrink-0 flex-col gap-2">
                         <button onClick={() => acceptSweep(f.id)} disabled={sweepItemBusy === f.id || grade === "unknown"}
-                          title={grade === "unknown" ? "This finding has no source, so it cannot enter the brain." : undefined}
-                          className="rounded-lg bg-[#22c55e] px-3.5 py-1.5 text-[15px] font-bold text-white hover:bg-[#16a34a] disabled:opacity-50">✓ Add</button>
+                          title={grade === "unknown" ? "This finding has no source, so it cannot enter the brain." : "For facts genuinely about this client - embeds into the brain."}
+                          className="rounded-lg bg-[#22c55e] px-3.5 py-1.5 text-[15px] font-bold text-white hover:bg-[#16a34a] disabled:opacity-50">✓ Add to brain</button>
+                        <button onClick={() => keepIntel(f.id)} disabled={sweepItemBusy === f.id || grade === "unknown"}
+                          title="For competitor / market facts - kept as strategic intelligence, never added to the brain."
+                          className="rounded-lg border border-[#a855f7]/50 px-3.5 py-1.5 text-[15px] font-semibold text-[#c9a7f5] hover:bg-[#a855f7]/10 disabled:opacity-50">Keep as intelligence</button>
                         <button onClick={() => rejectSweep(f.id)} disabled={sweepItemBusy === f.id}
                           className="rounded-lg border border-line px-3.5 py-1.5 text-[15px] font-semibold text-ink-dim hover:border-alert hover:text-alert disabled:opacity-50">Reject</button>
                       </div>
