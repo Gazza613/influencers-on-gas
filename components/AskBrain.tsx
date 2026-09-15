@@ -26,9 +26,9 @@ type Mode = "brain" | "mixed" | "claude" | "live";
 // looked this up just now, here is the link" into the same label as "I think I remember this" would throw
 // away the only difference that lets someone check it.
 const MODES: { id: Mode; label: string; note: string }[] = [
-  { id: "brain", label: "Brain only", note: "Only this client's own material. Says so when it does not know." },
-  { id: "mixed", label: "Brain + Claude", note: "The brain first, general knowledge to fill gaps. Every claim is labelled." },
-  { id: "claude", label: "Claude only", note: "General knowledge. No client material is read at all." },
+  { id: "brain", label: "Brain only", note: "The safe default: answers only from this client's own material, and says plainly when the brain does not hold something rather than guessing." },
+  { id: "mixed", label: "Brain + Claude", note: "Leads with the brain, then fills gaps with Claude's general knowledge. Every claim is labelled [brain] or [general] so you can tell them apart at a glance." },
+  { id: "claude", label: "Claude only", note: "Claude's own general knowledge, with no client material read at all. Good for general or well-known topics; for anything specific to this client, use Brain." },
   // "Brain + live web" removed from the picker (Gary: not needed here). The live-web path stays in the type and
   // the query route, just no longer offered as an option.
 ];
@@ -44,6 +44,10 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
   const [busy, setBusy] = useState(false);
   const [sharpening, setSharpening] = useState(false);
   const [tip, setTip] = useState<{ from: string; why: string } | null>(null);
+  // The sharpener now PROPOSES rather than auto-applies (Gary): show approve/reject, and on approve drop it into the
+  // box and turn Ask green so the user knows to submit. `askReady` is that green state.
+  const [pendingSharpen, setPendingSharpen] = useState<{ sharpened: string; why: string } | null>(null);
+  const [askReady, setAskReady] = useState(false);
   const [err, setErr] = useState("");
   const [openSources, setOpenSources] = useState(false);
   const [highlight, setHighlight] = useState<number | null>(null); // passage index a citation chip points at
@@ -63,7 +67,7 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
     const text = (question ?? q).trim();
     if (!text || !clientId || busy) return;
     const forClient = clientId;
-    setBusy(true); setErr(""); setAnswer(""); setHits([]); setStrength(null); setAsked(text); setOpenSources(false); setSaved("");
+    setBusy(true); setErr(""); setAnswer(""); setHits([]); setStrength(null); setAsked(text); setOpenSources(false); setSaved(""); setAskReady(false); setPendingSharpen(null);
     const d = await fetch(`/api/brains/${forClient}/query`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: text, mode }),
     }).then((r) => r.json()).catch(() => null);
@@ -113,14 +117,25 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
   // ask well, not that they lean on a button.
   async function sharpen() {
     if (!q.trim() || sharpening) return;
-    setSharpening(true); setTip(null);
+    setSharpening(true); setTip(null); setPendingSharpen(null);
     const d = await fetch(`/api/brains/${clientId}/sharpen`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, mode }),
     }).then((r) => r.json()).catch(() => null);
     setSharpening(false);
     if (!d?.sharpened) return;
-    if (d.changed) { setTip({ from: q, why: d.why || "" }); setQ(d.sharpened); }
+    // PROPOSE it - do not silently overwrite the box. The user approves (drops it in, Ask goes green) or rejects.
+    if (d.changed) setPendingSharpen({ sharpened: String(d.sharpened), why: d.why || "" });
     else setTip({ from: "", why: d.why || "That question is already specific enough to search well." });
+  }
+
+  // Approve the sharpened question: drop it into the box, clear the proposal, and turn Ask green so the next move
+  // (submit) is obvious. Rejecting just discards the proposal and leaves the original question untouched.
+  function approveSharpen() {
+    if (!pendingSharpen) return;
+    setQ(pendingSharpen.sharpened);
+    setTip({ from: "", why: pendingSharpen.why });
+    setPendingSharpen(null);
+    setAskReady(true);
   }
 
   return (
@@ -157,16 +172,16 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
           <p className="mt-2 text-[17px] text-ink-faint">{MODES.find((m) => m.id === mode)?.note}</p>
         </div>
 
-        <textarea value={q} onChange={(e) => setQ(e.target.value)} rows={3}
+        <textarea value={q} onChange={(e) => { setQ(e.target.value); setAskReady(false); }} rows={3}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask(); }}
           placeholder={`Ask anything ${brainName} should know, e.g. who runs it, what they sell, their positioning, or their proof points.`}
           className="mt-4 w-full rounded-xl border border-line bg-surface-2 px-4 py-3.5 text-[20px] leading-relaxed text-ink outline-none focus:border-accent" />
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button onClick={() => ask()} disabled={busy || !q.trim()}
-            className="btn-brand inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-[20px] font-bold disabled:opacity-50">
+            className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-[20px] font-bold text-white transition disabled:opacity-50 ${askReady && !busy ? "bg-[#22c55e] shadow-[0_8px_24px_-12px_#22c55e] hover:bg-[#16a34a]" : "btn-brand"}`}>
             {busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
-            {busy ? (mode === "live" ? "Searching…" : "Reading…") : "Ask"}
+            {busy ? (mode === "live" ? "Searching…" : "Reading…") : askReady ? "Ask ✓" : "Ask"}
           </button>
           <button onClick={sharpen} disabled={sharpening || !q.trim()}
             className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/40 px-4 py-2.5 text-[20px] font-semibold text-[#c79bff] hover:bg-[#a855f7]/10 disabled:opacity-50">
@@ -175,6 +190,22 @@ export default function AskBrain({ clients, initialClientId, lockClient }: { cli
           </button>
         </div>
         {busy && <div className="mt-3 text-[20px] text-[#c79bff]"><Working messages={mode === "live" ? WORKING_ASK_WEB : WORKING_ASK} /></div>}
+
+        {/* THE SHARPENED PROPOSAL, for approval (Gary): approve drops it into the box and turns Ask green; reject
+            discards it and leaves the original question. */}
+        {pendingSharpen && !busy && (
+          <div className="mt-4 rounded-lg border border-[#a855f7]/40 bg-[#a855f7]/[0.08] px-4 py-3.5">
+            <div className="tabular text-[13px] uppercase tracking-[0.16em] text-ink-faint">Sharpened question</div>
+            <p className="mt-1.5 text-[19px] leading-relaxed text-ink">{pendingSharpen.sharpened}</p>
+            {pendingSharpen.why && <p className="mt-1.5 text-[16px] text-[#c79bff]">{pendingSharpen.why}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={approveSharpen}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#22c55e] px-4 py-2 text-[18px] font-bold text-white hover:bg-[#16a34a]">✓ Approve, use this</button>
+              <button onClick={() => setPendingSharpen(null)}
+                className="rounded-lg border border-line px-4 py-2 text-[18px] font-semibold text-ink-dim hover:text-ink">Reject, keep mine</button>
+            </div>
+          </div>
+        )}
 
         {/* What the sharpener changed, and why. Shown rather than applied silently. */}
         {tip && (
