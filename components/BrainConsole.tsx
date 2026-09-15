@@ -676,6 +676,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                           onChange={(e) => saveFreshness(Number(e.target.value))}
                           className="rounded-lg border border-line bg-surface-2 px-2.5 py-1 text-[14px] text-ink outline-none focus:border-[#4ade80] disabled:opacity-50">
                           <option value={0}>Off</option>
+                          <option value={1}>Daily</option>
+                          <option value={7}>Weekly</option>
                           <option value={14}>Every 14 days</option>
                           <option value={30}>Every 30 days</option>
                           <option value={60}>Every 60 days</option>
@@ -685,7 +687,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                     )}
                   </div>
                   {autoRecrawl > 0
-                    ? <p className="mt-1.5 text-[15px] text-[#86efac]"><span aria-hidden>↻ </span>Auto-recrawling any site older than {autoRecrawl} days, so the brain stays current on its own.</p>
+                    ? <p className="mt-1.5 text-[15px] text-[#86efac]"><span aria-hidden>↻ </span>Auto-recrawling {autoRecrawl === 1 ? "daily" : autoRecrawl === 7 ? "weekly" : `any site older than ${autoRecrawl} days`}, so the brain stays current on its own. You can still Re-crawl any source by hand below.</p>
                     : dueCount > 0 && (
                       <p className="mt-1.5 text-[15px] text-[#fcd34d]">
                         <span aria-hidden>↻ </span>{dueCount === 1 ? "1 site is" : `${dueCount} sites are`} 30+ days old. A fresh crawl keeps the brain current{isAdmin ? ", or turn on Keep fresh above" : ""}.

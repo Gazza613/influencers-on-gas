@@ -130,6 +130,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [artCallout, setArtCallout] = useState("");
   const [creativeHeadline, setCreativeHeadline] = useState(""); // the line on the creative, user-overridable
   const [headlineAlert, setHeadlineAlert] = useState(false);    // show the "too long" popover for the headline
+  const [uploadingBanner, setUploadingBanner] = useState(false); // uploading a custom 16:9 banner
   const [recips, setRecips] = useState("");
   const [ceoRecips, setCeoRecips] = useState<string[]>([]);
   const [mdRecips, setMdRecips] = useState<string[]>([]);
@@ -327,6 +328,22 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   }
 
   // Generate the exec's branded creative(s) in the picked shape(s).
+  // UPLOAD YOUR OWN 16:9 BANNER (Gary): optimised to size server-side, then added as a normal 16:9 creative that
+  // rides as the email hero and an attachment - and auto-selected so it is ready to send.
+  async function uploadBanner(file: File) {
+    if (uploadingBanner || !clientId || !file) return;
+    setUploadingBanner(true); setCreativeErr("");
+    const fd = new FormData();
+    fd.append("clientId", clientId);
+    fd.append("file", file);
+    const d = await fetch("/api/studio/intel/newsletter-banner", { method: "POST", body: fd })
+      .then((r) => r.json()).catch(() => null);
+    setUploadingBanner(false);
+    if (!d?.ok || !d.url) { setCreativeErr(d?.error || "Couldn't upload that banner."); return; }
+    setCreatives((prev) => [...prev, { url: d.url as string, ratio: "16x9" as Ratio }]);
+    setChosen((prev) => [...prev, d.url as string]);
+  }
+
   async function drawCreative() {
     if (drawing || !ratios.length) return;
     // Block a headline that would not fit (and pop the alert), rather than let the renderer truncate it (Gary).
@@ -516,6 +533,14 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
               {drawing && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />}
               {drawing ? "Generating…" : creatives.length ? "Regenerate" : "Generate creative"}
             </button>
+            {/* UPLOAD YOUR OWN 16:9 banner (Gary): an alternative to generating - it is optimised to size and rides
+                as the email hero + an attachment, exactly like a generated 16:9. */}
+            <label className={`inline-flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-1 text-sm font-semibold text-ink-dim hover:text-ink ${uploadingBanner ? "opacity-50" : ""}`}>
+              {uploadingBanner && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
+              {uploadingBanner ? "Uploading…" : "⬆ Upload 16:9 banner"}
+              <input type="file" accept="image/*" className="hidden" disabled={uploadingBanner}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadBanner(f); e.currentTarget.value = ""; }} />
+            </label>
           </div>
           <p className="mt-1.5 text-xs text-ink-faint">Built from {whoLabel === "MD" ? "the MD's" : "the CEO's"} real photo and the client&rsquo;s brand. Tick the ones to attach; the 16:9 rides at the top of the email.</p>
           {creativeErr && <p className="mt-2 text-sm text-alert">{creativeErr}</p>}
