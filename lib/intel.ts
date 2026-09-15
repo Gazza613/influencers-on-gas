@@ -447,10 +447,18 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   // The RESEARCHER role (the market sweep) wants BREADTH: more searches and more room to write, so a wide market
   // baseline is not throttled into a couple of findings. The Strategist/Journalist daily watch stays lean.
   const deep = role === "researcher";
+  // THE REAL BREADTH LEVER (audit of why FedEx kept returning 2): the scope lock says the client is the SUBJECT of
+  // every finding and "competitors NEVER the subject", which forced the model to CONSOLIDATE all the competitor and
+  // category material into one or two summaries. For a market SWEEP that is exactly wrong. This override (sweep only)
+  // permits competitor/category findings as their OWN separate line items, filed as market intelligence for the
+  // client, while KEEPING the entity ringfence intact. It is appended to both the research and the filing prompts.
+  const sweepBreadth = deep
+    ? `\n\nMARKET-SWEEP OVERRIDE (this run only, and it takes precedence over the "subject" rule in the scope above): this is a wide market BASELINE, so findings about COMPETITORS and the CATEGORY are wanted AS THEIR OWN separate findings, each filed as market intelligence for ${cfg.clientName}. File EACH distinct competitor move, category trend, statistic, demand shift, pricing change and regulatory item as its OWN finding - do NOT roll them up into one or two summaries about ${cfg.clientName}. If the material supports 8 to 15 distinct findings, file 8 to 15. The ENTITY RINGFENCE still holds absolutely: research only the REAL ${cfg.clientName} and its ACTUAL market and competitive set, never a same-named but different business, and never invent a source.`
+    : "";
   const research = await client.messages.create({
     model: PREMIUM,
     max_tokens: deep ? 8000 : 6000,
-    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays, answerMode)}\n\n${STYLE}`,
+    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}${sweepBreadth}\n\n${roleBrief}\n\n${MARKETING_LENS}\n\n${ASSESSMENT}\n\n${HONESTY(windowDays, answerMode)}\n\n${STYLE}`,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: deep ? 18 : 10 } as unknown as Anthropic.Tool],
     messages: [{ role: "user", content: brief }],
   });
@@ -476,7 +484,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     max_tokens: deep ? 8000 : 6000,
     // STYLE belongs here most of all: this is the step that writes the words the team actually reads, and it
     // never carried the UK-spelling / no-em-dash rule at all, which is how em dashes kept reaching the inbox.
-    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
+    system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}${sweepBreadth}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
     messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}${deep
