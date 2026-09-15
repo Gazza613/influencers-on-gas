@@ -400,7 +400,9 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   // the ringfence holds. Only a brain with neither a brief nor material genuinely cannot be researched.
   const cfg = (await loadIntelBrief(clientId)) ?? (await deriveIntelBrief(clientId));
   if (!cfg) throw new Error("This brain has no material yet, so there is nothing to research. Feed it the client's website and documents on the Brain page first, then run this again.");
-  const roleBrief = role === "journalist" ? cfg.journalist : cfg.strategist;
+  // The RESEARCHER role (the market sweep) uses the RESEARCHER remit - a comprehensive, wide deep dive - not the
+  // Strategist "watch for what CHANGED" brief, which was quietly narrowing the sweep to a couple of change-notes.
+  const roleBrief = role === "journalist" ? cfg.journalist : role === "researcher" ? (cfg.researcher || cfg.strategist) : cfg.strategist;
   if (!roleBrief) return []; // this brain deliberately does not run this role
 
   const client = new Anthropic({ apiKey: key });
@@ -477,7 +479,9 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
     system: `${cfg.scope}${siteAnchor(cfg.clientName, cfg.website, cfg.socials)}\n\n${MARKETING_LENS}\n\n${HONESTY(windowDays, answerMode)}\n\n${ASSESSMENT}\n\n${STYLE}\n\nFile the research below as structured findings. Carry the REAL source URLs through - never invent one. If the research found nothing genuinely new, return an empty findings list and quiet_day=true. A quiet day is a correct answer, not a failure.`,
     tools: [{ name: "report", description: "The day's findings, each with a real source.", input_schema: SCHEMA }],
     tool_choice: { type: "tool", name: "report" }, // FORCED - a report always comes back
-    messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}` }],
+    messages: [{ role: "user", content: `Research notes from today's run:\n\n${notes.slice(0, 20000)}${deep
+      ? `\n\nFILE FOR BREADTH: this is a market BASELINE, so break the notes into MANY distinct findings - one per specific fact, competitor move, trend, statistic or regulatory item. Do NOT consolidate the whole market into two or three summary findings. If the notes contain ten separate material facts, file ten findings. Aim for 8 to 15 where the material supports it, each self-contained and separately sourced.`
+      : ""}` }],
   });
 
   const fu = res.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
