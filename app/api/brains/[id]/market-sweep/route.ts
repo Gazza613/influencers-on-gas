@@ -15,12 +15,18 @@ export const dynamic = "force-dynamic";
 const isAdmin = (role?: string | null) => role === "super_admin" || role === "admin";
 
 const FOCUS =
-  "Build a COMPREHENSIVE market baseline on this client, covering roughly the last 24 months. This is a " +
-  "foundational knowledge build, NOT a news check, so older material is wanted, not filtered out. Cover " +
-  "everything material and well sourced: major investments, deals and acquisitions; product and service " +
-  "launches; leadership and board changes; partnerships; regulatory, licensing and compliance events; funding " +
-  "and financial milestones; market position, share and notable competitor moves. File every distinct, " +
-  "well-sourced, material fact as its own finding with its real source. Be thorough and wide-ranging.";
+  "Build a COMPREHENSIVE market baseline for this client, covering roughly the last 24 months. This is a " +
+  "foundational knowledge build, NOT a news check, so older material is wanted. Gather TWO kinds of material, and " +
+  "file every distinct, well-sourced fact as its own finding with its real source:\n" +
+  "(1) THE CLIENT ITSELF - material moves: investments, deals and acquisitions; product and service launches; " +
+  "leadership and board changes; partnerships; regulatory, licensing and compliance events; funding and financial " +
+  "milestones; awards and notable milestones.\n" +
+  "(2) THE CLIENT'S MARKET AND CATEGORY - the context that shapes how this client should be positioned: the " +
+  "competitive landscape and key rivals and what they are doing, category and industry trends, shifts in customer " +
+  "behaviour and demand, pricing and business-model changes, and relevant regulation.\n" +
+  "If the client itself has a THIN public footprint (a small or private business), lean into the market and " +
+  "category context in (2), which always exists, so the brain still gains real market grounding. Be thorough and " +
+  "wide-ranging, but only file what is genuinely sourced.";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

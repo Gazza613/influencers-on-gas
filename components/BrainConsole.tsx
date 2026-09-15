@@ -219,7 +219,12 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     setSweepBusy(false);
     if (!d?.ok) { setSweepErr(d?.error || "Couldn't run the market sweep."); return; }
     const review = Array.isArray(d.review) ? d.review : [];
-    setSweepMsg(`Market sweep done: ${d.added} confirmed ${d.added === 1 ? "fact" : "facts"} added to the brain.${review.length ? ` ${review.length} more could not be machine-confirmed, review them below.` : ""}`);
+    const total = Number(d.total) || (Number(d.added) || 0) + review.length;
+    if (total === 0) {
+      setSweepMsg("The sweep found no new market facts to add this time. That is normal for an organisation with a small public footprint, or when the market has been quiet, and it never invents facts to pad the result. It works best on clients with active market coverage; nothing was added.");
+    } else {
+      setSweepMsg(`Market sweep done: ${d.added} confirmed ${d.added === 1 ? "fact" : "facts"} added to the brain automatically.${review.length ? ` ${review.length} more could not be machine-confirmed, review them below.` : ""}`);
+    }
     setSweepReview(review);
     await refresh();
     router.refresh();
