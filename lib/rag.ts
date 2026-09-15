@@ -261,10 +261,11 @@ export async function reembedChunks(clientId: string, ids: string[]): Promise<nu
 export type Retrieved = { content: string; metadata: Record<string, unknown>; score: number };
 
 // HYBRID RETRIEVAL tuning. Cast a wide, cheap net with two retrievers, fuse, then rerank a bounded shortlist.
-const DENSE_N = 40;    // dense (vector) candidates pulled
-const LEX_N = 40;      // lexical (tsvector) candidates pulled
+const DENSE_N = 60;    // dense (vector) candidates pulled - wider so duplicate-heavy brains still yield enough DISTINCT
+const LEX_N = 60;      // lexical (tsvector) candidates pulled
 const RRF_K = 60;      // Reciprocal Rank Fusion damping (the standard constant); larger flattens each rank's pull
-const SHORTLIST = 24;  // how many fused candidates the reranker actually scores
+const SHORTLIST = 30;  // how many fused candidates the reranker actually scores
+const RERANK_FLOOR = 0.05; // drop passages the cross-encoder scores as clearly irrelevant (but never return empty)
 
 // Retrieve the top-k most relevant chunks for a query, HARD-SCOPED to one brain.
 //
@@ -282,6 +283,9 @@ export async function retrieve(clientId: string, query: string, k = 6, opts?: { 
   const q = String(query || "").trim();
   if (!q) return [];
   const [qv] = await embed([q], "query").catch(() => [] as number[][]);
+  // METER the query embedding (audit P3): every paid Voyage call is recorded, even though the query embed is priced
+  // at zero today - so Cost Control never has an invisible paid call. Best-effort, never blocks retrieval.
+  if (qv) await recordUsage({ clientId, userEmail: opts?.userEmail ?? null, provider: "voyage", model: EMBED_MODEL, unit: "embed", action: "query-embed", count: 1 }).catch(() => {});
 
   // The two halves run in parallel. websearch_to_tsquery parses free user text safely (nothing to escape) and
   // returns an empty query for all-stopword input, in which case the lexical half matches nothing and the dense
@@ -335,7 +339,9 @@ export async function retrieve(clientId: string, query: string, k = 6, opts?: { 
   addList(lex);
   if (!fused.size) return [];
 
-  const shortlist = [...fused.values()].sort((a, b) => b.rrf - a.rrf).slice(0, SHORTLIST).map((x) => x.row);
+  const shortEntries = [...fused.values()].sort((a, b) => b.rrf - a.rrf).slice(0, SHORTLIST);
+  const shortlist = shortEntries.map((x) => x.row);
+  const maxRrf = shortEntries[0]?.rrf || 1;
 
   // RERANK the shortlist with the cross-encoder - the accuracy stage. If Voyage is unavailable or errors, DO NOT
   // fail retrieval: fall back to the RRF order, which is already a strong hybrid ranking. Degrade, never break.
@@ -343,10 +349,18 @@ export async function retrieve(clientId: string, query: string, k = 6, opts?: { 
     const scored = await rerank(q, shortlist.map((r) => r.content), k);
     if (scored.length) {
       await recordUsage({ clientId, userEmail: opts?.userEmail ?? null, provider: "voyage", model: "rerank-2.5", unit: "rerank", action: "brain-rerank", count: 1 }).catch(() => {});
-      return scored.map((s) => ({ ...shortlist[s.index], score: s.score })).slice(0, k);
+      const ranked = scored.map((s) => ({ ...shortlist[s.index], score: s.score }));
+      // FLOOR (audit P3): drop passages the cross-encoder scores as clearly irrelevant, so off-topic junk is not fed
+      // to the answerer - but never return empty, keep the single best so a weak-but-only match can still answer
+      // (the answer prompt itself says plainly when the passages do not cover the question).
+      const kept = ranked.filter((r) => (r.score ?? 0) >= RERANK_FLOOR);
+      return (kept.length ? kept : ranked.slice(0, 1)).slice(0, k);
     }
   } catch {
     // fall through to the fused order
   }
-  return shortlist.slice(0, k);
+  // FALLBACK (rerank down): return the fused order with a NORMALISED rrf score in 0-1 (audit P3), so the score means
+  // the same thing here as on the rerank path - a raw mixed cosine/ts_rank value made the strength chip and the
+  // answer-audit top_score misleading whenever rerank was unavailable.
+  return shortEntries.slice(0, k).map((x) => ({ ...x.row, score: Math.min(1, x.rrf / maxRrf) }));
 }

@@ -486,7 +486,11 @@ export const ingestSource = inngest.createFunction(
         if (!doc.content) throw new Error("that file had no readable text in it (a scanned image PDF or an empty document has no text layer)");
         items = withContextHeader(chunkStructured(cleanScraped(doc.content)).filter((c) => !isJunkChunk(c)), doc.title).map((c) => ({ content: c, metadata: { url: uri, title: doc.title } }));
       } else {
-        items = chunkStructured(text).map((c) => ({ content: c, metadata: { title: uri || (kind === "compliance" ? "Compliance copy" : "Pasted note"), ...(kind ? { kind } : {}) } }));
+        // Pasted text, a compliance note, or a market finding. Now runs the SAME junk filter + context header as the
+        // scraped paths (audit P3), so a heading-less note is not stored as a bare fragment and a market finding
+        // carries its own label as context.
+        const title = uri || (kind === "compliance" ? "Compliance copy" : "Pasted note");
+        items = withContextHeader(chunkStructured(text).filter((c) => !isJunkChunk(c)), title).map((c) => ({ content: c, metadata: { title, ...(kind ? { kind } : {}) } }));
       }
       if (!items.length) throw new Error("nothing to ingest");
 
