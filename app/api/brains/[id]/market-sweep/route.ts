@@ -28,9 +28,11 @@ const MARKET_INSTRUCTIONS =
   "competitor or the wider category IS wanted here, filed as this client's market context.\n" +
   "(2) THE CLIENT ITSELF, where public coverage exists: investments, deals, launches, leadership and board " +
   "changes, partnerships, funding, awards and milestones.\n" +
-  "Search the CATEGORY and the COMPETITORS by name, not only the client's own name. This is a foundational " +
-  "knowledge build, not a news check, so older material is welcome. Only file what is genuinely sourced, never " +
-  "invent.";
+  "Search the CATEGORY and the COMPETITORS by name, not only the client's own name.\n" +
+  "RECENCY: focus developments, trends, statistics and events on roughly the LAST 24 MONTHS, and never surface an " +
+  "old news event as if it were current. STATIC context - who a competitor is, when they were founded, who they " +
+  "serve - may reference an older date, because that is background identity, not news. Only file what is genuinely " +
+  "sourced, never invent.";
 
 // What the brain already knows about the client - the query that pulls a good description out of its passages.
 const CONTEXT_QUERY = "What does this organisation do, what does it sell or offer, who are its customers, what industry, category and market does it operate in, and who are its main competitors?";
@@ -73,15 +75,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ? `WHAT THIS CLIENT DOES, from their own knowledge base (use this to identify their market, category and competitors):\n${brainCtx}\n\n`
       : "") + MARKET_INSTRUCTIONS;
     const findings = await runIntel(clientId, "researcher", today, session.user?.email ?? null, focus, 120);
-    const confirmed = findings.filter((f) => f.verification === "verified" || f.verification === "partial");
-    const review = findings.filter((f) => !(f.verification === "verified" || f.verification === "partial"));
-    let added = 0;
-    for (const f of confirmed) if (f.id) { const r = await addFindingToBrain(clientId, f.id); if (r.ok) added++; }
+    // NOTHING IS ADDED AUTOMATICALLY (Gary): every finding goes to review so you decide what enters the brain. The
+    // verification verdict rides along so machine-confirmed facts are obvious and quick to accept.
     return NextResponse.json({
       ok: true,
-      added,
       total: findings.length,
-      review: review.map((f) => ({
+      review: findings.map((f) => ({
         id: f.id,
         headline: f.headline,
         why_it_matters: f.why_it_matters,
