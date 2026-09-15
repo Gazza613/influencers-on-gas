@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getBrain } from "@/lib/brains";
 import { runIntel, setIntelStatus } from "@/lib/intel";
 import { addFindingToBrain } from "@/lib/market-brain";
+import { retrieve } from "@/lib/rag";
 
 // THE MARKET SWEEP, ON THE BRAIN (Gary). Part of feeding the brain, not a dashboard afterthought: a wide ~24-month
 // open-web sweep of the client and its market. The CONFIRMED findings are embedded straight into the brain (so they
@@ -14,19 +15,25 @@ export const dynamic = "force-dynamic";
 
 const isAdmin = (role?: string | null) => role === "super_admin" || role === "admin";
 
-const FOCUS =
-  "Build a COMPREHENSIVE market baseline for this client, covering roughly the last 24 months. This is a " +
-  "foundational knowledge build, NOT a news check, so older material is wanted. Gather TWO kinds of material, and " +
-  "file every distinct, well-sourced fact as its own finding with its real source:\n" +
-  "(1) THE CLIENT ITSELF - material moves: investments, deals and acquisitions; product and service launches; " +
-  "leadership and board changes; partnerships; regulatory, licensing and compliance events; funding and financial " +
-  "milestones; awards and notable milestones.\n" +
-  "(2) THE CLIENT'S MARKET AND CATEGORY - the context that shapes how this client should be positioned: the " +
-  "competitive landscape and key rivals and what they are doing, category and industry trends, shifts in customer " +
-  "behaviour and demand, pricing and business-model changes, and relevant regulation.\n" +
-  "If the client itself has a THIN public footprint (a small or private business), lean into the market and " +
-  "category context in (2), which always exists, so the brain still gains real market grounding. Be thorough and " +
-  "wide-ranging, but only file what is genuinely sourced.";
+// The market research instructions. The brain's OWN description of what the client does is prepended at run time
+// (retrieved from its passages), so the model researches the RIGHT market and category, not just news about the
+// client's name. Findings are framed as the client's MARKET CONTEXT, which the scope lock explicitly permits.
+const MARKET_INSTRUCTIONS =
+  "Now build a MARKET BASELINE for this client over roughly the last 24 months. This is about their MARKET, not " +
+  "just news about them. Research and file each as its own well-sourced finding, framed as MARKET CONTEXT for this " +
+  "client (their market and competitive set), which your scope allows:\n" +
+  "(1) THE MARKET AND CATEGORY (the priority, and it always exists): the state and direction of the industry this " +
+  "client operates in, the competitive set and what key rivals are doing by name, category and demand trends, " +
+  "shifts in customer behaviour, pricing and business-model changes, and relevant regulation. A fact about a " +
+  "competitor or the wider category IS wanted here, filed as this client's market context.\n" +
+  "(2) THE CLIENT ITSELF, where public coverage exists: investments, deals, launches, leadership and board " +
+  "changes, partnerships, funding, awards and milestones.\n" +
+  "Search the CATEGORY and the COMPETITORS by name, not only the client's own name. This is a foundational " +
+  "knowledge build, not a news check, so older material is welcome. Only file what is genuinely sourced, never " +
+  "invent.";
+
+// What the brain already knows about the client - the query that pulls a good description out of its passages.
+const CONTEXT_QUERY = "What does this organisation do, what does it sell or offer, who are its customers, what industry, category and market does it operate in, and who are its main competitors?";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -57,7 +64,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // RUN the sweep. Auto-embed the confirmed (verified/partial) findings; return the rest to accept or reject.
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
   try {
-    const findings = await runIntel(clientId, "researcher", today, session.user?.email ?? null, FOCUS, 120);
+    // SEED WITH THE BRAIN'S OWN KNOWLEDGE (Gary: "we have 500 passages, you know who they are"). Pull the client's
+    // own description of what they do from their passages, so the sweep researches the RIGHT market and category
+    // rather than just news about the client's name. Without this, a rich brain barely informed the research.
+    const ctx = await retrieve(clientId, CONTEXT_QUERY, 14, { userEmail: session.user?.email ?? null }).catch(() => []);
+    const brainCtx = ctx.map((h) => h.content).join("\n\n").slice(0, 6000);
+    const focus = (brainCtx
+      ? `WHAT THIS CLIENT DOES, from their own knowledge base (use this to identify their market, category and competitors):\n${brainCtx}\n\n`
+      : "") + MARKET_INSTRUCTIONS;
+    const findings = await runIntel(clientId, "researcher", today, session.user?.email ?? null, focus, 120);
     const confirmed = findings.filter((f) => f.verification === "verified" || f.verification === "partial");
     const review = findings.filter((f) => !(f.verification === "verified" || f.verification === "partial"));
     let added = 0;
