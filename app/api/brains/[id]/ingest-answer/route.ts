@@ -25,9 +25,13 @@ export const dynamic = "force-dynamic";
 
 const norm = (s: string) => s.toLowerCase().replace(/\[(brain|general|web)\]/g, " ").replace(/[^a-z0-9]+/g, " ").trim().slice(0, 300);
 
+const isAdmin = (role?: string | null) => role === "super_admin" || role === "admin";
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Saving an answer WRITES into the brain's retrieval store and bills the embed, so it is a curation action -
+  // admin-only, consistent with the sweep and baseline (members can still Ask; only admins add to the brain).
+  if (!isAdmin(session?.user?.role)) return NextResponse.json({ error: "Admins only" }, { status: 403 });
   const { id } = await params;
   const brain = await getBrain(id);
   if (!brain) return NextResponse.json({ error: "Brain not found" }, { status: 404 });
@@ -65,18 +69,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // is marked indexed right after.
   const label = (question ? `Saved answer: ${question.slice(0, 90)}` : "Saved answer") + (unverified ? " (unverified)" : "");
   const sourceId = await createSource(id, "note", label, null);
-  const added = await ingestChunks(id, sourceId, [{
-    content,
-    metadata: {
-      kind: "ask_note",
-      mode,
-      unverified,
-      question,
-      answer_key: answerKey,
-      added_by: session.user?.email || null,
-      title: question ? `Saved answer: ${question.slice(0, 80)}` : "Saved answer",
-    },
-  }]);
+  let added = 0;
+  try {
+    added = await ingestChunks(id, sourceId, [{
+      content,
+      metadata: {
+        kind: "ask_note",
+        mode,
+        unverified,
+        question,
+        answer_key: answerKey,
+        added_by: session.user?.email || null,
+        title: question ? `Saved answer: ${question.slice(0, 80)}` : "Saved answer",
+      },
+    }]);
+  } catch {
+    // Embedding failed outright (e.g. the embed provider errored). Mark the source failed so it does not linger
+    // "pending" as a phantom Knowledge Source, then report the failure.
+    await setSourceStatus(sourceId, "failed", "The answer could not be embedded.").catch(() => {});
+    return NextResponse.json({ error: "The answer could not be saved to the brain right now." }, { status: 502 });
+  }
   await setSourceStatus(sourceId, added ? "indexed" : "failed", added ? null : "nothing could be embedded from this answer").catch(() => {});
   if (added) await recordUsage({ clientId: id, userEmail: session.user?.email ?? null, provider: "voyage", model: "voyage-4-lite", unit: "embed", action: "ask-ingest", count: added }).catch(() => {});
 

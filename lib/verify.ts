@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { isSafePublicUrl } from "./safe-url";
+import { isSafePublicUrl, safeFetch } from "./safe-url";
 import { INGEST } from "./vendors/anthropic";
 
 // VERIFIED RETRIEVAL. The Researcher's findings come back from a model that CITES sources - but a model can
@@ -74,8 +74,10 @@ export async function fetchSourcePage(url: string): Promise<{ ok: boolean; statu
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 9000);
   try {
-    const res = await fetch(url, {
-      redirect: "follow",
+    // SSRF-hardened: the URL is model-cited (attacker-influenceable), so safeFetch resolves DNS and re-validates
+    // every redirect hop - a public URL can neither rebind to nor 302 into an internal/metadata address.
+    const res = await safeFetch(url, {
+      validate: isSafePublicUrl,
       signal: ctrl.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; GAS-Studio-Researcher/1.0; +https://gasmarketing.co.za)",

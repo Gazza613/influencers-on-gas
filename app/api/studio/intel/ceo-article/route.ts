@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { writeCeoNewsletter } from "@/lib/ceo-newsletter";
 import { deliverCeoArticle } from "@/lib/ceo-send";
+import { isOwnBlobUrl } from "@/lib/safe-url";
 
 // THE CEO THOUGHT-LEADERSHIP ARTICLE (Gary). From a Daily Intelligence finding: DRAFT the client CEO's LinkedIn
 // piece (in their brain's voice + compliance, from the public-safe substance only, never the internal "move"),
@@ -172,7 +173,7 @@ export async function POST(req: Request) {
     const when = new Date(whenRaw);
     if (!whenRaw || Number.isNaN(when.getTime())) return NextResponse.json({ error: "Pick a valid date and time to send." }, { status: 400 });
     if (when.getTime() < Date.now() + 60_000) return NextResponse.json({ error: "Pick a time in the future." }, { status: 400 });
-    const isOurBlob = (u: string) => /^https:\/\/[^/]+\.blob\.vercel-storage\.com\//i.test(u);
+    const isOurBlob = (u: string) => isOwnBlobUrl(u); // canonical host-check; same blob-trust policy as the sender
     const heroRaw = String(b.heroUrl || "").trim();
     const heroUrl = heroRaw && isOurBlob(heroRaw) ? heroRaw : null;
     const creativeUrls = (Array.isArray(b.creativeUrls) ? b.creativeUrls : []).map((x) => String(x).trim()).filter(isOurBlob);

@@ -1,5 +1,5 @@
 import { getSecret } from "../connections";
-import { isSafeCrawlTarget } from "../safe-url";
+import { isSafeCrawlTarget, safeFetch } from "../safe-url";
 
 // Firecrawl - turn a web page into clean markdown for the knowledge base.
 const BASE = "https://api.firecrawl.dev/v1";
@@ -133,7 +133,9 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
 // Fetch a sitemap/robots document, SSRF-guarded. Returns the text, or null on any failure.
 async function fetchXml(url: string): Promise<string | null> {
   if (!isSafeCrawlTarget(url)) return null;
-  const res = await fetch(url, { headers: { "User-Agent": "FirecrawlAgent" } }).catch(() => null);
+  // SSRF-hardened: robots.txt Sitemap: lines and sitemap-index children are content-derived URLs, so safeFetch
+  // resolves DNS and re-validates each redirect hop - none can point at an internal/metadata address.
+  const res = await safeFetch(url, { validate: isSafeCrawlTarget, headers: { "User-Agent": "FirecrawlAgent" } }).catch(() => null);
   if (!res?.ok) return null;
   return await res.text().catch(() => null);
 }

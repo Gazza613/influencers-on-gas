@@ -114,9 +114,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const geoLine = country
       ? `\n\nGEOGRAPHIC FOCUS (important): this is the ${country} operation of the client (their site is ${siteRow[0]?.website}). Research the ${country} market and its LOCAL competitors and category dynamics, and ${country} regulation - name the real ${country} players. Do NOT drift to the US or the global parent's market: a global or US fact belongs here ONLY if it directly shapes the ${country} market. If your search returns mostly US or global results, search again with ${country}-specific terms and local competitor names.`
       : `\n\nGEOGRAPHIC FOCUS: infer the client's home market from their website and their own material above (for example a /en-za site with South African content means the SOUTH AFRICAN market), and research THAT local market and its local competitors, not the US or global market.`;
-    const focus = (brainCtx
-      ? `WHAT THIS CLIENT DOES, from their own knowledge base (use this to identify their market, category and competitors):\n${brainCtx}\n\n`
-      : "") + MARKET_INSTRUCTIONS + geoLine;
+    // ORDER MATTERS: the geo-anchor and breadth instructions lead so that if the whole focus is ever trimmed
+    // downstream, it is the (long, replaceable) brain-context tail that is cut, never the anti-US-drift steer.
+    const focus = MARKET_INSTRUCTIONS + geoLine + (brainCtx
+      ? `\n\nWHAT THIS CLIENT DOES, from their own knowledge base (use this to identify their market, category and competitors):\n${brainCtx}`
+      : "");
     const findings = await runIntel(clientId, "researcher", today, session.user?.email ?? null, focus, 120);
     // NOTHING IS ADDED AUTOMATICALLY (Gary): every finding goes to review so you decide what enters the brain. The
     // verification verdict rides along so machine-confirmed facts are obvious and quick to accept.

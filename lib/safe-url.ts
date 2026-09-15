@@ -65,3 +65,47 @@ export function isOwnBlobUrl(url: unknown): url is string {
     return false;
   }
 }
+
+// Is a RESOLVED IP address private / link-local / loopback / metadata (v4 AND v6)? Used after DNS resolution so a
+// public hostname that resolves to an internal address (DNS rebind) is caught, which the literal-host check cannot.
+function isPrivateAddress(ip: string): boolean {
+  const h = ip.toLowerCase();
+  if (h.includes(":")) {
+    if (h === "::1" || h === "::") return true;
+    if (h.startsWith("fe80")) return true;                 // link-local
+    if (/^f[cd][0-9a-f]{2}:/.test(h)) return true;          // ULA fc00::/7
+    const mapped = h.match(/::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/); // IPv4-mapped
+    if (mapped) return isPrivateIPv4(mapped[1]);
+    return false;                                           // other IPv6 = public
+  }
+  return isPrivateIPv4(h) || h === "0.0.0.0";
+}
+
+// FETCH A REQUEST-INFLUENCED URL SAFELY (SSRF-hardened). Closes the two gaps the literal-host check cannot: it
+// resolves DNS and blocks a hostname that points at a private/link-local/metadata address (DNS rebind), and it
+// follows redirects MANUALLY, re-validating and re-resolving every hop, so a public URL cannot 302 to an internal
+// one. Fails CLOSED (a DNS failure or an unsafe hop throws). `validate` is the per-caller URL policy
+// (isSafeCrawlTarget for a crawl target, isSafePublicUrl for https-only).
+export async function safeFetch(
+  url: string,
+  init: RequestInit & { validate?: (u: unknown) => boolean; maxHops?: number } = {},
+): Promise<Response> {
+  const { lookup } = await import("node:dns/promises");
+  const validate = init.validate ?? isSafeCrawlTarget;
+  const maxHops = init.maxHops ?? 4;
+  let current = url;
+  for (let hop = 0; ; hop++) {
+    if (!validate(current)) throw new Error("blocked: unsafe URL");
+    const hostname = new URL(current).hostname;
+    let addrs: { address: string }[];
+    try { addrs = await lookup(hostname, { all: true }); } catch { throw new Error("blocked: host could not be resolved"); }
+    if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) throw new Error("blocked: host resolves to a private address");
+    const res = await fetch(current, { ...init, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
+      if (hop >= maxHops) throw new Error("blocked: too many redirects");
+      current = new URL(res.headers.get("location")!, current).toString();
+      continue;
+    }
+    return res;
+  }
+}

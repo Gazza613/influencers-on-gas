@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { createSource } from "./brains";
+import { createSource, setSourceStatus } from "./brains";
 import { inngest } from "./inngest";
 import { setIntelStatus } from "./intel";
 
@@ -58,6 +58,9 @@ export async function addFindingToBrain(clientId: string, intelId: string): Prom
   try {
     await inngest.send({ name: "brain/ingest.source", data: { sourceId, clientId, type: "market", uri: label(f.headline), text, includePath: null, kind: "market" } });
   } catch {
+    // Don't leave the just-created source stuck "pending" (it would show as a phantom line in Knowledge Sources and
+    // inflate the strength score). Mark it failed so the row reads honestly and can be cleared.
+    await setSourceStatus(sourceId, "failed", "The ingestion engine could not be reached (Inngest).").catch(() => {});
     return { ok: false, error: "The ingestion engine is not connected (Inngest)." };
   }
   // Mark it accepted too, so it stays standing research for the desks (a re-run reports against it, does not restate it).

@@ -2,6 +2,7 @@ import { db } from "./db";
 import { sendEmail, emailConfigured } from "./email";
 import { buildCeoArticleEmail } from "./ceo-email";
 import { getClientEmailLogo } from "./client-logo";
+import { isOwnBlobUrl } from "./safe-url";
 
 // DELIVER A CEO/MD NEWSLETTER (shared, Gary). The one place a newsletter is actually sent, so the immediate "send"
 // and the scheduled "send-later" cron use IDENTICAL logic and can never drift: the same signer resolution, the
@@ -11,8 +12,9 @@ import { getClientEmailLogo } from "./client-logo";
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 const ukDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Johannesburg" });
 // SSRF GUARD: nodemailer fetches each attachment server-side and the mail client fetches the embedded hero, so both
-// are restricted to OUR OWN Vercel Blob host - the only place a real creative can live.
-const isOurBlob = (u: string) => /^https:\/\/[^/]+\.blob\.vercel-storage\.com\//i.test(u);
+// are restricted to OUR OWN Vercel Blob host - the only place a real creative can live. Uses the canonical host-check
+// helper (isOwnBlobUrl) rather than a local regex, so the blob-trust policy has a single source of truth.
+const isOurBlob = (u: string) => isOwnBlobUrl(u);
 
 export type DeliverResult = { ok: true; sent: number } | { ok: false; error: string; status: number };
 

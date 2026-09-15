@@ -431,7 +431,7 @@ export async function runIntel(clientId: string, role: "journalist" | "strategis
   // loosens the scope lock or the no-fabrication rule.
   const answerMode = !!focus?.trim();
   const focusLine = answerMode
-    ? `\n\nTHE TEAM HAS A SPECIFIC BRIEF FOR THIS RUN - addressing it is the PRIORITY:\n"${focus!.trim().slice(0, 8000)}"\nSearch specifically to address it and file sourced findings that speak to it directly, then flag anything else genuinely material. If the EXACT subject is not a direct player in ${cfg.clientName}'s market (wrong country, different sector, a name mix-up), DO NOT just return nothing: file one finding that says so plainly and pivots to the nearest relevant read (for example the local equivalent, or the closest real competitor), so the team always gets a useful answer. Only return empty if there is genuinely nothing sourced to say at all.`
+    ? `\n\nTHE TEAM HAS A SPECIFIC BRIEF FOR THIS RUN - addressing it is the PRIORITY:\n"${focus!.trim().slice(0, 12000)}"\nSearch specifically to address it and file sourced findings that speak to it directly, then flag anything else genuinely material. If the EXACT subject is not a direct player in ${cfg.clientName}'s market (wrong country, different sector, a name mix-up), DO NOT just return nothing: file one finding that says so plainly and pivots to the nearest relevant read (for example the local equivalent, or the closest real competitor), so the team always gets a useful answer. Only return empty if there is genuinely nothing sourced to say at all.`
     : "";
   const opening = answerMode
     ? `Today is ${today}. The team has asked a specific question. Give a genuine, sourced market read that ANSWERS it, strictly inside your scope lock.${focusLine}`
