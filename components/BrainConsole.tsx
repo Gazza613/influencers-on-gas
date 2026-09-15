@@ -117,6 +117,13 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   const [savingDoc, setSavingDoc] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState("");
+  // MARKET SWEEP (Gary): a wide 24-month sweep run from the Brain. Confirmed facts embed straight in; the rest land
+  // in a review tray to accept (embed) or reject. Accepted facts appear in Knowledge Sources and lift the strength.
+  const [sweepBusy, setSweepBusy] = useState(false);
+  const [sweepMsg, setSweepMsg] = useState("");
+  const [sweepErr, setSweepErr] = useState("");
+  const [sweepReview, setSweepReview] = useState<{ id: string; headline: string; why_it_matters: string; detail: string; verification: string | null; sources: { name?: string; url?: string }[] }[]>([]);
+  const [sweepItemBusy, setSweepItemBusy] = useState("");
 
   const [reindexing, setReindexing] = useState(false);
   // A crawl that JUST finished, so the team gets a clear "done, what next?" step instead of guessing (Gary).
@@ -200,6 +207,42 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // RUN THE MARKET SWEEP. Wide 24-month sweep; confirmed facts embed straight into the brain, the rest come back
+  // to review. After it lands, refresh() so the new market sources + the lifted strength show immediately.
+  async function runSweep() {
+    if (sweepBusy) return;
+    setSweepBusy(true); setSweepErr(""); setSweepMsg(""); setSweepReview([]);
+    const d = await fetch(`/api/brains/${brainId}/market-sweep`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sweep" }),
+    }).then((r) => r.json()).catch(() => null);
+    setSweepBusy(false);
+    if (!d?.ok) { setSweepErr(d?.error || "Couldn't run the market sweep."); return; }
+    const review = Array.isArray(d.review) ? d.review : [];
+    setSweepMsg(`Market sweep done: ${d.added} confirmed ${d.added === 1 ? "fact" : "facts"} added to the brain.${review.length ? ` ${review.length} more could not be machine-confirmed, review them below.` : ""}`);
+    setSweepReview(review);
+    await refresh();
+    router.refresh();
+  }
+  async function acceptSweep(id: string) {
+    if (sweepItemBusy) return;
+    setSweepItemBusy(id);
+    const d = await fetch(`/api/brains/${brainId}/market-sweep`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add", intelId: id }),
+    }).then((r) => r.json()).catch(() => null);
+    setSweepItemBusy("");
+    if (d?.ok) { setSweepReview((list) => list.filter((x) => x.id !== id)); await refresh(); router.refresh(); }
+    else setSweepErr(d?.error || "Couldn't add that finding.");
+  }
+  async function rejectSweep(id: string) {
+    if (sweepItemBusy) return;
+    setSweepItemBusy(id);
+    const d = await fetch(`/api/brains/${brainId}/market-sweep`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reject", intelId: id }),
+    }).then((r) => r.json()).catch(() => null);
+    setSweepItemBusy("");
+    if (d?.ok) setSweepReview((list) => list.filter((x) => x.id !== id));
+  }
 
   // WEBSITE(S). Multi-site: each row is scraped. Full-site crawls every page it can reach (no path scope);
   // single-page reads just that URL. Both keep each page's own title + URL so a passage traces back to source.
@@ -719,6 +762,61 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
           Everything added here is chunked and embedded into <b className="text-ink-dim">this brain only</b>. No other brain can read it.
         </p>
       </div>
+
+      {/* MARKET SWEEP (Gary): feed the brain its market. A wide 24-month sweep; confirmed facts embed straight in
+          (they appear in Knowledge Sources below and lift the strength), the rest are accepted or rejected here. */}
+      {isAdmin && (
+        <div className="rounded-xl border border-line bg-surface-1 p-6">
+          <div className="flex items-center gap-3">
+            <SectionTile d={ICON.sources} />
+            <div>
+              <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Market intelligence</div>
+              <p className="mt-0.5 text-[16px] text-ink-dim">A one-off ~24-month sweep of this client and their market. Confirmed facts are added to the brain automatically, so they strengthen it and appear in Knowledge Sources; the rest come back to accept or reject. Do this once when you set the brain up.</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button onClick={runSweep} disabled={sweepBusy}
+              className="btn-brand inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-[18px] font-bold disabled:opacity-50">
+              {sweepBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
+              {sweepBusy ? "Sweeping the market…" : "Run a market sweep"}
+            </button>
+            {sweepBusy && <span className="text-[15px] text-ink-faint">This runs a wide, thorough search and can take a couple of minutes. You can leave this page.</span>}
+          </div>
+          {sweepErr && <p className="mt-3 text-[16px] text-alert">{sweepErr}</p>}
+          {sweepMsg && <p className="mt-3 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/10 px-4 py-3 text-[16px] leading-relaxed text-ink-dim">{sweepMsg}</p>}
+          {sweepReview.length > 0 && (
+            <div className="mt-4">
+              <div className="tabular text-[15px] uppercase tracking-[0.16em] text-ink-faint">Review, then accept into the brain or reject</div>
+              <ul className="mt-2 space-y-2">
+                {sweepReview.map((f) => (
+                  <li key={f.id} className="rounded-lg border border-line bg-surface-2/50 p-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[18px] font-semibold text-ink">{f.headline}</div>
+                        {f.why_it_matters && <div className="mt-0.5 text-[16px] leading-relaxed text-ink-dim">{f.why_it_matters}</div>}
+                        {Array.isArray(f.sources) && f.sources.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[14px]">
+                            {f.sources.filter((s) => s?.url).slice(0, 4).map((s, j) => (
+                              <a key={j} href={s.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{s.name || "source"} ↗</a>
+                            ))}
+                          </div>
+                        )}
+                        {f.verification === "unverified" && <span className="mt-1.5 inline-block rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[13px] font-bold text-[#fcd34d]">could not be machine-confirmed</span>}
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button onClick={() => acceptSweep(f.id)} disabled={sweepItemBusy === f.id}
+                          className="rounded-lg bg-[#22c55e] px-3.5 py-1.5 text-[15px] font-bold text-white hover:bg-[#16a34a] disabled:opacity-50">✓ Add</button>
+                        <button onClick={() => rejectSweep(f.id)} disabled={sweepItemBusy === f.id}
+                          className="rounded-lg border border-line px-3.5 py-1.5 text-[15px] font-semibold text-ink-dim hover:border-alert hover:text-alert disabled:opacity-50">Reject</button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sources */}
       <div className="rounded-xl border border-line bg-surface-1 p-6">

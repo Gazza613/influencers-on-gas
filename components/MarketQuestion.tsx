@@ -114,9 +114,6 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [lastRun, setLastRun] = useState<{ mode: "question" | "discover"; windowDays: number; widened: number | null } | null>(null);
   // Full-size preview of a creative (the eye on each thumbnail opens it; the cross or Esc closes it back to the grid).
   const [lightbox, setLightbox] = useState<string | null>(null);
-  // The one-off "Build the baseline" sweep (admin): its running flag and the summary of what it added/left to review.
-  const [baselineBusy, setBaselineBusy] = useState(false);
-  const [baselineMsg, setBaselineMsg] = useState("");
   useEffect(() => {
     if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
@@ -434,23 +431,6 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
     setFindings(Array.isArray(d.findings) ? d.findings : []);
   }
 
-  // BUILD THE BASELINE (Gary): a wide ~24-month open-web sweep that gives the brain full context, so "what's new"
-  // has something to judge against. Auto-accepts the confirmed facts; the rest land in the list to accept or reject.
-  async function buildBaseline() {
-    if (baselineBusy || !clientId) return;
-    setBaselineBusy(true); setErr(""); setBaselineMsg(""); setFindings(null); setLastRun(null);
-    setDraftFor(null); setLiDraft(false); setLiSent(false); setSentFor(""); setDraftErr("");
-    const d = await fetch(`/api/studio/intel/baseline`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId }),
-    }).then((r) => r.json()).catch(() => null);
-    setBaselineBusy(false);
-    if (!d?.ok) { setErr(d?.error || "Couldn't build the baseline."); return; }
-    const review = Array.isArray(d.review) ? d.review : [];
-    setBaselineMsg(`Baseline built for ${brainName}: ${d.autoAccepted} confirmed ${d.autoAccepted === 1 ? "fact" : "facts"} added to the brain automatically.${review.length ? ` ${review.length} more could not be machine-confirmed, review them below.` : ""}`);
-    setFindings(review);
-  }
-
   const brainName = clients.find((c) => c.id === clientId)?.name || "this brain";
   const whoLabel = publisher === "md" ? "MD" : "CEO";
 
@@ -680,27 +660,12 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
             )}
           </div>
           {/* Solid PINK - distinct from Ask (purple), so the two research modes read apart. */}
-          <button onClick={() => ask("discover")} disabled={busy || baselineBusy}
+          <button onClick={() => ask("discover")} disabled={busy}
             className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec4899] to-[#db2777] px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_8px_24px_-12px_#ec4899] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0">
             ✦ Find what&rsquo;s new
           </button>
         </div>
-        {/* BUILD THE BASELINE (admin): a one-off wide sweep so "what's new" has full context. Set apart below the two
-            live-research buttons because it is a foundational, run-once action, not a day-to-day one. */}
-        {isAdmin && (
-          <div className="mt-4 border-t border-[#a855f7]/15 pt-3.5">
-            <div className="flex flex-wrap items-center gap-3">
-              <button onClick={buildBaseline} disabled={busy || baselineBusy}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#a855f7]/50 px-4 py-2 text-[13.5px] font-semibold text-[#c9a7f5] transition hover:bg-[#a855f7]/10 disabled:opacity-50">
-                {baselineBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#a855f7]/30 border-t-[#a855f7]" />}
-                {baselineBusy ? "Building the baseline…" : "Build the baseline"}
-              </button>
-              <span className="text-[12.5px] leading-snug text-ink-faint sm:max-w-[62%]">A one-off ~24-month sweep of the open web. Confirmed facts are added to the brain automatically; the rest come back to accept or reject. Do this once when you set a brain up, so <b className="text-ink-dim">Find what&rsquo;s new</b> has full context.</span>
-            </div>
-            {baselineBusy && <p className="mt-2 text-[12.5px] text-ink-faint">This runs a wide, thorough search and can take a couple of minutes. You can leave this open.</p>}
-            {baselineMsg && <p className="mt-2.5 rounded-lg border border-[#a855f7]/25 bg-[#a855f7]/10 px-3.5 py-2.5 text-[13px] leading-relaxed text-ink-dim">{baselineMsg}</p>}
-          </div>
-        )}
+        {/* The market baseline sweep now lives on the Brain page (part of feeding the brain), not here (Gary). */}
       </div>
 
       {/* THE LINKEDIN-ARTICLE SECTION (admin-only), FIXED underneath because it runs the other way round to the two
