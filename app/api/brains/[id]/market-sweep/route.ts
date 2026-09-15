@@ -5,6 +5,25 @@ import { runIntel, setIntelStatus } from "@/lib/intel";
 import { addFindingToBrain } from "@/lib/market-brain";
 import { retrieve } from "@/lib/rag";
 import { humanApiError } from "@/lib/errors";
+import { db } from "@/lib/db";
+
+// GEO-ANCHOR THE SWEEP (Gary: FedEx's brain is fedex.com/en-za, but the sweep pulled US data). The client's home
+// market is inferred from a locale path (/en-za) or a country TLD (.co.za) on their website, so the sweep researches
+// the LOCAL market and its LOCAL competitors, not the global/US parent's market. Common markets only; anything else
+// falls back to letting the model infer the market from the client's own material.
+const COUNTRY: Record<string, string> = {
+  za: "South Africa", us: "the United States", gb: "the United Kingdom", uk: "the United Kingdom",
+  au: "Australia", nz: "New Zealand", ke: "Kenya", ng: "Nigeria", gh: "Ghana", ae: "the United Arab Emirates",
+  in: "India", ca: "Canada", ie: "Ireland", sg: "Singapore", de: "Germany", fr: "France", nl: "the Netherlands",
+};
+function countryFromSite(url: string): string | null {
+  const u = String(url || "").toLowerCase();
+  const locale = u.match(/\/[a-z]{2}-([a-z]{2})(?:[/?#]|$)/);      // /en-za
+  if (locale && COUNTRY[locale[1]]) return COUNTRY[locale[1]];
+  const tld = u.match(/\.(?:co|com|org|net|gov|ac)?\.?([a-z]{2})(?:[/?#:]|$)/);  // .co.za, .com.au, .co.uk
+  if (tld && COUNTRY[tld[1]] && tld[1] !== "om" /* .com */) return COUNTRY[tld[1]];
+  return null;
+}
 
 // THE MARKET SWEEP, ON THE BRAIN (Gary). Part of feeding the brain, not a dashboard afterthought: a wide ~24-month
 // open-web sweep of the client and its market. The CONFIRMED findings are embedded straight into the brain (so they
@@ -88,9 +107,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // rather than just news about the client's name. Without this, a rich brain barely informed the research.
     const ctx = await retrieve(clientId, CONTEXT_QUERY, 14, { userEmail: session.user?.email ?? null }).catch(() => []);
     const brainCtx = ctx.map((h) => h.content).join("\n\n").slice(0, 6000);
+    // GEO-ANCHOR to the client's LOCAL market (Gary: FedEx en-za pulled US data). Inferred from the website; if we
+    // cannot tell, the model infers the market from the client's own material above.
+    const siteRow = (await db().query(`select website from clients where id = $1`, [clientId]).catch(() => [])) as { website: string | null }[];
+    const country = countryFromSite(siteRow[0]?.website || "");
+    const geoLine = country
+      ? `\n\nGEOGRAPHIC FOCUS (important): this is the ${country} operation of the client (their site is ${siteRow[0]?.website}). Research the ${country} market and its LOCAL competitors and category dynamics, and ${country} regulation - name the real ${country} players. Do NOT drift to the US or the global parent's market: a global or US fact belongs here ONLY if it directly shapes the ${country} market. If your search returns mostly US or global results, search again with ${country}-specific terms and local competitor names.`
+      : `\n\nGEOGRAPHIC FOCUS: infer the client's home market from their website and their own material above (for example a /en-za site with South African content means the SOUTH AFRICAN market), and research THAT local market and its local competitors, not the US or global market.`;
     const focus = (brainCtx
       ? `WHAT THIS CLIENT DOES, from their own knowledge base (use this to identify their market, category and competitors):\n${brainCtx}\n\n`
-      : "") + MARKET_INSTRUCTIONS;
+      : "") + MARKET_INSTRUCTIONS + geoLine;
     const findings = await runIntel(clientId, "researcher", today, session.user?.email ?? null, focus, 120);
     // NOTHING IS ADDED AUTOMATICALLY (Gary): every finding goes to review so you decide what enters the brain. The
     // verification verdict rides along so machine-confirmed facts are obvious and quick to accept.
