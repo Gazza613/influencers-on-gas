@@ -807,33 +807,42 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <div className="mt-4">
               <div className="tabular text-[15px] uppercase tracking-[0.16em] text-ink-faint">Review, then accept into the brain or reject</div>
               <ul className="mt-2 space-y-2">
-                {sweepReview.map((f) => (
+                {sweepReview.map((f) => {
+                  // GRADE (Gary): verified = green, unverified-but-sourced = orange, no source at all = red. A red
+                  // "source unknown" cannot enter the brain (no source to stand behind), so its Add is blocked.
+                  const hasSrc = Array.isArray(f.sources) && f.sources.some((s) => s?.url);
+                  const grade = (f.verification === "verified" || f.verification === "partial") ? "verified" : hasSrc ? "unverified" : "unknown";
+                  return (
                   <li key={f.id} className="rounded-lg border border-line bg-surface-2/50 p-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-[18px] font-semibold text-ink">{f.headline}</div>
                         {f.detail && <div className="mt-1 text-[16px] leading-relaxed text-ink-dim whitespace-pre-line">{f.detail}</div>}
                         {f.why_it_matters && <div className="mt-1.5 text-[15px] leading-relaxed text-ink-faint"><span className="font-semibold">Why it matters (analysis):</span> {f.why_it_matters}</div>}
-                        {Array.isArray(f.sources) && f.sources.length > 0 && (
+                        {hasSrc && (
                           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[14px]">
                             {f.sources.filter((s) => s?.url).slice(0, 4).map((s, j) => (
                               <a key={j} href={s.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{s.name || "source"} ↗</a>
                             ))}
                           </div>
                         )}
-                        {(f.verification === "verified" || f.verification === "partial")
+                        {grade === "verified"
                           ? <span className="mt-1.5 inline-block rounded bg-ready/15 px-2 py-0.5 text-[13px] font-bold text-ready">✓ verified{f.verification === "partial" ? " (partial)" : ""}</span>
-                          : <span className="mt-1.5 inline-block rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[13px] font-bold text-[#fcd34d]">could not be machine-confirmed</span>}
+                          : grade === "unverified"
+                          ? <span className="mt-1.5 inline-block rounded bg-[#fbbf24]/15 px-2 py-0.5 text-[13px] font-bold text-[#fcd34d]">unverified · source not machine-confirmed</span>
+                          : <span className="mt-1.5 inline-block rounded bg-alert/15 px-2 py-0.5 text-[13px] font-bold text-alert">source unknown · cannot be added</span>}
                       </div>
                       <div className="flex shrink-0 gap-2">
-                        <button onClick={() => acceptSweep(f.id)} disabled={sweepItemBusy === f.id}
+                        <button onClick={() => acceptSweep(f.id)} disabled={sweepItemBusy === f.id || grade === "unknown"}
+                          title={grade === "unknown" ? "This finding has no source, so it cannot enter the brain." : undefined}
                           className="rounded-lg bg-[#22c55e] px-3.5 py-1.5 text-[15px] font-bold text-white hover:bg-[#16a34a] disabled:opacity-50">✓ Add</button>
                         <button onClick={() => rejectSweep(f.id)} disabled={sweepItemBusy === f.id}
                           className="rounded-lg border border-line px-3.5 py-1.5 text-[15px] font-semibold text-ink-dim hover:border-alert hover:text-alert disabled:opacity-50">Reject</button>
                       </div>
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           )}
