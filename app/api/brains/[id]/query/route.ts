@@ -5,6 +5,7 @@ import { retrieve } from "@/lib/rag";
 import { getSecret } from "@/lib/connections";
 import { meterClaude } from "@/lib/usage";
 import { db } from "@/lib/db";
+import { humanApiError } from "@/lib/errors";
 
 // ANSWERABILITY STRENGTH from the best retrieval relevance: how well the passages actually covered the question.
 // Rough by design (it feeds a chip + the audit trail, not a gate). Claude-only mode reads no passages, so "none".
@@ -223,6 +224,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const strength = await logAnswer(mode, answer, hits);
     return NextResponse.json({ hits, answer, mode, strength });
   } catch (e) {
-    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 200) }, { status: 500 });
+    return NextResponse.json({ error: humanApiError(e, "Couldn't reach the brain.") }, { status: 500 });
   }
 }

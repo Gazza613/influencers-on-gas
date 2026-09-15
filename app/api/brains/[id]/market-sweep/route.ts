@@ -4,6 +4,7 @@ import { getBrain } from "@/lib/brains";
 import { runIntel, setIntelStatus } from "@/lib/intel";
 import { addFindingToBrain } from "@/lib/market-brain";
 import { retrieve } from "@/lib/rag";
+import { humanApiError } from "@/lib/errors";
 
 // THE MARKET SWEEP, ON THE BRAIN (Gary). Part of feeding the brain, not a dashboard afterthought: a wide ~24-month
 // open-web sweep of the client and its market. The CONFIRMED findings are embedded straight into the brain (so they
@@ -95,6 +96,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       })),
     });
   } catch (e) {
-    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 400 });
+    return NextResponse.json({ error: humanApiError(e, "Couldn't run the market sweep.") }, { status: 400 });
   }
 }

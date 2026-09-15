@@ -6,6 +6,7 @@ import { PREMIUM } from "./vendors/anthropic";
 import { meterClaude } from "./usage";
 import { WRITING_STYLE } from "./writing-style";
 import { buildFactCheckBlock, type FactCheckItem } from "./newsletter-format";
+import { humanApiError } from "./errors";
 
 // GROUNDING BACKSTOP for the fact-check links. The model is told to copy every URL verbatim from the sources it was
 // given, but a prompt is not a guarantee, so we ALSO drop any fact-check row whose link does not match a source we
@@ -127,14 +128,19 @@ export async function writeCeoNewsletter(clientId: string, m: NewsletterMaterial
   const rewrite = opts.notes?.trim() ? `\n\nREWRITE THIS PIECE, applying precisely: ${opts.notes.trim().slice(0, 600)}` : "";
 
   const client = new Anthropic({ apiKey: key });
-  const res = await client.messages.create({
-    model: PREMIUM,
-    max_tokens: 4000,
-    system: `${cfg.scope}\n\n${voice}\n\n${REGISTER}\n\n${WRITING_STYLE}\n\n${NEWSLETTER_FORMAT_NOTE}`,
-    tools: [{ name: "piece", description: "The CEO's newsletter piece and the art direction for its image.", input_schema: NEWSLETTER_PIECE }],
-    tool_choice: { type: "tool", name: "piece" },
-    messages: [{ role: "user", content: `Write the CEO's newsletter piece from the material below, and art-direct the LinkedIn image that runs with it.${rewrite}\n\n${material}` }],
-  });
+  let res;
+  try {
+    res = await client.messages.create({
+      model: PREMIUM,
+      max_tokens: 4000,
+      system: `${cfg.scope}\n\n${voice}\n\n${REGISTER}\n\n${WRITING_STYLE}\n\n${NEWSLETTER_FORMAT_NOTE}`,
+      tools: [{ name: "piece", description: "The CEO's newsletter piece and the art direction for its image.", input_schema: NEWSLETTER_PIECE }],
+      tool_choice: { type: "tool", name: "piece" },
+      messages: [{ role: "user", content: `Write the CEO's newsletter piece from the material below, and art-direct the LinkedIn image that runs with it.${rewrite}\n\n${material}` }],
+    });
+  } catch (e) {
+    return { ok: false, error: humanApiError(e, "Couldn't draft the piece. Try again."), status: 502 };
+  }
   await meterClaude(res, { clientId, userEmail: opts.userEmail ?? null, model: PREMIUM, action: "ceo-newsletter" }).catch(() => {});
   const block = res.content.find((x) => x.type === "tool_use");
   if (!block || block.type !== "tool_use") return { ok: false, error: "Nothing came back. Try again.", status: 500 };

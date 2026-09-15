@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { runIntel } from "@/lib/intel";
+import { humanApiError } from "@/lib/errors";
 
 // ASK THE MARKET A QUESTION (Gary): the dashboard free-text box. Runs the Strategist desk on demand for one brain,
 // seeded with the team's question, and returns the sourced findings + the internal read (what it could do, and
@@ -56,6 +57,6 @@ export async function POST(req: Request) {
       })),
     });
   } catch (e) {
-    return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 300) }, { status: 400 });
+    return NextResponse.json({ error: humanApiError(e, "Couldn't run that.") }, { status: 400 });
   }
 }
