@@ -26,7 +26,7 @@ const ADD_KINDS: { kind: string; label: string }[] = [
   { kind: "image", label: "Other image" },
 ];
 
-export default function BrainLibrary({ brainId }: { brainId: string }) {
+export default function BrainLibrary({ brainId, onChange }: { brainId: string; onChange?: () => void }) {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [total, setTotal] = useState(0);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -81,6 +81,7 @@ export default function BrainLibrary({ brainId }: { brainId: string }) {
     if (failed.length) setErr(failed.join(" · "));
     else flex(`${done} file${done === 1 ? "" : "s"} added to the brand library.`);
     await load();
+    onChange?.();   // tell the console so the Logo & photos checklist + strength update live
   }
 
   async function remove(a: Asset) {
@@ -98,6 +99,7 @@ export default function BrainLibrary({ brainId }: { brainId: string }) {
     }
     setGroups((gs) => gs?.map((g) => ({ ...g, assets: g.assets.filter((x) => x.id !== a.id) })).filter((g) => g.assets.length > 0) ?? gs);
     setTotal((t) => Math.max(0, t - 1));
+    onChange?.();   // keep the console's checklist + strength in step after a removal too
   }
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 import { askConfirm } from "@/lib/confirm";
@@ -137,13 +137,17 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // update live as you feed it.
   const [assetKinds, setAssetKinds] = useState<Record<string, number>>({});
   const feedRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
+  // Re-fetchable, so the "Logo & photos" checklist and the strength update the moment a logo/photo is added or
+  // removed in the Brand library below (Gary: uploaded logos but the tick did not turn green - it was only fetched
+  // once on mount and never re-checked). Passed to BrainLibrary as an onChange callback.
+  const loadAssets = useCallback(() => {
     fetch(`/api/brains/${brainId}/assets`, { cache: "no-store" }).then((r) => r.json()).then((d) => {
       const counts: Record<string, number> = {};
       for (const g of (d?.groups || [])) counts[String(g.kind)] = Array.isArray(g.assets) ? g.assets.length : 0;
       setAssetKinds(counts);
     }).catch(() => {});
   }, [brainId]);
+  useEffect(() => { loadAssets(); }, [loadAssets]);
   // WHAT THIS BRAIN CAN ANSWER ON: a passive topic map, cached server-side and regenerated on drift/refresh.
   const [coverage, setCoverage] = useState<{ topics: string[]; loading: boolean }>({ topics: [], loading: true });
   const loadCoverage = (refresh = false) => {
@@ -920,7 +924,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
       )}
 
       <BrainKnowledge brainId={brainId} total={liveChunks} />
-      <div id="brand-library"><BrainLibrary brainId={brainId} /></div>
+      <div id="brand-library"><BrainLibrary brainId={brainId} onChange={loadAssets} /></div>
 
       {/* DANGER ZONE - both destructive actions live here, tucked at the very bottom out of eye-line (they used to
           sit next to Re-index and here, doubled up). "Test the brain" is now the full Ask panel on the page below,
