@@ -307,15 +307,17 @@ export async function buildCeoCreatives(
     }
     let figureRaw = await sharp(cut).resize({ height: figH, kernel: "lanczos3" }).png().toBuffer();
 
-    // ALPHA PEDESTAL SAFETY NET. Some matte outputs leave a faint near-transparent haze across the bounding box,
-    // which would composite as a rectangle behind the figure. We map anything below ~14% opacity to fully
-    // transparent (rescaling the rest), so a hazy cutout can never paint a background rectangle. Measured clean on
-    // the GAS cutout (background alpha 0%), so here it is a no-op, but it protects any future poorly-matted photo.
-    // The dark halo Gary saw was the CONTACT SHADOW below, not a pedestal - fixed there. Dark scheme only.
+    // DEFRINGE THE EDGE (Gary: "shadows around the subject, it is not clean"). The cutout background is clean, but
+    // its SEMI-TRANSPARENT EDGE carries dark matte contamination - the dark suit and hair against the original
+    // studio background (measured: ~46% of edge pixels are dark). Composited over a BRIGHT backdrop that dark band
+    // reads as a halo around him. So we ERODE the alpha by ~1px to cut that contaminated outer band, then re-feather
+    // softly (blur 0.9) so the new, clean edge still blends into the scene rather than becoming a hard sticker. This
+    // also cleans the derived contact shadow, since it comes from this same alpha. Dark scheme only; the pedestal
+    // safety net is folded in (the erode zeroes any faint haze too).
     if (design.scheme !== "light") {
       const rgb = await sharp(figureRaw).removeAlpha().toBuffer();
-      const a = await sharp(figureRaw).ensureAlpha().extractChannel(3).linear(1 / 0.86, -(0.14 / 0.86) * 255).toBuffer();
-      figureRaw = await sharp(rgb).joinChannel(a).png().toBuffer();
+      const alpha = await sharp(figureRaw).ensureAlpha().extractChannel(3).blur(1.3).threshold(150).blur(0.9).toBuffer();
+      figureRaw = await sharp(rgb).joinChannel(alpha).png().toBuffer();
     }
 
     // BLEND INTO THE SCENE (Gary: "looks pasted on, needs to fuse with the scenery"): a contact shadow (their own
@@ -326,18 +328,14 @@ export async function buildCeoCreatives(
     // figure sits flush-right, so the shadow hides almost entirely behind him and only a faint edge shows. On 1x1
     // the figure is much larger and more central, so the SAME shadow reads as a halo. So the square gets a far
     // lighter, tighter shadow - present enough to ground him, never a visible band. Wide is unchanged.
-    const shadowGain = design.scheme === "light" ? 0.42 : (wide ? 0.5 : 0.2);
+    // Shadow is lighter now the edge is defringed (Gary wants it clean): a softer contact shadow on both aspects so
+    // it grounds him without adding its own halo against a bright backdrop. Wide dropped from 0.5, square stays low.
+    const shadowGain = design.scheme === "light" ? 0.42 : (wide ? 0.3 : 0.2);
     const shadowBlur = design.scheme === "light" ? 26 : (wide ? 30 : 20);
-    let figure = design.scheme === "light"
+    // The edge is already defringed + feathered on figureRaw above, so the figure just needs the tone grade here.
+    const figure = design.scheme === "light"
       ? await sharp(figureRaw).modulate(tone).sharpen({ sigma: 1.1 }).png().toBuffer()
       : await sharp(figureRaw).modulate(tone).png().toBuffer();
-    // Feather the alpha edge by ~1px, so the hard matte line softens into the backdrop instead of reading as a
-    // pasted cut-out. Kept subtle so the face and shoulders stay crisp.
-    if (design.scheme !== "light") {
-      const rgb = await sharp(figure).removeAlpha().toBuffer();
-      const alpha = await sharp(figure).ensureAlpha().extractChannel(3).blur(1.1).toBuffer();
-      figure = await sharp(rgb).joinChannel(alpha).png().toBuffer();
-    }
     const shadowAlpha = await sharp(figureRaw).extractChannel(3).blur(shadowBlur).linear(shadowGain, 0).toColourspace("b-w").toBuffer();
     const shadowBlack = await sharp({ create: { width: figW, height: figH, channels: 3, background: "#000000" } }).png().toBuffer();
     const shadow = await sharp(shadowBlack).joinChannel(shadowAlpha).png().toBuffer();
