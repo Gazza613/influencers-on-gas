@@ -663,10 +663,15 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
               // How many crawled sites are 30+ days old, so the team gets one quiet heads-up at the top rather
               // than having to scan every row (Gary: "a subtle alert for them").
               const dueCount = web.filter((s) => { const f = freshness(s.last_synced_at); return f?.due && s.status !== "pending"; }).length;
+              // A site still reading in shows "Crawling now", not the green "Already crawled" - otherwise a brand-new
+              // brain reads as done while it is still indexing (Gary). Only when every site is indexed is it "done".
+              const crawlingNow = web.some((s) => s.status !== "indexed" && s.status !== "failed");
               return (
-                <div className="mb-4 rounded-xl border border-[#4ade80]/25 bg-[#4ade80]/[0.04] p-3.5">
+                <div className={`mb-4 rounded-xl border p-3.5 ${crawlingNow ? "border-active/30 bg-active/[0.05]" : "border-[#4ade80]/25 bg-[#4ade80]/[0.04]"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="tabular text-[13px] font-bold uppercase tracking-[0.14em] text-[#86efac]">✓ Already crawled</div>
+                    <div className={`tabular flex items-center gap-2 text-[13px] font-bold uppercase tracking-[0.14em] ${crawlingNow ? "text-active" : "text-[#86efac]"}`}>
+                      {crawlingNow ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />Crawling now…</> : <>✓ Already crawled</>}
+                    </div>
                     {/* KEEP FRESH AUTOMATICALLY (admin cost dial): auto-recrawl these sites on an SLA so the brain
                         never quietly goes stale. Off by default; when on, the manual Re-crawl still works too. */}
                     {isAdmin && (
