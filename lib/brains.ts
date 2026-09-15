@@ -10,6 +10,7 @@ export type Brain = {
   brand: Record<string, unknown>;
   created_at: string;
   chunk_count?: number;
+  distinct_chunk_count?: number;   // deduped passage count, the honest depth basis for the strength score
   source_count?: number;
   // Strength inputs (for the shared brainStrength formula) so the overview can show the same score as the detail page.
   has_site?: boolean;
@@ -26,10 +27,11 @@ export async function listBrains(): Promise<Brain[]> {
   return (await db().query(
     `select c.id, c.name, c.slug, c.status, c.brand, c.created_at,
             (select count(*)::int from knowledge_chunks k where k.client_id = c.id)  as chunk_count,
+            (select count(distinct k.content)::int from knowledge_chunks k where k.client_id = c.id) as distinct_chunk_count,
             (select count(*)::int from knowledge_sources s where s.client_id = c.id) as source_count,
             exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('crawl','website') and s.status = 'indexed'
                    and (select count(*) from knowledge_chunks k where k.source_id = s.id) > 1) as has_site,
-            exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('file','text') and s.status = 'indexed') as has_docs,
+            exists(select 1 from knowledge_sources s where s.client_id = c.id and s.type in ('file','text','market') and s.status = 'indexed') as has_docs,
             exists(select 1 from studio_brand_kits b where b.client_id = c.id and coalesce(length(trim(b.tone_notes)),0) > 0) as has_doctrine,
             exists(select 1 from studio_assets a where a.client_id = c.id and a.kind in ('logo','ceo_photo','md_photo','team_photo')) as has_assets
      from clients c order by c.created_at desc`,
@@ -39,7 +41,8 @@ export async function listBrains(): Promise<Brain[]> {
 export async function getBrain(id: string): Promise<Brain | null> {
   const rows = (await db().query(
     `select id, name, slug, status, brand, created_at,
-            (select count(*)::int from knowledge_chunks k where k.client_id = clients.id) as chunk_count
+            (select count(*)::int from knowledge_chunks k where k.client_id = clients.id) as chunk_count,
+            (select count(distinct k.content)::int from knowledge_chunks k where k.client_id = clients.id) as distinct_chunk_count
      from clients where id = $1`,
     [id],
   )) as Brain[];

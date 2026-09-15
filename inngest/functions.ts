@@ -18,7 +18,7 @@ import { renderEdit, pollRenderOnce, probeDuration } from "@/lib/vendors/shotsta
 import { startTalkingVideo, pollTalking, remainingQuota } from "@/lib/vendors/heygen";
 import { qaCreative, composeCreativeScene, moderateText, matchesIdentity, describeOutfit } from "@/lib/vendors/anthropic";
 import { createTalkingPhoto } from "@/lib/vendors/heygen";
-import { scrape, startCrawl, crawlStatus, sitemapUrls } from "@/lib/vendors/firecrawl";
+import { scrape, scrapeReadable, looksBlocked, startCrawl, crawlStatus, sitemapUrls } from "@/lib/vendors/firecrawl";
 import { fetchFeed } from "@/lib/feed";
 import { chunkStructured, withContextHeader, ingestChunks, clearSourceChunks, cleanScraped, isJunkChunk, brainChunkIds, reembedChunks } from "@/lib/rag";
 import { setSourceStatus } from "@/lib/brains";
@@ -405,7 +405,7 @@ export const ingestSource = inngest.createFunction(
             const slice = targets.slice(i, i + B);
             const got = await step.run(`scrape-${i / B}`, async () =>
               (await Promise.all(slice.map((u) => scrape(u).catch(() => null))))
-                .filter((p): p is { url: string; title: string; content: string } => !!p && p.content.length > 400));
+                .filter((p): p is { url: string; title: string; content: string } => !!p && p.content.length > 400 && !looksBlocked(p.content)));
             pages = pages.concat(got);
           }
           await step.run("usage-crawl", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: pages.length }));
@@ -438,7 +438,7 @@ export const ingestSource = inngest.createFunction(
         // from - the difference between a citable brain and a pile of text.
         items = pages.flatMap((pg) => withContextHeader(chunkStructured(cleanScraped(pg.content)).filter((c) => !isJunkChunk(c)), pg.title).map((c) => ({ content: c, metadata: { url: pg.url, title: pg.title, kind: "article" } })));
       } else if (type === "website") {
-        const page = await step.run("scrape", () => scrape(uri));
+        const page = await step.run("scrape", () => scrapeReadable(uri));
         await step.run("usage-scrape", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest", count: 1 }));
         if (!page.content) throw new Error("page had no readable content");
         items = withContextHeader(chunkStructured(cleanScraped(page.content)).filter((c) => !isJunkChunk(c)), page.title).map((c) => ({ content: c, metadata: { url: page.url, title: page.title } }));
@@ -461,18 +461,29 @@ export const ingestSource = inngest.createFunction(
         // PDFs go through Firecrawl, which already parses them - rather than adding a PDF library to a bundle
         // that is already fighting Vercel's 250MB function limit. Plain text is just read.
         const name = text || uri;
+        // BINARY DOCUMENTS GO THROUGH FIRECRAWL, PLAIN TEXT IS READ DIRECTLY (audit P1). Previously only .pdf was
+        // parsed and everything else was read as raw bytes - so a .docx/.pptx/.xlsx (a ZIP) was chunked and embedded
+        // as binary garbage. Now any known binary/office document is parsed by Firecrawl (which handles them), plain
+        // text is read directly, and a direct read that turns out to be binary (NUL bytes) is rejected loudly.
         const isPdf = /\.pdf(\?|$)/i.test(uri);
+        const isBinaryDoc = /\.(docx?|pptx?|xlsx?|pages|key|numbers|odt|odp|ods|rtf|epub)(\?|$)/i.test(uri);
+        const parseViaFirecrawl = isPdf || isBinaryDoc;
         const doc = await step.run("read-file", async () => {
-          if (isPdf) {
+          if (parseViaFirecrawl) {
             const page = await scrape(uri);
             return { content: page.content, title: name };
           }
           const r = await fetch(uri);
           if (!r.ok) throw new Error(`could not read the uploaded file (${r.status})`);
-          return { content: (await r.text()).trim(), title: name };
+          const body = (await r.text()).trim();
+          // A plain-text read of a binary file comes back full of NUL / replacement characters - never embed that.
+          if (/[ �]/.test(body.slice(0, 4000))) {
+            throw new Error("that file is not plain text (it looks like a binary or office document). Upload it as a PDF, or a .docx/.pptx/.xlsx, which are parsed properly.");
+          }
+          return { content: body, title: name };
         });
-        if (isPdf) await step.run("usage-parse", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest-pdf", count: 1 }));
-        if (!doc.content) throw new Error("that file had no readable text in it (a scanned image PDF has no text layer)");
+        if (parseViaFirecrawl) await step.run("usage-parse", () => recordUsage({ clientId, provider: "firecrawl", model: "scrape", unit: "page", action: "ingest-doc", count: 1 }));
+        if (!doc.content) throw new Error("that file had no readable text in it (a scanned image PDF or an empty document has no text layer)");
         items = withContextHeader(chunkStructured(cleanScraped(doc.content)).filter((c) => !isJunkChunk(c)), doc.title).map((c) => ({ content: c, metadata: { url: uri, title: doc.title } }));
       } else {
         items = chunkStructured(text).map((c) => ({ content: c, metadata: { title: uri || (kind === "compliance" ? "Compliance copy" : "Pasted note"), ...(kind ? { kind } : {}) } }));

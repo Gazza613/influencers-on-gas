@@ -7,7 +7,7 @@ import { flex } from "@/lib/flex";
 import LivingBrain from "@/components/LivingBrain";
 import { brainStrength } from "@/lib/brain-strength";
 
-type Brain = { id: string; name: string; slug: string; chunk_count?: number; source_count?: number; has_site?: boolean; has_docs?: boolean; has_doctrine?: boolean; has_assets?: boolean };
+type Brain = { id: string; name: string; slug: string; chunk_count?: number; distinct_chunk_count?: number; source_count?: number; has_site?: boolean; has_docs?: boolean; has_doctrine?: boolean; has_assets?: boolean };
 
 // A compact, static neural glyph for each brain card - the sibling of the Living Brain hero, sized for a chip and
 // not animated (a roster can hold many, so per-node animation would be noise + cost). It simply LIGHTS when the
@@ -162,7 +162,7 @@ export default function BrainsManager({ initial }: { initial: Brain[] }) {
           const fed = sources > 0;
           // The SAME strength score as the brain detail page (shared brainStrength formula), so the overview and
           // the detail never disagree. Colour scales green (strong) -> amber (building) -> faint (early).
-          const strength = brainStrength({ hasSite: !!b.has_site, hasDocs: !!b.has_docs, hasDoctrine: !!b.has_doctrine, hasAssets: !!b.has_assets, liveChunks: passages });
+          const strength = brainStrength({ hasSite: !!b.has_site, hasDocs: !!b.has_docs, hasDoctrine: !!b.has_doctrine, hasAssets: !!b.has_assets, liveChunks: b.distinct_chunk_count ?? passages });
           const strengthColor = strength >= 67 ? "text-[#86efac]" : strength >= 34 ? "text-[#fcd34d]" : "text-ink-faint";
           return (
             <div key={b.id} className="group relative overflow-hidden rounded-xl border border-line bg-surface-1 transition hover:border-line-strong hover:bg-surface-2">

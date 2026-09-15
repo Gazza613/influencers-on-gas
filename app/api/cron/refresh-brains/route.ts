@@ -42,7 +42,7 @@ export async function GET(req: Request) {
         and ($2 or s.last_synced_at is null
              or (s.type = 'feed' and s.last_synced_at < now() - interval '20 hours')
              or (s.type in ('website','crawl') and s.last_synced_at < now() - make_interval(days => c.auto_recrawl_days)))
-      order by s.client_id, s.last_synced_at asc nulls first`,
+      order by s.last_synced_at asc nulls first`,
     [only, force],
   ).catch(() => [])) as { id: string; client_id: string; type: string; uri: string; include_path: string | null; last_synced_at: string | null; client_name: string }[];
 

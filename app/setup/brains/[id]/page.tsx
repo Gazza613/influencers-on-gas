@@ -43,7 +43,7 @@ export default async function BrainDetail({ params }: { params: Promise<{ id: st
         <span className="tabular rounded bg-surface-2 px-2.5 py-1 text-[13px] uppercase tracking-wide text-ink-faint">brain</span>
         <span className="tabular text-[18px] text-ink-faint">{brain.chunk_count ?? 0} passage{(brain.chunk_count ?? 0) === 1 ? "" : "s"}</span>
       </div>
-      <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} initialDoctrine={kit?.tone_notes ?? ""} isAdmin={isAdmin} />
+      <BrainConsole brainId={brain.id} initialSources={sources} chunkCount={brain.chunk_count ?? 0} distinctChunkCount={brain.distinct_chunk_count ?? brain.chunk_count ?? 0} initialDoctrine={kit?.tone_notes ?? ""} isAdmin={isAdmin} />
 
       {/* TEST THE BRAIN, in the same place you built it (Gary: fold Test the Brain into The Brain, one tile not two).
           Ask this brain a question and check it answers well before the Researcher builds on it. */}

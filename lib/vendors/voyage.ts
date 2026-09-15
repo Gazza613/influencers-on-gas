@@ -5,7 +5,11 @@ import { getSecret } from "../connections";
 // NOTE: v4 vectors are NOT compatible with 3.5 vectors, so any existing brain must be
 // fully RE-INGESTED per client_id after this change (do not mix old + new vectors).
 const BASE = "https://api.voyageai.com/v1/embeddings";
-const MODEL = "voyage-4-lite";
+// The CURRENT embedding model. Exported so ingest tags every chunk with the model it was embedded under, and
+// retrieval scores ONLY chunks embedded under the current model - vectors from different Voyage models are 1024-dim
+// but NOT comparable, so mixing them is silent retrieval noise. Changing this REQUIRES re-indexing every brain.
+export const EMBED_MODEL = "voyage-4-lite";
+const MODEL = EMBED_MODEL;
 export const EMBED_DIM = 1024;
 
 async function key(): Promise<string> {

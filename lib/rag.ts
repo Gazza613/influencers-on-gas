@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { db } from "./db";
-import { embed, rerank, toVectorLiteral } from "./vendors/voyage";
+import { embed, rerank, toVectorLiteral, EMBED_MODEL } from "./vendors/voyage";
 import { recordUsage } from "./usage";
 
 // CLEAN SCRAPED WEB CONTENT before it becomes brain knowledge (Gary: the scrape must be world-class, not a raw
@@ -197,11 +197,11 @@ export async function ingestChunks(
       // ON CONFLICT DO NOTHING is the blip-proof backstop; RETURNING id tells us whether the row was actually
       // written, so `stored` counts real inserts (and metering counts what truly landed).
       const ins = (await db().query(
-        `insert into knowledge_chunks (client_id, source_id, content, embedding, metadata)
-         values ($1, $2, $3, $4::vector, $5)
+        `insert into knowledge_chunks (client_id, source_id, content, embedding, metadata, embedding_model)
+         values ($1, $2, $3, $4::vector, $5, $6)
          on conflict do nothing
          returning id`,
-        [clientId, sourceId, batch[j].content, toVectorLiteral(vectors[j]), JSON.stringify(batch[j].metadata ?? {})],
+        [clientId, sourceId, batch[j].content, toVectorLiteral(vectors[j]), JSON.stringify(batch[j].metadata ?? {}), EMBED_MODEL],
       )) as { id: string }[];
       if (ins.length) stored++;
     }
@@ -250,8 +250,8 @@ export async function reembedChunks(clientId: string, ids: string[]): Promise<nu
   let done = 0;
   for (let j = 0; j < rows.length; j++) {
     await db().query(
-      `update knowledge_chunks set embedding = $1::vector where id = $2 and client_id = $3`,
-      [toVectorLiteral(vectors[j]), rows[j].id, clientId],
+      `update knowledge_chunks set embedding = $1::vector, embedding_model = $4 where id = $2 and client_id = $3`,
+      [toVectorLiteral(vectors[j]), rows[j].id, clientId, EMBED_MODEL],
     );
     done++;
   }
@@ -289,13 +289,17 @@ export async function retrieve(clientId: string, query: string, k = 6, opts?: { 
   const runDense = async (): Promise<Retrieved[]> => {
     if (!qv) return [];
     try {
+      // MODEL-CONSISTENCY GATE (audit P1): score ONLY chunks embedded under the CURRENT model. Vectors from a
+      // different Voyage model are 1024-dim but not comparable, so mixing them is silent noise; excluding them here
+      // means a model change can never quietly corrupt recall - the mismatched rows simply don't score until the
+      // brain is re-indexed. (Untagged legacy rows are treated as current, since retrieval on them works today.)
       return (await db().query(
         `select content, metadata, 1 - (embedding <=> $2::vector) as score
          from knowledge_chunks
-         where client_id = $1 and embedding is not null
+         where client_id = $1 and embedding is not null and (embedding_model = $4 or embedding_model is null)
          order by embedding <=> $2::vector
          limit $3`,
-        [clientId, toVectorLiteral(qv), DENSE_N],
+        [clientId, toVectorLiteral(qv), DENSE_N, EMBED_MODEL],
       )) as Retrieved[];
     } catch { return []; }
   };

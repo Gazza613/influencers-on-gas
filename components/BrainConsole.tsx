@@ -60,7 +60,7 @@ const ICON = {
   coverage: `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/>`,
 } as const;
 
-export default function BrainConsole({ brainId, initialSources, chunkCount = 0, initialDoctrine = "", isAdmin = false }: { brainId: string; initialSources: Source[]; chunkCount?: number; initialDoctrine?: string; isAdmin?: boolean }) {
+export default function BrainConsole({ brainId, initialSources, chunkCount = 0, distinctChunkCount = 0, initialDoctrine = "", isAdmin = false }: { brainId: string; initialSources: Source[]; chunkCount?: number; distinctChunkCount?: number; initialDoctrine?: string; isAdmin?: boolean }) {
   const [sources, setSources] = useState<Source[]>(initialSources);
   // FRESHNESS SLA: how often this brain auto-recrawls its website sources (0 = off). Loaded once; admin can set it.
   const [autoRecrawl, setAutoRecrawl] = useState(0);
@@ -427,10 +427,13 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // server total. Without this, the header said 86 while the card said 82 and doctrine added 0 to strength (B3).
   const sourceChunks = sources.reduce((a, s) => a + Number(s.chunk_count ?? 0), 0);
   const liveChunks = Math.max(sourceChunks, Number(chunkCount) || 0);
+  // The strength DEPTH uses the DISTINCT (deduped) passage count so cross-source duplication can't inflate it
+  // (audit P2). It is never more than the live total; falls back to live when the server figure is absent.
+  const distinctChunks = Math.min(Number(distinctChunkCount) || liveChunks, liveChunks);
   const indexedSources = sources.filter((s) => s.status === "indexed").length;
   const crawling = sources.some((s) => s.status === "pending");
   const hasSite = sources.some((s) => (s.type === "crawl" || s.type === "website") && s.status === "indexed" && (s.chunk_count ?? 0) > 1);
-  const hasDocs = sources.some((s) => (s.type === "file" || s.type === "text") && s.status === "indexed");
+  const hasDocs = sources.some((s) => (s.type === "file" || s.type === "text" || s.type === "market") && s.status === "indexed");
   const hasDoctrine = doctrine.trim().length > 0;
   const hasAssets = (assetKinds.logo || 0) + (assetKinds.ceo_photo || 0) + (assetKinds.md_photo || 0) + (assetKinds.team_photo || 0) > 0;
   const checklist: { key: string; label: string; met: boolean; go: () => void }[] = [
@@ -459,8 +462,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
   // not Q&A knowledge, so they carry little weight and a 2nd photo does not change the score - by design.
   // The SAME score the brains overview shows: one shared formula (lib/brain-strength) so the two never disagree.
   // hasSite here matches the overview's has_site (indexed site with >1 chunk), so the inputs are identical too.
-  const strengthPct = brainStrength({ hasSite, hasDocs, hasDoctrine, hasAssets, liveChunks });
-  const depthPts = Math.round(Math.min(1, Math.sqrt(liveChunks / 1000)) * 33); // for the breakdown line only
+  const strengthPct = brainStrength({ hasSite, hasDocs, hasDoctrine, hasAssets, liveChunks: distinctChunks });
+  const depthPts = Math.round(Math.min(1, Math.sqrt(distinctChunks / 500)) * 32); // for the breakdown line only
   // The single biggest thing still to add, so the indicator is actionable, not just a number.
   const nextGap = checklist.filter((c) => !c.met).map((c) => ({ label: c.label, pts: STRENGTH_WEIGHT[c.key as keyof typeof STRENGTH_WEIGHT] || 0 })).sort((a, b) => b.pts - a.pts)[0];
 
@@ -773,7 +776,7 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
             <SectionTile d={ICON.sources} />
             <div>
               <div className="tabular text-[18px] font-semibold uppercase tracking-[0.14em] text-ink-dim">Market intelligence</div>
-              <p className="mt-0.5 text-[16px] text-ink-dim">A one-off ~24-month sweep of this client and their market. Confirmed facts are added to the brain automatically, so they strengthen it and appear in Knowledge Sources; the rest come back to accept or reject. Do this once when you set the brain up.</p>
+              <p className="mt-0.5 text-[16px] text-ink-dim">A one-off ~24-month sweep of this client and their market. Every finding comes back for you to review, and <b className="text-ink-dim">nothing enters the brain until you accept it</b>. Accepted facts strengthen the brain and appear in Knowledge Sources. Do this once when you set the brain up.</p>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -795,7 +798,8 @@ export default function BrainConsole({ brainId, initialSources, chunkCount = 0, 
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-[18px] font-semibold text-ink">{f.headline}</div>
-                        {f.why_it_matters && <div className="mt-0.5 text-[16px] leading-relaxed text-ink-dim">{f.why_it_matters}</div>}
+                        {f.detail && <div className="mt-1 text-[16px] leading-relaxed text-ink-dim whitespace-pre-line">{f.detail}</div>}
+                        {f.why_it_matters && <div className="mt-1.5 text-[15px] leading-relaxed text-ink-faint"><span className="font-semibold">Why it matters (analysis):</span> {f.why_it_matters}</div>}
                         {Array.isArray(f.sources) && f.sources.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[14px]">
                             {f.sources.filter((s) => s?.url).slice(0, 4).map((s, j) => (

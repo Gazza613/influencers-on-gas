@@ -41,7 +41,10 @@ alter table clients add column if not exists websites jsonb;   -- additional off
 -- spends until a brain opts in); a positive value is the SLA in days - a daily cron re-crawls this brain's
 -- website sources once they are older than that, capped per run so cost stays bounded. Only website/crawl
 -- sources have a live URL to re-read; documents and pasted notes are untouched.
-alter table clients add column if not exists auto_recrawl_days int not null default 0;
+-- Auto-recrawl SLA (days). NEW brains default to 30 so they stay fresh out of the box (audit P2); existing brains
+-- keep whatever they were set to, and any brain can still be turned off (0) or tuned on the Brain page.
+alter table clients add column if not exists auto_recrawl_days int not null default 30;
+alter table clients alter column auto_recrawl_days set default 30;
 alter table clients add column if not exists socials jsonb not null default '[]'::jsonb;   -- the client's official social accounts (FB/IG/TikTok/LinkedIn/YouTube/X), mined by the Researcher
 alter table clients add column if not exists research_weekly boolean not null default false;   -- weekly auto-run of the Researcher (Mon 08:30 SAST); OFF by default so no spend happens without opting in
 alter table clients add column if not exists owner_context text;   -- when the subject is a product/brand owned by a parent (e.g. egifts24 owned by StellR): the Researcher researches the parent for context but attributes its people/numbers to the parent
@@ -80,7 +83,8 @@ create table if not exists knowledge_chunks (
   client_id  uuid not null references clients(id) on delete cascade,
   source_id  uuid references knowledge_sources(id) on delete cascade,
   content    text not null,
-  embedding  vector(1024),                               -- Voyage voyage-3.5
+  embedding  vector(1024),                               -- Voyage voyage-4-lite (1024-dim)
+  embedding_model text,                                  -- the model this vector was embedded under; retrieval scores only current-model rows
   metadata   jsonb default '{}'::jsonb,                  -- { title, url, tags[] }
   created_at timestamptz not null default now()
 );

@@ -40,6 +40,21 @@ export async function scrape(url: string, opts: { stealth?: boolean } = {}): Pro
   };
 }
 
+// SCRAPE, BUT NEVER STORE A BOT-WALL (audit P1). A default scrape can come back with a Cloudflare / JS challenge
+// body instead of the page, and that challenge text was silently being ingested as "knowledge". So: scrape, and if
+// the result looks blocked, retry ONCE through the stealth proxy (which renders JS and clears harder walls); if it
+// is STILL a wall, throw loudly rather than poisoning the brain with challenge text. Used for single-page ingest.
+export async function scrapeReadable(url: string): Promise<ScrapedPage> {
+  let page = await scrape(url);
+  if (looksBlocked(page.content)) {
+    page = await scrape(url, { stealth: true });
+    if (looksBlocked(page.content)) {
+      throw new Error("the page returned a bot-wall or challenge (Cloudflare or a JavaScript gate) instead of readable content, even through the stealth proxy, so nothing real could be read from it");
+    }
+  }
+  return page;
+}
+
 // CRAWL A WHOLE SECTION, not one page.
 //
 // Scraping the index of a blog gets you the index of a blog: fifty headlines and no arguments. To teach a
@@ -100,8 +115,9 @@ export async function crawlStatus(id: string): Promise<CrawlStatus> {
       }))
       // A crawl always picks up navigation and tag pages; anything under ~400 characters is not an article and
       // would fill the brain with menus. A sitemap is a list of links rather than content, so it goes too - it
-      // arrived in the first real crawl as 24 chunks of bare URLs.
-      .filter((p) => p.content.length > 400 && !/\.(xml|json|txt)(\?|$)/i.test(p.url)),
+      // arrived in the first real crawl as 24 chunks of bare URLs. A bot-wall / challenge page is dropped too, so
+      // a Cloudflare "Just a moment" body never enters the brain as knowledge (audit P1).
+      .filter((p) => p.content.length > 400 && !/\.(xml|json|txt)(\?|$)/i.test(p.url) && !looksBlocked(p.content)),
   };
 }
 
