@@ -95,22 +95,30 @@ export function chunkStructured(text: string, size = 1200): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const isHeading = (s?: string) => !!s && /^(?:#{1,6}\s+\S|-{2,}\s*[A-Z][^\n]*-{2,}\s*)$/.test(s.trim());
   const out: string[] = [];
   for (const section of sections) {
     const paras = section.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    // The section's own heading, carried onto every chunk AFTER the first (audit P3): when a long section splits
+    // across paragraphs, the later chunks would otherwise lose the antecedent (e.g. the "## Eligibility" heading
+    // that the second paragraph belongs under), making that fact unretrievable for the exact query. The first
+    // chunk already opens with the heading, so it is only prepended to the ones that follow.
+    const heading = isHeading(paras[0]) ? paras[0].trim() : "";
+    let first = true;
+    const push = (c: string) => { out.push(heading && !first && !c.startsWith(heading) ? `${heading}\n\n${c}` : c); first = false; };
     let buf = "";
     for (const p of paras) {
       if (p.length > size) {
         // Too big to keep whole. Flush, then fall back to the character chunker for this paragraph only.
-        if (buf) { out.push(buf); buf = ""; }
-        out.push(...chunkText(p, size, 120));
+        if (buf) { push(buf); buf = ""; }
+        for (const cc of chunkText(p, size, 120)) push(cc);
         continue;
       }
       // +2 for the blank line we rejoin with. Packing only ever happens WITHIN one section.
-      if (buf && buf.length + p.length + 2 > size) { out.push(buf); buf = p; }
+      if (buf && buf.length + p.length + 2 > size) { push(buf); buf = p; }
       else buf = buf ? `${buf}\n\n${p}` : p;
     }
-    if (buf) out.push(buf);
+    if (buf) push(buf);
   }
   return out;
 }
@@ -152,8 +160,11 @@ export function chunkText(text: string, size = 900, overlap = 120): string[] {
 
 // Drop everything a source previously taught the brain. Called before a re-ingest so the operation is
 // idempotent: a retried or re-run source REPLACES its chunks instead of adding a second copy of them.
-export async function clearSourceChunks(sourceId: string): Promise<void> {
-  await db().query(`delete from knowledge_chunks where source_id = $1`, [sourceId]);
+export async function clearSourceChunks(sourceId: string, clientId?: string): Promise<void> {
+  // client_id is added for defence in depth (audit P3): source_id is globally unique so this only ever hits the one
+  // source's rows, but scoping every write by the tenancy key keeps the "client_id in every WHERE" invariant whole.
+  if (clientId) await db().query(`delete from knowledge_chunks where source_id = $1 and client_id = $2`, [sourceId, clientId]);
+  else await db().query(`delete from knowledge_chunks where source_id = $1`, [sourceId]);
 }
 
 // Embed + store chunks for a brain. ALWAYS scoped to clientId. Embeds in batches.

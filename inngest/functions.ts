@@ -501,7 +501,7 @@ export const ingestSource = inngest.createFunction(
       //
       // Clearing this source's chunks first makes a retry replace rather than duplicate, and splitting the
       // work into batched steps keeps any single step short enough not to time out in the first place.
-      await step.run("clear-existing", () => clearSourceChunks(sourceId));
+      await step.run("clear-existing", () => clearSourceChunks(sourceId, clientId));
       let stored = 0;
       const BATCH = 40;
       for (let i = 0; i < items.length; i += BATCH) {
