@@ -359,6 +359,7 @@ const GROUPS: { label: string; note: string; doors: Door[] }[] = [
         href: "https://media.gasmarketing.co.za/",
         external: true,
         mark: <MediaMark />,
+        pod: "media",
         blurb: "Live campaign insight, as it happens. What the media is doing right now, every channel on a single dashboard.",
         action: "Open Media",
         ring: "border-[#38bdf8]/30 hover:border-[#38bdf8]/70 hover:shadow-[0_0_50px_-12px_rgba(56,189,248,0.45)]",
