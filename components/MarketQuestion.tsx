@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Working from "@/components/Working";
 import IntelEmailControl from "@/components/IntelEmailControl";
 import LinkedInAutomation from "@/components/LinkedInAutomation";
@@ -156,6 +156,21 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
   const [creativeErr, setCreativeErr] = useState("");
   // The LinkedIn-article free-prompt.
   const [liTopic, setLiTopic] = useState("");
+  const liTopicRef = useRef<HTMLTextAreaElement>(null);
+
+  // BRIDGE FROM AN UNVERIFIED FINDING TO A DRAFT (Gary): an unverified finding can't seed a piece under an
+  // executive's name (grounding stays strict), but the team still wants to write on the topic. Rather than a dead
+  // greyed button, we prefill the LinkedIn Article box with this finding's subject and jump the user to it - there
+  // the piece is drafted grounded in the brain + verified context, which is the safe path for the same topic.
+  const writeAsArticle = (headline: string) => {
+    setLiTopic(headline.trim());
+    setLiSent(false);
+    setLiHint(false);
+    requestAnimationFrame(() => {
+      liTopicRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      liTopicRef.current?.focus({ preventScroll: true });
+    });
+  };
   const [liSent, setLiSent] = useState(false); // the standalone LinkedIn draft was emailed (its own success state)
   // Empty-input hints: instead of a silent greyed button, a click on an empty run explains what to type.
   const [askHint, setAskHint] = useState(false);
@@ -714,7 +729,7 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
               <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-dim sm:max-w-[75%]"><b className="text-ink">You choose the topic.</b> Ask the market and Find what&rsquo;s new pull from live market research (the last 3 months and 2 weeks); this one runs the other way, drafting your {whoLabel}&rsquo;s piece on a topic you set, grounded in the brain&rsquo;s own material with verified market context where it exists.</p>
             </div>
           </div>
-          <textarea value={liTopic} onChange={(e) => { setLiTopic(e.target.value); setLiHint(false); setLiSent(false); }} onFocus={() => { setLiHint(false); setLiSent(false); }} rows={2}
+          <textarea ref={liTopicRef} value={liTopic} onChange={(e) => { setLiTopic(e.target.value); setLiHint(false); setLiSent(false); }} onFocus={() => { setLiHint(false); setLiSent(false); }} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) draftFromTopic(); }}
             placeholder={`e.g. why ${brainName}'s customers are shifting to X, and what it means for them`}
             className="mt-3 w-full rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 text-base leading-relaxed text-ink outline-none focus:border-[#0A66C2]" />
@@ -936,19 +951,29 @@ export default function MarketQuestion({ clients, isAdmin = false }: { clients: 
                             className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-base font-semibold text-ink-faint hover:text-alert hover:border-alert/40 disabled:opacity-50">
                             {rejectingId === f.id ? "Removing…" : "✕ Reject"}
                           </button>
-                          {/* Drafting is blocked on an unverified finding (grounding stays strict), so say so up
-                              front rather than only after a click. */}
-                          {isAdmin && (
-                            <button onClick={() => draftArticle(f)} disabled={drafting || f.verification === "unverified"}
-                              title={f.verification === "unverified" ? "This finding is unverified, so it cannot seed a piece under an executive's name." : undefined}
-                              className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-2 text-base font-semibold text-accent hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-45">
-                              ✍️ Draft the {whoLabel}&rsquo;s article
-                            </button>
-                          )}
+                          {/* Drafting under an executive's name is blocked on an unverified finding (grounding stays
+                              strict). Rather than a dead greyed button, we offer a LIVE bridge: it prefills the
+                              LinkedIn Article box with this topic and jumps the user there, where the same topic is
+                              drafted grounded in the brain + verified context - the safe path. A verified finding
+                              still seeds directly. */}
+                          {isAdmin && (f.verification === "unverified"
+                            ? (
+                              <button onClick={() => writeAsArticle(f.headline)}
+                                title="This finding is unverified, so it can't be drafted under an executive's name. This writes it via the LinkedIn Article box instead - grounded in the brain and verified context."
+                                className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-2 text-base font-semibold text-accent hover:bg-accent/10">
+                                ✍️ Write this as a {whoLabel} article ↑
+                              </button>
+                            )
+                            : (
+                              <button onClick={() => draftArticle(f)} disabled={drafting}
+                                className="inline-flex items-center gap-2 rounded-lg border border-accent/50 px-4 py-2 text-base font-semibold text-accent hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-45">
+                                ✍️ Draft the {whoLabel}&rsquo;s article
+                              </button>
+                            ))}
                         </div>
                         {draftBlock?.id === f.id && <p className="mt-2 rounded-lg border border-[#fbbf24]/30 bg-[#fbbf24]/[0.06] px-3 py-2 text-base text-[#fcd34d]">{draftBlock.msg}</p>}
                         {isAdmin && f.verification === "unverified" && draftBlock?.id !== f.id && (
-                          <p className="mt-2 text-sm text-ink-faint">Unverified source, so it can&rsquo;t seed an exec article. Use the <b className="text-ink-dim">LinkedIn Article</b> box above to write on this topic, grounded in the brain.</p>
+                          <p className="mt-2 text-sm text-ink-faint">This source is <b className="text-[#fcd34d]">unverified</b>, so it can&rsquo;t be drafted directly under the {whoLabel}&rsquo;s name. <b className="text-ink-dim">Write this as a {whoLabel} article</b> loads it into the LinkedIn Article box above, where it&rsquo;s written grounded in the brain and verified context.</p>
                         )}
                       </>
                     )}
