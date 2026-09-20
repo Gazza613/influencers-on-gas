@@ -23,6 +23,9 @@ export const POD_AGENTS: Record<string, Pod> = {
       { group: "Knowledge & retrieval", name: "Coverage Mapper", role: "Maps what the brain knows and scores its true strength." },
       { group: "Doctrine & governance", name: "Doctrine Keeper", role: "Holds the positioning and compliance rules and keeps them retrievable." },
       { group: "Doctrine & governance", name: "Quota Guardian", role: "Watches the crawl budget and warns before it runs out." },
+      { group: "Market intelligence", name: "Market Scout", role: "Sweeps the client's local market, competitors and category on the open web." },
+      { group: "Market intelligence", name: "Source Grader", role: "Opens each finding's source, checks its date and grades it verified or unverified." },
+      { group: "Market intelligence", name: "Intelligence Curator", role: "Routes each fact to the brain or to standing intelligence, keeping the brain client-only." },
     ],
   },
   researcher: {
