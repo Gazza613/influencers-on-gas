@@ -55,7 +55,7 @@ export const POD_AGENTS: Record<string, Pod> = {
   media: {
     label: "Media on GAS",
     agents: [
-      { group: "The Strategists", name: "Sami", role: "The strategist you talk to. Sonnet-5 reasoning grounded in your live Meta, TikTok, Google and LinkedIn data. Never invents a number." },
+      { group: "The Strategists", name: "The Media Strategist", role: "The expert media strategist you talk to, grounded in your live Meta, TikTok, Google and LinkedIn data. Never invents a number." },
       { group: "The Strategists", name: "Guided Build", role: "Walks 11 material questions (client, objective, budget, dates, audience, placements, creative) before you approve anything." },
       { group: "The Strategists", name: "Weekly Audit Composer", role: "7-dimension weekly review: pace vs plan, headline KPIs, winners to scale, leaks to cut, creative fatigue, audience health and structural hygiene." },
       { group: "The Strategists", name: "Deep Client Reviewer", role: "30-day strategic narrative for the marketing director." },
