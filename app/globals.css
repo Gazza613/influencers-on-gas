@@ -376,6 +376,7 @@ body {
 .door-h1 { display: flex; justify-content: center; align-items: center; gap: 0.28em; white-space: nowrap; height: 1.2em; font-size: clamp(24px, min(4.6vw, 6.4vh), 66px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; margin: 0 0 clamp(22px, 5vh, 64px); color: var(--door-ink); }
 .door-word-slot { position: relative; display: inline-flex; align-items: center; height: 1.2em; overflow: visible; transition: width .45s cubic-bezier(.2, .8, .2, 1); }
 .door-word-sizer { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; white-space: nowrap; }
+.door-lead { white-space: pre; color: var(--door-ink); }
 .door-word { background: linear-gradient(120deg, #F96203 0%, #E8431A 55%, #D9301C 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
 .door-caret { display: inline-block; width: clamp(3px, 0.05em, 5px); height: 0.74em; margin-left: 0.08em; border-radius: 3px; background: linear-gradient(#F96203, #D9301C); animation: doorBlink 1s step-end infinite; }
 .door-sub { font-size: clamp(14px, min(1.6vw, 2.3vh), 18px); color: var(--door-ink-dim); max-width: 66ch; margin: 0 auto; line-height: 1.65; text-wrap: balance; }
@@ -400,8 +401,7 @@ body {
 /* Phones: the flanks cannot fit, so the cascade becomes a strip along the foot. Still one screen. */
 .door-strip { display: none; }
 @media (max-width: 760px) {
-  .door-h1 { flex-direction: column; align-items: center; gap: 0; white-space: normal; height: auto; font-size: clamp(30px, 8.6vw, 44px); }
-  .door-word-slot { justify-content: flex-start; }
+  .door-h1 { font-size: clamp(22px, 6.2vw, 34px); }
   .door { grid-template-columns: 1fr; grid-template-rows: 1fr auto; align-content: center; }
   .door-cascade { display: none; }
   .door-inner { padding-top: 30px; padding-bottom: 0; }

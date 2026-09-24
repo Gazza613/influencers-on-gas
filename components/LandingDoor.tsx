@@ -14,33 +14,30 @@ import { TEAM, TEAM_ABOUT_URL } from "@/lib/team";
 // The numbers are LIVE: the page passes them in from POD_AGENTS and the database, so the flex never goes stale.
 
 const WORDS = ["Campaigns", "Articles", "Designs", "Research", "Influencers", "Insights", "Social Ads", "Avatars"];
-const TYPE_SPEED = 75;
-const DELETE_SPEED = 45;
-const PAUSE_MS = 1800;
+const LEAD = "Create Your ";
+const TYPE_SPEED = 62;
+const DELETE_SPEED = 32;
+const PAUSE_MS = 2000;
 
+// The whole sentence types out and clears (Gary): "Create Your Designs" letter by letter from the left, a pause, then
+// back to nothing and the next one. Typing the last word alone re-centred the line and jumped.
 function useTypewriter(enabled: boolean) {
-  const [text, setText] = useState(WORDS[0]);
   const [wordIdx, setWordIdx] = useState(0);
+  const full = LEAD + WORDS[wordIdx];
+  const [n, setN] = useState(full.length);
   const [phase, setPhase] = useState<"typing" | "deleting">("deleting");
   useEffect(() => {
     if (!enabled) return;
-    const word = WORDS[wordIdx];
     if (phase === "typing") {
-      if (text.length < word.length) {
-        const t = setTimeout(() => setText(word.slice(0, text.length + 1)), TYPE_SPEED);
-        return () => clearTimeout(t);
-      }
-      const t = setTimeout(() => setPhase("deleting"), PAUSE_MS);
-      return () => clearTimeout(t);
+      if (n < full.length) { const t = setTimeout(() => setN(n + 1), TYPE_SPEED); return () => clearTimeout(t); }
+      const t = setTimeout(() => setPhase("deleting"), PAUSE_MS); return () => clearTimeout(t);
     }
-    if (text.length > 0) {
-      const t = setTimeout(() => setText(text.slice(0, -1)), DELETE_SPEED);
-      return () => clearTimeout(t);
-    }
+    if (n > 0) { const t = setTimeout(() => setN(n - 1), DELETE_SPEED); return () => clearTimeout(t); }
     setWordIdx((i) => (i + 1) % WORDS.length);
     setPhase("typing");
-  }, [enabled, text, phase, wordIdx]);
-  return { text, target: WORDS[wordIdx] };
+  }, [enabled, n, phase, full.length]);
+  const typed = full.slice(0, n);
+  return { lead: typed.slice(0, LEAD.length), word: typed.slice(LEAD.length), full };
 }
 
 // The svg icons for the three pills (lucide-style strokes).
@@ -87,7 +84,7 @@ function Column({ start, slow }: { start: number; slow?: boolean }) {
 export default function LandingDoor({ agents, brains, pods, signedIn }: { agents: number; brains: number; pods: number; signedIn: boolean }) {
   const [reduced, setReduced] = useState(false);
   useEffect(() => { setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches); }, []);
-  const { text: word, target } = useTypewriter(!reduced);
+  const { lead, word, full } = useTypewriter(!reduced);
   // THE WORD SLOT is sized to the WHOLE word being typed (an invisible copy), so nothing moves while a word types
   // and deletes; when the next word arrives the slot eases to its width instead of snapping. The row itself has a
   // fixed height, so the mark above it never moves either.
@@ -96,7 +93,7 @@ export default function LandingDoor({ agents, brains, pods, signedIn }: { agents
   useEffect(() => {
     const m = () => { if (sizerRef.current) setSlotW(sizerRef.current.offsetWidth); };
     m(); window.addEventListener("resize", m); return () => window.removeEventListener("resize", m);
-  }, [target]);
+  }, [full]);
   const href = signedIn ? "/dashboard" : "/login";
   const pill = (n: number, label: string, icon: React.ReactNode, hue: string) => (
     <a className="door-pill" href={href} style={{ ["--a" as string]: hue }} aria-label={`${n} ${label}. ${signedIn ? "Enter the Agency" : "Sign in"}`}>
@@ -127,10 +124,9 @@ export default function LandingDoor({ agents, brains, pods, signedIn }: { agents
               the word types and deletes (a fixed-width slot jumped on the longer words and sat off-centre on the
               short ones). */}
           <h1 className="door-h1" aria-live="polite">
-            <span>Create Your</span>
             <span className="door-word-slot" style={slotW ? { width: slotW } : undefined}>
-              <span className="door-word-sizer" ref={sizerRef} aria-hidden>{target}</span>
-              <span className="door-word">{word}</span><span className="door-caret" aria-hidden />
+              <span className="door-word-sizer" ref={sizerRef} aria-hidden>{full}</span>
+              <span className="door-lead">{lead}</span><span className="door-word">{word}</span><span className="door-caret" aria-hidden />
             </span>
           </h1>
           <p className="door-sub">Thirteen humans in command. Eighty-three AI agents in execution. One platform from research to results, where every decision is made by a person and every task is done at machine speed.</p>
