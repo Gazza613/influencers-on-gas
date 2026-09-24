@@ -365,15 +365,15 @@ body {
 /* The message, budgeted to the screen height so it never scrolls. */
 .door-inner { position: relative; z-index: 2; text-align: center; padding: 0 16px 44px; max-width: 900px; justify-self: center; align-self: stretch; width: 100%; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
 .door-msg { flex: 0 0 auto; }
-.door-lower { flex: 0 0 auto; display: flex; justify-content: center; margin-top: clamp(40px, 10.5vh, 136px); }
-.door-mark { position: relative; display: block; width: clamp(270px, min(48vw, 48vh), 760px); margin: 0 auto clamp(30px, 7.5vh, 96px); animation: doorMarkIn 1.4s cubic-bezier(.2, .8, .2, 1) both, doorMarkFloat 9s ease-in-out 1.4s infinite; }
+.door-lower { flex: 0 0 auto; display: flex; justify-content: center; margin-top: clamp(46px, 12vh, 156px); }
+.door-mark { position: relative; display: block; width: clamp(270px, min(48vw, 48vh), 760px); margin: 0 auto clamp(34px, 8.5vh, 110px); animation: doorMarkIn 1.4s cubic-bezier(.2, .8, .2, 1) both, doorMarkFloat 9s ease-in-out 1.4s infinite; }
 .door-lockup { position: relative; z-index: 1; width: 100%; height: auto; display: block; filter: drop-shadow(0 14px 44px rgba(0, 0, 0, 0.55)); }
 .door-bloom { position: absolute; left: 50%; top: 55%; width: 62%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; z-index: 0; pointer-events: none; filter: blur(14px); animation: doorBloom 5s ease-in-out infinite;
   background: radial-gradient(circle, rgba(255, 150, 40, 0.55) 0%, rgba(249, 98, 3, 0.26) 30%, rgba(236, 72, 153, 0.08) 52%, transparent 70%); }
 .door-sweep { position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
   -webkit-mask: url("/agency-of-now.png") center / contain no-repeat; mask: url("/agency-of-now.png") center / contain no-repeat;
   background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.42) 50%, transparent 60%); background-size: 260% 100%; background-repeat: no-repeat; animation: doorSweep 11s ease-in-out 3s infinite; }
-.door-h1 { display: flex; justify-content: center; align-items: center; gap: 0.28em; white-space: nowrap; height: 1.2em; font-size: clamp(24px, min(4.6vw, 6.4vh), 66px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; margin: 0 0 clamp(22px, 5vh, 64px); color: var(--door-ink); }
+.door-h1 { display: flex; justify-content: center; align-items: center; gap: 0.28em; white-space: nowrap; height: 1.2em; font-size: clamp(22px, min(4.15vw, 5.75vh), 60px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; margin: 0 0 clamp(26px, 5.8vh, 76px); color: var(--door-ink); }
 .door-word-slot { position: relative; display: inline-flex; align-items: center; height: 1.2em; overflow: visible; transition: width .45s cubic-bezier(.2, .8, .2, 1); }
 .door-word-sizer { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; white-space: nowrap; }
 .door-lead { white-space: pre; color: var(--door-ink); }
