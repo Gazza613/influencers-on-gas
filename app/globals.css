@@ -368,7 +368,7 @@ body {
 .door-inner { position: relative; z-index: 2; text-align: center; padding: 0 16px 44px; max-width: 900px; justify-self: center; align-self: stretch; width: 100%; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
 .door-msg { flex: 0 0 auto; }
 .door-lower { flex: 0 0 auto; display: flex; justify-content: center; margin-top: clamp(46px, 12vh, 156px); }
-.door-mark { position: relative; display: block; width: clamp(270px, min(55vw, 55vh), 874px); margin: 0 auto clamp(36px, 9vh, 120px); animation: doorMarkIn 1.4s cubic-bezier(.2, .8, .2, 1) both, doorMarkFloat 9s ease-in-out 1.4s infinite; }
+.door-mark { position: relative; display: block; width: clamp(290px, min(60vw, 60vh), 960px); margin: 0 auto clamp(36px, 9vh, 120px); animation: doorMarkIn 1.4s cubic-bezier(.2, .8, .2, 1) both, doorMarkFloat 9s ease-in-out 1.4s infinite; }
 .door-lockup { position: relative; z-index: 1; width: 100%; height: auto; display: block; filter: drop-shadow(0 14px 44px rgba(0, 0, 0, 0.55)); }
 .door-bloom { position: absolute; left: 50%; top: 55%; width: 62%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; z-index: 0; pointer-events: none; filter: blur(14px); animation: doorBloom 5s ease-in-out infinite;
   background: radial-gradient(circle, rgba(255, 150, 40, 0.55) 0%, rgba(249, 98, 3, 0.26) 30%, rgba(236, 72, 153, 0.08) 52%, transparent 70%); }
@@ -408,7 +408,7 @@ body {
   .door { grid-template-columns: 1fr; grid-template-rows: 1fr; }
   .door-cascade, .door-strip, .door-credit { display: none; }
   .door-inner { padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
-  .door-mark { width: clamp(260px, min(88vw, 40vh), 460px); margin-bottom: clamp(20px, 5vh, 40px); }
+  .door-mark { width: clamp(280px, min(94vw, 44vh), 500px); margin-bottom: clamp(20px, 5vh, 40px); }
   .door-h1 { font-size: clamp(20px, 5.9vw, 34px); margin-bottom: clamp(16px, 3.5vh, 30px); }
   .door-sub { font-size: 15px; max-width: 34ch; }
   .door-lower { margin-top: clamp(22px, 5vh, 44px); }
