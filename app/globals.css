@@ -398,24 +398,23 @@ body {
 .door-credit { position: absolute; left: 0; right: 0; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 2; text-align: center; font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--door-ink-faint); pointer-events: none; }
 .door-credit b { color: #F96203; font-weight: 600; }
 
-/* Phones: the flanks cannot fit, so the cascade becomes a strip along the foot. Still one screen. */
+/* Phones (Gary): no cascade and no strip - the team cards looked odd at that size - just the message, centred.
+   The sentence stays on one line at a size that fits a narrow phone; the pills slim to number + play so all three
+   sit on one row. */
 .door-strip { display: none; }
 @media (max-width: 760px) {
-  .door-h1 { font-size: clamp(22px, 6.2vw, 34px); }
-  .door { grid-template-columns: 1fr; grid-template-rows: 1fr auto; align-content: center; }
-  .door-cascade { display: none; }
-  .door-inner { padding-top: 30px; padding-bottom: 0; }
-  .door-lower { margin-top: clamp(18px, 4vh, 40px); }
-  .door-mark { width: clamp(220px, min(74vw, 40vh), 380px); }
-  .door-strip { display: block; position: relative; z-index: 2; width: 100%; overflow: hidden; padding: 2vh 0 calc(24px + env(safe-area-inset-bottom, 0px)); }
-  .door-strip::before, .door-strip::after { content: ""; position: absolute; top: 0; bottom: 0; width: 12%; z-index: 2; pointer-events: none; }
-  .door-strip::before { left: 0; background: linear-gradient(90deg, var(--door-ground), transparent); }
-  .door-strip::after { right: 0; background: linear-gradient(270deg, var(--door-ground), transparent); }
-  .door-strip-track { display: flex; width: max-content; will-change: transform; animation: doorDrift 70s linear infinite; }
-  .door-strip .door-card { width: clamp(58px, 15vw, 76px); border-radius: 9px; margin: 0 10px 0 0; }
-  .door-credit { display: none; }
-  .door-pill-l { display: none; }
-  .door-pill { padding: 7px 12px 7px 8px; }
+  .door { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .door-cascade, .door-strip, .door-credit { display: none; }
+  .door-inner { padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .door-mark { width: clamp(220px, min(74vw, 40vh), 380px); margin-bottom: clamp(24px, 6vh, 48px); }
+  .door-h1 { font-size: clamp(18px, 5.2vw, 30px); margin-bottom: clamp(18px, 4vh, 36px); }
+  .door-sub { font-size: 15px; max-width: 34ch; }
+  .door-lower { margin-top: clamp(26px, 6vh, 56px); }
+  .door-flex { gap: 10px; }
+  .door-pill { padding: 7px 8px 7px 12px; gap: 8px; }
+  .door-pill-ic, .door-pill-l { display: none; }
+  .door-pill-n { font-size: 18px; }
+  .door-pill-play { width: 24px; height: 24px; margin-left: 0; }
 }
 @media (max-height: 560px) and (min-width: 761px) { .door-sub { display: none; } .door-mark { width: clamp(200px, 36vh, 400px); } }
 
