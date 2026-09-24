@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import DoorAtmosphere from "@/components/DoorAtmosphere";
 
+// THE LOGIN DOOR (Gary, 2026-09-24): the same world as the landing page it is reached from - the warm ground, the
+// ember and halo, the linen and grain, and the official Agency of NOW lockup as the mark - so the click-through
+// from the landing pills lands somewhere that feels like the same product, not a different app.
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,24 +46,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6" style={{ background: "#07070E" }}>
-      {/* Same drifting orbs + dot grid as the landing page - pink / blue / purple */}
-      <div style={{ position: "absolute", width: 760, height: 760, top: "-22%", left: "-18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.28) 0%, transparent 65%)", animation: "orb1 14s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: 620, height: 620, top: "-14%", right: "-12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,113,227,0.22) 0%, transparent 65%)", animation: "orb2 19s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: 820, height: 820, bottom: "-32%", left: "18%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 65%)", animation: "orb3 23s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
+    <div className="door-page">
+      <DoorAtmosphere />
 
       <div className="relative z-10 flex w-full max-w-[480px] flex-col items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/gas-logo.png" alt="GAS" className="login-logo rounded-full" style={{ width: "clamp(84px, 24vw, 158px)", height: "clamp(84px, 24vw, 158px)", filter: "drop-shadow(0 12px 40px rgba(255,90,30,0.55))" }} />
-        <h1 className="mt-[clamp(14px,4vw,28px)] inline-flex items-baseline gap-[0.32em] font-extrabold" style={{ fontSize: "clamp(19px, 4.6vw, 30px)", letterSpacing: "0.08em" }}>
-          <span style={{ background: "linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>STUDIO ON</span>
-          <span style={{ fontWeight: 900, background: "linear-gradient(135deg, #FFB020 0%, #FF6A00 45%, #FF2D55 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>GAS</span>
-        </h1>
-        <p className="tabular mt-[clamp(8px,2vw,12px)] text-[14px] uppercase tracking-[0.38em]" style={{ color: "rgba(255,255,255,0.42)" }}>Human led · AI powered</p>
+        <a href="/" className="door-mark" aria-label="The Agency of NOW. Back to the front door.">
+          <span className="door-bloom" aria-hidden />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="door-lockup" src="/agency-of-now.png" width={1600} height={769} fetchPriority="high" decoding="async" alt="The Agency of NOW. Human Command. AI Execution." />
+          <span className="door-sweep" aria-hidden />
+        </a>
 
-        <form onSubmit={submit} className="login-card relative mt-[clamp(20px,5vw,36px)] w-full rounded-2xl p-[clamp(22px,6vw,36px)]">
-          <div className="tabular mb-[clamp(16px,4vw,24px)] text-center text-[14px] font-semibold uppercase tracking-[0.34em]" style={{ color: "rgba(168,85,247,0.85)" }}>Studio Access</div>
+        <form onSubmit={submit} className="login-card">
+          <div className="tabular mb-[clamp(16px,4vw,24px)] text-center text-[14px] font-semibold uppercase tracking-[0.34em]" style={{ color: "rgba(168,85,247,0.85)" }}>Agency Access</div>
           <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your work email" autoComplete="username"
             className="login-input w-full rounded-xl px-5 py-4 text-[19px] text-ink outline-none" />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" autoComplete="current-password"
@@ -83,33 +82,10 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <p className="tabular mt-[clamp(16px,4vw,28px)] flex items-center gap-2 text-[13px] uppercase tracking-[0.3em] text-ink-faint">
-          <span aria-hidden>🔒</span> Secure Studio Platform
+        <p className="tabular mt-[clamp(16px,4vw,28px)] flex items-center gap-2 text-[12px] uppercase tracking-[0.3em] text-ink-faint">
+          <span aria-hidden>🔒</span> Secure platform · Human Command. <span style={{ color: "#F96203" }}>AI Execution.</span>
         </p>
       </div>
-
-      <style>{`
-        @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(55px,-45px) scale(1.07)} 66%{transform:translate(-35px,38px) scale(0.93)} }
-        @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-45px,55px) scale(1.11)} }
-        @keyframes orb3 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(35px,-55px) scale(0.90)} 70%{transform:translate(-55px,22px) scale(1.08)} }
-        .login-logo { animation: logoFloat 6s ease-in-out infinite; }
-        @keyframes logoFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-        .login-card {
-          background: linear-gradient(180deg, rgba(18,14,26,0.82) 0%, rgba(10,9,16,0.86) 100%);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(168,85,247,0.34);
-          box-shadow: 0 0 0 1px rgba(168,85,247,0.06), 0 0 38px rgba(168,85,247,0.18), inset 0 1px 0 rgba(255,255,255,0.04);
-          animation: cardGlow 4.5s ease-in-out infinite;
-        }
-        @keyframes cardGlow {
-          0%,100% { border-color: rgba(168,85,247,0.32); box-shadow: 0 0 0 1px rgba(168,85,247,0.05), 0 0 30px rgba(168,85,247,0.15), inset 0 1px 0 rgba(255,255,255,0.04); }
-          50%      { border-color: rgba(236,72,153,0.5); box-shadow: 0 0 0 1px rgba(168,85,247,0.12), 0 0 52px rgba(168,85,247,0.32), inset 0 1px 0 rgba(255,255,255,0.05); }
-        }
-        .login-input { background: rgba(8,7,12,0.6); border: 1px solid rgba(255,255,255,0.08); transition: border-color .15s, box-shadow .15s; }
-        .login-input::placeholder { color: rgba(255,255,255,0.32); }
-        .login-input:focus { border-color: rgba(168,85,247,0.7); box-shadow: 0 0 0 3px rgba(168,85,247,0.16); }
-        .login-cta:hover:not(:disabled) { filter: brightness(1.06) saturate(1.06); box-shadow: 0 0 60px rgba(168,85,247,0.65), 0 8px 32px rgba(0,0,0,0.5); transform: translateY(-1px); }
-      `}</style>
     </div>
   );
 }

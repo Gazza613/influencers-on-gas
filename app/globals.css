@@ -305,3 +305,145 @@ body {
   .rise { animation: none; }
   .lift { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+   THE DOORS (Gary, 2026-09-24): the landing page and the login page share this one visual system. Ground is the
+   warm near-black of the team card artwork; light is a quiet ember from the foot and a halo behind the mark; a fine
+   linen weave + film grain keep the dark field from banding. Landing-only pieces (cascade, pills, typewriter) follow.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+.door, .door-page {
+  --door-ground: #080706;
+  --door-ink: #ffffff;
+  --door-ink-dim: rgba(255, 255, 255, 0.64);
+  --door-ink-faint: rgba(255, 255, 255, 0.42);
+  --door-line: rgba(255, 255, 255, 0.10);
+  --door-screen: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  position: relative; overflow: hidden; isolation: isolate; background: var(--door-ground); color: var(--door-ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+}
+.door-atmos { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.door-orb { position: absolute; border-radius: 50%; }
+.door-orb-a { width: 820px; height: 820px; left: -22%; top: -30%; background: radial-gradient(circle, rgba(140, 70, 30, 0.22) 0%, rgba(120, 50, 120, 0.08) 34%, transparent 64%); animation: doorOrbA 16s ease-in-out infinite; }
+.door-orb-b { width: 620px; height: 620px; right: -14%; top: -18%; background: radial-gradient(circle, rgba(120, 60, 24, 0.20) 0%, transparent 62%); animation: doorOrbB 21s ease-in-out infinite; }
+.door-orb-c { width: 720px; height: 720px; right: -20%; bottom: -34%; background: radial-gradient(circle, rgba(200, 90, 20, 0.24) 0%, rgba(120, 45, 15, 0.10) 34%, transparent 64%); animation: doorOrbC 19s ease-in-out infinite; }
+.door-orb-d { width: 560px; height: 560px; left: -12%; bottom: -26%; background: radial-gradient(circle, rgba(200, 90, 20, 0.18) 0%, transparent 62%); animation: doorOrbB 25s ease-in-out infinite reverse; }
+.door-ember { position: absolute; left: -10%; right: -10%; bottom: -12%; height: 58%; animation: doorBreathe 14s ease-in-out infinite;
+  background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(249, 98, 3, 0.16) 0%, rgba(214, 74, 0, 0.07) 38%, transparent 72%); }
+.door-ember::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: 12%; height: 2px; filter: blur(2px);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 160, 60, 0.18) 30%, rgba(255, 190, 90, 0.28) 50%, rgba(255, 160, 60, 0.18) 70%, transparent 100%); }
+.door-halo { position: absolute; left: 50%; top: 26%; width: 900px; height: 520px; transform: translate(-50%, -50%); border-radius: 50%; filter: blur(30px); animation: doorBreathe 11s ease-in-out 2s infinite;
+  background: radial-gradient(ellipse, rgba(249, 98, 3, 0.09) 0%, rgba(255, 140, 40, 0.04) 40%, transparent 70%); }
+.door-dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px); background-size: 32px 32px; }
+.door-linen { position: absolute; inset: 0; opacity: 0.5; mix-blend-mode: overlay;
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 3px); }
+.door-grain { position: absolute; inset: 0; opacity: 0.07; mix-blend-mode: overlay; background-size: 160px 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.door-vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 38%, rgba(8, 7, 6, 0.7) 100%); }
+
+/* ── The landing: one viewport, three columns. Cascades on the flanks, the message in the middle. ─────────────── */
+.door { height: var(--door-screen); display: grid; grid-template-columns: minmax(170px, 21vw) 1fr minmax(170px, 21vw); grid-template-rows: 1fr; align-items: center; }
+
+/* THE CASCADE. No mask over the moving layer (masking a moving column re-rasterises every frame and stutters):
+   the top and bottom fades are two cheap gradient overlays sitting above the column instead. The column itself is a
+   single composited layer moving on translate3d. */
+.door-cascade { position: relative; z-index: 1; height: 100%; display: flex; justify-content: center; padding: 0 clamp(10px, 1.4vw, 24px); overflow: hidden; }
+.door-cascade::before, .door-cascade::after { content: ""; position: absolute; left: 0; right: 0; height: 16%; z-index: 2; pointer-events: none; }
+.door-cascade::before { top: 0; background: linear-gradient(180deg, var(--door-ground) 0%, transparent 100%); }
+.door-cascade::after { bottom: 0; background: linear-gradient(0deg, var(--door-ground) 0%, transparent 100%); }
+.door-cascade-l { padding-left: clamp(14px, 2vw, 40px); }
+.door-cascade-r { padding-right: clamp(14px, 2vw, 40px); padding-top: 9vh; }
+.door-col { display: flex; flex-direction: column; width: clamp(130px, 15vw, 270px); flex: 0 0 auto; will-change: transform; backface-visibility: hidden; transform: translate3d(0, 0, 0);
+  animation: doorFall var(--dur, 100s) linear infinite; animation-delay: var(--phase, 0s); }
+.door-col-slow { --dur: 119s; }
+.door-cascade-r .door-col { --phase: -45s; }
+.door-cascade:hover .door-col { animation-play-state: paused; }
+.door-card { display: block; width: 100%; aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden; flex: 0 0 auto; margin-bottom: clamp(10px, 1vw, 16px); text-decoration: none; cursor: pointer;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.09); transition: transform .35s ease, box-shadow .35s ease; }
+.door-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.door-card:hover, .door-card:focus-visible { transform: scale(1.05); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.28); z-index: 2; }
+
+/* The message, budgeted to the screen height so it never scrolls. */
+.door-inner { position: relative; z-index: 2; text-align: center; padding: 0 16px 44px; max-width: 900px; justify-self: center; align-self: stretch; width: 100%; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.door-msg { flex: 0 0 auto; }
+.door-lower { flex: 0 0 auto; display: flex; justify-content: center; margin-top: clamp(36px, 9.5vh, 120px); }
+.door-mark { position: relative; display: block; width: clamp(270px, min(50vw, 52vh), 800px); margin: 0 auto clamp(22px, 5.5vh, 72px); animation: doorMarkIn 1.4s cubic-bezier(.2, .8, .2, 1) both, doorMarkFloat 9s ease-in-out 1.4s infinite; }
+.door-lockup { position: relative; z-index: 1; width: 100%; height: auto; display: block; filter: drop-shadow(0 14px 44px rgba(0, 0, 0, 0.55)); }
+.door-bloom { position: absolute; left: 50%; top: 55%; width: 62%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; z-index: 0; pointer-events: none; filter: blur(14px); animation: doorBloom 5s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(255, 150, 40, 0.55) 0%, rgba(249, 98, 3, 0.26) 30%, rgba(236, 72, 153, 0.08) 52%, transparent 70%); }
+.door-sweep { position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
+  -webkit-mask: url("/agency-of-now.png") center / contain no-repeat; mask: url("/agency-of-now.png") center / contain no-repeat;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.42) 50%, transparent 60%); background-size: 260% 100%; background-repeat: no-repeat; animation: doorSweep 11s ease-in-out 3s infinite; }
+.door-h1 { font-size: clamp(34px, min(7.4vw, 9vh), 96px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.0; margin: 0; color: var(--door-ink); text-wrap: balance; }
+.door-word-row { display: flex; align-items: center; justify-content: center; min-height: 1.14em; font-size: clamp(34px, min(7.4vw, 9vh), 96px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.08; margin: 0 0 clamp(16px, 3.8vh, 46px); }
+.door-word { background: linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.door-caret { display: inline-block; width: clamp(3px, 0.05em, 5px); height: 0.74em; margin-left: 0.08em; border-radius: 3px; background: linear-gradient(#EC4899, #A855F7); animation: doorBlink 1s step-end infinite; }
+.door-sub { font-size: clamp(14px, min(1.6vw, 2.3vh), 18px); color: var(--door-ink-dim); max-width: 66ch; margin: 0 auto; line-height: 1.55; text-wrap: balance; }
+
+/* The flex pills: the way in. */
+.door-flex { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.door-pill { --a: #EC4899; display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px 10px 12px; border-radius: 999px; text-decoration: none; color: inherit;
+  border: 1px solid color-mix(in srgb, var(--a) 45%, transparent); background: color-mix(in srgb, var(--a) 10%, rgba(8, 7, 6, 0.6));
+  box-shadow: 0 0 22px -8px var(--a); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.door-pill:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--a) 80%, transparent); box-shadow: 0 0 30px -6px var(--a); }
+.door-pill-ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--a) 22%, transparent); color: var(--a); }
+.door-pill-ic svg { width: 15px; height: 15px; }
+.door-pill-n { font-weight: 800; font-size: clamp(17px, 2.2vh, 20px); letter-spacing: -0.02em; color: var(--door-ink); line-height: 1; }
+.door-pill-l { font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--door-ink-dim); }
+.door-pill-play { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; margin-left: 4px; color: #fff; background: color-mix(in srgb, var(--a) 55%, transparent); box-shadow: 0 0 12px -2px var(--a); transition: background .18s ease, transform .18s ease; }
+.door-pill-play svg { width: 12px; height: 12px; margin-left: 1px; }
+.door-pill:hover .door-pill-play { background: var(--a); transform: scale(1.08); }
+
+.door-credit { position: absolute; left: 0; right: 0; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 2; text-align: center; font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--door-ink-faint); pointer-events: none; }
+.door-credit b { color: #F96203; font-weight: 600; }
+
+/* Phones: the flanks cannot fit, so the cascade becomes a strip along the foot. Still one screen. */
+.door-strip { display: none; }
+@media (max-width: 760px) {
+  .door { grid-template-columns: 1fr; grid-template-rows: 1fr auto; align-content: center; }
+  .door-cascade { display: none; }
+  .door-inner { padding-top: 30px; padding-bottom: 0; }
+  .door-lower { margin-top: clamp(18px, 4vh, 40px); }
+  .door-mark { width: clamp(220px, min(74vw, 40vh), 380px); }
+  .door-strip { display: block; position: relative; z-index: 2; width: 100%; overflow: hidden; padding: 2vh 0 calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .door-strip::before, .door-strip::after { content: ""; position: absolute; top: 0; bottom: 0; width: 12%; z-index: 2; pointer-events: none; }
+  .door-strip::before { left: 0; background: linear-gradient(90deg, var(--door-ground), transparent); }
+  .door-strip::after { right: 0; background: linear-gradient(270deg, var(--door-ground), transparent); }
+  .door-strip-track { display: flex; width: max-content; will-change: transform; animation: doorDrift 70s linear infinite; }
+  .door-strip .door-card { width: clamp(58px, 15vw, 76px); border-radius: 9px; margin: 0 10px 0 0; }
+  .door-credit { display: none; }
+  .door-pill-l { display: none; }
+  .door-pill { padding: 7px 12px 7px 8px; }
+}
+@media (max-height: 560px) and (min-width: 761px) { .door-sub { display: none; } .door-mark { width: clamp(200px, 36vh, 400px); } }
+
+@keyframes doorBlink { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }
+@keyframes doorBreathe { 0%, 100% { opacity: .82 } 50% { opacity: 1 } }
+@keyframes doorOrbA { 0%, 100% { transform: translate(0, 0) scale(1) } 33% { transform: translate(55px, -45px) scale(1.07) } 66% { transform: translate(-35px, 38px) scale(.93) } }
+@keyframes doorOrbB { 0%, 100% { transform: translate(0, 0) scale(1) } 50% { transform: translate(-45px, 55px) scale(1.11) } }
+@keyframes doorOrbC { 0%, 100% { transform: translate(0, 0) scale(1) } 50% { transform: translate(-40px, -30px) scale(1.08) } }
+@keyframes doorFall { from { transform: translate3d(0, calc(-1 * var(--set, 50%)), 0) } to { transform: translate3d(0, 0, 0) } }
+@keyframes doorDrift { from { transform: translate3d(0, 0, 0) } to { transform: translate3d(-50%, 0, 0) } }
+@keyframes doorMarkIn { from { opacity: 0; transform: translateY(16px) scale(.96) } to { opacity: 1; transform: none } }
+@keyframes doorMarkFloat { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-5px) } }
+@keyframes doorBloom { 0%, 100% { opacity: .8; transform: translate(-50%, -50%) scale(1) } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) } }
+@keyframes doorSweep { 0%, 12% { background-position: 120% 0 } 40%, 100% { background-position: -120% 0 } }
+
+/* ── The login door: the same ground and light, with the mark above the form. ─────────────────────────────────── */
+.door-page { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(28px, 6vh, 56px) 24px; }
+.door-page .door-mark { width: clamp(240px, min(52vw, 34vh), 460px); margin-bottom: clamp(18px, 4vh, 36px); }
+.login-card { position: relative; z-index: 2; width: 100%; max-width: 480px; border-radius: 20px; padding: clamp(22px, 5vh, 36px);
+  background: linear-gradient(180deg, rgba(20, 15, 13, 0.82) 0%, rgba(10, 8, 7, 0.88) 100%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(168, 85, 247, 0.30); box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.05), 0 0 38px rgba(168, 85, 247, 0.14), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04); animation: loginGlow 4.5s ease-in-out infinite; }
+@keyframes loginGlow {
+  0%, 100% { border-color: rgba(168, 85, 247, 0.28); box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.05), 0 0 30px rgba(168, 85, 247, 0.12), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+  50%      { border-color: rgba(236, 72, 153, 0.46); box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.12), 0 0 52px rgba(168, 85, 247, 0.28), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+}
+.login-input { background: rgba(8, 7, 6, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); transition: border-color .15s, box-shadow .15s; }
+.login-input::placeholder { color: rgba(255, 255, 255, 0.32); }
+.login-input:focus { border-color: rgba(168, 85, 247, 0.7); box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.16); }
+.login-cta:hover:not(:disabled) { filter: brightness(1.06) saturate(1.06); box-shadow: 0 0 60px rgba(168, 85, 247, 0.65), 0 8px 32px rgba(0, 0, 0, 0.5); transform: translateY(-1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .door-col, .door-strip-track, .door-orb, .door-caret, .door-mark, .door-bloom, .door-sweep, .door-ember, .door-halo, .login-card { animation: none !important; }
+  .door-card, .door-pill { transition: none; }
+}
