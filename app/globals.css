@@ -409,7 +409,7 @@ body {
   .door-cascade, .door-strip, .door-credit { display: none; }
   .door-inner { padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
   .door-mark { width: clamp(260px, min(88vw, 40vh), 460px); margin-bottom: clamp(20px, 5vh, 40px); }
-  .door-h1 { font-size: clamp(22px, 7vw, 38px); margin-bottom: clamp(16px, 3.5vh, 30px); }
+  .door-h1 { font-size: clamp(20px, 5.9vw, 34px); margin-bottom: clamp(16px, 3.5vh, 30px); }
   .door-sub { font-size: 15px; max-width: 34ch; }
   .door-lower { margin-top: clamp(22px, 5vh, 44px); }
   /* Stacked, one under the other, with their labels (Gary: "83" alone said nothing). Each is a full-width row:

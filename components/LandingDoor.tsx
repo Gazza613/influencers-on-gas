@@ -6,24 +6,30 @@ import { TEAM, TEAM_ABOUT_URL } from "@/lib/team";
 
 // THE LANDING DOOR (Gary, approved 2026-09-24 after ~30 rounds on the dummy). One screen, no scroll, on any device:
 //   - the official Agency of NOW lockup as the mark, with a soft settle-in, a slow float and one light sweep;
-//   - the "Create Your ___" typewriter, carried over from the old landing;
+//   - a typewriter of six call-outs, one per part of the studio, each typed out whole;
 //   - three flex pills (AI agents / AI Brains / Pods) as the way in - all go to login (or the dashboard when signed in);
 //   - the TEAM as the atmosphere: one slow cascade of the thirteen down each flank (where the digit rain sits on the
 //     Media on GAS door), out of step left to right, every card a quiet link to the About page. On a phone the flanks
 //     cannot fit, so the cascade becomes a small strip along the foot.
 // The numbers are LIVE: the page passes them in from POD_AGENTS and the database, so the flex never goes stale.
 
-const WORDS = ["Campaigns", "Articles", "Designs", "Research", "Influencers", "Insights", "Social Ads", "Avatars"];
-const LEAD = "Create Your ";
-const TYPE_SPEED = 62;
-const DELETE_SPEED = 32;
-const PAUSE_MS = 2000;
+// THE SIX CALL-OUTS (Gary, 2026-09-24): one per part of the studio, in the order a client is walked through it. Each
+// line types out whole, pauses, clears, and the next follows. The last word of each carries the orange.
+const LINES = [
+  "Research That Verifies",
+  "Strategy Before Spend",
+  "A Brain For Every Brand",
+  "Creative Excellence At Scale",
+  "AI Influencers Built Here",
+  "Enquiries Scored For Intent",
+];
+const TYPE_SPEED = 58;
+const DELETE_SPEED = 28;
+const PAUSE_MS = 2400;
 
-// The whole sentence types out and clears (Gary): "Create Your Designs" letter by letter from the left, a pause, then
-// back to nothing and the next one. Typing the last word alone re-centred the line and jumped.
 function useTypewriter(enabled: boolean) {
-  const [wordIdx, setWordIdx] = useState(0);
-  const full = LEAD + WORDS[wordIdx];
+  const [idx, setIdx] = useState(0);
+  const full = LINES[idx];
   const [n, setN] = useState(full.length);
   const [phase, setPhase] = useState<"typing" | "deleting">("deleting");
   useEffect(() => {
@@ -33,11 +39,12 @@ function useTypewriter(enabled: boolean) {
       const t = setTimeout(() => setPhase("deleting"), PAUSE_MS); return () => clearTimeout(t);
     }
     if (n > 0) { const t = setTimeout(() => setN(n - 1), DELETE_SPEED); return () => clearTimeout(t); }
-    setWordIdx((i) => (i + 1) % WORDS.length);
+    setIdx((i) => (i + 1) % LINES.length);
     setPhase("typing");
   }, [enabled, n, phase, full.length]);
   const typed = full.slice(0, n);
-  return { lead: typed.slice(0, LEAD.length), word: typed.slice(LEAD.length), full };
+  const split = full.lastIndexOf(" ") + 1; // the last word is the orange one
+  return { lead: typed.slice(0, split), word: typed.slice(split), full };
 }
 
 // The svg icons for the three pills (lucide-style strokes).
