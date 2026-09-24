@@ -82,8 +82,10 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <p className="tabular mt-[clamp(16px,4vw,28px)] flex items-center gap-2 text-[12px] uppercase tracking-[0.3em] text-ink-faint">
-          <span aria-hidden>🔒</span> Secure platform · Human Command. <span style={{ color: "#F96203" }}>AI Execution.</span>
+        {/* One quiet line, never wrapped (Gary): the lock, then the platform line, in the same tracked caps as the
+            landing footer. */}
+        <p className="mt-[clamp(16px,4vw,28px)] whitespace-nowrap text-[11px] uppercase tracking-[0.2em] text-ink-faint">
+          <span aria-hidden>🔒</span>&nbsp; Secure platform &middot; Human Command. <span style={{ color: "#F96203" }}>AI Execution.</span>
         </p>
       </div>
     </div>
