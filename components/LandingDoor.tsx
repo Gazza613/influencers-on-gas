@@ -133,10 +133,10 @@ export default function LandingDoor({ agents, brains, pods, signedIn }: { agents
         </div>
         <div className="door-lower">
           <div className="door-flex" aria-label="The platform in numbers">
-            {/* All three in the same deep orange (Gary), the same heat as the typed word. */}
-            {pill(agents, "AI agents", ICON_AGENTS, "#E8431A")}
-            {pill(brains, "AI Brains", ICON_BRAINS, "#E8431A")}
-            {pill(pods, "Pods", ICON_PODS, "#E8431A")}
+            {/* All three in the typewriter's orange (Gary); the play disc carries its exact gradient. Quiet at rest, glowing on hover. */}
+            {pill(agents, "AI agents", ICON_AGENTS, "#EE4A18")}
+            {pill(brains, "AI Brains", ICON_BRAINS, "#EE4A18")}
+            {pill(pods, "Pods", ICON_PODS, "#EE4A18")}
           </div>
         </div>
       </div>
