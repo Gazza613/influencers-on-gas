@@ -66,7 +66,14 @@ export default function LoginPage() {
           {error && <p className="mt-3 text-[15px] text-alert">{error}</p>}
           <button type="submit" disabled={busy}
             className="login-cta mt-[clamp(18px,4.5vw,24px)] w-full rounded-full py-4 text-[17px] font-bold uppercase tracking-[0.18em] text-white transition disabled:opacity-70">
-            {busy ? "Checking…" : "Sign in →"}
+            {busy ? "Checking…" : (
+              <span className="inline-flex items-center justify-center gap-3">
+                Let&rsquo;s Build
+                <span className="login-play" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
+                </span>
+              </span>
+            )}
           </button>
           {/* Same muted colour as the line beneath it (Gary) - it is a quiet secondary action, not a second
               call to action competing with Sign in. The underline carries the affordance instead of colour. */}
