@@ -323,16 +323,16 @@ body {
 }
 .door-atmos { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .door-orb { position: absolute; border-radius: 50%; }
-.door-orb-a { width: 820px; height: 820px; left: -22%; top: -30%; background: radial-gradient(circle, rgba(140, 70, 30, 0.21) 0%, rgba(120, 50, 120, 0.07) 34%, transparent 64%); animation: doorOrbA 16s ease-in-out infinite; }
-.door-orb-b { width: 620px; height: 620px; right: -14%; top: -18%; background: radial-gradient(circle, rgba(120, 60, 24, 0.19) 0%, transparent 62%); animation: doorOrbB 21s ease-in-out infinite; }
-.door-orb-c { width: 720px; height: 720px; right: -20%; bottom: -34%; background: radial-gradient(circle, rgba(200, 90, 20, 0.22) 0%, rgba(120, 45, 15, 0.09) 34%, transparent 64%); animation: doorOrbC 19s ease-in-out infinite; }
-.door-orb-d { width: 560px; height: 560px; left: -12%; bottom: -26%; background: radial-gradient(circle, rgba(200, 90, 20, 0.17) 0%, transparent 62%); animation: doorOrbB 25s ease-in-out infinite reverse; }
+.door-orb-a { width: 820px; height: 820px; left: -22%; top: -30%; background: radial-gradient(circle, rgba(140, 70, 30, 0.18) 0%, rgba(120, 50, 120, 0.06) 34%, transparent 64%); animation: doorOrbA 16s ease-in-out infinite; }
+.door-orb-b { width: 620px; height: 620px; right: -14%; top: -18%; background: radial-gradient(circle, rgba(120, 60, 24, 0.16) 0%, transparent 62%); animation: doorOrbB 21s ease-in-out infinite; }
+.door-orb-c { width: 720px; height: 720px; right: -20%; bottom: -34%; background: radial-gradient(circle, rgba(200, 90, 20, 0.19) 0%, rgba(120, 45, 15, 0.08) 34%, transparent 64%); animation: doorOrbC 19s ease-in-out infinite; }
+.door-orb-d { width: 560px; height: 560px; left: -12%; bottom: -26%; background: radial-gradient(circle, rgba(200, 90, 20, 0.14) 0%, transparent 62%); animation: doorOrbB 25s ease-in-out infinite reverse; }
 .door-ember { position: absolute; left: -10%; right: -10%; bottom: -12%; height: 58%; animation: doorBreathe 14s ease-in-out infinite;
-  background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(249, 98, 3, 0.16) 0%, rgba(214, 74, 0, 0.07) 38%, transparent 72%); }
+  background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(249, 98, 3, 0.13) 0%, rgba(214, 74, 0, 0.06) 38%, transparent 72%); }
 .door-ember::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: 12%; height: 2px; filter: blur(2px);
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 160, 60, 0.17) 30%, rgba(255, 190, 90, 0.26) 50%, rgba(255, 160, 60, 0.17) 70%, transparent 100%); }
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 160, 60, 0.14) 30%, rgba(255, 190, 90, 0.22) 50%, rgba(255, 160, 60, 0.14) 70%, transparent 100%); }
 .door-halo { position: absolute; left: 50%; top: 26%; width: 900px; height: 520px; transform: translate(-50%, -50%); border-radius: 50%; filter: blur(30px); animation: doorBreathe 11s ease-in-out 2s infinite;
-  background: radial-gradient(ellipse, rgba(249, 98, 3, 0.09) 0%, rgba(255, 140, 40, 0.04) 40%, transparent 70%); }
+  background: radial-gradient(ellipse, rgba(249, 98, 3, 0.07) 0%, rgba(255, 140, 40, 0.03) 40%, transparent 70%); }
 .door-dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px); background-size: 32px 32px; }
 .door-linen { position: absolute; inset: 0; opacity: 0.8; mix-blend-mode: overlay;
   background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 3px); }
