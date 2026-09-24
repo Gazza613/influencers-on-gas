@@ -40,7 +40,7 @@ function useTypewriter(enabled: boolean) {
     setWordIdx((i) => (i + 1) % WORDS.length);
     setPhase("typing");
   }, [enabled, text, phase, wordIdx]);
-  return text;
+  return { text, target: WORDS[wordIdx] };
 }
 
 // The svg icons for the three pills (lucide-style strokes).
@@ -87,7 +87,16 @@ function Column({ start, slow }: { start: number; slow?: boolean }) {
 export default function LandingDoor({ agents, brains, pods, signedIn }: { agents: number; brains: number; pods: number; signedIn: boolean }) {
   const [reduced, setReduced] = useState(false);
   useEffect(() => { setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches); }, []);
-  const word = useTypewriter(!reduced);
+  const { text: word, target } = useTypewriter(!reduced);
+  // THE WORD SLOT is sized to the WHOLE word being typed (an invisible copy), so nothing moves while a word types
+  // and deletes; when the next word arrives the slot eases to its width instead of snapping. The row itself has a
+  // fixed height, so the mark above it never moves either.
+  const sizerRef = useRef<HTMLSpanElement>(null);
+  const [slotW, setSlotW] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const m = () => { if (sizerRef.current) setSlotW(sizerRef.current.offsetWidth); };
+    m(); window.addEventListener("resize", m); return () => window.removeEventListener("resize", m);
+  }, [target]);
   const href = signedIn ? "/dashboard" : "/login";
   const pill = (n: number, label: string, icon: React.ReactNode, hue: string) => (
     <a className="door-pill" href={href} style={{ ["--a" as string]: hue }} aria-label={`${n} ${label}. ${signedIn ? "Enter the Agency" : "Sign in"}`}>
@@ -119,7 +128,10 @@ export default function LandingDoor({ agents, brains, pods, signedIn }: { agents
               short ones). */}
           <h1 className="door-h1" aria-live="polite">
             <span>Create Your</span>
-            <span className="door-word-slot"><span className="door-word">{word}</span><span className="door-caret" aria-hidden /></span>
+            <span className="door-word-slot" style={slotW ? { width: slotW } : undefined}>
+              <span className="door-word-sizer" ref={sizerRef} aria-hidden>{target}</span>
+              <span className="door-word">{word}</span><span className="door-caret" aria-hidden />
+            </span>
           </h1>
           <p className="door-sub">Thirteen humans in command. Eighty-three AI agents in execution. One platform from research to results, where every decision is made by a person and every task is done at machine speed.</p>
         </div>
