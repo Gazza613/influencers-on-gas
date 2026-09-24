@@ -13,7 +13,7 @@ import { TEAM, TEAM_ABOUT_URL } from "@/lib/team";
 //     cannot fit, so the cascade becomes a small strip along the foot.
 // The numbers are LIVE: the page passes them in from POD_AGENTS and the database, so the flex never goes stale.
 
-// THE SIX CALL-OUTS (Gary, 2026-09-24): one per part of the studio, in the order a client is walked through it. Each
+// THE SEVEN CALL-OUTS (Gary, 2026-09-24): one per part of the studio, in the order a client is walked through it. Each
 // line types out whole, pauses, clears, and the next follows. The last word of each carries the orange.
 const LINES = [
   "Research That Verifies",
@@ -22,6 +22,7 @@ const LINES = [
   "Creative Excellence At Scale",
   "AI Influencers Built Here",
   "Enquiries Scored For Intent",
+  "Metrics That Really Matter",
 ];
 const TYPE_SPEED = 58;
 const DELETE_SPEED = 28;
