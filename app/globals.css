@@ -375,8 +375,8 @@ body {
   background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.42) 50%, transparent 60%); background-size: 260% 100%; background-repeat: no-repeat; animation: doorSweep 11s ease-in-out 3s infinite; }
 .door-h1 { font-size: clamp(34px, min(7.4vw, 9vh), 96px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.0; margin: 0; color: var(--door-ink); text-wrap: balance; }
 .door-word-row { display: flex; align-items: center; justify-content: center; min-height: 1.14em; font-size: clamp(34px, min(7.4vw, 9vh), 96px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.08; margin: 0 0 clamp(16px, 3.8vh, 46px); }
-.door-word { background: linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
-.door-caret { display: inline-block; width: clamp(3px, 0.05em, 5px); height: 0.74em; margin-left: 0.08em; border-radius: 3px; background: linear-gradient(#EC4899, #A855F7); animation: doorBlink 1s step-end infinite; }
+.door-word { background: linear-gradient(120deg, #FFB020 0%, #F96203 55%, #FF7A2E 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.door-caret { display: inline-block; width: clamp(3px, 0.05em, 5px); height: 0.74em; margin-left: 0.08em; border-radius: 3px; background: linear-gradient(#FFB020, #F96203); animation: doorBlink 1s step-end infinite; }
 .door-sub { font-size: clamp(14px, min(1.6vw, 2.3vh), 18px); color: var(--door-ink-dim); max-width: 66ch; margin: 0 auto; line-height: 1.55; text-wrap: balance; }
 
 /* The flex pills: the way in. */
