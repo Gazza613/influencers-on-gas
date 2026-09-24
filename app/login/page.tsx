@@ -65,10 +65,10 @@ export default function LoginPage() {
             className="login-input mt-3.5 w-full rounded-xl px-5 py-4 text-[19px] text-ink outline-none" />
           {error && <p className="mt-3 text-[15px] text-alert">{error}</p>}
           <button type="submit" disabled={busy}
-            className="login-cta mt-[clamp(18px,4.5vw,24px)] w-full rounded-full py-4 text-[17px] font-bold uppercase tracking-[0.18em] text-white transition disabled:opacity-70">
+            className="login-cta mt-[clamp(18px,4.5vw,24px)] w-full rounded-full py-[15px] text-[16px] font-semibold tracking-[0.01em] text-white transition disabled:opacity-70">
             {busy ? "Checking…" : (
-              <span className="inline-flex items-center justify-center gap-3">
-                Let&rsquo;s Build
+              <span className="inline-flex items-center justify-center gap-2.5">
+                Let&rsquo;s build
                 <span className="login-play" aria-hidden>
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
                 </span>
