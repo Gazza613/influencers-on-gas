@@ -408,8 +408,8 @@ body {
   .door { grid-template-columns: 1fr; grid-template-rows: 1fr; }
   .door-cascade, .door-strip, .door-credit { display: none; }
   .door-inner { padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
-  .door-mark { width: clamp(220px, min(74vw, 40vh), 380px); margin-bottom: clamp(24px, 6vh, 48px); }
-  .door-h1 { font-size: clamp(18px, 5.2vw, 30px); margin-bottom: clamp(18px, 4vh, 36px); }
+  .door-mark { width: clamp(260px, min(88vw, 40vh), 460px); margin-bottom: clamp(20px, 5vh, 40px); }
+  .door-h1 { font-size: clamp(22px, 7vw, 38px); margin-bottom: clamp(16px, 3.5vh, 30px); }
   .door-sub { font-size: 15px; max-width: 34ch; }
   .door-lower { margin-top: clamp(22px, 5vh, 44px); }
   /* Stacked, one under the other, with their labels (Gary: "83" alone said nothing). Each is a full-width row:
@@ -420,13 +420,13 @@ body {
   .door-pill-l { display: inline; font-size: 12px; }
   .door-pill-n { font-size: 19px; min-width: 2ch; text-align: right; }
   .door-pill-play { margin-left: auto; width: 26px; height: 26px; }
-  .door-mark { width: clamp(200px, min(66vw, 30vh), 340px); margin-bottom: clamp(18px, 4.5vh, 36px); }
-  .door-h1 { margin-bottom: clamp(14px, 3vh, 26px); }
+
+
   .door-sub { font-size: 14.5px; line-height: 1.5; }
 }
 @media (max-width: 760px) and (max-height: 700px) {
   .door-sub { display: none; }
-  .door-mark { width: clamp(180px, 26vh, 300px); }
+  .door-mark { width: clamp(220px, 34vh, 380px); }
 }
 @media (max-height: 560px) and (min-width: 761px) { .door-sub { display: none; } .door-mark { width: clamp(200px, 36vh, 400px); } }
 
