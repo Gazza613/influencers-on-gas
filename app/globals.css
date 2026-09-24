@@ -445,15 +445,16 @@ body {
 .door-page .door-mark { width: clamp(240px, min(52vw, 34vh), 460px); margin-bottom: clamp(18px, 4vh, 36px); }
 .login-card { position: relative; z-index: 2; width: 100%; max-width: 480px; border-radius: 20px; padding: clamp(22px, 5vh, 36px);
   background: linear-gradient(180deg, rgba(20, 15, 13, 0.82) 0%, rgba(10, 8, 7, 0.88) 100%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(168, 85, 247, 0.30); box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.05), 0 0 38px rgba(168, 85, 247, 0.14), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04); animation: loginGlow 4.5s ease-in-out infinite; }
+  border: 1px solid rgba(238, 74, 24, 0.34); box-shadow: 0 0 0 1px rgba(238, 74, 24, 0.05), 0 0 34px rgba(238, 74, 24, 0.12), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04); animation: loginGlow 4.5s ease-in-out infinite; }
 @keyframes loginGlow {
-  0%, 100% { border-color: rgba(168, 85, 247, 0.28); box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.05), 0 0 30px rgba(168, 85, 247, 0.12), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04); }
-  50%      { border-color: rgba(236, 72, 153, 0.46); box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.12), 0 0 52px rgba(168, 85, 247, 0.28), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+  0%, 100% { border-color: rgba(238, 74, 24, 0.30); box-shadow: 0 0 0 1px rgba(238, 74, 24, 0.05), 0 0 28px rgba(238, 74, 24, 0.10), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+  50%      { border-color: rgba(249, 98, 3, 0.48); box-shadow: 0 0 0 1px rgba(238, 74, 24, 0.10), 0 0 46px rgba(238, 74, 24, 0.24), 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 }
-.login-input { background: rgba(8, 7, 6, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); transition: border-color .15s, box-shadow .15s; }
+.login-input { background: rgba(8, 7, 6, 0.6); border: 1px solid rgba(238, 74, 24, 0.32); transition: border-color .15s, box-shadow .15s; }
 .login-input::placeholder { color: rgba(255, 255, 255, 0.32); }
-.login-input:focus { border-color: rgba(168, 85, 247, 0.7); box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.16); }
-.login-cta:hover:not(:disabled) { filter: brightness(1.06) saturate(1.06); box-shadow: 0 0 60px rgba(168, 85, 247, 0.65), 0 8px 32px rgba(0, 0, 0, 0.5); transform: translateY(-1px); }
+.login-input:focus { border-color: rgba(249, 98, 3, 0.85); box-shadow: 0 0 0 3px rgba(238, 74, 24, 0.18); }
+.login-cta { background: linear-gradient(120deg, #F96203 0%, #E8431A 55%, #D9301C 100%); box-shadow: 0 0 26px rgba(238, 74, 24, 0.35), 0 4px 20px rgba(0, 0, 0, 0.5); }
+.login-cta:hover:not(:disabled) { filter: brightness(1.06) saturate(1.06); box-shadow: 0 0 56px rgba(238, 74, 24, 0.6), 0 8px 32px rgba(0, 0, 0, 0.5); transform: translateY(-1px); }
 
 @media (prefers-reduced-motion: reduce) {
   .door-col, .door-strip-track, .door-orb, .door-caret, .door-mark, .door-bloom, .door-sweep, .door-ember, .door-halo, .login-card { animation: none !important; }

@@ -58,15 +58,14 @@ export default function LoginPage() {
         </a>
 
         <form onSubmit={submit} className="login-card">
-          <div className="tabular mb-[clamp(16px,4vw,24px)] text-center text-[14px] font-semibold uppercase tracking-[0.34em]" style={{ color: "rgba(168,85,247,0.85)" }}>Agency Access</div>
+          <div className="tabular mb-[clamp(16px,4vw,24px)] text-center text-[14px] font-semibold uppercase tracking-[0.34em]" style={{ color: "#F96203" }}>Agency Access</div>
           <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your work email" autoComplete="username"
             className="login-input w-full rounded-xl px-5 py-4 text-[19px] text-ink outline-none" />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" autoComplete="current-password"
             className="login-input mt-3.5 w-full rounded-xl px-5 py-4 text-[19px] text-ink outline-none" />
           {error && <p className="mt-3 text-[15px] text-alert">{error}</p>}
           <button type="submit" disabled={busy}
-            className="login-cta mt-[clamp(18px,4.5vw,24px)] w-full rounded-full py-4 text-[17px] font-bold uppercase tracking-[0.18em] text-white transition disabled:opacity-70"
-            style={{ background: "linear-gradient(135deg,#EC4899 0%,#8B5CF6 100%)", boxShadow: "0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)" }}>
+            className="login-cta mt-[clamp(18px,4.5vw,24px)] w-full rounded-full py-4 text-[17px] font-bold uppercase tracking-[0.18em] text-white transition disabled:opacity-70">
             {busy ? "Checking…" : "Sign in →"}
           </button>
           {/* Same muted colour as the line beneath it (Gary) - it is a quiet secondary action, not a second
