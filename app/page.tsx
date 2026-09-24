@@ -4,8 +4,7 @@ import { POD_AGENTS } from "@/lib/pod-agents";
 import LandingDoor from "@/components/LandingDoor";
 
 // THE FRONT DOOR (Gary, approved 2026-09-24). A public, one-screen landing that anyone can visit, signed in or
-// not: nothing redirects. The only thing the session changes is where the three pills go - the dashboard when you
-// are signed in, the login page when you are not (the same "same page, right door" rule the old landing had).
+// not: nothing redirects, and the three pills always go through the gated login (Gary: never straight in).
 //
 // The flexed numbers are LIVE, never typed: the agent total is derived from POD_AGENTS (the same list the dashboard
 // flexes), the brains are a count of the clients table, and the pods are the ten surfaces on the dashboard. So the

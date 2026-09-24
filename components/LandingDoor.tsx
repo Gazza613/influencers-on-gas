@@ -7,7 +7,7 @@ import { TEAM, TEAM_ABOUT_URL } from "@/lib/team";
 // THE LANDING DOOR (Gary, approved 2026-09-24 after ~30 rounds on the dummy). One screen, no scroll, on any device:
 //   - the official Agency of NOW lockup as the mark, with a soft settle-in, a slow float and one light sweep;
 //   - a typewriter of six call-outs, one per part of the studio, each typed out whole;
-//   - three flex pills (AI agents / AI Brains / Pods) as the way in - all go to login (or the dashboard when signed in);
+//   - three flex pills (AI agents / AI Brains / Pods) as the way in - all go through the gated login, always;
 //   - the TEAM as the atmosphere: one slow cascade of the thirteen down each flank (where the digit rain sits on the
 //     Media on GAS door), out of step left to right, every card a quiet link to the About page. On a phone the flanks
 //     cannot fit, so the cascade becomes a small strip along the foot.
@@ -102,7 +102,8 @@ export default function LandingDoor({ agents, brains, pods, signedIn }: { agents
     const m = () => { if (sizerRef.current) setSlotW(sizerRef.current.offsetWidth); };
     m(); window.addEventListener("resize", m); return () => window.removeEventListener("resize", m);
   }, [full]);
-  const href = signedIn ? "/dashboard" : "/login";
+  // The pills ALWAYS go through the gated login (Gary), even for a browser that already holds a session.
+  const href = "/login";
   const pill = (n: number, label: string, icon: React.ReactNode, hue: string) => (
     <a className="door-pill" href={href} style={{ ["--a" as string]: hue }} aria-label={`${n} ${label}. ${signedIn ? "Enter the Agency" : "Sign in"}`}>
       <span className="door-pill-ic" aria-hidden>{icon}</span>
