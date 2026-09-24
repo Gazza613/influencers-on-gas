@@ -453,6 +453,10 @@ body {
 .login-input { background: rgba(8, 7, 6, 0.6); border: 1px solid rgba(238, 74, 24, 0.32); transition: border-color .15s, box-shadow .15s; }
 .login-input::placeholder { color: rgba(255, 255, 255, 0.32); }
 .login-input:focus { border-color: rgba(249, 98, 3, 0.85); box-shadow: 0 0 0 3px rgba(238, 74, 24, 0.18); }
+/* The app-wide keyboard focus ring is violet; on the doors it is orange (the inputs use their own orange ring,
+   so they drop the outline entirely; buttons and links keep an orange one). */
+.login-input:focus-visible { outline: none; }
+.door :focus-visible, .door-page :focus-visible { outline-color: #F96203; }
 .login-cta { background: linear-gradient(120deg, #F96203 0%, #E8431A 55%, #D9301C 100%); box-shadow: 0 0 26px rgba(238, 74, 24, 0.35), 0 4px 20px rgba(0, 0, 0, 0.5); }
 .login-cta:hover:not(:disabled) { filter: brightness(1.06) saturate(1.06); box-shadow: 0 0 56px rgba(238, 74, 24, 0.6), 0 8px 32px rgba(0, 0, 0, 0.5); transform: translateY(-1px); }
 
