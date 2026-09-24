@@ -114,11 +114,12 @@ export default function LandingDoor({ agents, brains, pods, signedIn }: { agents
             <img className="door-lockup" src="/agency-of-now.png" width={1600} height={769} fetchPriority="high" decoding="async" alt="The Agency of NOW. Human Command. AI Execution." />
             <span className="door-sweep" aria-hidden />
           </div>
-          <h1 className="door-h1">Create Your</h1>
-          <div className="door-word-row" aria-live="polite">
-            <span className="door-word">{word}</span>
-            <span className="door-caret" aria-hidden />
-          </div>
+          {/* One line (Gary): "Create Your" and the typed word together. The word sits in a fixed-width slot so the
+              line never shifts sideways as it types and deletes. */}
+          <h1 className="door-h1" aria-live="polite">
+            <span>Create Your</span>
+            <span className="door-word-slot"><span className="door-word">{word}</span><span className="door-caret" aria-hidden /></span>
+          </h1>
           <p className="door-sub">Thirteen humans in command. Eighty-three AI agents in execution. One platform from research to results, where every decision is made by a person and every task is done at machine speed.</p>
         </div>
         <div className="door-lower">
