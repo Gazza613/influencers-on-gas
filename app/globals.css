@@ -386,9 +386,9 @@ body {
 /* The flex pills: the way in. */
 .door-flex { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
 .door-pill { --a: #EE4A18; display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px 10px 12px; border-radius: 999px; text-decoration: none; color: inherit;
-  border: 1px solid color-mix(in srgb, var(--a) 50%, transparent); background: color-mix(in srgb, var(--a) 9%, rgba(8, 7, 6, 0.6));
-  box-shadow: 0 0 22px -6px var(--a); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
-.door-pill:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--a) 85%, transparent); box-shadow: 0 0 34px -4px var(--a); }
+  border: 1px solid color-mix(in srgb, var(--a) 55%, transparent); background: color-mix(in srgb, var(--a) 10%, rgba(8, 7, 6, 0.6));
+  box-shadow: 0 0 28px 0 color-mix(in srgb, var(--a) 40%, transparent), 0 0 8px 0 color-mix(in srgb, var(--a) 22%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.door-pill:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--a) 90%, transparent); box-shadow: 0 0 46px 2px color-mix(in srgb, var(--a) 62%, transparent), 0 0 12px 0 color-mix(in srgb, var(--a) 35%, transparent); }
 .door-pill-ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--a) 22%, transparent); color: var(--a); }
 .door-pill-ic svg { width: 15px; height: 15px; }
 .door-pill-n { font-weight: 800; font-size: clamp(17px, 2.2vh, 20px); letter-spacing: -0.02em; color: var(--door-ink); line-height: 1; }
